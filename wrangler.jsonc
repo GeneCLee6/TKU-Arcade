@@ -1,0 +1,71 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // One Worker serves /api, /ws, the Durable Objects and the React app's static assets
+  // (ARCHITECTURE.md §1, §7)
+  "name": "tku-arcade",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "observability": { "enabled": true },
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      // One object per room: members, seats, the running GameModule (ARCHITECTURE.md §3)
+      { "name": "ROOM", "class_name": "RoomDO" },
+      // One object for the whole deployment: the public room list (e1-t09)
+      { "name": "LOBBY", "class_name": "LobbyDO" }
+    ]
+  },
+  // The free plan only offers SQLite-backed Durable Objects. Migrations only ever add: never edit
+  // or remove one that was deployed (DEPLOY.md)
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomDO", "LobbyDO"] }],
+  // Production's own database (prompts, results, ...; e12-t05 adds the migrations). Never give
+  // staging or previews this id
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tku-arcade",
+      "database_id": "b1922db6-2ced-45f9-994f-ab588cfb44b6",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    // glTF models, textures, sounds under content-hashed names (e12-t08, docs/ASSETS.md)
+    { "binding": "ASSETS_BUCKET", "bucket_name": "tku-arcade-assets" },
+    // Daily D1 backups (e12-t05)
+    { "binding": "BACKUPS", "bucket_name": "tku-arcade-backups" }
+  ],
+  // The deployed commit; the deploy workflows override it with --var APP_VERSION:<sha>
+  "vars": { "APP_VERSION": "local" },
+  // Staging and pull request previews (DEPLOY.md): separate Workers, so each has its own Durable
+  // Object storage and never touches production's. Bindings and vars are not inherited from the
+  // top level: repeat each one here. Selected at build time with CLOUDFLARE_ENV=preview (the Vite
+  // plugin bakes it into dist/)
+  "env": {
+    "preview": {
+      "name": "tku-arcade-preview",
+      "durable_objects": {
+        "bindings": [
+          { "name": "ROOM", "class_name": "RoomDO" },
+          { "name": "LOBBY", "class_name": "LobbyDO" }
+        ]
+      },
+      // One staging database shared by every preview; it never holds anything that matters
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "tku-arcade-staging",
+          "database_id": "d880eccb-2826-4bb5-9ed0-38e4e1654674",
+          "migrations_dir": "migrations"
+        }
+      ],
+      // Previews read the same assets as production (content-hashed, read-only in practice) and
+      // write no backups
+      "r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "tku-arcade-assets" }],
+      "vars": { "APP_VERSION": "local" }
+    }
+  }
+}

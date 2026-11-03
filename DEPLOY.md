@@ -1,0 +1,160 @@
+# DEPLOY — 部署
+
+## 1. 架構
+
+TKU Arcade 是**一個 Cloudflare Worker**（`tku-arcade`）：同一個 Worker 回答 `/api/*`、`/ws/*`，承載 Durable Object（每房一個 `RoomDO`、全站一個 `LobbyDO`），其餘路徑交給靜態資產（React app，`dist/client`，SPA fallback）。D1 `DB` 放題目、結果等資料；R2 `ASSETS_BUCKET` 放模型、貼圖、音檔，`BACKUPS` 放 D1 每日備份。設定都在 `wrangler.jsonc`。
+
+一個 Worker 一次部署：前端與 API 永遠是同一個 commit。建置時 `APP_VERSION`（commit SHA）寫進首頁 `<meta name="app-version">`，部署時也以 `--var APP_VERSION:<sha>` 給 Worker；smoke test 就是查這個。
+
+## 2. 環境
+
+| 環境 | Worker | 網址 | D1 | Durable Object 資料 |
+| --- | --- | --- | --- | --- |
+| 正式 | `tku-arcade` | <https://tku-arcade.genelee-pro.workers.dev> | `tku-arcade` | 正式站自己的 |
+| PR 預覽 | `tku-arcade-pr-<PR 號>` | `https://tku-arcade-pr-<號>.genelee-pro.workers.dev` | `tku-arcade-staging`（所有預覽共用） | 每個預覽自己的，PR 關閉時隨 Worker 刪除 |
+
+PR 預覽以 `CLOUDFLARE_ENV=preview` 建置（Vite 的 Cloudflare 外掛把 `env.preview` 的設定烤進 `dist/`），再用 `wrangler deploy --name tku-arcade-pr-<號>` 部署成**獨立的 Worker**。`env.preview` 本身的名字 `tku-arcade-preview` 只在手動部署 staging 時用到。
+
+**為什麼每個 PR 一個 Worker，而不是 `wrangler versions upload`**（`ARCHITECTURE.md` §7 原本的寫法）：
+
+- 正式 Worker 的 version 和正式站共用同一個 Durable Object namespace 與 D1，預覽會直接動到正式站的房間與資料。
+- Durable Object 的 migration 不能經由 `versions upload` 套用，只能 `wrangler deploy`；新增 DO class 的 PR 根本做不出預覽。
+- Cloudflare 不給實作 Durable Object 的 Worker 預覽網址。
+
+LongTalk 一開始也走 `versions upload`，因為以上原因改成每個 PR 一個 Worker，已經跑過。
+
+## 3. 一次性設定
+
+### 3.1 Cloudflare API token
+
+儀表板 → My Profile → API Tokens → Create Token → 範本「Edit Cloudflare Workers」，再**加上 D1 Edit**。帳號限定為自己的帳號。需要的權限：
+
+| 範圍 | 權限 | 為什麼 |
+| --- | --- | --- |
+| Account | Workers Scripts：Edit | 部署、刪除預覽 Worker、`wrangler secret put` |
+| Account | D1：Edit | `wrangler d1 migrations apply --remote` |
+| Account | Workers R2 Storage：Read（範本給 Edit 也可以） | 部署時確認 R2 綁定的 bucket |
+| Account | Account Settings：Read | wrangler 讀取帳號與 workers.dev 子網域 |
+| User | User Details：Read、Memberships：Read | wrangler 確認身分（範本內建） |
+
+範本另外附的 Workers KV、Workers Routes、Workers Tail 用不到，留著無妨。
+
+### 3.2 GitHub secrets
+
+```sh
+gh secret set CLOUDFLARE_API_TOKEN      # 貼上 3.1 的 token
+gh secret set CLOUDFLARE_ACCOUNT_ID     # 儀表板右側欄 Account ID，或 npx wrangler whoami
+gh secret list                          # 確認兩個都在
+```
+
+**沒設定 secret 時，部署與預覽 workflow 會跳過（notice，不是失敗）**，CI 照跑。
+
+### 3.3 GitHub 分支保護
+
+`main` 設為受保護分支：要求 PR、要求 `CI / verify` 通過、禁止 force-push（`CLAUDE.md` 規則 6、7）。
+
+### 3.4 已建好的資源（不用再建）
+
+| 種類 | 名稱 | id | 用途 |
+| --- | --- | --- | --- |
+| D1 | `tku-arcade` | `b1922db6-2ced-45f9-994f-ab588cfb44b6` | 正式站 |
+| D1 | `tku-arcade-staging` | `d880eccb-2826-4bb5-9ed0-38e4e1654674` | 所有 PR 預覽共用 |
+| R2 | `tku-arcade-assets` | — | 模型、貼圖、音檔（正式與預覽都讀這個；內容雜湊檔名，e12-t08） |
+| R2 | `tku-arcade-backups` | — | D1 每日備份，只有正式站綁定（e12-t05） |
+
+**正式站的 D1 id 只能出現在 `wrangler.jsonc` 頂層**，不要放進 `env.preview`。
+
+## 4. 日常流程
+
+1. 開分支、開 PR（標題英文、照 ROADMAP 批次號）。
+2. `ci.yml`：`npm ci` → lint → typecheck → test → build，全綠才可合併。
+3. `preview.yml`：套用 staging 的 D1 遷移 → 建置 → 部署 `tku-arcade-pr-<號>` → smoke test → 在 PR 留言預覽網址（同一則留言隨每次 push 更新）。
+4. 在預覽站看過，`gh pr merge <號> --squash --delete-branch`。
+5. `deploy.yml`（CI 在 `main` 綠了之後）：套用正式 D1 的遷移 → 建置 → `wrangler deploy` → smoke test 確認正式站正在提供這個 commit。**合併就是上線。**
+6. PR 關閉（合併或放棄）時，`preview.yml` 的 `cleanup` 刪掉 `tku-arcade-pr-<號>` 與它的 Durable Object 資料。
+
+| Workflow | 何時 | 做什麼 |
+| --- | --- | --- |
+| `ci.yml` | PR 到 `main`、push 到 `main` | lint、typecheck、test、build（之後依批次加上：A2 JS 預算、B1 `check-i18n`、K1 `check-assets`） |
+| `preview.yml` | PR 開啟、更新、重開；關閉 | 部署並留言預覽網址；關閉時刪除 |
+| `deploy.yml` | CI 在 `main` 成功後；或手動 Run workflow | 部署正式站 |
+
+部署之間不會重疊：正式站一個 concurrency group（排隊、不中途取消），每個 PR 一個（新的 push 取代進行中的預覽部署）。
+
+smoke test 檢查：首頁 `<meta name="app-version">` 是這個 commit（最多重試約一分鐘）、未知路徑回 200（SPA fallback）。
+
+漏刪的預覽：在 repo 外的資料夾執行 `npx wrangler delete --name tku-arcade-pr-<號>`（避免讀到 `wrangler.jsonc`）。
+
+## 5. 手動部署
+
+通常不需要。要的話：
+
+- 正式站：GitHub Actions → Deploy → Run workflow（部署 `main` 最新 commit），或本機：
+
+  ```sh
+  npx wrangler login
+  npx wrangler d1 migrations apply DB --remote   # 有新遷移時
+  npm run deploy                                  # build + wrangler deploy
+  ```
+
+- staging（`tku-arcade-preview`）：
+
+  ```sh
+  npx wrangler d1 migrations apply DB --remote --env preview
+  CLOUDFLARE_ENV=preview npm run build && npx wrangler deploy
+  ```
+
+本機 secret 放 `.dev.vars`（不進 git）。
+
+## 6. D1 遷移規則
+
+- 遷移檔放 `migrations/`（`wrangler.jsonc` 的 `migrations_dir`），用 `npx wrangler d1 migrations create DB <名稱>` 產生，檔名帶流水號，**已合併的檔案不要改、不要刪**；要改就再加一個。
+- workflow 在**建置之前**套用遷移（建置後 Vite 外掛會把 wrangler 導向 `dist/` 的設定，那份設定不接受 `--env`）；`migrations/` 沒有 `.sql` 時直接跳過。
+- 遷移在新程式上線**之前**套用，所以每個遷移都要讓**舊程式照常運作**：只加表、加欄位（給預設值）、加索引；要刪欄位或改名，分兩次 PR（先讓程式不再用，下一次再刪）。
+- staging 被所有預覽共用：某個 PR 的遷移套到 staging 後，即使 PR 沒合併也會留著。staging 的資料不重要，必要時可以清空重建；正式站不行。
+- 查看狀態：`npx wrangler d1 migrations list DB --remote`（staging 加 `--env preview`）。
+
+## 7. Durable Object migration 只增不改
+
+- `wrangler.jsonc` 的 `migrations`（DO 的，不是 D1 的）**只能往後加**：已部署的 tag 不要改、不要刪。新增 DO class 就加一個新 tag。現有：`v1` `RoomDO`、`LobbyDO`（SQLite 版，免費方案只能用這種）；下一個是 `v2`。
+- 刪除或改名 DO class 也要用新的 migration tag（`deleted_classes`／`renamed_classes`），而且**會刪資料**，先問擁有者。
+- `env.preview` **不會繼承**頂層的綁定與 `vars`：新增 DO、D1、R2 綁定或 var 時，頂層與 `env.preview` 各寫一次；DO 的 `migrations` 只寫在頂層。
+
+## 8. 回滾
+
+```sh
+npx wrangler deployments list            # 看最近的部署與 version id
+npx wrangler rollback                    # 回到上一個 version
+npx wrangler rollback <version-id> --message "rollback: <原因>"
+```
+
+- `rollback` 換回程式與靜態資產，**不會**撤銷 D1 遷移，也不會撤銷 DO migration；有新 DO migration 的部署可能無法回滾到它之前。所以第 6、7 節的「只增、舊程式要能跑」很重要。
+- 回滾後 `main` 仍是壞的版本：盡快開 revert PR（`git revert <sha>`），合併後正式站會再部署一次，和 `main` 一致。
+
+## 9. Secrets 清單
+
+### GitHub Actions secrets（現在需要）
+
+| 名稱 | 用途 |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | 部署、遷移、刪除預覽（§3.1） |
+| `CLOUDFLARE_ACCOUNT_ID` | 指定 Cloudflare 帳號 |
+
+### Worker secrets（之後的批次加入）
+
+| 名稱 | 批次 | 用途 |
+| --- | --- | --- |
+| `AUTH_SHARED_SECRET` | F1 | 與淡江牌桌共用的登入簽章金鑰 |
+| `ANTHROPIC_API_KEY` | H2 | 題目草稿 |
+| `LONGTALK_URL` | 選用 | LongTalk 語音房的網址 |
+
+只用 `wrangler secret put` 放在 Worker，**不進前端、不進 repo**：
+
+```sh
+npx wrangler secret put AUTH_SHARED_SECRET                          # 正式站（互動輸入值）
+printf '%s' "$VALUE" | npx wrangler secret put ANTHROPIC_API_KEY    # 從 stdin 給值
+npx wrangler secret put AUTH_SHARED_SECRET --name tku-arcade-pr-12  # 某個預覽
+npx wrangler secret list
+```
+
+PR 預覽是每次新建的 Worker，不會自動有這些 secret；需要時由該批次在 `preview.yml` 加一步，從 GitHub secret（例如 `PREVIEW_AUTH_SHARED_SECRET`）`wrangler secret put --name "$WORKER"`，沒設定就 notice 跳過。

@@ -27,7 +27,7 @@ depends_on: []
 ## 需求
 
 - **repo 骨架**：Vite＋React 19＋TS strict＋styled-components、`worker/`、`shared/`、`wrangler.jsonc`（DO：`LobbyDO`、`RoomDO`；D1；R2 `ASSETS`）、Vitest、oxlint、Playwright、`CLAUDE.md`、`RULES.md`、`DEPLOY.md`。
-- **CI**：lint、typecheck、test、build、JS 預算、i18n 檢查、資產登記檢查；PR 預覽（`wrangler versions upload`）；`main` 合併自動部署。
+- **CI**：lint、typecheck、test、build、JS 預算、i18n 檢查、資產登記檢查；PR 預覽（每個 PR 一個 Worker `wrangler deploy --name`，見 `DEPLOY.md`）；`main` 合併自動部署。
 - **JS 預算**：大廳與桌遊首屏 gzip ≤ 150 kB；卡丁車 chunk 另計（≤ 600 kB gzip，three.js 含）；`scripts/check-budget.mjs`。
 - **遙測**：Workers observability；錯誤回報端點（沿用橋館 `e10-t06` 做法）；每日房間數、每款遊戲場次、卡丁車 fps 分佈（匿名）。
 - **濫用防護**：建房速率（每 IP 每分鐘 5 間）、聊天速率、暱稱過濾（控制字元、過長）、WebSocket 連線上限每房 16、未登入不能用 AI 生成與管理頁。

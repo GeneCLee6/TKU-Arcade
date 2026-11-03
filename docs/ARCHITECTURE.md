@@ -90,7 +90,7 @@ docs/                   本資料夾
 
 ## 7. 部署與環境
 
-- 一個 Worker、`main` 自動部署；PR 預覽用 `wrangler versions upload`；`staging` 環境有自己的 D1 與 R2。
+- 一個 Worker、`main` 通過 CI 後自動部署；每個 PR 部署自己的 Worker `tku-arcade-pr-<號>`（`wrangler deploy --name`，PR 關閉即刪；不用 `versions upload`，因為 DO migration 不能走 versions upload，且版本會共用正式站的 DO 與 D1）；預覽共用 staging D1 `tku-arcade-staging`，R2 assets 與正式站共用、沒有備份桶。細節見 `DEPLOY.md`。
 - Secrets：`AUTH_SHARED_SECRET`（與牌桌共用）、`ANTHROPIC_API_KEY`（題目草稿）、`LONGTALK_URL`（選用）。
 - 成本：Workers、DO、D1、R2 都在免費額度內；卡丁車多人是最大變數（E12 儀表板）。
 
