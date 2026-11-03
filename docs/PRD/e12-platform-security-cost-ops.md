@@ -58,8 +58,8 @@ depends_on: []
 
 ### M0
 
-- [ ] `e12-t01` repo 骨架：Vite／React／TS、worker、shared、wrangler（DO、D1、R2）、Vitest、oxlint、`CLAUDE.md`、`RULES.md` · AC-12.1 · M
-- [ ] `e12-t02` CI workflow、PR 預覽、正式部署、`DEPLOY.md`、secrets 清單 · AC-12.1, 12.2 · M · ← e12-t01
+- [x] `e12-t01` repo 骨架：Vite／React／TS、worker、shared、wrangler（DO、D1、R2）、Vitest、oxlint、`CLAUDE.md`、`RULES.md` · AC-12.1 · M · #1
+- [x] `e12-t02` CI workflow、PR 預覽、正式部署、`DEPLOY.md`、secrets 清單 · AC-12.1, 12.2 · M · ← e12-t01 · #1
 - [ ] `e12-t03` JS 預算腳本（兩個預算：主站、卡丁車 chunk） · AC-12.2 · S · ← e12-t02
 - [ ] `e12-t04` 錯誤回報端點與前端攔截、Workers observability · AC-12.3 · S · ← e12-t01
 - [ ] `e12-t05` D1 骨架、遷移流程、每日備份 cron · AC-12.1 · S · ← e12-t01
