@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.wrangler/
+.env
+.env.*
+tmp/
+test-results/
+*.blend1
+# 3D 資產走 R2，不進 repo（docs/ASSETS.md 登記）
+*.glb
+*.gltf
+*.fbx
+*.wav
+*.mp3
+*.ogg
