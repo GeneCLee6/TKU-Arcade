@@ -80,7 +80,7 @@ docs/                   本資料夾
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
 - 遊戲模組的字串在 `shared/games/<id>/i18n.ts`（同樣兩語），由登記表合併。
 - 規則頁是 markdown 兩份（`rules.en.md`、`rules.zh-TW.md`）。
-- 預設 `en`；切換存 localStorage；`<html lang>` 跟著改。是否依瀏覽器語言偵測一次見 E7 未決。
+- 預設 `en`；第一次進站依 `navigator.languages` 偵測（`zh*` → `zh-TW`），之後以 localStorage 的使用者選擇為準；`<html lang>` 跟著改。
 
 ## 6. 帳號（M1）
 

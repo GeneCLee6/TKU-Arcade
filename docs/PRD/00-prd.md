@@ -9,7 +9,7 @@ owner: GeneCLee6
 
 > 這是產品的總 PRD：願景、範圍、功能需求（F）、驗收條件總表、里程碑與風險。每個 epic 的細節、AC 與 task 拆分在同一個資料夾的 `e*.md`，**勾選狀態以 epic 文件為準**。資料夾的閱讀方式與 task 格式見 [`README.md`](README.md)，版權與法律判斷見 [`01-legal-ip-analysis.md`](01-legal-ip-analysis.md)，為什麼只分三層見 [`../PLANNING-METHOD.md`](../PLANNING-METHOD.md)。
 >
-> **名稱未拍板**：工作名稱「TKU Arcade · 淡江遊樂場」，備選「TKU PlayHall · 淡江玩樂館」「TKU GameHall · 淡江遊戲館」（§14 Q1）。介面預設英文，所以英文名是主名，中文名是副名。
+> **名稱已拍板（2026-11-03）**：TKU Arcade，中文副名「淡江遊樂場」只在繁中介面出現（§14 Q1）。介面預設英文、依瀏覽器語言自動切繁中（§14 Q1b）。
 
 ## 1. 願景
 
@@ -119,7 +119,7 @@ TKU Arcade
 | F7 | 重連與旁觀 | 斷線 5 秒內自動重連回到同座位；旁觀者拿 `view('spectator')` | E2 |
 | F8 | 升官圖 | 完整規則（德才功贓四面骰或自訂）、圖版、移動動畫、結算、再來一局 | E3 |
 | F9 | 房內聊天 | 文字、連結可點、保留本房 200 則 | E1 |
-| F10 | 雙語 | 預設 English，右上角切換繁體中文；字串表 `en` 為來源、`zh-TW` 為翻譯；CI 擋缺漏 | E7 |
+| F10 | 雙語 | 預設 English；第一次進站依瀏覽器語言（`zh*` → 繁中）自動選，之後以使用者手動切換為準；字串表 `en` 為來源、`zh-TW` 為翻譯；CI 擋缺漏 | E7 |
 | F11 | 基礎介面 | 設計 token、深淺色、手機可玩升官圖、鍵盤可操作 | E7 |
 | F12 | 部署與 CI | Cloudflare Workers（帶靜態資產）＋DO；CI（lint、typecheck、test、build）；PR 預覽 | E12 |
 
@@ -238,8 +238,10 @@ AC 編號是 `AC-<epic>.<序號>`；勾選狀態與完整文字以各 epic 為�
 
 ## 14. 未決問題（跨 epic）
 
-- [ ] **Q1:** 產品名稱？工作名稱「TKU Arcade · 淡江遊樂場」，備選「TKU PlayHall · 淡江玩樂館」「TKU GameHall · 淡江遊戲館」。英文是主名（介面預設英文）。
-      **A:** _(建議 TKU Arcade：短、好唸、和 BridgeTable／BridgeHall 同一個命名節奏；未拍板)_
+- [x] **Q1:** 產品名稱？工作名稱「TKU Arcade · 淡江遊樂場」，備選「TKU PlayHall · 淡江玩樂館」「TKU GameHall · 淡江遊戲館」。英文是主名（介面預設英文）。
+      **A:** 2026-11-03 擁有者拍板：**TKU Arcade**（中文副名「淡江遊樂場」只在繁中介面出現）。GitHub repo `GeneCLee6/TKU-Arcade`，README 只寫英文（給面試官看）。
+- [x] **Q1b:** 介面語言要不要依瀏覽器語言自動切換？
+      **A:** 2026-11-03 擁有者拍板：**要**。第一次進站若 `navigator.language` 以 `zh` 開頭就用繁中，否則英文；使用者手動切換過就以使用者的選擇為準（E7 AC-7.2）。
 - [ ] **Q2:** 選用帳號要不要直接共用淡江牌桌的 Worker 與 session（像橋館那樣 `/api/*` 轉過去）？
       **A:** _(建議 M0 不要帳號；M1 共用牌桌 session 做「登入後暱稱固定與戰績」，自己的 Worker 只驗證牌桌簽的 token，不複製帳號系統；未拍板)_
 - [ ] **Q3:** 四款桌遊的正式名稱（The Heist／Spectrum／Bluff Reader／Promotion 都是暫名）？

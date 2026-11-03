@@ -1,30 +1,69 @@
-# TKU Arcade · 淡江遊樂場
+# TKU Arcade
 
-A game lobby for friends of the TKU Bridge Club: one link, pick a nickname, choose a game, play together. Non-commercial, friends only. English by default, Traditional Chinese available.
+A browser game lobby for friends of the Tamkang University Bridge Club: open one link, pick a nickname, choose a game, play together. Non-commercial, friends only. The UI defaults to English and switches to Traditional Chinese automatically when the browser prefers it (a manual toggle is always available).
 
-淡江橋藝社朋友圈的遊戲大廳：一個連結、取個暱稱、選一款遊戲、一起玩。非營利、只給朋友。介面預設英文，可切繁體中文。
+**Status: planning complete (2026-11-03), no code yet.** The next step is batch A1 in [`docs/ROADMAP.md`](docs/ROADMAP.md); the current position is tracked in [`docs/NEXT.md`](docs/NEXT.md).
 
-**Status: planning complete (2026-11-03), no code yet.** Start at [`docs/NEXT.md`](docs/NEXT.md).
+> Design docs are written in Traditional Chinese (the owner's working language). This README, all code, comments, commit messages and PR titles are in English.
 
 ## Games
 
-| Game | Inspired by (mechanics only) | Milestone |
+| Game | Mechanics inspired by | Milestone |
 | --- | --- | --- |
-| Promotion（升官圖） | Traditional Chinese board game (public domain) | M0 |
-| The Heist (working title) | *The Gang* — cooperative poker | M1 |
-| Spectrum (working title) | *Wavelength* — spectrum guessing | M1 |
-| Bluff Reader (working title) | *9upper* — honest reader vs. bluffers | M1 |
-| Kart (working title) | Classic 2000s drift-boost kart racing | M2–M3 |
+| Promotion | *Sheng Guan Tu*, a traditional Chinese dice-and-board game (public domain) | M0 |
+| The Heist (working title) | *The Gang*: cooperative poker, no talking, rank chips as hints | M1 |
+| Spectrum (working title) | *Wavelength*: place a clue between two extremes, teammates guess the dial | M1 |
+| Bluff Reader (working title) | *9upper*: one honest reader, everyone else bluffs, the judge picks | M1 |
+| Kart (working title) | Classic 2000s drift-boost kart racing: drift, fill the gauge, boost | M2–M3 |
 
-All names, art, characters, tracks, music and prompt decks are original. See [`docs/PRD/01-legal-ip-analysis.md`](docs/PRD/01-legal-ip-analysis.md).
+Game mechanics are not protected by copyright; names, art, characters, tracks, music and prompt decks are. Everything of the second kind here is original or CC0/CC BY licensed and registered in `docs/ASSETS.md`. The reasoning is in [`docs/PRD/01-legal-ip-analysis.md`](docs/PRD/01-legal-ip-analysis.md).
 
-## Docs
+## Milestones
 
-- [`docs/PRD/00-prd.md`](docs/PRD/00-prd.md) — product requirements
-- [`docs/PRD/`](docs/PRD/README.md) — 12 epics with acceptance criteria and tasks
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — batch order (one batch = one PR)
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DESIGN.md`](docs/DESIGN.md)
+| | Scope | Done when |
+| --- | --- | --- |
+| **M0** | Lobby, nicknames, rooms, game-module framework, reconnection, Promotion, chat, EN/zh-TW | Four friends finish a game on their own devices |
+| **M1** | Three party games, prompt decks (100+ bilingual each), rules pages, optional club login, records | One club meetup plays all three |
+| **M2** | Single-player kart: three.js scene, track format, arcade drift physics, time trial, ghost, gamepad | Owner and two friends sign off on the feel |
+| **M3** | Multiplayer kart: binary state sync, interpolation, item race with server-adjudicated hits, 2–3 tracks, characters and karts | Six players finish an item race with nobody dropping |
+| **M4** | Friends, achievements, leaderboards, seasons, next-game vote, track editor, cost dashboard | Monthly cloud cost stays at zero |
 
-## Stack (planned)
+## Architecture (planned)
 
-React 19 + TypeScript + styled-components + Vite · Cloudflare Workers + Durable Objects + D1 + R2 · three.js for the kart game. Same stack as [TKU BridgeTable](https://github.com/GeneCLee6/TKU-BridgeTable) and [LongTalk](https://github.com/GeneCLee6/LongTalk).
+- **Client**: React 19, TypeScript (strict), styled-components, Vite. Every UI string goes through a 100-line `t()` with `en` as the source language and `zh-TW` as the translation; CI fails on missing keys.
+- **Server**: a single Cloudflare Worker serving static assets, with Durable Objects (`LobbyDO`, one `RoomDO` per room), D1 (prompt decks, records) and R2 (3D assets, backups).
+- **Game framework**: each board game is a pure-function `GameModule` (`init / reduce / view / legalActions / isOver / result`). The `RoomDO` runs `reduce`, slices hidden information per seat through `view`, and pushes diffs over WebSocket. Replays are the action log plus the RNG seed.
+- **Kart**: three.js with a fixed 60 Hz simulation loop outside React. Each client simulates its own kart; the `RoomDO` relays 20 Hz binary state, interpolates nothing itself, and adjudicates laps, placings and item hits. No server-authoritative physics by design (friends-only, free tier).
+
+Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DESIGN.md`](docs/DESIGN.md).
+
+## Documentation
+
+```
+docs/PRD/00-prd.md               product requirements: vision, F1–F39, acceptance criteria, risks
+docs/PRD/01-legal-ip-analysis.md copyright and trademark analysis, asset licensing policy
+docs/PRD/e1 … e12                twelve epics: 124 tasks, 70 acceptance criteria
+docs/ROADMAP.md                  44 batches in phases A–P; one batch = one PR
+docs/NEXT.md                     current position and the per-batch working rules
+docs/ARCHITECTURE.md             technical design
+docs/DESIGN.md                   design tokens, components, i18n rules, glossary
+docs/PLANNING-METHOD.md          why three layers of planning docs and not more
+```
+
+## Related projects
+
+Same stack and the same planning method as [TKU BridgeTable](https://github.com/GeneCLee6/TKU-BridgeTable) (online bridge table, WebSocket rooms on Durable Objects), [TKU BridgeHall](https://github.com/GeneCLee6/TKU-BridgeHall) (the club's bidding-system handbook) and [LongTalk](https://github.com/GeneCLee6/LongTalk) (a meeting room with no time limit).
+
+## Development (after batch A1)
+
+```bash
+npm run dev          # http://localhost:5175
+npm run lint && npm run typecheck && npm test && npm run build
+npm run check-i18n   # en / zh-TW key parity
+npm run check-assets # every asset registered in docs/ASSETS.md
+npm run play -- <game>   # random playthrough in the terminal (smoke test)
+```
+
+## License
+
+Source code: MIT (to be added with the first code batch). Game names, artwork, characters, tracks, audio and prompt decks are original works of the project and are not covered by the code license.

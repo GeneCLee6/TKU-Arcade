@@ -20,12 +20,12 @@ depends_on: []
 ## 非目標
 
 - 第三種語言（架構允許，但不做）。
-- 自動偵測語言後切換（預設固定英文；是否依瀏覽器語言自動切繁中見未決問題）。
+- 第三種語言以外的自動翻譯；URL 帶語言參數（不做）。
 
 ## 需求
 
 - **i18n 架構**：`src/i18n/en.ts`（來源，key 以英文句子或語意命名）、`src/i18n/zh-TW.ts`；`useT()` 回傳 `t(key, params)`；複數與數字格式用 `Intl`；日期用 `Intl.DateTimeFormat`；遊戲模組的字串在 `shared/games/<id>/i18n.ts`，同樣兩個語言；**CI 腳本 `scripts/check-i18n.mjs`**：zh-TW 缺 key 或多餘 key 就失敗；前端缺翻譯時 fallback 英文並在 dev console 警告。
-- **語言切換**：右上角 `EN / 繁中`；存 localStorage；`<html lang>` 跟著改；URL 不帶語言。
+- **語言切換**：右上角 `EN / 繁中`；存 localStorage；`<html lang>` 跟著改；URL 不帶語言。**初次語言**：localStorage 沒有紀錄時，`navigator.languages` 第一個以 `zh` 開頭的就用 `zh-TW`，否則 `en`；之後以 localStorage 為準。
 - **設計 token**：顏色（深淺色各一組）、間距、圓角、字級、字型（Inter＋Noto Sans TC variable，沿用牌桌的 `@fontsource-variable/noto-sans-tc`）；大廳每款遊戲一個主題色。
 - **基礎元件**：Button、IconButton、Card、Dialog、Drawer、Toast、Tabs、Countdown、Avatar（暱稱首字＋顏色）、LanguageSwitch。
 - **手機**：桌遊全部可在手機玩（直向）；大廳卡片單欄；房內聊天是抽屜。
@@ -45,7 +45,7 @@ depends_on: []
 ## 驗收條件
 
 - [ ] AC-7.1 — 設計 token 與基礎元件；深淺色；每款遊戲主題色。
-- [ ] AC-7.2 — i18n 架構：`t()`、兩個語言檔、切換與記住、`<html lang>`、fallback。
+- [ ] AC-7.2 — i18n 架構：`t()`、兩個語言檔、初次依瀏覽器語言（`zh*` → 繁中，其餘英文）、切換與記住、`<html lang>`、fallback。
 - [ ] AC-7.3 — 繁中翻譯完整：`check-i18n` 在 CI 擋缺漏；切成繁中整站無英文殘留（人工走查清單）。
 - [ ] AC-7.4 — 手機：大廳、房間、四款桌遊直向可玩。
 - [ ] AC-7.5 — PWA 可安裝、離線提示。
@@ -83,5 +83,5 @@ depends_on: []
 
 ## 未決問題
 
-- [ ] **Q:** 瀏覽器語言是 zh-TW 時要不要自動切繁中？
-      **A:** _(建議第一次進站若 `navigator.language` 以 zh 開頭就預設繁中，否則英文；使用者切過就以使用者為準。擁有者說「default 英文」，若要嚴格固定英文就不做偵測；未拍板)_
+- [x] **Q:** 瀏覽器語言是 zh-TW 時要不要自動切繁中？
+      **A:** 2026-11-03 擁有者拍板：要。第一次進站若 `navigator.language` 以 `zh` 開頭就用繁中，否則英文；localStorage 有使用者的選擇時以使用者為準（`e7-t02`，AC-7.2）。

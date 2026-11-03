@@ -44,7 +44,7 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
    | Time trial / Item race / Ghost | 時間賽／道具賽／幽靈車 |
 
 7. **規則頁**是 markdown 兩份，不是 `t()`；由英文寫起，繁中翻譯，兩份都是「自己的話」，不轉載原作說明書。
-8. **預設語言**：`en`；切換記在 localStorage；是否在第一次進站依瀏覽器語言偵測一次，見 E7 未決。
+8. **預設語言**：`en`；第一次進站（localStorage 無紀錄）依 `navigator.languages` 偵測，`zh*` 用繁中、其餘英文；之後以使用者切換為準（2026-11-03 拍板）。
 
 ## 6. 無障礙
 
