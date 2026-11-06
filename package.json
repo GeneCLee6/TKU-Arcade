@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "budget": "node scripts/check-budget.mjs",
     "typecheck": "tsc -b",
     "lint": "oxlint",
     "test": "vitest run",

@@ -23,5 +23,5 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "shared", "tests"],
-  "exclude": ["tests/worker"]
+  "exclude": ["tests/worker", "tests/scripts"]
 }
