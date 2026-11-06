@@ -313,6 +313,59 @@ describe('a room', () => {
   })
 })
 
+describe('nicknames (AC-1.2)', () => {
+  const nameOf = (client: Client) => client.view?.members[client.you].name
+
+  it('gives a repeated name the next free suffix, and tells everyone', () => {
+    const world = room()
+    const first = world.join('Al')
+    const second = world.join('Al')
+    const third = world.join('al')
+    expect(nameOf(first)).toBe('Al')
+    expect(nameOf(second)).toBe('Al (2)')
+    expect(nameOf(third)).toBe('al (3)')
+    expect(first.view?.members[second.you].name).toBe('Al (2)')
+    expect(first.view?.members[third.you].name).toBe('al (3)')
+    expect(world.stored().members.map((member) => member.name)).toEqual(['Al', 'Al (2)', 'al (3)'])
+    expect(first.view).toEqual(first.fresh())
+  })
+
+  it('brings a token back to its stored name, whatever the join says, with no new suffix', () => {
+    const world = room()
+    world.join('Al')
+    const second = world.join('Al')
+    const [token, you] = [second.token, second.you]
+    world.disconnect(second)
+
+    const same = world.join('Al', token)
+    expect(same.you).toBe(you)
+    expect(nameOf(same)).toBe('Al (2)')
+    world.disconnect(same)
+
+    const renamed = world.join('Zed', token)
+    expect(renamed.you).toBe(you)
+    expect(nameOf(renamed)).toBe('Al (2)')
+    expect(world.host.summary()?.members).toBe(2)
+  })
+
+  it('does not compare someone coming back with themselves', () => {
+    const world = room()
+    const al = world.join('Al')
+    const again = world.join('Al', al.token)
+    expect(nameOf(again)).toBe('Al')
+    expect(world.stored().members.map((member) => member.name)).toEqual(['Al'])
+  })
+
+  it('counts an offline member’s name, also after a restart', () => {
+    const world = room()
+    const al = world.join('Al')
+    world.disconnect(al)
+    expect(nameOf(world.join('Al'))).toBe('Al (2)')
+    world.restart()
+    expect(nameOf(world.join('Al'))).toBe('Al (3)')
+  })
+})
+
 describe('starting a game', () => {
   it('only the host may', () => {
     const world = room()

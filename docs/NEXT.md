@@ -1,6 +1,6 @@
 # NEXT — 接下來怎麼做（給 AI 協作者與自己的交接手冊）
 
-最後更新 2026-11-06（Phase A、C1 完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
+最後更新 2026-11-06（Phase A、C1、B1 完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
 
 ## 1. 現在的位置
 
@@ -10,12 +10,14 @@
 - **A2 完成（PR #3）**：token、深淺色、基礎元件、i18n、語言切換、`npm run budget`。字型暫用堆疊、未打包 web font。
 - **A4 完成（PR #4）**：`RoomDO`、房間 API、回合引擎；在 PR 預覽（真的 Cloudflare）用真 socket 跑完一局井字棋。CI 沒有真實 DO 測試（`@cloudflare/vitest-pool-workers` 不支援 Vitest 5），`worker/room.ts` 的迴歸要靠手動跑。
 - **C1 完成（PR #5，經擁有者同意 2026-11-06 排在 Phase B 之前）**：升官圖圖版 79 格、規則引擎、規則選項；在 PR 預覽用真的 `RoomDO` 跑完 2、3、4、6 人局。
-- **下一批：B1**（大廳、暱稱、i18n 檢查）。
+- **B1 完成（PR #6）**：大廳首頁、開新房、貼連結加入、暱稱（可修改）、伺服器端同房去重、`npm run check-i18n` 進 CI。井字棋用 `meta.unlisted` 藏起來；`GAME_MESSAGES` 已併入 `t()`，遊戲字串用 `t(`${game.meta.i18nKey}.name`)`。
+- **下一批：B2**（`useRoom()`、等待室）。`src/pages/RoomPage.tsx` 與 `src/lib/joinRoom.ts` 是最小版的進房：只看 `welcome`、不套 patch、不自動重連，B2 用 `useRoom()` 取代；保留「`join` 只在仍有效的 socket 的 `open` 送出」，否則 StrictMode 會多出一個成員。
+- B1 留下的缺口：懶載入 `RoomPage` 沒有錯誤邊界，部署後還開著的舊分頁載不到舊 chunk 可能變空白（只從程式推論、未重現，`e12-t04` 一起處理）；未知路徑是空白頁；localStorage 被擋時 seat token 不會保留，重試會多一個成員。大廳公開房列表在 `e1-t09`，所以 AC-1.1 還不能勾。
+- `check-i18n` 的裸字串檢查只看 JSX 文字與 `aria-label`、`title`、`placeholder`、`alt`、`label` 的字面值，以及 `src/` 內所有 CJK；抓不到 `{'Hello'}`、`toast('Saved')`、條件式裡的字串，這些靠 AC-7.3 的人工走查。
 - C2／C3 注意：移動是跳格不是走格，`last` 給 `from`、`to`；`BOARD` 依官階排序、沒有座標，79 格在手機上要想排法；結算的 `score` 是官階 0–24，不是分數。改格子只能新增，id 存在進行中的局裡。
 - e3-t07 規則頁注意：四面陀螺的形式與遊戲起源都沒查到定論，官名品級只做過少量查證，別寫成定論；圖版標示「簡化版」。遊戲長度 20–40 分鐘目標：5–6 人達到、4 人勉強、2–3 人未達，實際秒數 C2 後才量得到。
-- 後面批次要接手的缺口：斷線的人永遠保留座位與房主（`e2-t05`、`e1-t05`）；離線旁觀者佔成員名額（上限 64）；`POST /api/rooms` 無速率限制（`e12-t06`）；房間不會自動清除（`e1-t10`）；暱稱去重（`e1-t03`）；公開／私人旗標未存（`e1-t09`）。`RoomView` 只能由已存狀態推導，改變一律走 `change()`，否則 diff 會漂移。
+- 後面批次要接手的缺口：斷線的人永遠保留座位與房主（`e2-t05`、`e1-t05`）；離線旁觀者佔成員名額（上限 64）；`POST /api/rooms` 無速率限制（`e12-t06`）；房間不會自動清除（`e1-t10`）；公開／私人旗標未存（`e1-t09`）。`RoomView` 只能由已存狀態推導，改變一律走 `change()`，否則 diff 會漂移。
 - **待擁有者**：`main` 分支保護尚未設（`DEPLOY.md` §3.3）。
-- B1 大廳不可列出井字棋（範本，尚無隱藏旗標）。遊戲字串 `GAME_MESSAGES` 尚未併入 `src/i18n` 的字典，`check-i18n` 也要涵蓋。
 - 尚無視覺稿、標誌、提案頁（LongTalk 與橋館有）；如需要，以 `docs/design/mockup.html` 補，不是必要條件。
 
 ## 2. 待擁有者決定（開工前）

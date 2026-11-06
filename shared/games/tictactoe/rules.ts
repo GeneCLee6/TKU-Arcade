@@ -39,7 +39,7 @@ export const ticTacToe: GameModule<
   TicTacToeOptions
 > = {
   id: 'tictactoe',
-  meta: { minPlayers: 2, maxPlayers: 2, minutes: 2, i18nKey: 'games.tictactoe' },
+  meta: { minPlayers: 2, maxPlayers: 2, minutes: 2, i18nKey: 'games.tictactoe', unlisted: true },
 
   options: {
     firstMove: {

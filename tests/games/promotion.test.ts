@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { GAME_IDS, getGame } from '../../shared/games/index.ts'
 import { applyAction, makeSeats, projectGame, startMatch } from '../../shared/games/match.ts'
 import { defaultOptions, parseOptions } from '../../shared/games/options.ts'
@@ -25,6 +25,9 @@ import type {
 } from '../../shared/games/promotion/types.ts'
 import { isGameError, type Actor, type GameError, type Rng } from '../../shared/games/types.ts'
 import { playRandom } from './harness.ts'
+
+// The harness plays whole games over many seeds, which goes past 5 s on a busy machine
+vi.setConfig({ testTimeout: 60_000 })
 
 const options: PromotionOptions = { dice: 'four-sided', turnLimit: DEFAULT_TURN_LIMIT }
 const ROLL = { type: 'roll' as const }

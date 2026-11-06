@@ -7,12 +7,19 @@ import { initLanguage } from '../../src/i18n/t.ts'
 beforeEach(() => {
   localStorage.clear()
   initLanguage()
+  window.history.pushState({}, '', '/')
 })
 
 describe('App', () => {
   it('renders the home page with the product name', () => {
     render(<App />)
     expect(screen.getByRole('heading', { level: 1, name: APP_NAME })).toBeInTheDocument()
+  })
+
+  it('loads the room page lazily on /r/:id', async () => {
+    window.history.pushState({}, '', '/r/nope')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Room not found' })).toBeInTheDocument()
   })
 
   it('switches the page language, and the product name stays the same', () => {

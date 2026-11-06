@@ -12,6 +12,9 @@ const BY_ID: ReadonlyMap<string, AnyGameModule> = new Map(MODULES.map((game) => 
 
 export const GAME_IDS: readonly string[] = MODULES.map((game) => game.id)
 
+/** The games the lobby shows a card for, in order */
+export const LOBBY_GAMES: readonly AnyGameModule[] = MODULES.filter((game) => !game.meta.unlisted)
+
 /** The module with this id, or null: ids come from the network */
 export function getGame(id: string): AnyGameModule | null {
   return BY_ID.get(id) ?? null

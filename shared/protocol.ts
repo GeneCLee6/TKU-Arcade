@@ -7,7 +7,9 @@
 //    and the whole room as this person may see it (`state`). A token the room still knows brings
 //    back the same member and seat within RECONNECT_GRACE_MS; any other token makes a new member.
 //    The token travels only here, never in the URL. A socket that does not join within
-//    JOIN_TIMEOUT_MS is closed.
+//    JOIN_TIMEOUT_MS is closed. The name in `state` is the one to show, which may differ from the
+//    one sent: a new member whose name is taken gets a suffix (uniqueName), and someone coming back
+//    keeps their stored name.
 // 2. Every change after that is a `patch` (shared/patch.ts) numbered `rev`. Each socket has its own
 //    `state`, because `state.game` is that viewer's projection (shared/games/match.ts projectGame):
 //    the server diffs per viewer, and hidden information is never in anyone else's patch. A browser
@@ -281,9 +283,41 @@ const UNSAFE_NAME_CHARS = /[\p{Cc}‪-‮⁦-⁩]/gu
  */
 export function normalizeName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
-  const name = raw.replace(UNSAFE_NAME_CHARS, '').replace(/\s+/g, ' ').trim()
-  if (name === '' || [...name].length > MAX_NAME_CHARS) return null
+  // NFC last: removing a character can bring together two that compose
+  const name = raw.replace(UNSAFE_NAME_CHARS, '').replace(/\s+/g, ' ').trim().normalize('NFC')
+  // Only zero-width characters would look like nobody at all in the seat list
+  if (name.replace(/[\p{Cf}\s]/gu, '') === '' || [...name].length > MAX_NAME_CHARS) return null
   return name
+}
+
+// What two names must differ in to look different. Format characters go first, since one between
+// two others stops them composing, and whitespace after, since a removed one can leave it doubled
+// or at the edge. Upper then lower so that ß and SS, or σ and ς, count as the same letter.
+function nameKey(name: string): string {
+  return name
+    .replace(/\p{Cf}/gu, '')
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+    .toLowerCase()
+}
+
+/**
+ * `name`, or if someone in `taken` looks the same, the first free of `name (2)`, `name (3)`, ...,
+ * in the person's own spelling and within MAX_NAME_CHARS, the base giving way to the suffix.
+ */
+export function uniqueName(name: string, taken: Iterable<string>): string {
+  const keys = new Set<string>()
+  for (const other of taken) keys.add(nameKey(other))
+  if (!keys.has(nameKey(name))) return name
+  const chars = [...name]
+  for (let n = 2; ; n++) {
+    const suffix = ` (${n})`
+    const base = chars.slice(0, MAX_NAME_CHARS - suffix.length).join('')
+    const candidate = base.trimEnd() + suffix
+    if (!keys.has(nameKey(candidate))) return candidate
+  }
 }
 
 /** 32 random bytes, base64url without padding: what RoomDO generates and `join` brings back */

@@ -1,13 +1,19 @@
+import { GAME_MESSAGES } from '../../shared/games/index.ts'
 import { readStored, writeStored } from '../lib/storage.ts'
 import { en, type MessageKey } from './en.ts'
 import { zhTW } from './zh-TW.ts'
 
 export type Language = 'en' | 'zh-TW'
 export type MessageParams = Record<string, string | number>
-export type Translate = (key: MessageKey, params?: MessageParams) => string
+/** A site string, or a game's (shared/games/<id>/i18n.ts): `${game.meta.i18nKey}.name` */
+export type TextKey = MessageKey | `games.${string}`
+export type Translate = (key: TextKey, params?: MessageParams) => string
 
-// Partial: the types require every key, but a catalog can still come up short at runtime
-const catalogs: Record<Language, Partial<Record<MessageKey, string>>> = { en, 'zh-TW': zhTW }
+// Partial: the types require every site key, but a catalog can still come up short at runtime
+const catalogs: Record<Language, Partial<Record<string, string>>> = {
+  en: { ...en, ...GAME_MESSAGES.en },
+  'zh-TW': { ...zhTW, ...GAME_MESSAGES['zh-TW'] },
+}
 
 const STORAGE_KEY = 'tku-arcade.language'
 const listeners = new Set<() => void>()
@@ -52,12 +58,12 @@ function format(template: string, language: Language, params?: MessageParams): s
   })
 }
 
-export function translate(language: Language, key: MessageKey, params?: MessageParams): string {
+export function translate(language: Language, key: TextKey, params?: MessageParams): string {
   const message = catalogs[language][key]
   if (message === undefined && import.meta.env.DEV) {
     console.warn(`Missing ${language} translation: ${key}`)
   }
-  return format(message ?? en[key] ?? key, language, params)
+  return format(message ?? catalogs.en[key] ?? key, language, params)
 }
 
 // For code outside React; components use useT() so they re-render when the language changes
