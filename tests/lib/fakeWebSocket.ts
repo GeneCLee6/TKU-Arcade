@@ -73,6 +73,7 @@ export function welcome(
     ready: false,
     host: true,
     online: true,
+    absent: false,
     ...me,
   }
   const members: Record<string, RoomMember> = { [member.id]: member }
@@ -96,6 +97,7 @@ export function welcome(
       },
       members,
       game: null,
+      coverable: [],
     },
   }
   return JSON.stringify(message)

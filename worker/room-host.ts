@@ -716,19 +716,20 @@ export class RoomHost {
         ready: member.ready,
         host: member.id === room.hostId,
         online: member.conn !== null,
+        absent: false,
       }
     }
     const game = this.game
     const projections = new Map<Viewer, GameProjection | null>()
     return (member) => {
-      if (!game) return { room: shared, members, game: null }
+      if (!game) return { room: shared, members, game: null, coverable: [] }
       const viewer: Viewer = member.seat ?? 'spectator'
       let projection = projections.get(viewer)
       if (projection === undefined) {
         projection = projectFor(this.deps.games(game.gameId), game, viewer)
         projections.set(viewer, projection)
       }
-      return { room: shared, members, game: projection }
+      return { room: shared, members, game: projection, coverable: [] }
     }
   }
 

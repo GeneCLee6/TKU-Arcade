@@ -258,6 +258,7 @@ describe('a room', () => {
       ready: false,
       host: true,
       online: true,
+      absent: false,
     })
     expect(c.view?.members[b.you]).toMatchObject({ seat: 1, host: false })
     expect(c.seat).toBeNull()

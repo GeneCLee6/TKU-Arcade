@@ -260,6 +260,7 @@ describe('in the room', () => {
     ready: false,
     host: false,
     online: true,
+    absent: false,
     ...over,
   })
 
@@ -331,6 +332,7 @@ describe('outside the waiting room', () => {
           ready: false,
           host: false,
           online: true,
+          absent: false,
         }),
       )
     }
