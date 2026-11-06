@@ -45,15 +45,20 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
   } catch {
     return fail('bad_request', 400)
   }
-  const { gameId, options } = (typeof body === 'object' && body !== null ? body : {}) as {
+  const {
+    gameId,
+    options,
+    public: isPublic,
+  } = (typeof body === 'object' && body !== null ? body : {}) as {
     gameId?: unknown
     options?: unknown
+    public?: unknown
   }
   if (typeof gameId !== 'string' || !getGame(gameId)) return fail('unknown_game', 400)
   for (let attempt = 0; attempt < CREATE_ATTEMPTS; attempt++) {
     const id = newRoomId()
     // The room checks `options` against the game's schema: this only keeps them plain for the RPC
-    if (await roomStub(env, id).create(id, gameId, plainOptions(options))) {
+    if (await roomStub(env, id).create(id, gameId, plainOptions(options), isPublic === true)) {
       const created: CreateRoomResponse = { id }
       return Response.json(created, { status: 201, headers: noStore })
     }

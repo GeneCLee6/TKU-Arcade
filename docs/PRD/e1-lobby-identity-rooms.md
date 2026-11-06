@@ -65,8 +65,8 @@ depends_on: [E2, E7]
 - [x] `e1-t06` 換遊戲：回 waiting、清局面、規則選項表單由 GameModule 的 `options` schema 產生 · AC-1.4 · S · ← e1-t05, e2-t01 · #8
 - [x] `e1-t07` 聊天：移植 LongTalk `shared/chat.ts`、面板、`chatLocked` · AC-1.5 · S · ← e1-t04 · #9
 - [x] `e1-t08` 旁觀者：進房分流、`view('spectator')`、補位 · AC-1.6 · S · ← e2-t03 · #9
-- [ ] `e1-t09` `LobbyDO`：公開房列表、RoomDO 回報、alarm 清理、首頁輪詢或 WebSocket · AC-1.1 · M · ← e1-t01
-- [ ] `e1-t10` 房間 10 分鐘清除 alarm 與測試；被踢黑名單過期 · AC-1.3 · S · ← e1-t05
+- [x] `e1-t09` `LobbyDO`：公開房列表、RoomDO 回報、alarm 清理、首頁輪詢或 WebSocket · AC-1.1 · M · ← e1-t01 · #PRNUM
+- [x] `e1-t10` 房間 10 分鐘清除 alarm 與測試；被踢黑名單過期 · AC-1.3 · S · ← e1-t05 · #PRNUM
 
 ### M1
 

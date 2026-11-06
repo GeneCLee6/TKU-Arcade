@@ -22,8 +22,10 @@
   // The free plan only offers SQLite-backed Durable Objects. Migrations only ever add: never edit
   // or remove one that was deployed (DEPLOY.md)
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomDO", "LobbyDO"] }],
-  // Production's own database (prompts, results, ...; e12-t05 adds the migrations). Never give
-  // staging or previews this id
+  // The daily D1 backup to the BACKUPS bucket: 19:00 UTC is 03:00 in Taipei (worker/backup.ts)
+  "triggers": { "crons": ["0 19 * * *"] },
+  // Production's own database (prompts, results, ...; migrations/). Never give staging or previews
+  // this id
   "d1_databases": [
     {
       "binding": "DB",
@@ -47,6 +49,8 @@
   "env": {
     "preview": {
       "name": "tku-arcade-preview",
+      // No cron here: previews have no backups, and many Workers would use up the account's cron limit
+      "triggers": { "crons": [] },
       "durable_objects": {
         "bindings": [
           { "name": "ROOM", "class_name": "RoomDO" },
