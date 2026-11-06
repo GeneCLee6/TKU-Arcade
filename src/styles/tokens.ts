@@ -18,6 +18,21 @@ const light = {
   // The same in both themes: a QR code only scans reliably dark on light
   qrDark: '#000000',
   qrLight: '#FFFFFF',
+  // A seat's piece, the same in both themes so that a seat keeps its colour; onSeat reads on all six
+  seat0: '#C2410C',
+  seat1: '#1D4ED8',
+  seat2: '#15803D',
+  seat3: '#7E22CE',
+  seat4: '#0F766E',
+  seat5: '#BE185D',
+  onSeat: '#FFFFFF',
+  // The promotion board's cells, by how far up the ladder they are; text reads on all of them
+  boardTier0: '#EEF0F4',
+  boardTier1: '#DCF3E6',
+  boardTier2: '#DCE9FB',
+  boardTier3: '#FBEBC4',
+  boardEnd: '#B3261E',
+  onBoardEnd: '#FFFFFF',
 }
 
 export type ColorName = keyof typeof light
@@ -36,6 +51,19 @@ const dark: Record<ColorName, string> = {
   overlay: '#00000099',
   qrDark: '#000000',
   qrLight: '#FFFFFF',
+  seat0: '#C2410C',
+  seat1: '#1D4ED8',
+  seat2: '#15803D',
+  seat3: '#7E22CE',
+  seat4: '#0F766E',
+  seat5: '#BE185D',
+  onSeat: '#FFFFFF',
+  boardTier0: '#2A3342',
+  boardTier1: '#17382C',
+  boardTier2: '#1C3355',
+  boardTier3: '#46360F',
+  boardEnd: '#B3261E',
+  onBoardEnd: '#FFFFFF',
 }
 
 // Raw values: only GlobalStyle (to define the variables) and the contrast tests should read these
@@ -50,6 +78,11 @@ export const color = Object.fromEntries(
 // The CSS declarations that define one theme's variables
 export const colorVariables = (theme: Record<ColorName, string>): string =>
   colorNames.map((name) => `--color-${name}: ${theme[name]};`).join('\n')
+
+/** A seat's colour: its piece, and the avatar of whoever sits there during a game */
+export const seatColor = (seat: number): string => color[`seat${seat % 6}` as ColorName]
+
+export const avatarColors: readonly string[] = [0, 1, 2, 3, 4, 5].map(seatColor)
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const
 

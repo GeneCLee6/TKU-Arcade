@@ -59,6 +59,11 @@ const Segment = styled.button`
   font-size: ${fontSize.sm}px;
   cursor: pointer;
 
+  /* So that the top bar stays one row on a phone, leaving the height to the page */
+  @media (max-width: 480px) {
+    padding: 0 ${space.xs}px;
+  }
+
   &:hover {
     color: ${color.text};
   }

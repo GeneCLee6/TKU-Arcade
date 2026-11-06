@@ -157,6 +157,11 @@ export const en = {
   'theme.system': 'System',
   'theme.light': 'Light',
   'theme.dark': 'Dark',
+  // C2: the game's side panel and its drawer on a phone
+  'room.panel.chatUnread': 'Chat ({count} new)',
+  'room.panel.members': 'Members',
+  'room.panel.title': 'Room',
+  'room.turnBadge': 'Up now',
 } as const
 
 export type MessageKey = keyof typeof en

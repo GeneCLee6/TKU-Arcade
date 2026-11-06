@@ -24,6 +24,19 @@ export function mergeChat(
   return [...base, ...added].slice(-CHAT_HISTORY)
 }
 
+/**
+ * How many messages from others came after the last one this person has seen. `seen` may be null, or
+ * have scrolled out of the history: then all of them count.
+ */
+export function unreadCount(
+  messages: readonly ChatMessage[],
+  seen: number | null,
+  you: string,
+): number {
+  const after = seen === null ? -1 : messages.findLastIndex((message) => message.id === seen)
+  return messages.slice(after + 1).filter((message) => message.from !== you).length
+}
+
 /** What someone is writing, kept apart from the panel so that it outlives a connection problem */
 export class ChatDraft {
   private text = ''

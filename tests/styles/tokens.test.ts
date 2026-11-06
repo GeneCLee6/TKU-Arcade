@@ -22,6 +22,17 @@ const readablePairs: [ColorName, ColorName][] = [
   ['danger', 'surface'],
   ['success', 'surface'],
   ['warning', 'surface'],
+  ['onSeat', 'seat0'],
+  ['onSeat', 'seat1'],
+  ['onSeat', 'seat2'],
+  ['onSeat', 'seat3'],
+  ['onSeat', 'seat4'],
+  ['onSeat', 'seat5'],
+  ['text', 'boardTier0'],
+  ['text', 'boardTier1'],
+  ['text', 'boardTier2'],
+  ['text', 'boardTier3'],
+  ['onBoardEnd', 'boardEnd'],
 ]
 
 describe('tokens', () => {

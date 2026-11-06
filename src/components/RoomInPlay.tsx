@@ -1,15 +1,26 @@
+import type { ReactNode } from 'react'
 import styled from 'styled-components'
 import type { CoverableSeat, CoverMessage, RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import type { RoomTimer } from '../lib/roomConnection.ts'
-import { space } from '../styles/tokens.ts'
+import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
+import { Avatar } from './Avatar.tsx'
 import { Button } from './Button.tsx'
 import { ConfirmButton } from './ConfirmButton.tsx'
 import { Countdown } from './Countdown.tsx'
 import { FreeSeatRow } from './FreeSeatRow.tsx'
 import { DissolveButton, SeatedGateButton } from './HostControls.tsx'
 import { MemberEntry } from './MemberEntry.tsx'
-import { Actions, Heading, List, Muted, Row, SeatNumber, Section } from './roomParts.ts'
+import {
+  Actions,
+  Heading,
+  List,
+  Muted,
+  Row,
+  SeatNumber,
+  Section,
+  seatedMembers,
+} from './roomParts.ts'
 
 export interface RoomInPlayProps {
   view: RoomView
@@ -22,9 +33,22 @@ export interface RoomInPlayProps {
   onDissolve(): void
   onReopen(): void
   onRematch(): void
+  /** What the game has to say about this member: the line under their name */
+  seatDetail?(member: RoomMember): ReactNode
+  /** The seat whose move it is: marked in words and with an outline */
+  turnSeat?: number | null
+  /** Avatars take the seat's colour, matching the game's pieces */
+  seatTint?: boolean
+  /** The game's screen says what is going on, so "in progress" would only repeat it */
+  hidePlaying?: boolean
+  /** The countdown and the stuck seats are on show elsewhere, as a drawer would hide them */
+  urgentElsewhere?: boolean
 }
 
-/** The room while it is not `waiting`: who is here and, for the host, what can be done next */
+/**
+ * The room while it is not `waiting`, the side panel of the game's screen: who is here and, for the
+ * host, what can be done next
+ */
 export function RoomInPlay({
   view,
   you,
@@ -36,13 +60,16 @@ export function RoomInPlay({
   onDissolve,
   onReopen,
   onRematch,
+  seatDetail,
+  turnSeat,
+  seatTint,
+  hidePlaying,
+  urgentElsewhere,
 }: RoomInPlayProps) {
   const t = useT()
   const { status, minPlayers } = view.room
   const members = Object.values(view.members)
-  const seated = members
-    .filter((member) => member.seat !== null)
-    .sort((a, b) => (a.seat as number) - (b.seat as number))
+  const seated = seatedMembers(view)
   const spectators = members.filter((member) => member.seat === null)
   const me = view.members[you]
   const isHost = me?.host === true
@@ -52,14 +79,16 @@ export function RoomInPlay({
 
   return (
     <Layout>
-      <StatusLine playing={status === 'playing'} isHost={isHost} />
-      {status === 'playing' && me?.seat === null && <Muted>{t('room.spectating')}</Muted>}
+      {!(hidePlaying && status === 'playing') && (
+        <StatusLine playing={status === 'playing'} isHost={isHost} />
+      )}
+      {status === 'playing' && !hidePlaying && me?.seat === null && (
+        <Muted>{t('room.spectating')}</Muted>
+      )}
 
-      {timers.map((timer) => (
-        <Countdown key={timer.id} timer={timer} />
-      ))}
+      {!urgentElsewhere && timers.map((timer) => <Countdown key={timer.id} timer={timer} />)}
 
-      {status === 'playing' && view.coverable.length > 0 && (
+      {!urgentElsewhere && status === 'playing' && view.coverable.length > 0 && (
         <CoverSection
           seated={seated}
           coverable={view.coverable}
@@ -71,20 +100,30 @@ export function RoomInPlay({
       <Section>
         <Heading>{t('room.members')}</Heading>
         <List>
-          {[...seated, ...spectators].map((member) => (
-            <Row key={member.id}>
-              {member.seat !== null && (
-                <SeatNumber>{t('room.waiting.seat', { seat: member.seat + 1 })}</SeatNumber>
-              )}
-              <MemberEntry
-                member={member}
-                isYou={member.id === you}
-                viewerIsHost={isHost}
-                onKick={onKick}
-                onTransfer={onTransfer}
-              />
-            </Row>
-          ))}
+          {[...seated, ...spectators].map((member) => {
+            const hasTurn = member.seat !== null && member.seat === turnSeat
+            const detail = seatDetail?.(member)
+            return (
+              <MemberRow key={member.id} $turn={hasTurn}>
+                <Avatar
+                  name={member.name}
+                  tint={seatTint && member.seat !== null ? seatColor(member.seat) : undefined}
+                />
+                {member.seat !== null && (
+                  <SeatNumber>{t('room.waiting.seat', { seat: member.seat + 1 })}</SeatNumber>
+                )}
+                <MemberEntry
+                  member={member}
+                  isYou={member.id === you}
+                  viewerIsHost={isHost}
+                  onKick={onKick}
+                  onTransfer={onTransfer}
+                />
+                {hasTurn && <TurnMark>{t('room.turnBadge')}</TurnMark>}
+                {detail && <SeatDetail>{detail}</SeatDetail>}
+              </MemberRow>
+            )
+          })}
         </List>
       </Section>
 
@@ -152,7 +191,7 @@ interface CoverSectionProps {
 }
 
 /** The seats a game is stuck on: the host keeps it moving, everyone else hears why it stopped */
-function CoverSection({ seated, coverable, isHost, onCover }: CoverSectionProps) {
+export function CoverSection({ seated, coverable, isHost, onCover }: CoverSectionProps) {
   const t = useT()
   if (!isHost) return <Muted>{t('room.cover.waitForHost')}</Muted>
   return (
@@ -214,5 +253,24 @@ const Layout = styled.div`
 `
 
 const CoverRow = styled(Row)`
+  overflow-wrap: anywhere;
+`
+
+// The outline and the word say whose move it is, so neither rests on a colour
+const MemberRow = styled(Row)<{ $turn: boolean }>`
+  outline: ${(p) => (p.$turn ? `2px solid ${color.text}` : 'none')};
+  outline-offset: -1px;
+`
+
+const TurnMark = styled.span`
+  font-size: ${fontSize.sm}px;
+  font-weight: 600;
+`
+
+const SeatDetail = styled.span`
+  flex-basis: 100%;
+  min-width: 0;
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
   overflow-wrap: anywhere;
 `
