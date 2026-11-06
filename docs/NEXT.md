@@ -14,7 +14,7 @@
 - **B2 完成（PR #7）**：`useRoom()`（`src/lib/useRoom.ts`、`roomConnection.ts`：patch、rev 缺口 `resync`、錯誤 toast）、等待室（座位、換座、準備、複製連結與 QR、開始條件）。協定新增 `ready`（不升版、不擋開始）。
 - **B3 完成（PR #8）**：房主控制（踢人、轉移、解散、再來一局、結束遊戲、離線 45 秒自動轉移）、換遊戲與規則選項表單、階段倒數（`timers`、DO alarm、`Countdown`）。協定新增訊息與關閉碼 4411／4412，不升版。`main` 分支保護已設（2026-11-06）：要 PR、`verify` 要過、禁 force-push 與刪除，對管理員也生效。
 - **B4 完成（PR #9）**：聊天（移植 LongTalk、200 則、每 10 秒 10 則、`chatLocked`）、旁觀者（`ended` 可補位）、自動重連（退避 1、2、4、8、15、30 秒，放棄前試 5 分鐘）、`absent` 與房主跳過／代打（`cover`）。升官圖兩者都支援，井字棋都不支援；未決問題「等多久」採建議值：離線滿 45 秒（實際 45–60 秒）。
-- **G1 完成（PR #PRNUM，經擁有者同意 2026-11-06 排在 Phase F 之前）**：默契牌局 Silent Table（遊戲 id `silent-table`）的牌型引擎 `shared/poker/hand.ts`、規則引擎、規則選項、view 裁切；在 PR 預覽用真的 `RoomDO` 跑完整局。`meta.unlisted`，大廳與換遊戲選單都看不到，等 G2 的畫面。規則細節（連過歸零、每人每輪 5 次移動、ready 清除、平手、揭牌、缺席）與交給 G2 的事項（`chatLocked`、`timers`、皮膚選項、拿掉 `unlisted`）在 `docs/PRD/e4-coop-poker.md` 的設計方向。
+- **G1 完成（PR #12，經擁有者同意 2026-11-06 排在 Phase F 之前）**：默契牌局 Silent Table（遊戲 id `silent-table`）的牌型引擎 `shared/poker/hand.ts`、規則引擎、規則選項、view 裁切；在 PR 預覽用真的 `RoomDO` 跑完整局。`meta.unlisted`，大廳與換遊戲選單都看不到，等 G2 的畫面。規則細節（連過歸零、每人每輪 5 次移動、ready 清除、平手、揭牌、缺席）與交給 G2 的事項（`chatLocked`、`timers`、皮膚選項、拿掉 `unlisted`）在 `docs/PRD/e4-coop-poker.md` 的設計方向。
 - **下一批：C2**（升官圖畫面）。
 - B4 留下的缺口：聊天面板在手機上排在頁面很下面，抽屜在 C2（`e7-t04`）。真實手機休眠喚醒、真正斷網、注音輸入都沒在真機測過，M0 四人實測時順便看。離線旁觀者滿 45 秒會被移除，所以回來是新成員，先前「離線旁觀者佔名額」的問題解決了。重連中按按鈕只會跳提示，不會排隊送出。
 - B3 留下的缺口：踢人黑名單只認 seat token，換瀏覽器或清 localStorage 就能回來（朋友圈可接受；同場 NAT 不適合擋 IP）。主動離開沒有專用訊息：房主按回大廳也要等 45–60 秒才轉移。**還沒有任何正式遊戲用 `timers`**，所以 alarm 觸發倒數只有單元測試（fake clock），第一款用到的遊戲（G2／H2）要在預覽站實測一次；同一條 alarm 路徑的自動轉移已在預覽站實測。換遊戲的選單目前只有升官圖（井字棋 unlisted）。
