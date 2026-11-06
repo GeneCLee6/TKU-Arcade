@@ -1,25 +1,55 @@
 import styled from 'styled-components'
 import { APP_NAME } from '../../shared/app.ts'
-import { color } from '../styles/tokens.ts'
+import { ThemeSwitch } from '../components/ThemeSwitch.tsx'
+import { LanguageSwitch } from '../i18n/LanguageSwitch.tsx'
+import { useT } from '../i18n/useT.ts'
+import { color, fontSize, space } from '../styles/tokens.ts'
 
-// Placeholder home page (e12-t01). It shows only the product name: every other UI string waits
-// for i18n t() (A2, CLAUDE.md rule 2).
+// Placeholder home page until the lobby (e1): the product name, a tagline and the switches
 export function HomePage() {
+  const t = useT()
   return (
-    <Main>
-      <Title $size={2.5}>{APP_NAME}</Title>
-    </Main>
+    <Page>
+      <Header>
+        <ThemeSwitch />
+        <LanguageSwitch />
+      </Header>
+      <Main>
+        <Title>{APP_NAME}</Title>
+        <Tagline>{t('home.tagline')}</Tagline>
+      </Main>
+    </Page>
   )
 }
 
-const Main = styled.main`
-  min-height: 100vh;
+const Page = styled.div`
+  min-height: 100dvh;
   display: grid;
-  place-items: center;
+  grid-template-rows: auto 1fr;
 `
 
-const Title = styled.h1<{ $size: number }>`
+const Header = styled.header`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: ${space.sm}px;
+  padding: ${space.lg}px;
+`
+
+const Main = styled.main`
+  display: grid;
+  place-content: center;
+  gap: ${space.sm}px;
+  padding: ${space.lg}px;
+  text-align: center;
+`
+
+const Title = styled.h1`
   margin: 0;
-  font-size: ${(p) => p.$size}rem;
-  color: ${color.fg};
+  font-size: ${fontSize.xxl}px;
+`
+
+const Tagline = styled.p`
+  margin: 0;
+  color: ${color.muted};
 `

@@ -29,7 +29,6 @@
 
 - JSX 不得有裸字串：一律 `t('key')`。`en.ts` 是來源，`zh-TW.ts` 必須有同一組 key；`npm run check-i18n` 在 CI 擋。
 - 唯一例外是產品名稱 `APP_NAME`（`shared/app.ts`），兩語相同。
-- A2 之前沒有 `t()`：畫面只放產品名稱，不寫任何其他文字。
 - 介面預設 English；初次依瀏覽器語言自動切繁中，之後以使用者切換為準（記在 localStorage）。
 - 術語以 `docs/DESIGN.md` 的術語表為準，兩語都要。
 
@@ -58,7 +57,7 @@
 - `tests/app/`：元件與頁面，以 Testing Library 依角色與名稱查詢。
 - `tests/games/`：每款遊戲用 harness 跑完整一局；`npm run play -- <game>` 是終端機煙霧測試。
 - `e2e/`：Playwright（`npm run test:browser`），對 `BASE_URL`（預設 `http://localhost:5175`）跑；檔名 `.spec.ts`，Vitest 不會撿到。
-- 提交前：`npm run lint && npm run typecheck && npm test && npm run build`。
+- 提交前：`npm run lint && npm run typecheck && npm test && npm run build && npm run budget`。
 
 ## 8. Commit、分支、PR
 
