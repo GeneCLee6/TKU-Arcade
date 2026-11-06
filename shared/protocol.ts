@@ -18,16 +18,24 @@
 // 4. `timer` replaces the list of countdowns running now (GameModule.timers), after `welcome` and
 //    whenever it changes. Times are durations, not clock times: browsers' clocks disagree.
 // 5. `chat` goes to everyone in the room (the sender too: that is its acknowledgement). While the
-//    game says `chatLocked`, it is refused with `chat_locked`. (B4 ports the limits, e1-t07.)
+//    game says `chatLocked`, it is refused with `chat_locked`. (B4 ports the limits, e1-t07; until
+//    then every `chat` is refused with `unavailable`.)
 // 6. Heartbeat: the browser sends the text frame `ping` every HEARTBEAT_INTERVAL_MS and gets `pong`
 //    (answered without waking the object); a socket silent for STALE_AFTER_MS is closed.
 // 7. A message that does not parse is a protocol error: the socket is closed with
 //    CloseCode.badMessage (E2: 「協定錯誤關連線」), unlike `error`, which is an answer to a well-formed
 //    message that was refused.
+// 8. The room's life is waiting → playing → ended → waiting. The first member to join is the host.
+//    While the room is `waiting`, someone joining takes the lowest free seat (none free: a
+//    spectator), and `sit` moves a member to a free seat or, with null, out of their seat. Anyone
+//    joining later is a spectator. `start` (host only, at least `RoomInfo.minPlayers` seated) begins
+//    the game: the seated members, in seat order, are renumbered 0, 1, ... n - 1, as games expect.
+//    When the game is over the room is `ended`, until `reopen` (host only) drops the game and goes
+//    back to `waiting` with everyone in their seats.
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
-import type { GameError, GameProjection, SeatId } from './games/types.ts'
+import type { GameError, GameProjection, OptionValues, SeatId } from './games/types.ts'
 import type { JsonValue, PatchOp } from './patch.ts'
 
 /** Bumped on any change a browser of the previous version could not understand */
@@ -38,10 +46,16 @@ export const HEARTBEAT_PONG = 'pong'
 export const HEARTBEAT_INTERVAL_MS = 15_000
 /** Three missed heartbeats */
 export const STALE_AFTER_MS = 45_000
-/** A socket must send `join` this soon after opening */
+/** A socket must send `join` this soon after opening; the next sweep closes it */
 export const JOIN_TIMEOUT_MS = 10_000
 /** How long a disconnected member keeps its seat without being marked offline (AC-2.3) */
 export const RECONNECT_GRACE_MS = 45_000
+/** How often the room looks for sockets past those limits, so a close can come this much later */
+export const SWEEP_INTERVAL_MS = 15_000
+/** Members a room keeps, seated or not, online or not; someone new past this gets roomFull */
+export const MAX_MEMBERS = 64
+/** Sockets open at once: every member, and a few that have not joined yet */
+export const MAX_CONNECTIONS = MAX_MEMBERS + 8
 
 /** Client messages larger than this (UTF-16 code units) are refused without parsing */
 export const MAX_CLIENT_MESSAGE_CHARS = 16_384
@@ -79,6 +93,12 @@ export type RoomInfo = {
   /** The GameModule this room plays (shared/games/index.ts) */
   gameId: string
   status: RoomStatus
+  /** The rule options the host chose, already checked against the game's schema */
+  options: OptionValues
+  /** `start` needs this many seated: here so the waiting room need not load the game's rules */
+  minPlayers: number
+  /** Seats are numbered 0 to maxSeats - 1 */
+  maxSeats: number
 }
 
 /** One person in the room. The seat token is never part of the view: only its owner gets it */
@@ -124,8 +144,27 @@ export type PatchMessage = { t: 'patch'; rev: number; ops: PatchOp[] }
  * - `no_game`: an `action` while no game is being played
  * - `chat_locked`: `chat` while the game says `chatLocked`
  * - `rate_limited`: too many messages; this one was not kept
+ * - `not_joined`: anything but `join` before `join`
+ * - `wrong_status`: not possible in the room's current status (`sit` during a game, ...)
+ * - `bad_seat`: `sit` on a seat number the room does not have
+ * - `seat_taken`: `sit` on someone else's seat
+ * - `not_enough_players`: `start` with fewer than `RoomInfo.minPlayers` seated
+ * - `game_failed`: the game module threw (a bug, not your mistake); nothing changed
+ * - `unavailable`: this server does not do that yet (`chat` until e1-t07)
  */
-export type ErrorCode = 'forbidden' | 'not_seated' | 'no_game' | 'chat_locked' | 'rate_limited'
+export type ErrorCode =
+  | 'forbidden'
+  | 'not_seated'
+  | 'no_game'
+  | 'chat_locked'
+  | 'rate_limited'
+  | 'not_joined'
+  | 'wrong_status'
+  | 'bad_seat'
+  | 'seat_taken'
+  | 'not_enough_players'
+  | 'game_failed'
+  | 'unavailable'
 
 /** A refusal, to the sender only. `game_error`: the game refused the action, `error` says why */
 export type ErrorMessage =
@@ -179,7 +218,42 @@ export type ActionMessage = { t: 'action'; action: JsonValue }
 
 export type ChatClientMessage = { t: 'chat'; text: string }
 
-export type ClientMessage = JoinMessage | ResyncMessage | ActionMessage | ChatClientMessage
+/** Move to this seat, or with null out of any seat; only while the room is `waiting` */
+export type SitMessage = { t: 'sit'; seat: SeatId | null }
+
+/** The host begins the game */
+export type StartMessage = { t: 'start' }
+
+/** The host takes an `ended` room back to `waiting` */
+export type ReopenMessage = { t: 'reopen' }
+
+export type ClientMessage =
+  | JoinMessage
+  | ResyncMessage
+  | ActionMessage
+  | ChatClientMessage
+  | SitMessage
+  | StartMessage
+  | ReopenMessage
+
+// ── HTTP ─────────────────────────────────────────────────────────────────────────────────────
+
+/** POST /api/rooms. Options the game does not accept fall back to its defaults */
+export type CreateRoomRequest = { gameId: string; options?: OptionValues }
+
+/** 201 from POST /api/rooms */
+export type CreateRoomResponse = { id: string }
+
+/** GET /api/rooms/<id>: what the screen before joining shows; nothing about anyone's game */
+export type RoomSummary = {
+  id: string
+  gameId: string
+  status: RoomStatus
+  /** Everyone in the room, seated or not, online or not */
+  members: number
+  seated: number
+  maxSeats: number
+}
 
 // ── Parsing ──────────────────────────────────────────────────────────────────────────────────
 
@@ -219,6 +293,14 @@ export function isSeatToken(value: unknown): value is string {
   return typeof value === 'string' && SEAT_TOKEN_PATTERN.test(value)
 }
 
+export function newSeatToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32))
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+}
+
 /** A browser's message, or null when it is not one this version understands */
 export function parseClientMessage(raw: string): ClientMessage | null {
   const value = parseObject(raw, MAX_CLIENT_MESSAGE_CHARS)
@@ -239,6 +321,15 @@ export function parseClientMessage(raw: string): ClientMessage | null {
         [...value.text].length <= MAX_CHAT_CHARS
         ? { t: 'chat', text: value.text }
         : null
+    case 'sit':
+      return value.seat === null ||
+        (Number.isSafeInteger(value.seat) && (value.seat as number) >= 0)
+        ? { t: 'sit', seat: value.seat as SeatId | null }
+        : null
+    case 'start':
+      return { t: 'start' }
+    case 'reopen':
+      return { t: 'reopen' }
     default:
       return null
   }

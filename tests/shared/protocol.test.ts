@@ -25,6 +25,10 @@ describe('parseClientMessage', () => {
       { t: 'action', action: { type: 'place', cell: 4 } },
       { t: 'action', action: null },
       { t: 'chat', text: 'hi' },
+      { t: 'sit', seat: 3 },
+      { t: 'sit', seat: null },
+      { t: 'start' },
+      { t: 'reopen' },
     ]
     for (const message of cases) {
       expect(parseClientMessage(JSON.stringify(message))).toEqual(message)
@@ -45,6 +49,10 @@ describe('parseClientMessage', () => {
       JSON.stringify({ t: 'chat', text: '   ' }),
       JSON.stringify({ t: 'chat', text: 'x'.repeat(MAX_CHAT_CHARS + 1) }),
       JSON.stringify({ t: 'chat', text: 1 }),
+      JSON.stringify({ t: 'sit' }),
+      JSON.stringify({ t: 'sit', seat: -1 }),
+      JSON.stringify({ t: 'sit', seat: 1.5 }),
+      JSON.stringify({ t: 'sit', seat: '1' }),
     ]
     for (const raw of cases) expect(parseClientMessage(raw), raw).toBeNull()
   })
@@ -89,7 +97,14 @@ describe('isSeatToken', () => {
 
 describe('parseServerMessage', () => {
   const state: RoomView = {
-    room: { id: 'r', gameId: 'tictactoe', status: 'waiting' },
+    room: {
+      id: 'r',
+      gameId: 'tictactoe',
+      status: 'waiting',
+      options: {},
+      minPlayers: 2,
+      maxSeats: 2,
+    },
     members: {},
     game: null,
   }
