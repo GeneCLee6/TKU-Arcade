@@ -13,7 +13,12 @@ const ROOM = 'abcdefghij'
 const SEAT_KEY = `tku-arcade.seat.${ROOM}`
 
 function handlers() {
-  return { onView: vi.fn(), onError: vi.fn(), onEnd: vi.fn() } satisfies RoomHandlers
+  return {
+    onView: vi.fn(),
+    onError: vi.fn(),
+    onTimers: vi.fn(),
+    onEnd: vi.fn(),
+  } satisfies RoomHandlers
 }
 
 /** Connected and welcomed at rev 0; the handlers have heard nothing yet */
@@ -100,11 +105,11 @@ describe('joining', () => {
     socket.receive('pong')
     socket.receive('not json')
     socket.receive(new ArrayBuffer(1))
-    socket.receive(JSON.stringify({ t: 'timer', timers: [] }))
     socket.receive(JSON.stringify({ t: 'chat', messages: [] }))
 
     expect(h.onView).not.toHaveBeenCalled()
     expect(h.onError).not.toHaveBeenCalled()
+    expect(h.onTimers).not.toHaveBeenCalled()
     expect(socket.closedByClient).toBe(false)
   })
 
@@ -219,6 +224,50 @@ describe('keeping the view', () => {
   })
 })
 
+describe('timers', () => {
+  const timerMessage = (...timers: { id: string; remainingMs: number; totalMs: number }[]) =>
+    JSON.stringify({ t: 'timer', timers })
+
+  it('turns each duration into a deadline on this browser’s clock, from when it arrived', () => {
+    vi.useFakeTimers()
+    const { h, socket } = welcomed()
+    vi.advanceTimersByTime(1_000)
+    const arrived = performance.now()
+
+    socket.receive(
+      timerMessage(
+        { id: 'turn', remainingMs: 4_000, totalMs: 30_000 },
+        { id: 'clue', remainingMs: 500, totalMs: 500 },
+      ),
+    )
+
+    expect(h.onTimers).toHaveBeenCalledExactlyOnceWith([
+      { id: 'turn', deadline: arrived + 4_000, totalMs: 30_000 },
+      { id: 'clue', deadline: arrived + 500, totalMs: 500 },
+    ])
+  })
+
+  it('passes on an empty list: nothing is running any more', () => {
+    const { h, socket } = welcomed()
+    socket.receive(timerMessage())
+    expect(h.onTimers).toHaveBeenCalledExactlyOnceWith([])
+  })
+
+  it('ignores them before welcome and after leaving', () => {
+    const h = handlers()
+    const { leave } = connectRoom(ROOM, 'Al', h)
+    const socket = FakeWebSocket.last
+    socket.open()
+    socket.receive(timerMessage({ id: 'turn', remainingMs: 1_000, totalMs: 1_000 }))
+    expect(h.onTimers).not.toHaveBeenCalled()
+
+    socket.receive(welcome({}))
+    leave()
+    socket.receive(timerMessage({ id: 'turn', remainingMs: 1_000, totalMs: 1_000 }))
+    expect(h.onTimers).not.toHaveBeenCalled()
+  })
+})
+
 describe('sending', () => {
   it('does nothing before welcome', () => {
     const connection = connectRoom(ROOM, 'Al', handlers())
@@ -308,6 +357,8 @@ describe('leaving and closing', () => {
     [CloseCode.versionMismatch, 'versionMismatch'],
     [CloseCode.roomNotFound, 'notFound'],
     [CloseCode.roomFull, 'full'],
+    [CloseCode.kicked, 'kicked'],
+    [CloseCode.dissolved, 'dissolved'],
     [CloseCode.stale, 'connectionLost'],
     [CloseCode.badMessage, 'connectionLost'],
     [1006, 'connectionLost'],
@@ -323,10 +374,32 @@ describe('leaving and closing', () => {
     [CloseCode.stale, 'disconnected'],
     [CloseCode.roomNotFound, 'disconnected'],
     [CloseCode.replaced, 'replaced'],
+    [CloseCode.kicked, 'kicked'],
+    [CloseCode.dissolved, 'dissolved'],
   ])('reads close %i after welcome as %s', (code, end) => {
     const { h, socket } = welcomed()
     socket.serverClose(code)
     expect(h.onEnd).toHaveBeenCalledExactlyOnceWith(end)
+  })
+
+  it('keeps the seat token when kicked: it is what the ban recognises', () => {
+    const { socket } = welcomed()
+    socket.serverClose(CloseCode.kicked)
+    expect(localStorage.getItem(SEAT_KEY)).toBe(TOKEN_A)
+  })
+
+  it('brings a banned token along again, and is closed as kicked before any welcome', () => {
+    localStorage.setItem(SEAT_KEY, TOKEN_A)
+    const h = handlers()
+    connectRoom(ROOM, 'Al', h)
+    const socket = FakeWebSocket.last
+    socket.open()
+    expect(socket.joins[0].token).toBe(TOKEN_A)
+
+    socket.serverClose(CloseCode.kicked)
+
+    expect(h.onEnd).toHaveBeenCalledExactlyOnceWith('kicked')
+    expect(localStorage.getItem(SEAT_KEY)).toBe(TOKEN_A)
   })
 
   it('opens no new socket by itself after a close', () => {

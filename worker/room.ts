@@ -65,6 +65,7 @@ export class RoomDO extends DurableObject<Env> {
             void storage.delete(keys)
           }
         },
+        clearAll: () => void storage.deleteAll(),
       },
       games: getGame,
       now: Date.now,

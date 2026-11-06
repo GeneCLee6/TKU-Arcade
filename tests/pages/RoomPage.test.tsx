@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CloseCode, type RoomSummary } from '../../shared/protocol.ts'
 import { ToastProvider } from '../../src/components/Toast.tsx'
 import { en } from '../../src/i18n/en.ts'
@@ -9,6 +9,7 @@ import { initLanguage, setLanguage } from '../../src/i18n/t.ts'
 import { zhTW } from '../../src/i18n/zh-TW.ts'
 import { RoomPage } from '../../src/pages/RoomPage.tsx'
 import { FakeWebSocket, TOKEN_A, TOKEN_B, welcome } from '../lib/fakeWebSocket.ts'
+import { stubDialog } from '../lib/stubDialog.ts'
 
 const ROOM = 'abcdefghij'
 const NICKNAME_KEY = 'tku-arcade.nickname'
@@ -67,6 +68,8 @@ async function joined(me: Parameters<typeof welcome>[0] = {}) {
 const backLink = () => screen.getByRole('link', { name: 'Back to the lobby' })
 const retryButton = () => screen.queryByRole('button', { name: 'Try again' })
 const startButton = () => screen.getByRole('button', { name: en['room.waiting.start'] })
+
+beforeAll(stubDialog)
 
 beforeEach(() => {
   localStorage.clear()
@@ -305,6 +308,186 @@ describe('in the room', () => {
   })
 })
 
+describe('outside the waiting room', () => {
+  const patch = (rev: number, path: string[], value: unknown) =>
+    JSON.stringify({ t: 'patch', rev, ops: [{ op: 'set', path, value }] })
+  const lastSent = () => JSON.parse(FakeWebSocket.last.sent.at(-1) as string)
+  const button = (name: string) => screen.queryByRole('button', { name })
+  const confirm = (title: string, name: string) =>
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: title })).getByRole('button', { name }),
+    )
+
+  /** Host or not, with `others` further seated members, the room in `status`; returns the next rev */
+  async function inStatus(status: 'playing' | 'ended', { host = true, others = 1 } = {}) {
+    await joined({ host })
+    let rev = 1
+    for (let i = 0; i < others; i++) {
+      serverSays(
+        patch(rev++, ['members', `m${i + 2}`], {
+          id: `m${i + 2}`,
+          name: i === 0 ? 'Bo' : `Other ${i}`,
+          seat: i + 1,
+          ready: false,
+          host: false,
+          online: true,
+        }),
+      )
+    }
+    serverSays(patch(rev++, ['room', 'status'], status))
+    FakeWebSocket.last.sent.length = 0
+    return rev
+  }
+
+  describe.each(['playing', 'ended'] as const)('%s', (status) => {
+    it('lists the members in seat order', async () => {
+      await inStatus(status)
+      const list = within(screen.getByRole('list')).getAllByRole('listitem')
+      expect(list[0]).toHaveTextContent('Seat 1')
+      expect(list[0]).toHaveTextContent('Al')
+      expect(list[1]).toHaveTextContent('Seat 2')
+      expect(list[1]).toHaveTextContent('Bo')
+    })
+
+    it('keeps the host’s row controls, behind their confirmations', async () => {
+      await inStatus(status)
+      expect(button('Make Bo host')).toBeInTheDocument()
+      fireEvent.click(button('Kick Bo')!)
+      expect(FakeWebSocket.last.sent).toEqual([])
+      confirm('Kick Bo?', 'Kick')
+      expect(lastSent()).toEqual({ t: 'kick', member: 'm2' })
+    })
+
+    it('gives everyone else no row controls', async () => {
+      await inStatus(status, { host: false })
+      expect(button('Kick Bo')).toBeNull()
+      expect(button('Make Bo host')).toBeNull()
+    })
+
+    it('lets the host dissolve, after confirming', async () => {
+      await inStatus(status)
+      fireEvent.click(button('Dissolve room')!)
+      expect(FakeWebSocket.last.sent).toEqual([])
+      confirm('Dissolve this room?', 'Dissolve room')
+      expect(lastSent()).toEqual({ t: 'dissolve' })
+    })
+
+    it('does not let anyone else dissolve', async () => {
+      await inStatus(status, { host: false })
+      expect(button('Dissolve room')).toBeNull()
+    })
+  })
+
+  describe('playing', () => {
+    it('keeps the placeholder text, and the host ends the game after confirming', async () => {
+      await inStatus('playing')
+      expect(screen.getByRole('status')).toHaveTextContent(en['room.inProgress'])
+
+      fireEvent.click(button('End game')!)
+      expect(FakeWebSocket.last.sent).toEqual([])
+      confirm('End this game?', 'End game')
+      expect(lastSent()).toEqual({ t: 'reopen' })
+    })
+
+    it('offers no rematch and no way back without ending the game', async () => {
+      await inStatus('playing')
+      expect(button('Rematch')).toBeNull()
+      expect(button('Back to waiting room')).toBeNull()
+    })
+
+    it('does not let anyone else end the game', async () => {
+      await inStatus('playing', { host: false })
+      expect(screen.getByRole('status')).toHaveTextContent(en['room.inProgress'])
+      expect(button('End game')).toBeNull()
+    })
+
+    it('drops an open End game when the game ends by itself, sending nothing', async () => {
+      const rev = await inStatus('playing')
+      fireEvent.click(button('End game')!)
+      serverSays(patch(rev, ['room', 'status'], 'ended'))
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(FakeWebSocket.last.sent).toEqual([])
+    })
+  })
+
+  describe('ended', () => {
+    it('says so in its own words, not as still in progress', async () => {
+      await inStatus('ended', { host: false })
+      expect(screen.getByRole('status')).toHaveTextContent(en['room.ended.waitForHost'])
+      expect(screen.queryByText(en['room.inProgress'])).toBeNull()
+    })
+
+    it('gives the host a rematch, at once', async () => {
+      await inStatus('ended')
+      expect(screen.getByRole('status')).toHaveTextContent(en['room.ended.host'])
+      fireEvent.click(button('Rematch')!)
+      expect(lastSent()).toEqual({ t: 'rematch' })
+    })
+
+    it('disables the rematch with a hint below the minimum', async () => {
+      await inStatus('ended', { others: 0 })
+      expect(button('Rematch')).toBeDisabled()
+      const hint = screen.getByText('Need at least 2 seated players to start')
+      expect(button('Rematch')).toHaveAttribute('aria-describedby', hint.id)
+    })
+
+    it('goes back to the waiting room', async () => {
+      await inStatus('ended')
+      fireEvent.click(button('Back to waiting room')!)
+      expect(lastSent()).toEqual({ t: 'reopen' })
+    })
+
+    it('gives everyone else neither', async () => {
+      await inStatus('ended', { host: false })
+      expect(button('Rematch')).toBeNull()
+      expect(button('Back to waiting room')).toBeNull()
+    })
+  })
+
+  describe('countdowns', () => {
+    it('shows what is running, and stops showing it', async () => {
+      await inStatus('playing')
+      expect(screen.queryByRole('timer')).toBeNull()
+
+      serverSays(
+        JSON.stringify({
+          t: 'timer',
+          timers: [{ id: 'turn', remainingMs: 5_000, totalMs: 30_000 }],
+        }),
+      )
+      expect(screen.getByRole('timer')).toHaveTextContent(/^5s/)
+
+      serverSays(JSON.stringify({ t: 'timer', timers: [] }))
+      expect(screen.queryByRole('timer')).toBeNull()
+    })
+  })
+})
+
+describe('host controls in the waiting room, over the wire', () => {
+  const lastSent = () => JSON.parse(FakeWebSocket.last.sent.at(-1) as string)
+
+  it('sends options from the form', async () => {
+    await joined()
+    const limit = screen.getByRole('spinbutton')
+    fireEvent.change(limit, { target: { value: '77' } })
+    fireEvent.blur(limit)
+    expect(lastSent()).toEqual({
+      t: 'set_options',
+      options: { dice: 'four-sided', turnLimit: 77 },
+    })
+  })
+
+  it('sends dissolve only after the confirmation', async () => {
+    await joined()
+    const before = FakeWebSocket.last.sent.length
+    fireEvent.click(screen.getByRole('button', { name: 'Dissolve room' }))
+    expect(FakeWebSocket.last.sent).toHaveLength(before)
+    const dialog = screen.getByRole('dialog', { name: 'Dissolve this room?' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Dissolve room' }))
+    expect(lastSent()).toEqual({ t: 'dissolve' })
+  })
+})
+
 describe('closes', () => {
   async function closedBeforeWelcome(code: number) {
     localStorage.setItem(NICKNAME_KEY, 'Al')
@@ -361,6 +544,33 @@ describe('closes', () => {
 
     socketOpens()
     expect(FakeWebSocket.last.joins).toEqual([{ t: 'join', name: 'Al', token: TOKEN_A }])
+  })
+
+  describe.each([
+    ['kicked', CloseCode.kicked, 'The host removed you'],
+    ['dissolved', CloseCode.dissolved, 'closed this room'],
+  ])('%s', (_, code, text) => {
+    it('after welcome: says so, with the lobby link and no retry', async () => {
+      await joined()
+      serverCloses(code)
+      expect(screen.getByRole('alert')).toHaveTextContent(text)
+      expect(retryButton()).not.toBeInTheDocument()
+      expect(backLink()).toBeInTheDocument()
+      expect(FakeWebSocket.instances).toHaveLength(1)
+    })
+
+    it('before welcome: says the same', async () => {
+      await closedBeforeWelcome(code)
+      expect(screen.getByRole('alert')).toHaveTextContent(text)
+      expect(retryButton()).not.toBeInTheDocument()
+      expect(backLink()).toBeInTheDocument()
+    })
+  })
+
+  it('kicked: keeps the seat token for the ban to recognise', async () => {
+    await joined()
+    serverCloses(CloseCode.kicked)
+    expect(localStorage.getItem(SEAT_KEY)).toBe(TOKEN_A)
   })
 
   it('replaced: another tab has it, and nothing retries', async () => {

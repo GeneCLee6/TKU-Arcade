@@ -17,8 +17,9 @@
 // 3. `action` carries a game action. RoomDO decides who sent it from the socket (`Actor`), runs
 //    `applyAction`, and on success everyone gets their `patch`. A refusal goes to the sender only,
 //    as `error` with code `game_error`, and nobody else hears of it.
-// 4. `timer` replaces the list of countdowns running now (GameModule.timers), after `welcome` and
-//    whenever it changes. Times are durations, not clock times: browsers' clocks disagree.
+// 4. `timer` replaces the list of countdowns running now (GameModule.timers), after `welcome` if any
+//    runs, before a `snapshot` and whenever it changes. Times are durations, not clock times:
+//    browsers' clocks disagree.
 // 5. `chat` goes to everyone in the room (the sender too: that is its acknowledgement). While the
 //    game says `chatLocked`, it is refused with `chat_locked`. (B4 ports the limits, e1-t07; until
 //    then every `chat` is refused with `unavailable`.)
@@ -33,9 +34,19 @@
 //    joining later is a spectator. `ready` lets a seated member say they are set; it only informs
 //    the others, leaving the seat or starting a game clears it. `start` (host only, at least
 //    `RoomInfo.minPlayers` seated, ready or not) begins the game: the seated members, in seat order,
-//    are renumbered 0, 1, ... n - 1, as games expect. When the game is over the room is `ended`,
-//    until `reopen` (host only) drops the game and goes back to `waiting` with everyone in their
-//    seats.
+//    are renumbered 0, 1, ... n - 1, as games expect. When the game is over the room is `ended`.
+// 9. What only the host can do. `reopen`, from `playing` or `ended`, drops the game and goes back to
+//    `waiting` with everyone in their seats. `rematch`, from `ended`, starts a new game with whoever
+//    is seated. `set_game`, from any status, drops any game and goes to `waiting` with the new game
+//    and its options; a seat the new game does not have moves its member to a free seat or out of
+//    any seat. `set_options`, only while `waiting`, replaces the rule options. Both clear `ready`,
+//    since nobody has said they are set for these rules. `transfer` hands the host to an online
+//    member. `kick` removes a member (also an offline one) and closes their socket with
+//    CloseCode.kicked; their seat token cannot join again for KICK_BAN_MS. During a game the seat
+//    stays empty: the game may wait for it, and `reopen` is the way out until B4's skip. `dissolve`
+//    closes every socket with CloseCode.dissolved and deletes the room for good.
+//    A host offline for RECONNECT_GRACE_MS loses the host to the earliest member to join who is
+//    online, seated ones first, and comes back as an ordinary member.
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
@@ -54,6 +65,8 @@ export const STALE_AFTER_MS = 45_000
 export const JOIN_TIMEOUT_MS = 10_000
 /** How long a disconnected member keeps its seat without being marked offline (AC-2.3) */
 export const RECONNECT_GRACE_MS = 45_000
+/** How long a kicked member's seat token cannot join again (E1) */
+export const KICK_BAN_MS = 5 * 60_000
 /** How often the room looks for sockets past those limits, so a close can come this much later */
 export const SWEEP_INTERVAL_MS = 15_000
 /** Members a room keeps, seated or not, online or not; someone new past this gets roomFull */
@@ -83,6 +96,10 @@ export const CloseCode = {
   roomFull: 4409,
   /** The same token joined from another socket (a second tab, or a reload that beat the close) */
   replaced: 4410,
+  /** The host removed this member, or this token was removed less than KICK_BAN_MS ago */
+  kicked: 4411,
+  /** The host dissolved the room; it no longer exists */
+  dissolved: 4412,
   /** A message that does not parse */
   badMessage: 4422,
 } as const
@@ -154,7 +171,9 @@ export type PatchMessage = { t: 'patch'; rev: number; ops: PatchOp[] }
  * - `wrong_status`: not possible in the room's current status (`sit` during a game, ...)
  * - `bad_seat`: `sit` on a seat number the room does not have
  * - `seat_taken`: `sit` on someone else's seat
- * - `not_enough_players`: `start` with fewer than `RoomInfo.minPlayers` seated
+ * - `not_enough_players`: `start` or `rematch` with fewer than `RoomInfo.minPlayers` seated
+ * - `bad_member`: `kick` of yourself or nobody; `transfer` to yourself, nobody or someone offline
+ * - `bad_game`: `set_game` with a game this server does not have
  * - `game_failed`: the game module threw (a bug, not your mistake); nothing changed
  * - `unavailable`: this server does not do that yet (`chat` until e1-t07)
  */
@@ -169,6 +188,8 @@ export type ErrorCode =
   | 'bad_seat'
   | 'seat_taken'
   | 'not_enough_players'
+  | 'bad_member'
+  | 'bad_game'
   | 'game_failed'
   | 'unavailable'
 
@@ -233,8 +254,26 @@ export type ReadyMessage = { t: 'ready'; ready: boolean }
 /** The host begins the game */
 export type StartMessage = { t: 'start' }
 
-/** The host takes an `ended` room back to `waiting` */
+/** The host takes a `playing` or `ended` room back to `waiting`, dropping the game */
 export type ReopenMessage = { t: 'reopen' }
+
+/** The host starts a new game from an `ended` room, with whoever is seated */
+export type RematchMessage = { t: 'rematch' }
+
+/** The host removes a member from the room; their token cannot join again for KICK_BAN_MS */
+export type KickMessage = { t: 'kick'; member: string }
+
+/** The host hands the host to another online member */
+export type TransferMessage = { t: 'transfer'; member: string }
+
+/** The host deletes the room for everyone */
+export type DissolveMessage = { t: 'dissolve' }
+
+/** The host changes the game; back to `waiting`. Options the game does not accept get defaults */
+export type SetGameMessage = { t: 'set_game'; gameId: string; options?: OptionValues }
+
+/** The host replaces the rule options while `waiting`. A missing or invalid one gets its default */
+export type SetOptionsMessage = { t: 'set_options'; options: OptionValues }
 
 export type ClientMessage =
   | JoinMessage
@@ -245,6 +284,12 @@ export type ClientMessage =
   | ReadyMessage
   | StartMessage
   | ReopenMessage
+  | RematchMessage
+  | KickMessage
+  | TransferMessage
+  | DissolveMessage
+  | SetGameMessage
+  | SetOptionsMessage
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -267,6 +312,9 @@ export type RoomSummary = {
 
 // ── Parsing ──────────────────────────────────────────────────────────────────────────────────
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
 function parseObject(raw: string, maxChars: number): Record<string, unknown> | null {
   if (raw.length > maxChars) return null
   let value: unknown
@@ -275,9 +323,7 @@ function parseObject(raw: string, maxChars: number): Record<string, unknown> | n
   } catch {
     return null
   }
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
+  return isPlainObject(value) ? value : null
 }
 
 // Control characters and the bidirectional overrides that could make a name render as someone
@@ -374,6 +420,25 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return { t: 'start' }
     case 'reopen':
       return { t: 'reopen' }
+    case 'rematch':
+      return { t: 'rematch' }
+    case 'dissolve':
+      return { t: 'dissolve' }
+    case 'kick':
+    case 'transfer':
+      return typeof value.member === 'string' && value.member !== ''
+        ? { t: value.t, member: value.member }
+        : null
+    case 'set_game':
+      if (typeof value.gameId !== 'string' || value.gameId === '') return null
+      if (value.options === undefined) return { t: 'set_game', gameId: value.gameId }
+      return isPlainObject(value.options)
+        ? { t: 'set_game', gameId: value.gameId, options: value.options as OptionValues }
+        : null
+    case 'set_options':
+      return isPlainObject(value.options)
+        ? { t: 'set_options', options: value.options as OptionValues }
+        : null
     default:
       return null
   }

@@ -5,9 +5,11 @@ import { diff, type JsonValue } from '../shared/patch.ts'
 import {
   CloseCode,
   JOIN_TIMEOUT_MS,
+  KICK_BAN_MS,
   MAX_CONNECTIONS,
   MAX_MEMBERS,
   PROTOCOL_VERSION,
+  RECONNECT_GRACE_MS,
   STALE_AFTER_MS,
   SWEEP_INTERVAL_MS,
   parseClientMessage,
@@ -18,8 +20,19 @@ import {
   type RoomSummary,
   type RoomView,
   type ServerMessage,
+  type TimerInfo,
 } from '../shared/protocol.ts'
-import { beginGame, playAction, projectFor, type StoredGame } from './room-turn.ts'
+import {
+  beginGame,
+  dueTimer,
+  nextTimerAt,
+  playAction,
+  projectFor,
+  spendTimer,
+  timerInfos,
+  type ActionOutcome,
+  type StoredGame,
+} from './room-turn.ts'
 
 export type RoomRecord = {
   id: string
@@ -31,6 +44,8 @@ export type RoomRecord = {
   /** Null until the first member joins */
   hostId: string | null
   createdAt: number
+  /** Seat tokens that cannot join yet. Never part of a view */
+  bans: { token: string; until: number }[]
 }
 
 export type MemberRecord = {
@@ -42,6 +57,8 @@ export type MemberRecord = {
   ready: boolean
   /** The socket this member is on now; null while offline */
   conn: string | null
+  /** When the socket went; null while online */
+  offlineAt: number | null
 }
 
 /** One open socket, as the socket itself remembers it through hibernation */
@@ -73,6 +90,8 @@ export type RoomHostDeps = {
     saveStep(index: number, step: ReplayStep<JsonValue>): void
     /** Forgets the first `count` steps */
     dropSteps(count: number): void
+    /** Forgets the whole room */
+    clearAll(): void
   }
   games(id: string): AnyGameModule | null
   now(): number
@@ -115,22 +134,30 @@ export class RoomHost {
    * socket is not among them lost it in a restart, which closes every socket and tells nobody.
    */
   restore(stored: StoredRoom, sockets: OpenSocket[], alarmAt: number | null): void {
-    this.room = stored.room
+    // A room or game from before bans and timers existed has neither
+    this.room = stored.room && { ...stored.room, bans: stored.room.bans ?? [] }
     this.rev = stored.rev
-    this.game = stored.game
+    this.game = stored.game && { ...stored.game, timers: stored.game.timers ?? [] }
     this.members.clear()
     this.conns.clear()
     for (const { conn, openedAt } of sockets) {
       // `heartbeat` brings lastSeen up to date before each sweep
       this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null })
     }
-    this.sweepAt = alarmAt ?? (sockets.length > 0 ? this.deps.now() + SWEEP_INTERVAL_MS : null)
+    // The alarm may be a game timer's, a long way off: sweeps still come every interval
+    const nextSweep = this.deps.now() + SWEEP_INTERVAL_MS
+    this.sweepAt = sockets.length > 0 ? Math.min(alarmAt ?? nextSweep, nextSweep) : null
     for (const record of stored.members) {
-      // A room from before `ready` existed has members without it
+      // A room from before `ready` and `offlineAt` existed has members without them
       const member = { ...record, ready: record.ready === true }
       const conn = member.conn === null ? undefined : this.conns.get(member.conn)
       if (conn) conn.member = member.id
-      this.members.set(member.id, conn ? member : { ...member, conn: null })
+      this.members.set(
+        member.id,
+        conn
+          ? { ...member, offlineAt: null }
+          : { ...member, conn: null, offlineAt: member.offlineAt ?? this.deps.now() },
+      )
     }
   }
 
@@ -149,6 +176,7 @@ export class RoomHost {
       maxSeats: module.meta.maxPlayers,
       hostId: null,
       createdAt: this.deps.now(),
+      bans: [],
     }
     this.deps.storage.saveRoom(this.room)
     return true
@@ -208,6 +236,8 @@ export class RoomHost {
     }
     switch (message.t) {
       case 'resync':
+        // It also clears a countdown whose ending was the message that went missing
+        this.deps.sockets.send(conn, { t: 'timer', timers: this.timers() })
         this.deps.sockets.send(conn, {
           t: 'snapshot',
           rev: this.rev,
@@ -228,6 +258,24 @@ export class RoomHost {
         return
       case 'reopen':
         this.reopen(conn, member)
+        return
+      case 'rematch':
+        this.rematch(conn, member)
+        return
+      case 'kick':
+        this.kick(conn, member, message.member)
+        return
+      case 'transfer':
+        this.transfer(conn, member, message.member)
+        return
+      case 'dissolve':
+        this.dissolve(conn, member)
+        return
+      case 'set_game':
+        this.setGame(conn, member, message.gameId, message.options)
+        return
+      case 'set_options':
+        this.setOptions(conn, member, message.options)
         return
       case 'chat':
         // e1-t07
@@ -256,7 +304,10 @@ export class RoomHost {
     if (connection && at > connection.lastSeen) connection.lastSeen = at
   }
 
-  /** The alarm: closes sockets that never joined or went silent */
+  /**
+   * The alarm, for whichever job it came for: closes sockets that never joined or went silent, fires
+   * the game's timers that ran out and replaces a host who has been gone too long.
+   */
   sweep(): void {
     const now = this.deps.now()
     for (const [conn, connection] of [...this.conns]) {
@@ -268,17 +319,25 @@ export class RoomHost {
         this.drop(conn, CloseCode.stale, connection.member === null ? 'no join' : 'no heartbeat')
       }
     }
+    this.fireTimers(now)
+    this.replaceAbsentHost(now)
     this.sweepAt = this.conns.size > 0 ? now + SWEEP_INTERVAL_MS : null
   }
 
-  /** When the alarm should fire next; null for no alarm. e1-t10 and e2-t08 add their jobs here */
+  /** When the alarm should fire next; null for no alarm. e1-t10 adds its job here */
   nextAlarm(): number | null {
-    return this.sweepAt
+    const timerAt = this.game && this.room?.status === 'playing' ? nextTimerAt(this.game) : null
+    if (timerAt === null) return this.sweepAt
+    return this.sweepAt === null ? timerAt : Math.min(this.sweepAt, timerAt)
   }
 
   // ── What members do ────────────────────────────────────────────────────────────────────────
 
   private join(conn: string, connection: Connection, name: string, token: string | null): void {
+    if (token !== null && this.isBanned(token)) {
+      this.drop(conn, CloseCode.kicked, 'kicked')
+      return
+    }
     const known = token === null ? undefined : this.findByToken(token)
     if (known) {
       if (known.conn !== null) {
@@ -288,6 +347,7 @@ export class RoomHost {
       }
       this.change(() => {
         known.conn = conn
+        known.offlineAt = null
         connection.member = known.id
         this.saveMembers()
       })
@@ -309,6 +369,7 @@ export class RoomHost {
       seat: this.lowestFreeSeat(),
       ready: false,
       conn,
+      offlineAt: null,
     }
     this.change(() => {
       const room = this.requireRoom()
@@ -353,6 +414,18 @@ export class RoomHost {
     const room = this.requireRoom()
     if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
     if (room.status !== 'waiting') return this.refuse(conn, 'wrong_status')
+    this.beginFromSeats(conn, room)
+  }
+
+  private rematch(conn: string, member: MemberRecord): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    if (room.status !== 'ended') return this.refuse(conn, 'wrong_status')
+    this.beginFromSeats(conn, room)
+  }
+
+  /** A new game for whoever is seated, in place of the finished one if there is one */
+  private beginFromSeats(conn: string, room: RoomRecord): void {
     const seated = [...this.members.values()]
       .filter((other) => other.seat !== null)
       .sort((a, b) => (a.seat as number) - (b.seat as number))
@@ -365,8 +438,10 @@ export class RoomHost {
         seated.map((_, id) => ({ id })),
         room.options,
         this.deps.newSeed(),
+        this.deps.now(),
       )
     if (!game) return this.refuse(conn, 'game_failed')
+    const oldSteps = this.game?.steps ?? 0
     this.change(() => {
       seated.forEach((other, index) => {
         other.seat = index
@@ -374,6 +449,7 @@ export class RoomHost {
       // The next waiting room starts over
       for (const other of this.members.values()) other.ready = false
       this.saveMembers()
+      this.deps.storage.dropSteps(oldSteps)
       this.game = game
       this.deps.storage.saveGame(game)
       room.status = 'playing'
@@ -389,16 +465,24 @@ export class RoomHost {
     if (member.seat === null) return this.refuse(conn, 'not_seated')
     const module = this.deps.games(game.gameId)
     if (!module) return this.refuse(conn, 'game_failed')
-    const outcome = playAction(module, game, action, member.seat)
+    const outcome = playAction(module, game, action, member.seat, this.deps.now())
     if (outcome.kind === 'refused') {
       this.deps.sockets.send(conn, { t: 'error', code: 'game_error', error: outcome.error })
       return
     }
     if (outcome.kind === 'failed') return this.refuse(conn, 'game_failed')
+    this.accept(room, game.steps, outcome)
+  }
+
+  private accept(
+    room: RoomRecord,
+    step: number,
+    outcome: Extract<ActionOutcome, { kind: 'accepted' }>,
+  ): void {
     this.change(() => {
       this.game = outcome.game
       this.deps.storage.saveGame(outcome.game)
-      this.deps.storage.saveStep(game.steps, outcome.step)
+      this.deps.storage.saveStep(step, outcome.step)
       if (outcome.over) {
         room.status = 'ended'
         this.deps.storage.saveRoom(room)
@@ -406,18 +490,160 @@ export class RoomHost {
     })
   }
 
+  /**
+   * Every timer that ran out, as `actor: 'system'`. Each one is spent first, so that an action the
+   * game refuses, or a module that throws, cannot make the room fire it for ever.
+   */
+  private fireTimers(now: number): void {
+    const room = this.room
+    if (!room) return
+    while (room.status === 'playing' && this.game) {
+      const game = this.game
+      const timer = dueTimer(game, now)
+      if (!timer) return
+      const spent = spendTimer(game, timer.id)
+      const module = this.deps.games(game.gameId)
+      const outcome: ActionOutcome = module
+        ? playAction(module, spent, timer.action, 'system', now)
+        : { kind: 'failed' }
+      if (outcome.kind === 'accepted') {
+        this.accept(room, game.steps, outcome)
+        continue
+      }
+      if (outcome.kind === 'refused') {
+        // A timer's action is the module's own: being refused is a bug, not a player's mistake
+        console.error(`game ${game.gameId}: timer ${timer.id} refused: ${outcome.error.gameError}`)
+      }
+      this.change(() => {
+        this.game = spent
+        this.deps.storage.saveGame(spent)
+      })
+    }
+  }
+
+  private replaceAbsentHost(now: number): void {
+    const room = this.room
+    const host = room?.hostId == null ? undefined : this.members.get(room.hostId)
+    if (!room || !host || host.conn !== null) return
+    if (host.offlineAt === null || now - host.offlineAt < RECONNECT_GRACE_MS) return
+    const online = [...this.members.values()].filter((other) => other.conn !== null)
+    const next = online.find((other) => other.seat !== null) ?? online[0]
+    if (!next) return
+    this.change(() => {
+      room.hostId = next.id
+      this.deps.storage.saveRoom(room)
+    })
+  }
+
   private reopen(conn: string, member: MemberRecord): void {
     const room = this.requireRoom()
     if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
-    if (room.status !== 'ended') return this.refuse(conn, 'wrong_status')
-    const steps = this.game?.steps ?? 0
+    if (room.status === 'waiting') return this.refuse(conn, 'wrong_status')
     this.change(() => {
-      this.game = null
-      this.deps.storage.saveGame(null)
-      this.deps.storage.dropSteps(steps)
+      this.dropGame()
       room.status = 'waiting'
       this.deps.storage.saveRoom(room)
     })
+  }
+
+  private setGame(
+    conn: string,
+    member: MemberRecord,
+    gameId: string,
+    rawOptions: OptionValues | undefined,
+  ): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    const module = this.deps.games(gameId)
+    if (!module) return this.refuse(conn, 'bad_game')
+    this.change(() => {
+      this.dropGame()
+      room.gameId = gameId
+      room.options = parseOptions(module.options, rawOptions)
+      room.minPlayers = module.meta.minPlayers
+      room.maxSeats = module.meta.maxPlayers
+      room.status = 'waiting'
+      this.deps.storage.saveRoom(room)
+      // After the new maxSeats: those without a seat in this game take one that is left, if any
+      const others = [...this.members.values()]
+      const homeless = others.filter((other) => other.seat !== null && other.seat >= room.maxSeats)
+      for (const other of homeless) other.seat = null
+      for (const other of homeless) other.seat = this.lowestFreeSeat()
+      for (const other of others) other.ready = false
+      this.saveMembers()
+    })
+  }
+
+  private setOptions(conn: string, member: MemberRecord, rawOptions: OptionValues): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    if (room.status !== 'waiting') return this.refuse(conn, 'wrong_status')
+    const module = this.deps.games(room.gameId)
+    if (!module) return this.refuse(conn, 'bad_game')
+    this.change(() => {
+      room.options = parseOptions(module.options, rawOptions)
+      this.deps.storage.saveRoom(room)
+      for (const other of this.members.values()) other.ready = false
+      this.saveMembers()
+    })
+  }
+
+  private transfer(conn: string, member: MemberRecord, targetId: string): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    const target = this.members.get(targetId)
+    if (!target || target === member || target.conn === null) {
+      return this.refuse(conn, 'bad_member')
+    }
+    this.change(() => {
+      room.hostId = target.id
+      this.deps.storage.saveRoom(room)
+    })
+  }
+
+  private kick(conn: string, member: MemberRecord, targetId: string): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    const target = this.members.get(targetId)
+    if (!target || target === member) return this.refuse(conn, 'bad_member')
+    if (target.conn !== null) {
+      // Gone first, so that nothing below is sent to it and its close tells nobody it went offline
+      this.conns.delete(target.conn)
+      this.deps.sockets.close(target.conn, CloseCode.kicked, 'kicked')
+    }
+    const now = this.deps.now()
+    this.change(() => {
+      this.members.delete(target.id)
+      this.saveMembers()
+      room.bans = [
+        ...room.bans.filter((ban) => ban.until > now),
+        { token: target.token, until: now + KICK_BAN_MS },
+      ]
+      this.deps.storage.saveRoom(room)
+    })
+  }
+
+  private dissolve(conn: string, member: MemberRecord): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    for (const open of this.conns.keys()) {
+      this.deps.sockets.close(open, CloseCode.dissolved, 'dissolved')
+    }
+    this.conns.clear()
+    this.members.clear()
+    this.room = null
+    this.game = null
+    this.rev = 0
+    this.sweepAt = null
+    this.deps.storage.clearAll()
+  }
+
+  /** Part of a `change`: forgets the game and its steps, if there is one */
+  private dropGame(): void {
+    const steps = this.game?.steps ?? 0
+    this.game = null
+    this.deps.storage.saveGame(null)
+    this.deps.storage.dropSteps(steps)
   }
 
   // ── Telling the sockets ────────────────────────────────────────────────────────────────────
@@ -428,6 +654,7 @@ export class RoomHost {
    * empty if nothing they can see changed, so a gap always means a message went missing.
    */
   private change(mutate: () => void): void {
+    const timersBefore = this.timersKey()
     const viewBefore = this.viewBuilder()
     const before = new Map<string, RoomView>()
     for (const [conn, { member }] of this.conns) {
@@ -448,6 +675,22 @@ export class RoomHost {
         ops: diff(previous as JsonValue, viewAfter(record) as JsonValue),
       })
     }
+    if (this.timersKey() !== timersBefore) {
+      const timers = this.timers()
+      for (const conn of before.keys()) {
+        if (this.conns.has(conn)) this.deps.sockets.send(conn, { t: 'timer', timers })
+      }
+    }
+  }
+
+  private timers(): TimerInfo[] {
+    return timerInfos(this.game, this.deps.now())
+  }
+
+  /** Changes when a countdown starts or stops, not as time passes */
+  private timersKey(): string {
+    const running = (this.game?.timers ?? []).filter((timer) => !timer.spent)
+    return JSON.stringify(running.map((timer) => [timer.id, timer.endsAt]))
   }
 
   /**
@@ -498,6 +741,8 @@ export class RoomHost {
       rev: this.rev,
       state: this.viewBuilder()(member),
     })
+    const timers = this.timers()
+    if (timers.length > 0) this.deps.sockets.send(conn, { t: 'timer', timers })
   }
 
   private refuse(conn: string, code: ErrorCode): void {
@@ -518,12 +763,18 @@ export class RoomHost {
     if (!member || member.conn !== conn) return
     this.change(() => {
       member.conn = null
+      member.offlineAt = this.deps.now()
       this.saveMembers()
     })
   }
 
   private saveMembers(): void {
     this.deps.storage.saveMembers([...this.members.values()])
+  }
+
+  private isBanned(token: string): boolean {
+    const now = this.deps.now()
+    return this.requireRoom().bans.some((ban) => ban.token === token && ban.until > now)
   }
 
   private findByToken(token: string): MemberRecord | undefined {

@@ -19,6 +19,19 @@ import {
   type Viewer,
 } from '../shared/games/types.ts'
 import type { JsonValue } from '../shared/patch.ts'
+import type { TimerInfo } from '../shared/protocol.ts'
+
+/**
+ * A countdown the game's state asked for, with the time the room gave it. `spent` once it has fired:
+ * it stays while the state still lists its id, so that it does not start over (`TimerSpec`).
+ */
+export type RunningTimer = {
+  id: string
+  ms: number
+  action: JsonValue
+  endsAt: number
+  spent: boolean
+}
 
 /**
  * A running or finished game as storage holds it. Never sent to a browser. With its steps
@@ -33,6 +46,7 @@ export type StoredGame = {
   match: Match<JsonValue>
   /** How many steps have been stored */
   steps: number
+  timers: RunningTimer[]
 }
 
 export type ActionOutcome =
@@ -51,16 +65,78 @@ function projectAll(module: AnyGameModule, game: StoredGame): void {
   projectGame(module, game.match.state, 'spectator')
 }
 
+/**
+ * What `state` asks for: an id already running keeps its time, a new one starts now, any other stops.
+ * At least 1 ms, so that a timer started while timers fire is never due in the same round.
+ */
+function nextTimers(
+  module: AnyGameModule,
+  state: JsonValue,
+  running: readonly RunningTimer[],
+  now: number,
+): RunningTimer[] {
+  if (module.isOver(state)) return []
+  return (module.timers?.(state) ?? []).map(({ id, ms, action }) => {
+    const known = running.find((timer) => timer.id === id)
+    return known
+      ? { ...known, action }
+      : { id, ms, action, endsAt: now + Math.max(ms, 1), spent: false }
+  })
+}
+
+/** The timer that should fire first at `now`, if any */
+export function dueTimer(game: StoredGame, now: number): RunningTimer | null {
+  return (
+    game.timers
+      .filter((timer) => !timer.spent && timer.endsAt <= now)
+      .sort((a, b) => a.endsAt - b.endsAt)[0] ?? null
+  )
+}
+
+/** `game` with this timer spent, whatever its action then does */
+export function spendTimer(game: StoredGame, id: string): StoredGame {
+  return {
+    ...game,
+    timers: game.timers.map((timer) => (timer.id === id ? { ...timer, spent: true } : timer)),
+  }
+}
+
+/** When the next timer of this game runs out; null when none is running */
+export function nextTimerAt(game: StoredGame): number | null {
+  const times = game.timers.filter((timer) => !timer.spent).map((timer) => timer.endsAt)
+  return times.length > 0 ? Math.min(...times) : null
+}
+
+/** The countdowns as browsers get them: durations, since their clocks disagree */
+export function timerInfos(game: StoredGame | null, now: number): TimerInfo[] {
+  return (game?.timers ?? [])
+    .filter((timer) => !timer.spent)
+    .map((timer) => ({
+      id: timer.id,
+      remainingMs: Math.max(timer.endsAt - now, 0),
+      totalMs: timer.ms,
+    }))
+}
+
 /** The new game, or null when the module could not start one or could not show the result */
 export function beginGame(
   module: AnyGameModule,
   seats: Seat[],
   options: OptionValues,
   seed: number,
+  now: number,
 ): StoredGame | null {
   try {
     const match = startMatch(module, seats, options, seed)
-    const game: StoredGame = { gameId: module.id, seats, options, seed, match, steps: 0 }
+    const game: StoredGame = {
+      gameId: module.id,
+      seats,
+      options,
+      seed,
+      match,
+      steps: 0,
+      timers: nextTimers(module, match.state, [], now),
+    }
     projectAll(module, game)
     return game
   } catch (error) {
@@ -78,11 +154,17 @@ export function playAction(
   game: StoredGame,
   action: JsonValue,
   actor: Actor,
+  now: number,
 ): ActionOutcome {
   try {
     const match = applyAction(module, structuredClone(game.match), action, actor)
     if (isGameError(match)) return { kind: 'refused', error: match }
-    const next: StoredGame = { ...game, match, steps: game.steps + 1 }
+    const next: StoredGame = {
+      ...game,
+      match,
+      steps: game.steps + 1,
+      timers: nextTimers(module, match.state, game.timers, now),
+    }
     projectAll(module, next)
     return {
       kind: 'accepted',

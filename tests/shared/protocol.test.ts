@@ -256,3 +256,39 @@ describe('roomSocketPath', () => {
     expect(roomSocketPath('abc')).toBe(`/ws/abc?v=${PROTOCOL_VERSION}`)
   })
 })
+
+describe('host control messages', () => {
+  const parse = (message: unknown) => parseClientMessage(JSON.stringify(message))
+
+  it('parse', () => {
+    expect(parse({ t: 'rematch' })).toEqual({ t: 'rematch' })
+    expect(parse({ t: 'dissolve', extra: 1 })).toEqual({ t: 'dissolve' })
+    expect(parse({ t: 'kick', member: 'm', extra: 1 })).toEqual({ t: 'kick', member: 'm' })
+    expect(parse({ t: 'transfer', member: 'm' })).toEqual({ t: 'transfer', member: 'm' })
+    expect(parse({ t: 'set_game', gameId: 'g' })).toEqual({ t: 'set_game', gameId: 'g' })
+    expect(parse({ t: 'set_game', gameId: 'g', options: { a: 1 } })).toEqual({
+      t: 'set_game',
+      gameId: 'g',
+      options: { a: 1 },
+    })
+    expect(parse({ t: 'set_options', options: {} })).toEqual({ t: 'set_options', options: {} })
+  })
+
+  it('do not parse with the wrong shape', () => {
+    for (const bad of [
+      { t: 'kick' },
+      { t: 'kick', member: '' },
+      { t: 'kick', member: 1 },
+      { t: 'transfer', member: null },
+      { t: 'set_game' },
+      { t: 'set_game', gameId: 1 },
+      { t: 'set_game', gameId: 'g', options: [] },
+      { t: 'set_game', gameId: 'g', options: null },
+      { t: 'set_options' },
+      { t: 'set_options', options: [] },
+      { t: 'set_options', options: 'x' },
+    ]) {
+      expect(parse(bad), JSON.stringify(bad)).toBeNull()
+    }
+  })
+})
