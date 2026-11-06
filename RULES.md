@@ -7,7 +7,7 @@
 | 位置 | 職責 | 禁止 |
 | --- | --- | --- |
 | `shared/` | 前後端共用的型別與純函式（協定、id、`GameModule` 與各遊戲規則） | React、DOM、Cloudflare API |
-| `shared/games/<id>/` | 一款遊戲的 `GameModule`：`setup`、`reduce`、`view` | 隨機數不經注入的 `Rng`、讀時間 |
+| `shared/games/<id>/` | 一款遊戲的 `GameModule`：`init`、`reduce`、`view`、`legalActions`、`isOver`、`result` | 隨機數不經注入的 `Rng`、讀時間 |
 | `worker/app.ts` | HTTP 路由：`/api/*`、`/ws/*`，其餘交給靜態資產 | 房間狀態（屬於 RoomDO） |
 | `worker/room.ts` | `RoomDO`：每房一個，房間與遊戲狀態的唯一真相 | 前端邏輯 |
 | `worker/lobby.ts` | `LobbyDO`：全站一個，公開房列表 | 房間內的狀態 |
@@ -20,7 +20,7 @@
 
 ## 2. 規則在伺服器
 
-- 遊戲狀態只由 RoomDO 呼叫 `GameModule.reduce(state, action)` 改變；前端送 action，收 `view`。
+- 遊戲狀態只由 RoomDO 呼叫 `GameModule.reduce`（經 `shared/games/match.ts`） 改變；前端送 action，收 `view`。
 - 隱藏資訊（手牌、題目答案、別人的角色）只能透過 `view(state, seat)` 裁切；不得把完整 state 送到瀏覽器，也不得靠前端「不顯示」來藏。
 - 權限、輪到誰、計時，都在伺服器判斷；前端的按鈕只是方便，不是把關。
 - 卡丁車例外：物理在瀏覽器跑（自主模擬），但吃道具、命中、圈數、完賽由 RoomDO 裁定（ARCHITECTURE.md §4）。
