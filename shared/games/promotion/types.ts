@@ -51,7 +51,7 @@ export type PromotionState = {
   winner: SeatId | null
 }
 
-export type PromotionAction = { type: 'roll' }
+export type PromotionAction = { type: 'roll' } | { type: 'pass' }
 
 /** What every viewer sees: the whole state, and which seat is theirs */
 export type PromotionView = PromotionState & {

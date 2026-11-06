@@ -1,5 +1,7 @@
+import { CHAT_CHUNK, CHAT_HISTORY, ChatRateLimit, type ChatMessage } from '../shared/chat.ts'
 import type { ReplayStep } from '../shared/games/match.ts'
 import { parseOptions } from '../shared/games/options.ts'
+import { createRng } from '../shared/games/rng.ts'
 import type { AnyGameModule, GameProjection, OptionValues, Viewer } from '../shared/games/types.ts'
 import { diff, type JsonValue } from '../shared/patch.ts'
 import {
@@ -14,6 +16,7 @@ import {
   SWEEP_INTERVAL_MS,
   parseClientMessage,
   uniqueName,
+  type CoverableSeat,
   type ErrorCode,
   type RoomMember,
   type RoomStatus,
@@ -24,6 +27,7 @@ import {
 } from '../shared/protocol.ts'
 import {
   beginGame,
+  coverOptions,
   dueTimer,
   nextTimerAt,
   playAction,
@@ -59,6 +63,8 @@ export type MemberRecord = {
   conn: string | null
   /** When the socket went; null while online */
   offlineAt: number | null
+  /** Offline past RECONNECT_GRACE_MS, as a sweep found; stored, since a view comes from storage */
+  absent: boolean
 }
 
 /** One open socket, as the socket itself remembers it through hibernation */
@@ -70,6 +76,8 @@ export type StoredRoom = {
   members: MemberRecord[]
   rev: number
   game: StoredGame | null
+  /** Any order */
+  chat: ChatMessage[]
 }
 
 export type RoomHostDeps = {
@@ -90,6 +98,10 @@ export type RoomHostDeps = {
     saveStep(index: number, step: ReplayStep<JsonValue>): void
     /** Forgets the first `count` steps */
     dropSteps(count: number): void
+    /** A chat message the room accepted: each is stored on its own, by id */
+    saveChat(message: ChatMessage): void
+    /** A chat message that fell out of the last CHAT_HISTORY */
+    dropChat(id: number): void
     /** Forgets the whole room */
     clearAll(): void
   }
@@ -97,7 +109,7 @@ export type RoomHostDeps = {
   now(): number
   newMemberId(): string
   newToken(): string
-  /** A uint32 for a new game's Rng */
+  /** A uint32 for a new game's Rng, or for picking a turn played for someone */
   newSeed(): number
 }
 
@@ -122,6 +134,12 @@ export class RoomHost {
   private rev = 0
   private game: StoredGame | null = null
   private sweepAt: number | null = null
+  /** The latest CHAT_HISTORY messages, oldest first */
+  private chat: ChatMessage[] = []
+  /** The id of the last message the room accepted (0 before the first) */
+  private chatId = 0
+  /** In memory: forgetting it in an eviction only ever lets a member send sooner */
+  private readonly chatRate = new ChatRateLimit()
   private readonly deps: RoomHostDeps
 
   constructor(deps: RoomHostDeps) {
@@ -138,6 +156,8 @@ export class RoomHost {
     this.room = stored.room && { ...stored.room, bans: stored.room.bans ?? [] }
     this.rev = stored.rev
     this.game = stored.game && { ...stored.game, timers: stored.game.timers ?? [] }
+    this.chat = [...(stored.chat ?? [])].sort((a, b) => a.id - b.id).slice(-CHAT_HISTORY)
+    this.chatId = this.chat.at(-1)?.id ?? 0
     this.members.clear()
     this.conns.clear()
     for (const { conn, openedAt } of sockets) {
@@ -148,14 +168,14 @@ export class RoomHost {
     const nextSweep = this.deps.now() + SWEEP_INTERVAL_MS
     this.sweepAt = sockets.length > 0 ? Math.min(alarmAt ?? nextSweep, nextSweep) : null
     for (const record of stored.members) {
-      // A room from before `ready` and `offlineAt` existed has members without them
-      const member = { ...record, ready: record.ready === true }
+      // A room from before `ready`, `offlineAt` and `absent` existed has members without them
+      const member = { ...record, ready: record.ready === true, absent: record.absent === true }
       const conn = member.conn === null ? undefined : this.conns.get(member.conn)
       if (conn) conn.member = member.id
       this.members.set(
         member.id,
         conn
-          ? { ...member, offlineAt: null }
+          ? { ...member, offlineAt: null, absent: false }
           : { ...member, conn: null, offlineAt: member.offlineAt ?? this.deps.now() },
       )
     }
@@ -278,8 +298,10 @@ export class RoomHost {
         this.setOptions(conn, member, message.options)
         return
       case 'chat':
-        // e1-t07
-        this.refuse(conn, 'unavailable')
+        this.postChat(conn, member, message.text)
+        return
+      case 'cover':
+        this.cover(conn, member, message.seat, message.how)
         return
     }
   }
@@ -306,7 +328,7 @@ export class RoomHost {
 
   /**
    * The alarm, for whichever job it came for: closes sockets that never joined or went silent, fires
-   * the game's timers that ran out and replaces a host who has been gone too long.
+   * the game's timers that ran out and deals with members who have been gone too long.
    */
   sweep(): void {
     const now = this.deps.now()
@@ -320,7 +342,9 @@ export class RoomHost {
       }
     }
     this.fireTimers(now)
-    this.replaceAbsentHost(now)
+    this.markAbsent(now)
+    this.replaceAbsentHost()
+    this.removeAbsentSpectators()
     this.sweepAt = this.conns.size > 0 ? now + SWEEP_INTERVAL_MS : null
   }
 
@@ -348,6 +372,7 @@ export class RoomHost {
       this.change(() => {
         known.conn = conn
         known.offlineAt = null
+        known.absent = false
         connection.member = known.id
         this.saveMembers()
       })
@@ -370,6 +395,7 @@ export class RoomHost {
       ready: false,
       conn,
       offlineAt: null,
+      absent: false,
     }
     this.change(() => {
       const room = this.requireRoom()
@@ -386,7 +412,7 @@ export class RoomHost {
 
   private sit(conn: string, member: MemberRecord, seat: number | null): void {
     const room = this.requireRoom()
-    if (room.status !== 'waiting') return this.refuse(conn, 'wrong_status')
+    if (room.status === 'playing') return this.refuse(conn, 'wrong_status')
     if (seat !== null && seat >= room.maxSeats) return this.refuse(conn, 'bad_seat')
     if (seat === member.seat) return
     const taken =
@@ -521,11 +547,26 @@ export class RoomHost {
     }
   }
 
-  private replaceAbsentHost(now: number): void {
+  private markAbsent(now: number): void {
+    if (!this.room) return
+    const gone = [...this.members.values()].filter(
+      (member) =>
+        !member.absent &&
+        member.conn === null &&
+        member.offlineAt !== null &&
+        now - member.offlineAt >= RECONNECT_GRACE_MS,
+    )
+    if (gone.length === 0) return
+    this.change(() => {
+      for (const member of gone) member.absent = true
+      this.saveMembers()
+    })
+  }
+
+  private replaceAbsentHost(): void {
     const room = this.room
     const host = room?.hostId == null ? undefined : this.members.get(room.hostId)
-    if (!room || !host || host.conn !== null) return
-    if (host.offlineAt === null || now - host.offlineAt < RECONNECT_GRACE_MS) return
+    if (!room || !host || !host.absent) return
     const online = [...this.members.values()].filter((other) => other.conn !== null)
     const next = online.find((other) => other.seat !== null) ?? online[0]
     if (!next) return
@@ -533,6 +574,103 @@ export class RoomHost {
       room.hostId = next.id
       this.deps.storage.saveRoom(room)
     })
+  }
+
+  /** They hold no seat and take up one of MAX_MEMBERS; returning, they are someone new */
+  private removeAbsentSpectators(): void {
+    const room = this.room
+    if (!room) return
+    const gone = [...this.members.values()].filter(
+      (member) => member.absent && member.seat === null && member.id !== room.hostId,
+    )
+    if (gone.length === 0) return
+    this.change(() => {
+      for (const member of gone) {
+        this.members.delete(member.id)
+        this.chatRate.forget(member.id)
+      }
+      this.saveMembers()
+    })
+  }
+
+  /** The seats the game is waiting for whose player is absent or gone, and what each allows */
+  private coverable(): CoverableSeat[] {
+    const game = this.game
+    if (this.room?.status !== 'playing' || !game) return []
+    const module = this.deps.games(game.gameId)
+    if (!module) return []
+    const coverable: CoverableSeat[] = []
+    for (const { id: seat } of game.seats) {
+      if (!this.isSeatVacated(seat)) continue
+      const options = coverOptions(module, game, seat)
+      if (options) {
+        coverable.push({ seat, skip: options.skip !== null, proxy: options.proxy.length > 0 })
+      }
+    }
+    return coverable
+  }
+
+  private isSeatVacated(seat: number): boolean {
+    const holder = [...this.members.values()].find((member) => member.seat === seat)
+    return !holder || holder.absent
+  }
+
+  private cover(conn: string, member: MemberRecord, seat: number, how: 'skip' | 'proxy'): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    const game = this.game
+    const module = game && this.deps.games(game.gameId)
+    const seated = game?.seats.some((other) => other.id === seat) === true
+    if (room.status !== 'playing' || !game || !module || !seated || !this.isSeatVacated(seat)) {
+      return this.refuse(conn, 'cannot_cover')
+    }
+    const options = coverOptions(module, game, seat)
+    if (!options) return this.refuse(conn, 'cannot_cover')
+    const now = this.deps.now()
+    let outcome: ActionOutcome
+    if (how === 'skip') {
+      if (options.skip === null) return this.refuse(conn, 'cannot_cover')
+      outcome = playAction(module, game, options.skip, 'system', now)
+    } else {
+      if (options.proxy.length === 0) return this.refuse(conn, 'cannot_cover')
+      // Not the game's own Rng: which action was picked goes into the steps, like any other action
+      const action = createRng(this.deps.newSeed()).pick(options.proxy)
+      outcome = playAction(module, game, action, seat, now)
+    }
+    if (outcome.kind === 'refused') return this.refuse(conn, 'cannot_cover')
+    if (outcome.kind === 'failed') return this.refuse(conn, 'game_failed')
+    this.accept(room, game.steps, outcome)
+  }
+
+  private postChat(conn: string, member: MemberRecord, text: string): void {
+    const now = this.deps.now()
+    // Before the limit: being refused for a closed chat should not use up someone's allowance
+    if (this.room?.status === 'playing' && this.isChatLocked()) {
+      return this.refuse(conn, 'chat_locked')
+    }
+    if (!this.chatRate.take(member.id, now)) return this.refuse(conn, 'rate_limited')
+    const message: ChatMessage = {
+      id: ++this.chatId,
+      from: member.id,
+      name: member.name,
+      text,
+      at: now,
+    }
+    this.chat.push(message)
+    this.deps.storage.saveChat(message)
+    while (this.chat.length > CHAT_HISTORY) {
+      this.deps.storage.dropChat((this.chat.shift() as ChatMessage).id)
+    }
+    for (const [open, { member: id }] of this.conns) {
+      if (id !== null) this.deps.sockets.send(open, { t: 'chat', messages: [message] })
+    }
+  }
+
+  private isChatLocked(): boolean {
+    const game = this.game
+    const module = game && this.deps.games(game.gameId)
+    if (!game || !module) return false
+    return projectFor(module, game, 'spectator')?.chatLocked === true
   }
 
   private reopen(conn: string, member: MemberRecord): void {
@@ -614,6 +752,7 @@ export class RoomHost {
     const now = this.deps.now()
     this.change(() => {
       this.members.delete(target.id)
+      this.chatRate.forget(target.id)
       this.saveMembers()
       room.bans = [
         ...room.bans.filter((ban) => ban.until > now),
@@ -635,6 +774,8 @@ export class RoomHost {
     this.game = null
     this.rev = 0
     this.sweepAt = null
+    this.chat = []
+    this.chatId = 0
     this.deps.storage.clearAll()
   }
 
@@ -699,6 +840,7 @@ export class RoomHost {
    */
   private viewBuilder(): (member: MemberRecord) => RoomView {
     const room = this.requireRoom()
+    const coverable = this.coverable()
     const shared: RoomView['room'] = {
       id: room.id,
       gameId: room.gameId,
@@ -716,20 +858,22 @@ export class RoomHost {
         ready: member.ready,
         host: member.id === room.hostId,
         online: member.conn !== null,
-        absent: false,
+        absent: member.absent,
       }
     }
     const game = this.game
     const projections = new Map<Viewer, GameProjection | null>()
     return (member) => {
-      if (!game) return { room: shared, members, game: null, coverable: [] }
-      const viewer: Viewer = member.seat ?? 'spectator'
+      if (!game) return { room: shared, members, game: null, coverable }
+      // Someone who took a free seat after the game has no seat in it
+      const inGame = game.seats.some((seat) => seat.id === member.seat)
+      const viewer: Viewer = inGame ? (member.seat as number) : 'spectator'
       let projection = projections.get(viewer)
       if (projection === undefined) {
         projection = projectFor(this.deps.games(game.gameId), game, viewer)
         projections.set(viewer, projection)
       }
-      return { room: shared, members, game: projection, coverable: [] }
+      return { room: shared, members, game: projection, coverable }
     }
   }
 
@@ -744,6 +888,14 @@ export class RoomHost {
     })
     const timers = this.timers()
     if (timers.length > 0) this.deps.sockets.send(conn, { t: 'timer', timers })
+    // Always the first chunk, with `reset`: someone coming back must drop what they have
+    for (let from = 0; from === 0 || from < this.chat.length; from += CHAT_CHUNK) {
+      const messages = this.chat.slice(from, from + CHAT_CHUNK)
+      this.deps.sockets.send(
+        conn,
+        from === 0 ? { t: 'chat', messages, reset: true } : { t: 'chat', messages },
+      )
+    }
   }
 
   private refuse(conn: string, code: ErrorCode): void {

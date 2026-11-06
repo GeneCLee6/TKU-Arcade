@@ -4,8 +4,10 @@
 // A real Durable Object is not involved: @cloudflare/vitest-pool-workers needs Vitest 4 and this
 // repo is on 5.
 import { describe, expect, it, vi } from 'vitest'
+import { CHAT_HISTORY, CHAT_RATE, type ChatMessage } from '../../shared/chat.ts'
 import { replayMatch, type ReplayStep } from '../../shared/games/match.ts'
 import { createRng } from '../../shared/games/rng.ts'
+import { promotion } from '../../shared/games/promotion/rules.ts'
 import { ticTacToe } from '../../shared/games/tictactoe/rules.ts'
 import {
   gameError,
@@ -96,6 +98,7 @@ class World {
   clock = 10_000
   store = new Map<string, string>()
   steps = new Map<number, string>()
+  chat = new Map<number, string>()
   clients = new Map<string, Client>()
   host!: RoomHost
   private nextId = 0
@@ -133,9 +136,12 @@ class World {
         dropSteps: (count) => {
           for (let index = 0; index < count; index++) this.steps.delete(index)
         },
+        saveChat: (message) => this.chat.set(message.id, JSON.stringify(message)),
+        dropChat: (id) => this.chat.delete(id),
         clearAll: () => {
           this.store.clear()
           this.steps.clear()
+          this.chat.clear()
         },
       },
       games: (id) => this.modules[id] ?? null,
@@ -156,6 +162,7 @@ class World {
       members: read('members', []),
       rev: read('rev', 0),
       game: read('game', null),
+      chat: [...this.chat.values()].map((json) => JSON.parse(json) as ChatMessage),
     }
   }
 
@@ -342,13 +349,6 @@ describe('a room', () => {
     expect(a.view?.members[b.you].online).toBe(false)
     world.host.badFrame(a.conn)
     expect(a.closed).toBe(CloseCode.badMessage)
-  })
-
-  it('refuses chat until e1-t07', () => {
-    const world = room()
-    const a = world.join('A')
-    a.send({ t: 'chat', text: 'hi' })
-    expect(a.errors).toEqual([{ t: 'error', code: 'unavailable' }])
   })
 })
 
@@ -1213,12 +1213,13 @@ describe('the host', () => {
     world.disconnect(b)
     world.clock += RECONNECT_GRACE_MS * 2
     world.host.sweep()
-    const stored = world.stored()
-    expect(stored.room?.hostId).toBe(a.you)
-    const back = world.join('B', b.token)
+    expect(world.stored().room?.hostId).toBe(a.you)
+
+    const spectator = world.join('S')
+    spectator.send({ t: 'sit', seat: null })
     world.clock += 1
     world.host.sweep()
-    expect(back.view?.members[b.you].host).toBe(true)
+    expect(spectator.view?.members[spectator.you].host).toBe(true)
   })
 
   it('counts a host lost in a restart as gone from the restart on', () => {
@@ -1505,5 +1506,415 @@ describe('timers', () => {
     const far = world.clock + 10 * SWEEP_INTERVAL_MS
     world.host.restore(world.stored(), world.sockets, far)
     expect(world.host.nextAlarm()).toBeLessThanOrEqual(world.clock + SWEEP_INTERVAL_MS)
+  })
+})
+
+// ── Chat (e1-t07), spectators (e1-t08), absence and cover (e2-t05) ──────────────────────────────
+
+const chats = (client: Client) => client.received.filter((m) => m.t === 'chat')
+const texts = (client: Client) =>
+  chats(client).flatMap((m) => (m.t === 'chat' ? m.messages.map((x) => x.text) : []))
+
+describe('chat', () => {
+  it('goes to everyone, sender and spectators too, stamped by the room', () => {
+    const { world, x, o } = started()
+    const spectator = world.join('Sam')
+    x.send({ t: 'chat', text: '  hello\r\nthere‮ ' })
+    for (const client of [x, o, spectator]) {
+      expect(chats(client).at(-1)).toEqual({
+        t: 'chat',
+        messages: [{ id: 1, from: x.you, name: 'Xia', text: 'hello\nthere', at: world.clock }],
+      })
+    }
+    spectator.send({ t: 'chat', text: 'me too' })
+    expect(texts(x)).toEqual(['hello\nthere', 'me too'])
+  })
+
+  it('does not touch rev, so nobody sees a gap', () => {
+    const { x, o } = started()
+    const rev = o.rev
+    x.send({ t: 'chat', text: 'hi' })
+    expect(o.rev).toBe(rev)
+  })
+
+  it('closes a socket sending what cannot be a message', () => {
+    const { x } = started()
+    x.send({ t: 'chat', text: '   ' })
+    expect(x.closed).toBe(CloseCode.badMessage)
+  })
+
+  it('starts every welcome with a reset, then the history in chunks', () => {
+    const world = room()
+    const a = world.join('A')
+    expect(a.received.at(-1)).toEqual({ t: 'chat', messages: [], reset: true })
+    for (let i = 0; i < 120; i++) {
+      world.clock += CHAT_RATE.windowMs
+      a.send({ t: 'chat', text: `m${i}` })
+    }
+    const later = world.join('Later')
+    const frames = chats(later)
+    expect(frames.map((m) => (m.t === 'chat' ? m.messages.length : 0))).toEqual([50, 50, 20])
+    expect(frames.map((m) => (m.t === 'chat' ? m.reset : null))).toEqual([true, undefined, undefined])
+    expect(texts(later)[0]).toBe('m0')
+    expect(texts(later).at(-1)).toBe('m119')
+  })
+
+  it('keeps the latest ones, in storage too, and ids go on through a restart', () => {
+    const world = room()
+    const a = world.join('A')
+    for (let i = 0; i < CHAT_HISTORY + 5; i++) {
+      world.clock += CHAT_RATE.windowMs
+      a.send({ t: 'chat', text: `m${i}` })
+    }
+    expect(world.chat.size).toBe(CHAT_HISTORY)
+    world.restart()
+    const back = world.join('A', a.token)
+    expect(texts(back)).toHaveLength(CHAT_HISTORY)
+    expect(texts(back)[0]).toBe('m5')
+    world.clock += CHAT_RATE.windowMs
+    back.send({ t: 'chat', text: 'next' })
+    const last = chats(back).at(-1)
+    expect(last?.t === 'chat' && last.messages[0].id).toBe(CHAT_HISTORY + 6)
+  })
+
+  it('limits each member by itself, with the window sliding', () => {
+    const world = room()
+    const a = world.join('A')
+    const b = world.join('B')
+    for (let i = 0; i < CHAT_RATE.count; i++) a.send({ t: 'chat', text: 'x' })
+    expect(a.errors).toEqual([])
+    a.send({ t: 'chat', text: 'too many' })
+    expect(a.errors).toEqual([{ t: 'error', code: 'rate_limited' }])
+    expect(texts(b)).not.toContain('too many')
+    b.send({ t: 'chat', text: 'still fine' })
+    expect(b.errors).toEqual([])
+    world.clock += CHAT_RATE.windowMs
+    a.send({ t: 'chat', text: 'again' })
+    expect(texts(b)).toContain('again')
+  })
+
+  it('is refused while the game locks it, and open again after', () => {
+    const locked = {
+      ...timedGame,
+      id: 'locked',
+      timers: undefined,
+      chatLocked: (state: TimedState) => state.pokes === 0,
+    } as unknown as AnyGameModule
+    const world = room('locked', { locked })
+    const a = world.join('A')
+    const b = world.join('B')
+    a.send({ t: 'chat', text: 'before' })
+    a.send({ t: 'start' })
+    b.send({ t: 'chat', text: 'during' })
+    expect(b.errors).toEqual([{ t: 'error', code: 'chat_locked' }])
+    expect(texts(a)).toEqual(['before'])
+    a.send({ t: 'action', action: { type: 'poke' } })
+    b.send({ t: 'chat', text: 'unlocked' })
+    expect(texts(a)).toEqual(['before', 'unlocked'])
+  })
+
+  it('needs a join first, and leaves with the room', () => {
+    const world = room()
+    const stranger = world.open()
+    stranger.send({ t: 'chat', text: 'hi' })
+    expect(stranger.errors).toEqual([{ t: 'error', code: 'not_joined' }])
+    const a = world.join('A')
+    a.send({ t: 'chat', text: 'hi' })
+    a.send({ t: 'dissolve' })
+    expect(world.chat.size).toBe(0)
+  })
+
+  it('keeps a kicked member’s old messages under their name', () => {
+    const world = room()
+    const a = world.join('A')
+    const b = world.join('B')
+    b.send({ t: 'chat', text: 'bye' })
+    a.send({ t: 'kick', member: b.you })
+    const later = world.join('Later')
+    const first = chats(later)[0]
+    expect(first.t === 'chat' && first.messages[0]).toMatchObject({ name: 'B', text: 'bye' })
+  })
+})
+
+describe('spectators', () => {
+  it('join a running game with the spectator’s view and no actions', () => {
+    const { world, x } = started()
+    const spectator = world.join('Sam')
+    expect(spectator.seat).toBeNull()
+    expect(spectator.game.legal).toEqual([])
+    spectator.send(place(0))
+    expect(spectator.errors).toEqual([{ t: 'error', code: 'not_seated' }])
+    expect(x.view?.members[spectator.you].seat).toBeNull()
+  })
+
+  it('cannot take a seat during a game, can once it has ended, and play the rematch', () => {
+    const { world, x, o } = started()
+    const spectator = world.join('Sam')
+    spectator.send({ t: 'sit', seat: 1 })
+    expect(spectator.errors.at(-1)).toEqual({ t: 'error', code: 'wrong_status' })
+    for (const [client, cell] of [
+      [x, 0],
+      [o, 3],
+      [x, 1],
+      [o, 4],
+      [x, 2],
+    ] as const) {
+      client.send(place(cell))
+    }
+    expect(x.view?.room.status).toBe('ended')
+
+    spectator.send({ t: 'sit', seat: 1 })
+    expect(spectator.errors.at(-1)).toEqual({ t: 'error', code: 'seat_taken' })
+    o.send({ t: 'sit', seat: null })
+    spectator.send({ t: 'sit', seat: 1 })
+    expect(spectator.seat).toBe(1)
+    expect(x.view).toEqual(x.fresh())
+
+    x.send({ t: 'rematch' })
+    expect(spectator.view?.room.status).toBe('playing')
+    expect(spectator.game.view).toMatchObject({ you: 1 })
+    expect(o.game.legal).toEqual([])
+  })
+
+  it('see a finished game as a spectator from a seat that was not in it', () => {
+    const viewers = {
+      ...timedGame,
+      id: 'viewers',
+      view: (_: TimedState, viewer: number | 'spectator') => ({ viewer }),
+    } as unknown as AnyGameModule
+    const world = room('viewers', { viewers })
+    const a = world.join('A')
+    world.join('B')
+    a.send({ t: 'start' })
+    const late = world.join('Late')
+    world.clock += 1000
+    world.host.sweep()
+    world.clock += 1000
+    world.host.sweep()
+    expect(a.view?.room.status).toBe('ended')
+
+    // A seat the two-player game never had: its view would be for a seat that does not exist
+    late.send({ t: 'sit', seat: 3 })
+    expect(late.seat).toBe(3)
+    expect(late.game.view).toEqual({ viewer: 'spectator' })
+    expect(a.game.view).toEqual({ viewer: 0 })
+    expect(late.view).toEqual(late.fresh())
+  })
+
+  it('are removed once absent, and are someone new when they return', () => {
+    const world = room('big', modules)
+    const a = world.join('A')
+    const spectator = world.join('Sam')
+    spectator.send({ t: 'sit', seat: null })
+    world.disconnect(spectator)
+    world.clock += RECONNECT_GRACE_MS
+    a.send({ t: 'resync' })
+    world.host.sweep()
+    expect(a.view?.members[spectator.you]).toBeUndefined()
+    expect(world.stored().members).toHaveLength(1)
+    expect(a.view).toEqual(a.fresh())
+
+    const back = world.join('Sam', spectator.token)
+    expect(back.you).not.toBe(spectator.you)
+  })
+
+  it('stay while they are the host, there being nobody to hand it to', () => {
+    const world = room('big', modules)
+    const a = world.join('A')
+    a.send({ t: 'sit', seat: null })
+    world.disconnect(a)
+    world.clock += RECONNECT_GRACE_MS * 2
+    world.host.sweep()
+    expect(world.stored().members).toHaveLength(1)
+    expect(world.stored().room?.hostId).toBe(a.you)
+  })
+})
+
+/** Turns go round the seats; each is a `roll`; `skipAction` passes as `system` */
+type TurnState = { turn: number; seats: number; log: string[] }
+const turnGame = {
+  id: 'turns',
+  meta: { minPlayers: 2, maxPlayers: 4, minutes: 1, i18nKey: 'games.turns', proxyTurns: true },
+  options: {},
+  init: (seats: { id: number }[]) => ({ turn: 0, seats: seats.length, log: [] }),
+  reduce: (state: TurnState, action: { type: string }, actor: number | 'system') => {
+    const next = (state.turn + 1) % state.seats
+    if (action?.type === 'pass' && actor === 'system') {
+      return { ...state, turn: next, log: [...state.log, `pass ${state.turn}`] }
+    }
+    if (['roll', 'stay'].includes(action?.type) && actor === state.turn) {
+      return { ...state, turn: next, log: [...state.log, `${action.type} ${actor}`] }
+    }
+    return gameError('nope')
+  },
+  view: (state: TurnState) => state,
+  legalActions: (state: TurnState, seat: number) =>
+    state.turn === seat ? [{ type: 'roll' }, { type: 'stay' }] : [],
+  skipAction: () => ({ type: 'pass' }),
+  isOver: () => false,
+  result: () => ({ summary: { key: 'over' }, standings: [] }),
+} as unknown as AnyGameModule
+const noCoverGame = {
+  ...turnGame,
+  id: 'nocover',
+  meta: { ...turnGame.meta, proxyTurns: undefined },
+  skipAction: undefined,
+} as unknown as AnyGameModule
+
+function turnRoom(gameId = 'turns') {
+  const world = room(gameId, { turns: turnGame, nocover: noCoverGame })
+  const a = world.join('A')
+  const b = world.join('B')
+  a.send({ t: 'start' })
+  return { world, a, b }
+}
+
+/** B, whose turn comes after A's, goes away for long enough */
+function absentB() {
+  const { world, a, b } = turnRoom()
+  a.send({ t: 'action', action: { type: 'roll' } })
+  world.disconnect(b)
+  world.clock += RECONNECT_GRACE_MS
+  a.send({ t: 'resync' })
+  world.host.sweep()
+  return { world, a, b }
+}
+
+describe('someone gone', () => {
+  it('is offline at once, and absent only past the grace', () => {
+    const { world, a, b } = turnRoom()
+    world.disconnect(b)
+    expect(a.view?.members[b.you]).toMatchObject({ online: false, absent: false })
+    world.clock += RECONNECT_GRACE_MS - 1
+    a.send({ t: 'resync' })
+    world.host.sweep()
+    expect(a.view?.members[b.you].absent).toBe(false)
+    world.clock += 1
+    a.send({ t: 'resync' })
+    world.host.sweep()
+    expect(a.view?.members[b.you].absent).toBe(true)
+    expect(a.view).toEqual(a.fresh())
+    expect(world.join('B', b.token).view?.members[b.you]).toMatchObject({
+      online: true,
+      absent: false,
+      seat: 1,
+    })
+  })
+
+  it('stays absent through hibernation, and a socket lost in a restart counts from then', () => {
+    const { world, a } = absentB()
+    world.hibernate()
+    expect(a.fresh().coverable).toHaveLength(1)
+    world.restart()
+    const back = world.join('A', a.token)
+    expect(back.view?.coverable).toHaveLength(1)
+  })
+
+  it('makes their turn coverable, and only while it is their turn', () => {
+    const { world, a, b } = absentB()
+    expect(a.view?.coverable).toEqual([{ seat: 1, skip: true, proxy: true }])
+    a.send({ t: 'cover', seat: 1, how: 'skip' })
+    expect(a.view?.coverable).toEqual([])
+    expect((a.game.view as TurnState).log.at(-1)).toBe('pass 1')
+    a.send({ t: 'cover', seat: 1, how: 'skip' })
+    expect(a.errors.at(-1)).toEqual({ t: 'error', code: 'cannot_cover' })
+    const stored = world.stored().game
+    const again = replayMatch(turnGame, stored?.seats ?? [], {}, stored?.seed ?? 0, world.storedSteps())
+    expect(again).toEqual(stored?.match)
+    void b
+  })
+
+  it('can have a random legal action played for them, as their own seat, replayably', () => {
+    const { world, a } = absentB()
+    a.send({ t: 'cover', seat: 1, how: 'proxy' })
+    const last = (a.game.view as TurnState).log.at(-1)
+    expect(['roll 1', 'stay 1']).toContain(last)
+    expect(world.storedSteps().at(-1)?.actor).toBe(1)
+    const stored = world.stored().game
+    const again = replayMatch(turnGame, stored?.seats ?? [], {}, stored?.seed ?? 0, world.storedSteps())
+    expect(again).toEqual(stored?.match)
+  })
+
+  it('counts a seat emptied by a kick at once', () => {
+    const { a, b } = turnRoom()
+    a.send({ t: 'action', action: { type: 'roll' } })
+    a.send({ t: 'kick', member: b.you })
+    expect(a.view?.coverable).toEqual([{ seat: 1, skip: true, proxy: true }])
+    a.send({ t: 'cover', seat: 1, how: 'proxy' })
+    expect(a.view?.coverable).toEqual([])
+    expect(a.errors).toEqual([])
+  })
+
+  it('is covered by the host only, not before the grace, and not after they return', () => {
+    const { world, a, b } = turnRoom()
+    a.send({ t: 'action', action: { type: 'roll' } })
+    world.disconnect(b)
+    a.send({ t: 'cover', seat: 1, how: 'skip' })
+    expect(a.errors.at(-1)).toEqual({ t: 'error', code: 'cannot_cover' })
+
+    world.clock += RECONNECT_GRACE_MS
+    a.send({ t: 'resync' })
+    world.host.sweep()
+    const spectator = world.join('Sam')
+    spectator.send({ t: 'cover', seat: 1, how: 'skip' })
+    expect(spectator.errors).toEqual([{ t: 'error', code: 'forbidden' }])
+
+    const back = world.join('B', b.token)
+    expect(back.view?.coverable).toEqual([])
+    a.send({ t: 'cover', seat: 1, how: 'skip' })
+    expect(a.errors.at(-1)).toEqual({ t: 'error', code: 'cannot_cover' })
+    expect(a.game.legal).toEqual([])
+    back.send({ t: 'action', action: { type: 'roll' } })
+    expect(back.errors).toEqual([])
+  })
+
+  it('cannot be covered in a game that allows neither', () => {
+    const { world, a, b } = turnRoom('nocover')
+    a.send({ t: 'action', action: { type: 'roll' } })
+    world.disconnect(b)
+    world.clock += RECONNECT_GRACE_MS
+    a.send({ t: 'resync' })
+    world.host.sweep()
+    expect(a.view?.coverable).toEqual([{ seat: 1, skip: false, proxy: false }])
+    a.send({ t: 'cover', seat: 1, how: 'skip' })
+    a.send({ t: 'cover', seat: 1, how: 'proxy' })
+    expect(a.errors).toEqual([
+      { t: 'error', code: 'cannot_cover' },
+      { t: 'error', code: 'cannot_cover' },
+    ])
+  })
+
+  it('refuses a seat not in the game, and outside a game', () => {
+    const { a } = absentB()
+    a.send({ t: 'cover', seat: 3, how: 'skip' })
+    expect(a.errors.at(-1)).toEqual({ t: 'error', code: 'cannot_cover' })
+    a.send({ t: 'reopen' })
+    a.send({ t: 'cover', seat: 1, how: 'skip' })
+    expect(a.errors).toHaveLength(2)
+    expect(a.view?.coverable).toEqual([])
+  })
+
+  it('in promotion: a real pass moves the turn and the rounds, a browser cannot send one', () => {
+    const world = new World({ promotion: promotion as unknown as AnyGameModule })
+    expect(world.host.create(ROOM_ID, 'promotion', undefined)).toBe(true)
+    const a = world.join('A')
+    const b = world.join('B')
+    a.send({ t: 'start' })
+    const first = a.game.legal.length > 0 ? a : b
+    const other = first === a ? b : a
+    first.send({ t: 'action', action: { type: 'pass' } })
+    expect(first.errors.at(-1)?.code).toBe('game_error')
+    first.send({ t: 'action', action: { type: 'roll' } })
+    world.disconnect(other)
+    world.clock += RECONNECT_GRACE_MS
+    first.send({ t: 'resync' })
+    world.host.sweep()
+    expect(first.view?.coverable).toEqual([{ seat: other.seat, skip: true, proxy: true }])
+    first.send({ t: 'cover', seat: other.seat, how: 'skip' })
+    expect(first.game.legal).toEqual([{ type: 'roll' }])
+    first.send({ t: 'action', action: { type: 'roll' } })
+    first.send({ t: 'cover', seat: other.seat, how: 'proxy' })
+    expect(first.errors.filter((e) => e.code === 'cannot_cover')).toEqual([])
+    expect(first.view).toEqual(first.fresh())
   })
 })
