@@ -40,7 +40,11 @@ function renderRoom(id = ROOM, { strict = false } = {}) {
 }
 
 /** Lets the summary arrive, and with a stored name the socket gets made */
-const summaryLoaded = () => screen.findByRole('heading', { level: 1 })
+const summaryLoaded = async () => {
+  await screen.findByRole('heading', { level: 1 })
+  // The heading can appear before the effect that opens the socket has run
+  await act(async () => {})
+}
 
 const serverSays = (data: string) => act(() => FakeWebSocket.last.receive(data))
 const serverCloses = (code: number) => act(() => FakeWebSocket.last.serverClose(code))
@@ -107,7 +111,8 @@ describe('before joining', () => {
     fetchMock.mockImplementation(() => Promise.resolve(Response.json(summary())))
     fireEvent.click(retryButton()!)
 
-    expect(await screen.findByRole('heading', { name: 'Promotion' })).toBeInTheDocument()
+    await summaryLoaded()
+    expect(screen.getByRole('heading', { name: 'Promotion' })).toBeInTheDocument()
     expect(FakeWebSocket.instances).toHaveLength(1)
   })
 

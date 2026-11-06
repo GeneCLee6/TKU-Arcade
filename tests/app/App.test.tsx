@@ -7,6 +7,7 @@ import { initLanguage } from '../../src/i18n/t.ts'
 beforeEach(() => {
   localStorage.clear()
   initLanguage()
+  window.history.pushState({}, '', '/')
 })
 
 describe('App', () => {
@@ -19,7 +20,6 @@ describe('App', () => {
     window.history.pushState({}, '', '/r/nope')
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Room not found' })).toBeInTheDocument()
-    window.history.pushState({}, '', '/')
   })
 
   it('switches the page language, and the product name stays the same', () => {

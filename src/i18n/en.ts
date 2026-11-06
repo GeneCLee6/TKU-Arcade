@@ -8,7 +8,9 @@ export const en = {
   // Each language's own name, so it reads the same in both catalogs
   'language.en': 'EN',
   'language.zhTW': '繁中',
+  'lobby.changeNickname': 'Change',
   'lobby.games': 'Games',
+  'lobby.playingAs': 'Playing as {name}',
   'lobby.join.invalid': "That's not a room link or ID. Check it and try again.",
   'lobby.join.label': 'Got a link? Paste it here',
   'lobby.join.submit': 'Join',

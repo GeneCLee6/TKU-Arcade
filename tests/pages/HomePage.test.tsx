@@ -54,6 +54,30 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+describe('changing the nickname', () => {
+  it('offers nothing until there is a nickname', () => {
+    renderLobby()
+    expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
+  })
+
+  it('prefills the dialog, stores the new name and creates no room', () => {
+    localStorage.setItem(NICKNAME_KEY, 'Tpyo')
+    const fetchMock = stubFetch(created)
+    renderLobby()
+    expect(screen.getByText('Playing as Tpyo')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+    const input = screen.getByRole('textbox', { name: 'Nickname' })
+    expect(input).toHaveValue('Tpyo')
+    fireEvent.change(input, { target: { value: 'Typo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(screen.getByText('Playing as Typo')).toBeInTheDocument()
+    expect(localStorage.getItem(NICKNAME_KEY)).toBe('Typo')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('lobby cards', () => {
   it('lists promotion with its facts, and not the unlisted tic-tac-toe', () => {
     renderLobby()

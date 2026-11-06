@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { APP_NAME } from '../../shared/app.ts'
 import { LOBBY_GAMES } from '../../shared/games/index.ts'
+import { Button } from '../components/Button.tsx'
 import { Dialog } from '../components/Dialog.tsx'
 import { GameCard } from '../components/GameCard.tsx'
 import { JoinRoomForm } from '../components/JoinRoomForm.tsx'
@@ -19,8 +20,9 @@ export function HomePage() {
   const t = useT()
   const navigate = useNavigate()
   const toast = useToast()
-  // The game whose "New room" is waiting for a nickname
-  const [asking, setAsking] = useState<string | null>(null)
+  const [nickname, setNickname] = useState(readNickname)
+  // The nickname dialog is open; `gameId` is the "New room" waiting for it, null for a plain change
+  const [asking, setAsking] = useState<{ gameId: string | null } | null>(null)
   const [creating, setCreating] = useState(false)
   const inFlight = useRef<AbortController | null>(null)
 
@@ -39,12 +41,13 @@ export function HomePage() {
   }
 
   const handleNewRoom = (gameId: string) => {
-    if (readNickname() === null) setAsking(gameId)
+    if (nickname === null) setAsking({ gameId })
     else void create(gameId)
   }
 
-  const handleNickname = () => {
-    if (asking !== null) void create(asking)
+  const handleNickname = (name: string) => {
+    setNickname(name)
+    if (asking?.gameId != null) void create(asking.gameId)
     setAsking(null)
   }
 
@@ -55,6 +58,14 @@ export function HomePage() {
         <Intro>
           <Title>{APP_NAME}</Title>
           <Tagline>{t('home.tagline')}</Tagline>
+          {nickname !== null && (
+            <PlayingAs>
+              <span>{t('lobby.playingAs', { name: nickname })}</span>
+              <Button $variant="ghost" $size="sm" onClick={() => setAsking({ gameId: null })}>
+                {t('lobby.changeNickname')}
+              </Button>
+            </PlayingAs>
+          )}
         </Intro>
         <JoinRoomForm />
         <section>
@@ -103,6 +114,16 @@ const Title = styled.h1`
 const Tagline = styled.p`
   margin: ${space.xs}px 0 0;
   color: ${color.muted};
+`
+
+const PlayingAs = styled.p`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: ${space.xs}px;
+  margin: ${space.sm}px 0 0;
+  overflow-wrap: anywhere;
 `
 
 const SectionTitle = styled.h2`

@@ -59,7 +59,7 @@ depends_on: []
 
 - [x] `e7-t01` 設計 token、GlobalStyle、字型、深淺色、Button／Card／Dialog／Toast · AC-7.1 · M · ← e12-t01 · #3
 - [x] `e7-t02` i18n：`t()`、`en.ts`／`zh-TW.ts`、`useT`、`LanguageSwitch`、localStorage、`<html lang>` · AC-7.2 · M · ← e7-t01 · #3
-- [ ] `e7-t03` `scripts/check-i18n.mjs` 與裸字串檢查，接進 CI · AC-7.3 · S · ← e7-t02, e12-t02
+- [x] `e7-t03` `scripts/check-i18n.mjs` 與裸字串檢查，接進 CI · AC-7.3 · S · ← e7-t02, e12-t02 · #6
 - [ ] `e7-t04` Drawer、Tabs、Countdown、Avatar、Dialog 的手機版 · AC-7.4 · S · ← e7-t01
 - [ ] `e7-t05` 大廳與房間的手機版面 · AC-7.4 · S · ← e1-t02, e1-t04
 - [ ] `e7-t06` 鍵盤與焦點樣式、`visually-hidden`、axe 測試骨架 · AC-7.6 · S · ← e7-t01

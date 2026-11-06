@@ -285,7 +285,8 @@ export function normalizeName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   // NFC last: removing a character can bring together two that compose
   const name = raw.replace(UNSAFE_NAME_CHARS, '').replace(/\s+/g, ' ').trim().normalize('NFC')
-  if (name === '' || [...name].length > MAX_NAME_CHARS) return null
+  // Only zero-width characters would look like nobody at all in the seat list
+  if (name.replace(/[\p{Cf}\s]/gu, '') === '' || [...name].length > MAX_NAME_CHARS) return null
   return name
 }
 

@@ -87,6 +87,12 @@ describe('normalizeName', () => {
     expect(normalizeName(1)).toBeNull()
   })
 
+  it('refuses a name with nothing visible in it', () => {
+    expect(normalizeName('​')).toBeNull()
+    expect(normalizeName(' ​ ﻿ ')).toBeNull()
+    expect(normalizeName('a​b')).toBe('a​b')
+  })
+
   it('stores names in NFC, and measures them after that', () => {
     expect(normalizeName('é')).toBe('é')
     // Composes only once the control character between the two is gone
