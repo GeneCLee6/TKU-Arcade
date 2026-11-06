@@ -50,6 +50,7 @@ worker/
 src/
   i18n/                 en.ts、zh-TW.ts、t.ts、useT.ts
   styles/tokens.ts      顏色與間距的唯一來源
+  lib/                  瀏覽器工具（storage 等）
   components/           基礎元件
   pages/                Lobby、Room、Rules、Me、Admin
   games/<id>/           每款遊戲的畫面（lazy）
@@ -97,7 +98,7 @@ docs/                   本資料夾
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
 - 遊戲模組的字串在 `shared/games/<id>/i18n.ts`（同樣兩語），由登記表合併。
 - 規則頁是 markdown 兩份（`rules.en.md`、`rules.zh-TW.md`）。
-- 預設 `en`；第一次進站依 `navigator.languages` 偵測（`zh*` → `zh-TW`），之後以 localStorage 的使用者選擇為準；`<html lang>` 跟著改。
+- 預設 `en`；第一次進站依瀏覽器第一順位語言偵測（`zh`、`zh-*` → `zh-TW`），之後以 localStorage 的使用者選擇為準；`<html lang>` 跟著改。
 
 ## 6. 帳號（M1）
 
