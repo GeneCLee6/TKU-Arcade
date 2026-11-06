@@ -43,10 +43,15 @@ function roll(kind: PromotionOptions['dice'], rng: Rng): { face: Face; dice: num
 }
 
 /** `action` comes off the network: its static type promises nothing at run time */
-function isRoll(action: unknown): action is PromotionAction {
-  return (
-    typeof action === 'object' && action !== null && (action as { type?: unknown }).type === 'roll'
-  )
+const hasType = (action: unknown, type: string) =>
+  typeof action === 'object' && action !== null && (action as { type?: unknown }).type === type
+
+function isRoll(action: unknown): action is { type: 'roll' } {
+  return hasType(action, 'roll')
+}
+
+function isPass(action: unknown): action is { type: 'pass' } {
+  return hasType(action, 'pass')
 }
 
 const rankOf = (player: PromotionPlayer) => getCell(player.cell).rank
@@ -69,7 +74,8 @@ export const promotion: GameModule<
   PromotionOptions
 > = {
   id: 'promotion',
-  meta: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.promotion' },
+  // Every turn is one roll, with nothing to decide, so playing it for someone is fair
+  meta: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.promotion', proxyTurns: true },
 
   options: {
     dice: {
@@ -106,8 +112,19 @@ export const promotion: GameModule<
   },
 
   reduce(state, action, actor, rng) {
-    if (!isRoll(action)) return gameError('games.promotion.error.badAction')
+    if (!isRoll(action) && !isPass(action)) return gameError('games.promotion.error.badAction')
     if (state.turn === null) return gameError('games.promotion.error.over')
+
+    if (isPass(action)) {
+      // Only the room passes a turn, for someone who is gone (`skipAction`)
+      if (actor !== 'system') return gameError('games.promotion.error.notYourTurn')
+      const at = state.players.findIndex((player) => player.seat === state.turn)
+      const after: SeatId = state.players[(at + 1) % state.players.length].seat
+      const nextRound = after === state.first ? state.round + 1 : state.round
+      if (nextRound > state.turnLimit) return { ...state, turn: null, ending: 'turnLimit' }
+      return { ...state, turn: after, round: nextRound }
+    }
+
     if (actor !== state.turn) return gameError('games.promotion.error.notYourTurn')
 
     const index = state.players.findIndex((player) => player.seat === actor)
@@ -144,6 +161,10 @@ export const promotion: GameModule<
 
   legalActions(state, seat) {
     return state.turn === seat ? [{ type: 'roll' }] : []
+  },
+
+  skipAction() {
+    return { type: 'pass' }
   },
 
   isOver(state) {

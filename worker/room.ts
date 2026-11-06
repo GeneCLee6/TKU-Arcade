@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers'
+import type { ChatMessage } from '../shared/chat.ts'
 import { getGame } from '../shared/games/index.ts'
 import type { OptionValues } from '../shared/games/types.ts'
 import {
@@ -20,6 +21,9 @@ const GAME_KEY = 'game'
 /** The action log, one key per step, zero-padded so that `list({ prefix })` gives them in order */
 const STEP_PREFIX = 'step:'
 const stepKey = (index: number) => STEP_PREFIX + String(index).padStart(12, '0')
+/** Chat messages, one key each: a message is up to 2 kB and the room keeps 200 */
+const CHAT_PREFIX = 'chat:'
+const chatKey = (id: number) => CHAT_PREFIX + String(id).padStart(12, '0')
 /** The most keys one `storage.delete` takes */
 const DELETE_BATCH = 128
 
@@ -65,6 +69,8 @@ export class RoomDO extends DurableObject<Env> {
             void storage.delete(keys)
           }
         },
+        saveChat: (message) => void storage.put(chatKey(message.id), message),
+        dropChat: (id) => void storage.delete(chatKey(id)),
         clearAll: () => void storage.deleteAll(),
       },
       games: getGame,
@@ -75,8 +81,9 @@ export class RoomDO extends DurableObject<Env> {
     })
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG))
     void ctx.blockConcurrencyWhile(async () => {
-      const [stored, alarm] = await Promise.all([
+      const [stored, chat, alarm] = await Promise.all([
         storage.get<unknown>([ROOM_KEY, MEMBERS_KEY, REV_KEY, GAME_KEY]),
+        storage.list<ChatMessage>({ prefix: CHAT_PREFIX }),
         storage.getAlarm(),
       ])
       this.alarmAt = alarm
@@ -86,6 +93,7 @@ export class RoomDO extends DurableObject<Env> {
           members: (stored.get(MEMBERS_KEY) as MemberRecord[] | undefined) ?? [],
           rev: (stored.get(REV_KEY) as number | undefined) ?? 0,
           game: (stored.get(GAME_KEY) as StoredGame | null | undefined) ?? null,
+          chat: [...chat.values()],
         },
         ctx.getWebSockets().map((ws) => ws.deserializeAttachment() as OpenSocket),
         alarm,

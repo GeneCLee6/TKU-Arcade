@@ -20,6 +20,8 @@ export class FakeWebSocket {
   readonly url: string
   readonly sent: string[] = []
   closedByClient = false
+  /** Closed, by either side */
+  gone = false
   onopen: (() => void) | null = null
   onmessage: ((event: { data: unknown }) => void) | null = null
   onclose: ((event: { code: number }) => void) | null = null
@@ -35,6 +37,7 @@ export class FakeWebSocket {
 
   close(): void {
     this.closedByClient = true
+    this.gone = true
     this.onclose?.({ code: 1005 })
   }
 
@@ -49,6 +52,7 @@ export class FakeWebSocket {
   }
 
   serverClose(code: number): void {
+    this.gone = true
     this.onclose?.({ code })
   }
 
@@ -73,6 +77,7 @@ export function welcome(
     ready: false,
     host: true,
     online: true,
+    absent: false,
     ...me,
   }
   const members: Record<string, RoomMember> = { [member.id]: member }
@@ -96,6 +101,7 @@ export function welcome(
       },
       members,
       game: null,
+      coverable: [],
     },
   }
   return JSON.stringify(message)

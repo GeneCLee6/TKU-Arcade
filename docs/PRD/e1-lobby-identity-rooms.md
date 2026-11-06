@@ -48,8 +48,8 @@ depends_on: [E2, E7]
 - [x] AC-1.2 — 暱稱：長度與字元限制、本機記住、同房去重。
 - [ ] AC-1.3 — 房間生命週期：建房、進房、狀態轉換、10 分鐘後清除（DO alarm 測試）。
 - [x] AC-1.4 — 房主控制：開始、踢人、換遊戲、再來一局、轉移、解散、房主離開自動轉移。
-- [ ] AC-1.5 — 聊天：200 則、速率限制、連結、`chatLocked`。
-- [ ] AC-1.6 — 旁觀：旁觀者視角、補位。
+- [x] AC-1.5 — 聊天：200 則、速率限制、連結、`chatLocked`。
+- [x] AC-1.6 — 旁觀：旁觀者視角、補位。
 - [ ] AC-1.7 — 選用帳號：牌桌 token 驗簽、本站 session、暱稱固定。
 - [ ] AC-1.8 — 語音連結：一鍵建 LongTalk 房並貼連結。
 
@@ -63,8 +63,8 @@ depends_on: [E2, E7]
 - [x] `e1-t04` 等待室：成員列、座位、準備、複製連結與 QR、開始按鈕條件 · AC-1.3 · M · ← e1-t03 · #7
 - [x] `e1-t05` 房主控制：開始、踢人（5 分鐘黑名單）、再來一局、轉移、解散、自動轉移 · AC-1.4 · M · ← e1-t04 · #8
 - [x] `e1-t06` 換遊戲：回 waiting、清局面、規則選項表單由 GameModule 的 `options` schema 產生 · AC-1.4 · S · ← e1-t05, e2-t01 · #8
-- [ ] `e1-t07` 聊天：移植 LongTalk `shared/chat.ts`、面板、`chatLocked` · AC-1.5 · S · ← e1-t04
-- [ ] `e1-t08` 旁觀者：進房分流、`view('spectator')`、補位 · AC-1.6 · S · ← e2-t03
+- [x] `e1-t07` 聊天：移植 LongTalk `shared/chat.ts`、面板、`chatLocked` · AC-1.5 · S · ← e1-t04 · #9
+- [x] `e1-t08` 旁觀者：進房分流、`view('spectator')`、補位 · AC-1.6 · S · ← e2-t03 · #9
 - [ ] `e1-t09` `LobbyDO`：公開房列表、RoomDO 回報、alarm 清理、首頁輪詢或 WebSocket · AC-1.1 · M · ← e1-t01
 - [ ] `e1-t10` 房間 10 分鐘清除 alarm 與測試；被踢黑名單過期 · AC-1.3 · S · ← e1-t05
 

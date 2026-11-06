@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CloseCode, type RoomSummary } from '../../shared/protocol.ts'
+import { CHAT_ACK_TIMEOUT_MS } from '../../src/lib/chatState.ts'
 import { ToastProvider } from '../../src/components/Toast.tsx'
 import { en } from '../../src/i18n/en.ts'
 import { initLanguage, setLanguage } from '../../src/i18n/t.ts'
@@ -260,6 +261,7 @@ describe('in the room', () => {
     ready: false,
     host: false,
     online: true,
+    absent: false,
     ...over,
   })
 
@@ -331,6 +333,7 @@ describe('outside the waiting room', () => {
           ready: false,
           host: false,
           online: true,
+          absent: false,
         }),
       )
     }
@@ -488,6 +491,114 @@ describe('host controls in the waiting room, over the wire', () => {
   })
 })
 
+describe('losing the connection', () => {
+  const banner = () => screen.queryByText(en['room.reconnecting'])
+
+  async function droppedRoom() {
+    await joined()
+    vi.useFakeTimers()
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    serverCloses(1006)
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('has no banner while connected', async () => {
+    await joined()
+    expect(banner()).toBeNull()
+  })
+
+  it('keeps showing the room under a polite banner', async () => {
+    await droppedRoom()
+    expect(banner()!.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite')
+    expect(screen.getByText('Al')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('tells that a button did nothing while reconnecting', async () => {
+    await droppedRoom()
+    fireEvent.click(screen.getByRole('button', { name: en['room.waiting.ready'] }))
+    expect(screen.getByText(en['room.reconnecting.notSent'])).toBeInTheDocument()
+  })
+
+  it('comes back as the same member, and the banner goes', async () => {
+    await droppedRoom()
+    act(() => vi.advanceTimersByTime(1_000))
+    expect(FakeWebSocket.instances).toHaveLength(2)
+    socketOpens()
+    expect(FakeWebSocket.last.joins).toEqual([{ t: 'join', name: 'Al', token: TOKEN_A }])
+
+    serverSays(welcome({}))
+
+    expect(banner()).toBeNull()
+    expect(screen.getAllByText('Al')).toHaveLength(1)
+  })
+
+  it('shows not found when the room is gone by the time it tries again', async () => {
+    await droppedRoom()
+    act(() => vi.advanceTimersByTime(1_000))
+    serverCloses(CloseCode.roomNotFound)
+    expect(screen.getByRole('heading', { name: 'Room not found' })).toBeInTheDocument()
+    expect(retryButton()).toBeNull()
+  })
+
+  it('after giving up shows disconnected with Retry', async () => {
+    await droppedRoom()
+    for (let i = 0; i < 20 && !retryButton(); i++) {
+      act(() => vi.advanceTimersByTime(30_000))
+      serverCloses(1006)
+    }
+    expect(screen.getByRole('alert')).toHaveTextContent('Disconnected from the room.')
+    expect(banner()).toBeNull()
+
+    fireEvent.click(retryButton()!)
+
+    socketOpens()
+    expect(FakeWebSocket.last.joins).toEqual([{ t: 'join', name: 'Al', token: TOKEN_A }])
+  })
+
+  it('leaves nothing running on leaving the page mid-backoff', async () => {
+    await droppedRoom()
+    const opened = FakeWebSocket.instances.length
+    fireEvent.click(backLink())
+    expect(screen.getByText('the lobby')).toBeInTheDocument()
+
+    act(() => vi.advanceTimersByTime(600_000))
+
+    expect(FakeWebSocket.instances).toHaveLength(opened)
+  })
+})
+
+describe('in a room with a game, over the wire', () => {
+  const patch = (rev: number, path: string[], value: unknown) =>
+    JSON.stringify({ t: 'patch', rev, ops: [{ op: 'set', path, value }] })
+  const lastSent = () => JSON.parse(FakeWebSocket.last.sent.at(-1) as string)
+
+  it('sends a spectator’s sit while ended', async () => {
+    await joined({ seat: null })
+    serverSays(patch(1, ['room', 'status'], 'ended'))
+    fireEvent.click(screen.getByRole('button', { name: 'Sit in seat 3' }))
+    expect(lastSent()).toEqual({ t: 'sit', seat: 2 })
+  })
+
+  it('sends the host’s cover', async () => {
+    await joined()
+    serverSays(patch(1, ['room', 'status'], 'playing'))
+    serverSays(patch(2, ['coverable'], [{ seat: 1, skip: true, proxy: true }]))
+    fireEvent.click(screen.getByRole('button', { name: "Skip seat 2's turn" }))
+    expect(lastSent()).toEqual({ t: 'cover', seat: 1, how: 'skip' })
+  })
+
+  it('tells a host whose cover came too late why, in a toast', async () => {
+    await joined()
+    serverSays(JSON.stringify({ t: 'error', code: 'cannot_cover' }))
+    expect(screen.getByText(en['room.error.cannot_cover'])).toBeInTheDocument()
+  })
+})
+
 describe('closes', () => {
   async function closedBeforeWelcome(code: number) {
     localStorage.setItem(NICKNAME_KEY, 'Al')
@@ -534,9 +645,9 @@ describe('closes', () => {
     },
   )
 
-  it('after welcome: disconnected, and retry comes back with the token', async () => {
+  it('a protocol error after welcome: disconnected, retry comes back with the token', async () => {
     await joined()
-    serverCloses(1006)
+    serverCloses(CloseCode.badMessage)
     expect(screen.getByRole('alert')).toHaveTextContent('Disconnected from the room.')
     expect(FakeWebSocket.instances).toHaveLength(1)
 
@@ -579,5 +690,182 @@ describe('closes', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('opened in another tab')
     expect(retryButton()).not.toBeInTheDocument()
     expect(FakeWebSocket.instances).toHaveLength(1)
+  })
+})
+
+describe('chat', () => {
+  const chatBox = () => screen.getByRole('textbox', { name: en['chat.inputLabel'] })
+  const chatLog = () => screen.getByRole('log', { name: en['chat.messages'] })
+  const game = (chatLocked: boolean) => ({
+    view: {},
+    legal: [],
+    over: false,
+    result: null,
+    chatLocked,
+  })
+  const statusPatch = (rev: number, status: string, chatLocked = false) =>
+    JSON.stringify({
+      t: 'patch',
+      rev,
+      ops: [
+        { op: 'set', path: ['room', 'status'], value: status },
+        { op: 'set', path: ['game'], value: game(chatLocked) },
+      ],
+    })
+
+  it('shows while waiting, playing and ended', async () => {
+    await joined()
+    expect(chatLog()).toBeInTheDocument()
+
+    serverSays(statusPatch(1, 'playing'))
+    expect(chatLog()).toBeInTheDocument()
+
+    serverSays(statusPatch(2, 'ended'))
+    expect(chatLog()).toBeInTheDocument()
+  })
+
+  it('a spectator can read and write too', async () => {
+    await joined({ seat: null, host: false })
+    serverSays(
+      JSON.stringify({
+        t: 'chat',
+        messages: [{ id: 1, from: 'm2', name: 'Bo', text: 'hello all', at: 5 }],
+        reset: true,
+      }),
+    )
+    expect(within(chatLog()).getByText('hello all')).toBeInTheDocument()
+    expect(chatBox()).toBeEnabled()
+  })
+
+  it('is not there before joining', async () => {
+    localStorage.setItem(NICKNAME_KEY, 'Al')
+    stubSummary()
+    renderRoom()
+    await summaryLoaded()
+    expect(screen.queryByRole('log')).toBeNull()
+  })
+
+  it('locks and unlocks as the game says', async () => {
+    await joined()
+    serverSays(statusPatch(1, 'playing', true))
+    expect(chatBox()).toBeDisabled()
+
+    serverSays(statusPatch(2, 'playing', false))
+    expect(chatBox()).toBeEnabled()
+  })
+
+  it('sends, clears when the room answers, marks it as yours', async () => {
+    await joined()
+    fireEvent.change(chatBox(), { target: { value: 'hi' } })
+    fireEvent.click(screen.getByRole('button', { name: en['chat.send'] }))
+    await act(async () => {})
+
+    const sent = FakeWebSocket.last.sent.at(-1)
+    expect(sent).toBe(JSON.stringify({ t: 'chat', text: 'hi' }))
+    expect(chatBox()).toHaveValue('')
+
+    serverSays(
+      JSON.stringify({
+        t: 'chat',
+        messages: [{ id: 1, from: 'm1', name: 'Al', text: 'hi', at: 5 }],
+      }),
+    )
+    await act(async () => {})
+
+    expect(within(chatLog()).getByRole('listitem')).toHaveTextContent(en['chat.you'])
+    expect(chatBox()).toHaveValue('')
+  })
+
+  it('puts a refused message back in the box, explained there and not as a toast too', async () => {
+    await joined()
+    fireEvent.change(chatBox(), { target: { value: 'too soon' } })
+    fireEvent.click(screen.getByRole('button', { name: en['chat.send'] }))
+
+    serverSays(JSON.stringify({ t: 'error', code: 'rate_limited' }))
+    await act(async () => {})
+
+    expect(chatBox()).toHaveValue('too soon')
+    const alerts = screen.getAllByRole('alert')
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]).toHaveTextContent(en['room.error.rate_limited'])
+  })
+
+  it('keeps unsent text across a connection that ends and the retry', async () => {
+    await joined()
+    fireEvent.change(chatBox(), { target: { value: 'half a thought' } })
+
+    serverCloses(CloseCode.badMessage)
+    fireEvent.click(retryButton() as HTMLElement)
+    socketOpens()
+    serverSays(welcome({}))
+
+    expect(chatBox()).toHaveValue('half a thought')
+  })
+
+  describe('through a reconnect', () => {
+    async function comeBack() {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000)
+      })
+      socketOpens()
+      serverSays(welcome({}))
+    }
+
+    beforeEach(async () => {
+      await joined()
+      vi.useFakeTimers()
+      vi.spyOn(Math, 'random').mockReturnValue(0)
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.restoreAllMocks()
+    })
+
+    it('keeps what is being typed, in the same box', async () => {
+      const box = chatBox()
+      fireEvent.change(box, { target: { value: 'half a thought' } })
+      serverCloses(1006)
+      await comeBack()
+      expect(chatBox()).toBe(box)
+      expect(box).toHaveValue('half a thought')
+    })
+
+    it('gives back a message lost with the socket, once it is clear no answer is coming', async () => {
+      fireEvent.change(chatBox(), { target: { value: 'lost at sea' } })
+      fireEvent.click(screen.getByRole('button', { name: en['chat.send'] }))
+      await act(async () => {})
+      expect(chatBox()).toHaveValue('')
+
+      serverCloses(1006)
+      await comeBack()
+      serverSays(JSON.stringify({ t: 'chat', reset: true, messages: [] }))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CHAT_ACK_TIMEOUT_MS)
+      })
+
+      expect(chatBox()).toHaveValue('lost at sea')
+    })
+
+    it('does not give back a message the history shows got through', async () => {
+      fireEvent.change(chatBox(), { target: { value: 'made it' } })
+      fireEvent.click(screen.getByRole('button', { name: en['chat.send'] }))
+      await act(async () => {})
+
+      serverCloses(1006)
+      await comeBack()
+      serverSays(
+        JSON.stringify({
+          t: 'chat',
+          reset: true,
+          messages: [{ id: 1, from: 'm1', name: 'Al', text: 'made it', at: 1 }],
+        }),
+      )
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CHAT_ACK_TIMEOUT_MS)
+      })
+
+      expect(chatBox()).toHaveValue('')
+    })
   })
 })

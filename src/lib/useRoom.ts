@@ -1,21 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { normalizeChatText, type ChatMessage } from '../../shared/chat.ts'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { JsonValue } from '../../shared/patch.ts'
-import type { ClientMessage, ErrorMessage, RoomView } from '../../shared/protocol.ts'
+import type { ClientMessage, CoverMessage, ErrorMessage, RoomView } from '../../shared/protocol.ts'
 import { useToast } from '../components/useToast.ts'
 import { en } from '../i18n/en.ts'
 import { t, type TextKey } from '../i18n/t.ts'
+import { ChatSends, mergeChat, type ChatSendResult } from './chatState.ts'
 import { connectRoom, type RoomConnection, type RoomEnd, type RoomTimer } from './roomConnection.ts'
 
 export type RoomSession =
   | { phase: 'joining' }
-  | { phase: 'joined'; you: string; view: RoomView }
+  /** `reconnecting`: the connection dropped; `view` is the last one seen, nothing can be sent */
+  | { phase: 'joined'; you: string; view: RoomView; reconnecting: boolean }
   | { phase: 'ended'; end: RoomEnd }
 
 export type RoomHandle = {
   session: RoomSession
   /** The countdowns running now; none once the connection has ended */
   timers: readonly RoomTimer[]
+  /** The room's messages, oldest first; kept through a reconnect until a `reset` replaces them */
+  chat: readonly ChatMessage[]
   retry(): void
   sit(seat: number | null): void
   setReady(ready: boolean): void
@@ -26,8 +31,12 @@ export type RoomHandle = {
   dissolve(): void
   rematch(): void
   reopen(): void
+  /** The host deals with a seat in `view.coverable` */
+  cover(seat: number, how: CoverMessage['how']): void
   setGame(gameId: string, options?: OptionValues): void
   setOptions(options: OptionValues): void
+  /** Settles when the room has answered or won't: anything but `sent` means it did not arrive */
+  sendChat(text: string): Promise<ChatSendResult>
 }
 
 function errorText(error: ErrorMessage): string {
@@ -44,15 +53,45 @@ export function useRoom(roomId: string, name: string): RoomHandle {
   const [timers, setTimers] = useState<readonly RoomTimer[]>([])
   const [attempt, setAttempt] = useState(0)
   const connection = useRef<RoomConnection | null>(null)
+  const [chat, setChat] = useState<readonly ChatMessage[]>([])
+  const chatSends = useRef(new ChatSends())
+  const you = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (session.phase === 'joined') you.current = session.you
+  }, [session])
+
+  // Another room's messages are not this one's. Not on a reconnect: those wait for the `reset`
+  useEffect(() => {
+    const sends = chatSends.current
+    return () => {
+      sends.reset()
+      setChat([])
+    }
+  }, [roomId])
 
   useEffect(() => {
     const opened = connectRoom(roomId, name, {
-      onView: (you, view) => setSession({ phase: 'joined', you, view }),
-      onError: (error) => toast(errorText(error), { tone: 'danger' }),
+      onView: (you, view) => setSession({ phase: 'joined', you, view, reconnecting: false }),
+      // Sends still waiting stay so: one that got through shows up in the history the next socket
+      // gets, and giving its text back now would have it sent twice. CHAT_ACK_TIMEOUT_MS ends the rest
+      onReconnecting: () =>
+        setSession((current) =>
+          current.phase === 'joined' ? { ...current, reconnecting: true } : current,
+        ),
+      onError: (error) => {
+        // A refused message is the composer's to explain, with its text back in the box
+        if (!chatSends.current.refused(error.code)) toast(errorText(error), { tone: 'danger' })
+      },
       onTimers: setTimers,
+      onChat: (messages, reset) => {
+        setChat((current) => mergeChat(current, messages, reset))
+        chatSends.current.heard(messages, you.current)
+      },
       onEnd: (end) => {
         setSession({ phase: 'ended', end })
         setTimers([])
+        chatSends.current.failAll()
       },
     })
     connection.current = opened
@@ -63,7 +102,15 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     }
   }, [roomId, name, attempt, toast])
 
-  const send = useCallback((message: ClientMessage) => connection.current?.send(message), [])
+  // Every button goes through here, so none of them can look as if it had worked while offline
+  const send = useCallback(
+    (message: ClientMessage) => {
+      if (!connection.current?.send(message)) {
+        toast(t('room.reconnecting.notSent'), { tone: 'warning' })
+      }
+    },
+    [toast],
+  )
 
   const retry = useCallback(() => {
     setSession({ phase: 'joining' })
@@ -79,6 +126,10 @@ export function useRoom(roomId: string, name: string): RoomHandle {
   const dissolve = useCallback(() => send({ t: 'dissolve' }), [send])
   const rematch = useCallback(() => send({ t: 'rematch' }), [send])
   const reopen = useCallback(() => send({ t: 'reopen' }), [send])
+  const cover = useCallback(
+    (seat: number, how: CoverMessage['how']) => send({ t: 'cover', seat, how }),
+    [send],
+  )
   const setGame = useCallback(
     (gameId: string, options?: OptionValues) =>
       send(options ? { t: 'set_game', gameId, options } : { t: 'set_game', gameId }),
@@ -88,10 +139,20 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     (options: OptionValues) => send({ t: 'set_options', options }),
     [send],
   )
+  const sendChat = useCallback((raw: string): Promise<ChatSendResult> => {
+    // The room closes the socket over a message that does not parse
+    const text = normalizeChatText(raw)
+    // Not sent while reconnecting: the composer keeps the text and says so
+    if (text === null || !connection.current?.send({ t: 'chat', text })) {
+      return Promise.resolve('failed')
+    }
+    return chatSends.current.add(text)
+  }, [])
 
   return {
     session,
     timers,
+    chat,
     retry,
     sit,
     setReady,
@@ -102,7 +163,9 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     dissolve,
     rematch,
     reopen,
+    cover,
     setGame,
     setOptions,
+    sendChat,
   }
 }

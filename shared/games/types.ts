@@ -201,6 +201,11 @@ export type GameMeta = {
   i18nKey: `games.${string}`
   /** Left out of the lobby (a template, not something to play); rooms can still be made for it */
   unlisted?: true
+  /**
+   * The host may have the room play a random legal action for an absent seat. Only for a game
+   * without decisions that matter: nobody should lose a game to a coin flip they did not ask for.
+   */
+  proxyTurns?: true
 }
 
 /**
@@ -258,6 +263,13 @@ export interface GameModule<
 
   /** The countdowns this state asks for; leave out for a game with no clock. See `TimerSpec` */
   timers?(state: S): TimerSpec<A>[]
+
+  /**
+   * The action, applied with `actor: 'system'`, that passes `seat`'s turn when the player is gone;
+   * leave out, or answer null, when this game has no such thing. Only asked while
+   * `legalActions(state, seat)` is not empty. `reduce` must accept it.
+   */
+  skipAction?(state: S, seat: SeatId): A | null
 
   /** Whether the room's chat is closed in this state; leaving it out means never */
   chatLocked?(state: S): boolean

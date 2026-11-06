@@ -5,7 +5,7 @@
 // 1. The browser opens the socket and sends `join` (its nickname, and the seat token it was given
 //    last time, if any). The server answers `welcome`: the person's member id, the token to keep,
 //    and the whole room as this person may see it (`state`). A token the room still knows brings
-//    back the same member and seat within RECONNECT_GRACE_MS; any other token makes a new member.
+//    back the same member and seat, however long it took; any other token makes a new member.
 //    The token travels only here, never in the URL. A socket that does not join within
 //    JOIN_TIMEOUT_MS is closed. The name in `state` is the one to show, which may differ from the
 //    one sent: a new member whose name is taken gets a suffix (uniqueName), and someone coming back
@@ -20,9 +20,10 @@
 // 4. `timer` replaces the list of countdowns running now (GameModule.timers), after `welcome` if any
 //    runs, before a `snapshot` and whenever it changes. Times are durations, not clock times:
 //    browsers' clocks disagree.
-// 5. `chat` goes to everyone in the room (the sender too: that is its acknowledgement). While the
-//    game says `chatLocked`, it is refused with `chat_locked`. (B4 ports the limits, e1-t07; until
-//    then every `chat` is refused with `unavailable`.)
+// 5. `chat` (shared/chat.ts) goes to everyone in the room, spectators too, and the sender: that is
+//    its acknowledgement. Over CHAT_RATE it is refused with `rate_limited`; while the game says
+//    `chatLocked`, with `chat_locked`. After every `welcome` the history follows in chunks, the
+//    first with `reset`, so a browser coming back replaces what it has.
 // 6. Heartbeat: the browser sends the text frame `ping` every HEARTBEAT_INTERVAL_MS and gets `pong`
 //    (answered without waking the object); a socket silent for STALE_AFTER_MS is closed.
 // 7. A message that does not parse is a protocol error: the socket is closed with
@@ -47,9 +48,19 @@
 //    closes every socket with CloseCode.dissolved and deletes the room for good.
 //    A host offline for RECONNECT_GRACE_MS loses the host to the earliest member to join who is
 //    online, seated ones first, and comes back as an ordinary member.
+// 10. A socket that drops is a member `online: false` at once, who keeps their seat and token. Past
+//    RECONNECT_GRACE_MS (found by a sweep, so up to SWEEP_INTERVAL_MS later) they are `absent`, until
+//    they come back; a spectator is then removed instead, unless they are the host, and is someone
+//    new when they return. The browser reconnects by itself with the same token.
+// 11. A game waits for a seat that is absent or empty until the host acts: `RoomView.coverable` lists
+//    the seats the game is waiting for right now and what it allows (`GameModule.skipAction`,
+//    `meta.proxyTurns`). `cover` (host only) skips that turn or plays a random legal action for it;
+//    anything else is refused with `cannot_cover`.
+// 12. `sit` also works while `ended`, so that a spectator can take a free seat for the rematch.
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
+import { normalizeChatText, type ChatMessage } from './chat.ts'
 import type { GameError, GameProjection, OptionValues, SeatId } from './games/types.ts'
 import type { JsonValue, PatchOp } from './patch.ts'
 
@@ -63,7 +74,7 @@ export const HEARTBEAT_INTERVAL_MS = 15_000
 export const STALE_AFTER_MS = 45_000
 /** A socket must send `join` this soon after opening; the next sweep closes it */
 export const JOIN_TIMEOUT_MS = 10_000
-/** How long a disconnected member keeps its seat without being marked offline (AC-2.3) */
+/** How long until a disconnected member is `absent`, and loses the host if they had it (AC-2.3) */
 export const RECONNECT_GRACE_MS = 45_000
 /** How long a kicked member's seat token cannot join again (E1) */
 export const KICK_BAN_MS = 5 * 60_000
@@ -78,8 +89,6 @@ export const MAX_CONNECTIONS = MAX_MEMBERS + 8
 export const MAX_CLIENT_MESSAGE_CHARS = 16_384
 /** A nickname's length in characters (code points), after normalizeName (E1) */
 export const MAX_NAME_CHARS = 16
-/** A chat message's length in characters (code points) (E1) */
-export const MAX_CHAT_CHARS = 500
 
 /**
  * WebSocket close codes the server uses. The browser reconnects after any close but the 44xx ones,
@@ -131,8 +140,19 @@ export type RoomMember = {
   /** Says they are set to play; always false without a seat. Does not hold back `start` */
   ready: boolean
   host: boolean
-  /** The socket dropped; the member keeps its seat */
+  /** False from the moment the socket drops; the member keeps its seat */
   online: boolean
+  /** Offline for longer than RECONNECT_GRACE_MS: the host can cover this seat's turns */
+  absent: boolean
+}
+
+/** A seat the game is waiting for, whose player is absent or gone, and what the host can do */
+export type CoverableSeat = {
+  seat: SeatId
+  /** The game has a way to pass this turn (`cover` with `skip`) */
+  skip: boolean
+  /** The game lets the room play a random legal action (`cover` with `proxy`) */
+  proxy: boolean
 }
 
 /** What `welcome` and `snapshot` send and `patch` keeps up to date; different for every viewer */
@@ -141,6 +161,8 @@ export type RoomView = {
   members: Record<string, RoomMember>
   /** Null while no game has started */
   game: GameProjection | null
+  /** Empty unless a game is waiting for an absent or empty seat */
+  coverable: CoverableSeat[]
 }
 
 // ── Server → browser ─────────────────────────────────────────────────────────────────────────
@@ -175,7 +197,8 @@ export type PatchMessage = { t: 'patch'; rev: number; ops: PatchOp[] }
  * - `bad_member`: `kick` of yourself or nobody; `transfer` to yourself, nobody or someone offline
  * - `bad_game`: `set_game` with a game this server does not have
  * - `game_failed`: the game module threw (a bug, not your mistake); nothing changed
- * - `unavailable`: this server does not do that yet (`chat` until e1-t07)
+ * - `cannot_cover`: `cover` of a seat that is not in `RoomView.coverable`, or in a way it does not allow
+ * - `unavailable`: this server does not do that yet
  */
 export type ErrorCode =
   | 'forbidden'
@@ -190,6 +213,7 @@ export type ErrorCode =
   | 'not_enough_players'
   | 'bad_member'
   | 'bad_game'
+  | 'cannot_cover'
   | 'game_failed'
   | 'unavailable'
 
@@ -210,19 +234,10 @@ export type TimerInfo = {
 /** The countdowns running now; replaces the previous list, and an empty list means none */
 export type TimerMessage = { t: 'timer'; timers: TimerInfo[] }
 
-export type ChatMessage = {
-  id: string
-  /** The sender's member id */
-  from: string
-  /** The sender's nickname when they sent it */
-  name: string
-  text: string
-  /** The server's clock */
-  at: number
-}
-
 /** `reset`: replace every message you have with these. Without it: new messages, append them */
 export type ChatServerMessage = { t: 'chat'; messages: ChatMessage[]; reset?: true }
+
+export type { ChatMessage }
 
 export type ServerMessage =
   | WelcomeMessage
@@ -245,7 +260,7 @@ export type ActionMessage = { t: 'action'; action: JsonValue }
 
 export type ChatClientMessage = { t: 'chat'; text: string }
 
-/** Move to this seat, or with null out of any seat; only while the room is `waiting` */
+/** Move to this seat, or with null out of any seat; only while the room is `waiting` or `ended` */
 export type SitMessage = { t: 'sit'; seat: SeatId | null }
 
 /** Say you are set to play, or take it back; only with a seat, while the room is `waiting` */
@@ -256,6 +271,9 @@ export type StartMessage = { t: 'start' }
 
 /** The host takes a `playing` or `ended` room back to `waiting`, dropping the game */
 export type ReopenMessage = { t: 'reopen' }
+
+/** The host deals with a seat in `RoomView.coverable` */
+export type CoverMessage = { t: 'cover'; seat: SeatId; how: 'skip' | 'proxy' }
 
 /** The host starts a new game from an `ended` room, with whoever is seated */
 export type RematchMessage = { t: 'rematch' }
@@ -285,6 +303,7 @@ export type ClientMessage =
   | StartMessage
   | ReopenMessage
   | RematchMessage
+  | CoverMessage
   | KickMessage
   | TransferMessage
   | DissolveMessage
@@ -403,11 +422,15 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return { t: 'resync' }
     case 'action':
       return value.action === undefined ? null : { t: 'action', action: value.action as JsonValue }
-    case 'chat':
-      return typeof value.text === 'string' &&
-        value.text.trim() !== '' &&
-        [...value.text].length <= MAX_CHAT_CHARS
-        ? { t: 'chat', text: value.text }
+    case 'chat': {
+      const text = normalizeChatText(value.text)
+      return text === null ? null : { t: 'chat', text }
+    }
+    case 'cover':
+      return Number.isSafeInteger(value.seat) &&
+        (value.seat as number) >= 0 &&
+        (value.how === 'skip' || value.how === 'proxy')
+        ? { t: 'cover', seat: value.seat as SeatId, how: value.how }
         : null
     case 'sit':
       return value.seat === null ||

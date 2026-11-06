@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_CHAT_CHARS, normalizeChatText } from '../../shared/chat.ts'
 import { gameError } from '../../shared/games/types.ts'
 import {
   isSeatToken,
-  MAX_CHAT_CHARS,
   MAX_CLIENT_MESSAGE_CHARS,
   MAX_NAME_CHARS,
   normalizeName,
@@ -209,6 +209,7 @@ describe('parseServerMessage', () => {
     },
     members: {},
     game: null,
+    coverable: [],
   }
 
   it('accepts what the server sends', () => {
@@ -290,5 +291,12 @@ describe('host control messages', () => {
     ]) {
       expect(parse(bad), JSON.stringify(bad)).toBeNull()
     }
+  })
+})
+
+describe('chat text', () => {
+  it('is not a message when only zero-width characters are left', () => {
+    expect(normalizeChatText('​‍ ﻿')).toBeNull()
+    expect(normalizeChatText('a‍b')).toBe('a‍b')
   })
 })

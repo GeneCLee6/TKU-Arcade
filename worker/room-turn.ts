@@ -16,6 +16,7 @@ import {
   type GameProjection,
   type OptionValues,
   type Seat,
+  type SeatId,
   type Viewer,
 } from '../shared/games/types.ts'
 import type { JsonValue } from '../shared/patch.ts'
@@ -175,6 +176,28 @@ export function playAction(
   } catch (error) {
     logFailure(module, 'action', error)
     return { kind: 'failed' }
+  }
+}
+
+/**
+ * What the room can do for `seat` if the game is waiting for it; null when it is not, or when the
+ * module cannot say. `proxy` holds the actions a random one can be picked from.
+ */
+export function coverOptions(
+  module: AnyGameModule,
+  game: StoredGame,
+  seat: SeatId,
+): { skip: JsonValue | null; proxy: JsonValue[] } | null {
+  try {
+    const legal = module.legalActions(game.match.state, seat)
+    if (legal.length === 0) return null
+    return {
+      skip: module.skipAction?.(game.match.state, seat) ?? null,
+      proxy: module.meta.proxyTurns ? legal : [],
+    }
+  } catch (error) {
+    logFailure(module, 'cover', error)
+    return null
   }
 }
 

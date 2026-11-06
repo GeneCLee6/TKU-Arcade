@@ -15,6 +15,7 @@ const member = (id: string, over: Partial<RoomMember> = {}): RoomMember => ({
   ready: false,
   host: false,
   online: true,
+  absent: false,
   ...over,
 })
 
@@ -30,6 +31,7 @@ function viewOf(members: RoomMember[], minPlayers = 2, maxSeats = 3): RoomView {
     },
     members: Object.fromEntries(members.map((m) => [m.id, m])),
     game: null,
+    coverable: [],
   }
 }
 

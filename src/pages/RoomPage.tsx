@@ -3,16 +3,18 @@ import { Link, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { isRoomId } from '../../shared/room-id.ts'
 import { Button } from '../components/Button.tsx'
+import { ChatPanel } from '../components/ChatPanel.tsx'
 import { NicknameForm } from '../components/NicknameForm.tsx'
 import { RoomInPlay } from '../components/RoomInPlay.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { WaitingRoom } from '../components/WaitingRoom.tsx'
 import { useT } from '../i18n/useT.ts'
+import { ChatDraft } from '../lib/chatState.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
 import { useRoom } from '../lib/useRoom.ts'
-import { color, fontSize, space } from '../styles/tokens.ts'
+import { color, fontSize, radius, space } from '../styles/tokens.ts'
 
 // The key gives each room its own state when the address changes without leaving this page
 export function RoomPage() {
@@ -72,6 +74,8 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
   const t = useT()
   const room = useRoom(id, name)
   const { session, retry } = room
+  // Here, not in the panel: what someone was writing outlives a connection problem and the retry
+  const [chatDraft] = useState(() => new ChatDraft())
 
   if (session.phase === 'ended') {
     switch (session.end) {
@@ -114,6 +118,10 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
   const { view, you } = session
   return (
     <>
+      {/* Always in the page: screen readers only announce changes in a region they already know */}
+      <ConnectionStatus aria-live="polite">
+        {session.reconnecting && <ReconnectBanner>{t('room.reconnecting')}</ReconnectBanner>}
+      </ConnectionStatus>
       <RoomHeading
         title={gameTitle(t, view.room.gameId)}
         members={Object.keys(view.members).length}
@@ -137,6 +145,8 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
           view={view}
           you={you}
           timers={room.timers}
+          onSit={room.sit}
+          onCover={room.cover}
           onKick={room.kick}
           onTransfer={room.transfer}
           onDissolve={room.dissolve}
@@ -144,6 +154,13 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
           onRematch={room.rematch}
         />
       )}
+      <ChatPanel
+        messages={room.chat}
+        you={you}
+        locked={view.game?.chatLocked ?? false}
+        onSend={room.sendChat}
+        draftStore={chatDraft}
+      />
       <LobbyLink />
     </>
   )
@@ -200,6 +217,27 @@ const Main = styled.main`
   & p {
     margin: 0;
   }
+`
+
+// Stuck to the top, since the room can be longer than a phone's screen. Empty, it takes up no room:
+// the negative margin cancels the gap of the grid it is in.
+const ConnectionStatus = styled.div`
+  position: sticky;
+  top: 0;
+  z-index: 1;
+
+  &:empty {
+    margin-bottom: -${space.lg}px;
+  }
+`
+
+const ReconnectBanner = styled.p`
+  padding: ${space.sm}px ${space.md}px;
+  background: ${color.surface};
+  color: ${color.text};
+  border: 1px solid ${color.border};
+  border-left: ${space.xs}px solid ${color.warning};
+  border-radius: ${radius.component}px;
 `
 
 const Title = styled.h1`
