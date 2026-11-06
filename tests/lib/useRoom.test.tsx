@@ -131,6 +131,22 @@ describe('senders', () => {
     ['setReady', (room) => room.setReady(true), { t: 'ready', ready: true }],
     ['start', (room) => room.start(), { t: 'start' }],
     ['act', (room) => room.act({ roll: 1 }), { t: 'action', action: { roll: 1 } }],
+    ['kick', (room) => room.kick('m2'), { t: 'kick', member: 'm2' }],
+    ['transfer', (room) => room.transfer('m2'), { t: 'transfer', member: 'm2' }],
+    ['dissolve', (room) => room.dissolve(), { t: 'dissolve' }],
+    ['rematch', (room) => room.rematch(), { t: 'rematch' }],
+    ['reopen', (room) => room.reopen(), { t: 'reopen' }],
+    ['setGame', (room) => room.setGame('promotion'), { t: 'set_game', gameId: 'promotion' }],
+    [
+      'setGame with options',
+      (room) => room.setGame('promotion', { turnLimit: 20 }),
+      { t: 'set_game', gameId: 'promotion', options: { turnLimit: 20 } },
+    ],
+    [
+      'setOptions',
+      (room) => room.setOptions({ turnLimit: 20 }),
+      { t: 'set_options', options: { turnLimit: 20 } },
+    ],
   ])('%s sends its frame', (_, call, frame) => {
     const { result, socket } = joined()
     act(() => call(result.current))
@@ -162,15 +178,46 @@ describe('senders', () => {
 
   it('stay the same functions across updates', () => {
     const { result, socket } = joined()
-    const { sit, setReady, start, act: send, retry } = result.current
+    const { session: _session, timers: _timers, ...before } = result.current
 
     serverSays(socket, READY_PATCH)
 
-    expect(result.current.sit).toBe(sit)
-    expect(result.current.setReady).toBe(setReady)
-    expect(result.current.start).toBe(start)
-    expect(result.current.act).toBe(send)
-    expect(result.current.retry).toBe(retry)
+    const { session: _s, timers: _t, ...after } = result.current
+    expect(Object.keys(before)).toContain('setOptions')
+    for (const [name, sender] of Object.entries(before)) {
+      expect(after[name as keyof typeof after]).toBe(sender)
+    }
+  })
+})
+
+describe('timers', () => {
+  const TIMER = { t: 'timer', timers: [{ id: 'turn', remainingMs: 5_000, totalMs: 30_000 }] }
+
+  it('starts with none, follows the server’s list, and keeps the same id and total', () => {
+    const { result, socket } = joined()
+    expect(result.current.timers).toEqual([])
+
+    serverSays(socket, TIMER)
+    expect(result.current.timers).toEqual([
+      { id: 'turn', deadline: expect.any(Number), totalMs: 30_000 },
+    ])
+
+    serverSays(socket, { t: 'timer', timers: [] })
+    expect(result.current.timers).toEqual([])
+  })
+
+  it('clears them when the connection ends', () => {
+    const { result, socket } = joined()
+    serverSays(socket, TIMER)
+    act(() => socket.serverClose(1006))
+    expect(result.current.timers).toEqual([])
+  })
+
+  it('clears them on retry, before the new socket has said anything', () => {
+    const { result, socket } = joined()
+    serverSays(socket, TIMER)
+    act(() => result.current.retry())
+    expect(result.current.timers).toEqual([])
   })
 })
 
@@ -213,6 +260,15 @@ describe('refusals', () => {
       error: { gameError: 'games.x.notYourTurn' },
     })
     expect(screen.getByRole('alert')).toHaveTextContent('games.x.notYourTurn')
+  })
+
+  it.each([
+    ['bad_member', "That person isn't in the room or isn't online."],
+    ['bad_game', "That game isn't available."],
+  ])('has its own words for %s', (code, text) => {
+    const socket = rendered()
+    serverSays(socket, { t: 'error', code })
+    expect(screen.getByRole('alert')).toHaveTextContent(text)
   })
 
   it('falls back for a code from a newer server', () => {
