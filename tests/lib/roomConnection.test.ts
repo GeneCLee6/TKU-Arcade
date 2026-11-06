@@ -17,6 +17,7 @@ function handlers() {
     onView: vi.fn(),
     onError: vi.fn(),
     onTimers: vi.fn(),
+    onChat: vi.fn(),
     onEnd: vi.fn(),
   } satisfies RoomHandlers
 }
@@ -406,5 +407,41 @@ describe('leaving and closing', () => {
     connectRoom(ROOM, 'Al', handlers())
     FakeWebSocket.last.serverClose(1006)
     expect(FakeWebSocket.instances).toHaveLength(1)
+  })
+})
+
+describe('chat', () => {
+  const MESSAGE = { id: 1, from: 'm2', name: 'Bo', text: 'hi', at: 5 }
+  const chat = (over: object) => JSON.stringify({ t: 'chat', ...over })
+
+  it('passes on new messages, and a reset as a reset', () => {
+    const { h, socket } = welcomed()
+
+    socket.receive(chat({ messages: [MESSAGE] }))
+    expect(h.onChat).toHaveBeenLastCalledWith([MESSAGE], false)
+
+    socket.receive(chat({ messages: [MESSAGE], reset: true }))
+    expect(h.onChat).toHaveBeenLastCalledWith([MESSAGE], true)
+  })
+
+  it('drops what is not a message', () => {
+    const { h, socket } = welcomed()
+    socket.receive(chat({ messages: [MESSAGE, { id: 'x' }, 7] }))
+    expect(h.onChat).toHaveBeenLastCalledWith([MESSAGE], false)
+  })
+
+  it('hears nothing before welcome or after leaving', () => {
+    const h = handlers()
+    const connection = connectRoom(ROOM, 'Al', h)
+    const socket = FakeWebSocket.last
+    socket.open()
+
+    socket.receive(chat({ messages: [MESSAGE] }))
+    expect(h.onChat).not.toHaveBeenCalled()
+
+    socket.receive(welcome({}))
+    connection.leave()
+    socket.receive(chat({ messages: [MESSAGE] }))
+    expect(h.onChat).not.toHaveBeenCalled()
   })
 })

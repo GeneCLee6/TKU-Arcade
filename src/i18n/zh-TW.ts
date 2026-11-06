@@ -2,6 +2,19 @@ import type { Messages } from './en.ts'
 
 // The annotation makes a missing or an extra key a compile error
 export const zhTW: Messages = {
+  'chat.empty': '還沒有訊息，打聲招呼吧。',
+  'chat.heading': '聊天',
+  'chat.hint': '按 Enter 傳送，Shift+Enter 換行。',
+  'chat.hintTouch': '點「傳送」送出，Enter 換行。',
+  'chat.inputLabel': '傳給房間的訊息',
+  'chat.locked': '遊戲目前鎖定聊天，這個階段不能傳訊息。',
+  'chat.messages': '聊天訊息',
+  'chat.placeholder': '輸入訊息',
+  'chat.remaining': '還可以輸入 {count} 個字',
+  'chat.send': '傳送',
+  'chat.sendFailed': '傳送失敗，訊息已放回輸入框。',
+  'chat.tooLong': '太長了，最多 {max} 個字。',
+  'chat.you': '你',
   'common.cancel': '取消',
   'common.close': '關閉',
   'common.loading': '載入中…',

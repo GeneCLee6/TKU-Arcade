@@ -583,3 +583,127 @@ describe('closes', () => {
     expect(FakeWebSocket.instances).toHaveLength(1)
   })
 })
+
+describe('chat', () => {
+  const chatBox = () => screen.getByRole('textbox', { name: en['chat.inputLabel'] })
+  const chatLog = () => screen.getByRole('log', { name: en['chat.messages'] })
+  const game = (chatLocked: boolean) => ({
+    view: {},
+    legal: [],
+    over: false,
+    result: null,
+    chatLocked,
+  })
+  const statusPatch = (rev: number, status: string, chatLocked = false) =>
+    JSON.stringify({
+      t: 'patch',
+      rev,
+      ops: [
+        { op: 'set', path: ['room', 'status'], value: status },
+        { op: 'set', path: ['game'], value: game(chatLocked) },
+      ],
+    })
+
+  it('shows while waiting, playing and ended', async () => {
+    await joined()
+    expect(chatLog()).toBeInTheDocument()
+
+    serverSays(statusPatch(1, 'playing'))
+    expect(chatLog()).toBeInTheDocument()
+
+    serverSays(statusPatch(2, 'ended'))
+    expect(chatLog()).toBeInTheDocument()
+  })
+
+  it('a spectator can read and write too', async () => {
+    await joined({ seat: null, host: false })
+    serverSays(
+      JSON.stringify({
+        t: 'chat',
+        messages: [{ id: 1, from: 'm2', name: 'Bo', text: 'hello all', at: 5 }],
+        reset: true,
+      }),
+    )
+    expect(within(chatLog()).getByText('hello all')).toBeInTheDocument()
+    expect(chatBox()).toBeEnabled()
+  })
+
+  it('is not there before joining', async () => {
+    localStorage.setItem(NICKNAME_KEY, 'Al')
+    stubSummary()
+    renderRoom()
+    await summaryLoaded()
+    expect(screen.queryByRole('log')).toBeNull()
+  })
+
+  it('locks and unlocks as the game says', async () => {
+    await joined()
+    serverSays(statusPatch(1, 'playing', true))
+    expect(chatBox()).toBeDisabled()
+
+    serverSays(statusPatch(2, 'playing', false))
+    expect(chatBox()).toBeEnabled()
+  })
+
+  it('sends, clears when the room answers, marks it as yours', async () => {
+    await joined()
+    fireEvent.change(chatBox(), { target: { value: 'hi' } })
+    fireEvent.click(screen.getByRole('button', { name: en['chat.send'] }))
+    await act(async () => {})
+
+    const sent = FakeWebSocket.last.sent.at(-1)
+    expect(sent).toBe(JSON.stringify({ t: 'chat', text: 'hi' }))
+    expect(chatBox()).toHaveValue('')
+
+    serverSays(
+      JSON.stringify({
+        t: 'chat',
+        messages: [{ id: 1, from: 'm1', name: 'Al', text: 'hi', at: 5 }],
+      }),
+    )
+    await act(async () => {})
+
+    expect(within(chatLog()).getByRole('listitem')).toHaveTextContent(en['chat.you'])
+    expect(chatBox()).toHaveValue('')
+  })
+
+  it('puts a refused message back in the box, explained there and not as a toast too', async () => {
+    await joined()
+    fireEvent.change(chatBox(), { target: { value: 'too soon' } })
+    fireEvent.click(screen.getByRole('button', { name: en['chat.send'] }))
+
+    serverSays(JSON.stringify({ t: 'error', code: 'rate_limited' }))
+    await act(async () => {})
+
+    expect(chatBox()).toHaveValue('too soon')
+    const alerts = screen.getAllByRole('alert')
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]).toHaveTextContent(en['room.error.rate_limited'])
+  })
+
+  it('keeps unsent text across a dropped connection and the retry', async () => {
+    await joined()
+    fireEvent.change(chatBox(), { target: { value: 'half a thought' } })
+
+    serverCloses(1006)
+    fireEvent.click(retryButton() as HTMLElement)
+    socketOpens()
+    serverSays(welcome({}))
+
+    expect(chatBox()).toHaveValue('half a thought')
+  })
+
+  it('gives back a message lost with the connection, after the retry', async () => {
+    await joined()
+    fireEvent.change(chatBox(), { target: { value: 'lost at sea' } })
+    fireEvent.click(screen.getByRole('button', { name: en['chat.send'] }))
+
+    serverCloses(1006)
+    await act(async () => {})
+    fireEvent.click(retryButton() as HTMLElement)
+    socketOpens()
+    serverSays(welcome({}))
+
+    expect(chatBox()).toHaveValue('lost at sea')
+  })
+})

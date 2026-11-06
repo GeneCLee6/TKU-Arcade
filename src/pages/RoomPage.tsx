@@ -3,11 +3,13 @@ import { Link, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { isRoomId } from '../../shared/room-id.ts'
 import { Button } from '../components/Button.tsx'
+import { ChatPanel } from '../components/ChatPanel.tsx'
 import { NicknameForm } from '../components/NicknameForm.tsx'
 import { RoomInPlay } from '../components/RoomInPlay.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { WaitingRoom } from '../components/WaitingRoom.tsx'
 import { useT } from '../i18n/useT.ts'
+import { ChatDraft } from '../lib/chatState.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
@@ -72,6 +74,8 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
   const t = useT()
   const room = useRoom(id, name)
   const { session, retry } = room
+  // Here, not in the panel: what someone was writing outlives a connection problem and the retry
+  const [chatDraft] = useState(() => new ChatDraft())
 
   if (session.phase === 'ended') {
     switch (session.end) {
@@ -144,6 +148,13 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
           onRematch={room.rematch}
         />
       )}
+      <ChatPanel
+        messages={room.chat}
+        you={you}
+        locked={view.game?.chatLocked ?? false}
+        onSend={room.sendChat}
+        draftStore={chatDraft}
+      />
       <LobbyLink />
     </>
   )

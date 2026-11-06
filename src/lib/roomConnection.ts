@@ -1,3 +1,4 @@
+import { isChatMessage } from '../../shared/chat.ts'
 import {
   CloseCode,
   HEARTBEAT_INTERVAL_MS,
@@ -6,6 +7,7 @@ import {
   isSeatToken,
   parseServerMessage,
   roomSocketPath,
+  type ChatMessage,
   type ClientMessage,
   type ErrorMessage,
   type JoinMessage,
@@ -38,6 +40,8 @@ export type RoomHandlers = {
   onError: (error: ErrorMessage) => void
   /** The countdowns running now, replacing the previous list; an empty list means none */
   onTimers: (timers: RoomTimer[]) => void
+  /** `reset`: these replace every message so far. Otherwise they are new, or may be repeats */
+  onChat: (messages: ChatMessage[], reset: boolean) => void
   onEnd: (end: RoomEnd) => void
 }
 
@@ -124,7 +128,6 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
   socket.onmessage = (event: MessageEvent) => {
     if (!current || typeof event.data !== 'string' || event.data === HEARTBEAT_PONG) return
     const message = parseServerMessage(event.data)
-    // `chat` (e1-t07) comes with its batch
     switch (message?.t) {
       case 'welcome':
         if (joined) return
@@ -158,6 +161,10 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
         )
         return
       }
+      case 'chat':
+        if (!joined) return
+        handlers.onChat(message.messages.filter(isChatMessage), message.reset === true)
+        return
     }
   }
 

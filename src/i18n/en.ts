@@ -1,6 +1,19 @@
 // The source language (docs/DESIGN.md §5): write here first, then translate in zh-TW.ts.
 // Keys name the meaning, not the sentence.
 export const en = {
+  'chat.empty': 'No messages yet. Say hi.',
+  'chat.heading': 'Chat',
+  'chat.hint': 'Enter sends, Shift+Enter starts a new line.',
+  'chat.hintTouch': 'Tap Send to send. Enter starts a new line.',
+  'chat.inputLabel': 'Message to the room',
+  'chat.locked': "The game has locked chat for now. You can't send messages during this part.",
+  'chat.messages': 'Chat messages',
+  'chat.placeholder': 'Write a message',
+  'chat.remaining': '{count} characters left',
+  'chat.send': 'Send',
+  'chat.sendFailed': "Couldn't send that. Your message is back in the box.",
+  'chat.tooLong': 'Too long. Keep it to {max} characters.',
+  'chat.you': 'You',
   'common.cancel': 'Cancel',
   'common.close': 'Close',
   'common.loading': 'Loading…',
