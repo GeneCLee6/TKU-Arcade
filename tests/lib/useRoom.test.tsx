@@ -3,6 +3,7 @@ import { StrictMode, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '../../src/components/Toast.tsx'
 import { setLanguage } from '../../src/i18n/t.ts'
+import { CHAT_ACK_TIMEOUT_MS } from '../../src/lib/chatState.ts'
 import { useRoom, type RoomHandle } from '../../src/lib/useRoom.ts'
 import { FakeWebSocket, TOKEN_A, welcome } from './fakeWebSocket.ts'
 
@@ -275,5 +276,195 @@ describe('refusals', () => {
     const socket = rendered()
     serverSays(socket, { t: 'error', code: 'from_the_future' })
     expect(screen.getByRole('alert')).toHaveTextContent("That didn't work. Try again.")
+  })
+})
+
+describe('chat', () => {
+  const said = (id: number, over: object = {}) => ({
+    id,
+    from: 'm2',
+    name: 'Bo',
+    text: `message ${id}`,
+    at: 1000 + id,
+    ...over,
+  })
+  const ids = (room: RoomHandle) => room.chat.map((message) => message.id)
+
+  it('starts empty, replaces on reset and appends otherwise', () => {
+    const { result, socket } = joined()
+    expect(result.current.chat).toEqual([])
+
+    serverSays(socket, { t: 'chat', messages: [said(1), said(2)], reset: true })
+    expect(ids(result.current)).toEqual([1, 2])
+
+    // The rest of the history, then a new message
+    serverSays(socket, { t: 'chat', messages: [said(3)] })
+    serverSays(socket, { t: 'chat', messages: [said(4)] })
+    expect(ids(result.current)).toEqual([1, 2, 3, 4])
+
+    serverSays(socket, { t: 'chat', messages: [said(9)], reset: true })
+    expect(ids(result.current)).toEqual([9])
+
+    serverSays(socket, { t: 'chat', messages: [], reset: true })
+    expect(result.current.chat).toEqual([])
+  })
+
+  it('de-duplicates by id', () => {
+    const { result, socket } = joined()
+    serverSays(socket, { t: 'chat', messages: [said(1)], reset: true })
+    serverSays(socket, { t: 'chat', messages: [said(1), said(2)] })
+    expect(ids(result.current)).toEqual([1, 2])
+  })
+
+  it('ignores what is not a message, keeping the rest of the frame', () => {
+    const { result, socket } = joined()
+    serverSays(socket, { t: 'chat', messages: [said(1), { id: 'x' }, null] })
+    expect(ids(result.current)).toEqual([1])
+  })
+
+  it('keeps the messages through a dropped socket and a retry, until the next reset', () => {
+    const { result, socket } = joined()
+    serverSays(socket, { t: 'chat', messages: [said(1), said(2)], reset: true })
+
+    act(() => socket.serverClose(1006))
+    expect(ids(result.current)).toEqual([1, 2])
+
+    act(() => result.current.retry())
+    expect(ids(result.current)).toEqual([1, 2])
+
+    const next = FakeWebSocket.last
+    act(() => {
+      next.open()
+      next.receive(welcome({}))
+    })
+    expect(ids(result.current)).toEqual([1, 2])
+
+    serverSays(next, { t: 'chat', messages: [said(2), said(3)], reset: true })
+    expect(ids(result.current)).toEqual([2, 3])
+  })
+
+  it('does not carry messages over to another room', () => {
+    const hook = renderHook(({ id }) => useRoom(id, 'Al'), {
+      wrapper,
+      initialProps: { id: ROOM },
+    })
+    const socket = FakeWebSocket.last
+    act(() => {
+      socket.open()
+      socket.receive(welcome({}))
+    })
+    serverSays(socket, { t: 'chat', messages: [said(1)], reset: true })
+
+    hook.rerender({ id: 'zzzzzzzzzz' })
+
+    expect(hook.result.current.chat).toEqual([])
+  })
+
+  describe('sendChat', () => {
+    /** Which way the promise has gone so far, if at all */
+    const watch = (answer: Promise<string>) => {
+      const seen: { result?: string } = {}
+      void answer.then((result) => (seen.result = result))
+      return seen
+    }
+    const flushed = () => act(async () => {})
+
+    it('sends the frame, normalized', () => {
+      const { result, socket } = joined()
+      act(() => void result.current.sendChat('  hi  '))
+      expect(socket.sent).toEqual([JSON.stringify({ t: 'chat', text: 'hi' })])
+    })
+
+    it('is answered by the message coming back', async () => {
+      const { result, socket } = joined()
+      const seen = watch(result.current.sendChat('hi'))
+      await flushed()
+      expect(seen.result).toBeUndefined()
+
+      serverSays(socket, { t: 'chat', messages: [said(1, { from: 'm1', text: 'hi' })] })
+      await flushed()
+
+      expect(seen.result).toBe('sent')
+    })
+
+    it.each(['rate_limited', 'chat_locked'])(
+      'is answered by %s, without a toast: the composer says it',
+      async (code) => {
+        function Probe({ onRoom }: { onRoom: (room: RoomHandle) => void }) {
+          onRoom(useRoom(ROOM, 'Al'))
+          return null
+        }
+        let room: RoomHandle | undefined
+        render(
+          <ToastProvider>
+            <Probe onRoom={(handle) => (room = handle)} />
+          </ToastProvider>,
+        )
+        const socket = FakeWebSocket.last
+        act(() => {
+          socket.open()
+          socket.receive(welcome({}))
+        })
+        const seen = watch((room as RoomHandle).sendChat('hi'))
+
+        serverSays(socket, { t: 'error', code })
+        await flushed()
+
+        expect(seen.result).toBe(code)
+        expect(screen.queryByRole('alert')).toBeNull()
+      },
+    )
+
+    it('leaves a chat refusal with no send waiting to the toast', () => {
+      function Probe() {
+        useRoom(ROOM, 'Al')
+        return null
+      }
+      render(
+        <ToastProvider>
+          <Probe />
+        </ToastProvider>,
+      )
+      const socket = FakeWebSocket.last
+      act(() => {
+        socket.open()
+        socket.receive(welcome({}))
+      })
+      serverSays(socket, { t: 'error', code: 'chat_locked' })
+      expect(screen.getByRole('alert')).toHaveTextContent('Chat is locked right now.')
+    })
+
+    it('fails at once for nothing, without sending what the room would close the socket for', async () => {
+      const { result, socket } = joined()
+      await expect(result.current.sendChat('   ')).resolves.toBe('failed')
+      await expect(result.current.sendChat('x'.repeat(501))).resolves.toBe('failed')
+      expect(socket.sent).toEqual([])
+    })
+
+    it('fails when the connection ends', async () => {
+      const { result, socket } = joined()
+      const seen = watch(result.current.sendChat('hi'))
+
+      act(() => socket.serverClose(1006))
+      await flushed()
+
+      expect(seen.result).toBe('failed')
+    })
+
+    it('fails when nothing comes back in time', async () => {
+      vi.useFakeTimers()
+      try {
+        const { result } = joined()
+        const seen = watch(result.current.sendChat('hi'))
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(CHAT_ACK_TIMEOUT_MS)
+        })
+
+        expect(seen.result).toBe('failed')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })
