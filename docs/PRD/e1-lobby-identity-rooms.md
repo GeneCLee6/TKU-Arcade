@@ -30,7 +30,7 @@ depends_on: [E2, E7]
 - **房間**：`/r/<room-id>`（10 碼 base58，沿用 LongTalk `shared/room-id.ts` 的做法）；屬性：遊戲 id、人數上限、公開／私密、規則選項（由 GameModule 宣告）、房主、座位、旁觀者；狀態 `waiting → playing → ended → waiting`；最後一人離開 10 分鐘後 DO 清除。
 - **等待室**：列出已進來的人、座位、準備狀態；房主「開始」按鈕在人數達到 GameModule 的 `minPlayers` 才可按；可複製連結與 QR code（沿用牌桌的 `qrcode-generator`）。
 - **房主控制**：開始、踢人（被踢者 5 分鐘不能回來）、換遊戲（回到 waiting，清掉局面）、再來一局（保留座位）、轉移房主、解散；房主離開時自動把房主交給最早進來的玩家。
-- **聊天**：文字 ≤ 500 字、連結可點、保留 200 則、每人每 10 秒 10 則（沿用 LongTalk `shared/chat.ts`）；局內 GameModule 可宣告 `chatLocked`（合作撲克在暗示回合禁聊）。
+- **聊天**：文字 ≤ 500 字、連結可點、保留 200 則、每人每 10 秒 10 則（沿用 LongTalk `shared/chat.ts`）；局內 GameModule 可宣告 `chatLocked`（默契牌局在暗示回合禁聊）。
 - **旁觀**：房間滿或遊戲進行中時以旁觀者進入；看得到 `view('spectator')`；可聊天；遊戲結束後可補位。
 - **選用帳號（M1）**：「用淡江帳號登入」→ 轉到牌桌的登入 → 回來帶一個牌桌簽的短效 token → 本站 Worker 驗簽（公鑰或共用 secret）→ 發本站 session；登入者暱稱固定、戰績入 D1（E11）。
 - **語音連結（M1）**：等待室「開語音」→ 呼叫 LongTalk 的 `POST /api/rooms` 建一間並把連結貼進聊天；LongTalk 不可用時隱藏按鈕。

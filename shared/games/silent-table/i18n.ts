@@ -1,0 +1,71 @@
+// Every player-facing string of this game. `en` is the source; the type makes zh-TW keep the same
+// keys. src/i18n merges these through GAME_MESSAGES (shared/games/index.ts).
+const en = {
+  'games.silent-table.name': 'Silent Table',
+  'games.silent-table.summary':
+    'Co-operative poker without a word: use rank chips to put your hands in order.',
+  'games.silent-table.option.levelsToWin': 'Levels in a row to win',
+  'games.silent-table.option.failureLimit': 'Failed levels that end the game',
+  'games.silent-table.option.allowTakeFromPlayers': 'Chips can be taken from other players',
+  'games.silent-table.option.spectatorsSeeAll': 'Spectators see all hole cards',
+  'games.silent-table.hand.highCard': 'High card',
+  'games.silent-table.hand.pair': 'Pair',
+  'games.silent-table.hand.twoPair': 'Two pair',
+  'games.silent-table.hand.threeOfAKind': 'Three of a kind',
+  'games.silent-table.hand.straight': 'Straight',
+  'games.silent-table.hand.flush': 'Flush',
+  'games.silent-table.hand.fullHouse': 'Full house',
+  'games.silent-table.hand.fourOfAKind': 'Four of a kind',
+  'games.silent-table.hand.straightFlush': 'Straight flush',
+  'games.silent-table.error.badAction': 'That is not a move in this game.',
+  'games.silent-table.error.over': 'The game is over.',
+  'games.silent-table.error.cardsShowing': 'Chips cannot move while the cards are being shown.',
+  'games.silent-table.error.noSuchChip': 'That chip is not on the table.',
+  'games.silent-table.error.noChipThere': 'That player has no chip to take.',
+  'games.silent-table.error.takeOff': 'This game does not allow taking chips from other players.',
+  'games.silent-table.error.noMoves': 'You have no chip moves left this round.',
+  'games.silent-table.error.needChip': 'Take a chip first.',
+  'games.silent-table.error.alreadyReady': 'You are already ready.',
+  'games.silent-table.error.notAPlayer': 'That seat is not playing in this game.',
+  'games.silent-table.error.systemOnly': 'Only the room can do that.',
+  'games.silent-table.result.won': 'The table wins: {levels} in a row, {failures} failed on the way.',
+  'games.silent-table.result.lost': 'The table loses: {failures} failed.',
+  'games.silent-table.note.reads': 'Final chip right in {reads} of {levels} levels played.',
+}
+
+const zhTW: Record<keyof typeof en, string> = {
+  'games.silent-table.name': '默契牌局',
+  'games.silent-table.summary': '不說話的合作撲克：用順位籌碼排出大家手牌的強弱。',
+  'games.silent-table.option.levelsToWin': '連過幾關獲勝',
+  'games.silent-table.option.failureLimit': '失敗幾關算輸',
+  'games.silent-table.option.allowTakeFromPlayers': '可以從別的玩家手上拿籌碼',
+  'games.silent-table.option.spectatorsSeeAll': '旁觀者可以看所有底牌',
+  'games.silent-table.hand.highCard': '高牌',
+  'games.silent-table.hand.pair': '一對',
+  'games.silent-table.hand.twoPair': '兩對',
+  'games.silent-table.hand.threeOfAKind': '三條',
+  'games.silent-table.hand.straight': '順子',
+  'games.silent-table.hand.flush': '同花',
+  'games.silent-table.hand.fullHouse': '葫蘆',
+  'games.silent-table.hand.fourOfAKind': '四條',
+  'games.silent-table.hand.straightFlush': '同花順',
+  'games.silent-table.error.badAction': '這不是這款遊戲的動作。',
+  'games.silent-table.error.over': '這局已經結束了。',
+  'games.silent-table.error.cardsShowing': '揭牌時不能移動籌碼。',
+  'games.silent-table.error.noSuchChip': '桌上沒有這枚籌碼。',
+  'games.silent-table.error.noChipThere': '這位玩家手上沒有籌碼可拿。',
+  'games.silent-table.error.takeOff': '這局不能從別的玩家手上拿籌碼。',
+  'games.silent-table.error.noMoves': '這一輪你已經不能再移動籌碼了。',
+  'games.silent-table.error.needChip': '請先拿一枚籌碼。',
+  'games.silent-table.error.alreadyReady': '你已經準備好了。',
+  'games.silent-table.error.notAPlayer': '這個座位沒有參與這局。',
+  'games.silent-table.error.systemOnly': '只有房間本身能這麼做。',
+  'games.silent-table.result.won': '全桌獲勝：連過 {levels} 關，途中失敗 {failures} 關。',
+  'games.silent-table.result.lost': '全桌落敗：失敗 {failures} 關。',
+  'games.silent-table.note.reads': '玩了 {levels} 關，有 {reads} 關最後的籌碼拿對。',
+}
+
+export const silentTableMessages = { en, 'zh-TW': zhTW } as {
+  en: Record<string, string>
+  'zh-TW': Record<string, string>
+}
