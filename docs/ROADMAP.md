@@ -52,7 +52,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 
 | 批 | Task | 內容 | 前提 |
 | --- | --- | --- | --- |
-| [ ] D1 | `e1-t09` `e1-t10` `e12-t04` `e12-t05` | `LobbyDO` 公開房列表；房間 10 分鐘清除與黑名單過期；錯誤回報與 observability；D1 骨架、遷移、備份 cron | B4 |
+| [x] D1（#10） | `e1-t09` `e1-t10` `e12-t04` `e12-t05` | `LobbyDO` 公開房列表；房間 10 分鐘清除與黑名單過期；錯誤回報與 observability；D1 骨架、遷移、備份 cron | B4 |
 | [ ] D2 | `e7-t05` `e7-t06` `e7-t08` `e12-t09` | 大廳與房間手機版面；鍵盤與焦點、axe 骨架；繁中全站走查；`IP-CHECKLIST.md` 與升官圖簽核。**M0 完成：4 個朋友實測一局升官圖** | C3, D1 |
 
 ## Phase F · M1 帳號、戰績與題庫地基

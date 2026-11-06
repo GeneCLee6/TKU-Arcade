@@ -38,7 +38,27 @@ describe('POST /api/rooms', () => {
     const { id } = (await res.json()) as { id: string }
     expect(isRoomId(id)).toBe(true)
     expect(names).toEqual([id])
-    expect(room.create).toHaveBeenCalledWith(id, 'tictactoe', options)
+    expect(room.create).toHaveBeenCalledWith(id, 'tictactoe', options, false)
+  })
+
+  it('makes a room public only when asked in so many words', async () => {
+    const cases: [unknown, boolean][] = [
+      [true, true],
+      [false, false],
+      ['true', false],
+      [1, false],
+      [undefined, false],
+    ]
+    for (const [value, expected] of cases) {
+      const { env, room } = setup()
+      await handleRequest(post(JSON.stringify({ gameId: 'tictactoe', public: value })), env)
+      expect(room.create, String(value)).toHaveBeenCalledWith(
+        expect.any(String),
+        'tictactoe',
+        undefined,
+        expected,
+      )
+    }
   })
 
   it('tries another id on a collision, and gives up in the end', async () => {

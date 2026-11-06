@@ -57,6 +57,8 @@
 //    `meta.proxyTurns`). `cover` (host only) skips that turn or plays a random legal action for it;
 //    anything else is refused with `cannot_cover`.
 // 12. `sit` also works while `ended`, so that a spectator can take a free seat for the rematch.
+// 13. A room with no socket open for ROOM_CLEANUP_MS, or `ended` with nothing happening for that long,
+//    is deleted: any socket left is closed with CloseCode.roomNotFound (RoomHost.sweep).
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
@@ -84,6 +86,8 @@ export const SWEEP_INTERVAL_MS = 15_000
 export const MAX_MEMBERS = 64
 /** Sockets open at once: every member, and a few that have not joined yet */
 export const MAX_CONNECTIONS = MAX_MEMBERS + 8
+/** How long a room stays with nobody in it, or finished with nothing happening, before it is deleted */
+export const ROOM_CLEANUP_MS = 10 * 60_000
 
 /** Client messages larger than this (UTF-16 code units) are refused without parsing */
 export const MAX_CLIENT_MESSAGE_CHARS = 16_384
@@ -97,7 +101,7 @@ export const MAX_NAME_CHARS = 16
 export const CloseCode = {
   /** The browser speaks another protocol version: reload the page */
   versionMismatch: 4400,
-  /** No room with this id (never created, or closed) */
+  /** No room with this id (never created, closed, or just deleted for being empty or finished) */
   roomNotFound: 4404,
   /** No heartbeat for STALE_AFTER_MS, or no `join` within JOIN_TIMEOUT_MS */
   stale: 4408,
@@ -312,8 +316,11 @@ export type ClientMessage =
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────────────────────
 
-/** POST /api/rooms. Options the game does not accept fall back to its defaults */
-export type CreateRoomRequest = { gameId: string; options?: OptionValues }
+/**
+ * POST /api/rooms. Options the game does not accept fall back to its defaults. `public` lists the
+ * room on the home page while it waits for people; without it the room is reachable by link only.
+ */
+export type CreateRoomRequest = { gameId: string; options?: OptionValues; public?: boolean }
 
 /** 201 from POST /api/rooms */
 export type CreateRoomResponse = { id: string }
@@ -328,6 +335,31 @@ export type RoomSummary = {
   seated: number
   maxSeats: number
 }
+
+/** A public room waiting for people, as GET /api/lobby shows it to anyone. No member but the host */
+export type RoomListing = {
+  id: string
+  gameId: string
+  /** The host's nickname */
+  host: string
+  seated: number
+  maxSeats: number
+  createdAt: number
+}
+
+/** GET /api/lobby: newest first */
+export type LobbyResponse = { rooms: RoomListing[] }
+
+/** How often the home page asks for the list, while it is visible */
+export const LOBBY_POLL_MS = 15_000
+/** A listed room tells the lobby it is still there this often, even if nothing changed */
+export const LOBBY_HEARTBEAT_MS = 4 * 60_000
+/** The lobby forgets a room it has not heard from for this long (its removal may have got lost) */
+export const LOBBY_TTL_MS = 10 * 60_000
+/** Rooms GET /api/lobby answers with */
+export const LOBBY_LIST_LIMIT = 50
+/** Rooms the lobby keeps track of; past this, a new room is not listed until there is space */
+export const LOBBY_MAX_ROOMS = 200
 
 // ── Parsing ──────────────────────────────────────────────────────────────────────────────────
 
