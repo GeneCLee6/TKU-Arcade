@@ -697,7 +697,18 @@ describe('chat', () => {
   const chatBox = () => screen.getByRole('textbox', { name: en['chat.inputLabel'] })
   const chatLog = () => screen.getByRole('log', { name: en['chat.messages'] })
   const game = (chatLocked: boolean) => ({
-    view: {},
+    view: {
+      players: [{ seat: 0, cell: 'baiding', rolls: 0, demotions: 0 }],
+      turn: 0,
+      first: 0,
+      round: 1,
+      turnLimit: 60,
+      dice: 'four-sided',
+      last: null,
+      ending: null,
+      winner: null,
+      you: 0,
+    },
     legal: [],
     over: false,
     result: null,

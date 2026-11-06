@@ -136,4 +136,9 @@ export const zhTW: Messages = {
   'theme.system': '跟隨系統',
   'theme.light': '淺色',
   'theme.dark': '深色',
+  // C2
+  'room.panel.chatUnread': '聊天（{count} 則新訊息）',
+  'room.panel.members': '成員',
+  'room.panel.title': '房間',
+  'room.turnBadge': '輪到',
 }

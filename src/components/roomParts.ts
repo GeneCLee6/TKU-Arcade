@@ -1,6 +1,12 @@
 // The pieces the room's screens are built from, so the waiting room and the game look the same
 import styled from 'styled-components'
+import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
+
+export const seatedMembers = (view: RoomView): RoomMember[] =>
+  Object.values(view.members)
+    .filter((member) => member.seat !== null)
+    .sort((a, b) => (a.seat as number) - (b.seat as number))
 
 export const Section = styled.section`
   display: grid;

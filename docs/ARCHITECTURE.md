@@ -53,7 +53,8 @@ src/
   lib/                  瀏覽器工具（storage 等）
   components/           基礎元件
   pages/                Lobby、Room、Rules、Me、Admin
-  games/<id>/           每款遊戲的畫面（lazy）
+  games/screens.ts      遊戲畫面登記表（gameId → lazy 畫面）；沒登記的遊戲只有房間面板
+  games/<id>/           每款遊戲的畫面（lazy）；用 components/GameLayout 放進房間（寬螢幕右欄、手機抽屜）
   kart/                 Scene、Renderer、Hud、Tune（調參面板）
 scripts/                check-budget、check-i18n、check-assets、assets/upload、kart/build-track、seed
 tests/                  games/harness.ts、每款遊戲的完整一局、worker 測試、browser（Playwright）
