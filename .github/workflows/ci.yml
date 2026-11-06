@@ -1,11 +1,10 @@
 name: CI
 
-# Runs on pull requests targeting main and on every push to main: install -> lint -> typecheck ->
-# test -> build -> JS budgets (AC-12.2). All must pass before a pull request can merge; production
-# deploys run in deploy.yml after this workflow succeeds on main (DEPLOY.md §4).
+# Runs on pull requests targeting main and on every push to main: install -> lint -> translations ->
+# typecheck -> test -> build -> JS budgets (AC-12.2). All must pass before a pull request can merge;
+# production deploys run in deploy.yml after this workflow succeeds on main (DEPLOY.md §4).
 #
 # Steps still to come, each added by the batch that adds its npm script (don't call them before):
-#   - B1:           `npm run check-i18n` — en.ts and zh-TW.ts have the same keys
 #   - K1 (e12-t08): `npm run check-assets` — every file in public/ and R2 is listed in ASSETS.md
 on:
   push:
@@ -37,6 +36,9 @@ jobs:
 
       - name: Lint (oxlint)
         run: npm run lint
+
+      - name: Translations (check-i18n)
+        run: npm run check-i18n
 
       - name: Type check
         run: npm run typecheck

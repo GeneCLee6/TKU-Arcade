@@ -15,6 +15,13 @@ describe('App', () => {
     expect(screen.getByRole('heading', { level: 1, name: APP_NAME })).toBeInTheDocument()
   })
 
+  it('loads the room page lazily on /r/:id', async () => {
+    window.history.pushState({}, '', '/r/nope')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Room not found' })).toBeInTheDocument()
+    window.history.pushState({}, '', '/')
+  })
+
   it('switches the page language, and the product name stays the same', () => {
     render(<App />)
     expect(screen.getByText('Pick a game and play with friends.')).toBeInTheDocument()
