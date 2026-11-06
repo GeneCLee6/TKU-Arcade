@@ -39,7 +39,7 @@ depends_on: [E2, E7]
 
 - 大廳不需要 DO：遊戲清單是靜態的（`shared/games/index.ts`），公開房列表由 `LobbyDO`（單一實例）維護，各 `RoomDO` 在狀態變化時通知它（alarm 保活，10 分鐘沒心跳就移除）。
 - 路由：`/`（大廳）、`/r/<id>`（房間）、`/games/<id>/rules`（規則頁，E7）、`/me`（M1 戰績，E11）。
-- 進房流程：`GET /api/rooms/<id>` 先拿房間摘要（遊戲、人數、是否可加入）→ 輸入暱稱 → WebSocket `/api/rooms/<id>/ws?v=1`。
+- 進房流程：`GET /api/rooms/<id>` 先拿房間摘要（遊戲、人數、是否可加入）→ 輸入暱稱 → WebSocket `/ws/<id>?v=1`。
 - 帳號：**不複製牌桌的帳號程式**；只做 token 驗證（`worker/auth.ts`）。牌桌那邊要加一個「對外簽 token」的端點（牌桌 repo 的 task，記在 §未決問題）。
 
 ## 驗收條件
