@@ -45,7 +45,7 @@ depends_on: []
 
 ## 驗收條件
 
-- [ ] AC-12.1 — 部署：正式站上線、`DEPLOY.md`、PR 預覽。
+- [x] AC-12.1 — 部署：正式站上線、`DEPLOY.md`、PR 預覽。
 - [ ] AC-12.2 — CI：lint／typecheck／test／build／預算／i18n／資產檢查全在 PR 跑。
 - [ ] AC-12.3 — 遙測：錯誤回報與每日指標可見。
 - [ ] AC-12.4 — 成本：儀表板與 80% 警示。
