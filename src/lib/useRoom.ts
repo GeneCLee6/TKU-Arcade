@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { OptionValues } from '../../shared/games/types.ts'
 import type { JsonValue } from '../../shared/patch.ts'
 import type { ClientMessage, ErrorMessage, RoomView } from '../../shared/protocol.ts'
 import { useToast } from '../components/useToast.ts'
 import { en } from '../i18n/en.ts'
 import { t, type TextKey } from '../i18n/t.ts'
-import { connectRoom, type RoomConnection, type RoomEnd } from './roomConnection.ts'
+import { connectRoom, type RoomConnection, type RoomEnd, type RoomTimer } from './roomConnection.ts'
 
 export type RoomSession =
   | { phase: 'joining' }
@@ -13,11 +14,20 @@ export type RoomSession =
 
 export type RoomHandle = {
   session: RoomSession
+  /** The countdowns running now; none once the connection has ended */
+  timers: readonly RoomTimer[]
   retry(): void
   sit(seat: number | null): void
   setReady(ready: boolean): void
   start(): void
   act(action: JsonValue): void
+  kick(memberId: string): void
+  transfer(memberId: string): void
+  dissolve(): void
+  rematch(): void
+  reopen(): void
+  setGame(gameId: string, options?: OptionValues): void
+  setOptions(options: OptionValues): void
 }
 
 function errorText(error: ErrorMessage): string {
@@ -31,6 +41,7 @@ function errorText(error: ErrorMessage): string {
 export function useRoom(roomId: string, name: string): RoomHandle {
   const toast = useToast()
   const [session, setSession] = useState<RoomSession>({ phase: 'joining' })
+  const [timers, setTimers] = useState<readonly RoomTimer[]>([])
   const [attempt, setAttempt] = useState(0)
   const connection = useRef<RoomConnection | null>(null)
 
@@ -38,7 +49,11 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     const opened = connectRoom(roomId, name, {
       onView: (you, view) => setSession({ phase: 'joined', you, view }),
       onError: (error) => toast(errorText(error), { tone: 'danger' }),
-      onEnd: (end) => setSession({ phase: 'ended', end }),
+      onTimers: setTimers,
+      onEnd: (end) => {
+        setSession({ phase: 'ended', end })
+        setTimers([])
+      },
     })
     connection.current = opened
     return () => {
@@ -52,12 +67,42 @@ export function useRoom(roomId: string, name: string): RoomHandle {
 
   const retry = useCallback(() => {
     setSession({ phase: 'joining' })
+    setTimers([])
     setAttempt((count) => count + 1)
   }, [])
   const sit = useCallback((seat: number | null) => send({ t: 'sit', seat }), [send])
   const setReady = useCallback((ready: boolean) => send({ t: 'ready', ready }), [send])
   const start = useCallback(() => send({ t: 'start' }), [send])
   const act = useCallback((action: JsonValue) => send({ t: 'action', action }), [send])
+  const kick = useCallback((member: string) => send({ t: 'kick', member }), [send])
+  const transfer = useCallback((member: string) => send({ t: 'transfer', member }), [send])
+  const dissolve = useCallback(() => send({ t: 'dissolve' }), [send])
+  const rematch = useCallback(() => send({ t: 'rematch' }), [send])
+  const reopen = useCallback(() => send({ t: 'reopen' }), [send])
+  const setGame = useCallback(
+    (gameId: string, options?: OptionValues) =>
+      send(options ? { t: 'set_game', gameId, options } : { t: 'set_game', gameId }),
+    [send],
+  )
+  const setOptions = useCallback(
+    (options: OptionValues) => send({ t: 'set_options', options }),
+    [send],
+  )
 
-  return { session, retry, sit, setReady, start, act }
+  return {
+    session,
+    timers,
+    retry,
+    sit,
+    setReady,
+    start,
+    act,
+    kick,
+    transfer,
+    dissolve,
+    rematch,
+    reopen,
+    setGame,
+    setOptions,
+  }
 }

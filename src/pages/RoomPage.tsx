@@ -1,14 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import styled from 'styled-components'
-import { getGame } from '../../shared/games/index.ts'
 import { isRoomId } from '../../shared/room-id.ts'
 import { Button } from '../components/Button.tsx'
 import { NicknameForm } from '../components/NicknameForm.tsx'
+import { RoomInPlay } from '../components/RoomInPlay.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { WaitingRoom } from '../components/WaitingRoom.tsx'
-import type { Translate } from '../i18n/t.ts'
 import { useT } from '../i18n/useT.ts'
+import { gameTitle } from '../lib/gameTitle.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
 import { useRoom } from '../lib/useRoom.ts'
@@ -70,7 +70,8 @@ interface RoomSessionProps {
 
 function RoomSession({ id, name, title, members }: RoomSessionProps) {
   const t = useT()
-  const { session, retry, sit, setReady, start } = useRoom(id, name)
+  const room = useRoom(id, name)
+  const { session, retry } = room
 
   if (session.phase === 'ended') {
     switch (session.end) {
@@ -87,6 +88,10 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         return <Problem message={t('room.full')} />
       case 'replaced':
         return <Problem message={t('room.replaced')} />
+      case 'kicked':
+        return <Problem message={t('room.kicked')} />
+      case 'dissolved':
+        return <Problem message={t('room.dissolved')} />
       case 'connectionLost':
         return (
           <Problem message={t('room.connectionLost')} action={<RetryButton onClick={retry} />} />
@@ -118,22 +123,30 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
           roomId={id}
           view={view}
           you={you}
-          onSit={sit}
-          onReady={setReady}
-          onStart={start}
+          onSit={room.sit}
+          onReady={room.setReady}
+          onStart={room.start}
+          onKick={room.kick}
+          onTransfer={room.transfer}
+          onDissolve={room.dissolve}
+          onSetGame={room.setGame}
+          onSetOptions={room.setOptions}
         />
       ) : (
-        <p role="status">{t('room.inProgress')}</p>
+        <RoomInPlay
+          view={view}
+          you={you}
+          timers={room.timers}
+          onKick={room.kick}
+          onTransfer={room.transfer}
+          onDissolve={room.dissolve}
+          onReopen={room.reopen}
+          onRematch={room.rematch}
+        />
       )}
       <LobbyLink />
     </>
   )
-}
-
-// A room from a newer deployment can have a game this page does not know
-function gameTitle(t: Translate, gameId: string): string {
-  const game = getGame(gameId)
-  return game ? t(`${game.meta.i18nKey}.name`) : t('room.genericTitle')
 }
 
 function RoomHeading({ title, members }: { title: string; members: number }) {

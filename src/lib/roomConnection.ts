@@ -21,11 +21,23 @@ export type RoomEnd =
   | 'connectionLost'
   | 'disconnected'
   | 'replaced'
+  | 'kicked'
+  | 'dissolved'
+
+/** One countdown, in this browser's own time: `performance.now()` reads against `deadline` */
+export type RoomTimer = {
+  id: string
+  deadline: number
+  /** The whole countdown, for a progress bar */
+  totalMs: number
+}
 
 export type RoomHandlers = {
   /** After `welcome`, and whenever what this person sees changes */
   onView: (you: string, view: RoomView) => void
   onError: (error: ErrorMessage) => void
+  /** The countdowns running now, replacing the previous list; an empty list means none */
+  onTimers: (timers: RoomTimer[]) => void
   onEnd: (end: RoomEnd) => void
 }
 
@@ -46,6 +58,10 @@ function readSeatToken(roomId: string): string | null {
 
 function endOfClose(code: number, welcomed: boolean): RoomEnd {
   if (code === CloseCode.replaced) return 'replaced'
+  // Before `welcome` too: a token still banned is closed as soon as it joins. The token stays in
+  // storage on purpose: it is what the ban recognises, so a new one would walk straight back in.
+  if (code === CloseCode.kicked) return 'kicked'
+  if (code === CloseCode.dissolved) return 'dissolved'
   if (welcomed) return 'disconnected'
   if (code === CloseCode.versionMismatch) return 'versionMismatch'
   if (code === CloseCode.roomNotFound) return 'notFound'
@@ -108,7 +124,7 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
   socket.onmessage = (event: MessageEvent) => {
     if (!current || typeof event.data !== 'string' || event.data === HEARTBEAT_PONG) return
     const message = parseServerMessage(event.data)
-    // `timer` (e2-t08) and `chat` (e1-t07) come with their batches
+    // `chat` (e1-t07) comes with its batch
     switch (message?.t) {
       case 'welcome':
         if (joined) return
@@ -129,6 +145,19 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
       case 'error':
         handlers.onError(message)
         return
+      case 'timer': {
+        if (!joined) return
+        // A duration, not a clock time, and counted from now: browsers' clocks disagree
+        const now = performance.now()
+        handlers.onTimers(
+          message.timers.map(({ id, remainingMs, totalMs }) => ({
+            id,
+            deadline: now + remainingMs,
+            totalMs,
+          })),
+        )
+        return
+      }
     }
   }
 

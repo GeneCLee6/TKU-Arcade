@@ -89,11 +89,19 @@ const Header = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: ${space.lg}px;
+
+  & > button {
+    flex: none;
+  }
 `
 
+// A title can hold someone's nickname; a long one without spaces must wrap, not push the close
+// button off a 320px screen
 const Title = styled.h2`
+  min-width: 0;
   margin: 0;
   font-size: ${fontSize.lg}px;
+  overflow-wrap: anywhere;
 `
 
 const Actions = styled.div`

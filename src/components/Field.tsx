@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import styled from 'styled-components'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
 
@@ -23,6 +24,45 @@ export const TextInput = styled.input`
   &[aria-invalid='true'] {
     border-color: ${color.danger};
   }
+`
+
+export const SelectInput = styled.select`
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 ${space.md}px;
+  background: ${color.bg};
+  color: ${color.text};
+  border: 1px solid ${color.border};
+  border-radius: ${radius.component}px;
+  font-family: inherit;
+  font-size: ${fontSize.md}px;
+`
+
+/** Fields someone may read but not change, as label and value; holds `ReadOnlyField`s */
+export const ReadOnlyFields = styled.dl`
+  display: grid;
+  gap: ${space.sm}px;
+  margin: 0;
+`
+
+export function ReadOnlyField({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <ReadOnlyLabel>{label}</ReadOnlyLabel>
+      <ReadOnlyValue>{value}</ReadOnlyValue>
+    </div>
+  )
+}
+
+const ReadOnlyLabel = styled.dt`
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
+`
+
+const ReadOnlyValue = styled.dd`
+  margin: 0;
+  font-weight: 600;
 `
 
 export const FieldError = styled.p`
