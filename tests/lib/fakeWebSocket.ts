@@ -66,7 +66,15 @@ export function welcome(
   me: Partial<RoomMember>,
   { token = TOKEN_A, others = 0 }: { token?: string; others?: number } = {},
 ): string {
-  const member: RoomMember = { id: 'm1', name: 'Al', seat: 0, host: true, online: true, ...me }
+  const member: RoomMember = {
+    id: 'm1',
+    name: 'Al',
+    seat: 0,
+    ready: false,
+    host: true,
+    online: true,
+    ...me,
+  }
   const members: Record<string, RoomMember> = { [member.id]: member }
   for (let i = 0; i < others; i++) {
     members[`other${i}`] = { ...member, id: `other${i}`, name: `Other ${i}`, seat: i + 1 }
