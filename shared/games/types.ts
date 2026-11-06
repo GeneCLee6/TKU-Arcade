@@ -197,8 +197,10 @@ export type GameMeta = {
   maxPlayers: number
   /** A typical game's length, for the lobby card */
   minutes: number
-  /** Prefix of the module's strings, `games.<id>`; `<prefix>.name` must exist */
-  i18nKey: string
+  /** Prefix of the module's strings, `games.<id>`; `.name` and `.summary` under it must exist */
+  i18nKey: `games.${string}`
+  /** Left out of the lobby (a template, not something to play); rooms can still be made for it */
+  unlisted?: true
 }
 
 /**
