@@ -18,7 +18,8 @@
 //    `applyAction`, and on success everyone gets their `patch`. A refusal goes to the sender only,
 //    as `error` with code `game_error`, and nobody else hears of it.
 // 4. `timer` replaces the list of countdowns running now (GameModule.timers), after `welcome` if any
-//    runs, before a `snapshot` and whenever it changes. Times are durations: browsers' clocks disagree.
+//    runs, before a `snapshot` and whenever it changes. Times are durations, not clock times:
+//    browsers' clocks disagree.
 // 5. `chat` goes to everyone in the room (the sender too: that is its acknowledgement). While the
 //    game says `chatLocked`, it is refused with `chat_locked`. (B4 ports the limits, e1-t07; until
 //    then every `chat` is refused with `unavailable`.)

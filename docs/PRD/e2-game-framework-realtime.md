@@ -78,7 +78,7 @@ depends_on: [E12]
 - [ ] `e2-t05` 重連：seatToken、退避、離線標示、房主跳過／代打 · AC-2.3 · M · ← e2-t04
 - [ ] `e2-t06` 結果畫面、再來一局、回大廳 · AC-2.4 · S · ← e2-t04
 - [x] `e2-t07` `tests/games/harness.ts`、`npm run play` 煙霧測試 · AC-2.6 · S · ← e2-t01 · #2
-- [ ] `e2-t08` `timers`：DO alarm 驅動的階段倒數、`timer` 訊息、前端倒數元件 · AC-2.2 · S · ← e2-t03
+- [x] `e2-t08` `timers`：DO alarm 驅動的階段倒數、`timer` 訊息、前端倒數元件 · AC-2.2 · S · ← e2-t03 · #8
 
 ### M1
 

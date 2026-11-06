@@ -61,8 +61,8 @@ depends_on: [E2, E7]
 - [x] `e1-t02` 大廳首頁：遊戲卡片（讀 `shared/games/index.ts`）、開新房流程、加入連結輸入 · AC-1.1 · M · ← e1-t01, e7-t01 · #6
 - [x] `e1-t03` 暱稱輸入、localStorage、去重、`join` 訊息 · AC-1.2 · S · ← e1-t01 · #6
 - [x] `e1-t04` 等待室：成員列、座位、準備、複製連結與 QR、開始按鈕條件 · AC-1.3 · M · ← e1-t03 · #7
-- [ ] `e1-t05` 房主控制：開始、踢人（5 分鐘黑名單）、再來一局、轉移、解散、自動轉移 · AC-1.4 · M · ← e1-t04
-- [ ] `e1-t06` 換遊戲：回 waiting、清局面、規則選項表單由 GameModule 的 `options` schema 產生 · AC-1.4 · S · ← e1-t05, e2-t01
+- [x] `e1-t05` 房主控制：開始、踢人（5 分鐘黑名單）、再來一局、轉移、解散、自動轉移 · AC-1.4 · M · ← e1-t04 · #8
+- [x] `e1-t06` 換遊戲：回 waiting、清局面、規則選項表單由 GameModule 的 `options` schema 產生 · AC-1.4 · S · ← e1-t05, e2-t01 · #8
 - [ ] `e1-t07` 聊天：移植 LongTalk `shared/chat.ts`、面板、`chatLocked` · AC-1.5 · S · ← e1-t04
 - [ ] `e1-t08` 旁觀者：進房分流、`view('spectator')`、補位 · AC-1.6 · S · ← e2-t03
 - [ ] `e1-t09` `LobbyDO`：公開房列表、RoomDO 回報、alarm 清理、首頁輪詢或 WebSocket · AC-1.1 · M · ← e1-t01
