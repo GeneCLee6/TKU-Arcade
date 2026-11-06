@@ -131,7 +131,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
               over={game.over}
               yourTurn={yourTurn}
               nameOf={nameOf}
-              playing={playing}
+              rolling={rolling}
             />
             {game.over && game.result && (
               <SmallText>
@@ -228,18 +228,18 @@ function TurnLine({
   over,
   yourTurn,
   nameOf,
-  playing,
+  rolling,
 }: {
   state: PromotionView
   over: boolean
   yourTurn: boolean
   nameOf(seat: number): string
-  playing: boolean
+  rolling: boolean
 }) {
   const t = useT()
   const { last, turn, winner, you } = state
   let text: string
-  if (playing && last) text = t('games.promotion.ui.rolling', { name: nameOf(last.seat) })
+  if (rolling && last) text = t('games.promotion.ui.rolling', { name: nameOf(last.seat) })
   else if (over) {
     text =
       winner !== null
