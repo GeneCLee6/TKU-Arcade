@@ -38,6 +38,27 @@ describe('worker', () => {
     expect(e.ASSETS.fetch).not.toHaveBeenCalled()
   })
 
+  it('answers GET /api/lobby from the one LobbyDO, and takes nothing else', async () => {
+    const rooms = [{ id: 'abcdefghij', gameId: 'promotion', host: 'A', seated: 1, maxSeats: 6 }]
+    const names: string[] = []
+    const e = env({
+      LOBBY: {
+        idFromName: (name: string) => {
+          names.push(name)
+          return name
+        },
+        get: () => ({ list: async () => rooms }),
+      } as unknown as Env['LOBBY'],
+    })
+    const res = await handleRequest(new Request('https://x/api/lobby'), e)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(await res.json()).toEqual({ rooms })
+    expect(names).toEqual(['lobby'])
+    const post = await handleRequest(new Request('https://x/api/lobby', { method: 'POST' }), e)
+    expect(post.status).toBe(405)
+  })
+
   it('hands every other path to the static assets', async () => {
     const e = env()
     const res = await handleRequest(new Request('https://x/'), e)

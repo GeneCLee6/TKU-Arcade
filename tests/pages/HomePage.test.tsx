@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GameCard } from '../../src/components/GameCard.tsx'
@@ -6,6 +6,7 @@ import { ToastProvider } from '../../src/components/Toast.tsx'
 import { initLanguage, setLanguage, translate } from '../../src/i18n/t.ts'
 import { HomePage } from '../../src/pages/HomePage.tsx'
 import { getGame } from '../../shared/games/index.ts'
+import { LOBBY_POLL_MS } from '../../shared/protocol.ts'
 
 const ROOM = 'abcdefghij'
 const NICKNAME_KEY = 'tku-arcade.nickname'
@@ -28,9 +29,17 @@ function renderLobby() {
 }
 
 const newRoom = () => screen.getByRole('button', { name: 'New room' })
-const stubFetch = (implementation: () => Promise<Response>) => {
+/** `implementation` answers everything but the public list, which only `lobby` answers */
+const stubFetch = (
+  implementation: () => Promise<Response>,
+  lobby: () => Promise<Response> = () => Promise.resolve(Response.json({ rooms: [] })),
+) => {
   const fetchMock = vi.fn(implementation)
-  vi.stubGlobal('fetch', fetchMock)
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
+    url === '/api/lobby'
+      ? lobby()
+      : (fetchMock as (u: string, i?: RequestInit) => unknown)(url, init),
+  )
   return fetchMock
 }
 const created = () => Promise.resolve(Response.json({ id: ROOM }, { status: 201 }))
@@ -249,5 +258,102 @@ describe('join by link', () => {
     join('nope')
     fireEvent.change(box(), { target: { value: 'nope2' } })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('public rooms', () => {
+  const LISTING = {
+    id: ROOM,
+    gameId: 'promotion',
+    host: 'Mei',
+    seated: 2,
+    maxSeats: 6,
+    createdAt: 1,
+  }
+  const lobbyWith =
+    (...rooms: unknown[]) =>
+    () =>
+      Promise.resolve(Response.json({ rooms }))
+
+  it('lists them, and joining goes to the room', async () => {
+    stubFetch(created, lobbyWith(LISTING))
+    renderLobby()
+    const join = await screen.findByRole('button', { name: "Join Mei's room" })
+    expect(screen.getByText('Host: Mei · 2/6 seated')).toBeInTheDocument()
+    fireEvent.click(join)
+    expect(await screen.findByTestId('where')).toHaveTextContent(`/r/${ROOM}`)
+  })
+
+  it('says so when there are none, in either language', async () => {
+    stubFetch(created)
+    renderLobby()
+    expect(await screen.findByText('No public rooms are waiting right now.')).toBeInTheDocument()
+    cleanup()
+    setLanguage('zh-TW')
+    renderLobby()
+    expect(await screen.findByText('目前沒有等人的公開房。')).toBeInTheDocument()
+  })
+
+  it('keeps a game that is not on offer out of the list', async () => {
+    stubFetch(created, lobbyWith({ ...LISTING, gameId: 'tictactoe' }))
+    renderLobby()
+    expect(await screen.findByText('No public rooms are waiting right now.')).toBeInTheDocument()
+  })
+
+  it('says when the list cannot be loaded, without hiding the rest of the page', async () => {
+    stubFetch(created, () => Promise.resolve(new Response('nope', { status: 500 })))
+    renderLobby()
+    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't load the public rooms")
+    expect(newRoom()).toBeEnabled()
+  })
+
+  it('asks again while visible, stops when hidden and asks at once on coming back', async () => {
+    const lobby = vi.fn(lobbyWith())
+    stubFetch(created, lobby)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    try {
+      renderLobby()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(lobby).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(LOBBY_POLL_MS)
+      })
+      expect(lobby).toHaveBeenCalledTimes(2)
+
+      hidden.mockReturnValue(true)
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(LOBBY_POLL_MS * 4)
+      })
+      expect(lobby).toHaveBeenCalledTimes(2)
+
+      hidden.mockReturnValue(false)
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(lobby).toHaveBeenCalledTimes(3)
+    } finally {
+      hidden.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('creates a private room unless the box is ticked', async () => {
+    localStorage.setItem(NICKNAME_KEY, 'Al')
+    const fetchMock = stubFetch(created)
+    renderLobby()
+    const box = screen.getByRole('checkbox', { name: /List new rooms on this page/ })
+    expect(box).not.toBeChecked()
+    fireEvent.click(box)
+    fireEvent.click(newRoom())
+    expect(await screen.findByTestId('where')).toHaveTextContent(`/r/${ROOM}`)
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toEqual({ gameId: 'promotion', public: true })
   })
 })

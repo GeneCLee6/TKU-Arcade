@@ -25,6 +25,7 @@ import {
   MAX_MEMBERS,
   PROTOCOL_VERSION,
   RECONNECT_GRACE_MS,
+  ROOM_CLEANUP_MS,
   STALE_AFTER_MS,
   SWEEP_INTERVAL_MS,
   type RoomView,
@@ -968,14 +969,15 @@ describe('tokens', () => {
 describe('the sweep', () => {
   it('runs while sockets are open, and not otherwise', () => {
     const world = room()
-    expect(world.host.nextAlarm()).toBeNull()
+    // With nobody in it, only the clean-up is left to wait for
+    expect(world.host.nextAlarm()).toBe(world.clock + ROOM_CLEANUP_MS)
     const a = world.join('A')
     expect(world.host.nextAlarm()).toBe(world.clock + SWEEP_INTERVAL_MS)
     world.clock += 1000
     world.host.sweep()
     expect(world.host.nextAlarm()).toBe(world.clock + SWEEP_INTERVAL_MS)
     world.disconnect(a)
-    expect(world.host.nextAlarm()).toBeNull()
+    expect(world.host.nextAlarm()).toBe(world.clock + ROOM_CLEANUP_MS)
   })
 
   it('closes a socket that never joined', () => {
@@ -1408,7 +1410,13 @@ describe('timers', () => {
     expect(a.view).toEqual(a.fresh())
 
     const stored = world.stored().game
-    const again = replayMatch(timedGame, stored?.seats ?? [], {}, stored?.seed ?? 0, world.storedSteps())
+    const again = replayMatch(
+      timedGame,
+      stored?.seats ?? [],
+      {},
+      stored?.seed ?? 0,
+      world.storedSteps(),
+    )
     expect(again).toEqual(stored?.match)
   })
 
@@ -1460,7 +1468,8 @@ describe('timers', () => {
     world.clock += 800
     world.host.sweep()
     expect(world.host.summary()?.status).toBe('ended')
-    expect(world.host.nextAlarm()).toBeNull()
+    // Not a timer any more: what is left is the clean-up, counted from the restart that emptied it
+    expect(world.host.nextAlarm()).toBe(world.clock - 800 + ROOM_CLEANUP_MS)
   })
 
   it('catches up in order after a late alarm, a timer started now counting from now', () => {
@@ -1554,7 +1563,11 @@ describe('chat', () => {
     const later = world.join('Later')
     const frames = chats(later)
     expect(frames.map((m) => (m.t === 'chat' ? m.messages.length : 0))).toEqual([50, 50, 20])
-    expect(frames.map((m) => (m.t === 'chat' ? m.reset : null))).toEqual([true, undefined, undefined])
+    expect(frames.map((m) => (m.t === 'chat' ? m.reset : null))).toEqual([
+      true,
+      undefined,
+      undefined,
+    ])
     expect(texts(later)[0]).toBe('m0')
     expect(texts(later).at(-1)).toBe('m119')
   })
@@ -1819,7 +1832,13 @@ describe('someone gone', () => {
     a.send({ t: 'cover', seat: 1, how: 'skip' })
     expect(a.errors.at(-1)).toEqual({ t: 'error', code: 'cannot_cover' })
     const stored = world.stored().game
-    const again = replayMatch(turnGame, stored?.seats ?? [], {}, stored?.seed ?? 0, world.storedSteps())
+    const again = replayMatch(
+      turnGame,
+      stored?.seats ?? [],
+      {},
+      stored?.seed ?? 0,
+      world.storedSteps(),
+    )
     expect(again).toEqual(stored?.match)
     void b
   })
@@ -1831,7 +1850,13 @@ describe('someone gone', () => {
     expect(['roll 1', 'stay 1']).toContain(last)
     expect(world.storedSteps().at(-1)?.actor).toBe(1)
     const stored = world.stored().game
-    const again = replayMatch(turnGame, stored?.seats ?? [], {}, stored?.seed ?? 0, world.storedSteps())
+    const again = replayMatch(
+      turnGame,
+      stored?.seats ?? [],
+      {},
+      stored?.seed ?? 0,
+      world.storedSteps(),
+    )
     expect(again).toEqual(stored?.match)
   })
 
@@ -1916,5 +1941,328 @@ describe('someone gone', () => {
     first.send({ t: 'cover', seat: other.seat, how: 'proxy' })
     expect(first.errors.filter((e) => e.code === 'cannot_cover')).toEqual([])
     expect(first.view).toEqual(first.fresh())
+  })
+})
+
+describe('clean-up (e1-t10)', () => {
+  /** Runs the alarm whenever the room asked for it, as the runtime does, until `until` */
+  function runAlarms(world: World, until: number) {
+    for (;;) {
+      const at = world.host.nextAlarm()
+      if (at === null || at > until) break
+      world.clock = at
+      world.host.sweep()
+    }
+    world.clock = until
+  }
+
+  const wiped = (world: World) => {
+    expect(world.host.summary()).toBeNull()
+    expect(world.host.nextAlarm()).toBeNull()
+    expect(world.store.size).toBe(0)
+    expect(world.steps.size).toBe(0)
+    expect(world.chat.size).toBe(0)
+  }
+
+  it('deletes a room nobody ever joined, ten minutes after it was made', () => {
+    const world = room()
+    expect(world.host.nextAlarm()).toBe(world.clock + ROOM_CLEANUP_MS)
+    const start = world.clock
+    runAlarms(world, start + ROOM_CLEANUP_MS - 1)
+    expect(world.host.summary()).not.toBeNull()
+    runAlarms(world, start + ROOM_CLEANUP_MS)
+    wiped(world)
+    expect(world.host.admit('1')).toMatchObject({ code: CloseCode.roomNotFound })
+  })
+
+  it('counts from the last socket going, and starts over for someone coming back', () => {
+    const world = room()
+    const a = world.join('A')
+    const b = world.join('B')
+    world.clock += 30_000
+    world.disconnect(a)
+    world.clock += 60_000
+    world.disconnect(b)
+    const emptied = world.clock
+    expect(world.host.nextAlarm()).toBe(emptied + ROOM_CLEANUP_MS)
+
+    world.clock += ROOM_CLEANUP_MS / 2
+    const back = world.join('B', b.token)
+    expect(back.you).toBe(b.you)
+    world.disconnect(back)
+    expect(world.host.nextAlarm()).toBe(world.clock + ROOM_CLEANUP_MS)
+
+    const second = world.clock
+    runAlarms(world, second + ROOM_CLEANUP_MS - 1)
+    expect(world.host.summary()).not.toBeNull()
+    runAlarms(world, second + ROOM_CLEANUP_MS)
+    wiped(world)
+  })
+
+  it('keeps counting through hibernation and restarts, and does not start over', () => {
+    const world = room()
+    const a = world.join('A')
+    world.disconnect(a)
+    const emptied = world.clock
+    world.clock += 60_000
+    world.hibernate()
+    expect(world.host.nextAlarm()).toBe(emptied + ROOM_CLEANUP_MS)
+    world.clock += 60_000
+    world.restart()
+    expect(world.host.nextAlarm()).toBe(emptied + ROOM_CLEANUP_MS)
+  })
+
+  it('starts counting when a restart took every socket and told nobody', () => {
+    const world = room()
+    world.join('A')
+    world.clock += 60_000
+    world.restart()
+    expect(world.host.nextAlarm()).toBe(world.clock + ROOM_CLEANUP_MS)
+    expect(world.stored().room?.emptySince).toBe(world.clock)
+  })
+
+  it('leaves a room with someone in it alone, however long', () => {
+    const { world, x } = started()
+    for (let i = 0; i < 6; i++) {
+      world.clock += ROOM_CLEANUP_MS / 2
+      for (const { conn } of world.sockets) world.host.heartbeat(conn, world.clock)
+      world.host.sweep()
+    }
+    expect(world.host.summary()).not.toBeNull()
+    expect(x.closed).toBeNull()
+    expect(world.host.nextAlarm()).toBe(world.clock + SWEEP_INTERVAL_MS)
+  })
+
+  it('takes every part of a finished game with it', () => {
+    const { world, x, o } = started()
+    for (const [client, cell] of [
+      [x, 0],
+      [o, 3],
+    ] as const) {
+      client.send(place(cell))
+    }
+    x.send({ t: 'chat', text: 'bye' })
+    world.disconnect(x)
+    world.disconnect(o)
+    expect(world.steps.size).toBeGreaterThan(0)
+    expect(world.chat.size).toBeGreaterThan(0)
+    runAlarms(world, world.clock + ROOM_CLEANUP_MS)
+    wiped(world)
+  })
+
+  it('deletes a finished room nobody does anything in, and tells those still there', () => {
+    const { world, x, o } = started()
+    for (const [client, cell] of [
+      [x, 0],
+      [o, 3],
+      [x, 1],
+      [o, 4],
+      [x, 2],
+    ] as const) {
+      client.send(place(cell))
+    }
+    expect(x.view?.room.status).toBe('ended')
+    const ended = world.clock
+    expect(world.stored().room?.idleSince).toBe(ended)
+    expect(world.host.nextAlarm()).toBe(ended + SWEEP_INTERVAL_MS)
+
+    // Chat counts as something happening
+    world.clock += ROOM_CLEANUP_MS - 1000
+    x.send({ t: 'chat', text: 'one more?' })
+    const lastWord = world.clock
+    for (const { conn } of world.sockets) world.host.heartbeat(conn, world.clock)
+    world.host.sweep()
+    expect(world.host.summary()).not.toBeNull()
+
+    world.clock = lastWord + ROOM_CLEANUP_MS - 1
+    for (const { conn } of world.sockets) world.host.heartbeat(conn, world.clock)
+    world.host.sweep()
+    expect(world.host.summary()).not.toBeNull()
+
+    world.clock += 1
+    world.host.sweep()
+    expect(x.closed).toBe(CloseCode.roomNotFound)
+    expect(o.closed).toBe(CloseCode.roomNotFound)
+    wiped(world)
+  })
+
+  it('stops the finished clock for a rematch, and an unfinished game has none', () => {
+    const { world, x, o } = started()
+    expect(world.stored().room?.idleSince).toBeNull()
+    for (const [client, cell] of [
+      [x, 0],
+      [o, 3],
+      [x, 1],
+      [o, 4],
+      [x, 2],
+    ] as const) {
+      client.send(place(cell))
+    }
+    expect(world.stored().room?.idleSince).toBe(world.clock)
+    x.send({ t: 'rematch' })
+    expect(x.view?.room.status).toBe('playing')
+    expect(world.stored().room?.idleSince).toBeNull()
+  })
+
+  it('shares the alarm with the sweep and a game timer, earliest first', () => {
+    const { world, a, b } = timedRoom('stubborn')
+    // The stubborn game's timer is due in a second, before the sweep
+    expect(world.host.nextAlarm()).toBe(world.clock + 1000)
+    world.clock += 1000
+    world.host.sweep()
+    // Spent, and refused by the game: the sweep is next
+    expect(world.host.nextAlarm()).toBe(world.clock + SWEEP_INTERVAL_MS)
+
+    // Nobody left: no more sweeps, and the clean-up is what is left
+    world.disconnect(a)
+    world.disconnect(b)
+    const emptied = world.clock
+    expect(world.host.nextAlarm()).toBe(emptied + ROOM_CLEANUP_MS)
+    world.clock = emptied + ROOM_CLEANUP_MS
+    world.host.sweep()
+    wiped(world)
+  })
+
+  it('lets game timers go on firing in an empty room, before the clean-up', () => {
+    const { world, a, b } = timedRoom()
+    world.disconnect(a)
+    world.disconnect(b)
+    const emptied = world.clock
+    expect(world.host.nextAlarm()).toBe(emptied + 1000)
+    world.clock += 1000
+    world.host.sweep()
+    expect(world.storedSteps().at(-1)?.actor).toBe('system')
+    expect(world.host.nextAlarm()).toBe(world.clock + 1000)
+    runAlarms(world, emptied + ROOM_CLEANUP_MS)
+    wiped(world)
+  })
+
+  it('moves the host on before the clean-up has any say, with someone still there', () => {
+    const world = room()
+    const a = world.join('A')
+    const b = world.join('B')
+    world.disconnect(a)
+    world.clock += RECONNECT_GRACE_MS
+    world.host.heartbeat(b.conn, world.clock)
+    world.host.sweep()
+    expect(b.view?.members[b.you].host).toBe(true)
+    expect(world.stored().room?.emptySince).toBeNull()
+  })
+
+  it('takes rooms from before this existed as private, with clocks that start when they wake', () => {
+    const world = room()
+    world.join('A')
+    world.clients.clear()
+    world.sockets = []
+    const stored = world.stored()
+    const old = { ...stored.room } as Record<string, unknown>
+    delete old.public
+    delete old.emptySince
+    delete old.idleSince
+    world.store.set('room', JSON.stringify(old))
+
+    world.hibernate()
+    expect(world.host.listing()).toBeNull()
+    expect(world.stored().room).toMatchObject({ public: false, emptySince: world.clock })
+    const woke = world.clock
+    expect(world.host.nextAlarm()).toBe(woke + ROOM_CLEANUP_MS)
+    // Saved, or the alarm that wakes it would find the clock starting over
+    world.clock += ROOM_CLEANUP_MS
+    world.hibernate()
+    world.host.sweep()
+    wiped(world)
+  })
+
+  it('forgets a kick once it has run out, keeping those that have not', () => {
+    const world = room()
+    const host = world.join('Host')
+    const first = world.join('First')
+    const second = world.join('Second')
+    host.send({ t: 'kick', member: first.you })
+    expect(world.stored().room?.bans).toHaveLength(1)
+    world.clock += 60_000
+    host.send({ t: 'kick', member: second.you })
+    expect(world.stored().room?.bans).toHaveLength(2)
+
+    world.clock += KICK_BAN_MS - 60_000
+    world.host.heartbeat(host.conn, world.clock)
+    world.host.sweep()
+    expect(world.stored().room?.bans.map((ban) => ban.token)).toEqual([second.token])
+    // Past the ban, the token is someone new again
+    expect(world.join('First', first.token).closed).toBeNull()
+    expect(world.join('Second', second.token).closed).toBe(CloseCode.kicked)
+  })
+
+  it('does not move the view or rev by itself', () => {
+    const world = room()
+    const a = world.join('A')
+    const b = world.join('B')
+    const rev = a.rev
+    world.clock += 1000
+    world.host.heartbeat(a.conn, world.clock)
+    world.host.heartbeat(b.conn, world.clock)
+    world.host.sweep()
+    expect(a.rev).toBe(rev)
+    expect(a.fresh()).toEqual(a.view)
+  })
+})
+
+describe('the public listing (e1-t09)', () => {
+  function publicRoom(gameId = 'tictactoe') {
+    const world = new World()
+    expect(world.host.create(ROOM_ID, gameId, undefined, true)).toBe(true)
+    return world
+  }
+
+  it('is never there for a private room', () => {
+    const world = room()
+    const a = world.join('A')
+    expect(world.host.listing()).toBeNull()
+    expect(a.view?.room).not.toHaveProperty('public')
+  })
+
+  it('shows a waiting room with free seats once someone is in it', () => {
+    const world = publicRoom()
+    expect(world.host.listing()).toBeNull()
+    world.join('Ann')
+    expect(world.host.listing()).toEqual({
+      id: ROOM_ID,
+      gameId: 'tictactoe',
+      host: 'Ann',
+      seated: 1,
+      maxSeats: 2,
+      createdAt: 10_000,
+    })
+  })
+
+  it('goes away when the seats fill, the game starts or everyone leaves, and comes back', () => {
+    const world = publicRoom()
+    const a = world.join('Ann')
+    expect(world.host.listing()).not.toBeNull()
+    const b = world.join('Bo')
+    expect(world.host.listing()).toBeNull()
+    b.send({ t: 'sit', seat: null })
+    expect(world.host.listing()).toMatchObject({ seated: 1 })
+    b.send({ t: 'sit', seat: 1 })
+    a.send({ t: 'start' })
+    expect(a.view?.room.status).toBe('playing')
+    expect(world.host.listing()).toBeNull()
+    a.send({ t: 'reopen' })
+    expect(world.host.listing()).toBeNull()
+    b.send({ t: 'sit', seat: null })
+    expect(world.host.listing()).toMatchObject({ seated: 1 })
+    world.disconnect(a)
+    expect(world.host.listing()).toMatchObject({ host: 'Ann' })
+    world.disconnect(b)
+    expect(world.host.listing()).toBeNull()
+  })
+
+  it('survives hibernation, and a dissolved room has none', () => {
+    const world = publicRoom()
+    const a = world.join('Ann')
+    world.hibernate()
+    expect(world.host.listing()).toMatchObject({ host: 'Ann' })
+    a.send({ t: 'dissolve' })
+    expect(world.host.listing()).toBeNull()
   })
 })

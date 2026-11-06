@@ -2,7 +2,7 @@
 
 ## 1. 架構
 
-TKU Arcade 是**一個 Cloudflare Worker**（`tku-arcade`）：同一個 Worker 回答 `/api/*`、`/ws/*`，承載 Durable Object（每房一個 `RoomDO`、全站一個 `LobbyDO`），其餘路徑交給靜態資產（React app，`dist/client`，SPA fallback）。D1 `DB` 放題目、結果等資料；R2 `ASSETS_BUCKET` 放模型、貼圖、音檔，`BACKUPS` 放 D1 每日備份。設定都在 `wrangler.jsonc`。
+TKU Arcade 是**一個 Cloudflare Worker**（`tku-arcade`）：同一個 Worker 回答 `/api/*`、`/ws/*`，承載 Durable Object（每房一個 `RoomDO`、全站一個 `LobbyDO`），其餘路徑交給靜態資產（React app，`dist/client`，SPA fallback）。D1 `DB` 放題目、結果等資料；R2 `ASSETS_BUCKET` 放模型、貼圖、音檔，`BACKUPS` 放 D1 每日備份（§10）。Worker 另有一個 cron（`scheduled`），只有正式站有。設定都在 `wrangler.jsonc`。
 
 一個 Worker 一次部署：前端與 API 永遠是同一個 commit。建置時 `APP_VERSION`（commit SHA）寫進首頁 `<meta name="app-version">`，部署時也以 `--var APP_VERSION:<sha>` 給 Worker；smoke test 就是查這個。
 
@@ -60,7 +60,7 @@ gh secret list                          # 確認兩個都在
 | D1 | `tku-arcade` | `b1922db6-2ced-45f9-994f-ab588cfb44b6` | 正式站 |
 | D1 | `tku-arcade-staging` | `d880eccb-2826-4bb5-9ed0-38e4e1654674` | 所有 PR 預覽共用 |
 | R2 | `tku-arcade-assets` | — | 模型、貼圖、音檔（正式與預覽都讀這個；內容雜湊檔名，e12-t08） |
-| R2 | `tku-arcade-backups` | — | D1 每日備份，只有正式站綁定（e12-t05） |
+| R2 | `tku-arcade-backups` | — | D1 每日備份，只有正式站綁定（§10） |
 
 **正式站的 D1 id 只能出現在 `wrangler.jsonc` 頂層**，不要放進 `env.preview`。
 
@@ -80,6 +80,8 @@ gh secret list                          # 確認兩個都在
 | `deploy.yml` | CI 在 `main` 成功後；或手動 Run workflow | 部署正式站 |
 
 部署之間不會重疊：正式站一個 concurrency group（排隊、不中途取消），每個 PR 一個（新的 push 取代進行中的預覽部署）。
+
+錯誤與日誌：Worker 開了 observability（`wrangler.jsonc`，預覽站也有），儀表板 → Workers → `tku-arcade` → Logs 可查。瀏覽器的錯誤由 `POST /api/errors` 寫成 `{"event":"client_error",...}`，備份寫成 `backup_done`，搜尋這些字即可；內容已去掉引號內文字、房號、token、email，也不記 IP（`shared/client-error.ts`）。
 
 smoke test 檢查：首頁 `<meta name="app-version">` 是這個 commit（最多重試約一分鐘）、未知路徑回 200（SPA fallback）。
 
@@ -108,6 +110,7 @@ smoke test 檢查：首頁 `<meta name="app-version">` 是這個 commit（最多
 
 ## 6. D1 遷移規則
 
+- 現有：`0001_app_meta.sql`（骨架，只有一張 `app_meta`）；`prompts`、`results` 等表由用到的批次加。
 - 遷移檔放 `migrations/`（`wrangler.jsonc` 的 `migrations_dir`），用 `npx wrangler d1 migrations create DB <名稱>` 產生，檔名帶流水號，**已合併的檔案不要改、不要刪**；要改就再加一個。
 - workflow 在**建置之前**套用遷移（建置後 Vite 外掛會把 wrangler 導向 `dist/` 的設定，那份設定不接受 `--env`）；`migrations/` 沒有 `.sql` 時直接跳過。
 - 遷移在新程式上線**之前**套用，所以每個遷移都要讓**舊程式照常運作**：只加表、加欄位（給預設值）、加索引；要刪欄位或改名，分兩次 PR（先讓程式不再用，下一次再刪）。
@@ -158,3 +161,47 @@ npx wrangler secret list
 ```
 
 PR 預覽是每次新建的 Worker，不會自動有這些 secret；需要時由該批次在 `preview.yml` 加一步，從 GitHub secret（例如 `PREVIEW_AUTH_SHARED_SECRET`）`wrangler secret put --name "$WORKER"`，沒設定就 notice 跳過。
+
+## 10. D1 備份與還原
+
+**備份**：`wrangler.jsonc` 的 cron `0 19 * * *`（UTC，台北 03:00）觸發 `worker/index.ts` 的 `scheduled`，由 `worker/backup.ts` 透過 `DB` 綁定把整個資料庫匯出成 SQL、gzip 後寫到 R2 `tku-arcade-backups`，key 為 `d1/<日期>/tku-arcade-<時間>.sql.gz`。不需要任何新 secret。寫入成功後才刪除超過 30 天的備份。只有正式站有 `BACKUPS` 與 cron；預覽站 `triggers.crons` 是空的，就算被觸發也只記一行 `backup_skipped`。
+
+限制：
+
+- 分頁讀取、不是快照，備份途中的寫入可能在、也可能不在裡面（資料很少寫，又在清晨跑，可接受）。
+- 匯出整份放在記憶體裡。資料庫大到幾十 MB 時要改成串流。
+- 超過 2^53 的整數會失準（JavaScript 數字）；目前沒有這種欄位，新增時要注意。
+
+**確認有在跑**：
+
+儀表板 → R2 → `tku-arcade-backups` 看 `d1/` 底下有沒有當天的檔案（wrangler 沒有列 bucket 內容的指令），或 Workers → `tku-arcade` → Logs 搜尋 `backup_done`；失敗時該次 cron 顯示為 failed。
+
+**還原**（先選 A，只有超過 A 的時間窗才用 B）：
+
+A. **Time Travel**（D1 內建，精確到分鐘；免費方案保留 7 天）：
+
+```sh
+npx wrangler d1 time-travel info DB                                  # 看目前的 bookmark
+npx wrangler d1 time-travel restore DB --timestamp=<ISO 8601 時間>    # 就地還原，會覆蓋現況
+```
+
+B. **從 R2 的備份還原到一個新的空資料庫**。備份裡有 `CREATE TABLE`，所以目標必須是空的；`d1_migrations` 也在裡面，還原後遷移紀錄是對的：
+
+```sh
+npx wrangler r2 object get tku-arcade-backups/d1/<日期>/<檔名>.sql.gz --remote --file backup.sql.gz
+gunzip backup.sql.gz
+npx wrangler d1 create tku-arcade-restored                          # 記下新的 database_id
+npx wrangler d1 execute tku-arcade-restored --remote --file backup.sql
+npx wrangler d1 execute tku-arcade-restored --remote --command "SELECT name FROM sqlite_master"   # 檢查
+```
+
+確認內容正確後，開 PR 把 `wrangler.jsonc` 頂層的 `database_name`、`database_id` 換成新的（§3.4 也要改），合併即生效；舊資料庫留著，確定沒問題再由擁有者刪除。
+
+實測（2026-11-06，本機 `wrangler dev`，不是正式站）：`/cdn-cgi/handler/scheduled` 觸發 → 備份寫入本機 R2 → 取回、解壓 → `d1 execute --file` 進空的本機 D1 → 資料相同，且 `d1 migrations apply` 回報沒有待套用的遷移。本機觸發要用這條路徑，`/__scheduled` 會被靜態資產的 SPA fallback 接走：
+
+```sh
+npm run build
+npx wrangler d1 migrations apply DB --local --config wrangler.jsonc
+npx wrangler dev --config dist/tku_arcade/wrangler.json --test-scheduled --port 5176
+curl 'http://localhost:5176/cdn-cgi/handler/scheduled?cron=0+19+*+*+*'
+```
