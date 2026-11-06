@@ -122,8 +122,7 @@ export class RoomDO extends DurableObject<Env> {
 
   /** RPC from GET /api/rooms/<id>: null when there is no such room */
   async summary(): Promise<RoomSummary | null> {
-    // A room from before clean-up has no alarm: being looked at is what starts its clock. Not in the
-    // constructor: on a wake-up for the alarm itself, setting one cancels the alarm that is running
+    // A room from before clean-up has no alarm: being looked at is what starts its clock
     await this.settle()
     return this.host.summary()
   }
