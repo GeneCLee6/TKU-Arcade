@@ -43,7 +43,8 @@ export function normalizeChatText(raw: unknown): string | null {
     .replace(UNSAFE_CHAT_CHARS, (char) => (char === '\n' ? '\n' : ''))
     .replace(/\n{4,}/g, '\n\n\n')
     .trim()
-  if (text === '' || [...text].length > MAX_CHAT_CHARS) return null
+  // Only zero-width characters would be a blank bubble
+  if (text.replace(/[p{Cf}s]/gu, '') === '' || [...text].length > MAX_CHAT_CHARS) return null
   return text
 }
 
