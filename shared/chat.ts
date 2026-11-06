@@ -27,7 +27,7 @@ export type ChatMessage = {
 
 // Control characters (but the newline) and the bidirectional overrides that could make text
 // render as something else (U+202A–202E, U+2066–2069)
-const UNSAFE_CHAT_CHARS = /[\p{Cc}‪-‮⁦-⁩]/gu
+const UNSAFE_CHAT_CHARS = /[\p{Cc}\u202A-\u202E\u2066-\u2069]/gu
 
 /**
  * A message as the room stores it: line breaks unified to \n, tabs to spaces, every other control
@@ -44,7 +44,7 @@ export function normalizeChatText(raw: unknown): string | null {
     .replace(/\n{4,}/g, '\n\n\n')
     .trim()
   // Only zero-width characters would be a blank bubble
-  if (text.replace(/[p{Cf}s]/gu, '') === '' || [...text].length > MAX_CHAT_CHARS) return null
+  if (text.replace(/[\p{Cf}\s]/gu, '') === '' || [...text].length > MAX_CHAT_CHARS) return null
   return text
 }
 
