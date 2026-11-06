@@ -1,7 +1,9 @@
+import { CloseCode } from '../../shared/protocol.ts'
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { StrictMode, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '../../src/components/Toast.tsx'
+import { en } from '../../src/i18n/en.ts'
 import { setLanguage } from '../../src/i18n/t.ts'
 import { CHAT_ACK_TIMEOUT_MS } from '../../src/lib/chatState.ts'
 import { useRoom, type RoomHandle } from '../../src/lib/useRoom.ts'
@@ -94,7 +96,7 @@ describe('session', () => {
 
   it('retry goes back to joining on one new socket, with the token', () => {
     const { result, socket } = joined()
-    act(() => socket.serverClose(1006))
+    act(() => socket.serverClose(4422))
     expect(result.current.session).toEqual({ phase: 'ended', end: 'disconnected' })
 
     act(() => result.current.retry())
@@ -137,6 +139,8 @@ describe('senders', () => {
     ['dissolve', (room) => room.dissolve(), { t: 'dissolve' }],
     ['rematch', (room) => room.rematch(), { t: 'rematch' }],
     ['reopen', (room) => room.reopen(), { t: 'reopen' }],
+    ['cover skip', (room) => room.cover(2, 'skip'), { t: 'cover', seat: 2, how: 'skip' }],
+    ['cover proxy', (room) => room.cover(0, 'proxy'), { t: 'cover', seat: 0, how: 'proxy' }],
     ['setGame', (room) => room.setGame('promotion'), { t: 'set_game', gameId: 'promotion' }],
     [
       'setGame with options',
@@ -170,7 +174,7 @@ describe('senders', () => {
 
   it('do nothing after the end', () => {
     const { result, socket } = joined()
-    act(() => socket.serverClose(1006))
+    act(() => socket.serverClose(4422))
 
     act(() => result.current.start())
 
@@ -210,7 +214,7 @@ describe('timers', () => {
   it('clears them when the connection ends', () => {
     const { result, socket } = joined()
     serverSays(socket, TIMER)
-    act(() => socket.serverClose(1006))
+    act(() => socket.serverClose(4422))
     expect(result.current.timers).toEqual([])
   })
 
@@ -219,6 +223,140 @@ describe('timers', () => {
     serverSays(socket, TIMER)
     act(() => result.current.retry())
     expect(result.current.timers).toEqual([])
+  })
+})
+
+describe('reconnecting', () => {
+  const TIMER = { t: 'timer', timers: [{ id: 'turn', remainingMs: 5_000, totalMs: 30_000 }] }
+  const nextAttempt = (ms = 1_000) => act(() => vi.advanceTimersByTime(ms))
+
+  function dropped() {
+    vi.useFakeTimers()
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const room = joined()
+    serverSays(room.socket, TIMER)
+    act(() => room.socket.serverClose(1006))
+    return room
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('stays joined with the last view, and says it is reconnecting', () => {
+    const { result } = dropped()
+    expect(result.current.session).toMatchObject({
+      phase: 'joined',
+      you: 'm1',
+      reconnecting: true,
+    })
+    const { session } = result.current
+    expect(session.phase === 'joined' && session.view.members.m1.name).toBe('Al')
+  })
+
+  it('is back on welcome: not reconnecting, the new view, and the old timers gone', () => {
+    const { result } = dropped()
+    expect(result.current.timers).toHaveLength(1)
+    nextAttempt()
+    const attempt = FakeWebSocket.last
+    act(() => attempt.open())
+    expect(attempt.joins).toEqual([{ t: 'join', name: 'Al', token: TOKEN_A }])
+    // A welcome with no `timer` after it: nothing is running now
+    act(() => attempt.receive(welcome({ name: 'Back' })))
+
+    expect(result.current.timers).toEqual([])
+    expect(result.current.session).toMatchObject({ phase: 'joined', reconnecting: false })
+    const { session } = result.current
+    expect(session.phase === 'joined' && session.view.members.m1.name).toBe('Back')
+  })
+
+  it('ends at disconnected after 5 minutes, and retry comes back with the token', () => {
+    const { result } = dropped()
+    for (let i = 0; i < 20 && result.current.session.phase === 'joined'; i++) {
+      nextAttempt(30_000)
+      act(() => FakeWebSocket.last.serverClose(1006))
+    }
+    expect(result.current.session).toEqual({ phase: 'ended', end: 'disconnected' })
+    expect(result.current.timers).toEqual([])
+
+    act(() => result.current.retry())
+    act(() => FakeWebSocket.last.open())
+
+    expect(FakeWebSocket.last.joins).toEqual([{ t: 'join', name: 'Al', token: TOKEN_A }])
+  })
+
+  it('ends at the reason a close during an attempt gives', () => {
+    const { result } = dropped()
+    nextAttempt()
+    act(() => FakeWebSocket.last.serverClose(4404))
+    expect(result.current.session).toEqual({ phase: 'ended', end: 'notFound' })
+  })
+
+  it('leaves no timer and no new socket when unmounted mid-backoff', () => {
+    const { unmount } = dropped()
+    const opened = FakeWebSocket.instances.length
+
+    unmount()
+
+    expect(vi.getTimerCount()).toBe(0)
+    act(() => vi.advanceTimersByTime(600_000))
+    window.dispatchEvent(new Event('online'))
+    expect(FakeWebSocket.instances).toHaveLength(opened)
+  })
+
+  it('tells of a send that could not go out', () => {
+    function Probe() {
+      const room = useRoom(ROOM, 'Al')
+      return <button onClick={room.start}>start</button>
+    }
+    vi.useFakeTimers()
+    render(
+      <ToastProvider>
+        <Probe />
+      </ToastProvider>,
+    )
+    const socket = FakeWebSocket.last
+    act(() => {
+      socket.open()
+      socket.receive(welcome({}))
+    })
+    socket.sent.length = 0
+    fireEvent.click(screen.getByRole('button', { name: 'start' }))
+    expect(screen.queryByText(en['room.reconnecting.notSent'])).toBeNull()
+
+    act(() => socket.serverClose(1006))
+    fireEvent.click(screen.getByRole('button', { name: 'start' }))
+
+    expect(screen.getByText(en['room.reconnecting.notSent'])).toBeInTheDocument()
+    expect(socket.sent).toEqual([JSON.stringify({ t: 'start' })])
+  })
+
+  it('in StrictMode has one attempt on one socket after a drop', () => {
+    vi.useFakeTimers()
+    function Probe() {
+      useRoom(ROOM, 'Al')
+      return null
+    }
+    render(
+      <StrictMode>
+        <ToastProvider>
+          <Probe />
+        </ToastProvider>
+      </StrictMode>,
+    )
+    const [first, second] = FakeWebSocket.instances
+    expect(first.closedByClient).toBe(true)
+    act(() => {
+      second.open()
+      second.receive(welcome({}))
+    })
+
+    act(() => second.serverClose(1006))
+    nextAttempt()
+
+    expect(FakeWebSocket.instances).toHaveLength(3)
+    expect(FakeWebSocket.instances.filter((socket) => !socket.gone)).toHaveLength(1)
   })
 })
 
@@ -441,14 +579,60 @@ describe('chat', () => {
       expect(socket.sent).toEqual([])
     })
 
-    it('fails when the connection ends', async () => {
+    it('fails when the connection ends for good', async () => {
       const { result, socket } = joined()
       const seen = watch(result.current.sendChat('hi'))
 
-      act(() => socket.serverClose(1006))
+      act(() => socket.serverClose(CloseCode.dissolved))
       await flushed()
 
       expect(seen.result).toBe('failed')
+    })
+
+    it('recognises a message that got through, in the history after a reconnect', async () => {
+      vi.useFakeTimers()
+      vi.spyOn(Math, 'random').mockReturnValue(0)
+      try {
+        const { result, socket } = joined()
+        const seen = watch(result.current.sendChat('hi'))
+        act(() => socket.serverClose(1006))
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1_000)
+        })
+        expect(seen.result).toBeUndefined()
+
+        const next = FakeWebSocket.last
+        expect(next).not.toBe(socket)
+        act(() => {
+          next.open()
+          next.receive(welcome({}))
+        })
+        serverSays(next, {
+          t: 'chat',
+          reset: true,
+          messages: [{ id: 1, from: 'm1', name: 'Al', text: 'hi', at: 1 }],
+        })
+        await act(async () => {})
+
+        expect(seen.result).toBe('sent')
+        expect(result.current.chat.map((message) => message.text)).toEqual(['hi'])
+      } finally {
+        vi.useRealTimers()
+        vi.restoreAllMocks()
+      }
+    })
+
+    it('fails at once while reconnecting, with nothing sent', async () => {
+      vi.useFakeTimers()
+      try {
+        const { result, socket } = joined()
+        act(() => socket.serverClose(1006))
+        const sent = socket.sent.length
+        await expect(result.current.sendChat('hi')).resolves.toBe('failed')
+        expect(socket.sent).toHaveLength(sent)
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('fails when nothing comes back in time', async () => {

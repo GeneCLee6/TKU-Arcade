@@ -6,7 +6,14 @@ import {
   roomSocketPath,
   type RoomView,
 } from '../../shared/protocol.ts'
-import { connectRoom, type RoomHandlers } from '../../src/lib/roomConnection.ts'
+import {
+  connectRoom,
+  reconnectDelay,
+  RECONNECT_ATTEMPT_TIMEOUT_MS,
+  RECONNECT_GIVE_UP_MS,
+  type RoomConnection,
+  type RoomHandlers,
+} from '../../src/lib/roomConnection.ts'
 import { FakeWebSocket, TOKEN_A, TOKEN_B, welcome } from './fakeWebSocket.ts'
 
 const ROOM = 'abcdefghij'
@@ -15,6 +22,7 @@ const SEAT_KEY = `tku-arcade.seat.${ROOM}`
 function handlers() {
   return {
     onView: vi.fn(),
+    onReconnecting: vi.fn(),
     onError: vi.fn(),
     onTimers: vi.fn(),
     onChat: vi.fn(),
@@ -22,10 +30,19 @@ function handlers() {
   } satisfies RoomHandlers
 }
 
+// A connection left reconnecting would answer the next test's `online` event
+const connected: RoomConnection[] = []
+
+function connectAndTrack(roomId: string, h: RoomHandlers): RoomConnection {
+  const connection = connectRoom(roomId, 'Al', h)
+  connected.push(connection)
+  return connection
+}
+
 /** Connected and welcomed at rev 0; the handlers have heard nothing yet */
 function welcomed() {
   const h = handlers()
-  const connection = connectRoom(ROOM, 'Al', h)
+  const connection = connectAndTrack(ROOM, h)
   const socket = FakeWebSocket.last
   socket.open()
   socket.receive(welcome({}))
@@ -44,6 +61,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  for (const connection of connected.splice(0)) connection.leave()
   vi.unstubAllGlobals()
   vi.useRealTimers()
 })
@@ -276,26 +294,26 @@ describe('sending', () => {
     socket.open()
     socket.sent.length = 0
 
-    connection.send({ t: 'start' })
+    expect(connection.send({ t: 'start' })).toBe(false)
 
     expect(socket.sent).toEqual([])
   })
 
   it('sends after welcome', () => {
     const { connection, socket } = welcomed()
-    connection.send({ t: 'start' })
+    expect(connection.send({ t: 'start' })).toBe(true)
     expect(socket.sent).toEqual([JSON.stringify({ t: 'start' })])
   })
 
   it('does nothing after the end or after leaving', () => {
     const closed = welcomed()
-    closed.socket.serverClose(1006)
-    closed.connection.send({ t: 'start' })
+    closed.socket.serverClose(CloseCode.dissolved)
+    expect(closed.connection.send({ t: 'start' })).toBe(false)
     expect(closed.socket.sent).toEqual([])
 
     const left = welcomed()
     left.connection.leave()
-    left.connection.send({ t: 'start' })
+    expect(left.connection.send({ t: 'start' })).toBe(false)
     expect(left.socket.sent).toEqual([])
   })
 
@@ -305,6 +323,495 @@ describe('sending', () => {
       throw new Error('InvalidStateError')
     }
     expect(() => connection.send({ t: 'start' })).not.toThrow()
+  })
+})
+
+describe('reconnecting', () => {
+  /** Welcomed, then the socket drops. Math.random is 0: the delays have no jitter */
+  function dropped(code = 1006) {
+    vi.useFakeTimers()
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const room = welcomed()
+    room.socket.serverClose(code)
+    return room
+  }
+
+  const sockets = () => FakeWebSocket.instances.length
+  const openSockets = () => FakeWebSocket.instances.filter((socket) => !socket.gone)
+  /** The first attempt, its socket open and joined but not welcomed */
+  function attempting() {
+    const room = dropped()
+    vi.advanceTimersByTime(1_000)
+    const attempt = FakeWebSocket.last
+    attempt.open()
+    return { ...room, attempt }
+  }
+
+  const setVisibility = (state: DocumentVisibilityState) => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state)
+    document.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it.each([[1006], [1000], [CloseCode.stale]])('tries again after close %i', (code) => {
+    const { h } = dropped(code)
+    expect(h.onReconnecting).toHaveBeenCalledOnce()
+    expect(h.onEnd).not.toHaveBeenCalled()
+    expect(sockets()).toBe(1)
+
+    vi.advanceTimersByTime(1_000)
+
+    expect(sockets()).toBe(2)
+    FakeWebSocket.last.open()
+    expect(FakeWebSocket.last.joins).toEqual([{ t: 'join', name: 'Al', token: TOKEN_A }])
+  })
+
+  it('backs off 1, 2, 4, 8, 15, then 30 s, and stays at the cap', () => {
+    dropped()
+    for (const [i, delay] of [1, 2, 4, 8, 15, 30, 30, 30].entries()) {
+      vi.advanceTimersByTime(delay * 1_000 - 1)
+      expect(sockets()).toBe(i + 1)
+      vi.advanceTimersByTime(1)
+      expect(sockets()).toBe(i + 2)
+      FakeWebSocket.last.serverClose(1006)
+    }
+  })
+
+  it('jitters only downwards, so that the cap holds', () => {
+    const random = vi.spyOn(Math, 'random')
+    random.mockReturnValue(0)
+    expect([0, 1, 2, 3, 4, 5, 6, 50].map(reconnectDelay)).toEqual([
+      1_000, 2_000, 4_000, 8_000, 15_000, 30_000, 30_000, 30_000,
+    ])
+    random.mockReturnValue(1)
+    expect(reconnectDelay(0)).toBe(750)
+    expect(reconnectDelay(9)).toBe(22_500)
+  })
+
+  it('reads a stale close during an attempt as one more failure', () => {
+    const { h, attempt } = attempting()
+    attempt.serverClose(CloseCode.stale)
+    expect(h.onEnd).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(2_000)
+    expect(sockets()).toBe(3)
+  })
+
+  it('gives up after 5 minutes of failures, as disconnected, and stops', () => {
+    const { h } = dropped()
+    let waited = 0
+    for (const delay of [1, 2, 4, 8, 15]) {
+      vi.advanceTimersByTime(delay * 1_000)
+      waited += delay * 1_000
+      FakeWebSocket.last.serverClose(1006)
+    }
+    while (waited + 30_000 < RECONNECT_GIVE_UP_MS) {
+      vi.advanceTimersByTime(30_000)
+      waited += 30_000
+      FakeWebSocket.last.serverClose(1006)
+      expect(h.onEnd).not.toHaveBeenCalled()
+    }
+
+    vi.advanceTimersByTime(30_000)
+    FakeWebSocket.last.serverClose(1006)
+
+    expect(h.onEnd).toHaveBeenCalledExactlyOnceWith('disconnected')
+    expect(vi.getTimerCount()).toBe(0)
+    const opened = sockets()
+    window.dispatchEvent(new Event('online'))
+    vi.advanceTimersByTime(60_000)
+    expect(sockets()).toBe(opened)
+  })
+
+  it('does not count a phone’s sleep as failing: it gets its attempt on waking', () => {
+    const { h } = dropped()
+    vi.setSystemTime(Date.now() + 60 * 60_000)
+
+    window.dispatchEvent(new Event('online'))
+    expect(h.onEnd).not.toHaveBeenCalled()
+    FakeWebSocket.last.open()
+    FakeWebSocket.last.receive(welcome({}))
+
+    expect(h.onEnd).not.toHaveBeenCalled()
+    expect(h.onView).toHaveBeenCalledOnce()
+  })
+
+  describe('when it comes back', () => {
+    it('replaces the view and clears the timers before any new ones', () => {
+      const { h, attempt } = attempting()
+      h.onTimers.mockClear()
+
+      attempt.receive(welcome({ name: 'Back' }))
+
+      expect(h.onTimers).toHaveBeenCalledExactlyOnceWith([])
+      expect(lastView(h).members.m1.name).toBe('Back')
+      expect(h.onTimers.mock.invocationCallOrder[0]).toBeLessThan(
+        h.onView.mock.invocationCallOrder[0],
+      )
+    })
+
+    it('takes the timers that follow the welcome', () => {
+      const { h, attempt } = attempting()
+      attempt.receive(welcome({}))
+      h.onTimers.mockClear()
+      attempt.receive(
+        JSON.stringify({
+          t: 'timer',
+          timers: [{ id: 'turn', remainingMs: 1_000, totalMs: 1_000 }],
+        }),
+      )
+      expect(h.onTimers).toHaveBeenCalledExactlyOnceWith([
+        { id: 'turn', deadline: expect.any(Number), totalMs: 1_000 },
+      ])
+    })
+
+    it('counts rev from the new welcome, not from where it left off', () => {
+      vi.useFakeTimers()
+      const { h, socket } = welcomed()
+      socket.receive(patch(1))
+      socket.receive(patch(2, [{ op: 'set', path: ['members', 'm1', 'ready'], value: false }]))
+      socket.serverClose(1006)
+      vi.advanceTimersByTime(1_000)
+      const next = FakeWebSocket.last
+      next.open()
+      next.receive(welcome({}))
+      next.sent.length = 0
+      h.onView.mockClear()
+
+      next.receive(patch(1))
+
+      expect(lastView(h).members.m1.ready).toBe(true)
+      // Not taken for a gap
+      expect(next.sent).toEqual([])
+    })
+
+    it('keeps the new token', () => {
+      const { attempt } = attempting()
+      attempt.receive(welcome({}, { token: TOKEN_B }))
+      expect(localStorage.getItem(SEAT_KEY)).toBe(TOKEN_B)
+    })
+
+    it('leaves nothing waiting, and a later drop starts over from 1 s', () => {
+      const { h, attempt } = attempting()
+      attempt.receive(welcome({}))
+      attempt.sent.length = 0
+
+      // Only the heartbeat is left
+      expect(vi.getTimerCount()).toBe(1)
+      attempt.serverClose(1006)
+      expect(h.onReconnecting).toHaveBeenCalledTimes(2)
+      vi.advanceTimersByTime(999)
+      expect(sockets()).toBe(2)
+      vi.advanceTimersByTime(1)
+      expect(sockets()).toBe(3)
+    })
+
+    it('starts the 5 minutes over after a later drop', () => {
+      const { h, attempt } = attempting()
+      vi.advanceTimersByTime(RECONNECT_ATTEMPT_TIMEOUT_MS - 1)
+      attempt.receive(welcome({}))
+      vi.setSystemTime(Date.now() + 60 * 60_000)
+
+      attempt.serverClose(1006)
+      vi.advanceTimersByTime(1_000)
+      FakeWebSocket.last.serverClose(1006)
+
+      expect(h.onEnd).not.toHaveBeenCalled()
+    })
+
+    it('hears nothing more from the old socket', () => {
+      const { h, socket, attempt } = attempting()
+      attempt.receive(welcome({}))
+      h.onView.mockClear()
+
+      socket.receive(patch(1))
+      socket.serverClose(CloseCode.replaced)
+
+      expect(h.onView).not.toHaveBeenCalled()
+      expect(h.onEnd).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('at once on coming back', () => {
+    it.each([
+      ['online', () => window.dispatchEvent(new Event('online'))],
+      ['visible', () => setVisibility('visible')],
+    ])('%s: attempts now, and the wait it replaced opens no second socket', (_, wake) => {
+      dropped()
+      wake()
+      expect(sockets()).toBe(2)
+      FakeWebSocket.last.open()
+      FakeWebSocket.last.receive(welcome({}))
+
+      vi.advanceTimersByTime(60_000)
+
+      expect(sockets()).toBe(2)
+    })
+
+    it.each([
+      ['online', () => window.dispatchEvent(new Event('online'))],
+      ['visible', () => setVisibility('visible')],
+    ])('%s: an attempt under way will do', (_, wake) => {
+      const { attempt } = attempting()
+      wake()
+      wake()
+      expect(sockets()).toBe(2)
+      expect(attempt.gone).toBe(false)
+    })
+
+    it('fires on two events in a row just once', () => {
+      dropped()
+      window.dispatchEvent(new Event('online'))
+      setVisibility('visible')
+      expect(sockets()).toBe(2)
+    })
+
+    it('does not fire when the page is hidden', () => {
+      dropped()
+      setVisibility('hidden')
+      expect(sockets()).toBe(1)
+    })
+
+    it('starts the backoff over if that attempt fails too', () => {
+      dropped()
+      vi.advanceTimersByTime(1_000)
+      FakeWebSocket.last.serverClose(1006)
+      vi.advanceTimersByTime(2_000)
+      FakeWebSocket.last.serverClose(1006)
+
+      window.dispatchEvent(new Event('online'))
+      FakeWebSocket.last.serverClose(1006)
+      const before = sockets()
+      vi.advanceTimersByTime(1_000)
+
+      expect(sockets()).toBe(before + 1)
+    })
+
+    it('ignores those events while connected', () => {
+      vi.useFakeTimers()
+      welcomed()
+      window.dispatchEvent(new Event('online'))
+      setVisibility('visible')
+      expect(sockets()).toBe(1)
+    })
+
+    it('ignores them on a first connection that failed', () => {
+      connectRoom(ROOM, 'Al', handlers())
+      FakeWebSocket.last.serverClose(1006)
+      window.dispatchEvent(new Event('online'))
+      expect(sockets()).toBe(1)
+    })
+  })
+
+  describe('an attempt that hangs', () => {
+    it('is closed and counted as a failure, one socket at a time', () => {
+      const { attempt } = attempting()
+      vi.advanceTimersByTime(RECONNECT_ATTEMPT_TIMEOUT_MS - 1)
+      expect(attempt.gone).toBe(false)
+
+      vi.advanceTimersByTime(1)
+      expect(attempt.closedByClient).toBe(true)
+      expect(openSockets()).toHaveLength(0)
+
+      vi.advanceTimersByTime(2_000)
+      expect(sockets()).toBe(3)
+      expect(openSockets()).toHaveLength(1)
+    })
+
+    it('has no say once closed', () => {
+      const { h, attempt } = attempting()
+      vi.advanceTimersByTime(RECONNECT_ATTEMPT_TIMEOUT_MS)
+      attempt.receive(welcome({}))
+      attempt.serverClose(CloseCode.kicked)
+      expect(h.onView).not.toHaveBeenCalled()
+      expect(h.onEnd).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('a socket that went quiet', () => {
+    it('counts as dropped once three pings have gone unanswered', () => {
+      vi.useFakeTimers()
+      const { h, socket } = welcomed()
+      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS * 3)
+      expect(h.onReconnecting).not.toHaveBeenCalled()
+      expect(socket.sent.filter((data) => data === 'ping')).toHaveLength(3)
+
+      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
+
+      expect(h.onReconnecting).toHaveBeenCalledOnce()
+      expect(socket.closedByClient).toBe(true)
+      expect(socket.sent.filter((data) => data === 'ping')).toHaveLength(3)
+    })
+
+    it('does not while it answers', () => {
+      vi.useFakeTimers()
+      const { h, socket } = welcomed()
+      for (let i = 0; i < 10; i++) {
+        vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
+        socket.receive('pong')
+      }
+      expect(h.onReconnecting).not.toHaveBeenCalled()
+      expect(socket.closedByClient).toBe(false)
+    })
+  })
+
+  describe('closes that end it, during an attempt', () => {
+    it.each([
+      [CloseCode.kicked, 'kicked'],
+      [CloseCode.dissolved, 'dissolved'],
+      [CloseCode.roomNotFound, 'notFound'],
+      [CloseCode.versionMismatch, 'versionMismatch'],
+      [CloseCode.roomFull, 'full'],
+      [CloseCode.replaced, 'replaced'],
+      [CloseCode.badMessage, 'disconnected'],
+    ])('%i ends as %s, with nothing left running', (code, end) => {
+      const { h, attempt } = attempting()
+
+      attempt.serverClose(code)
+
+      expect(h.onEnd).toHaveBeenCalledExactlyOnceWith(end)
+      expect(vi.getTimerCount()).toBe(0)
+      window.dispatchEvent(new Event('online'))
+      vi.advanceTimersByTime(RECONNECT_GIVE_UP_MS)
+      expect(sockets()).toBe(2)
+    })
+
+    it('treats a 44xx this page does not know as an end too', () => {
+      const { h, attempt } = attempting()
+      attempt.serverClose(4499)
+      expect(h.onEnd).toHaveBeenCalledExactlyOnceWith('disconnected')
+    })
+  })
+
+  describe.each([
+    [CloseCode.kicked],
+    [CloseCode.dissolved],
+    [CloseCode.roomNotFound],
+    [CloseCode.versionMismatch],
+    [CloseCode.roomFull],
+    [CloseCode.replaced],
+    [CloseCode.badMessage],
+  ])('close %i of a welcomed socket', (code) => {
+    it('never tries again', () => {
+      const { h } = dropped(code)
+      expect(h.onReconnecting).not.toHaveBeenCalled()
+      expect(vi.getTimerCount()).toBe(0)
+      vi.advanceTimersByTime(RECONNECT_GIVE_UP_MS)
+      expect(sockets()).toBe(1)
+    })
+  })
+
+  describe('leaving', () => {
+    it('mid-backoff leaves no timer, no socket and no listener', () => {
+      const { h, connection } = dropped()
+
+      connection.leave()
+
+      expect(vi.getTimerCount()).toBe(0)
+      vi.advanceTimersByTime(RECONNECT_GIVE_UP_MS)
+      window.dispatchEvent(new Event('online'))
+      setVisibility('visible')
+      expect(sockets()).toBe(1)
+      expect(h.onEnd).not.toHaveBeenCalled()
+    })
+
+    it('mid-attempt closes that socket and leaves no timer', () => {
+      const { h, connection, attempt } = attempting()
+
+      connection.leave()
+
+      expect(attempt.closedByClient).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
+      attempt.receive(welcome({}))
+      expect(h.onView).not.toHaveBeenCalled()
+      expect(sockets()).toBe(2)
+    })
+  })
+
+  describe('sending', () => {
+    it('says it could not while waiting, and while an attempt has not been welcomed', () => {
+      const { connection, attempt } = (() => {
+        const room = dropped()
+        expect(room.connection.send({ t: 'start' })).toBe(false)
+        vi.advanceTimersByTime(1_000)
+        FakeWebSocket.last.open()
+        return { ...room, attempt: FakeWebSocket.last }
+      })()
+      attempt.sent.length = 0
+
+      expect(connection.send({ t: 'start' })).toBe(false)
+      expect(attempt.sent).toEqual([])
+    })
+
+    it('goes out on the new socket once welcomed', () => {
+      const { connection, attempt } = attempting()
+      attempt.receive(welcome({}))
+      attempt.sent.length = 0
+
+      expect(connection.send({ t: 'start' })).toBe(true)
+
+      expect(attempt.sent).toEqual([JSON.stringify({ t: 'start' })])
+    })
+  })
+
+  describe('when localStorage keeps nothing', () => {
+    function blockStorage() {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('SecurityError')
+      })
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('SecurityError')
+      })
+    }
+
+    it('reconnects with the token from memory', () => {
+      vi.useFakeTimers()
+      blockStorage()
+      connectAndTrack('blockedaaa', handlers())
+      FakeWebSocket.last.open()
+      FakeWebSocket.last.receive(welcome({}))
+
+      FakeWebSocket.last.serverClose(1006)
+      vi.advanceTimersByTime(1_000)
+      FakeWebSocket.last.open()
+
+      expect(FakeWebSocket.last.joins).toEqual([{ t: 'join', name: 'Al', token: TOKEN_A }])
+    })
+
+    it('brings it to a new connection too (Retry), for this room only', () => {
+      blockStorage()
+      const first = connectRoom('blockedbbb', 'Al', handlers())
+      FakeWebSocket.last.open()
+      FakeWebSocket.last.receive(welcome({}))
+      first.leave()
+
+      connectRoom('blockedbbb', 'Al', handlers())
+      FakeWebSocket.last.open()
+      expect(FakeWebSocket.last.joins[0].token).toBe(TOKEN_A)
+
+      connectRoom('blockedccc', 'Al', handlers())
+      FakeWebSocket.last.open()
+      expect(FakeWebSocket.last.joins[0].token).toBeNull()
+    })
+
+    it('uses the newer token when storage can read but not write (full)', () => {
+      localStorage.setItem('tku-arcade.seat.blockedddd', TOKEN_B)
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError')
+      })
+      const first = connectRoom('blockedddd', 'Al', handlers())
+      FakeWebSocket.last.open()
+      expect(FakeWebSocket.last.joins[0].token).toBe(TOKEN_B)
+      FakeWebSocket.last.receive(welcome({}, { token: TOKEN_A }))
+      first.leave()
+
+      connectRoom('blockedddd', 'Al', handlers())
+      FakeWebSocket.last.open()
+
+      expect(FakeWebSocket.last.joins[0].token).toBe(TOKEN_A)
+    })
   })
 })
 
@@ -371,9 +878,10 @@ describe('leaving and closing', () => {
   })
 
   it.each([
-    [1006, 'disconnected'],
-    [CloseCode.stale, 'disconnected'],
-    [CloseCode.roomNotFound, 'disconnected'],
+    [CloseCode.versionMismatch, 'versionMismatch'],
+    [CloseCode.roomNotFound, 'notFound'],
+    [CloseCode.roomFull, 'full'],
+    [CloseCode.badMessage, 'disconnected'],
     [CloseCode.replaced, 'replaced'],
     [CloseCode.kicked, 'kicked'],
     [CloseCode.dissolved, 'dissolved'],

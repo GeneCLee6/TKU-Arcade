@@ -5,7 +5,7 @@
 // 1. The browser opens the socket and sends `join` (its nickname, and the seat token it was given
 //    last time, if any). The server answers `welcome`: the person's member id, the token to keep,
 //    and the whole room as this person may see it (`state`). A token the room still knows brings
-//    back the same member and seat within RECONNECT_GRACE_MS; any other token makes a new member.
+//    back the same member and seat, however long it took; any other token makes a new member.
 //    The token travels only here, never in the URL. A socket that does not join within
 //    JOIN_TIMEOUT_MS is closed. The name in `state` is the one to show, which may differ from the
 //    one sent: a new member whose name is taken gets a suffix (uniqueName), and someone coming back
@@ -74,7 +74,7 @@ export const HEARTBEAT_INTERVAL_MS = 15_000
 export const STALE_AFTER_MS = 45_000
 /** A socket must send `join` this soon after opening; the next sweep closes it */
 export const JOIN_TIMEOUT_MS = 10_000
-/** How long a disconnected member keeps its seat without being marked offline (AC-2.3) */
+/** How long until a disconnected member is `absent`, and loses the host if they had it (AC-2.3) */
 export const RECONNECT_GRACE_MS = 45_000
 /** How long a kicked member's seat token cannot join again (E1) */
 export const KICK_BAN_MS = 5 * 60_000

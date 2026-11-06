@@ -4,6 +4,7 @@ import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import { space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
+import { FreeSeatRow } from './FreeSeatRow.tsx'
 import { DissolveButton, GameSetup, SeatedGateButton } from './HostControls.tsx'
 import { MemberEntry } from './MemberEntry.tsx'
 import { QrCode } from './QrCode.tsx'
@@ -63,25 +64,13 @@ export function WaitingRoom({
         <List>
           {seats.map((seat) => {
             const member = seated.find((other) => other.seat === seat)
-            return (
+            return member ? (
               <Row key={seat}>
                 <SeatNumber>{t('room.waiting.seat', { seat: seat + 1 })}</SeatNumber>
-                {member ? (
-                  entry(member)
-                ) : (
-                  <>
-                    <Muted>{t('room.waiting.empty')}</Muted>
-                    <SitButton
-                      $variant="secondary"
-                      $size="sm"
-                      aria-label={t('room.waiting.sitIn', { seat: seat + 1 })}
-                      onClick={() => onSit(seat)}
-                    >
-                      {t('room.waiting.sit')}
-                    </SitButton>
-                  </>
-                )}
+                {entry(member)}
               </Row>
+            ) : (
+              <FreeSeatRow key={seat} seat={seat} onSit={onSit} />
             )
           })}
         </List>
@@ -171,10 +160,6 @@ function Invite({ roomId }: { roomId: string }) {
 const Layout = styled.div`
   display: grid;
   gap: ${space.xl}px;
-`
-
-const SitButton = styled(Button)`
-  margin-left: auto;
 `
 
 const LinkText = styled.p`
