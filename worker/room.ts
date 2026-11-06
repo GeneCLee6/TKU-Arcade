@@ -104,9 +104,6 @@ export class RoomDO extends DurableObject<Env> {
         ctx.getWebSockets().map((ws) => ws.deserializeAttachment() as OpenSocket),
         alarm,
       )
-      // A room from before clean-up has no alarm, and one whose sockets all went in a restart may
-      // need another: without this, what was found here would only act on the next event
-      await this.settle()
     })
   }
 
@@ -125,6 +122,9 @@ export class RoomDO extends DurableObject<Env> {
 
   /** RPC from GET /api/rooms/<id>: null when there is no such room */
   async summary(): Promise<RoomSummary | null> {
+    // A room from before clean-up has no alarm: being looked at is what starts its clock. Not in the
+    // constructor: on a wake-up for the alarm itself, setting one cancels the alarm that is running
+    await this.settle()
     return this.host.summary()
   }
 
@@ -175,9 +175,8 @@ export class RoomDO extends DurableObject<Env> {
   }
 
   override async alarm(): Promise<void> {
-    // The alarm that fired is spent, and reads as none. If this wake-up's constructor set another, it
-    // is pending, and a room deleted below must delete it
-    this.alarmAt = await this.ctx.storage.getAlarm()
+    // The alarm that fired is spent
+    this.alarmAt = null
     for (const ws of this.ctx.getWebSockets()) {
       const at = this.ctx.getWebSocketAutoResponseTimestamp(ws)
       if (at) this.host.heartbeat((ws.deserializeAttachment() as OpenSocket).conn, at.getTime())
