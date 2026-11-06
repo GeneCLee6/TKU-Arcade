@@ -39,7 +39,7 @@ depends_on: [E2, E7]
 
 - 大廳不需要 DO：遊戲清單是靜態的（`shared/games/index.ts`），公開房列表由 `LobbyDO`（單一實例）維護，各 `RoomDO` 在狀態變化時通知它（alarm 保活，10 分鐘沒心跳就移除）。
 - 路由：`/`（大廳）、`/r/<id>`（房間）、`/games/<id>/rules`（規則頁，E7）、`/me`（M1 戰績，E11）。
-- 進房流程：`GET /api/rooms/<id>` 先拿房間摘要（遊戲、人數、是否可加入）→ 輸入暱稱 → WebSocket `/api/rooms/<id>/ws?v=1`。
+- 進房流程：`GET /api/rooms/<id>` 先拿房間摘要（遊戲、人數、是否可加入）→ 輸入暱稱 → WebSocket `/ws/<id>?v=1`。
 - 帳號：**不複製牌桌的帳號程式**；只做 token 驗證（`worker/auth.ts`）。牌桌那邊要加一個「對外簽 token」的端點（牌桌 repo 的 task，記在 §未決問題）。
 
 ## 驗收條件
@@ -57,7 +57,7 @@ depends_on: [E2, E7]
 
 ### M0
 
-- [ ] `e1-t01` `shared/room-id.ts`、`RoomDO` 骨架（成員、座位、房主、狀態機）、`POST /api/rooms`、`GET /api/rooms/:id` · AC-1.3 · M · ← e12-t01
+- [x] `e1-t01` `shared/room-id.ts`、`RoomDO` 骨架（成員、座位、房主、狀態機）、`POST /api/rooms`、`GET /api/rooms/:id` · AC-1.3 · M · ← e12-t01 · #4
 - [ ] `e1-t02` 大廳首頁：遊戲卡片（讀 `shared/games/index.ts`）、開新房流程、加入連結輸入 · AC-1.1 · M · ← e1-t01, e7-t01
 - [ ] `e1-t03` 暱稱輸入、localStorage、去重、`join` 訊息 · AC-1.2 · S · ← e1-t01
 - [ ] `e1-t04` 等待室：成員列、座位、準備、複製連結與 QR、開始按鈕條件 · AC-1.3 · M · ← e1-t03

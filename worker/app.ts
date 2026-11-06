@@ -1,6 +1,7 @@
 import type { HealthResponse } from '../shared/health.ts'
 import type { LobbyDO } from './lobby.ts'
 import type { RoomDO } from './room.ts'
+import { handleRooms, handleRoomSocket } from './rooms.ts'
 
 export interface Env {
   /** The React app's static assets (wrangler `assets`) */
@@ -31,8 +32,10 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     const body: HealthResponse = { ok: true, version: env.APP_VERSION ?? 'local' }
     return Response.json(body, { headers: noStore })
   }
+  if (url.pathname === '/api/rooms' || url.pathname.startsWith('/api/rooms/')) {
+    return handleRooms(request, env, url)
+  }
   if (url.pathname.startsWith('/api/')) return notFound()
-  // The room WebSocket (A4) hands the upgrade to RoomDO; nothing answers it yet
-  if (url.pathname.startsWith('/ws/')) return notFound()
+  if (url.pathname.startsWith('/ws/')) return handleRoomSocket(request, env, url)
   return env.ASSETS.fetch(request)
 }

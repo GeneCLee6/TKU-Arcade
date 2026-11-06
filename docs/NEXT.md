@@ -1,6 +1,6 @@
 # NEXT — 接下來怎麼做（給 AI 協作者與自己的交接手冊）
 
-最後更新 2026-11-06（A1、A2、A3 完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
+最後更新 2026-11-06（Phase A 完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
 
 ## 1. 現在的位置
 
@@ -8,9 +8,11 @@
 - **A1 完成（PR #1）**：repo 骨架、CI、每 PR 預覽 Worker、`main` CI 綠自動部署、`DEPLOY.md`、`RULES.md`；正式站 https://tku-arcade.genelee-pro.workers.dev 已上線。Cloudflare 已建 D1 `tku-arcade`／`tku-arcade-staging`、R2 `tku-arcade-assets`／`tku-arcade-backups`。
 - **A3 完成（PR #2）**：`GameModule`、`match.ts`、Rng、井字棋範本、協定 v1、patch、harness、`npm run play`。
 - **A2 完成（PR #3）**：token、深淺色、基礎元件、i18n、語言切換、`npm run budget`。字型暫用堆疊、未打包 web font。
-- **下一批：A4**（`RoomDO`）。
+- **A4 完成（PR #4）**：`RoomDO`、房間 API、回合引擎；在 PR 預覽（真的 Cloudflare）用真 socket 跑完一局井字棋。CI 沒有真實 DO 測試（`@cloudflare/vitest-pool-workers` 不支援 Vitest 5），`worker/room.ts` 的迴歸要靠手動跑。
+- **下一批：B1**；C1 經擁有者同意（2026-11-06）提前做，排在 B 之前。
+- 後面批次要接手的缺口：斷線的人永遠保留座位與房主（`e2-t05`、`e1-t05`）；離線旁觀者佔成員名額（上限 64）；`POST /api/rooms` 無速率限制（`e12-t06`）；房間不會自動清除（`e1-t10`）；暱稱去重（`e1-t03`）；公開／私人旗標未存（`e1-t09`）。`RoomView` 只能由已存狀態推導，改變一律走 `change()`，否則 diff 會漂移。
 - **待擁有者**：`main` 分支保護尚未設（`DEPLOY.md` §3.3）。
-- A4 注意：`RoomDO` 要走 `shared/games/match.ts`，不直接呼叫 `reduce`；存整個 `Match` 外加種子與動作紀錄；`reduce` 外面要 try/catch。B1 大廳不可列出井字棋（範本，尚無隱藏旗標）。遊戲字串 `GAME_MESSAGES` 尚未併入 `src/i18n` 的字典，`check-i18n` 也要涵蓋。
+- B1 大廳不可列出井字棋（範本，尚無隱藏旗標）。遊戲字串 `GAME_MESSAGES` 尚未併入 `src/i18n` 的字典，`check-i18n` 也要涵蓋。
 - 尚無視覺稿、標誌、提案頁（LongTalk 與橋館有）；如需要，以 `docs/design/mockup.html` 補，不是必要條件。
 
 ## 2. 待擁有者決定（開工前）
