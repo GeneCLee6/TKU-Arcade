@@ -228,6 +228,12 @@ const Dock = styled.div<{ $stuck?: boolean }>`
   &:empty {
     display: none;
   }
+
+  /* A phone on its side has little height to give: one row, beside what is pressed most */
+  @media (max-height: 500px) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
 `
 
 const DockButtons = styled.div`
