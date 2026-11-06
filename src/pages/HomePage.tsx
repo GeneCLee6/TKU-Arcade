@@ -8,6 +8,7 @@ import { Dialog } from '../components/Dialog.tsx'
 import { GameCard } from '../components/GameCard.tsx'
 import { JoinRoomForm } from '../components/JoinRoomForm.tsx'
 import { NicknameForm } from '../components/NicknameForm.tsx'
+import { PublicRooms } from '../components/PublicRooms.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { useToast } from '../components/useToast.ts'
 import { useT } from '../i18n/useT.ts'
@@ -15,7 +16,7 @@ import { readNickname } from '../lib/nickname.ts'
 import { createRoom } from '../lib/rooms.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 
-/** The lobby (e1-t02); the list of public rooms comes with e1-t09 */
+/** The lobby: the games, a link box and the public rooms (e1-t02, e1-t09) */
 export function HomePage() {
   const t = useT()
   const navigate = useNavigate()
@@ -24,6 +25,8 @@ export function HomePage() {
   // The nickname dialog is open; `gameId` is the "New room" waiting for it, null for a plain change
   const [asking, setAsking] = useState<{ gameId: string | null } | null>(null)
   const [creating, setCreating] = useState(false)
+  // Off by default: nobody's room shows up in front of strangers unless they asked for that
+  const [listPublicly, setListPublicly] = useState(false)
   const inFlight = useRef<AbortController | null>(null)
 
   // Whoever left the lobby meanwhile should not be carried off to the new room
@@ -33,7 +36,7 @@ export function HomePage() {
     const controller = new AbortController()
     inFlight.current = controller
     setCreating(true)
-    const id = await createRoom(gameId, controller.signal)
+    const id = await createRoom(gameId, listPublicly, controller.signal)
     if (controller.signal.aborted) return
     setCreating(false)
     if (id !== null) navigate(`/r/${id}`)
@@ -68,8 +71,20 @@ export function HomePage() {
           )}
         </Intro>
         <JoinRoomForm />
+        <PublicRooms />
         <section>
           <SectionTitle>{t('lobby.games')}</SectionTitle>
+          <PublicChoice>
+            <PublicCheck
+              type="checkbox"
+              checked={listPublicly}
+              onChange={(event) => setListPublicly(event.target.checked)}
+            />
+            <span>
+              {t('lobby.publicRooms.choice')}
+              <PublicHint>{t('lobby.publicRooms.choiceHint')}</PublicHint>
+            </span>
+          </PublicChoice>
           <Grid>
             {LOBBY_GAMES.map((game) => (
               <li key={game.id}>
@@ -129,6 +144,31 @@ const PlayingAs = styled.p`
 const SectionTitle = styled.h2`
   margin: 0 0 ${space.md}px;
   font-size: ${fontSize.lg}px;
+`
+
+const PublicChoice = styled.label`
+  display: flex;
+  align-items: flex-start;
+  gap: ${space.sm}px;
+  min-height: 44px;
+  margin-bottom: ${space.md}px;
+  font-weight: 600;
+  cursor: pointer;
+`
+
+const PublicCheck = styled.input`
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: ${color.accent};
+`
+
+const PublicHint = styled.small`
+  display: block;
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
+  font-weight: 400;
 `
 
 // 280px columns in at most 960px: three at most on a desktop, one on a phone

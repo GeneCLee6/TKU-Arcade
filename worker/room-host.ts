@@ -12,12 +12,14 @@ import {
   MAX_MEMBERS,
   PROTOCOL_VERSION,
   RECONNECT_GRACE_MS,
+  ROOM_CLEANUP_MS,
   STALE_AFTER_MS,
   SWEEP_INTERVAL_MS,
   parseClientMessage,
   uniqueName,
   type CoverableSeat,
   type ErrorCode,
+  type RoomListing,
   type RoomMember,
   type RoomStatus,
   type RoomSummary,
@@ -50,6 +52,12 @@ export type RoomRecord = {
   createdAt: number
   /** Seat tokens that cannot join yet. Never part of a view */
   bans: { token: string; until: number }[]
+  /** Listed on the home page while waiting for people; otherwise reachable by link only */
+  public: boolean
+  /** Since when no socket has been open; null while one is (`settleCleanup`) */
+  emptySince: number | null
+  /** While `ended`: when something last happened; null in any other status (`settleCleanup`) */
+  idleSince: number | null
 }
 
 export type MemberRecord = {
@@ -152,8 +160,15 @@ export class RoomHost {
    * socket is not among them lost it in a restart, which closes every socket and tells nobody.
    */
   restore(stored: StoredRoom, sockets: OpenSocket[], alarmAt: number | null): void {
-    // A room or game from before bans and timers existed has neither
-    this.room = stored.room && { ...stored.room, bans: stored.room.bans ?? [] }
+    // A room or game from before bans, timers, listing and clean-up existed has none of them. Such a
+    // room stays private, and its clean-up clocks start now (`settleCleanup` below)
+    this.room = stored.room && {
+      ...stored.room,
+      bans: stored.room.bans ?? [],
+      public: stored.room.public === true,
+      emptySince: stored.room.emptySince ?? null,
+      idleSince: stored.room.idleSince ?? null,
+    }
     this.rev = stored.rev
     this.game = stored.game && { ...stored.game, timers: stored.game.timers ?? [] }
     this.chat = [...(stored.chat ?? [])].sort((a, b) => a.id - b.id).slice(-CHAT_HISTORY)
@@ -179,12 +194,13 @@ export class RoomHost {
           : { ...member, conn: null, offlineAt: member.offlineAt ?? this.deps.now() },
       )
     }
+    this.settleCleanup()
   }
 
   // ── Before joining ─────────────────────────────────────────────────────────────────────────
 
   /** False when the room exists already, or there is no such game: the caller checks that first */
-  create(id: string, gameId: string, rawOptions: unknown): boolean {
+  create(id: string, gameId: string, rawOptions: unknown, isPublic = false): boolean {
     const module = this.deps.games(gameId)
     if (this.room || !module) return false
     this.room = {
@@ -197,6 +213,9 @@ export class RoomHost {
       hostId: null,
       createdAt: this.deps.now(),
       bans: [],
+      public: isPublic,
+      emptySince: this.deps.now(),
+      idleSince: null,
     }
     this.deps.storage.saveRoom(this.room)
     return true
@@ -215,6 +234,26 @@ export class RoomHost {
     }
   }
 
+  /** What the home page shows of this room; null while it should not be listed (e1-t09) */
+  listing(): RoomListing | null {
+    const room = this.room
+    if (!room?.public || room.status !== 'waiting') return null
+    const host = room.hostId === null ? undefined : this.members.get(room.hostId)
+    const members = [...this.members.values()]
+    const seated = members.filter((member) => member.seat !== null).length
+    if (!host || seated >= room.maxSeats || !members.some((member) => member.conn !== null)) {
+      return null
+    }
+    return {
+      id: room.id,
+      gameId: room.gameId,
+      host: host.name,
+      seated,
+      maxSeats: room.maxSeats,
+      createdAt: room.createdAt,
+    }
+  }
+
   /** May this upgrade become a socket of the room? */
   admit(version: string | null): Admission {
     if (version !== String(PROTOCOL_VERSION)) {
@@ -230,12 +269,18 @@ export class RoomHost {
   opened(conn: string, openedAt: number): void {
     this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null })
     this.sweepAt ??= this.deps.now() + SWEEP_INTERVAL_MS
+    this.settleCleanup()
   }
 
   // ── Sockets ────────────────────────────────────────────────────────────────────────────────
 
   /** A text frame from a socket. Never throws for anything a client can send */
   message(conn: string, raw: string): void {
+    this.handleMessage(conn, raw)
+    this.settleCleanup()
+  }
+
+  private handleMessage(conn: string, raw: string): void {
     const connection = this.conns.get(conn)
     if (!connection || !this.room) return
     connection.lastSeen = this.deps.now()
@@ -244,6 +289,8 @@ export class RoomHost {
       this.drop(conn, CloseCode.badMessage, 'bad message')
       return
     }
+    // Coming back, or anything said or done, shows people are still at a finished room's table
+    if (message.t !== 'resync') this.noteActivity()
     if (message.t === 'join') {
       if (connection.member !== null) this.refuse(conn, 'forbidden')
       else this.join(conn, connection, message.name, message.token)
@@ -309,6 +356,7 @@ export class RoomHost {
   /** Binary frames are not part of the protocol */
   badFrame(conn: string): void {
     if (this.conns.has(conn)) this.drop(conn, CloseCode.badMessage, 'bad message')
+    this.settleCleanup()
   }
 
   /** The socket closed. The member keeps its seat and its token */
@@ -318,6 +366,7 @@ export class RoomHost {
     this.conns.delete(conn)
     this.markOffline(conn, connection)
     if (this.conns.size === 0) this.sweepAt = null
+    this.settleCleanup()
   }
 
   /** When the runtime last answered this socket's `ping` by itself, without waking the room */
@@ -328,7 +377,8 @@ export class RoomHost {
 
   /**
    * The alarm, for whichever job it came for: closes sockets that never joined or went silent, fires
-   * the game's timers that ran out and deals with members who have been gone too long.
+   * the game's timers that ran out, deals with members who have been gone too long, forgets kicks
+   * that have run out and deletes a room whose time is up.
    */
   sweep(): void {
     const now = this.deps.now()
@@ -345,14 +395,64 @@ export class RoomHost {
     this.markAbsent(now)
     this.replaceAbsentHost()
     this.removeAbsentSpectators()
+    this.dropExpiredBans(now)
+    this.settleCleanup()
+    const cleanupAt = this.cleanupAt()
+    if (cleanupAt !== null && now >= cleanupAt) {
+      this.wipe(CloseCode.roomNotFound, 'room closed')
+      return
+    }
     this.sweepAt = this.conns.size > 0 ? now + SWEEP_INTERVAL_MS : null
   }
 
-  /** When the alarm should fire next; null for no alarm. e1-t10 adds its job here */
+  /**
+   * When the alarm should fire next; null for no alarm. A Durable Object has one alarm, so it is the
+   * earliest of what the room is waiting for: the sweep, the game's timers and the clean-up.
+   */
   nextAlarm(): number | null {
     const timerAt = this.game && this.room?.status === 'playing' ? nextTimerAt(this.game) : null
-    if (timerAt === null) return this.sweepAt
-    return this.sweepAt === null ? timerAt : Math.min(this.sweepAt, timerAt)
+    const times = [this.sweepAt, timerAt, this.cleanupAt()].filter((at) => at !== null)
+    return times.length > 0 ? Math.min(...times) : null
+  }
+
+  /** When this room is to be deleted if nothing changes; null when nothing is counting down */
+  private cleanupAt(): number | null {
+    const room = this.room
+    if (!room) return null
+    const since = [room.emptySince, room.idleSince].filter((at) => at !== null)
+    return since.length > 0 ? Math.min(...since) + ROOM_CLEANUP_MS : null
+  }
+
+  /**
+   * Brings the two clean-up clocks in line with the room, after anything that may have moved them.
+   * They are stored so that waking up does not start them over, but they are no part of any view, so
+   * they need no `change` and no `rev` of their own.
+   */
+  private settleCleanup(): void {
+    const room = this.room
+    if (!room) return
+    const now = this.deps.now()
+    const emptySince = this.conns.size > 0 ? null : (room.emptySince ?? now)
+    const idleSince = room.status === 'ended' ? (room.idleSince ?? now) : null
+    if (emptySince === room.emptySince && idleSince === room.idleSince) return
+    room.emptySince = emptySince
+    room.idleSince = idleSince
+    this.deps.storage.saveRoom(room)
+  }
+
+  private noteActivity(): void {
+    const room = this.room
+    if (room?.status !== 'ended') return
+    room.idleSince = this.deps.now()
+    this.deps.storage.saveRoom(room)
+  }
+
+  /** `isBanned` already ignores them: this only keeps them from staying in storage */
+  private dropExpiredBans(now: number): void {
+    const room = this.room
+    if (!room || room.bans.every((ban) => ban.until > now)) return
+    room.bans = room.bans.filter((ban) => ban.until > now)
+    this.deps.storage.saveRoom(room)
   }
 
   // ── What members do ────────────────────────────────────────────────────────────────────────
@@ -765,9 +865,12 @@ export class RoomHost {
   private dissolve(conn: string, member: MemberRecord): void {
     const room = this.requireRoom()
     if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
-    for (const open of this.conns.keys()) {
-      this.deps.sockets.close(open, CloseCode.dissolved, 'dissolved')
-    }
+    this.wipe(CloseCode.dissolved, 'dissolved')
+  }
+
+  /** Closes every socket and forgets the whole room, in memory and in storage */
+  private wipe(code: number, reason: string): void {
+    for (const open of this.conns.keys()) this.deps.sockets.close(open, code, reason)
     this.conns.clear()
     this.members.clear()
     this.room = null

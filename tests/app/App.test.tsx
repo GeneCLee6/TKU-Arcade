@@ -22,6 +22,13 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Room not found' })).toBeInTheDocument()
   })
 
+  it('shows a page for any path that is none of ours', async () => {
+    window.history.pushState({}, '', '/no/such/page')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to the lobby' })).toHaveAttribute('href', '/')
+  })
+
   it('switches the page language, and the product name stays the same', () => {
     render(<App />)
     expect(screen.getByText('Pick a game and play with friends.')).toBeInTheDocument()
