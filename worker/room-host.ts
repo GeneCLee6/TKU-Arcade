@@ -39,6 +39,7 @@ export type MemberRecord = {
   /** Only ever sent to this member, in `welcome` */
   token: string
   seat: number | null
+  ready: boolean
   /** The socket this member is on now; null while offline */
   conn: string | null
 }
@@ -124,7 +125,9 @@ export class RoomHost {
       this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null })
     }
     this.sweepAt = alarmAt ?? (sockets.length > 0 ? this.deps.now() + SWEEP_INTERVAL_MS : null)
-    for (const member of stored.members) {
+    for (const record of stored.members) {
+      // A room from before `ready` existed has members without it
+      const member = { ...record, ready: record.ready === true }
       const conn = member.conn === null ? undefined : this.conns.get(member.conn)
       if (conn) conn.member = member.id
       this.members.set(member.id, conn ? member : { ...member, conn: null })
@@ -217,6 +220,9 @@ export class RoomHost {
       case 'sit':
         this.sit(conn, member, message.seat)
         return
+      case 'ready':
+        this.ready(conn, member, message.ready)
+        return
       case 'start':
         this.start(conn, member)
         return
@@ -301,6 +307,7 @@ export class RoomHost {
       ),
       token: this.deps.newToken(),
       seat: this.lowestFreeSeat(),
+      ready: false,
       conn,
     }
     this.change(() => {
@@ -326,6 +333,18 @@ export class RoomHost {
     if (taken) return this.refuse(conn, 'seat_taken')
     this.change(() => {
       member.seat = seat
+      if (seat === null) member.ready = false
+      this.saveMembers()
+    })
+  }
+
+  private ready(conn: string, member: MemberRecord, ready: boolean): void {
+    const room = this.requireRoom()
+    if (room.status !== 'waiting') return this.refuse(conn, 'wrong_status')
+    if (member.seat === null) return this.refuse(conn, 'not_seated')
+    if (member.ready === ready) return
+    this.change(() => {
+      member.ready = ready
       this.saveMembers()
     })
   }
@@ -352,6 +371,8 @@ export class RoomHost {
       seated.forEach((other, index) => {
         other.seat = index
       })
+      // The next waiting room starts over
+      for (const other of this.members.values()) other.ready = false
       this.saveMembers()
       this.game = game
       this.deps.storage.saveGame(game)
@@ -449,6 +470,7 @@ export class RoomHost {
         id: member.id,
         name: member.name,
         seat: member.seat,
+        ready: member.ready,
         host: member.id === room.hostId,
         online: member.conn !== null,
       }

@@ -1,9 +1,12 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CloseCode, type RoomSummary } from '../../shared/protocol.ts'
+import { ToastProvider } from '../../src/components/Toast.tsx'
+import { en } from '../../src/i18n/en.ts'
 import { initLanguage, setLanguage } from '../../src/i18n/t.ts'
+import { zhTW } from '../../src/i18n/zh-TW.ts'
 import { RoomPage } from '../../src/pages/RoomPage.tsx'
 import { FakeWebSocket, TOKEN_A, TOKEN_B, welcome } from '../lib/fakeWebSocket.ts'
 
@@ -29,12 +32,14 @@ function stubSummary(over: Partial<RoomSummary> = {}) {
 
 function renderRoom(id = ROOM, { strict = false } = {}) {
   const tree = (
-    <MemoryRouter initialEntries={[`/r/${id}`]}>
-      <Routes>
-        <Route path="/" element={<p>the lobby</p>} />
-        <Route path="/r/:id" element={<RoomPage />} />
-      </Routes>
-    </MemoryRouter>
+    <ToastProvider>
+      <MemoryRouter initialEntries={[`/r/${id}`]}>
+        <Routes>
+          <Route path="/" element={<p>the lobby</p>} />
+          <Route path="/r/:id" element={<RoomPage />} />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>
   )
   return render(strict ? <StrictMode>{tree}</StrictMode> : tree)
 }
@@ -61,6 +66,7 @@ async function joined(me: Parameters<typeof welcome>[0] = {}) {
 
 const backLink = () => screen.getByRole('link', { name: 'Back to the lobby' })
 const retryButton = () => screen.queryByRole('button', { name: 'Try again' })
+const startButton = () => screen.getByRole('button', { name: en['room.waiting.start'] })
 
 beforeEach(() => {
   localStorage.clear()
@@ -170,20 +176,22 @@ describe('joining', () => {
 
     serverSays(welcome({ name: 'Al (2)', seat: 1 }, { token: TOKEN_B }))
 
-    expect(screen.getByText('You joined as Al (2)')).toBeInTheDocument()
+    expect(screen.getByText('Al (2)')).toBeInTheDocument()
     expect(localStorage.getItem(SEAT_KEY)).toBe(TOKEN_B)
     expect(localStorage.getItem(NICKNAME_KEY)).toBe('Al')
   })
 
-  it('shows the seat counted from one', async () => {
+  it('shows the waiting room, the seat counted from one', async () => {
     await joined({ seat: 2 })
-    expect(screen.getByText('Your seat: 3')).toBeInTheDocument()
+    const row = screen.getByText('Al').closest('li') as HTMLElement
+    expect(within(row).getByText('Seat 3')).toBeInTheDocument()
+    expect(startButton()).toBeInTheDocument()
     expect(backLink()).toBeInTheDocument()
   })
 
   it('shows a spectator as one', async () => {
     await joined({ seat: null })
-    expect(screen.getByText("You're spectating")).toBeInTheDocument()
+    expect(screen.getByText(en['room.waiting.pickSeat'])).toBeInTheDocument()
   })
 
   it('counts this person in once joined, which the earlier summary could not', async () => {
@@ -200,7 +208,7 @@ describe('joining', () => {
   it('keeps the socket when the language changes', async () => {
     await joined()
     act(() => setLanguage('zh-TW'))
-    expect(screen.getByText('你以「Al」的名字加入')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: zhTW['room.waiting.seats'] })).toBeInTheDocument()
     expect(FakeWebSocket.instances).toHaveLength(1)
     expect(FakeWebSocket.last.closedByClient).toBe(false)
     act(() => setLanguage('en'))
@@ -235,7 +243,65 @@ describe('joining', () => {
     expect(second.joins).toHaveLength(1)
 
     serverSays(welcome({}))
-    expect(screen.getByText('You joined as Al')).toBeInTheDocument()
+    expect(screen.getByText('Al')).toBeInTheDocument()
+  })
+})
+
+describe('in the room', () => {
+  const patch = (rev: number, path: string[], value: unknown) =>
+    JSON.stringify({ t: 'patch', rev, ops: [{ op: 'set', path, value }] })
+  const bo = (over = {}) => ({
+    id: 'm2',
+    name: 'Bo',
+    seat: 1,
+    ready: false,
+    host: false,
+    online: true,
+    ...over,
+  })
+
+  it('follows the patches: someone arrives', async () => {
+    await joined()
+    expect(screen.getByText('In the room: 1')).toBeInTheDocument()
+    serverSays(patch(1, ['members', 'm2'], bo({ ready: true })))
+    expect(screen.getByText('In the room: 2')).toBeInTheDocument()
+    const row = screen.getByText('Bo').closest('li') as HTMLElement
+    expect(within(row).getByText(en['room.waiting.badge.ready'])).toBeInTheDocument()
+  })
+
+  it('sends what the buttons say', async () => {
+    await joined()
+    const sent = () => FakeWebSocket.last.sent.map((data) => JSON.parse(data)).slice(1)
+    fireEvent.click(screen.getByRole('button', { name: en['room.waiting.ready'] }))
+    fireEvent.click(screen.getByRole('button', { name: en['room.waiting.standUp'] }))
+    expect(sent()).toEqual([
+      { t: 'ready', ready: true },
+      { t: 'sit', seat: null },
+    ])
+  })
+
+  it('starts only once enough are seated', async () => {
+    await joined()
+    expect(startButton()).toBeDisabled()
+    serverSays(patch(1, ['members', 'm2'], bo()))
+    expect(startButton()).toBeEnabled()
+    fireEvent.click(startButton())
+    expect(JSON.parse(FakeWebSocket.last.sent.at(-1) as string)).toEqual({ t: 'start' })
+  })
+
+  it('leaves the waiting room once the game is on', async () => {
+    await joined()
+    serverSays(patch(1, ['room', 'status'], 'playing'))
+    expect(screen.getByRole('status')).toHaveTextContent(en['room.inProgress'])
+    expect(screen.queryByRole('heading', { name: en['room.waiting.seats'] })).toBeNull()
+    expect(backLink()).toBeInTheDocument()
+  })
+
+  it('tells of a refusal in a toast and stays in the room', async () => {
+    await joined()
+    serverSays(JSON.stringify({ t: 'error', code: 'seat_taken' }))
+    expect(screen.getByText(en['room.error.seat_taken'])).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: en['room.waiting.seats'] })).toBeInTheDocument()
   })
 })
 

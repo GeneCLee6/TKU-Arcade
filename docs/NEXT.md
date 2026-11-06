@@ -1,6 +1,6 @@
 # NEXT — 接下來怎麼做（給 AI 協作者與自己的交接手冊）
 
-最後更新 2026-11-06（Phase A、C1、B1 完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
+最後更新 2026-11-06（Phase A、C1、B1、B2 完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
 
 ## 1. 現在的位置
 
@@ -11,7 +11,9 @@
 - **A4 完成（PR #4）**：`RoomDO`、房間 API、回合引擎；在 PR 預覽（真的 Cloudflare）用真 socket 跑完一局井字棋。CI 沒有真實 DO 測試（`@cloudflare/vitest-pool-workers` 不支援 Vitest 5），`worker/room.ts` 的迴歸要靠手動跑。
 - **C1 完成（PR #5，經擁有者同意 2026-11-06 排在 Phase B 之前）**：升官圖圖版 79 格、規則引擎、規則選項；在 PR 預覽用真的 `RoomDO` 跑完 2、3、4、6 人局。
 - **B1 完成（PR #6）**：大廳首頁、開新房、貼連結加入、暱稱（可修改）、伺服器端同房去重、`npm run check-i18n` 進 CI。井字棋用 `meta.unlisted` 藏起來；`GAME_MESSAGES` 已併入 `t()`，遊戲字串用 `t(`${game.meta.i18nKey}.name`)`。
-- **下一批：B2**（`useRoom()`、等待室）。`src/pages/RoomPage.tsx` 與 `src/lib/joinRoom.ts` 是最小版的進房：只看 `welcome`、不套 patch、不自動重連，B2 用 `useRoom()` 取代；保留「`join` 只在仍有效的 socket 的 `open` 送出」，否則 StrictMode 會多出一個成員。
+- **B2 完成（PR #7）**：`useRoom()`（`src/lib/useRoom.ts`、`roomConnection.ts`：patch、rev 缺口 `resync`、錯誤 toast）、等待室（座位、換座、準備、複製連結與 QR、開始條件）。協定新增 `ready`（不升版、不擋開始）。
+- **下一批：B3**（房主控制、換遊戲與規則選項、階段倒數）。
+- B2 留下的缺口：開局後還沒有遊戲畫面（C2），房間顯示「進行中」的佔位文字，而且 `ended` 也只看到同一句，房主要到 C3／B3 才有再來一局；斷線仍要手動按「再試一次」（`e2-t05`）；`timer`、`chat` 訊息前端先忽略（`e2-t08`、`e1-t07`）。
 - B1 留下的缺口：懶載入 `RoomPage` 沒有錯誤邊界，部署後還開著的舊分頁載不到舊 chunk 可能變空白（只從程式推論、未重現，`e12-t04` 一起處理）；未知路徑是空白頁；localStorage 被擋時 seat token 不會保留，重試會多一個成員。大廳公開房列表在 `e1-t09`，所以 AC-1.1 還不能勾。
 - `check-i18n` 的裸字串檢查只看 JSX 文字與 `aria-label`、`title`、`placeholder`、`alt`、`label` 的字面值，以及 `src/` 內所有 CJK；抓不到 `{'Hello'}`、`toast('Saved')`、條件式裡的字串，這些靠 AC-7.3 的人工走查。
 - C2／C3 注意：移動是跳格不是走格，`last` 給 `from`、`to`；`BOARD` 依官階排序、沒有座標，79 格在手機上要想排法；結算的 `score` 是官階 0–24，不是分數。改格子只能新增，id 存在進行中的局裡。

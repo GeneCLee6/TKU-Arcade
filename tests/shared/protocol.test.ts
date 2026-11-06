@@ -28,6 +28,8 @@ describe('parseClientMessage', () => {
       { t: 'chat', text: 'hi' },
       { t: 'sit', seat: 3 },
       { t: 'sit', seat: null },
+      { t: 'ready', ready: true },
+      { t: 'ready', ready: false },
       { t: 'start' },
       { t: 'reopen' },
     ]
@@ -54,6 +56,8 @@ describe('parseClientMessage', () => {
       JSON.stringify({ t: 'sit', seat: -1 }),
       JSON.stringify({ t: 'sit', seat: 1.5 }),
       JSON.stringify({ t: 'sit', seat: '1' }),
+      JSON.stringify({ t: 'ready' }),
+      JSON.stringify({ t: 'ready', ready: 'yes' }),
     ]
     for (const raw of cases) expect(parseClientMessage(raw), raw).toBeNull()
   })

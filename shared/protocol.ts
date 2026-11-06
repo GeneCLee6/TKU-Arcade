@@ -30,10 +30,12 @@
 // 8. The room's life is waiting → playing → ended → waiting. The first member to join is the host.
 //    While the room is `waiting`, someone joining takes the lowest free seat (none free: a
 //    spectator), and `sit` moves a member to a free seat or, with null, out of their seat. Anyone
-//    joining later is a spectator. `start` (host only, at least `RoomInfo.minPlayers` seated) begins
-//    the game: the seated members, in seat order, are renumbered 0, 1, ... n - 1, as games expect.
-//    When the game is over the room is `ended`, until `reopen` (host only) drops the game and goes
-//    back to `waiting` with everyone in their seats.
+//    joining later is a spectator. `ready` lets a seated member say they are set; it only informs
+//    the others, leaving the seat or starting a game clears it. `start` (host only, at least
+//    `RoomInfo.minPlayers` seated, ready or not) begins the game: the seated members, in seat order,
+//    are renumbered 0, 1, ... n - 1, as games expect. When the game is over the room is `ended`,
+//    until `reopen` (host only) drops the game and goes back to `waiting` with everyone in their
+//    seats.
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
@@ -109,6 +111,8 @@ export type RoomMember = {
   name: string
   /** Null for a spectator */
   seat: SeatId | null
+  /** Says they are set to play; always false without a seat. Does not hold back `start` */
+  ready: boolean
   host: boolean
   /** The socket dropped; the member keeps its seat */
   online: boolean
@@ -142,7 +146,7 @@ export type PatchMessage = { t: 'patch'; rev: number; ops: PatchOp[] }
 
 /**
  * - `forbidden`: this member may not do that
- * - `not_seated`: an `action` from a spectator
+ * - `not_seated`: an `action` or `ready` from a spectator
  * - `no_game`: an `action` while no game is being played
  * - `chat_locked`: `chat` while the game says `chatLocked`
  * - `rate_limited`: too many messages; this one was not kept
@@ -223,6 +227,9 @@ export type ChatClientMessage = { t: 'chat'; text: string }
 /** Move to this seat, or with null out of any seat; only while the room is `waiting` */
 export type SitMessage = { t: 'sit'; seat: SeatId | null }
 
+/** Say you are set to play, or take it back; only with a seat, while the room is `waiting` */
+export type ReadyMessage = { t: 'ready'; ready: boolean }
+
 /** The host begins the game */
 export type StartMessage = { t: 'start' }
 
@@ -235,6 +242,7 @@ export type ClientMessage =
   | ActionMessage
   | ChatClientMessage
   | SitMessage
+  | ReadyMessage
   | StartMessage
   | ReopenMessage
 
@@ -360,6 +368,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
         (Number.isSafeInteger(value.seat) && (value.seat as number) >= 0)
         ? { t: 'sit', seat: value.seat as SeatId | null }
         : null
+    case 'ready':
+      return typeof value.ready === 'boolean' ? { t: 'ready', ready: value.ready } : null
     case 'start':
       return { t: 'start' }
     case 'reopen':

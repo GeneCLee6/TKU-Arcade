@@ -6,15 +6,15 @@ import { isRoomId } from '../../shared/room-id.ts'
 import { Button } from '../components/Button.tsx'
 import { NicknameForm } from '../components/NicknameForm.tsx'
 import { TopBar } from '../components/TopBar.tsx'
+import { WaitingRoom } from '../components/WaitingRoom.tsx'
 import type { Translate } from '../i18n/t.ts'
 import { useT } from '../i18n/useT.ts'
-import { joinRoom, type JoinEnd, type JoinedRoom } from '../lib/joinRoom.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
+import { useRoom } from '../lib/useRoom.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 
-// Room entry, deliberately small: B2 replaces it with useRoom() and the real waiting room. The key
-// gives each room its own state when the address changes without leaving this page.
+// The key gives each room its own state when the address changes without leaving this page
 export function RoomPage() {
   const { id = '' } = useParams()
   return (
@@ -68,29 +68,9 @@ interface RoomSessionProps {
   members: number
 }
 
-type Session =
-  | { phase: 'joining' }
-  | { phase: 'joined'; joined: JoinedRoom }
-  | { phase: 'ended'; end: JoinEnd }
-
 function RoomSession({ id, name, title, members }: RoomSessionProps) {
   const t = useT()
-  const [session, setSession] = useState<Session>({ phase: 'joining' })
-  const [attempt, setAttempt] = useState(0)
-
-  useEffect(
-    () =>
-      joinRoom(id, name, {
-        onWelcome: (joined) => setSession({ phase: 'joined', joined }),
-        onEnd: (end) => setSession({ phase: 'ended', end }),
-      }),
-    [id, name, attempt],
-  )
-
-  const retry = () => {
-    setSession({ phase: 'joining' })
-    setAttempt((count) => count + 1)
-  }
+  const { session, retry, sit, setReady, start } = useRoom(id, name)
 
   if (session.phase === 'ended') {
     switch (session.end) {
@@ -125,17 +105,26 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
     )
   }
 
-  // The summary was read before this person joined, so only `welcome` has the right count
-  const { joined } = session
+  // From here on the room itself says: the summary was read before this person joined
+  const { view, you } = session
   return (
     <>
-      <RoomHeading title={title} members={joined.members} />
-      <Lines role="status">
-        <p>{t('room.joinedAs', { name: joined.name })}</p>
-        <p>
-          {joined.seat === null ? t('room.spectating') : t('room.seated', { seat: joined.seat + 1 })}
-        </p>
-      </Lines>
+      <RoomHeading
+        title={gameTitle(t, view.room.gameId)}
+        members={Object.keys(view.members).length}
+      />
+      {view.room.status === 'waiting' ? (
+        <WaitingRoom
+          roomId={id}
+          view={view}
+          you={you}
+          onSit={sit}
+          onReady={setReady}
+          onStart={start}
+        />
+      ) : (
+        <p role="status">{t('room.inProgress')}</p>
+      )}
       <LobbyLink />
     </>
   )
@@ -207,11 +196,6 @@ const Title = styled.h1`
 
 const Muted = styled.p`
   color: ${color.muted};
-`
-
-const Lines = styled.div`
-  display: grid;
-  gap: ${space.xs}px;
 `
 
 const BackLink = styled(Link)`

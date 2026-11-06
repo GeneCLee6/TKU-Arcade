@@ -15,6 +15,9 @@ const light = {
   danger: '#B91C1C',
   warning: '#B45309',
   overlay: '#11182780',
+  // The same in both themes: a QR code only scans reliably dark on light
+  qrDark: '#000000',
+  qrLight: '#FFFFFF',
 }
 
 export type ColorName = keyof typeof light
@@ -31,6 +34,8 @@ const dark: Record<ColorName, string> = {
   danger: '#F87171',
   warning: '#FBBF24',
   overlay: '#00000099',
+  qrDark: '#000000',
+  qrLight: '#FFFFFF',
 }
 
 // Raw values: only GlobalStyle (to define the variables) and the contrast tests should read these

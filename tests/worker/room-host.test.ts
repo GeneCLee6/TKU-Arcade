@@ -249,6 +249,7 @@ describe('a room', () => {
       id: a.you,
       name: 'A',
       seat: 0,
+      ready: false,
       host: true,
       online: true,
     })
@@ -281,6 +282,37 @@ describe('a room', () => {
     const before = a.received.length
     a.send({ t: 'sit', seat: 1 })
     expect(a.received.length).toBe(before)
+  })
+
+  it('tells everyone who is ready, and keeps it through a move but not out of the seat', () => {
+    const world = room()
+    const a = world.join('A')
+    const b = world.join('B')
+    expect(a.view?.members[a.you].ready).toBe(false)
+
+    a.send({ t: 'ready', ready: true })
+    expect(b.view?.members[a.you].ready).toBe(true)
+    const before = a.received.length
+    a.send({ t: 'ready', ready: true })
+    expect(a.received.length).toBe(before)
+
+    b.send({ t: 'sit', seat: null })
+    a.send({ t: 'sit', seat: 1 })
+    expect(b.view?.members[a.you]).toMatchObject({ seat: 1, ready: true })
+
+    a.send({ t: 'sit', seat: null })
+    expect(b.view?.members[a.you]).toMatchObject({ seat: null, ready: false })
+    a.send({ t: 'ready', ready: true })
+    expect(a.errors).toEqual([{ t: 'error', code: 'not_seated' }])
+    expect(b.view?.members[a.you].ready).toBe(false)
+  })
+
+  it('does not hold back the start for someone not ready', () => {
+    const world = room()
+    const a = world.join('A')
+    world.join('B')
+    a.send({ t: 'start' })
+    expect(a.view?.room.status).toBe('playing')
   })
 
   it('answers a socket that has not joined, and a second join, with an error', () => {
@@ -455,6 +487,20 @@ describe('playing a game', () => {
     x.send({ t: 'start' })
     expect(o.view?.room.status).toBe('playing')
     expect(o.game.over).toBe(false)
+  })
+
+  it('clears ready when the game starts, so the next waiting room starts over', () => {
+    const world = room()
+    const a = world.join('A')
+    const b = world.join('B')
+    a.send({ t: 'ready', ready: true })
+    a.send({ t: 'start' })
+    expect(b.view?.room.status).toBe('playing')
+    expect(b.view?.members[a.you].ready).toBe(false)
+
+    a.send({ t: 'ready', ready: true })
+    expect(a.errors).toEqual([{ t: 'error', code: 'wrong_status' }])
+    expect(a.view).toEqual(a.fresh())
   })
 
   it('answers an illegal action to the sender alone, and changes nothing', () => {
@@ -838,6 +884,21 @@ describe('hibernation', () => {
 })
 
 describe('a restart', () => {
+  it('reads a member stored before `ready` existed as not ready', () => {
+    const world = room()
+    const a = world.join('A')
+    const { token, you } = a
+    const members = JSON.parse(world.store.get('members') as string) as Record<string, unknown>[]
+    world.store.set(
+      'members',
+      JSON.stringify(members.map(({ ready: _ready, ...member }) => member)),
+    )
+    world.restart()
+    const back = world.join('A', token)
+    expect(back.view?.members[you].ready).toBe(false)
+    expect(back.view).toEqual(back.fresh())
+  })
+
   it('keeps the game and everyone’s seat; a token brings a member back', () => {
     const { world, x, o } = started()
     x.send(place(4))
