@@ -11,6 +11,7 @@ import {
   STALE_AFTER_MS,
   SWEEP_INTERVAL_MS,
   parseClientMessage,
+  uniqueName,
   type ErrorCode,
   type RoomMember,
   type RoomStatus,
@@ -293,7 +294,11 @@ export class RoomHost {
     }
     const member: MemberRecord = {
       id: this.deps.newMemberId(),
-      name,
+      // Against offline members too: they keep their seat and can come back
+      name: uniqueName(
+        name,
+        [...this.members.values()].map((other) => other.name),
+      ),
       token: this.deps.newToken(),
       seat: this.lowestFreeSeat(),
       conn,

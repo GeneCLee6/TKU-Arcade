@@ -10,6 +10,7 @@ import {
   parseServerMessage,
   PROTOCOL_VERSION,
   roomSocketPath,
+  uniqueName,
   type RoomView,
   type ServerMessage,
 } from '../../shared/protocol.ts'
@@ -84,6 +85,97 @@ describe('normalizeName', () => {
     expect(normalizeName('淡'.repeat(MAX_NAME_CHARS + 1))).toBeNull()
     expect(normalizeName('')).toBeNull()
     expect(normalizeName(1)).toBeNull()
+  })
+
+  it('stores names in NFC, and measures them after that', () => {
+    expect(normalizeName('é')).toBe('é')
+    // Composes only once the control character between the two is gone
+    expect(normalizeName('e\u0000́')).toBe('é')
+    expect(normalizeName('é'.repeat(MAX_NAME_CHARS))).toBe('é'.repeat(MAX_NAME_CHARS))
+  })
+})
+
+describe('uniqueName', () => {
+  const codePoints = (name: string) => [...name].length
+
+  it('leaves a name nobody has alone', () => {
+    expect(uniqueName('Al', [])).toBe('Al')
+    expect(uniqueName('Al', ['Bo', 'Alan'])).toBe('Al')
+  })
+
+  it('takes the first free suffix', () => {
+    expect(uniqueName('Al', ['Al'])).toBe('Al (2)')
+    expect(uniqueName('Al', ['Al', 'Al (2)'])).toBe('Al (3)')
+    expect(uniqueName('Al', ['Al', 'Al (3)'])).toBe('Al (2)')
+  })
+
+  it('accepts any iterable', () => {
+    expect(uniqueName('Al', new Set(['Al']))).toBe('Al (2)')
+  })
+
+  it('counts names that only look different as the same, keeping the newcomer’s spelling', () => {
+    expect(uniqueName('AL', ['al'])).toBe('AL (2)')
+    expect(uniqueName('Ａｌ', ['Al'])).toBe('Ａｌ (2)')
+    expect(uniqueName('A​l', ['Al'])).toBe('A​l (2)')
+    expect(uniqueName('Al', ['﻿A­l‍'])).toBe('Al (2)')
+    expect(uniqueName('STRASSE', ['straße'])).toBe('STRASSE (2)')
+  })
+
+  it('sees through a format character that keeps two others from composing', () => {
+    expect(uniqueName('e‍́', ['é'])).toBe('e‍́ (2)')
+  })
+
+  it('sees through a format character that only hides extra whitespace', () => {
+    expect(uniqueName('a ​ b', ['a b'])).toBe('a ​ b (2)')
+    expect(uniqueName('​ Al', ['Al'])).toBe('​ Al (2)')
+  })
+
+  it('counts the suffix as part of the name', () => {
+    // Somebody really is called that
+    expect(uniqueName('Al', ['Al (2)'])).toBe('Al')
+    expect(uniqueName('Al (2)', ['Al (2)'])).toBe('Al (2) (2)')
+    expect(uniqueName('Al', ['Al', 'AL （2）'])).toBe('Al (3)')
+  })
+
+  it('shortens the base to fit a 16-character name', () => {
+    const full = 'abcdefghijklmnop'
+    expect(codePoints(full)).toBe(MAX_NAME_CHARS)
+    expect(uniqueName(full, [])).toBe(full)
+    expect(uniqueName(full, [full])).toBe('abcdefghijkl (2)')
+    expect(uniqueName(full, [full, 'abcdefghijkl (2)'])).toBe('abcdefghijkl (3)')
+  })
+
+  it('shortens further when the suffix grows', () => {
+    const full = 'abcdefghijklmnop'
+    const taken = [full]
+    for (let n = 2; n <= 9; n++) taken.push(`abcdefghijkl (${n})`)
+    const name = uniqueName(full, taken)
+    expect(name).toBe('abcdefghijk (10)')
+    expect(codePoints(name)).toBe(MAX_NAME_CHARS)
+  })
+
+  it('leaves no whitespace at the cut', () => {
+    const full = 'abcdefghijk mnop'
+    expect(uniqueName(full, [full])).toBe('abcdefghijk (2)')
+  })
+
+  it('never splits an emoji', () => {
+    // The cut falls right after the emoji, then right before it
+    const kept = `${'a'.repeat(11)}😀bbbb`
+    expect(uniqueName(kept, [kept])).toBe(`${'a'.repeat(11)}😀 (2)`)
+    const dropped = `${'a'.repeat(12)}😀bbb`
+    expect(uniqueName(dropped, [dropped])).toBe(`${'a'.repeat(12)} (2)`)
+
+    const emoji = '😀'.repeat(MAX_NAME_CHARS)
+    const name = uniqueName(emoji, [emoji])
+    expect(name).toBe(`${'😀'.repeat(12)} (2)`)
+    expect(codePoints(name)).toBe(MAX_NAME_CHARS)
+  })
+
+  it('gives back something normalizeName keeps as it is', () => {
+    const full = 'abcdefghijk mnop'
+    const name = uniqueName(full, [full])
+    expect(normalizeName(name)).toBe(name)
   })
 })
 
