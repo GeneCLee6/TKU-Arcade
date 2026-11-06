@@ -57,7 +57,7 @@ depends_on: [E2, E7]
 
 ### M0
 
-- [ ] `e1-t01` `shared/room-id.ts`、`RoomDO` 骨架（成員、座位、房主、狀態機）、`POST /api/rooms`、`GET /api/rooms/:id` · AC-1.3 · M · ← e12-t01
+- [x] `e1-t01` `shared/room-id.ts`、`RoomDO` 骨架（成員、座位、房主、狀態機）、`POST /api/rooms`、`GET /api/rooms/:id` · AC-1.3 · M · ← e12-t01 · #4
 - [ ] `e1-t02` 大廳首頁：遊戲卡片（讀 `shared/games/index.ts`）、開新房流程、加入連結輸入 · AC-1.1 · M · ← e1-t01, e7-t01
 - [ ] `e1-t03` 暱稱輸入、localStorage、去重、`join` 訊息 · AC-1.2 · S · ← e1-t01
 - [ ] `e1-t04` 等待室：成員列、座位、準備、複製連結與 QR、開始按鈕條件 · AC-1.3 · M · ← e1-t03

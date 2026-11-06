@@ -29,7 +29,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | [x] A1（#1） | `e12-t01` `e12-t02` | repo 骨架（Vite／React／TS、worker、shared、wrangler：DO＋D1＋R2、Vitest、oxlint、CLAUDE.md、RULES.md）、CI 與部署（含 PR 預覽）、`DEPLOY.md` | — |
 | [x] A2（#3） | `e7-t01` `e7-t02` `e12-t03` | 設計 token、基礎元件、深淺色；i18n `t()`、`en.ts`／`zh-TW.ts`、語言切換；JS 預算腳本 | A1 |
 | [x] A3（#2） | `e2-t01` `e2-t02` `e2-t07` | `GameModule` 介面、`OptionsSchema`、seedable Rng、井字棋範本；協定 v1 與 patch；測試 harness 與 `npm run play` | A1 |
-| [ ] A4 | `e1-t01` `e2-t03` | `RoomDO` 骨架（成員、座位、房主、狀態機）、`POST/GET /api/rooms`；執行引擎（action→reduce→per-seat view diff、storage、hibernation 測試） | A3 |
+| [x] A4（#4） | `e1-t01` `e2-t03` | `RoomDO` 骨架（成員、座位、房主、狀態機）、`POST/GET /api/rooms`；執行引擎（action→reduce→per-seat view diff、storage、hibernation 測試） | A3 |
 
 ## Phase B · M0 大廳與房間
 
