@@ -94,7 +94,7 @@
 1. 第 2、3 行要由看過原作實物的人判斷：牌局的「三輪、籌碼排序」是玩法，可以學；畫面與文字有沒有太像，查核看不出來。
 2. 主題皮膚用了分析文件 §2.2 建議的潛水隊、登山隊；預設是素面牌桌，**沒有**用原作的主題。
 3. `README.md` 的遊戲表仍然寫著原作名稱（升官圖那一節「給擁有者」第 1 點），M1 上線前要定案。
-4. 簽名之後，拿掉 `shared/games/silent-table/rules.ts` 的 `unlisted`，改 `tests/games/silent-table.test.ts` 第一個測試，大廳就會出現。
+4. 簽名之後，拿掉 `shared/games/silent-table/info.ts` 的 `unlisted`，改 `tests/games/silent-table.test.ts` 第一個測試，大廳就會出現。
 
 ### 其他遊戲
 

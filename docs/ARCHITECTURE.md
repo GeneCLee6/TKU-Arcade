@@ -33,7 +33,8 @@ shared/                 前後端共用、純 TS、可在 Node 測
   chat.ts               聊天限制（移植 LongTalk）
   games/
     types.ts            GameModule / RealtimeModule / OptionsSchema / Rng
-    index.ts            遊戲登記表（id、meta、lazy 畫面）
+    catalog.ts          瀏覽器用的遊戲清單（id、meta、options、首屏字串），不含規則
+    index.ts            Worker 與腳本用的登記表（含規則），瀏覽器不得 import
     tictactoe/          範本（測試用）
     promotion/          升官圖：board.ts、rules.ts、i18n.ts、rules.en.md、rules.zh-TW.md
     silent-table/         默契牌局：rules.ts、types.ts、i18n.ts（等待室要的字串）、i18n.screen.ts（隨畫面載入）

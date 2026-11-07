@@ -1,5 +1,5 @@
 // The contract between a game and the platform (docs/ARCHITECTURE.md §3). To add a game, write a
-// `GameModule` in shared/games/<id>/, add it to shared/games/index.ts, and play it with
+// `GameModule` in shared/games/<id>/, add it to shared/games/index.ts and its info to catalog.ts, and play it with
 // tests/games/harness.ts; shared/games/tictactoe/ is the template to copy.
 //
 // How a module is run (shared/games/match.ts is that code; RoomDO, replays and the harness share
@@ -274,6 +274,16 @@ export interface GameModule<
   /** Whether the room's chat is closed in this state; leaving it out means never */
   chatLocked?(state: S): boolean
 }
+
+/** A game as the browser knows it before anyone plays: no rules (shared/games/catalog.ts) */
+export type GameInfo<O extends OptionValues = OptionValues> = {
+  id: string
+  meta: GameMeta
+  options: OptionsSchema<O>
+}
+
+/** Any game's info, with its own option types forgotten */
+export type AnyGameInfo = GameInfo<OptionValues>
 
 /** Any module, with its own types forgotten: what the registry and the room hold */
 export type AnyGameModule = GameModule<JsonValue, JsonValue, JsonValue, OptionValues>

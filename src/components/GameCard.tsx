@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import type { AnyGameModule } from '../../shared/games/types.ts'
+import type { AnyGameInfo } from '../../shared/games/types.ts'
 import { useT } from '../i18n/useT.ts'
 import { hasRules } from '../lib/rulesDoc.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
@@ -8,7 +8,7 @@ import { Button } from './Button.tsx'
 import { Card } from './Card.tsx'
 
 interface GameCardProps {
-  game: AnyGameModule
+  game: AnyGameInfo
   /** A room is being created: a second click would make a second room */
   disabled: boolean
   onNewRoom: () => void

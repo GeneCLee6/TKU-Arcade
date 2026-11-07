@@ -1,6 +1,7 @@
 // Promotion (e3-t02, e3-t03): every seat starts as a commoner and takes turns rolling; the cell they
 // stand on says where each result leads (board.ts). The first to reach the end cell wins at once;
 // if nobody has after `turnLimit` rounds, the game ends and seniority decides.
+import { DEFAULT_TURN_LIMIT, promotionInfo } from './info.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import { END_CELL, FACES, getCell, START_CELL, type Face } from './board.ts'
 import type {
@@ -12,7 +13,7 @@ import type {
 } from './types.ts'
 
 /** Rarely reached (see tests/games/promotion.test.ts): it caps a long game, it does not end most */
-export const DEFAULT_TURN_LIMIT = 60
+export { DEFAULT_TURN_LIMIT }
 
 /**
  * Four six-sided dice to one result: how many of them show a red face (1 or 4, the faces Chinese
@@ -73,28 +74,7 @@ export const promotion: GameModule<
   PromotionView,
   PromotionOptions
 > = {
-  id: 'promotion',
-  // Every turn is one roll, with nothing to decide, so playing it for someone is fair
-  meta: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.promotion', proxyTurns: true },
-
-  options: {
-    dice: {
-      kind: 'select',
-      labelKey: 'games.promotion.option.dice',
-      choices: [
-        { value: 'four-sided', labelKey: 'games.promotion.option.dice.fourSided' },
-        { value: 'six-sided', labelKey: 'games.promotion.option.dice.sixSided' },
-      ],
-      default: 'four-sided',
-    },
-    turnLimit: {
-      kind: 'int',
-      labelKey: 'games.promotion.option.turnLimit',
-      min: 10,
-      max: 200,
-      default: DEFAULT_TURN_LIMIT,
-    },
-  },
+  ...promotionInfo,
 
   init(seats, options, rng) {
     const first = rng.pick(seats).id

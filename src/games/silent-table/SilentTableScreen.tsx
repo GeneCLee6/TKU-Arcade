@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { silentTableScreenMessages } from '../../../shared/games/silent-table/i18n.screen.ts'
-import { ROUNDS } from '../../../shared/games/silent-table/rules.ts'
+import { ROUNDS } from '../../../shared/games/silent-table/info.ts'
 import type {
   SilentTableAction,
   SilentTablePlayerView,

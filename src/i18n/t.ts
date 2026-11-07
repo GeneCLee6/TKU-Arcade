@@ -1,4 +1,4 @@
-import { GAME_MESSAGES } from '../../shared/games/index.ts'
+import { GAME_MESSAGES } from '../../shared/games/catalog.ts'
 import { readStored, writeStored } from '../lib/storage.ts'
 import { en, type MessageKey } from './en.ts'
 import { zhTW } from './zh-TW.ts'

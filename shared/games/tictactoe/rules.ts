@@ -2,6 +2,7 @@
 // purpose and also the framework's test subject. It has no secrets and no clock: see `view` for
 // where a game with secrets cuts them, and TimerSpec (shared/games/types.ts) for a game with a
 // clock.
+import { ticTacToeInfo } from './info.ts'
 import { gameError, type GameModule, type SeatId } from '../types.ts'
 import type { TicTacToeAction, TicTacToeOptions, TicTacToeState, TicTacToeView } from './types.ts'
 
@@ -38,20 +39,7 @@ export const ticTacToe: GameModule<
   TicTacToeView,
   TicTacToeOptions
 > = {
-  id: 'tictactoe',
-  meta: { minPlayers: 2, maxPlayers: 2, minutes: 2, i18nKey: 'games.tictactoe', unlisted: true },
-
-  options: {
-    firstMove: {
-      kind: 'select',
-      labelKey: 'games.tictactoe.option.firstMove',
-      choices: [
-        { value: 'random', labelKey: 'games.tictactoe.option.firstMove.random' },
-        { value: 'lowestSeat', labelKey: 'games.tictactoe.option.firstMove.lowestSeat' },
-      ],
-      default: 'random',
-    },
-  },
+  ...ticTacToeInfo,
 
   init(seats, options, rng) {
     return {
