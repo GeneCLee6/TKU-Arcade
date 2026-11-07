@@ -2,6 +2,7 @@
 // through the test harness, as a smoke test. Prints the seed, so a failure can be played again.
 import { parseArgs } from 'node:util'
 import { GAME_IDS, GAME_MESSAGES, getGame } from '../shared/games/index.ts'
+import { SCREEN_MESSAGES } from '../shared/games/screenMessages.ts'
 import type { TextRef } from '../shared/games/types.ts'
 import { HarnessError, playRandom } from '../tests/games/harness.ts'
 
@@ -21,7 +22,7 @@ function intArg(name: string, raw: string | undefined): number | undefined {
 }
 
 function text(ref: TextRef): string {
-  const template = GAME_MESSAGES.en[ref.key] ?? ref.key
+  const template = GAME_MESSAGES.en[ref.key] ?? SCREEN_MESSAGES.en[ref.key] ?? ref.key
   return template.replace(/\{(\w+)\}/g, (_, name: string) => String(ref.params?.[name] ?? ''))
 }
 

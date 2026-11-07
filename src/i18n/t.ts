@@ -1,4 +1,5 @@
 import { GAME_MESSAGES } from '../../shared/games/index.ts'
+import type { GameMessages } from '../../shared/games/types.ts'
 import { readStored, writeStored } from '../lib/storage.ts'
 import { en, type MessageKey } from './en.ts'
 import { zhTW } from './zh-TW.ts'
@@ -13,6 +14,15 @@ export type Translate = (key: TextKey, params?: MessageParams) => string
 const catalogs: Record<Language, Partial<Record<string, string>>> = {
   en: { ...en, ...GAME_MESSAGES.en },
   'zh-TW': { ...zhTW, ...GAME_MESSAGES['zh-TW'] },
+}
+
+/**
+ * Adds the strings only a game's screen needs: its lazy chunk calls this as it loads, so that they stay
+ * out of everyone's first load (docs/ARCHITECTURE.md). A screen renders only after that call.
+ */
+export function addGameMessages(messages: GameMessages): void {
+  Object.assign(catalogs.en, messages.en)
+  Object.assign(catalogs['zh-TW'], messages['zh-TW'])
 }
 
 const STORAGE_KEY = 'tku-arcade.language'

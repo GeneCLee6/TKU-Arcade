@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url'
 const SITE_EN = 'src/i18n/en.ts'
 const SITE_ZH = 'src/i18n/zh-TW.ts'
 const GAMES = 'shared/games/index.ts'
+const GAME_SCREENS = 'shared/games/screenMessages.ts'
 const SOURCE_ROOT = 'src'
 
 const USER_VISIBLE_ATTRIBUTES = new Set(['aria-label', 'title', 'placeholder', 'alt', 'label'])
@@ -313,6 +314,15 @@ const gamesZh = gameMessages['zh-TW'] ?? {}
 
 checkParity(siteEn, SITE_EN, siteZh, SITE_ZH)
 checkParity(gamesEn, `${GAMES} (en)`, gamesZh, `${GAMES} (zh-TW)`)
+if (existsSync(GAME_SCREENS)) {
+  const screenMessages = await load(GAME_SCREENS, 'SCREEN_MESSAGES')
+  checkParity(
+    screenMessages.en ?? {},
+    `${GAME_SCREENS} (en)`,
+    screenMessages['zh-TW'] ?? {},
+    `${GAME_SCREENS} (zh-TW)`,
+  )
+}
 for (const [catalog, file] of [[siteEn, SITE_EN], [siteZh, SITE_ZH]]) {
   for (const key of Object.keys(catalog)) {
     if (key.startsWith('games.')) problems.push(`${file}: '${key}': games.* belongs to game modules`)

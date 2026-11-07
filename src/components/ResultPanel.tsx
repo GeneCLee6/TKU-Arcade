@@ -19,6 +19,8 @@ export interface ResultPanelProps {
   headline?: ReactNode
   /** What the game says of a seat's standing. Without it a game's score, if it keeps one, shows */
   detail?(standing: Standing): ReactNode
+  /** Everyone shares the outcome, as in a co-operative game: "1st" for all of them would say nothing */
+  unranked?: boolean
   onRematch(): void
   onReopen(): void
   onDissolve(): void
@@ -31,6 +33,7 @@ export function ResultPanel({
   result,
   headline,
   detail,
+  unranked,
   onRematch,
   onReopen,
   onDissolve,
@@ -67,8 +70,8 @@ export function ResultPanel({
             detail?.(standing) ??
             (standing.score !== null ? t('room.result.score', { score: standing.score }) : null)
           return (
-            <StandingRow key={standing.seat} $top={standing.rank === 1}>
-              <Place>{t('room.result.place', { rank: standing.rank })}</Place>
+            <StandingRow key={standing.seat} $top={!unranked && standing.rank === 1}>
+              {!unranked && <Place>{t('room.result.place', { rank: standing.rank })}</Place>}
               <Avatar name={name} tint={seatColor(standing.seat)} />
               <Who>
                 <Name>

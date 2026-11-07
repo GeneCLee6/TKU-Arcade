@@ -41,6 +41,42 @@ export async function startGame(host: Page, guest: Page): Promise<void> {
   await expect(host.locator('[data-cell]').first()).toBeVisible()
 }
 
+/** Silent Table is not in the lobby until the owner signs off: its rooms come from the API */
+export async function createSilentTableRoom(page: Page, nickname: string): Promise<void> {
+  const response = await page.request.post('/api/rooms', { data: { gameId: 'silent-table' } })
+  const { id } = (await response.json()) as { id: string }
+  await joinRoom(page, `/r/${id}`, nickname)
+}
+
+/** Three of the same room's seats, for Silent Table's minimum game, up to the host pressing start */
+export async function silentTablePlayers(
+  browser: Browser,
+  names: readonly string[],
+  options: BrowserContextOptions = {},
+): Promise<Page[]> {
+  const people: Page[] = []
+  for (const name of names) {
+    const person = await newPerson(browser, options)
+    if (people.length === 0) await createSilentTableRoom(person, name)
+    else await joinRoom(person, people[0].url(), name)
+    people.push(person)
+  }
+  return people
+}
+
+/** Everyone takes the first chip they can and says ready: one round of Silent Table */
+export async function playSilentRound(people: readonly Page[]): Promise<void> {
+  for (const person of people) {
+    await person.getByRole('button', { name: /^Take chip \d+$/ }).first().click()
+    await expect(person.getByRole('button', { name: /you hold it$/ })).toBeVisible()
+  }
+  for (const person of people) {
+    const ready = person.getByRole('button', { name: 'Ready', exact: true })
+    await expect(ready).toHaveAttribute('aria-disabled', 'false')
+    await ready.click()
+  }
+}
+
 /**
  * A whole game of two, the shortest there is, up to the result on the host's screen. Give both
  * people `reducedMotion: 'reduce'`, or it takes as long as a game does.

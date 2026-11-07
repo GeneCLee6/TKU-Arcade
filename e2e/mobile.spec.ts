@@ -1,5 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createRoom, joinRoom, newPerson, playToResult, startGame } from './helpers.ts'
+import {
+  createRoom,
+  joinRoom,
+  newPerson,
+  playSilentRound,
+  playToResult,
+  silentTablePlayers,
+  startGame,
+} from './helpers.ts'
 
 // e7-t05 (AC-7.4): the lobby and the waiting room on a phone held upright
 const PHONE = { width: 375, height: 667 }
@@ -173,5 +181,41 @@ test.describe('the game at 375 px', () => {
     const back = await result.getByRole('link', { name: 'Back to the lobby' }).boundingBox()
     expect(back?.height).toBeGreaterThanOrEqual(44)
     await guest.context().close()
+  })
+})
+
+test.describe('Silent Table at 375 px', () => {
+  test('six seats fit, with finger-sized chips and the chips on the first screen', async ({ browser }) => {
+    test.setTimeout(90_000)
+    const names = ['W'.repeat(16), 'M'.repeat(16), 'Cy', 'Di', 'Ed', 'Flo']
+    const people = await silentTablePlayers(browser, names, { ...device, reducedMotion: 'reduce' })
+    const [host] = people
+    await host.getByRole('button', { name: 'Start game' }).click()
+    await expect(host.getByRole('group', { name: 'Rank chips' })).toBeVisible()
+
+    await expectNoSidewaysScroll(host)
+    await expectFingerSizedControls(host, [/^Take chip 1$/, /^Take chip 6$/, /^Ready$/, /^Members$/, /^Chat$/])
+    const six = await host.getByRole('button', { name: 'Take chip 6' }).boundingBox()
+    expect((six?.x ?? 0) + (six?.width ?? Infinity)).toBeLessThanOrEqual(PHONE.width)
+    expect((six?.y ?? 0) + (six?.height ?? Infinity)).toBeLessThanOrEqual(PHONE.height)
+
+    await playSilentRound(people)
+    await expect(host.getByText('Round 2/3')).toBeVisible()
+    await expectNoSidewaysScroll(host)
+    for (const person of people) await person.context().close()
+  })
+
+  test('the reveal fits too', async ({ browser }) => {
+    test.setTimeout(90_000)
+    const people = await silentTablePlayers(browser, ['W'.repeat(16), 'Bob', 'Cy'], {
+      ...device,
+      reducedMotion: 'reduce',
+    })
+    await people[0].getByRole('button', { name: 'Start game' }).click()
+    for (let round = 0; round < 3; round++) await playSilentRound(people)
+    await expect(people[0].getByRole('region', { name: 'The cards' })).toBeVisible()
+    await expectNoSidewaysScroll(people[0])
+    await expectFingerSizedControls(people[0], [/^Next level$/])
+    for (const person of people) await person.context().close()
   })
 })

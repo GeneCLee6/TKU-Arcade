@@ -22,6 +22,7 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
 
 - 大廳：頂欄（標誌、語言、登入）＋ 遊戲卡片網格（桌機三欄、手機單欄）＋ 公開房列表。
 - 房間：頂欄（遊戲名、房號、複製連結、語言）＋ 主區（遊戲畫面）＋ 右欄（座位、聊天；手機變抽屜）。寬度 900px 以下算手機版面（`COMPACT_QUERY`）：等不得的東西不放抽屜（倒數、卡住的座位、遊戲結束後的房主動作），底部固定一條 dock（輪到誰、擲骰、開抽屜）。
+- 默契牌局：牌桌（`felt*` token，深淺色相同）依序放關卡進度、禁聊提醒、公共牌、自己的底牌、籌碼軌，375 × 667 的第一個畫面就看得到這些；其他人的座位在牌桌下面，手機一欄。籌碼軌一條線排 1 到 n，同時是目前的排列和拿籌碼的按鈕。揭牌由最弱的手牌排起。
 - 升官圖圖版：直向手機 7 欄 × 12 列，由外往內繞，三圈正好 78 格，中央 1 × 6 留給「榮歸」；寬螢幕同一個螺旋橫放成 12 × 7。英文格子只放音譯，括號意譯在點格子後的說明。
 - 卡丁車：全螢幕 canvas，HUD 疊在上面（速度、加速條、圈數、分段、小地圖、道具欄），Esc 開選單。
 
@@ -39,6 +40,7 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
    | Room / Host / Seat / Spectator | 房間／房主／座位／旁觀者 |
    | Roll | 擲骰 |
    | Rank chip | 順位籌碼 |
+   | Hole cards / Shared cards / Reveal | 底牌／公共牌／揭牌 |
    | Clue / Dial / Target | 提示／刻度／目標 |
    | Judge / Honest reader / Bluffer | 裁判／老實人／瞎掰人 |
    | Drift / Boost gauge / Boost | 甩尾／加速條／噴射 |
@@ -60,6 +62,6 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
 
 ## 7. 視覺資產
 
-- 所有圖示、插圖、模型、音效都在 `docs/ASSETS.md` 登記（來源、授權、作者）。例外：程式畫的 SVG（升官圖圖版、陀螺、骰子）與 `src/lib/sound.ts` 用 WebAudio 合成的音效都是這個 repo 自己的程式碼，沒有資產檔，不用登記。
+- 所有圖示、插圖、模型、音效都在 `docs/ASSETS.md` 登記（來源、授權、作者）。例外：程式畫的 SVG（升官圖圖版、陀螺、骰子，默契牌局的花色、牌背、皮膚線條）與 `src/lib/sound.ts` 用 WebAudio 合成的音效都是這個 repo 自己的程式碼，沒有資產檔，不用登記。
 - 風格一致：低多邊形卡通（3D）、簡單幾何插圖（2D）。
 - 不出現任何原作的角色、標誌、配色組合。

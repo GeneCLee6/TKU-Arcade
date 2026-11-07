@@ -1,6 +1,9 @@
 import type { Card, HandCategory } from '../../poker/hand.ts'
 import type { SeatId } from '../types.ts'
 
+/** How the table looks and nothing else: a skin never changes a rule */
+export type SilentTableSkin = 'plain' | 'diving' | 'climbing'
+
 export type SilentTableOptions = {
   /** How many levels in a row the table must clear to win */
   levelsToWin: number
@@ -10,6 +13,9 @@ export type SilentTableOptions = {
   allowTakeFromPlayers: boolean
   /** Whether spectators see every hole card during a level, not just at the reveal */
   spectatorsSeeAll: boolean
+  /** How long a round may last; 0 for no clock */
+  roundSeconds: number
+  skin: SilentTableSkin
 }
 
 export type SilentTablePlayer = {
@@ -76,6 +82,8 @@ export type SilentTableState = {
   failureLimit: number
   allowTakeFromPlayers: boolean
   spectatorsSeeAll: boolean
+  roundSeconds: number
+  skin: SilentTableSkin
   /** The latest reveal while `phase` is `reveal` or `over`; otherwise null */
   reveal: Reveal | null
   ending: SilentTableEnding | null
@@ -90,6 +98,8 @@ export type SilentTableAction =
   | { type: 'ready' }
   /** From the room only (`skipAction`): decide for a seat whose player is gone */
   | { type: 'pass'; seat: SeatId }
+  /** From the room only (`timers`): the round's time is up, so every seat settles as it stands */
+  | { type: 'timeUp' }
 
 export type SilentTablePlayerView = Omit<SilentTablePlayer, 'hole'> & {
   /** Null for a card this viewer may not see */

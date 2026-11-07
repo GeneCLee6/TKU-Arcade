@@ -100,6 +100,17 @@ describe('check-i18n catalogs', () => {
     expect(output).toContain(`${SITE_EN}: 'games.x.title'`)
   })
 
+  it('applies the parity check to the strings that load with a screen', () => {
+    const { status, output } = run({
+      'shared/games/screenMessages.ts': `export const SCREEN_MESSAGES = {
+        en: { 'games.x.ui.roll': 'Roll' },
+        'zh-TW': {},
+      }`,
+    })
+    expect(status).toBe(1)
+    expect(output).toContain(`missing key 'games.x.ui.roll'`)
+  })
+
   it('applies every parity check to GAME_MESSAGES', () => {
     const { status, output } = run(
       games(
