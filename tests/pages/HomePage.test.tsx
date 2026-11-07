@@ -112,7 +112,11 @@ describe('lobby cards', () => {
   it('prints one number when a game takes exactly one player count', () => {
     const game = getGame('promotion')!
     const fixed = { ...game, meta: { ...game.meta, minPlayers: 4, maxPlayers: 4 } }
-    render(<GameCard game={fixed} disabled={false} onNewRoom={vi.fn()} />)
+    render(
+      <MemoryRouter>
+        <GameCard game={fixed} disabled={false} onNewRoom={vi.fn()} />
+      </MemoryRouter>,
+    )
     expect(screen.getByText('4 players')).toBeInTheDocument()
     expect(screen.queryByText(/4–4/)).not.toBeInTheDocument()
   })

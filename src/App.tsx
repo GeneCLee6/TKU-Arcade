@@ -11,12 +11,16 @@ const RoomPage = lazy(() =>
   import('./pages/RoomPage.tsx').then(({ RoomPage }) => ({ default: RoomPage })),
 )
 
+const RulesPage = lazy(() =>
+  import('./pages/RulesPage.tsx').then(({ RulesPage }) => ({ default: RulesPage })),
+)
+
 function RouteLoading() {
   const t = useT()
   return <p role="status">{t('common.loading')}</p>
 }
 
-// Routes: the lobby, a room and anything else. The boundary also catches a lazy page that cannot load
+// Routes: the lobby, a room, a game's rules and anything else. The boundary also catches a lazy page that cannot load
 function AppRoutes() {
   const { pathname } = useLocation()
   return (
@@ -25,6 +29,7 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/r/:id" element={<RoomPage />} />
+          <Route path="/games/:id/rules" element={<RulesPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>

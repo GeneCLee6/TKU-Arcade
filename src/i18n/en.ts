@@ -163,6 +163,12 @@ export const en = {
   'room.panel.members': 'Members',
   'room.panel.title': 'Room',
   'room.turnBadge': 'Up now',
+  'room.result.heading': 'Results',
+  'room.result.place': '#{rank}',
+  'room.result.score': 'Score: {score}',
+  'rules.howToPlay': 'How to play',
+  'rules.loadFailed': "Couldn't load the rules. Check your connection and try again.",
+  'rules.pageTitle': 'How to play {game}',
 } as const
 
 export type MessageKey = keyof typeof en

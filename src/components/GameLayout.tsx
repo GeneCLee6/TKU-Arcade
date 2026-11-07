@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import styled from 'styled-components'
 import type { ChatMessage } from '../../shared/chat.ts'
+import type { Standing } from '../../shared/games/types.ts'
 import type { JsonValue } from '../../shared/patch.ts'
 import type { RoomMember } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
@@ -11,6 +12,7 @@ import { Button } from './Button.tsx'
 import { ChatPanel, type ChatPanelProps } from './ChatPanel.tsx'
 import { Countdown } from './Countdown.tsx'
 import { Drawer } from './Drawer.tsx'
+import { ResultPanel } from './ResultPanel.tsx'
 import { CoverSection, RoomInPlay, type RoomInPlayProps } from './RoomInPlay.tsx'
 import { seatedMembers } from './roomParts.ts'
 import { Tabs } from './Tabs.tsx'
@@ -20,7 +22,7 @@ export type RoomChat = Pick<ChatPanelProps, 'messages' | 'locked' | 'onSend' | '
 /** Everything of the room that the game's screen does not draw itself */
 export type RoomParts = Omit<
   RoomInPlayProps,
-  'seatDetail' | 'turnSeat' | 'seatTint' | 'urgentElsewhere' | 'hidePlaying'
+  'seatDetail' | 'turnSeat' | 'seatTint' | 'urgentElsewhere' | 'hidePlaying' | 'resultElsewhere'
 > & {
   chat: RoomChat
   act(action: JsonValue): void
@@ -36,6 +38,11 @@ export interface GameLayoutProps {
   turnSeat?: number | null
   /** Members' avatars take their seat's colour, as the pieces do */
   seatTint?: boolean
+  /** See `ResultPanel` */
+  resultHeadline?: ReactNode
+  resultDetail?(standing: Standing): ReactNode
+  /** The game's screen is still playing out the last move: the result would give away its end */
+  resultHeld?: boolean
 }
 
 type PanelId = 'players' | 'chat'
@@ -53,22 +60,47 @@ export function GameLayout({
   seatDetail,
   turnSeat,
   seatTint,
+  resultHeadline,
+  resultDetail,
+  resultHeld,
 }: GameLayoutProps) {
   const compact = useCompact()
   const hasGame = children !== undefined
   const status = room.view.room.status
-  const panelProps = { ...room, seatDetail, turnSeat, seatTint, hidePlaying: hasGame }
+  const result = status === 'ended' ? (room.view.game?.result ?? null) : null
+  const panelProps = {
+    ...room,
+    seatDetail,
+    turnSeat,
+    seatTint,
+    hidePlaying: hasGame,
+    resultElsewhere: result !== null,
+  }
+  const resultPanel = result && !resultHeld && (
+    <ResultPanel
+      view={room.view}
+      you={room.you}
+      result={result}
+      headline={resultHeadline}
+      detail={resultDetail}
+      onRematch={room.onRematch}
+      onReopen={room.onReopen}
+      onDissolve={room.onDissolve}
+    />
+  )
 
   if (!compact) {
     return (
       <Wide data-wide-room={hasGame ? '' : undefined} $columns={hasGame}>
         {hasGame && (
           <GameColumn>
+            {resultPanel}
             {children}
             <Dock $stuck>{dock}</Dock>
           </GameColumn>
         )}
         <SideColumn>
+          {!hasGame && resultPanel}
           <RoomInPlay {...panelProps} />
           <ChatPanel {...room.chat} you={room.you} />
         </SideColumn>
@@ -81,6 +113,7 @@ export function GameLayout({
   return (
     <Narrow data-wide-room="">
       {!panelInline && <UrgentParts room={room} />}
+      {resultPanel}
       {children}
       {panelInline && <RoomInPlay {...panelProps} />}
       <PhoneDock

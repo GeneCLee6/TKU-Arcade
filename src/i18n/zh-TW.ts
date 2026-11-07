@@ -161,4 +161,10 @@ export const zhTW: Messages = {
   'room.panel.members': '成員',
   'room.panel.title': '房間',
   'room.turnBadge': '輪到',
+  'room.result.heading': '結果',
+  'room.result.place': '第 {rank} 名',
+  'room.result.score': '分數：{score}',
+  'rules.howToPlay': '怎麼玩',
+  'rules.loadFailed': '規則載入失敗，請確認網路後再試一次。',
+  'rules.pageTitle': '{game}怎麼玩',
 }
