@@ -6,8 +6,10 @@ import {
   newPerson,
   playSilentRound,
   playToResult,
+  setIntOption,
   silentTablePlayers,
   startGame,
+  takeFirstChip,
 } from './helpers.ts'
 
 // e7-t06 (AC-7.6): the skeleton. A new screen gets a line here. Dev-only: nothing of axe reaches the
@@ -106,22 +108,18 @@ for (const scheme of ['light', 'dark'] as const) {
         reducedMotion: 'reduce',
       })
       const [host] = people
-      const failures = host.getByRole('spinbutton', { name: 'Failed levels that end the game' })
-      await failures.fill('1')
-      await failures.press('Enter')
-      const wins = host.getByRole('spinbutton', { name: 'Levels in a row to win' })
-      await wins.fill('1')
-      await wins.press('Enter')
+      await setIntOption(host, people[1], 'Failed levels that end the game', '1')
+      await setIntOption(host, people[1], 'Levels in a row to win', '1')
       await host.getByRole('button', { name: 'Start game' }).click()
       await expect(host.getByRole('group', { name: 'Rank chips' })).toBeVisible()
       await expectNoSeriousProblems(host)
 
-      await host.getByRole('button', { name: /^Take chip \d+$/ }).first().click()
+      await takeFirstChip(host)
       await expect(people[1].getByRole('button', { name: /^Take chip \d+ from Ann$/ })).toBeVisible()
       await expectNoSeriousProblems(people[1])
 
-      await people[1].getByRole('button', { name: /^Take chip \d+$/ }).first().click()
-      await people[2].getByRole('button', { name: /^Take chip \d+$/ }).first().click()
+      await takeFirstChip(people[1])
+      await takeFirstChip(people[2])
       for (const person of people) await person.getByRole('button', { name: 'Ready', exact: true }).click()
       await expect(host.getByText('Round 2/3')).toBeVisible()
       await playSilentRound(people)

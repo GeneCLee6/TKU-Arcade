@@ -1,17 +1,18 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createSilentTableRoom, newPerson, playSilentRound, silentTablePlayers } from './helpers.ts'
+import {
+  createSilentTableRoom,
+  newPerson,
+  playSilentRound,
+  setIntOption,
+  setSelectOption,
+  silentTablePlayers,
+} from './helpers.ts'
 
 // e4-t04 to e4-t07: three players and a spectator through the real room. The chips are whatever comes
 // first, so levels pass or fail by chance: these tests look at what happens, not which way it goes.
 
 const close = (people: readonly Page[]) =>
   Promise.all(people.map((person) => person.context().close()))
-
-async function setOption(host: Page, label: string, value: string) {
-  const field = host.getByRole('spinbutton', { name: label })
-  await field.fill(value)
-  await field.press('Enter')
-}
 
 const seenCards = (page: Page, group: string) =>
   page.getByRole('group', { name: group }).getByRole('img')
@@ -20,8 +21,8 @@ test('three players and a spectator play to the result', async ({ browser }) => 
   test.setTimeout(120_000)
   const players = await silentTablePlayers(browser, ['Ann', 'Bob', 'Cy'], { reducedMotion: 'reduce' })
   const [host, guest] = players
-  await setOption(host, 'Levels in a row to win', '1')
-  await setOption(host, 'Failed levels that end the game', '1')
+  await setIntOption(host, players[1], 'Levels in a row to win', '1')
+  await setIntOption(host, players[1], 'Failed levels that end the game', '1')
   await host.getByRole('button', { name: 'Start game' }).click()
 
   const watcher = await newPerson(browser, { reducedMotion: 'reduce' })
@@ -94,8 +95,8 @@ test('a failed level comes back round with a new deal after a reveal everyone ac
   test.setTimeout(180_000)
   const players = await silentTablePlayers(browser, ['Ann', 'Bob', 'Cy'], { reducedMotion: 'reduce' })
   const [host] = players
-  await setOption(host, 'Levels in a row to win', '7')
-  await setOption(host, 'Failed levels that end the game', '5')
+  await setIntOption(host, players[1], 'Levels in a row to win', '7')
+  await setIntOption(host, players[1], 'Failed levels that end the game', '5')
   await host.getByRole('button', { name: 'Start game' }).click()
   for (let round = 0; round < 3; round++) await playSilentRound(players)
 
@@ -115,8 +116,8 @@ test('the hands turn over one at a time, and the result waits for the last', asy
   test.setTimeout(120_000)
   const players = await silentTablePlayers(browser, ['Ann', 'Bob', 'Cy'])
   const [host] = players
-  await setOption(host, 'Levels in a row to win', '1')
-  await setOption(host, 'Failed levels that end the game', '1')
+  await setIntOption(host, players[1], 'Levels in a row to win', '1')
+  await setIntOption(host, players[1], 'Failed levels that end the game', '1')
   await host.getByRole('button', { name: 'Start game' }).click()
   for (let round = 0; round < 3; round++) await playSilentRound(players)
 
@@ -133,8 +134,7 @@ test('a round runs out of time: chips are dealt, the round moves on', async ({ b
   test.setTimeout(120_000)
   const players = await silentTablePlayers(browser, ['Ann', 'Bob', 'Cy'], { reducedMotion: 'reduce' })
   const [host, guest] = players
-  await host.getByRole('combobox', { name: 'Time for each round' }).selectOption('60')
-  await expect(guest.getByText('60 seconds')).toBeVisible()
+  await setSelectOption(host, guest, 'Time for each round', '60', '60 seconds')
   await host.getByRole('button', { name: 'Start game' }).click()
 
   await expect(host.getByRole('timer')).toBeVisible()
@@ -153,8 +153,7 @@ test('a round runs out of time: chips are dealt, the round moves on', async ({ b
 test('the table theme shows on the table, and a guest sees it too', async ({ browser }) => {
   const players = await silentTablePlayers(browser, ['Ann', 'Bob', 'Cy'])
   const [host, guest] = players
-  await host.getByRole('combobox', { name: 'Table theme' }).selectOption('climbing')
-  await expect(guest.getByText('Climbing team')).toBeVisible()
+  await setSelectOption(host, guest, 'Table theme', 'climbing', 'Climbing team')
   await host.getByRole('button', { name: 'Start game' }).click()
   await expect(guest.locator('[data-skin="climbing"]')).toBeVisible()
   await close(players)

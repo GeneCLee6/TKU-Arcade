@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
+import { setIntOption, setSelectOption } from './helpers.ts'
 
 // e7-t08 (AC-7.3): the site in Traditional Chinese, screen by screen, with nothing left in English.
 // The list of screens is docs/ZH-WALKTHROUGH.md. It reads what is on the screen and what a screen
@@ -235,13 +236,10 @@ for (const [label, viewport, touch] of [
         ['連過幾關獲勝', '1'],
         ['失敗幾關算輸', '1'],
       ]) {
-        const field = host.getByRole('spinbutton', { name: label })
-        await field.fill(value)
-        await field.press('Enter')
+        await setIntOption(host, people[1], label, value)
       }
-      await host.getByRole('combobox', { name: '每輪時間' }).selectOption('120')
-      await host.getByRole('combobox', { name: '牌桌主題' }).selectOption('diving')
-      await expect(people[1].getByText('潛水隊')).toBeVisible()
+      await setSelectOption(host, people[1], '每輪時間', '120', '120 秒')
+      await setSelectOption(host, people[1], '牌桌主題', 'diving', '潛水隊')
 
       await host.getByRole('button', { name: '開始遊戲' }).click()
       await expect(host.getByRole('group', { name: '順位籌碼' })).toBeVisible()
@@ -252,8 +250,11 @@ for (const [label, viewport, touch] of [
 
       for (let round = 0; round < 3; round++) {
         for (const page of people) {
-          await page.getByRole('button', { name: /^拿籌碼 \d+$/ }).first().click()
-          await expect(page.getByRole('button', { name: /在你手上$/ })).toBeVisible()
+          // Again if somebody else's move had not reached this person yet
+          await expect(async () => {
+            await page.getByRole('button', { name: /^拿籌碼 \d+$/ }).first().click()
+            await expect(page.getByRole('button', { name: /在你手上$/ })).toBeVisible({ timeout: 1000 })
+          }).toPass({ timeout: 15_000 })
         }
         await expectAllChinese(host, 'Silent Table, chips taken')
         for (const page of people) {

@@ -64,12 +64,56 @@ export async function silentTablePlayers(
   return people
 }
 
+/**
+ * A host's change of option, once a guest can see it. The form sends all the options each time, from
+ * what the room last said: a second change before the first comes back would undo the first.
+ */
+export async function setRoomOption(
+  host: Page,
+  guest: Page,
+  label: string,
+  change: (host: Page) => Promise<void>,
+  shown: string,
+): Promise<void> {
+  await change(host)
+  await expect(guest.locator('dl > div', { hasText: label }).locator('dd')).toHaveText(shown)
+}
+
+export const setIntOption = (host: Page, guest: Page, label: string, value: string) =>
+  setRoomOption(
+    host,
+    guest,
+    label,
+    async (page) => {
+      const field = page.getByRole('spinbutton', { name: label })
+      await field.fill(value)
+      await field.press('Enter')
+    },
+    value,
+  )
+
+export const setSelectOption = (host: Page, guest: Page, label: string, value: string, shown: string) =>
+  setRoomOption(
+    host,
+    guest,
+    label,
+    async (page) => {
+      await page.getByRole('combobox', { name: label }).selectOption(value)
+    },
+    shown,
+  )
+
+/** Takes the first chip this person can. Again if somebody else's move had not reached them yet */
+export async function takeFirstChip(person: Page): Promise<void> {
+  await expect(async () => {
+    await person.getByRole('button', { name: /^Take chip \d+$/ }).first().click()
+    await expect(person.getByRole('button', { name: /you hold it$/ })).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
+}
+
 /** Everyone takes the first chip they can and says ready: one round of Silent Table */
 export async function playSilentRound(people: readonly Page[]): Promise<void> {
-  for (const person of people) {
-    await person.getByRole('button', { name: /^Take chip \d+$/ }).first().click()
-    await expect(person.getByRole('button', { name: /you hold it$/ })).toBeVisible()
-  }
+  for (const person of people) await takeFirstChip(person)
   for (const person of people) {
     const ready = person.getByRole('button', { name: 'Ready', exact: true })
     await expect(ready).toHaveAttribute('aria-disabled', 'false')
