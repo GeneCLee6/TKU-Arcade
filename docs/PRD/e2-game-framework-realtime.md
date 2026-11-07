@@ -76,7 +76,7 @@ depends_on: [E12]
 - [x] `e2-t03` RoomDO 執行引擎：action 驗證、reduce、per-seat view diff、storage、`isOver` · AC-2.2 · L→拆：t03a 引擎、t03b storage 與 hibernation 測試 · ← e1-t01, e2-t02 · #4
 - [x] `e2-t04` 前端 `useRoom()`：WebSocket、snapshot/patch 套用、action 送出、錯誤 toast · AC-2.2 · M · ← e2-t03 · #7
 - [x] `e2-t05` 重連：seatToken、退避、離線標示、房主跳過／代打 · AC-2.3 · M · ← e2-t04 · #9
-- [ ] `e2-t06` 結果畫面、再來一局、回大廳 · AC-2.4 · S · ← e2-t04
+- [x] `e2-t06` 結果畫面、再來一局、回大廳 · AC-2.4 · S · ← e2-t04 · #PR
 - [x] `e2-t07` `tests/games/harness.ts`、`npm run play` 煙霧測試 · AC-2.6 · S · ← e2-t01 · #2
 - [x] `e2-t08` `timers`：DO alarm 驅動的階段倒數、`timer` 訊息、前端倒數元件 · AC-2.2 · S · ← e2-t03 · #8
 

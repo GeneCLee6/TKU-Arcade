@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameProjection } from '../../../shared/games/types.ts'
 import type { PromotionView } from '../../../shared/games/promotion/types.ts'
@@ -90,9 +91,12 @@ function parts({
 }
 
 const screenOf = (room: RoomParts, game: GameProjection) => (
-  <ToastProvider>
-    <PromotionScreen room={room} game={game} />
-  </ToastProvider>
+  <MemoryRouter>
+    <ToastProvider>
+      {/* The room's view holds the same game as the one handed to the screen, as in RoomPage */}
+      <PromotionScreen room={{ ...room, view: { ...room.view, game } }} game={game} />
+    </ToastProvider>
+  </MemoryRouter>
 )
 
 const rollButton = () => screen.queryByRole('button', { name: 'Roll' })
@@ -378,9 +382,71 @@ describe('the room around the game', () => {
 
     it('says who won and how it ended, and offers no roll', () => {
       render(screenOf(parts({ status: 'ended' }), ended))
-      expect(screen.getByText('Bo retires in glory')).toBeInTheDocument()
+      expect(screen.getAllByText('Bo retires in glory').length).toBeGreaterThan(0)
       expect(screen.getByText(/after 3 rounds/)).toBeInTheDocument()
       expect(rollButton()).toBeNull()
+    })
+
+    it('names the office rather than the seniority number behind it', () => {
+      const withStandings = projection(over, {
+        over: true,
+        result: {
+          summary: { key: 'games.promotion.result.retired', params: { rounds: 3 } },
+          standings: [
+            { seat: 1, rank: 1, score: 24, note: { key: 'games.promotion.note.retired', params: { rolls: 3 } } },
+            { seat: 0, rank: 2, score: 3, note: { key: 'games.promotion.note.student', params: { rolls: 3 } } },
+          ],
+        },
+      })
+      render(screenOf(parts({ status: 'ended' }), withStandings))
+      const rows = within(screen.getByRole('region', { name: en['room.result.heading'] })).getAllByRole(
+        'listitem',
+      )
+      expect(rows[0]).toHaveTextContent('Bo')
+      expect(rows[0]).toHaveTextContent('Retired in glory after 3 rolls.')
+      expect(rows[1]).toHaveTextContent(/Juren/)
+      expect(screen.queryByText(/Score:/)).toBeNull()
+    })
+
+    it('at the round limit names whoever tied at the top', () => {
+      const limit = state({ turn: null, ending: 'turnLimit', winner: null })
+      const tied = projection(limit, {
+        over: true,
+        result: {
+          summary: { key: 'games.promotion.result.turnLimit', params: { rounds: 60 } },
+          standings: [
+            { seat: 0, rank: 1, score: 0, note: { key: 'games.promotion.note.commoner', params: { rolls: 1 } } },
+            { seat: 1, rank: 1, score: 0, note: { key: 'games.promotion.note.commoner', params: { rolls: 1 } } },
+          ],
+        },
+      })
+      render(screenOf(parts({ status: 'ended' }), tied))
+      expect(screen.getByText('Al and Bo ended the most senior')).toBeInTheDocument()
+    })
+
+    it('waits for the last move to land before giving the result away', () => {
+      vi.useFakeTimers()
+      try {
+        const before = state({
+          players: [
+            { seat: 0, cell: 'juren', rolls: 3, demotions: 0 },
+            { seat: 1, cell: 'taishi', rolls: 2, demotions: 0 },
+          ],
+          turn: 1,
+        })
+        const heading = () => screen.queryByRole('heading', { name: en['room.result.heading'] })
+        const { rerender } = render(screenOf(parts(), projection(before)))
+        rerender(screenOf(parts({ status: 'ended' }), ended))
+        expect(heading()).toBeNull()
+        // Nor does the host get the actions anywhere else in the meantime
+        expect(screen.queryByRole('button', { name: en['room.host.rematch'] })).toBeNull()
+        act(() => vi.advanceTimersByTime(ROLL_MS))
+        expect(heading()).toBeNull()
+        act(() => vi.advanceTimersByTime(MOVE_MS))
+        expect(heading()).toBeInTheDocument()
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it("keeps the host's rematch and the way to the waiting room", () => {

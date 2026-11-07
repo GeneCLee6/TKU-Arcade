@@ -1,6 +1,8 @@
+import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import type { AnyGameModule } from '../../shared/games/types.ts'
 import { useT } from '../i18n/useT.ts'
+import { hasRules } from '../lib/rulesDoc.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 import { Card } from './Card.tsx'
@@ -32,6 +34,11 @@ export function GameCard({ game, disabled, onNewRoom }: GameCardProps) {
         <span>{t('lobby.minutes', { minutes })}</span>
       </Facts>
       <Summary>{t(`${i18nKey}.summary`)}</Summary>
+      {hasRules(game.id) && (
+        <RulesLink to={`/games/${game.id}/rules`} aria-label={t('rules.pageTitle', { game: name })}>
+          {t('rules.howToPlay')}
+        </RulesLink>
+      )}
       <Button disabled={disabled} onClick={onNewRoom}>
         {t('lobby.newRoom')}
       </Button>
@@ -86,4 +93,10 @@ const Facts = styled.p`
 
 const Summary = styled.p`
   margin: 0;
+`
+
+const RulesLink = styled(Link)`
+  align-self: flex-start;
+  color: ${color.text};
+  font-size: ${fontSize.sm}px;
 `
