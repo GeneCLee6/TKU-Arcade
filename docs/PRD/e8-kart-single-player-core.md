@@ -43,7 +43,7 @@ depends_on: [E7, E12]
 ## 設計方向
 
 - `shared/kart/{physics.ts, track.ts, input.ts, ghost.ts}`（純邏輯、可測）；`src/kart/{Scene.ts, Renderer.ts, Hud.tsx, …}`；頁面 `/kart`（M2 單機）→ M3 併入房間。
-- 第一批是 **spike**：方塊車＋平面＋甩尾，先看 three.js 與固定步長迴圈在 Vite 下的 bundle 與效能；手感不對就在這裡調，不做賽道。
+- 第一批是 **spike**：方塊車＋平面＋甩尾，先看 three.js 與固定步長迴圈在 Vite 下的 bundle 與效能；手感不對就在這裡調，不做賽道。J1 的結果與數字在 `ARCHITECTURE.md` §4.1；`/kart/spike` 不算卡丁車頁（`e8-t14`），上線正式頁時拿掉。
 - 參考（概念，不抄資產）：MarioKart.js（開源 three.js 卡丁車）的攝影機與甩尾粒子做法；Kenney 的 CC0「Racing Kit」當 placeholder 模型。
 - 第一張賽道主題：原創，例如「淡水河畔」（河、橋、夕陽），以 Blender 做低多邊形。
 
@@ -62,7 +62,7 @@ depends_on: [E7, E12]
 
 ### M2
 
-- [ ] `e8-t01` **Spike**：three.js＋固定步長迴圈＋方塊車在平面上加速、轉向、甩尾（最簡物理）；bundle 與 fps 數字記錄 · AC-8.3 · M · ← e12-t03
+- [x] `e8-t01` **Spike**：three.js＋固定步長迴圈＋方塊車在平面上加速、轉向、甩尾（最簡物理）；bundle 與 fps 數字記錄 · AC-8.3 · M · ← e12-t03 · #15
 - [ ] `e8-t02` `shared/kart/physics.ts` 完整街機物理（甩尾、加速條、噴射、連噴、碰牆、復位）與測試 · AC-8.3 · L→拆：t02a 甩尾與加速條、t02b 碰撞與復位 · ← e8-t01
 - [ ] `e8-t03` 調參面板與 preset · AC-8.8 · S · ← e8-t02
 - [ ] `e8-t04` 賽道 JSON schema、檢查點、復位點、`build-track.ts` 匯出腳本 · AC-8.2 · M · ← e8-t02
@@ -90,6 +90,6 @@ depends_on: [E7, E12]
 ## 未決問題
 
 - [ ] **Q:** 視覺風格（總 PRD Q4）。
-      **A:** _(建議低多邊形卡通；spike 時確認)_
+      **A:** _(建議低多邊形卡通；spike 時確認。J1 沒定，等擁有者；給決定用的參考在 `ARCHITECTURE.md` §4.1)_
 - [ ] **Q:** 噴射是「加速條滿自動噴」還是「按鍵噴」？
       **A:** _(建議按鍵噴，連噴才有操作感；規則選項可切)_

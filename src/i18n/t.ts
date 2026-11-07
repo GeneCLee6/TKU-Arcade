@@ -1,5 +1,4 @@
 import { GAME_MESSAGES } from '../../shared/games/index.ts'
-import type { GameMessages } from '../../shared/games/types.ts'
 import { readStored, writeStored } from '../lib/storage.ts'
 import { en, type MessageKey } from './en.ts'
 import { zhTW } from './zh-TW.ts'
@@ -7,7 +6,7 @@ import { zhTW } from './zh-TW.ts'
 export type Language = 'en' | 'zh-TW'
 export type MessageParams = Record<string, string | number>
 /** A site string, or a game's (shared/games/<id>/i18n.ts): `${game.meta.i18nKey}.name` */
-export type TextKey = MessageKey | `games.${string}`
+export type TextKey = MessageKey | `games.${string}` | `kart.${string}`
 export type Translate = (key: TextKey, params?: MessageParams) => string
 
 // Partial: the types require every site key, but a catalog can still come up short at runtime
@@ -16,11 +15,8 @@ const catalogs: Record<Language, Partial<Record<string, string>>> = {
   'zh-TW': { ...zhTW, ...GAME_MESSAGES['zh-TW'] },
 }
 
-/**
- * Adds the strings only a game's screen needs: its lazy chunk calls this as it loads, so that they stay
- * out of everyone's first load (docs/ARCHITECTURE.md). A screen renders only after that call.
- */
-export function addGameMessages(messages: GameMessages): void {
+/** Adds a lazy chunk's own catalog, so that its strings stay out of the first load */
+export function registerMessages(messages: Record<Language, Record<string, string>>): void {
   Object.assign(catalogs.en, messages.en)
   Object.assign(catalogs['zh-TW'], messages['zh-TW'])
 }

@@ -11,7 +11,7 @@ import type {
 import { Avatar } from '../../components/Avatar.tsx'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
-import { addGameMessages, type Translate } from '../../i18n/t.ts'
+import { registerMessages, type Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { useReducedMotion } from '../../lib/useMediaQuery.ts'
 import { color, fontSize, radius, seatColor, space } from '../../styles/tokens.ts'
@@ -22,7 +22,7 @@ import { CardBack, CardFace, CardSlot } from './PlayingCard.tsx'
 import { RevealPanel } from './RevealPanel.tsx'
 import { useRevealPlayback } from './useRevealPlayback.ts'
 
-addGameMessages(silentTableScreenMessages)
+registerMessages(silentTableScreenMessages)
 
 /** If the room never answers "ready", the button comes back after this */
 const READY_ANSWER_MS = 4000

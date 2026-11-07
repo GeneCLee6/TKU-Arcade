@@ -103,6 +103,19 @@ export const seatColor = (seat: number): string => color[`seat${seat % 6}` as Co
 
 export const avatarColors: readonly string[] = [0, 1, 2, 3, 4, 5].map(seatColor)
 
+// The kart's 3D scene. Plain values, because WebGL materials cannot read CSS variables, and the same
+// in both themes, because the scene's look does not follow the page's. Neutral on purpose: the
+// visual style (PRD Q4) is still open.
+export const kartScene = {
+  sky: '#B9D3E6',
+  ground: '#8A9A8C',
+  gridLine: '#6B7A6E',
+  body: '#C2410C',
+  nose: '#F3F4F6',
+  lightSky: '#FFFFFF',
+  lightGround: '#6B7280',
+} as const
+
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const
 
 export const radius = { component: 8, card: 16 } as const

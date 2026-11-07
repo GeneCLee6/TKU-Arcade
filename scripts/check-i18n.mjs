@@ -12,6 +12,7 @@ const SITE_EN = 'src/i18n/en.ts'
 const SITE_ZH = 'src/i18n/zh-TW.ts'
 const GAMES = 'shared/games/index.ts'
 const GAME_SCREENS = 'shared/games/screenMessages.ts'
+const KART = 'shared/kart/i18n.ts' // Registered by the kart's lazy chunk, so not in the site's catalogs
 const SOURCE_ROOT = 'src'
 
 const USER_VISIBLE_ATTRIBUTES = new Set(['aria-label', 'title', 'placeholder', 'alt', 'label'])
@@ -314,14 +315,17 @@ const gamesZh = gameMessages['zh-TW'] ?? {}
 
 checkParity(siteEn, SITE_EN, siteZh, SITE_ZH)
 checkParity(gamesEn, `${GAMES} (en)`, gamesZh, `${GAMES} (zh-TW)`)
-if (existsSync(GAME_SCREENS)) {
-  const screenMessages = await load(GAME_SCREENS, 'SCREEN_MESSAGES')
-  checkParity(
-    screenMessages.en ?? {},
-    `${GAME_SCREENS} (en)`,
-    screenMessages['zh-TW'] ?? {},
-    `${GAME_SCREENS} (zh-TW)`,
-  )
+const screenMessages = existsSync(GAME_SCREENS) ? await load(GAME_SCREENS, 'SCREEN_MESSAGES') : {}
+const screensEn = screenMessages.en ?? {}
+checkParity(screensEn, `${GAME_SCREENS} (en)`, screenMessages['zh-TW'] ?? {}, `${GAME_SCREENS} (zh-TW)`)
+for (const key of Object.keys(screensEn)) {
+  if (!key.startsWith('games.')) problems.push(`${GAME_SCREENS}: '${key}': keys here start with games.`)
+}
+const kartMessages = existsSync(KART) ? await load(KART, 'KART_MESSAGES') : {}
+const kartEn = kartMessages.en ?? {}
+checkParity(kartEn, `${KART} (en)`, kartMessages['zh-TW'] ?? {}, `${KART} (zh-TW)`)
+for (const key of Object.keys(kartEn)) {
+  if (!key.startsWith('kart.')) problems.push(`${KART}: '${key}': keys here start with kart.`)
 }
 for (const [catalog, file] of [[siteEn, SITE_EN], [siteZh, SITE_ZH]]) {
   for (const key of Object.keys(catalog)) {
@@ -336,6 +340,10 @@ if (problems.length > 0) {
   // Not process.exit(): on Windows stdout to a pipe is async, and the list must reach the end
   process.exitCode = 1
 } else {
-  const keys = Object.keys(siteEn).length + Object.keys(gamesEn).length
+  const keys =
+    Object.keys(siteEn).length +
+    Object.keys(gamesEn).length +
+    Object.keys(screensEn).length +
+    Object.keys(kartEn).length
   console.log(`ok   check-i18n: ${keys} keys, ${sourceFiles.length} source files`)
 }

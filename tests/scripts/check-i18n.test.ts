@@ -53,6 +53,21 @@ describe('check-i18n catalogs', () => {
     expect(status).toBe(0)
   })
 
+  it('compares the kart catalog when there is one', () => {
+    const kart = (en: string, zh: string) => ({
+      'shared/kart/i18n.ts': `export const KART_MESSAGES = { en: { ${en} }, 'zh-TW': { ${zh} } }`,
+    })
+    expect(run(kart(`'kart.a': 'A word'`, `'kart.a': '甲'`)).status).toBe(0)
+
+    const missing = run(kart(`'kart.a': 'A word'`, ``))
+    expect(missing.output).toContain(`'kart.a'`)
+    expect(missing.status).toBe(1)
+
+    const stray = run(kart(`'a': 'A word'`, `'a': '甲'`))
+    expect(stray.output).toContain(`keys here start with kart.`)
+    expect(stray.status).toBe(1)
+  })
+
   it('fails on a site key missing from zh-TW', () => {
     const { status, output } = run({
       [SITE_EN]: `export const en = { a: 'A word', b: 'B word' }`,
