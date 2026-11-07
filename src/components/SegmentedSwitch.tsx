@@ -46,6 +46,11 @@ const Group = styled.div`
   background: ${color.surface};
   border: 1px solid ${color.border};
   border-radius: ${radius.component}px;
+
+  @media (max-width: 480px) {
+    gap: 2px;
+    padding: 2px;
+  }
 `
 
 const Segment = styled.button`
@@ -59,8 +64,10 @@ const Segment = styled.button`
   font-size: ${fontSize.sm}px;
   cursor: pointer;
 
-  /* So that the top bar stays one row on a phone, leaving the height to the page */
+  /* A finger's height, but the top bar still has to stay one row down to a 360px phone */
   @media (max-width: 480px) {
+    min-width: 32px;
+    min-height: 44px;
     padding: 0 ${space.xs}px;
   }
 

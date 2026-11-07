@@ -53,7 +53,7 @@ export function Dialog({ open, onClose, title, children, actions }: DialogProps)
         <Content>
           <Header>
             <Title id={titleId}>{title}</Title>
-            <Button $variant="ghost" $size="sm" onClick={onClose}>
+            <Button $variant="ghost" onClick={onClose}>
               {t('common.close')}
             </Button>
           </Header>

@@ -128,7 +128,7 @@ describe('member rows', () => {
     const row = screen.getByText('Bo').closest('li') as HTMLElement
     expect(within(row).getAllByText(en['room.waiting.badge.offline'])).toHaveLength(1)
     expect(button('Kick Bo')).toBeInTheDocument()
-    expect(button('Make Bo host')).toBeNull()
+    expect(button('Make host: Bo')).toBeNull()
   })
 })
 

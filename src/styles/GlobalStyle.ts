@@ -35,9 +35,17 @@ export const GlobalStyle = createGlobalStyle`
     text-size-adjust: 100%;
   }
 
-  :focus-visible {
+  /* :root so that it beats a component's own outline, such as the one marking whose turn it is */
+  :root :focus-visible {
     outline: 2px solid ${color.accent};
     outline-offset: 2px;
+  }
+
+  /* What Tab lands on must not end up behind the phone layout's dock, stuck to the bottom */
+  @media (max-width: 899px) {
+    html {
+      scroll-padding-bottom: 140px;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

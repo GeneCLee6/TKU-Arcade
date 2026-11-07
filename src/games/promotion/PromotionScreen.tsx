@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { FACES, getCell } from '../../../shared/games/promotion/board.ts'
 import type { LastRoll, PromotionView } from '../../../shared/games/promotion/types.ts'
@@ -8,6 +8,7 @@ import { Avatar } from '../../components/Avatar.tsx'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
 import { Muted } from '../../components/roomParts.ts'
+import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import type { Translate } from '../../i18n/t.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
 import { initialOf } from '../../lib/avatar.ts'
@@ -40,6 +41,11 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
   const zoom = useBoardZoom()
   const { viewport, show, zoom: zoomLevel } = zoom
   const [selected, setSelected] = useState<string | null>(null)
+  // Stable, so that the board's memoised cells sit out a chat message or someone's move
+  const toggleCell = useCallback(
+    (cell: string) => setSelected((current) => (current === cell ? null : cell)),
+    [],
+  )
   const [asked, setAsked] = useState(false)
   useSoundUnlock()
 
@@ -172,7 +178,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
               type="button"
               $turn={player.seat === activeSeat}
               aria-pressed={selected === player.cell}
-              onClick={() => setSelected(selected === player.cell ? null : player.cell)}
+              onClick={() => toggleCell(player.cell)}
             >
               <Avatar name={nameOf(player.seat)} tint={seatColor(player.seat)} />
               <ChipName>{nameOf(player.seat)}</ChipName>
@@ -190,7 +196,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
             pieces={pieces}
             activeSeat={activeSeat}
             selected={detailCell ?? null}
-            onSelect={(cell) => setSelected(selected === cell ? null : cell)}
+            onSelect={toggleCell}
             flight={flight}
             reducedMotion={reducedMotion}
             zoom={zoom.zoom}
@@ -230,6 +236,8 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
           </RoundText>
         </Toolbar>
 
+        {/* Only what someone asked to see: the moves of the game have their own status line */}
+        <VisuallyHidden role="status">{selected ? cellText(t, selected) : ''}</VisuallyHidden>
         {detailCell && <CellDetail id={detailCell} />}
         <Muted>{t('games.promotion.simplified')}</Muted>
       </Stage>
@@ -318,7 +326,8 @@ const SeatStrip = styled.div`
   display: flex;
   gap: ${space.xs}px;
   overflow-x: auto;
-  padding: 2px;
+  /* Room for the focus ring, which this scrolling strip would otherwise cut off */
+  padding: ${space.xs}px;
 `
 
 // Whose turn is told by the thick outline, not only by which colour it is
@@ -330,6 +339,11 @@ const SeatChip = styled.button<{ $turn: boolean }>`
   max-width: 140px;
   min-height: 36px;
   padding: 2px ${space.sm}px 2px 2px;
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+
   background: ${color.surface};
   color: ${color.text};
   border: 1px solid ${color.border};

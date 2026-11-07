@@ -43,8 +43,9 @@ export function ResultPanel({
   // On a phone the last roll was watched further down the page than this
   const panel = useRef<HTMLElement>(null)
   useEffect(() => {
+    // Its top, who won: `nearest` lines up the bottom of a panel taller than a phone's screen
     panel.current?.scrollIntoView?.({
-      block: 'nearest',
+      block: 'start',
       behavior: reducedMotion ? 'auto' : 'smooth',
     })
     // Once, when the result first shows
@@ -167,6 +168,9 @@ const Small = styled.div`
 `
 
 const BackLink = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   justify-self: start;
   color: ${color.text};
 `

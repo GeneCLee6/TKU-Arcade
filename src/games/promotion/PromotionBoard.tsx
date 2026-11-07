@@ -1,6 +1,7 @@
-import { memo, useLayoutEffect, useRef } from 'react'
+import { memo, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { BOARD, END_CELL, getCell } from '../../../shared/games/promotion/board.ts'
+import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, seatColor } from '../../styles/tokens.ts'
 import {
@@ -13,6 +14,7 @@ import {
   type CellBox,
   type Point,
 } from './boardLayout.ts'
+import { cellForKey } from './boardKeys.ts'
 import { MOVE_MS } from './useRollPlayback.ts'
 
 export interface BoardPiece {
@@ -57,34 +59,39 @@ export function PromotionBoard({
   const t = useT()
   const points = piecePoints(pieces, layout)
   const flown = flight && !reducedMotion ? flightPath(flight, pieces, layout) : null
+  const hintId = useId()
 
   return (
-    <Svg
-      viewBox={`0 0 ${layout.width} ${layout.height}`}
-      style={{ width: `${zoom * 100}%` }}
-      role="img"
-      aria-label={t('games.promotion.ui.boardLabel', { count: BOARD.length })}
-    >
-      <Cells layout={layout} selected={selected} onSelect={onSelect} />
-      {flown && flight && (
-        <FlightLine
-          d={flown.d}
-          pathLength={1}
-          $demoted={flight.demoted}
-          style={{ stroke: flight.demoted ? undefined : seatColor(flight.seat) }}
-        />
-      )}
-      {pieces.map((piece) => (
-        <Piece
-          key={piece.seat}
-          piece={piece}
-          point={points.get(piece.seat)}
-          active={piece.seat === activeSeat}
-          trail={flown && flight?.seat === piece.seat ? flown.trail : null}
-          reducedMotion={reducedMotion}
-        />
-      ))}
-    </Svg>
+    <>
+      <VisuallyHidden id={hintId}>{t('board.keyboardHint')}</VisuallyHidden>
+      <Svg
+        viewBox={`0 0 ${layout.width} ${layout.height}`}
+        style={{ width: `${zoom * 100}%` }}
+        role="group"
+        aria-label={t('games.promotion.ui.boardLabel', { count: BOARD.length })}
+        aria-describedby={hintId}
+      >
+        <Cells layout={layout} selected={selected} onSelect={onSelect} />
+        {flown && flight && (
+          <FlightLine
+            d={flown.d}
+            pathLength={1}
+            $demoted={flight.demoted}
+            style={{ stroke: flight.demoted ? undefined : seatColor(flight.seat) }}
+          />
+        )}
+        {pieces.map((piece) => (
+          <Piece
+            key={piece.seat}
+            piece={piece}
+            point={points.get(piece.seat)}
+            active={piece.seat === activeSeat}
+            trail={flown && flight?.seat === piece.seat ? flown.trail : null}
+            reducedMotion={reducedMotion}
+          />
+        ))}
+      </Svg>
+    </>
   )
 }
 
@@ -114,13 +121,42 @@ const Cells = memo(function Cells({
   onSelect,
 }: Pick<PromotionBoardProps, 'layout' | 'selected' | 'onSelect'>) {
   const t = useT()
+  const group = useRef<SVGGElement>(null)
+  // One Tab stop for the 79 cells: the cell in focus, or else the one being shown, so that coming
+  // back to the board lands on what the game is about right now
+  const [focused, setFocused] = useState<string | null>(null)
+  const tabStop = focused ?? selected ?? layout.cells[0].id
+
+  const onKeyDown = (event: KeyboardEvent, id: string) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      if (!event.repeat) onSelect(id)
+      return
+    }
+    const next = cellForKey(layout, id, event.key)
+    if (next === null) return
+    event.preventDefault()
+    group.current?.querySelector<SVGGElement>(`[data-cell="${next}"]`)?.focus()
+  }
+
   return (
-    <g>
+    <g ref={group}>
       {layout.cells.map((box) => {
         const full = t(`games.promotion.cell.${box.id}`)
         const end = box.id === END_CELL
         return (
-          <g key={box.id} onClick={() => onSelect(box.id)} data-cell={box.id}>
+          <CellGroup
+            key={box.id}
+            role="button"
+            aria-pressed={box.id === selected}
+            tabIndex={box.id === tabStop ? 0 : -1}
+            onClick={() => onSelect(box.id)}
+            onKeyDown={(event) => onKeyDown(event, box.id)}
+            onFocus={() => setFocused(box.id)}
+            onBlur={() => setFocused(null)}
+            data-cell={box.id}
+          >
             <title>{full}</title>
             <CellRect
               x={box.x}
@@ -132,7 +168,7 @@ const Cells = memo(function Cells({
               $selected={box.id === selected}
             />
             <CellName box={box} full={full} end={end} shape={layout.shape} />
-          </g>
+          </CellGroup>
         )
       })}
     </g>
@@ -238,6 +274,7 @@ function Piece({
       ref={ref}
       $glide={!reducedMotion && !trail}
       style={{ transform: `translate(${point.x}px, ${point.y}px)` }}
+      aria-hidden="true"
       data-seat={piece.seat}
     >
       {active && <TurnRing r={PIECE_RADIUS + 6} $still={reducedMotion} />}
@@ -267,6 +304,19 @@ const CellRect = styled.rect<{ $tier: Tier; $selected: boolean }>`
   stroke: ${(p) => (p.$selected ? color.text : color.border)};
   stroke-width: ${(p) => (p.$selected ? 4 : 1)};
   cursor: pointer;
+`
+
+// Thicker than `selected`'s outline, so that the two read apart when they are different cells. The
+// browser's outline around an SVG group is not reliable, and the gap between cells has room for this
+const CellGroup = styled.g`
+  &&:focus-visible {
+    outline: none;
+  }
+
+  &:focus-visible > rect {
+    stroke: ${color.accent};
+    stroke-width: 8;
+  }
 `
 
 const NameText = styled.text<{ $end: boolean }>`

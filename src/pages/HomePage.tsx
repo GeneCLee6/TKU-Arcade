@@ -64,14 +64,14 @@ export function HomePage() {
           {nickname !== null && (
             <PlayingAs>
               <span>{t('lobby.playingAs', { name: nickname })}</span>
-              <Button $variant="ghost" $size="sm" onClick={() => setAsking({ gameId: null })}>
+              <Button $variant="ghost" onClick={() => setAsking({ gameId: null })}>
                 {t('lobby.changeNickname')}
               </Button>
             </PlayingAs>
           )}
         </Intro>
         <JoinRoomForm />
-        <PublicRooms />
+        {/* The games first: on a phone a list of rooms must not push "New room" off the screen */}
         <section>
           <SectionTitle>{t('lobby.games')}</SectionTitle>
           <PublicChoice>
@@ -97,6 +97,7 @@ export function HomePage() {
             ))}
           </Grid>
         </section>
+        <PublicRooms />
       </Main>
       <Dialog
         open={asking !== null}
@@ -115,6 +116,12 @@ const Main = styled.main`
   width: min(960px, 100%);
   margin: 0 auto;
   padding: ${space.xl}px ${space.lg}px ${space.xxxl}px;
+
+  /* So that the first game's "New room" is on a phone's first screen */
+  @media (max-width: 480px) {
+    gap: ${space.lg}px;
+    padding-top: ${space.md}px;
+  }
 `
 
 const Intro = styled.div`
@@ -124,6 +131,10 @@ const Intro = styled.div`
 const Title = styled.h1`
   margin: 0;
   font-size: ${fontSize.xxl}px;
+
+  @media (max-width: 480px) {
+    font-size: ${fontSize.xl}px;
+  }
 `
 
 const Tagline = styled.p`

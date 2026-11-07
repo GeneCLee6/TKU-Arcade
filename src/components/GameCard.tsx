@@ -96,6 +96,9 @@ const Summary = styled.p`
 `
 
 const RulesLink = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   align-self: flex-start;
   color: ${color.text};
   font-size: ${fontSize.sm}px;
