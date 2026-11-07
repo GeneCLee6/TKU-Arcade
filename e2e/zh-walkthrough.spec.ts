@@ -186,7 +186,8 @@ for (const [label, viewport, touch] of [
         await host.waitForTimeout(150)
       }
       await expect(over).toBeVisible({ timeout: 10_000 })
-      await expect(over.getByText('第 1 名')).toBeVisible()
+      // Equal seniority shares a place, so there can be two of them
+      await expect(over.getByText('第 1 名').first()).toBeVisible()
       await expectAllChinese(host, 'result, host')
       await expectAllChinese(guest, 'result, guest')
 
