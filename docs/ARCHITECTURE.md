@@ -36,7 +36,8 @@ shared/                 前後端共用、純 TS、可在 Node 測
     index.ts            遊戲登記表（id、meta、lazy 畫面）
     tictactoe/          範本（測試用）
     promotion/          升官圖：board.ts、rules.ts、i18n.ts、rules.en.md、rules.zh-TW.md
-    heist/ spectrum/ bluff/   三款桌遊（暫名）
+    silent-table/         默契牌局：rules.ts、types.ts、i18n.ts
+    spectrum/ bluff/      兩款桌遊（暫名）
   poker/hand.ts         牌型引擎
   kart/                 physics.ts、track.ts、input.ts、ghost.ts、net.ts、karts.ts、unlocks.ts
 worker/

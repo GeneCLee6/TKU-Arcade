@@ -11,7 +11,7 @@ A browser game lobby for friends of the Tamkang University Bridge Club: open one
 | Game | Mechanics inspired by | Milestone |
 | --- | --- | --- |
 | Promotion | *Sheng Guan Tu*, a traditional Chinese dice-and-board game (public domain) | M0 |
-| The Heist (working title) | *The Gang*: cooperative poker, no talking, rank chips as hints | M1 |
+| Silent Table | *The Gang*: cooperative poker, no talking, rank chips as hints | M1 |
 | Spectrum (working title) | *Wavelength*: place a clue between two extremes, teammates guess the dial | M1 |
 | Bluff Reader (working title) | *9upper*: one honest reader, everyone else bluffs, the judge picks | M1 |
 | Kart (working title) | Classic 2000s drift-boost kart racing: drift, fill the gauge, boost | M2–M3 |

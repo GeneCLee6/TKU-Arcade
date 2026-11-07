@@ -1,6 +1,6 @@
 # NEXT — 接下來怎麼做（給 AI 協作者與自己的交接手冊）
 
-最後更新 2026-11-07（Phase A、Phase B、Phase C、D1 完成，D2 的程式與文件完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
+最後更新 2026-11-07（Phase A、Phase B、Phase C、D1、G1 完成，D2 的程式與文件完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
 
 ## 1. 現在的位置
 
@@ -18,6 +18,7 @@
 - **C2 完成（PR #11）**：升官圖畫面（`src/games/promotion/`、登記在 `src/games/screens.ts`，lazy）：圖版直向 7 × 12、寬螢幕 12 × 7 的螺旋，陀螺或四顆骰子，棋子飛弧線，WebAudio 合成音效（無音檔、可靜音），雙指與按鈕縮放。`GameLayout` 把成員、房主動作、跳過／代打、補位併進右欄，手機進抽屜（`Drawer`、`Tabs`），聊天在手機也進抽屜；`RoomInPlay` 留著當右欄內容。新增 `Avatar`、`Dialog` 手機版。
 - **C3 完成（PR #13）**：`ResultPanel`（`GameLayout` 在 `ended` 且有 `result` 時自動顯示，任何遊戲都有名次、每人一句話、再來一局、回大廳），房主的結束後動作從側欄移進來（抽成 `HostEndedActions`）；遊戲可傳 `resultHeadline`、`resultDetail`、`resultHeld`。規則頁 `/games/<id>/rules` 與房內「怎麼玩」讀同一份 `shared/games/<id>/rules.{en,zh-TW}.md`（`src/lib/rulesDoc.ts`，有 `rules.en.md` 就算有規則）；自寫小型 markdown 解析器（`src/lib/markdown.ts`，不用 raw HTML、不加套件）。**下一款遊戲的畫面把 `score` 的意思想清楚**：沒傳 `resultDetail` 而 `score` 非 null 時會顯示「分數」。
 - **D2 的程式與文件完成（PR #14）**：大廳與等待室手機版面（遊戲排在公開房前面、邀請排在遊戲設定前面、頂欄到 360 px 都是一行）；觸控螢幕上小按鈕與連結都至少 44 px（`Button` 的 `sm` 用 `pointer: coarse` 放大）；升官圖圖版可用鍵盤（一個 Tab 停靠點，方向鍵照畫面移動，Enter 看說明，邏輯在 `boardKeys.ts`）；全域焦點框蓋過元件自己的 `outline`；`VisuallyHidden`；`e2e/` 有 axe、鍵盤、手機、繁中走查（`ZH-WALKTHROUGH.md`），**都是手動跑，CI 沒跑**；`IP-CHECKLIST.md` 與升官圖第一次查核。
+- **G1 完成（PR #12，經擁有者同意 2026-11-06 排在 Phase F 之前）**：默契牌局 Silent Table（遊戲 id `silent-table`）的牌型引擎 `shared/poker/hand.ts`、規則引擎、規則選項、view 裁切；在 PR 預覽用真的 `RoomDO` 跑完整局。`meta.unlisted`，大廳與換遊戲選單都看不到，等 G2 的畫面。規則細節（連過歸零、每人每輪 5 次移動、ready 清除、平手、揭牌、缺席）與交給 G2 的事項（`chatLocked`、`timers`、皮膚選項、拿掉 `unlisted`）在 `docs/PRD/e4-coop-poker.md` 的設計方向。
 - **下一步：等擁有者。M0 還沒完成**，差兩件事：(1) 擁有者看完 `IP-CHECKLIST.md` 升官圖那一節並簽名，`e12-t09`、AC-12.8 才勾；(2) 4 個朋友各自的裝置玩完一局升官圖。之後才是 F1。
 - D2 留下的缺口：手機只在 Playwright 模擬裡看過，沒上實體手機，也沒有試過軟體鍵盤蓋住輸入框。AC-7.3、7.4、7.6 都沒勾，因為都還差 M1 的部分。繁中走查沒有實際走到重新連線、被踢、版本不符、錯誤邊界、旁觀、代打等狀態，只讀了字串；母語語感要人看。IP 清單的「下架」一行未通過（`e12-t11` 功能旗標還沒做），「對外」要擁有者本人確認；`README.md` 寫了原作名稱，和 §4-2「只在規則頁」不一致，要擁有者定。按鈕的無障礙名稱不要用另一句話（axe 的 `label-content-name-mismatch`）；圖版格子的名稱來自 SVG `<title>`，不是 `aria-label`，因為看得到的字被拆成幾行。`e2e` 裡圖版的格子也是 `button`，查按鈕名稱要 `exact`（有官職的英文含 Roll）。
 - C2 留下的缺口：**音效只確認 WebAudio 有被呼叫、靜音有效，沒有人耳聽過**；動畫、縮放、抽屜（含軟體鍵盤）都沒在實體手機試過，M0 四人實測時看。D2 之後升官圖首屏 146.2 kB／150 kB（C3 之後 144.8 kB），預算不寬，後面的批次要注意。
@@ -36,7 +37,8 @@
 | ~~Q1 產品名稱~~ | — | 已拍板：TKU Arcade |
 | ~~E7 瀏覽器語言自動切換~~ | — | 已拍板：初次依瀏覽器語言，之後以使用者為準 |
 | Q2 帳號共用方式 | F1 | 牌桌簽 token、本站驗簽 |
-| Q3 四款桌遊正式名稱 | G1 | 避開原作名稱與主題 |
+| Q3 桌遊正式名稱（部分拍板）：合作撲克已定 **Silent Table／默契牌局**（2026-11-06）；Spectrum、Bluff Reader、Promotion 仍是暫名 | H1、I1 | 避開原作名稱與主題 |
+| 默契牌局：「連過」要連續還是累計；每人每輪 5 次移動上限要不要留（`e4` 未決問題） | G2 | 先照 G1 的做法玩過再決定 |
 | Q4 卡丁車視覺風格 | J1 | 低多邊形卡通 |
 | Q5 AI 題目生成的模型與金鑰 | H2 | 沿用牌桌的 Anthropic SDK |
 | Q6 真假朗讀站內語音 | I1 | 不做，用 LongTalk |
