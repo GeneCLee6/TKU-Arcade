@@ -90,7 +90,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 
 | 批 | Task | 內容 | 前提 |
 | --- | --- | --- | --- |
-| [ ] J1 | `e8-t01` | **Spike**：three.js＋固定步長迴圈＋方塊車在平面加速、轉向、甩尾；記錄 bundle 與 fps；總 PRD Q4 視覺風格確認 | D2（可與 Phase F–I 並行，但建議 M1 後再開） |
+| [x] J1（#15，經擁有者要求 2026-11-07 與 M1 的批次平行進行） | `e8-t01` | **Spike**：three.js＋固定步長迴圈＋方塊車在平面加速、轉向、甩尾；記錄 bundle 與 fps（`ARCHITECTURE.md` §4）。總 PRD Q4 視覺風格**還沒定**，等擁有者；方塊車不受影響 | D2（可與 Phase F–I 並行，但建議 M1 後再開） |
 | [ ] J2 | `e8-t02a` `e8-t12` | 甩尾與加速條物理（純函式、測試）；鍵盤、手把、改鍵 | J1 |
 | [ ] J3 | `e8-t02b` `e8-t03` `e8-t08` | 碰牆與復位；調參面板與 preset；攝影機跟隨與 HUD | J2 |
 | [ ] J4 | `e8-t04` `e8-t09` | 賽道 JSON schema、檢查點、復位點、Blender 匯出腳本；小地圖 | J3 |
