@@ -167,9 +167,9 @@ describe('the host, on someone else’s row', () => {
   it('has no controls on their own row', () => {
     renderRoom(viewOf([al(), bo()]))
     expect(button('Kick Al')).toBeNull()
-    expect(button('Make Al host')).toBeNull()
+    expect(button('Make host: Al')).toBeNull()
     expect(button('Kick Bo')).toBeInTheDocument()
-    expect(button('Make Bo host')).toBeInTheDocument()
+    expect(button('Make host: Bo')).toBeInTheDocument()
   })
 
   it('reaches spectators too', () => {
@@ -206,7 +206,7 @@ describe('the host, on someone else’s row', () => {
 
   it('hands the host over only after confirming', () => {
     const { onTransfer } = renderRoom(viewOf([al(), bo()]))
-    fireEvent.click(button('Make Bo host')!)
+    fireEvent.click(button('Make host: Bo')!)
     expect(onTransfer).not.toHaveBeenCalled()
     expect(dialog('Make Bo the host?')).toHaveTextContent(/take this back/)
 
@@ -218,13 +218,13 @@ describe('the host, on someone else’s row', () => {
   it('can kick someone offline, but not make them host', () => {
     renderRoom(viewOf([al(), bo({ online: false })]))
     expect(button('Kick Bo')).toBeInTheDocument()
-    expect(button('Make Bo host')).toBeNull()
+    expect(button('Make host: Bo')).toBeNull()
   })
 
   describe('with a confirmation open', () => {
     it('drops it when the person goes offline, sending nothing', () => {
       const { onTransfer, showView } = renderRoom(viewOf([al(), bo()]))
-      fireEvent.click(button('Make Bo host')!)
+      fireEvent.click(button('Make host: Bo')!)
       showView(viewOf([al(), bo({ online: false })]))
       expect(screen.queryByRole('dialog')).toBeNull()
       expect(onTransfer).not.toHaveBeenCalled()

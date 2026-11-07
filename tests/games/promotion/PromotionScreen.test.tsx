@@ -125,7 +125,7 @@ describe('the board', () => {
     const { container } = render(screenOf(parts(), projection(state())))
     expect(container.querySelectorAll('[data-cell]')).toHaveLength(79)
     expect(container.querySelectorAll('[data-seat]')).toHaveLength(2)
-    expect(container.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toMatch(
+    expect(container.querySelector('svg[role="group"]')?.getAttribute('aria-label')).toMatch(
       /Promotion board of 79 offices/,
     )
   })
@@ -306,7 +306,7 @@ describe('sound', () => {
 
 describe('zoom', () => {
   const svgWidth = (container: HTMLElement) =>
-    (container.querySelector('svg[role="img"]') as SVGElement).style.width
+    (container.querySelector('svg[role="group"]') as SVGElement).style.width
 
   it('goes up and back with the buttons, within its limits', () => {
     const { container } = render(screenOf(parts(), projection(state())))
@@ -415,7 +415,7 @@ describe('the room around the game', () => {
 
     it('lays the board out for a portrait screen', () => {
       const { container } = render(screenOf(parts(), projection(state())))
-      const viewBox = (container.querySelector('svg[role="img"]') as SVGElement).getAttribute(
+      const viewBox = (container.querySelector('svg[role="group"]') as SVGElement).getAttribute(
         'viewBox',
       ) as string
       const [, , width, height] = viewBox.split(' ').map(Number)

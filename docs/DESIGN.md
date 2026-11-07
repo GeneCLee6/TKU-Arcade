@@ -50,6 +50,9 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
 ## 6. 無障礙
 
 - 全部操作可鍵盤完成；焦點樣式可見；拖曳（刻度盤）有鍵盤替代（左右鍵、Shift 加速）。
+- 一大片格子只佔一個 Tab 停靠點：升官圖圖版用方向鍵在格子間移動（照畫面上下左右，不是沿著路徑），Enter 或空白鍵看說明，Home、End 到起點與榮歸。
+- 按鈕上看得到的字要包含在無障礙名稱裡（WCAG 2.5.3）：「轉移房主：{name}」，不是另一句話。只給螢幕閱讀器的文字用 `VisuallyHidden`。
+- `e2e/a11y.spec.ts`（axe，擋 serious 與 critical）、`e2e/keyboard.spec.ts`、`e2e/mobile.spec.ts` 目前要手動跑（`npm run test:browser`，先 `npm run dev`），CI 還沒跑。新畫面要在 `a11y.spec.ts` 加一行。
 - 狀態不只靠顏色：輪到誰同時有外框與文字；道具圖示形狀各異。
 - 動畫尊重 `prefers-reduced-motion`。
 - axe 無嚴重錯誤是 CI 的一部分（M1）。

@@ -34,7 +34,6 @@ export function PublicRooms() {
               </Facts>
               <Button
                 $variant="secondary"
-                $size="sm"
                 aria-label={t('lobby.publicRooms.joinNamed', { host: room.host })}
                 onClick={() => navigate(`/r/${room.id}`)}
               >

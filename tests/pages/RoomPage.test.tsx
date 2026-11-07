@@ -354,7 +354,7 @@ describe('outside the waiting room', () => {
 
     it('keeps the host’s row controls, behind their confirmations', async () => {
       await inStatus(status)
-      expect(button('Make Bo host')).toBeInTheDocument()
+      expect(button('Make host: Bo')).toBeInTheDocument()
       fireEvent.click(button('Kick Bo')!)
       expect(FakeWebSocket.last.sent).toEqual([])
       confirm('Kick Bo?', 'Kick')
@@ -364,7 +364,7 @@ describe('outside the waiting room', () => {
     it('gives everyone else no row controls', async () => {
       await inStatus(status, { host: false })
       expect(button('Kick Bo')).toBeNull()
-      expect(button('Make Bo host')).toBeNull()
+      expect(button('Make host: Bo')).toBeNull()
     })
 
     it('lets the host dissolve, after confirming', async () => {

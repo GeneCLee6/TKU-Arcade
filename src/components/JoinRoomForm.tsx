@@ -34,6 +34,12 @@ export function JoinRoomForm() {
           id={inputId}
           name="room"
           autoComplete="off"
+          // A room id is case-sensitive: a phone's keyboard must not "correct" what is typed
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          inputMode="url"
+          enterKeyHint="go"
           value={value}
           onChange={handleChange}
           aria-invalid={invalid}

@@ -64,14 +64,14 @@ export function HomePage() {
           {nickname !== null && (
             <PlayingAs>
               <span>{t('lobby.playingAs', { name: nickname })}</span>
-              <Button $variant="ghost" $size="sm" onClick={() => setAsking({ gameId: null })}>
+              <Button $variant="ghost" onClick={() => setAsking({ gameId: null })}>
                 {t('lobby.changeNickname')}
               </Button>
             </PlayingAs>
           )}
         </Intro>
         <JoinRoomForm />
-        <PublicRooms />
+        {/* The games first: on a phone a list of rooms must not push "New room" off the screen */}
         <section>
           <SectionTitle>{t('lobby.games')}</SectionTitle>
           <PublicChoice>
@@ -97,6 +97,7 @@ export function HomePage() {
             ))}
           </Grid>
         </section>
+        <PublicRooms />
       </Main>
       <Dialog
         open={asking !== null}

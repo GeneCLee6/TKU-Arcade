@@ -369,7 +369,7 @@ const Input = styled.textarea`
   resize: none;
   overflow-y: auto;
 
-  &:focus {
+  &&:focus {
     outline: none;
   }
 `

@@ -284,6 +284,9 @@ const Muted = styled.p`
 `
 
 const BackLink = styled(Link)`
+  display: inline-flex;
+  align-items: center;
   justify-self: start;
+  min-height: 44px;
   color: ${color.text};
 `
