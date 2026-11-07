@@ -72,9 +72,12 @@ test.describe('the lobby at 375 px', () => {
     await page.waitForURL(/\/r\//)
 
     const looker = await newPerson(browser, device)
-    await looker.goto('/')
     const join = looker.getByRole('button', { name: /WWWW/ }).first()
-    await expect(join).toBeVisible()
+    // A room is listed once its host has joined, and the home page asks only every 15 s
+    await expect(async () => {
+      await looker.goto('/')
+      await expect(join).toBeVisible({ timeout: 1000 })
+    }).toPass({ timeout: 15_000 })
     await expectNoSidewaysScroll(looker)
     expect((await join.boundingBox())?.height).toBeGreaterThanOrEqual(44)
     await looker.context().close()
