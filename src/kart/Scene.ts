@@ -68,7 +68,13 @@ export function createKartScene(container: HTMLElement): KartScene {
   scene.add(sun)
 
   const groundGeometry = new PlaneGeometry(GROUND_SIZE, GROUND_SIZE)
-  const groundMaterial = new MeshLambertMaterial({ color: kartScene.ground })
+  const groundMaterial = new MeshLambertMaterial({
+    color: kartScene.ground,
+    // Pushes the ground back in the depth buffer, so that the grid lying on it never flickers away
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
+  })
   const ground = new Mesh(groundGeometry, groundMaterial)
   ground.rotation.x = -Math.PI / 2
   const grid = new GridHelper(
@@ -92,7 +98,7 @@ export function createKartScene(container: HTMLElement): KartScene {
   car.add(body, nose)
   scene.add(car)
 
-  const camera = new PerspectiveCamera(60, 1, 0.1, 260)
+  const camera = new PerspectiveCamera(60, 1, 1, 260)
   let cameraHeading = 0
 
   const resize = () => {
