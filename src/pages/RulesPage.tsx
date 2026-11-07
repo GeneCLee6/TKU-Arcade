@@ -40,6 +40,9 @@ const Title = styled.h1`
 `
 
 const BackLink = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   justify-self: start;
   color: ${color.text};
 `

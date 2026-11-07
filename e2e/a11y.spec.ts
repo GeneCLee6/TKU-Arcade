@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { createRoom, joinRoom, newPerson, startGame } from './helpers.ts'
+import { createRoom, joinRoom, newPerson, playToResult, startGame } from './helpers.ts'
 
 // e7-t06 (AC-7.6): the skeleton. A new screen gets a line here. Dev-only: nothing of axe reaches the
 // site's bundle. "No serious errors" per DESIGN §6, so the two worst of axe's four levels fail a test.
@@ -17,7 +17,7 @@ async function expectNoSeriousProblems(page: Page) {
 test('the lobby in Traditional Chinese', async ({ browser }) => {
   const page = await newPerson(browser, { locale: 'zh-TW' })
   await page.goto('/')
-  await expect(page.getByRole('button', { name: '開新房' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '建立房間' }).first()).toBeVisible()
   await expectNoSeriousProblems(page)
   await page.context().close()
 })
@@ -30,6 +30,28 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.goto('/')
       await expect(page.getByRole('button', { name: 'New room' }).first()).toBeVisible()
       await expectNoSeriousProblems(page)
+    })
+
+    test('the rules page', async ({ page }) => {
+      await page.goto('/games/promotion/rules')
+      await expect(page.getByRole('table')).toBeVisible()
+      await expectNoSeriousProblems(page)
+    })
+
+    test('how to play, over the room', async ({ page }) => {
+      await createRoom(page, 'Ann')
+      await page.getByRole('button', { name: 'How to play' }).click()
+      await expect(page.getByRole('dialog').getByRole('table')).toBeVisible()
+      await expectNoSeriousProblems(page)
+    })
+
+    test('the result', async ({ page, browser }) => {
+      test.setTimeout(90_000)
+      const guest = await newPerson(browser, { colorScheme: scheme, reducedMotion: 'reduce' })
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await playToResult(page, guest)
+      await expectNoSeriousProblems(page)
+      await guest.context().close()
     })
 
     test('the nickname dialog', async ({ page }) => {

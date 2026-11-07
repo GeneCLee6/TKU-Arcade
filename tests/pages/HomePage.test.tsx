@@ -103,7 +103,7 @@ describe('lobby cards', () => {
     const name = translate('zh-TW', 'games.promotion.name')
     fireEvent.click(screen.getByRole('button', { name: '繁中' }))
     expect(screen.getByRole('heading', { level: 3, name })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '開新房' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '建立房間' })).toBeInTheDocument()
     expect(screen.getByText('2–6 人')).toBeInTheDocument()
     expect(screen.getByText('約 20 分鐘')).toBeInTheDocument()
     setLanguage('en')

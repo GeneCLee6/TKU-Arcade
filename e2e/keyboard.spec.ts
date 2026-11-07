@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { newPerson, startGame } from './helpers.ts'
+import { createRoom, newPerson, playToResult, startGame } from './helpers.ts'
 
 // e7-t06 (AC-7.6): what a person with only a keyboard needs, in a real browser
 
@@ -104,5 +104,43 @@ test('the turn markers on the seat chips do not hide the focus ring', async ({ p
     return { style: style.outlineStyle, width: style.outlineWidth }
   })
   expect(outline).toEqual({ style: 'solid', width: '2px' })
+  await guest.context().close()
+})
+
+test('the rules can be reached from a game card, and the way back too', async ({ page }) => {
+  await page.goto('/')
+  const link = page.getByRole('link', { name: 'How to play Promotion' })
+  await expect(link).toBeVisible()
+  await tabTo(page, link)
+  await page.keyboard.press('Enter')
+  await page.waitForURL(/\/games\/promotion\/rules/)
+  const back = page.getByRole('link', { name: 'Back to the lobby' })
+  await tabTo(page, back)
+  await page.keyboard.press('Enter')
+  await page.waitForURL((url) => url.pathname === '/')
+})
+
+test('how to play opens over the room and Esc gives the focus back', async ({ page }) => {
+  await createRoom(page, 'Ann')
+  const open = page.getByRole('button', { name: 'How to play' })
+  await tabTo(page, open)
+  await page.keyboard.press('Enter')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('table')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(open).toBeFocused()
+})
+
+test('what comes after the result can be done with the keyboard', async ({ page, browser }) => {
+  test.setTimeout(90_000)
+  const guest = await newPerson(browser, { reducedMotion: 'reduce' })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const result = await playToResult(page, guest)
+  const rematch = result.getByRole('button', { name: 'Rematch' })
+  await tabTo(page, rematch, 60)
+  await page.keyboard.press('Enter')
+  await expect(result).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Roll', exact: true })).toBeVisible()
   await guest.context().close()
 })

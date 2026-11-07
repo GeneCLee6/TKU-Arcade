@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createRoom, joinRoom, newPerson } from './helpers.ts'
+import { createRoom, joinRoom, newPerson, playToResult, startGame } from './helpers.ts'
 
 // e7-t05 (AC-7.4): the lobby and the waiting room on a phone held upright
 const PHONE = { width: 375, height: 667 }
@@ -15,7 +15,7 @@ async function expectNoSidewaysScroll(page: Page) {
   expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
 }
 
-/** The page's own tap targets are a finger's height. The in-game dock is out of this spec's scope */
+/** Tap targets are a finger's height */
 async function expectFingerSizedControls(page: Page, names: (string | RegExp)[]) {
   for (const name of names) {
     const box = await page.getByRole('button', { name }).first().boundingBox()
@@ -26,7 +26,7 @@ async function expectFingerSizedControls(page: Page, names: (string | RegExp)[])
 test.describe('the lobby at 375 px', () => {
   for (const [locale, newRoom, theme] of [
     ['en-US', 'New room', 'Dark'],
-    ['zh-TW', '開新房', '深色'],
+    ['zh-TW', '建立房間', '深色'],
   ]) {
     test(`${locale}: fits, and "New room" is on the first screen`, async ({ browser }) => {
       const page = await newPerson(browser, { ...device, locale })
@@ -112,5 +112,66 @@ test.describe('the waiting room at 375 px', () => {
     await back.click({ trial: true })
     const box = await back.boundingBox()
     expect(box?.height).toBeGreaterThanOrEqual(44)
+  })
+})
+
+test.describe('the rules at 375 px', () => {
+  test('the page fits, table included, and the card links to it with a finger-sized link', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    const link = page.getByRole('link', { name: 'How to play Promotion' })
+    expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+    await link.tap()
+    await expect(page.getByRole('table')).toBeVisible()
+    await expectNoSidewaysScroll(page)
+    const table = await page.getByRole('table').boundingBox()
+    expect((table?.x ?? 0) + (table?.width ?? Infinity)).toBeLessThanOrEqual(PHONE.width)
+    const back = await page.getByRole('link', { name: 'Back to the lobby' }).boundingBox()
+    expect(back?.height).toBeGreaterThanOrEqual(44)
+  })
+
+  test('how to play is a sheet that scrolls inside the screen', async ({ page }) => {
+    await createRoom(page, 'Ann')
+    await expectFingerSizedControls(page, ['How to play'])
+    await page.getByRole('button', { name: 'How to play' }).tap()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('table')).toBeVisible()
+    await expectNoSidewaysScroll(page)
+    const box = await dialog.boundingBox()
+    expect((box?.y ?? -1) >= 0).toBe(true)
+    expect((box?.y ?? 0) + (box?.height ?? Infinity)).toBeLessThanOrEqual(PHONE.height)
+    await expectFingerSizedControls(page, ['Close'])
+    // The last line of a long text can be reached
+    const last = dialog.getByRole('table')
+    await last.scrollIntoViewIfNeeded()
+    await expect(last).toBeInViewport()
+  })
+})
+
+test.describe('the game at 375 px', () => {
+  test('its controls are finger-sized and the page does not scroll sideways', async ({
+    page,
+    browser,
+  }) => {
+    const guest = await newPerson(browser, device)
+    await startGame(page, guest)
+    await expectNoSidewaysScroll(page)
+    await expectFingerSizedControls(page, [/^Roll$/, /^Members$/, /^Chat$/, 'Zoom in', 'Zoom out', /^Fit$/])
+    await expectFingerSizedControls(page, [/^Ann$/, /^Bob$/])
+    await guest.context().close()
+  })
+
+  test('the result fits, and is on the screen when the game ends', async ({ page, browser }) => {
+    test.setTimeout(90_000)
+    const guest = await newPerson(browser, { ...device, reducedMotion: 'reduce' })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const result = await playToResult(page, guest)
+    await expect(result.getByRole('heading', { name: 'Result' })).toBeInViewport()
+    await expectNoSidewaysScroll(page)
+    await expectFingerSizedControls(page, ['Rematch'])
+    const back = await result.getByRole('link', { name: 'Back to the lobby' }).boundingBox()
+    expect(back?.height).toBeGreaterThanOrEqual(44)
+    await guest.context().close()
   })
 })

@@ -116,6 +116,12 @@ const Main = styled.main`
   width: min(960px, 100%);
   margin: 0 auto;
   padding: ${space.xl}px ${space.lg}px ${space.xxxl}px;
+
+  /* So that the first game's "New room" is on a phone's first screen */
+  @media (max-width: 480px) {
+    gap: ${space.lg}px;
+    padding-top: ${space.md}px;
+  }
 `
 
 const Intro = styled.div`
@@ -125,6 +131,10 @@ const Intro = styled.div`
 const Title = styled.h1`
   margin: 0;
   font-size: ${fontSize.xxl}px;
+
+  @media (max-width: 480px) {
+    font-size: ${fontSize.xl}px;
+  }
 `
 
 const Tagline = styled.p`
