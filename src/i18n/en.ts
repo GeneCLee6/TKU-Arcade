@@ -54,6 +54,7 @@ export const en = {
   'notFound.title': 'Page not found',
   'notFound.hint': "There's nothing at this address.",
   'notFound.home': 'Back to the lobby',
+  'board.keyboardHint': 'Arrow keys move between the cells; Enter or Space shows what a cell does.',
   'nickname.dialogTitle': 'Choose a nickname',
   'nickname.invalid': 'Use 1 to {max} characters.',
   'nickname.label': 'Nickname',
@@ -109,7 +110,7 @@ export const en = {
   'room.host.reopen': 'Back to waiting room',
   'room.host.transfer': 'Make host',
   'room.host.transferBody': "{name} will run the room from now on. You can't take this back yourself.",
-  'room.host.transferNamed': 'Make {name} host',
+  'room.host.transferNamed': 'Make host: {name}',
   'room.host.transferTitle': 'Make {name} the host?',
   'room.inProgress': 'A game is in progress. Its screen is coming soon.',
   'room.joining': 'Joining…',
@@ -157,6 +158,17 @@ export const en = {
   'theme.system': 'System',
   'theme.light': 'Light',
   'theme.dark': 'Dark',
+  // C2: the game's side panel and its drawer on a phone
+  'room.panel.chatUnread': 'Chat ({count} new)',
+  'room.panel.members': 'Members',
+  'room.panel.title': 'Room',
+  'room.turnBadge': 'Up now',
+  'room.result.heading': 'Results',
+  'room.result.place': '#{rank}',
+  'room.result.score': 'Score: {score}',
+  'rules.howToPlay': 'How to play',
+  'rules.loadFailed': "Couldn't load the rules. Check your connection and try again.",
+  'rules.pageTitle': 'How to play {game}',
 } as const
 
 export type MessageKey = keyof typeof en

@@ -354,7 +354,7 @@ describe('outside the waiting room', () => {
 
     it('keeps the host’s row controls, behind their confirmations', async () => {
       await inStatus(status)
-      expect(button('Make Bo host')).toBeInTheDocument()
+      expect(button('Make host: Bo')).toBeInTheDocument()
       fireEvent.click(button('Kick Bo')!)
       expect(FakeWebSocket.last.sent).toEqual([])
       confirm('Kick Bo?', 'Kick')
@@ -364,7 +364,7 @@ describe('outside the waiting room', () => {
     it('gives everyone else no row controls', async () => {
       await inStatus(status, { host: false })
       expect(button('Kick Bo')).toBeNull()
-      expect(button('Make Bo host')).toBeNull()
+      expect(button('Make host: Bo')).toBeNull()
     })
 
     it('lets the host dissolve, after confirming', async () => {
@@ -697,7 +697,18 @@ describe('chat', () => {
   const chatBox = () => screen.getByRole('textbox', { name: en['chat.inputLabel'] })
   const chatLog = () => screen.getByRole('log', { name: en['chat.messages'] })
   const game = (chatLocked: boolean) => ({
-    view: {},
+    view: {
+      players: [{ seat: 0, cell: 'baiding', rolls: 0, demotions: 0 }],
+      turn: 0,
+      first: 0,
+      round: 1,
+      turnLimit: 60,
+      dice: 'four-sided',
+      last: null,
+      ending: null,
+      winner: null,
+      you: 0,
+    },
     legal: [],
     over: false,
     result: null,

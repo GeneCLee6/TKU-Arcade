@@ -1,13 +1,14 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { createElement, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { isRoomId } from '../../shared/room-id.ts'
 import { Button } from '../components/Button.tsx'
-import { ChatPanel } from '../components/ChatPanel.tsx'
+import { GameLayout, RoomChatPanel, type RoomParts } from '../components/GameLayout.tsx'
+import { HowToPlay } from '../components/HowToPlay.tsx'
 import { NicknameForm } from '../components/NicknameForm.tsx'
-import { RoomInPlay } from '../components/RoomInPlay.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { WaitingRoom } from '../components/WaitingRoom.tsx'
+import { gameScreen } from '../games/screens.ts'
 import { useT } from '../i18n/useT.ts'
 import { ChatDraft } from '../lib/chatState.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
@@ -55,7 +56,11 @@ function RoomEntry({ id }: { id: string }) {
   if (name === null) {
     return (
       <>
-        <RoomHeading title={title} members={lookup.summary.members} />
+        <RoomHeading
+          title={title}
+          members={lookup.summary.members}
+          gameId={lookup.summary.gameId}
+        />
         <NicknameForm onSubmit={setName} />
       </>
     )
@@ -116,6 +121,26 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
 
   // From here on the room itself says: the summary was read before this person joined
   const { view, you } = session
+  const parts: RoomParts = {
+    view,
+    you,
+    timers: room.timers,
+    onSit: room.sit,
+    onCover: room.cover,
+    onKick: room.kick,
+    onTransfer: room.transfer,
+    onDissolve: room.dissolve,
+    onReopen: room.reopen,
+    onRematch: room.rematch,
+    act: room.act,
+    chat: {
+      messages: room.chat,
+      locked: view.game?.chatLocked ?? false,
+      onSend: room.sendChat,
+      draftStore: chatDraft,
+    },
+  }
+  const Screen = gameScreen(view.room.gameId)
   return (
     <>
       {/* Always in the page: screen readers only announce changes in a region they already know */}
@@ -125,54 +150,65 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
       <RoomHeading
         title={gameTitle(t, view.room.gameId)}
         members={Object.keys(view.members).length}
+        gameId={view.room.gameId}
       />
       {view.room.status === 'waiting' ? (
-        <WaitingRoom
-          roomId={id}
-          view={view}
-          you={you}
-          onSit={room.sit}
-          onReady={room.setReady}
-          onStart={room.start}
-          onKick={room.kick}
-          onTransfer={room.transfer}
-          onDissolve={room.dissolve}
-          onSetGame={room.setGame}
-          onSetOptions={room.setOptions}
-        />
+        <>
+          <WaitingRoom
+            roomId={id}
+            view={view}
+            you={you}
+            onSit={room.sit}
+            onReady={room.setReady}
+            onStart={room.start}
+            onKick={room.kick}
+            onTransfer={room.transfer}
+            onDissolve={room.dissolve}
+            onSetGame={room.setGame}
+            onSetOptions={room.setOptions}
+          />
+          <RoomChatPanel room={parts} />
+        </>
+      ) : view.game && Screen ? (
+        // While its code loads the room is already all there, chat included
+        <Suspense
+          fallback={
+            <GameLayout room={parts} resultHeld>
+              <p role="status">{t('common.loading')}</p>
+            </GameLayout>
+          }
+        >
+          {createElement(Screen, { room: parts, game: view.game })}
+        </Suspense>
       ) : (
-        <RoomInPlay
-          view={view}
-          you={you}
-          timers={room.timers}
-          onSit={room.sit}
-          onCover={room.cover}
-          onKick={room.kick}
-          onTransfer={room.transfer}
-          onDissolve={room.dissolve}
-          onReopen={room.reopen}
-          onRematch={room.rematch}
-        />
+        <GameLayout room={parts} />
       )}
-      <ChatPanel
-        messages={room.chat}
-        you={you}
-        locked={view.game?.chatLocked ?? false}
-        onSend={room.sendChat}
-        draftStore={chatDraft}
-      />
-      <LobbyLink />
+      {/* A result carries its own, where it can be seen without passing the board */}
+      {!(view.room.status === 'ended' && view.game?.result) && <LobbyLink />}
     </>
   )
 }
 
-function RoomHeading({ title, members }: { title: string; members: number }) {
+function RoomHeading({
+  title,
+  members,
+  gameId,
+}: {
+  title: string
+  members: number
+  gameId?: string
+}) {
   const t = useT()
   return (
-    <div>
+    <HeadingRow>
       <Title>{title}</Title>
       <Muted>{t('room.memberCount', { count: members })}</Muted>
-    </div>
+      {gameId !== undefined && (
+        <HeadingAction>
+          <HowToPlay gameId={gameId} />
+        </HeadingAction>
+      )}
+    </HeadingRow>
   )
 }
 
@@ -217,6 +253,17 @@ const Main = styled.main`
   & p {
     margin: 0;
   }
+
+  /* A game needs the width its board can use, and on a phone every pixel of it */
+  &:has([data-wide-room]) {
+    width: min(1280px, 100%);
+  }
+
+  @media (max-width: 899px) {
+    &:has([data-wide-room]) {
+      padding: ${space.md}px ${space.sm}px ${space.sm}px;
+    }
+  }
 `
 
 // Stuck to the top, since the room can be longer than a phone's screen. Empty, it takes up no room:
@@ -240,6 +287,17 @@ const ReconnectBanner = styled.p`
   border-radius: ${radius.component}px;
 `
 
+const HeadingRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: ${space.md}px;
+`
+
+const HeadingAction = styled.div`
+  margin-left: auto;
+`
+
 const Title = styled.h1`
   margin: 0;
   font-size: ${fontSize.xl}px;
@@ -250,6 +308,9 @@ const Muted = styled.p`
 `
 
 const BackLink = styled(Link)`
+  display: inline-flex;
+  align-items: center;
   justify-self: start;
+  min-height: 44px;
   color: ${color.text};
 `

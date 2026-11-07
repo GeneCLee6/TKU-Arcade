@@ -110,14 +110,15 @@ export function WaitingRoom({
         <Muted>{t('room.waiting.waitForHost')}</Muted>
       )}
 
+      {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
+      <Invite roomId={roomId} />
+
       <GameSetup
         room={view.room}
         isHost={isHost}
         onSetGame={onSetGame}
         onSetOptions={onSetOptions}
       />
-
-      <Invite roomId={roomId} />
 
       {isHost && (
         <Actions>

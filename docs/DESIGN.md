@@ -21,7 +21,8 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
 ## 4. 版面
 
 - 大廳：頂欄（標誌、語言、登入）＋ 遊戲卡片網格（桌機三欄、手機單欄）＋ 公開房列表。
-- 房間：頂欄（遊戲名、房號、複製連結、語言）＋ 主區（遊戲畫面）＋ 右欄（座位、聊天；手機變抽屜）。
+- 房間：頂欄（遊戲名、房號、複製連結、語言）＋ 主區（遊戲畫面）＋ 右欄（座位、聊天；手機變抽屜）。寬度 900px 以下算手機版面（`COMPACT_QUERY`）：等不得的東西不放抽屜（倒數、卡住的座位、遊戲結束後的房主動作），底部固定一條 dock（輪到誰、擲骰、開抽屜）。
+- 升官圖圖版：直向手機 7 欄 × 12 列，由外往內繞，三圈正好 78 格，中央 1 × 6 留給「榮歸」；寬螢幕同一個螺旋橫放成 12 × 7。英文格子只放音譯，括號意譯在點格子後的說明。
 - 卡丁車：全螢幕 canvas，HUD 疊在上面（速度、加速條、圈數、分段、小地圖、道具欄），Esc 開選單。
 
 ## 5. i18n 規則
@@ -49,12 +50,16 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
 ## 6. 無障礙
 
 - 全部操作可鍵盤完成；焦點樣式可見；拖曳（刻度盤）有鍵盤替代（左右鍵、Shift 加速）。
+- 一大片格子只佔一個 Tab 停靠點：升官圖圖版用方向鍵在格子間移動（照畫面上下左右，不是沿著路徑），Enter 或空白鍵看說明，Home、End 到起點與榮歸。
+- 按鈕上看得到的字要包含在無障礙名稱裡（WCAG 2.5.3）：「轉移房主：{name}」，不是另一句話。只給螢幕閱讀器的文字用 `VisuallyHidden`。
+- 觸控螢幕上（`pointer: coarse`）可點的東西至少 44 px：`Button` 的 `sm` 尺寸自己會放大，連結要自己設。手機版面的底部 dock 用 `scroll-padding-bottom` 避開，Tab 不會停在 dock 後面。
+- `e2e/a11y.spec.ts`（axe，擋 serious 與 critical）、`keyboard.spec.ts`、`mobile.spec.ts`、`zh-walkthrough.spec.ts` 目前要手動跑（`npm run test:browser`，先 `npm run dev`，或設 `BASE_URL` 指向預覽站），CI 還沒跑。新畫面要各加一行。繁中走查清單在 `ZH-WALKTHROUGH.md`。
 - 狀態不只靠顏色：輪到誰同時有外框與文字；道具圖示形狀各異。
 - 動畫尊重 `prefers-reduced-motion`。
 - axe 無嚴重錯誤是 CI 的一部分（M1）。
 
 ## 7. 視覺資產
 
-- 所有圖示、插圖、模型、音效都在 `docs/ASSETS.md` 登記（來源、授權、作者）。
+- 所有圖示、插圖、模型、音效都在 `docs/ASSETS.md` 登記（來源、授權、作者）。例外：程式畫的 SVG（升官圖圖版、陀螺、骰子）與 `src/lib/sound.ts` 用 WebAudio 合成的音效都是這個 repo 自己的程式碼，沒有資產檔，不用登記。
 - 風格一致：低多邊形卡通（3D）、簡單幾何插圖（2D）。
 - 不出現任何原作的角色、標誌、配色組合。

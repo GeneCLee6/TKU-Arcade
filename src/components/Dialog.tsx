@@ -53,7 +53,7 @@ export function Dialog({ open, onClose, title, children, actions }: DialogProps)
         <Content>
           <Header>
             <Title id={titleId}>{title}</Title>
-            <Button $variant="ghost" $size="sm" onClick={onClose}>
+            <Button $variant="ghost" onClick={onClose}>
               {t('common.close')}
             </Button>
           </Header>
@@ -67,7 +67,11 @@ export function Dialog({ open, onClose, title, children, actions }: DialogProps)
 
 const Panel = styled.dialog`
   width: min(480px, calc(100vw - ${space.xxl}px));
+  /* A long body scrolls inside: the phone's own chrome must not hide the buttons */
+  max-height: calc(100dvh - ${space.xxl}px);
   padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: ${color.surface};
   color: ${color.text};
   border: 1px solid ${color.border};
@@ -76,12 +80,21 @@ const Panel = styled.dialog`
   &::backdrop {
     background: ${color.overlay};
   }
+
+  /* On a phone it sits at the bottom, where a thumb can reach its buttons */
+  @media (max-width: 599px) {
+    width: 100%;
+    max-width: 100%;
+    margin: auto 0 0;
+    border-width: 1px 0 0;
+    border-radius: ${radius.card}px ${radius.card}px 0 0;
+  }
 `
 
 const Content = styled.div`
   display: grid;
   gap: ${space.lg}px;
-  padding: ${space.xl}px;
+  padding: ${space.xl}px ${space.xl}px calc(${space.xl}px + env(safe-area-inset-bottom));
 `
 
 const Header = styled.div`
@@ -109,4 +122,10 @@ const Actions = styled.div`
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: ${space.sm}px;
+
+  @media (max-width: 599px) {
+    & > * {
+      flex: 1;
+    }
+  }
 `

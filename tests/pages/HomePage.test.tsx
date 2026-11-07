@@ -103,7 +103,7 @@ describe('lobby cards', () => {
     const name = translate('zh-TW', 'games.promotion.name')
     fireEvent.click(screen.getByRole('button', { name: '繁中' }))
     expect(screen.getByRole('heading', { level: 3, name })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '開新房' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '建立房間' })).toBeInTheDocument()
     expect(screen.getByText('2–6 人')).toBeInTheDocument()
     expect(screen.getByText('約 20 分鐘')).toBeInTheDocument()
     setLanguage('en')
@@ -112,7 +112,11 @@ describe('lobby cards', () => {
   it('prints one number when a game takes exactly one player count', () => {
     const game = getGame('promotion')!
     const fixed = { ...game, meta: { ...game.meta, minPlayers: 4, maxPlayers: 4 } }
-    render(<GameCard game={fixed} disabled={false} onNewRoom={vi.fn()} />)
+    render(
+      <MemoryRouter>
+        <GameCard game={fixed} disabled={false} onNewRoom={vi.fn()} />
+      </MemoryRouter>,
+    )
     expect(screen.getByText('4 players')).toBeInTheDocument()
     expect(screen.queryByText(/4–4/)).not.toBeInTheDocument()
   })

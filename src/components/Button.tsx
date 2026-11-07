@@ -37,6 +37,12 @@ const sizes = {
     min-height: 32px;
     padding: 0 ${space.md}px;
     font-size: ${fontSize.sm}px;
+
+    /* Small to the eye, not to a finger */
+    @media (pointer: coarse) {
+      min-width: 44px;
+      min-height: 44px;
+    }
   `,
   // 44px: a comfortable touch target on a phone
   md: css`
