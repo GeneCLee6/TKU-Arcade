@@ -1,5 +1,5 @@
 // What the lobby and the waiting room say of this game: these are in everyone's first load, through
-// GAME_MESSAGES (shared/games/index.ts). All the rest is in i18n.screen.ts, which loads with the screen.
+// GAME_MESSAGES (shared/games/catalog.ts). All the rest is in i18n.screen.ts, which loads with the screen.
 // `en` is the source; the type makes zh-TW keep the same keys.
 const en = {
   'games.silent-table.name': 'Silent Table',

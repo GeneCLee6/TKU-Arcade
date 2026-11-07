@@ -1,12 +1,12 @@
-// The registry: every game the server can run. A new game adds its module and its strings here. No
-// React: the Worker imports this file; the lazy screens get their own map with src/games/ (e2-t12).
-import { promotionMessages } from './promotion/i18n.ts'
+// The registry with the rules: every game the server can run. The Worker and the scripts import this
+// file; the browser must not, or every game's rules are in its first load: it has catalog.ts, and the
+// lazy screens have src/games/screens.ts. A new game adds its module here and its info in catalog.ts.
 import { promotion } from './promotion/rules.ts'
-import { silentTableMessages } from './silent-table/i18n.ts'
 import { silentTable } from './silent-table/rules.ts'
-import { ticTacToeMessages } from './tictactoe/i18n.ts'
 import { ticTacToe } from './tictactoe/rules.ts'
-import type { AnyGameModule, GameMessages } from './types.ts'
+import type { AnyGameModule } from './types.ts'
+
+export { GAME_MESSAGES, LOBBY_GAMES } from './catalog.ts'
 
 const MODULES: readonly AnyGameModule[] = [ticTacToe, promotion, silentTable]
 
@@ -14,20 +14,7 @@ const BY_ID: ReadonlyMap<string, AnyGameModule> = new Map(MODULES.map((game) => 
 
 export const GAME_IDS: readonly string[] = MODULES.map((game) => game.id)
 
-/** The games the lobby shows a card for, in order */
-export const LOBBY_GAMES: readonly AnyGameModule[] = MODULES.filter((game) => !game.meta.unlisted)
-
 /** The module with this id, or null: ids come from the network */
 export function getGame(id: string): AnyGameModule | null {
   return BY_ID.get(id) ?? null
-}
-
-/** Every game's strings, for src/i18n to merge into its dictionaries */
-export const GAME_MESSAGES: GameMessages = {
-  en: { ...ticTacToeMessages.en, ...promotionMessages.en, ...silentTableMessages.en },
-  'zh-TW': {
-    ...ticTacToeMessages['zh-TW'],
-    ...promotionMessages['zh-TW'],
-    ...silentTableMessages['zh-TW'],
-  },
 }

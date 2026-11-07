@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { LOBBY_GAMES, getGame } from '../../shared/games/index.ts'
+import { LOBBY_GAMES, getGameInfo } from '../../shared/games/catalog.ts'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { RoomInfo } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
@@ -91,7 +91,7 @@ interface GameSetupProps {
 export function GameSetup({ room, isHost, onSetGame, onSetOptions }: GameSetupProps) {
   const t = useT()
   const selectId = useId()
-  const game = getGame(room.gameId)
+  const game = getGameInfo(room.gameId)
   // The room's own game is always there to be shown as selected, listed or not
   const choices = LOBBY_GAMES.map((other) => other.id)
   if (!choices.includes(room.gameId)) choices.unshift(room.gameId)

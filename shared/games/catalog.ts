@@ -1,0 +1,36 @@
+// What the browser needs of every game: names, player counts, rule options and the strings for them.
+// No rules: src/ imports this file, and whatever it imports is in everyone's first load. The Worker's
+// registry with the rules is shared/games/index.ts; a new game adds itself to both.
+import { promotionMessages } from './promotion/i18n.ts'
+import { promotionInfo } from './promotion/info.ts'
+import { silentTableMessages } from './silent-table/i18n.ts'
+import { silentTableInfo } from './silent-table/info.ts'
+import { ticTacToeMessages } from './tictactoe/i18n.ts'
+import { ticTacToeInfo } from './tictactoe/info.ts'
+import type { AnyGameInfo, GameMessages } from './types.ts'
+
+export const GAME_INFOS = [
+  ticTacToeInfo,
+  promotionInfo,
+  silentTableInfo,
+] as unknown as readonly AnyGameInfo[]
+
+const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
+
+/** The games the lobby shows a card for, in order */
+export const LOBBY_GAMES: readonly AnyGameInfo[] = GAME_INFOS.filter((game) => !game.meta.unlisted)
+
+/** This game's info, or null: ids come from the network */
+export function getGameInfo(id: string): AnyGameInfo | null {
+  return BY_ID.get(id) ?? null
+}
+
+/** Every game's first-load strings, for src/i18n to merge into its dictionaries */
+export const GAME_MESSAGES: GameMessages = {
+  en: { ...ticTacToeMessages.en, ...promotionMessages.en, ...silentTableMessages.en },
+  'zh-TW': {
+    ...ticTacToeMessages['zh-TW'],
+    ...promotionMessages['zh-TW'],
+    ...silentTableMessages['zh-TW'],
+  },
+}

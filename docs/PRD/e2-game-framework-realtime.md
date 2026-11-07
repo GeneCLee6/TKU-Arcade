@@ -54,7 +54,7 @@ depends_on: [E12]
 
 ## 設計方向
 
-- 資料夾：`shared/games/<id>/{rules.ts, types.ts, i18n.ts}`、`src/games/<id>/{Board.tsx, …}`、`shared/games/index.ts` 登記表。前端依 `id` 動態 `import()` 畫面（JS 預算）。
+- 資料夾：`shared/games/<id>/{info.ts, rules.ts, types.ts, i18n.ts}`、`src/games/<id>/{Board.tsx, …}`、`shared/games/index.ts` 登記表（含規則，給 Worker）、`shared/games/catalog.ts`（不含規則，給瀏覽器）。前端依 `id` 動態 `import()` 畫面（JS 預算）。
 - RoomDO 每房一個（沿用牌桌 H1 拆 DO 的結論），SQLite storage。
 - 錯誤：`GameError` 回給動作者，不廣播；協定錯誤關連線。
 
@@ -85,7 +85,7 @@ depends_on: [E12]
 - [ ] `e2-t09` 動作序列與種子保存、`/replay` 端點、前端重放器 · AC-2.5 · M · ← e2-t03
 - [ ] `e2-t10` 戰績寫入 D1（結果→`results` 表；登入者才寫） · AC-2.4 · S · ← e1-t12, e12-t05
 - [ ] `e2-t11` `RealtimeModule` 介面骨架與文件（E9 用） · — · S
-- [ ] `e2-t12` 遊戲畫面動態載入與 JS 預算分 chunk · — · S · ← e12-t03
+- [x] `e2-t12` 遊戲畫面動態載入與 JS 預算分 chunk · — · S · ← e12-t03 · #17
 
 ## 風險與對策
 

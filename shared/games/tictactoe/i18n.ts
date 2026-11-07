@@ -1,5 +1,5 @@
 // Every player-facing string of this game. `en` is the source; the type makes zh-TW keep the same
-// keys. src/i18n merges these through GAME_MESSAGES (shared/games/index.ts).
+// keys. src/i18n merges these through GAME_MESSAGES (shared/games/catalog.ts).
 const en = {
   'games.tictactoe.name': 'Tic-Tac-Toe',
   'games.tictactoe.summary': 'Three in a row wins.',

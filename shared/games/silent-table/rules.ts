@@ -9,6 +9,7 @@
 // - Hands that tie may hold their chips in either order.
 // - Any chip moving clears everyone's ready, because ready means accepting the chips as they are.
 // - `MOVES_PER_ROUND` caps a seat's moves in a round, so a round always ends without a clock.
+import { COMMUNITY_BY_ROUND, ROUNDS, silentTableInfo } from './info.ts'
 import { bestHand, fullDeck, type Card } from '../../poker/hand.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
@@ -21,9 +22,7 @@ import type {
 } from './types.ts'
 
 export const HOLE_CARDS = 2
-/** How many shared cards are showing in round 1, 2 and 3 */
-export const COMMUNITY_BY_ROUND: readonly number[] = [3, 4, 5]
-export const ROUNDS = COMMUNITY_BY_ROUND.length
+export { COMMUNITY_BY_ROUND, ROUNDS }
 /**
  * Moves one seat may make in one round: plenty to argue over a chip, and it means the moves run out,
  * so nobody can keep the table in a round for ever, even in a game with no timer.
@@ -217,64 +216,7 @@ export const silentTable: GameModule<
   SilentTableView,
   SilentTableOptions
 > = {
-  id: 'silent-table',
-  // Unlisted until the owner signs docs/IP-CHECKLIST.md: merging deploys, and a listed game is live.
-  // No `proxyTurns`: a chip is a decision, and a random one could lose the level
-  meta: {
-    minPlayers: 3,
-    maxPlayers: 6,
-    minutes: 20,
-    i18nKey: 'games.silent-table',
-    unlisted: true,
-  },
-
-  options: {
-    levelsToWin: {
-      kind: 'int',
-      labelKey: 'games.silent-table.option.levelsToWin',
-      min: 1,
-      max: 7,
-      default: 3,
-    },
-    failureLimit: {
-      kind: 'int',
-      labelKey: 'games.silent-table.option.failureLimit',
-      min: 1,
-      max: 5,
-      default: 3,
-    },
-    allowTakeFromPlayers: {
-      kind: 'boolean',
-      labelKey: 'games.silent-table.option.allowTakeFromPlayers',
-      default: true,
-    },
-    spectatorsSeeAll: {
-      kind: 'boolean',
-      labelKey: 'games.silent-table.option.spectatorsSeeAll',
-      default: false,
-    },
-    roundSeconds: {
-      kind: 'select',
-      labelKey: 'games.silent-table.option.roundSeconds',
-      choices: [
-        { value: 0, labelKey: 'games.silent-table.option.roundSeconds.off' },
-        { value: 60, labelKey: 'games.silent-table.option.roundSeconds.60' },
-        { value: 90, labelKey: 'games.silent-table.option.roundSeconds.90' },
-        { value: 120, labelKey: 'games.silent-table.option.roundSeconds.120' },
-      ],
-      default: 0,
-    },
-    skin: {
-      kind: 'select',
-      labelKey: 'games.silent-table.option.skin',
-      choices: [
-        { value: 'plain', labelKey: 'games.silent-table.option.skin.plain' },
-        { value: 'diving', labelKey: 'games.silent-table.option.skin.diving' },
-        { value: 'climbing', labelKey: 'games.silent-table.option.skin.climbing' },
-      ],
-      default: 'plain',
-    },
-  },
+  ...silentTableInfo,
 
   init(seats, options, rng) {
     const players = seats.map(

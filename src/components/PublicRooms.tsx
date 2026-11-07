@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { getGame } from '../../shared/games/index.ts'
+import { getGameInfo } from '../../shared/games/catalog.ts'
 import { useT } from '../i18n/useT.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
 import { usePublicRooms } from '../lib/usePublicRooms.ts'
@@ -13,7 +13,7 @@ export function PublicRooms() {
   const navigate = useNavigate()
   const { rooms, failed } = usePublicRooms()
   // A game that is not on offer stays out even if someone made a room of it by hand
-  const shown = (rooms ?? []).filter(({ gameId }) => getGame(gameId)?.meta.unlisted !== true)
+  const shown = (rooms ?? []).filter(({ gameId }) => getGameInfo(gameId)?.meta.unlisted !== true)
 
   return (
     <section>
