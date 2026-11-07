@@ -8,7 +8,7 @@ import { Button } from './Button.tsx'
 import { ConfirmButton } from './ConfirmButton.tsx'
 import { FieldLabel, ReadOnlyField, ReadOnlyFields, SelectInput } from './Field.tsx'
 import { OptionsForm } from './OptionsForm.tsx'
-import { Heading, Muted, Section } from './roomParts.ts'
+import { Actions, Heading, Muted, Section } from './roomParts.ts'
 
 interface SeatedGateButtonProps {
   label: string
@@ -42,6 +42,41 @@ export function DissolveButton({ onDissolve }: { onDissolve(): void }) {
       body={t('room.host.dissolveBody')}
       onConfirm={onDissolve}
     />
+  )
+}
+
+interface HostEndedActionsProps {
+  seated: number
+  minPlayers: number
+  onRematch(): void
+  onReopen(): void
+  onDissolve(): void
+}
+
+/** What the host can do once a game is over */
+export function HostEndedActions({
+  seated,
+  minPlayers,
+  onRematch,
+  onReopen,
+  onDissolve,
+}: HostEndedActionsProps) {
+  const t = useT()
+  return (
+    <Section>
+      <SeatedGateButton
+        label={t('room.host.rematch')}
+        seated={seated}
+        minPlayers={minPlayers}
+        onClick={onRematch}
+      />
+      <Actions>
+        <Button $variant="secondary" onClick={onReopen}>
+          {t('room.host.reopen')}
+        </Button>
+        <DissolveButton onDissolve={onDissolve} />
+      </Actions>
+    </Section>
   )
 }
 

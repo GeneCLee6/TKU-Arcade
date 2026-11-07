@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import { isRoomId } from '../../shared/room-id.ts'
 import { Button } from '../components/Button.tsx'
 import { GameLayout, RoomChatPanel, type RoomParts } from '../components/GameLayout.tsx'
+import { HowToPlay } from '../components/HowToPlay.tsx'
 import { NicknameForm } from '../components/NicknameForm.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { WaitingRoom } from '../components/WaitingRoom.tsx'
@@ -55,7 +56,11 @@ function RoomEntry({ id }: { id: string }) {
   if (name === null) {
     return (
       <>
-        <RoomHeading title={title} members={lookup.summary.members} />
+        <RoomHeading
+          title={title}
+          members={lookup.summary.members}
+          gameId={lookup.summary.gameId}
+        />
         <NicknameForm onSubmit={setName} />
       </>
     )
@@ -145,6 +150,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
       <RoomHeading
         title={gameTitle(t, view.room.gameId)}
         members={Object.keys(view.members).length}
+        gameId={view.room.gameId}
       />
       {view.room.status === 'waiting' ? (
         <>
@@ -167,7 +173,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         // While its code loads the room is already all there, chat included
         <Suspense
           fallback={
-            <GameLayout room={parts}>
+            <GameLayout room={parts} resultHeld>
               <p role="status">{t('common.loading')}</p>
             </GameLayout>
           }
@@ -177,17 +183,31 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
       ) : (
         <GameLayout room={parts} />
       )}
-      <LobbyLink />
+      {/* A result carries its own, where it can be seen without passing the board */}
+      {!(view.room.status === 'ended' && view.game?.result) && <LobbyLink />}
     </>
   )
 }
 
-function RoomHeading({ title, members }: { title: string; members: number }) {
+function RoomHeading({
+  title,
+  members,
+  gameId,
+}: {
+  title: string
+  members: number
+  gameId?: string
+}) {
   const t = useT()
   return (
     <HeadingRow>
       <Title>{title}</Title>
       <Muted>{t('room.memberCount', { count: members })}</Muted>
+      {gameId !== undefined && (
+        <HeadingAction>
+          <HowToPlay gameId={gameId} />
+        </HeadingAction>
+      )}
     </HeadingRow>
   )
 }
@@ -272,6 +292,10 @@ const HeadingRow = styled.div`
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: ${space.md}px;
+`
+
+const HeadingAction = styled.div`
+  margin-left: auto;
 `
 
 const Title = styled.h1`

@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { FACES, getCell } from '../../../shared/games/promotion/board.ts'
 import type { LastRoll, PromotionView } from '../../../shared/games/promotion/types.ts'
+import type { Standing } from '../../../shared/games/types.ts'
 import type { RoomMember } from '../../../shared/protocol.ts'
 import { Avatar } from '../../components/Avatar.tsx'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
 import { Muted } from '../../components/roomParts.ts'
-import type { TextKey, Translate } from '../../i18n/t.ts'
-import { useT } from '../../i18n/useT.ts'
+import type { Translate } from '../../i18n/t.ts'
+import { useLanguage, useT } from '../../i18n/useT.ts'
 import { initialOf } from '../../lib/avatar.ts'
 import { playCue, setSoundOn, useSoundOn, useSoundUnlock } from '../../lib/sound.ts'
 import { useCompact, useMediaQuery, useReducedMotion } from '../../lib/useMediaQuery.ts'
@@ -30,6 +31,7 @@ const shortCellText = (t: Translate, id: string) => cellText(t, id).split(' (')[
 /** The promotion game's screen (e3-t04, e3-t05). Rules stay on the server: this draws `view` */
 export default function PromotionScreen({ room, game }: GameScreenProps) {
   const t = useT()
+  const language = useLanguage()
   const state = game.view as unknown as PromotionView
   const reducedMotion = useReducedMotion()
   const compact = useCompact()
@@ -109,12 +111,26 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
     players.find((player) => player.seat === activeSeat)?.cell ?? last?.to ?? players[0]?.cell
   const detailCell = selected ?? moverCell
 
-  const seatDetail = (member: RoomMember) => {
-    const player = players.find((candidate) => candidate.seat === member.seat)
+  const officeOf = (seat: number | null) => {
+    const player = players.find((candidate) => candidate.seat === seat)
     if (!player) return null
     const rank = t(`games.promotion.rank.${getCell(player.cell).rank}`)
     return `${cellText(t, player.cell)} · ${rank}`
   }
+  const seatDetail = (member: RoomMember) => officeOf(member.seat)
+  // `score` is how senior they ended up, 0 to 24, not points: the office says it in words
+  const resultDetail = (standing: Standing) => officeOf(standing.seat)
+
+  // Reaching the end wins outright; at the round limit there can be a tie at the top
+  const topSeats = game.result?.standings.filter((standing) => standing.rank === 1) ?? []
+  const resultHeadline =
+    state.winner !== null
+      ? t('games.promotion.ui.winner', { name: nameOf(state.winner) })
+      : t('games.promotion.ui.mostSenior', {
+          names: new Intl.ListFormat(language).format(
+            topSeats.map((standing) => nameOf(standing.seat)),
+          ),
+        })
 
   return (
     <GameLayout
@@ -122,6 +138,9 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
       turnSeat={activeSeat}
       seatDetail={seatDetail}
       seatTint
+      resultHeadline={resultHeadline}
+      resultDetail={resultDetail}
+      resultHeld={playing}
       dock={
         <TurnPanel>
           <RollDisplay kind={state.dice} shown={rolling ? null : last} rolling={rolling} />
@@ -133,11 +152,6 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
               nameOf={nameOf}
               rolling={rolling}
             />
-            {game.over && game.result && (
-              <SmallText>
-                {t(game.result.summary.key as TextKey, game.result.summary.params)}
-              </SmallText>
-            )}
             <SmallText role="status">
               {!rolling && last ? rollSentence(t, last, nameOf(last.seat)) : ''}
             </SmallText>

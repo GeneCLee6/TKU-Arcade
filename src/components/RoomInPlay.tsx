@@ -9,7 +9,7 @@ import { Button } from './Button.tsx'
 import { ConfirmButton } from './ConfirmButton.tsx'
 import { Countdown } from './Countdown.tsx'
 import { FreeSeatRow } from './FreeSeatRow.tsx'
-import { DissolveButton, SeatedGateButton } from './HostControls.tsx'
+import { DissolveButton, HostEndedActions } from './HostControls.tsx'
 import { MemberEntry } from './MemberEntry.tsx'
 import {
   Actions,
@@ -43,6 +43,8 @@ export interface RoomInPlayProps {
   hidePlaying?: boolean
   /** The countdown and the stuck seats are on show elsewhere, as a drawer would hide them */
   urgentElsewhere?: boolean
+  /** The result panel says the game has ended and holds what the host does next */
+  resultElsewhere?: boolean
 }
 
 /**
@@ -65,6 +67,7 @@ export function RoomInPlay({
   seatTint,
   hidePlaying,
   urgentElsewhere,
+  resultElsewhere,
 }: RoomInPlayProps) {
   const t = useT()
   const { status, minPlayers } = view.room
@@ -79,7 +82,7 @@ export function RoomInPlay({
 
   return (
     <Layout>
-      {!(hidePlaying && status === 'playing') && (
+      {!(hidePlaying && status === 'playing') && !(resultElsewhere && status === 'ended') && (
         <StatusLine playing={status === 'playing'} isHost={isHost} />
       )}
       {status === 'playing' && !hidePlaying && me?.seat === null && (
@@ -163,21 +166,14 @@ export function RoomInPlay({
         </Actions>
       )}
 
-      {isHost && status === 'ended' && (
-        <Section>
-          <SeatedGateButton
-            label={t('room.host.rematch')}
-            seated={seated.length}
-            minPlayers={minPlayers}
-            onClick={onRematch}
-          />
-          <Actions>
-            <Button $variant="secondary" onClick={onReopen}>
-              {t('room.host.reopen')}
-            </Button>
-            <DissolveButton onDissolve={onDissolve} />
-          </Actions>
-        </Section>
+      {isHost && status === 'ended' && !resultElsewhere && (
+        <HostEndedActions
+          seated={seated.length}
+          minPlayers={minPlayers}
+          onRematch={onRematch}
+          onReopen={onReopen}
+          onDissolve={onDissolve}
+        />
       )}
     </Layout>
   )
