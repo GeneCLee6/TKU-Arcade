@@ -6,13 +6,19 @@ import { zhTW } from './zh-TW.ts'
 export type Language = 'en' | 'zh-TW'
 export type MessageParams = Record<string, string | number>
 /** A site string, or a game's (shared/games/<id>/i18n.ts): `${game.meta.i18nKey}.name` */
-export type TextKey = MessageKey | `games.${string}`
+export type TextKey = MessageKey | `games.${string}` | `kart.${string}`
 export type Translate = (key: TextKey, params?: MessageParams) => string
 
 // Partial: the types require every site key, but a catalog can still come up short at runtime
 const catalogs: Record<Language, Partial<Record<string, string>>> = {
   en: { ...en, ...GAME_MESSAGES.en },
   'zh-TW': { ...zhTW, ...GAME_MESSAGES['zh-TW'] },
+}
+
+/** Adds a lazy chunk's own catalog, so that its strings stay out of the first load */
+export function registerMessages(messages: Record<Language, Record<string, string>>): void {
+  Object.assign(catalogs.en, messages.en)
+  Object.assign(catalogs['zh-TW'], messages['zh-TW'])
 }
 
 const STORAGE_KEY = 'tku-arcade.language'

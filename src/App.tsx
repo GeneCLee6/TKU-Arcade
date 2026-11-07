@@ -15,6 +15,11 @@ const RulesPage = lazy(() =>
   import('./pages/RulesPage.tsx').then(({ RulesPage }) => ({ default: RulesPage })),
 )
 
+// e8-t01: reached only by typing the address. Nothing links here, and three.js loads with this chunk
+const KartSpikePage = lazy(() =>
+  import('./kart/SpikePage.tsx').then(({ SpikePage }) => ({ default: SpikePage })),
+)
+
 function RouteLoading() {
   const t = useT()
   return <p role="status">{t('common.loading')}</p>
@@ -30,6 +35,7 @@ function AppRoutes() {
           <Route path="/" element={<HomePage />} />
           <Route path="/r/:id" element={<RoomPage />} />
           <Route path="/games/:id/rules" element={<RulesPage />} />
+          <Route path="/kart/spike" element={<KartSpikePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
