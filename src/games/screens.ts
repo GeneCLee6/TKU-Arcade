@@ -14,6 +14,7 @@ type GameScreen = LazyExoticComponent<ComponentType<GameScreenProps>>
 
 const SCREENS: Partial<Record<string, GameScreen>> = {
   promotion: lazy(() => import('./promotion/PromotionScreen.tsx')),
+  'silent-table': lazy(() => import('./silent-table/SilentTableScreen.tsx')),
 }
 
 export const gameScreen = (gameId: string): GameScreen | null => SCREENS[gameId] ?? null

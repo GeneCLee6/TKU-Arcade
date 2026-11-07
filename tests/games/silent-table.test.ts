@@ -4,6 +4,7 @@ import { makeSeats, projectGame, startMatch, applyAction } from '../../shared/ga
 import { defaultOptions, parseOptions } from '../../shared/games/options.ts'
 import { createRng } from '../../shared/games/rng.ts'
 import { silentTableMessages } from '../../shared/games/silent-table/i18n.ts'
+import { silentTableScreenMessages } from '../../shared/games/silent-table/i18n.screen.ts'
 import { MOVES_PER_ROUND, silentTable } from '../../shared/games/silent-table/rules.ts'
 import type {
   SilentTableAction,
@@ -23,6 +24,8 @@ const OPTIONS: SilentTableOptions = {
   failureLimit: 3,
   allowTakeFromPlayers: true,
   spectatorsSeeAll: false,
+  roundSeconds: 0,
+  skin: 'plain',
 }
 
 const start = (seats: number, overrides: Partial<SilentTableOptions> = {}, seed = 1) =>
@@ -104,7 +107,7 @@ const viewOf = (state: SilentTableState, viewer: Viewer): SilentTableView =>
   silentTable.view(state, viewer)
 
 describe('the module', () => {
-  it('runs on the room, for 3 to 6 seats, but no lobby or menu lists it until it has a screen', () => {
+  it('runs on the room, for 3 to 6 seats, but no lobby or menu lists it until the owner signs', () => {
     expect(getGame('silent-table')).toBe(silentTable)
     expect(GAME_IDS).toContain('silent-table')
     expect(silentTable.meta).toMatchObject({ minPlayers: 3, maxPlayers: 6, unlisted: true })
@@ -128,13 +131,22 @@ describe('rule options', () => {
         failureLimit: 0,
         allowTakeFromPlayers: 'yes',
         spectatorsSeeAll: 1,
+        roundSeconds: 45,
+        skin: 'pirates',
         extra: true,
       }),
     ).toEqual(OPTIONS)
   })
 
   it('keeps what is valid and copies it into the state', () => {
-    const chosen = { levelsToWin: 5, failureLimit: 1, allowTakeFromPlayers: false, spectatorsSeeAll: true }
+    const chosen: SilentTableOptions = {
+      levelsToWin: 5,
+      failureLimit: 1,
+      allowTakeFromPlayers: false,
+      spectatorsSeeAll: true,
+      roundSeconds: 90,
+      skin: 'diving',
+    }
     expect(parseOptions(silentTable.options, chosen)).toEqual(chosen)
     expect(start(3, chosen)).toMatchObject(chosen)
   })
@@ -600,6 +612,79 @@ describe('view trimming', () => {
   })
 })
 
+describe('the clock', () => {
+  const TIME_UP: SilentTableAction = { type: 'timeUp' }
+  const timed = (seats = 3) => start(seats, { roundSeconds: 90 })
+  const timers = (state: SilentTableState) => silentTable.timers?.(state) ?? []
+
+  it('asks for none when the option is off, or for a game from before the option', () => {
+    expect(timers(start(3))).toEqual([])
+    const { roundSeconds: _, ...old } = timed()
+    expect(timers(old as SilentTableState)).toEqual([])
+  })
+
+  it('asks for a countdown in the round, with an id that is new each round and level', () => {
+    const first = timers(timed())
+    expect(first).toEqual([{ id: 'round-1-1', ms: 90_000, action: TIME_UP }])
+    const second = settle(timed(), [1, 2, 3])
+    expect(timers(second)[0].id).toBe('round-1-2')
+  })
+
+  it('stays the same countdown while chips move in a round', () => {
+    expect(timers(act(timed(), take(1), 0))[0].id).toBe('round-1-1')
+  })
+
+  it('asks for none at a reveal or at the end', () => {
+    const state = timed()
+    expect(timers(playLevel(state, wrongChips(state)))).toEqual([])
+    const ended = start(3, { roundSeconds: 90, failureLimit: 1 })
+    expect(timers(playLevel(ended, wrongChips(ended)))).toEqual([])
+  })
+
+  it('only the room can call time', () => {
+    expect(refusal(timed(), TIME_UP, 0)).toBe(error('systemOnly'))
+  })
+
+  it('moves the round on with every chip where it is, ready or not', () => {
+    const next = act(act(timed(), take(3), 1), READY, 1)
+    const after = act(next, TIME_UP, 'system')
+    expect(after.round).toBe(2)
+    expect(after.players.map((player) => player.history)).toEqual([[1], [3], [2]])
+    expect(after.players.every((player) => player.chip === null && !player.ready)).toBe(true)
+  })
+
+  it('leaves a seat its chip even when others have none, unlike passing each in turn', () => {
+    const next = act(act(act(timed(), take(2), 0), READY, 0), take(1), 2)
+    const after = act(next, TIME_UP, 'system')
+    expect(after.players.map((player) => player.history)).toEqual([[2], [3], [1]])
+  })
+
+  it('scores the level when it runs out in the last round', () => {
+    const third = settle(settle(timed(), [1, 2, 3]), [1, 2, 3])
+    const after = act(third, TIME_UP, 'system')
+    expect(after.phase === 'reveal' || after.phase === 'over').toBe(true)
+    expect(after.reveal?.seats).toHaveLength(3)
+  })
+
+  it('refuses at a reveal, so a late timer cannot do anything', () => {
+    const state = timed()
+    const shown = playLevel(state, wrongChips(state))
+    expect(refusal(shown, TIME_UP, 'system')).toBe(error('cardsShowing'))
+  })
+})
+
+describe('chat', () => {
+  it('is closed while chips are taken and open once the cards are shown', () => {
+    const state = start(3)
+    expect(silentTable.chatLocked?.(state)).toBe(true)
+    const shown = playLevel(state, wrongChips(state))
+    expect(shown.phase).toBe('reveal')
+    expect(silentTable.chatLocked?.(shown)).toBe(false)
+    const over = start(3, { failureLimit: 1 })
+    expect(silentTable.chatLocked?.(playLevel(over, wrongChips(over)))).toBe(false)
+  })
+})
+
 describe('whole games through the harness', () => {
   /** Others' hole cards until the reveal; the cards still to come, for everybody */
   const secrets = (state: SilentTableState, viewer: Viewer): Card[] => {
@@ -614,8 +699,9 @@ describe('whole games through the harness', () => {
     OPTIONS,
     { ...OPTIONS, allowTakeFromPlayers: false },
     { ...OPTIONS, spectatorsSeeAll: true },
-    { levelsToWin: 1, failureLimit: 1, allowTakeFromPlayers: true, spectatorsSeeAll: false },
-    { levelsToWin: 7, failureLimit: 5, allowTakeFromPlayers: true, spectatorsSeeAll: false },
+    { ...OPTIONS, levelsToWin: 1, failureLimit: 1 },
+    { ...OPTIONS, levelsToWin: 7, failureLimit: 5 },
+    { ...OPTIONS, roundSeconds: 60, skin: 'climbing' },
   ]
 
   // The harness checks every action of every seat at every position, so a game at five or six seats
@@ -650,7 +736,8 @@ describe('whole games through the harness', () => {
 })
 
 describe('strings', () => {
-  const { en, 'zh-TW': zhTW } = silentTableMessages
+  const en = { ...silentTableMessages.en, ...silentTableScreenMessages.en }
+  const zhTW = { ...silentTableMessages['zh-TW'], ...silentTableScreenMessages['zh-TW'] }
 
   it('has the owner-chosen names', () => {
     expect(en['games.silent-table.name']).toBe('Silent Table')

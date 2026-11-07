@@ -48,7 +48,7 @@ const ERROR = {
 function parseAction(action: unknown): SilentTableAction | null {
   if (typeof action !== 'object' || action === null) return null
   const { type, chip, seat } = action as { type?: unknown; chip?: unknown; seat?: unknown }
-  if (type === 'ready') return { type }
+  if (type === 'ready' || type === 'timeUp') return { type }
   if (type === 'takeChip' && Number.isInteger(chip)) return { type, chip: chip as number }
   if ((type === 'takeFrom' || type === 'pass') && Number.isInteger(seat)) {
     return { type, seat: seat as SeatId }
@@ -188,6 +188,22 @@ function passFor(state: SilentTableState, seat: SeatId, rng: Rng): SilentTableSt
   )
 }
 
+/**
+ * The round's time ran out. All at once, not one `passFor` per seat: a chip moving clears everyone's
+ * ready, so seats passed in turn would undo each other. Nobody's chip moves but those who hold none.
+ */
+function timeUp(state: SilentTableState): SilentTableState {
+  const free = tableChips(state.players)
+  let nextFree = 0
+  return advanceIfSettled(
+    withPlayers(state, (player) => ({
+      ...player,
+      chip: player.chip ?? free[nextFree++],
+      ready: true,
+    })),
+  )
+}
+
 function acknowledge(state: SilentTableState, seat: SeatId, rng: Rng): SilentTableState {
   return advanceIfAcknowledged(
     withPlayers(state, (other) => (other.seat === seat ? { ...other, ready: true } : other)),
@@ -202,7 +218,8 @@ export const silentTable: GameModule<
   SilentTableOptions
 > = {
   id: 'silent-table',
-  // No screen until G2. No `proxyTurns`: a chip is a decision, and a random one could lose the level
+  // Unlisted until the owner signs docs/IP-CHECKLIST.md: merging deploys, and a listed game is live.
+  // No `proxyTurns`: a chip is a decision, and a random one could lose the level
   meta: {
     minPlayers: 3,
     maxPlayers: 6,
@@ -236,6 +253,27 @@ export const silentTable: GameModule<
       labelKey: 'games.silent-table.option.spectatorsSeeAll',
       default: false,
     },
+    roundSeconds: {
+      kind: 'select',
+      labelKey: 'games.silent-table.option.roundSeconds',
+      choices: [
+        { value: 0, labelKey: 'games.silent-table.option.roundSeconds.off' },
+        { value: 60, labelKey: 'games.silent-table.option.roundSeconds.60' },
+        { value: 90, labelKey: 'games.silent-table.option.roundSeconds.90' },
+        { value: 120, labelKey: 'games.silent-table.option.roundSeconds.120' },
+      ],
+      default: 0,
+    },
+    skin: {
+      kind: 'select',
+      labelKey: 'games.silent-table.option.skin',
+      choices: [
+        { value: 'plain', labelKey: 'games.silent-table.option.skin.plain' },
+        { value: 'diving', labelKey: 'games.silent-table.option.skin.diving' },
+        { value: 'climbing', labelKey: 'games.silent-table.option.skin.climbing' },
+      ],
+      default: 'plain',
+    },
   },
 
   init(seats, options, rng) {
@@ -259,6 +297,8 @@ export const silentTable: GameModule<
       failureLimit: options.failureLimit,
       allowTakeFromPlayers: options.allowTakeFromPlayers,
       spectatorsSeeAll: options.spectatorsSeeAll,
+      roundSeconds: options.roundSeconds,
+      skin: options.skin,
       ending: null,
     }
   },
@@ -272,6 +312,12 @@ export const silentTable: GameModule<
       if (actor !== 'system') return gameError(ERROR.systemOnly)
       if (!state.players[action.seat]) return gameError(ERROR.notAPlayer)
       return passFor(state, action.seat, rng)
+    }
+
+    if (action.type === 'timeUp') {
+      if (actor !== 'system') return gameError(ERROR.systemOnly)
+      if (state.phase !== 'round') return gameError(ERROR.cardsShowing)
+      return timeUp(state)
     }
 
     if (actor === 'system') return gameError(ERROR.badAction)
@@ -345,6 +391,23 @@ export const silentTable: GameModule<
   // Everyone acts at once, so the table waits for an absent seat until the host decides for it
   skipAction(_state, seat) {
     return { type: 'pass', seat }
+  },
+
+  // Level and round in the id, so that every round gets a fresh clock. Nothing to wait for at a reveal
+  timers(state) {
+    if (state.phase !== 'round' || !state.roundSeconds) return []
+    return [
+      {
+        id: `round-${state.level}-${state.round}`,
+        ms: state.roundSeconds * 1000,
+        action: { type: 'timeUp' },
+      },
+    ]
+  },
+
+  // Only the chips may speak while they are being taken; at a reveal the table can talk it over
+  chatLocked(state) {
+    return state.phase === 'round'
   },
 
   isOver(state) {

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createRoom, newPerson, playToResult, startGame } from './helpers.ts'
+import { createRoom, newPerson, playToResult, silentTablePlayers, startGame } from './helpers.ts'
 
 // e7-t06 (AC-7.6): what a person with only a keyboard needs, in a real browser
 
@@ -130,6 +130,27 @@ test('how to play opens over the room and Esc gives the focus back', async ({ pa
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
   await expect(open).toBeFocused()
+})
+
+test('a chip can be taken and ready said with the keyboard alone', async ({ browser }) => {
+  const people = await silentTablePlayers(browser, ['Ann', 'Bob', 'Cy'])
+  const [host, guest] = people
+  await host.getByRole('button', { name: 'Start game' }).click()
+
+  const chip = guest.getByRole('button', { name: 'Take chip 2', exact: true })
+  await tabTo(guest, chip)
+  await guest.keyboard.press('Enter')
+  const mine = guest.getByRole('button', { name: 'Chip 2: you hold it' })
+  await expect(mine).toBeVisible()
+  // Still the same button: the focus does not fall off the page when a chip changes hands
+  await expect(mine).toBeFocused()
+
+  const ready = guest.getByRole('button', { name: 'Ready', exact: true })
+  await tabTo(guest, ready)
+  await guest.keyboard.press('Space')
+  await expect(ready).toHaveAttribute('aria-disabled', 'true')
+  await expect(ready).toBeFocused()
+  for (const person of people) await person.context().close()
 })
 
 test('what comes after the result can be done with the keyboard', async ({ page, browser }) => {

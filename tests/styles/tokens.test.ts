@@ -33,6 +33,12 @@ const readablePairs: [ColorName, ColorName][] = [
   ['text', 'boardTier2'],
   ['text', 'boardTier3'],
   ['onBoardEnd', 'boardEnd'],
+  ['onFelt', 'feltPlain'],
+  ['onFelt', 'feltDiving'],
+  ['onFelt', 'feltClimbing'],
+  ['cardInk', 'cardFace'],
+  ['cardRed', 'cardFace'],
+  ['chipInk', 'chipFace'],
 ]
 
 describe('tokens', () => {

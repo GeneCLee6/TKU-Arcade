@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
+import { setIntOption, setSelectOption } from './helpers.ts'
 
 // e7-t08 (AC-7.3): the site in Traditional Chinese, screen by screen, with nothing left in English.
 // The list of screens is docs/ZH-WALKTHROUGH.md. It reads what is on the screen and what a screen
@@ -201,6 +202,72 @@ for (const [label, viewport, touch] of [
 
       await host.context().close()
       await guest.context().close()
+    })
+
+    test('Silent Table, from the rules to the result', async ({ browser }) => {
+      test.setTimeout(120_000)
+      const names = ['小安', '小博', '小綺']
+      const people: Page[] = []
+      for (const name of names) {
+        const page = await person(browser, viewport, touch)
+        if (people.length === 0) {
+          const response = await page.request.post('/api/rooms', { data: { gameId: 'silent-table' } })
+          const { id } = (await response.json()) as { id: string }
+          await page.goto(`/r/${id}`)
+        } else {
+          await page.goto(people[0].url())
+        }
+        await nicknameBox(page).fill(name)
+        await nicknameBox(page).press('Enter')
+        await expect(page.getByRole('heading', { name: '座位', exact: true })).toBeVisible()
+        people.push(page)
+      }
+      const [host] = people
+
+      await host.goto('/games/silent-table/rules')
+      await expect(host.getByRole('heading', { name: '目標' })).toBeVisible()
+      await expectAllChinese(host, 'Silent Table rules page')
+      await host.goBack()
+      await expect(host.getByRole('heading', { name: '座位', exact: true })).toBeVisible()
+
+      await expectAllChinese(host, 'Silent Table waiting room, its options')
+      await expectAllChinese(people[1], 'Silent Table waiting room, guest')
+      for (const [label, value] of [
+        ['連過幾關獲勝', '1'],
+        ['失敗幾關算輸', '1'],
+      ]) {
+        await setIntOption(host, people[1], label, value)
+      }
+      await setSelectOption(host, people[1], '每輪時間', '120', '120 秒')
+      await setSelectOption(host, people[1], '牌桌主題', 'diving', '潛水隊')
+
+      await host.getByRole('button', { name: '開始遊戲' }).click()
+      await expect(host.getByRole('group', { name: '順位籌碼' })).toBeVisible()
+      await expect(host.getByText('現在不能講話')).toBeVisible()
+      await expectAllChinese(host, 'Silent Table in play')
+      await expect(host.getByRole('timer')).toBeVisible()
+      await expectAllChinese(host, 'Silent Table with its countdown')
+
+      for (let round = 0; round < 3; round++) {
+        for (const page of people) {
+          // Again if somebody else's move had not reached this person yet
+          await expect(async () => {
+            await page.getByRole('button', { name: /^拿籌碼 \d+$/ }).first().click()
+            await expect(page.getByRole('button', { name: /在你手上$/ })).toBeVisible({ timeout: 1000 })
+          }).toPass({ timeout: 15_000 })
+        }
+        await expectAllChinese(host, 'Silent Table, chips taken')
+        for (const page of people) {
+          await page.getByRole('button', { name: '準備好了', exact: true }).click()
+        }
+        if (round < 2) await expect(host.getByText(`第 ${round + 2}/3 輪`)).toBeVisible()
+      }
+
+      const over = host.getByRole('region', { name: '結果' })
+      await expect(over).toBeVisible()
+      await expect(over.getByText('名')).toHaveCount(0)
+      await expectAllChinese(host, 'Silent Table reveal and result')
+      for (const page of people) await page.context().close()
     })
   })
 }

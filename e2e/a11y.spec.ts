@@ -1,6 +1,16 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { createRoom, joinRoom, newPerson, playToResult, startGame } from './helpers.ts'
+import {
+  createRoom,
+  joinRoom,
+  newPerson,
+  playSilentRound,
+  playToResult,
+  setIntOption,
+  silentTablePlayers,
+  startGame,
+  takeFirstChip,
+} from './helpers.ts'
 
 // e7-t06 (AC-7.6): the skeleton. A new screen gets a line here. Dev-only: nothing of axe reaches the
 // site's bundle. "No serious errors" per DESIGN §6, so the two worst of axe's four levels fail a test.
@@ -83,6 +93,41 @@ for (const scheme of ['light', 'dark'] as const) {
       await startGame(page, guest)
       await expectNoSeriousProblems(page)
       await guest.context().close()
+    })
+
+    test('the rules of Silent Table', async ({ page }) => {
+      await page.goto('/games/silent-table/rules')
+      await expect(page.getByRole('heading', { name: 'The goal' })).toBeVisible()
+      await expectNoSeriousProblems(page)
+    })
+
+    test('a game of Silent Table: the table, the reveal, the result', async ({ browser }) => {
+      test.setTimeout(90_000)
+      const people = await silentTablePlayers(browser, ['Ann', 'Bob', 'Cy'], {
+        colorScheme: scheme,
+        reducedMotion: 'reduce',
+      })
+      const [host] = people
+      await setIntOption(host, people[1], 'Failed levels that end the game', '1')
+      await setIntOption(host, people[1], 'Levels in a row to win', '1')
+      await host.getByRole('button', { name: 'Start game' }).click()
+      await expect(host.getByRole('group', { name: 'Rank chips' })).toBeVisible()
+      await expectNoSeriousProblems(host)
+
+      await takeFirstChip(host)
+      await expect(people[1].getByRole('button', { name: /^Take chip \d+ from Ann$/ })).toBeVisible()
+      await expectNoSeriousProblems(people[1])
+
+      await takeFirstChip(people[1])
+      await takeFirstChip(people[2])
+      for (const person of people) await person.getByRole('button', { name: 'Ready', exact: true }).click()
+      await expect(host.getByText('Round 2/3')).toBeVisible()
+      await playSilentRound(people)
+      await expect(host.getByText('Round 3/3')).toBeVisible()
+      await playSilentRound(people)
+      await expect(host.getByRole('region', { name: 'Result' })).toBeVisible()
+      await expectNoSeriousProblems(host)
+      for (const person of people) await person.context().close()
     })
   })
 }

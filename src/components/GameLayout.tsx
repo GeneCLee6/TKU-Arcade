@@ -43,6 +43,8 @@ export interface GameLayoutProps {
   resultDetail?(standing: Standing): ReactNode
   /** The game's screen is still playing out the last move: the result would give away its end */
   resultHeld?: boolean
+  /** See `ResultPanel` */
+  resultUnranked?: boolean
 }
 
 type PanelId = 'players' | 'chat'
@@ -63,6 +65,7 @@ export function GameLayout({
   resultHeadline,
   resultDetail,
   resultHeld,
+  resultUnranked,
 }: GameLayoutProps) {
   const compact = useCompact()
   const hasGame = children !== undefined
@@ -83,6 +86,7 @@ export function GameLayout({
       result={result}
       headline={resultHeadline}
       detail={resultDetail}
+      unranked={resultUnranked}
       onRematch={room.onRematch}
       onReopen={room.onReopen}
       onDissolve={room.onDissolve}

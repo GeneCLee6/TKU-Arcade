@@ -56,6 +56,17 @@ const everyone = [member('Al', 0, true), member('Bo', 1)]
 beforeAll(() => stubDialog())
 beforeEach(() => setLanguage('en'))
 
+describe('a table that shares one fate', () => {
+  beforeEach(() => setLanguage('en'))
+
+  it('shows no places', () => {
+    renderPanel([member('Al', 0), member('Bo', 1), member('Cy', 2)], 'Al', { unranked: true })
+    const panel = screen.getByRole('region', { name: en['room.result.heading'] })
+    expect(within(panel).queryByText('1st')).toBeNull()
+    expect(within(panel).getByText('Bo')).toBeInTheDocument()
+  })
+})
+
 describe('the result panel', () => {
   it('lists every seat in order, with places shared on a tie and each one its sentence', () => {
     renderPanel(everyone, 'Al')

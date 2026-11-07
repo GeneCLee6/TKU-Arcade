@@ -33,6 +33,16 @@ const light = {
   boardTier3: '#FBEBC4',
   boardEnd: '#B3261E',
   onBoardEnd: '#FFFFFF',
+  // Silent Table: the same in both themes, as a table and a deck of cards are
+  feltPlain: '#14532D',
+  feltDiving: '#0C4A6E',
+  feltClimbing: '#44403C',
+  onFelt: '#FFFFFF',
+  cardFace: '#FFFFFF',
+  cardInk: '#111827',
+  cardRed: '#B91C1C',
+  chipFace: '#FDE68A',
+  chipInk: '#111827',
 }
 
 export type ColorName = keyof typeof light
@@ -64,6 +74,15 @@ const dark: Record<ColorName, string> = {
   boardTier3: '#46360F',
   boardEnd: '#B3261E',
   onBoardEnd: '#FFFFFF',
+  feltPlain: '#14532D',
+  feltDiving: '#0C4A6E',
+  feltClimbing: '#44403C',
+  onFelt: '#FFFFFF',
+  cardFace: '#FFFFFF',
+  cardInk: '#111827',
+  cardRed: '#B91C1C',
+  chipFace: '#FDE68A',
+  chipInk: '#111827',
 }
 
 // Raw values: only GlobalStyle (to define the variables) and the contrast tests should read these
