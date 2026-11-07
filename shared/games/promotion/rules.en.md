@@ -6,7 +6,7 @@ The board here is **a simplified Qing ladder written for this game**. The titles
 
 ## The goal
 
-Everyone starts as a commoner. **The first to reach Retirement wins at once.** If nobody gets there before the round limit, the game ends and the most senior office wins. Equal seniority shares a place.
+Everyone starts as a commoner. **The first to reach Ronggui (Retired in Glory), at the centre of the board, wins at once.** If nobody gets there before the round limit, the game ends and the most senior office wins. Equal seniority shares a place.
 
 ## Your turn
 
