@@ -41,7 +41,7 @@ depends_on: [E2, E7]
 - 路由：`/`（大廳）、`/r/<id>`（房間）、`/games/<id>/rules`（規則頁，E7）、`/me`（M1 戰績，E11）。
 - 進房流程：`GET /api/rooms/<id>` 先拿房間摘要（遊戲、人數、是否可加入）→ 輸入暱稱 → WebSocket `/ws/<id>?v=1`。
 - 帳號：**不複製牌桌的帳號程式**；只做 token 驗證（`worker/auth.ts`）。牌桌那邊要加一個「對外簽 token」的端點（牌桌 repo 的 task，記在 §未決問題）。
-- **F1 定案的細節**（#PRNUM，2026-11-09；全文在 `ARCHITECTURE.md` §6）：
+- **F1 定案的細節**（#20，2026-11-09；全文在 `ARCHITECTURE.md` §6）：
   - 帳號在介面上叫「**Overtrick 帳號**」（牌桌的平台名，只有英文）；牌桌只讓**淡江的社員**用（牌桌 PR #331 的決定，等擁有者確認）。
   - token 走網址的 `#`，頁面讀到就拿掉、POST 給 Worker；state 放在本站的 HttpOnly cookie、牌桌簽回，擋登入 CSRF；`jti` 存 D1 `auth_token_uses`（`migrations/0002`），同一個 token 只能用一次。
   - session 是簽過的 cookie（`__Host-arcade_session`，30 天），鑰匙從共用 secret 衍生；沒有伺服器端撤銷，換金鑰會讓所有人登出。
@@ -78,8 +78,8 @@ depends_on: [E2, E7]
 ### M1
 
 - [ ] `e1-t11` 牌桌 repo：對外簽發短效 token 的端點（記在牌桌 ROADMAP） · AC-1.7 · S（牌桌 PR GeneCLee6/TKU-BridgeTable#331，牌桌的 `e1-t37`、ROADMAP O7；等擁有者審核合併、設 secret，正式站整條流程通了才勾）
-- [x] `e1-t12` 本站 `worker/auth.ts` 驗簽、session cookie、`/api/me` · AC-1.7 · M · ← e1-t11 · #PRNUM
-- [x] `e1-t13` 前端登入按鈕、回跳、登入者暱稱固定 · AC-1.7 · S · ← e1-t12 · #PRNUM
+- [x] `e1-t12` 本站 `worker/auth.ts` 驗簽、session cookie、`/api/me` · AC-1.7 · M · ← e1-t11 · #20
+- [x] `e1-t13` 前端登入按鈕、回跳、登入者暱稱固定 · AC-1.7 · S · ← e1-t12 · #20
 - [ ] `e1-t14` 語音連結：呼叫 LongTalk 建房、貼聊天、不可用時隱藏 · AC-1.8 · S · ← e1-t07
 - [ ] `e1-t15` 公開房列表篩選（遊戲、人數）與「隨機加入一間」 · AC-1.1 · S · ← e1-t09
 - [ ] `e1-t16` 房間密碼（私密房可選） · AC-1.3 · S · ← e1-t04
