@@ -165,16 +165,38 @@ docs/                   本資料夾
 - 規則頁是 markdown 兩份（`rules.en.md`、`rules.zh-TW.md`）。
 - 預設 `en`；第一次進站依瀏覽器第一順位語言偵測（`zh`、`zh-*` → `zh-TW`），之後以 localStorage 的使用者選擇為準；`<html lang>` 跟著改。
 
-## 6. 帳號（M1）
+## 6. 帳號（M1，F1 起已實作）
 
-- 不複製牌桌的帳號系統。流程：本站「用淡江帳號登入」→ 轉到牌桌登入頁（帶 `return_to`）→ 牌桌簽一個 5 分鐘有效的 token（含 user id、暱稱）→ 回本站 `/api/auth/callback` 驗簽（共用 secret 或公鑰）→ 發本站 session cookie。
-- 牌桌端要加一個端點（牌桌 repo 的 task `e1-t11`）。
-- 訪客永遠可玩；登入只多「暱稱固定、戰績、好友、解鎖進度」。
+**決定**（擁有者 2026-11-09，總 PRD Q2）：不共用牌桌的 session、不複製牌桌的帳號程式。牌桌（平台名 **Overtrick**）簽一個短效 token，本站 Worker 驗簽後發**自己的** session。訪客永遠可玩；登入只多「暱稱固定」（之後還有戰績、好友、解鎖進度）。介面上帳號一律叫「Overtrick 帳號」（牌桌 DESIGN.md §6：平台名只有英文）。
+
+**流程**：
+
+```
+本站頁面 ──「用 Overtrick 登入」── GET /api/auth/start?return=<本站路徑>
+  └─ 本站 Worker：發 state（32 byte 隨機）放進 HttpOnly cookie __Secure-arcade_auth_state（Path=/api/auth/、10 分鐘）
+     302 → 牌桌 GET /api/arcade/login?return_to=<本站網址>&state=<state>
+        └─ 牌桌：沒登入 → 它自己的登入頁（/arcade）→ 回來；只給淡江的社員
+           302 → <本站網址>#overtrick_token=v1.<claims>.<HMAC-SHA256>
+本站頁面（main.tsx 最先跑 startAccount）：把 # 後面從網址拿掉（history.replaceState）
+  └─ POST /api/auth/callback { token }（同源，Origin 要是本站）
+     └─ 本站 Worker 驗：格式 → HMAC（crypto.subtle.verify，定時比較）→ iss = overtrick → aud = 本站 origin
+        → nonce = state cookie（定時比較）→ exp − iat ≤ 300 秒、iat 不在未來、exp 未過（各容許 30 秒時鐘誤差）
+        → 名字可用（normalizeName，太長截成 16 字）→ jti 第一次出現（D1 auth_token_uses，主鍵擋重複）
+        → 發 session cookie __Host-arcade_session（HttpOnly、Secure、SameSite=Lax、Path=/、30 天），清掉 state
+```
+
+- **token 走 `#`**：不會進任何一邊的伺服器紀錄，也不會出現在 Referer；頁面一讀到就從網址拿掉，之後的歷史紀錄與複製的連結都沒有它。query string 會留在紀錄與歷史裡；牌桌自動送出的表單 POST 要行內 script，牌桌的 CSP 不放行。剩下的窗口是那一次轉址本身的歷史紀錄，靠 5 分鐘到期與只能用一次擋。
+- **state 擋登入 CSRF**（別人把自己的 token 塞給你的瀏覽器）：state 只在本站的 HttpOnly cookie 裡，牌桌原樣簽回 `nonce`。
+- **session 是簽過的 cookie，不是資料庫**：內容是帳號 id、名字、時間，用從共用 secret 衍生的另一把鑰匙簽（HMAC(secret, "tku-arcade session v1")），所以 token 永遠不能當 session 用；瀏覽器讀不到（HttpOnly）、改了簽章就不對。代價：單一 session 沒辦法從伺服器撤銷，只能等 30 天或換金鑰（換金鑰會讓所有人登出）。朋友圈規模可接受；要撤銷時再加 D1 的 session 表。
+- **暱稱固定，在伺服器擋**：`worker/rooms.ts` 在 WebSocket 升級時讀 session，把帳號放進 header `X-Arcade-Account` 給 `RoomDO`（先刪掉瀏覽器自己送的同名 header；Durable Object 從外面連不到，所以這個 header 只可能來自 Worker）。`RoomDO` 把帳號存在 socket 的 attachment（休眠後還在），`RoomHost.join` 對登入的人一律用帳號的名字，**不看 `join.name`**；同房去重「(2)」照舊（跟訪客、跟同一個帳號的第二台裝置都比）。訪客帶 seat token 回來時已經登入，座位不變、名字換成帳號的。帳號 id 存在 `MemberRecord.account`，不進任何 view。
+- **沒設定就沒有**：`AUTH_SHARED_SECRET`（Worker secret，至少 32 字）與 `AUTH_BRIDGE_URL`（var，`wrangler.jsonc` 頂層，https）都有才開。沒開時 `GET /api/me` 回 `{ configured: false, account: null }`（就算瀏覽器有舊 cookie），其他三條路由回 404 `not_configured`，頁面不出現任何按鈕，房間也不收帳號。所以這批可以在牌桌那邊上線之前合併。
+- **路由**：`GET /api/me`、`GET /api/auth/start`、`POST /api/auth/callback`、`POST /api/auth/signout`（後兩個要同源 `Origin`）。程式在 `worker/auth.ts`、`shared/account.ts`、`src/lib/account.ts`、`src/components/AccountControl.tsx`；牌桌那邊在牌桌 repo 的 `worker/arcade-login.ts`（牌桌 `e1-t37`）。
+- **首屏**：登入的程式只有一個小 store 與一個按鈕（沒登入時在大廳最下面、房間的暱稱步驟；登入後在大廳的暱稱那一行。不放頂欄：頂欄在 360 px 要維持一行；也不放遊戲上面：手機第一個畫面要看得到「開新房」），跟著主站一起載入（`/api/me` 是開站時的一個請求）；沒有新套件。
 
 ## 7. 部署與環境
 
 - 一個 Worker、`main` 通過 CI 後自動部署；每個 PR 部署自己的 Worker `tku-arcade-pr-<號>`（`wrangler deploy --name`，PR 關閉即刪；不用 `versions upload`，因為 DO migration 不能走 versions upload，且版本會共用正式站的 DO 與 D1）；預覽共用 staging D1 `tku-arcade-staging`，R2 assets 與正式站共用、沒有備份桶。細節見 `DEPLOY.md`。
-- Secrets：`AUTH_SHARED_SECRET`（與牌桌共用）、`ANTHROPIC_API_KEY`（題目草稿）、`LONGTALK_URL`（選用）。
+- Secrets：`AUTH_SHARED_SECRET`（與牌桌共用，F1；var `AUTH_BRIDGE_URL` 是牌桌的網址，DEPLOY.md §11）、`ANTHROPIC_API_KEY`（題目草稿）、`LONGTALK_URL`（選用）。
 - 成本：Workers、DO、D1、R2 都在免費額度內；卡丁車多人是最大變數（E12 儀表板）。
 
 ## 8. 從牌桌與 LongTalk 直接搬的東西

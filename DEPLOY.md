@@ -147,7 +147,7 @@ npx wrangler rollback <version-id> --message "rollback: <原因>"
 
 | 名稱 | 批次 | 用途 |
 | --- | --- | --- |
-| `AUTH_SHARED_SECRET` | F1 | 與淡江牌桌共用的登入簽章金鑰 |
+| `AUTH_SHARED_SECRET` | F1 | 與淡江牌桌（Overtrick）共用的登入簽章金鑰，至少 32 字；步驟見 §11。牌桌的網址是 var `AUTH_BRIDGE_URL`（`wrangler.jsonc` 頂層），不是 secret |
 | `ANTHROPIC_API_KEY` | H2 | 題目草稿 |
 | `LONGTALK_URL` | 選用 | LongTalk 語音房的網址 |
 
@@ -205,3 +205,51 @@ npx wrangler d1 migrations apply DB --local --config wrangler.jsonc
 npx wrangler dev --config dist/tku_arcade/wrangler.json --test-scheduled --port 5176
 curl 'http://localhost:5176/cdn-cgi/handler/scheduled?cron=0+19+*+*+*'
 ```
+
+## 11. 選用登入：Overtrick 帳號（F1，`e1-t11`–`e1-t13`）
+
+淡江橋藝社的朋友可以用牌桌（Overtrick）的帳號登入，名字就固定是帳號的名字。牌桌簽一個 5 分鐘的 token，本站驗簽後發自己的 session（`ARCHITECTURE.md` §6）。**兩邊的 Worker 共用一個 secret**：牌桌叫 `ARCADE_LOGIN_SECRET`，本站叫 `AUTH_SHARED_SECRET`，值一樣。
+
+**沒設 secret 時什麼都不會發生**：大廳沒有登入連結，`GET /api/me` 回 `{"configured":false,"account":null}`，其他登入路由回 404 `not_configured`。本站的 var `AUTH_BRIDGE_URL`（`https://tku-bridge-table.genelee-pro.workers.dev`）已經寫在 `wrangler.jsonc` 頂層；預覽沒有。
+
+### 11.1 打開（擁有者，一次）
+
+前提：牌桌那邊的端點已經合併、上線（牌桌 repo 的 `e1-t37`，它的 DEPLOY.md §4.22）。順序：先牌桌、再本站；本站一設好，按鈕就會出現。
+
+```sh
+# 1. 在自己的終端機產生一個 256 bit 的值（不要貼進聊天、issue、PR）
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+
+# 2. 牌桌正式站（在牌桌 repo 的資料夾裡跑，互動貼上同一個值）
+npx wrangler secret put ARCADE_LOGIN_SECRET
+
+# 3. 本站正式站（在這個 repo 的資料夾裡跑，貼上同一個值）
+npx wrangler secret put AUTH_SHARED_SECRET
+```
+
+**檢查**：`curl -s https://tku-arcade.genelee-pro.workers.dev/api/me` 回 `"configured":true`；開首頁，大廳最下面有「Sign in with Overtrick／用 Overtrick 登入」；按下去 → 牌桌（沒登入會先要你登入）→ 回到原本那一頁，首頁顯示「你的暱稱：<帳號名稱>（Overtrick 帳號）」；進一間房，名字就是帳號的名字，不會問暱稱。Workers Logs 搜尋 `auth_signed_in`、`auth_refused`（`reason` 說是哪一關沒過），牌桌那邊搜尋 `arcadeToken`。
+
+### 11.2 換金鑰
+
+1. 產生新值（同上）。
+2. 牌桌：`npx wrangler secret put ARCADE_LOGIN_SECRET`；本站：`npx wrangler secret put AUTH_SHARED_SECRET`，兩個指令接著跑。中間那一兩分鐘登入會失敗（`auth_refused`、`reason: signature`），再按一次就好。
+3. **換金鑰會讓本站所有人登出**：session cookie 的簽章鑰匙是從這個 secret 衍生的。大家再按一次登入即可，房間、座位不受影響（座位靠的是 seat token，不是登入）。
+
+懷疑 secret 外洩時就換；平常不用定期換。
+
+### 11.3 關掉
+
+`npx wrangler secret delete AUTH_SHARED_SECRET`（本站）：按鈕消失、已登入的人變回訪客（名字回到自己輸入的暱稱）。牌桌那邊要不要也刪 `ARCADE_LOGIN_SECRET`，看牌桌的文件。
+
+### 11.4 在 PR 預覽測（不碰正式站與牌桌）
+
+預覽 Worker `tku-arcade-pr-<號>` 是每次新建的，沒有這些設定。**只用隨機的測試值，不要用正式的 secret，也不要動牌桌**：
+
+```sh
+TEST_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+printf '%s' "$TEST_SECRET" | npx wrangler secret put AUTH_SHARED_SECRET --name tku-arcade-pr-<號>
+printf '%s' "https://tku-bridge-table.genelee-pro.workers.dev" | npx wrangler secret put AUTH_BRIDGE_URL --name tku-arcade-pr-<號>
+```
+
+（預覽的設定沒有 `AUTH_BRIDGE_URL` 這個 var，所以可以用同名的 secret 補上。）牌桌不會替預覽簽 token（它沒有這個測試值），所以自己簽：`GET /api/auth/start` 拿到 state cookie 與轉址裡的 `state`，用同一個測試值照牌桌的格式（`v1.<base64url JSON>.<HMAC-SHA256>`，claims 見 `ARCHITECTURE.md` §6）簽一個 `aud` 是預覽網址、`nonce` 是那個 `state` 的 token，開 `<預覽網址>/#overtrick_token=<token>`。預覽在 PR 關閉時整個刪掉，secret 一起消失。staging D1 的 `auth_token_uses` 是所有預覽共用的，只有隨機 id，不用清。
+

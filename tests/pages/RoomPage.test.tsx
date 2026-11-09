@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CloseCode, type RoomSummary } from '../../shared/protocol.ts'
+import { resetAccountForTests } from '../../src/lib/account.ts'
 import { CHAT_ACK_TIMEOUT_MS } from '../../src/lib/chatState.ts'
 import { ToastProvider } from '../../src/components/Toast.tsx'
 import { en } from '../../src/i18n/en.ts'
@@ -169,6 +170,32 @@ describe('joining', () => {
 
     expect(FakeWebSocket.last.joins).toEqual([{ t: 'join', name: 'Al', token: TOKEN_A }])
     expect(screen.getByRole('status')).toHaveTextContent('Joining…')
+  })
+
+  it('never asks a signed-in person for a nickname, and joins under the account name (e1-t13)', async () => {
+    resetAccountForTests({ configured: true, account: { id: 'acct-amy', name: 'Amy' } })
+    localStorage.setItem(NICKNAME_KEY, 'Al')
+    stubSummary()
+    renderRoom()
+    await summaryLoaded()
+    expect(screen.queryByLabelText('Nickname')).not.toBeInTheDocument()
+    socketOpens()
+    // The room takes the name from the session anyway; this is only what the page sends
+    expect(FakeWebSocket.last.joins).toEqual([{ t: 'join', name: 'Amy', token: null }])
+  })
+
+  it('offers signing in instead of a nickname, back to this room, only when configured (e1-t13)', async () => {
+    stubSummary()
+    renderRoom()
+    await summaryLoaded()
+    expect(screen.getByLabelText('Nickname')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Sign in with Overtrick' })).not.toBeInTheDocument()
+    cleanup()
+    resetAccountForTests({ configured: true, account: null })
+    renderRoom()
+    await summaryLoaded()
+    const link = screen.getByRole('link', { name: 'Sign in with Overtrick' })
+    expect(link.getAttribute('href')).toBe(`/api/auth/start?return=%2Fr%2F${ROOM}`)
   })
 
   it('shows the server’s name, keeps the typed one, and saves the token', async () => {

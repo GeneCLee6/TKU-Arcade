@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { APP_NAME } from '../../shared/app.ts'
 import { LOBBY_GAMES } from '../../shared/games/catalog.ts'
+import { AccountControl } from '../components/AccountControl.tsx'
 import { Button } from '../components/Button.tsx'
 import { Dialog } from '../components/Dialog.tsx'
 import { GameCard } from '../components/GameCard.tsx'
@@ -12,6 +13,7 @@ import { PublicRooms } from '../components/PublicRooms.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { useToast } from '../components/useToast.ts'
 import { useT } from '../i18n/useT.ts'
+import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { createRoom } from '../lib/rooms.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
@@ -21,7 +23,10 @@ export function HomePage() {
   const t = useT()
   const navigate = useNavigate()
   const toast = useToast()
-  const [nickname, setNickname] = useState(readNickname)
+  const [guestName, setNickname] = useState(readNickname)
+  // Signed in (e1-t13): the account's name, fixed; the room takes it from the session anyway
+  const account = useAccount()?.account ?? null
+  const nickname = account?.name ?? guestName
   // The nickname dialog is open; `gameId` is the "New room" waiting for it, null for a plain change
   const [asking, setAsking] = useState<{ gameId: string | null } | null>(null)
   const [creating, setCreating] = useState(false)
@@ -61,13 +66,21 @@ export function HomePage() {
         <Intro>
           <Title>{APP_NAME}</Title>
           <Tagline>{t('home.tagline')}</Tagline>
-          {nickname !== null && (
+          {/* Signed in (e1-t13): the fixed name and sign-out, where a guest's nickname would be */}
+          {account !== null ? (
             <PlayingAs>
-              <span>{t('lobby.playingAs', { name: nickname })}</span>
-              <Button $variant="ghost" onClick={() => setAsking({ gameId: null })}>
-                {t('lobby.changeNickname')}
-              </Button>
+              <span>{t('account.playingAs', { name: account.name })}</span>
+              <AccountControl />
             </PlayingAs>
+          ) : (
+            nickname !== null && (
+              <PlayingAs>
+                <span>{t('lobby.playingAs', { name: nickname })}</span>
+                <Button $variant="ghost" onClick={() => setAsking({ gameId: null })}>
+                  {t('lobby.changeNickname')}
+                </Button>
+              </PlayingAs>
+            )
           )}
         </Intro>
         <JoinRoomForm />
@@ -98,6 +111,14 @@ export function HomePage() {
           </Grid>
         </section>
         <PublicRooms />
+        {/* Signing in (e1-t13) is optional, so it comes last: not in the top bar, which stays one
+            row on a 360 px phone, and not above the games, which must start on a phone's first
+            screen. Nothing at all while sign-in is not configured */}
+        {account === null && (
+          <SignInRow>
+            <AccountControl />
+          </SignInRow>
+        )}
       </Main>
       <Dialog
         open={asking !== null}
@@ -150,6 +171,15 @@ const PlayingAs = styled.p`
   gap: ${space.xs}px;
   margin: ${space.sm}px 0 0;
   overflow-wrap: anywhere;
+`
+
+const SignInRow = styled.div`
+  display: flex;
+  justify-content: center;
+
+  &:empty {
+    display: none;
+  }
 `
 
 const SectionTitle = styled.h2`

@@ -31,6 +31,7 @@ import {
   type RoomView,
   type ServerMessage,
 } from '../../shared/protocol.ts'
+import type { Account } from '../../shared/account.ts'
 import { RoomHost, type OpenSocket, type StoredRoom } from '../../worker/room-host.ts'
 
 const ROOM_ID = 'abcdefghij'
@@ -188,18 +189,19 @@ class World {
     this.host.restore(this.stored(), [], null)
   }
 
-  open(): Client {
+  /** `account`: what the Worker found in the session (e1-t13), none for a guest */
+  open(account: Account | null = null): Client {
     expect(this.host.admit(String(PROTOCOL_VERSION))).toEqual({ ok: true })
     const conn = `conn-${++this.nextConn}`
     const client = new Client(this, conn)
     this.clients.set(conn, client)
-    this.sockets.push({ conn, openedAt: this.clock })
-    this.host.opened(conn, this.clock)
+    this.sockets.push({ conn, openedAt: this.clock, ...(account ? { account } : {}) })
+    this.host.opened(conn, this.clock, account)
     return client
   }
 
-  join(name: string, token: string | null = null): Client {
-    const client = this.open()
+  join(name: string, token: string | null = null, account: Account | null = null): Client {
+    const client = this.open(account)
     client.send({ t: 'join', name, token })
     return client
   }
@@ -403,6 +405,72 @@ describe('nicknames (AC-1.2)', () => {
     expect(nameOf(world.join('Al'))).toBe('Al (2)')
     world.restart()
     expect(nameOf(world.join('Al'))).toBe('Al (3)')
+  })
+})
+
+describe('signed-in names (e1-t13)', () => {
+  const nameOf = (client: Client) => client.view?.members[client.you].name
+  const amy: Account = { id: 'acct-amy', name: 'Amy' }
+
+  it('takes a signed-in name from the session, never from join', () => {
+    const world = room()
+    const forged = world.join('Somebody Else', null, amy)
+    expect(nameOf(forged)).toBe('Amy')
+    expect(world.stored().members[0]).toMatchObject({ name: 'Amy', account: 'acct-amy' })
+    // The account id is the server's own business: no view carries it
+    expect(JSON.stringify(forged.view)).not.toContain('acct-amy')
+    expect(forged.view).toEqual(forged.fresh())
+  })
+
+  it('still gives the same-room suffix, against guests and other accounts alike', () => {
+    const world = room()
+    const guest = world.join('Amy')
+    const signedIn = world.join('Amy', null, amy)
+    expect(nameOf(guest)).toBe('Amy')
+    expect(nameOf(signedIn)).toBe('Amy (2)')
+    // The same account on a second device is a second member, with the next suffix
+    const world2 = room()
+    world2.join('x', null, amy)
+    expect(nameOf(world2.join('y', null, amy))).toBe('Amy (2)')
+  })
+
+  it('leaves guests as they were', () => {
+    const world = room()
+    expect(nameOf(world.join('Bo'))).toBe('Bo')
+    expect(world.stored().members[0].account).toBeUndefined()
+  })
+
+  it('keeps a signed-in member’s name when they come back, whatever join says', () => {
+    const world = room()
+    const first = world.join('x', null, amy)
+    const [token, you] = [first.token, first.you]
+    world.disconnect(first)
+    const back = world.join('Forged', token, amy)
+    expect(back.you).toBe(you)
+    expect(nameOf(back)).toBe('Amy')
+  })
+
+  it('renames a guest who comes back signed in, keeping the seat', () => {
+    const world = room()
+    const other = world.join('Amy')
+    const guest = world.join('Bo')
+    const [token, you, seat] = [guest.token, guest.you, guest.seat]
+    world.disconnect(guest)
+    const back = world.join('Bo', token, amy)
+    expect(back.you).toBe(you)
+    expect(back.seat).toBe(seat)
+    // Not compared with themselves, but with the guest already called Amy
+    expect(nameOf(back)).toBe('Amy (2)')
+    expect(other.view?.members[you].name).toBe('Amy (2)')
+    expect(world.stored().members[1]).toMatchObject({ account: 'acct-amy' })
+  })
+
+  it('keeps the account through hibernation', () => {
+    const world = room()
+    const socket = world.open(amy)
+    world.hibernate()
+    socket.send({ t: 'join', name: 'Forged', token: null })
+    expect(nameOf(socket)).toBe('Amy')
   })
 })
 

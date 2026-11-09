@@ -1,3 +1,4 @@
+import type { Account } from '../shared/account.ts'
 import { CHAT_CHUNK, CHAT_HISTORY, ChatRateLimit, type ChatMessage } from '../shared/chat.ts'
 import type { ReplayStep } from '../shared/games/match.ts'
 import { parseOptions } from '../shared/games/options.ts'
@@ -73,10 +74,18 @@ export type MemberRecord = {
   offlineAt: number | null
   /** Offline past RECONNECT_GRACE_MS, as a sweep found; stored, since a view comes from storage */
   absent: boolean
+  /**
+   * The club account this member joined or came back signed in with (e1-t13); their name is that
+   * account's. Absent for a guest. Never part of a view
+   */
+  account?: string
 }
 
-/** One open socket, as the socket itself remembers it through hibernation */
-export type OpenSocket = { conn: string; openedAt: number }
+/**
+ * One open socket, as the socket itself remembers it through hibernation: with the account its
+ * session was signed in to when it opened (e1-t13), from the Worker, never from the browser
+ */
+export type OpenSocket = { conn: string; openedAt: number; account?: Account }
 
 /** All the room keeps between two wake-ups, apart from the steps, which only a replay reads */
 export type StoredRoom = {
@@ -123,7 +132,12 @@ export type RoomHostDeps = {
 
 export type Admission = { ok: true } | { ok: false; code: number; reason: string }
 
-type Connection = { openedAt: number; lastSeen: number; member: string | null }
+type Connection = {
+  openedAt: number
+  lastSeen: number
+  member: string | null
+  account: Account | null
+}
 
 /**
  * One room, without Cloudflare: members, seats, the host, waiting → playing → ended → waiting, and
@@ -175,9 +189,9 @@ export class RoomHost {
     this.chatId = this.chat.at(-1)?.id ?? 0
     this.members.clear()
     this.conns.clear()
-    for (const { conn, openedAt } of sockets) {
+    for (const { conn, openedAt, account } of sockets) {
       // `heartbeat` brings lastSeen up to date before each sweep
-      this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null })
+      this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null, account: account ?? null })
     }
     // The alarm may be a game timer's, a long way off: sweeps still come every interval
     const nextSweep = this.deps.now() + SWEEP_INTERVAL_MS
@@ -266,8 +280,9 @@ export class RoomHost {
     return { ok: true }
   }
 
-  opened(conn: string, openedAt: number): void {
-    this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null })
+  /** `account`: who the session says this is (e1-t13), null for a guest */
+  opened(conn: string, openedAt: number, account: Account | null = null): void {
+    this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null, account })
     this.sweepAt ??= this.deps.now() + SWEEP_INTERVAL_MS
     this.settleCleanup()
   }
@@ -457,7 +472,18 @@ export class RoomHost {
 
   // ── What members do ────────────────────────────────────────────────────────────────────────
 
+  /** `name`, or with the first free suffix among every member but `self` (uniqueName) */
+  private uniqueAmongOthers(name: string, self: string | null): string {
+    const others = [...this.members.values()].filter((other) => other.id !== self)
+    return uniqueName(
+      name,
+      others.map((other) => other.name),
+    )
+  }
+
   private join(conn: string, connection: Connection, name: string, token: string | null): void {
+    // Who the session says this is (e1-t13): the name `join` sent is only a guest's
+    const account = connection.account
     if (token !== null && this.isBanned(token)) {
       this.drop(conn, CloseCode.kicked, 'kicked')
       return
@@ -474,6 +500,11 @@ export class RoomHost {
         known.offlineAt = null
         known.absent = false
         connection.member = known.id
+        // Signed in since (or as someone else): the seat stays, the name becomes the account's
+        if (account && known.account !== account.id) {
+          known.account = account.id
+          known.name = this.uniqueAmongOthers(account.name, known.id)
+        }
         this.saveMembers()
       })
       this.welcome(conn, known)
@@ -485,17 +516,16 @@ export class RoomHost {
     }
     const member: MemberRecord = {
       id: this.deps.newMemberId(),
-      // Against offline members too: they keep their seat and can come back
-      name: uniqueName(
-        name,
-        [...this.members.values()].map((other) => other.name),
-      ),
+      // Signed in: the account's name, whatever `join` said. Against offline members too: they
+      // keep their seat and can come back
+      name: this.uniqueAmongOthers(account?.name ?? name, null),
       token: this.deps.newToken(),
       seat: this.lowestFreeSeat(),
       ready: false,
       conn,
       offlineAt: null,
       absent: false,
+      ...(account ? { account: account.id } : {}),
     }
     this.change(() => {
       const room = this.requireRoom()

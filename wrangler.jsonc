@@ -40,8 +40,13 @@
     // Daily D1 backups (e12-t05)
     { "binding": "BACKUPS", "bucket_name": "tku-arcade-backups" }
   ],
-  // The deployed commit; the deploy workflows override it with --var APP_VERSION:<sha>
-  "vars": { "APP_VERSION": "local" },
+  // The deployed commit; the deploy workflows override it with --var APP_VERSION:<sha>.
+  // AUTH_BRIDGE_URL: the bridge table that signs club sign-in tokens (e1-t12, DEPLOY.md §11). Sign-in
+  // stays off until the secret AUTH_SHARED_SECRET is set too
+  "vars": {
+    "APP_VERSION": "local",
+    "AUTH_BRIDGE_URL": "https://tku-bridge-table.genelee-pro.workers.dev"
+  },
   // Staging and pull request previews (DEPLOY.md): separate Workers, so each has its own Durable
   // Object storage and never touches production's. Bindings and vars are not inherited from the
   // top level: repeat each one here. Selected at build time with CLOUDFLARE_ENV=preview (the Vite

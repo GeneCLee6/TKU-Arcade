@@ -60,7 +60,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 
 | 批 | Task | 內容 | 前提 |
 | --- | --- | --- | --- |
-| [ ] F1 | `e1-t11` `e1-t12` `e1-t13` | 牌桌 repo 簽發 token 端點（先在牌桌開 PR）；本站 `worker/auth.ts` 驗簽與 session；登入按鈕與暱稱固定 | D2；總 PRD Q2 拍板 |
+| [ ] F1（#20 做了 `e1-t12` `e1-t13`；`e1-t11` 在牌桌 #331 等擁有者合併、設 secret） | `e1-t11` `e1-t12` `e1-t13` | 牌桌 repo 簽發 token 端點（先在牌桌開 PR）；本站 `worker/auth.ts` 驗簽與 session；登入按鈕與暱稱固定 | D2；總 PRD Q2 拍板 |
 | [ ] F2 | `e2-t10` `e11-t01` `e11-t02` `e11-t03` | 結果寫 D1；`results` 表與 API；`/me` 頁；訪客成績上傳 | F1 |
 | [ ] F3 | `e5-t01` `e12-t06` | D1 `prompts` 表與 100 組光譜題（自寫）；濫用防護（速率、過濾、連線上限、管理頁權限） | F1 |
 

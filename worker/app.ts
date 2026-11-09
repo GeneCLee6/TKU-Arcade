@@ -1,5 +1,6 @@
 import type { HealthResponse } from '../shared/health.ts'
 import type { LobbyResponse } from '../shared/protocol.ts'
+import { handleAuth, isAuthPath } from './auth.ts'
 import { handleClientError } from './errors.ts'
 import { LOBBY_NAME } from './lobby-board.ts'
 import type { LobbyDO } from './lobby.ts'
@@ -21,6 +22,13 @@ export interface Env {
   BACKUPS?: R2Bucket
   // Set at deploy time (wrangler deploy --var APP_VERSION:<commit>)
   APP_VERSION?: string
+  /**
+   * The optional club account (e1-t12, worker/auth.ts, DEPLOY.md §11): the secret shared with the
+   * bridge table (a Worker secret, 32 characters or more) and the bridge table's address (a var).
+   * Sign-in is off unless both are set
+   */
+  AUTH_SHARED_SECRET?: string
+  AUTH_BRIDGE_URL?: string
 }
 
 const noStore = { 'cache-control': 'no-store' }
@@ -52,6 +60,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     return handleRooms(request, env, url)
   }
   if (url.pathname === '/api/lobby') return handleLobby(request, env)
+  if (isAuthPath(url.pathname)) return handleAuth(request, env, url)
   if (url.pathname === '/api/errors') return handleClientError(request, env, url)
   if (url.pathname.startsWith('/api/')) return notFound()
   if (url.pathname.startsWith('/ws/')) return handleRoomSocket(request, env, url)

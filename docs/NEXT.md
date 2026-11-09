@@ -1,6 +1,6 @@
 # NEXT — 接下來怎麼做（給 AI 協作者與自己的交接手冊）
 
-最後更新 2026-11-09（Phase A、Phase B、Phase C、D1、D3、G1、G2、J1、J2 完成，D2 的程式與文件完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
+最後更新 2026-11-09（Phase A、Phase B、Phase C、D1、D3、G1、G2、J1、J2 完成，D2 的程式與文件完成，F1 的本站程式完成）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
 
 ## 1. 現在的位置
 
@@ -26,6 +26,7 @@
 - **D3 完成（#17，經擁有者同意 2026-11-07 從 I3 提前，`e2-t12`）**：瀏覽器只 import `shared/games/catalog.ts`（每款遊戲的 `info.ts` 與首屏字串，不含規則）；`shared/games/index.ts` 留給 Worker 與腳本。`tests/games/catalog.test.ts` 擋 `src/` 直接 import `rules.ts` 或 `index.ts`。**新遊戲要加兩個地方**：`index.ts` 的模組、`catalog.ts` 的 info 與字串；常數如果畫面也要用，放 `info.ts`。
 - **首屏預算（D3 之後）**：主站 116.0 kB，升官圖第一個畫面 145.8 kB，默契牌局 146.0 kB（上限 150 kB），每條線少約 3.5 kB，剩約 4 kB。每款新遊戲仍會佔首屏：`info.ts` 和 `i18n.ts`，所以字串要照默契牌局的做法，只留大廳與等待室要的，其他放 `i18n.screen.ts`。還可以省的：升官圖的字串（`shared/games/promotion/i18n.ts` 約 8 kB 原始碼）照同樣做法移走，能讓主站和其他遊戲少幾 kB，但升官圖自己那條線不會變。
 - **J1 完成（PR #15，經擁有者要求與 M1 的批次平行進行）**：`/kart/spike` 卡丁車 spike（`shared/kart/{physics,clock,i18n}.ts`、`src/kart/`）。lazy 路由，大廳沒有連結、沒有遊戲卡、沒有登記 GameModule；打網址才到得了。three.js `0.186.1`（MIT）；卡丁車 chunk 135.7 kB gzip；數字、限制與給 J2 的事在 `ARCHITECTURE.md` §4.1。**J1 留下的**：實體手機與筆電的 fps 空白待擁有者填；**手機上開不了**（沒有觸控操作，epic 把觸控排在 M4，頁面會明說）；手感沒人試過，AC-8.3 沒勾；Q4 沒定；加速條、噴射、連噴、碰牆、復位、賽道、HUD、手把、改鍵都沒做（J2 起）。**升官圖首屏在 J1 之前就只剩 0.6 kB 預算（149.4／150 kB），J1 之後 149.2 kB，後面的批次要先看 `npm run budget`**；頁面新用一個共用元件也可能讓打包器多拆一個 chunk、讓別人的首屏變大。
+- **F1 的程式完成（#20，`e1-t12`、`e1-t13`；經擁有者要求 2026-11-09 開工）**：選用的 Overtrick 帳號登入（`worker/auth.ts`、`shared/account.ts`、`src/lib/account.ts`、大廳與房間暱稱步驟的 `AccountControl`）。牌桌簽 5 分鐘的 HMAC token、走網址的 `#` 回來，本站驗簽（定時比較、`aud`、`state`、到期與 30 秒誤差、`jti` 存 D1 只能用一次）後發自己的簽章 cookie；暱稱在伺服器固定（WebSocket 升級時的 `X-Arcade-Account`，不看 `join.name`）。**沒設 `AUTH_SHARED_SECRET` 時什麼都沒有**，所以合併不會改變正式站。牌桌那邊是牌桌的 PR #331（牌桌 `e1-t37`），**等擁有者審核合併**；之後照 `DEPLOY.md` §11 在兩邊設同一個 secret。`e1-t11`、AC-1.7 等正式站整條流程通了才勾。首屏：主站 117.0 kB、升官圖 146.9 kB、默契牌局 147.1 kB（各多約 1 kB，剩約 3 kB）。登入連結放在大廳最下面與房間的暱稱步驟，不放頂欄（360 px 要一行）、不放遊戲上面（手機第一個畫面要看得到開新房）。
 - **J2 完成（#19，與 F1 平行進行）**：`/kart/spike` 加上加速條、噴射、連噴（`shared/kart/physics.ts`）與手把、改鍵（`shared/kart/input.ts`、`src/kart/{devices.ts,ControlsPanel.tsx,Hud.tsx}`）。噴射用鍵發（擁有者 2026-11-09 拍板），「操作設定」裡可切成自動噴、可關連噴。甩尾的側滑角不再貼著上限；預設鍵 ↑↓←→／WASD、甩尾 Z／空白鍵、噴射 X／E（**不用 Shift**，避開 Windows 相黏鍵；不用 Ctrl，Ctrl＋W 會關分頁）。所有參數在 `KART_TUNING` 一個物件，表在 e8 epic 的「J2 定案的細節」。頁面仍然藏著：同一條 lazy 路由、大廳沒有連結、沒有 GameModule。
 - **J2 留給擁有者試的**（AC-8.3 要等碰牆、AC-8.5 是擁有者的手感，都沒勾）：(1) 開 `/kart/spike`，甩尾 2.5 秒存一次噴射、按 X 噴、噴射中甩尾再放開連噴，看節奏對不對：加速條快慢（`gaugeFillRate` 40）、噴射長度（1.2 秒）、連噴長度（0.8 秒）與寬限（0.3 秒）、甩尾掉速（30 → 26.5 m/s）都是猜的起始值；(2) 甩尾角度：打滿 32°、置中 22°、反打 12.5°，夠不夠「甩」；(3) Z／X 這組預設鍵順不順手，筆電鍵盤同時按方向鍵＋Z＋X 會不會漏鍵（沒實測）；(4) **真的手把**：只用模擬的 `navigator.getGamepads` 測過，Xbox、PS、Switch Pro 在 Chrome／Edge／Firefox 的 mapping 都沒試過，搖桿死區 0.2 合不合適也要真手把才知道；(5) 「自動噴」那個選項要不要留。調參數等 J3 的調參面板，在那之前改 `KART_TUNING` 的值。
 - J2 看到但沒改：手機上仍然開不了（沒有觸控，M4）；改鍵面板打開時車會滑行到停（輸入全部交給面板）；按鍵名稱用實體位置（`KeyboardEvent.code`），AZERTY 等鍵盤上顯示的字母可能和鍵帽不同；手把只讀第一支（優先 standard mapping）。
