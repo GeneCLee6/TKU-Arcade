@@ -1,20 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
+import { KART_ACTIONS, type Bindings, type KartAction } from '../../shared/kart/input.ts'
+import { KART_TUNING, type KartRules } from '../../shared/kart/physics.ts'
 import { Button } from '../components/Button.tsx'
 import { registerMessages, type MessageParams } from '../i18n/t.ts'
 import { useT } from '../i18n/useT.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
+import { ControlsPanel } from './ControlsPanel.tsx'
+import { keyLabel, loadBindings, loadRules, padLabel, saveBindings, saveRules } from './devices.ts'
+import { Hud } from './Hud.tsx'
 import { supportsWebGL2 } from './Scene.ts'
-import { startSpikeLoop, type SpikeStats } from './spikeLoop.ts'
+import { startSpikeLoop, type SpikeHud, type SpikeStats } from './spikeLoop.ts'
 
 registerMessages(KART_MESSAGES)
 
 type Failure = 'noWebgl' | 'contextLost'
 
+const EMPTY_HUD: SpikeHud = { gauge: 0, storedBoosts: 0, boosting: false, chain: 0 }
+
 /**
  * e8-t01: three.js, a fixed-step loop and a box car, to see whether the stack holds up in a browser.
+ * e8-t02a and e8-t12 add the boost gauge, boosts, a gamepad and changeable controls.
  * Reached only by typing /kart/spike: nothing links here, and the lobby does not know about it.
  */
 export function SpikePage() {
@@ -24,6 +32,16 @@ export function SpikePage() {
     supportsWebGL2() ? undefined : 'noWebgl',
   )
   const [stats, setStats] = useState<SpikeStats>()
+  const [hud, setHud] = useState<SpikeHud>(EMPTY_HUD)
+  const [bindings, setBindings] = useState<Bindings>(loadBindings)
+  const [rules, setRules] = useState<KartRules>(loadRules)
+  const [controlsOpen, setControlsOpen] = useState(false)
+  const opener = useRef<HTMLButtonElement>(null)
+  // The loop reads these every frame without restarting
+  const controls = useRef({ bindings, rules, enabled: !controlsOpen })
+  useEffect(() => {
+    controls.current = { bindings, rules, enabled: !controlsOpen }
+  }, [bindings, rules, controlsOpen])
   const [showNumbers, setShowNumbers] = useState(() =>
     new URLSearchParams(window.location.search).has('fps'),
   )
@@ -34,7 +52,9 @@ export function SpikePage() {
     if (!stage.current) return
     try {
       return startSpikeLoop(stage.current, {
+        controls: () => controls.current,
         onStats: setStats,
+        onHud: setHud,
         onContextLost: () => setFailure('contextLost'),
       })
     } catch {
@@ -50,6 +70,29 @@ export function SpikePage() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
+
+  const changeBindings = useCallback((next: Bindings) => {
+    setBindings(next)
+    return saveBindings(next)
+  }, [])
+  const changeRules = useCallback((next: KartRules) => {
+    setRules(next)
+    return saveRules(next)
+  }, [])
+  const closeControls = useCallback(() => {
+    setControlsOpen(false)
+    // Back where the keyboard was before the panel opened
+    queueMicrotask(() => opener.current?.focus())
+  }, [])
+
+  /** The first control of an action, for the hint: a key, else a gamepad control */
+  const firstControl = (action: KartAction): string => {
+    const key = bindings.keys[action].find((code) => code !== null)
+    if (key) return keyLabel(key, t)
+    const pad = bindings.pad[action].find((control) => control !== null)
+    return pad ? padLabel(pad, t) : t('kart.controls.none')
+  }
+  const hintKeys = Object.fromEntries(KART_ACTIONS.map((action) => [action, firstControl(action)]))
 
   if (failure) {
     return (
@@ -70,9 +113,20 @@ export function SpikePage() {
         <Panel>
           <Link to="/">{t('kart.spike.back')}</Link>
         </Panel>
-        <Button $variant="secondary" $size="sm" onClick={() => setShowNumbers((shown) => !shown)}>
-          {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
-        </Button>
+        <Buttons>
+          <Button
+            ref={opener}
+            $variant="secondary"
+            $size="sm"
+            aria-expanded={controlsOpen}
+            onClick={() => (controlsOpen ? closeControls() : setControlsOpen(true))}
+          >
+            {t('kart.controls.open')}
+          </Button>
+          <Button $variant="secondary" $size="sm" onClick={() => setShowNumbers((shown) => !shown)}>
+            {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
+          </Button>
+        </Buttons>
       </TopRow>
       {showNumbers && stats && (
         <Numbers data-testid="kart-numbers">
@@ -83,19 +137,34 @@ export function SpikePage() {
           <dt>{t('kart.spike.speed')}</dt>
           <dd>{t('kart.spike.metresPerSecond', { speed: Math.round(stats.speed) })}</dd>
           <dt>{t('kart.spike.slip')}</dt>
-          <dd>{t('kart.spike.degrees', { degrees: Math.round(stats.slipDegrees) })}</dd>
+          <dd>{t('kart.spike.degrees', { degrees: Math.round(stats.slipDegrees) || 0 })}</dd>
           <dt>{t('kart.spike.drift')}</dt>
           <dd>{t(stats.drifting ? 'kart.spike.yes' : 'kart.spike.no')}</dd>
           <dt>{t('kart.spike.resolution')}</dt>
           <dd>{stats.drawingBuffer}</dd>
           <dt>{t('kart.spike.renderer')}</dt>
           <dd>{stats.rendererName}</dd>
+          <dt>{t('kart.spike.gamepad')}</dt>
+          <dd data-testid="kart-gamepad">{stats.gamepad ?? t('kart.spike.noGamepad')}</dd>
         </Numbers>
       )}
-      <Hint>
-        <HintTitle>{t('kart.spike.title')}</HintTitle>
-        {t(coarsePointer ? 'kart.spike.noTouch' : 'kart.spike.keys')}
-      </Hint>
+      <Bottom>
+        <Hud t={t} hud={hud} maxStored={KART_TUNING.maxStoredBoosts} />
+        <Hint>
+          <HintTitle>{t('kart.spike.title')}</HintTitle>
+          {coarsePointer ? t('kart.spike.noTouch') : t('kart.spike.keys', hintKeys)}
+        </Hint>
+      </Bottom>
+      {controlsOpen && (
+        <ControlsPanel
+          t={t}
+          bindings={bindings}
+          rules={rules}
+          onBindings={changeBindings}
+          onRules={changeRules}
+          onClose={closeControls}
+        />
+      )}
     </Page>
   )
 }
@@ -150,12 +219,21 @@ const Numbers = styled(Panel).attrs({ as: 'dl' })`
   }
 `
 
-const Hint = styled(Panel)`
+const Buttons = styled.div`
+  display: flex;
+  gap: ${space.sm}px;
+`
+
+const Bottom = styled.div`
   position: absolute;
   bottom: ${space.sm}px;
   left: ${space.sm}px;
   right: ${space.sm}px;
+  display: grid;
+  gap: ${space.sm}px;
 `
+
+const Hint = styled(Panel)``
 
 const HintTitle = styled.h1`
   margin: 0;

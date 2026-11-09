@@ -34,6 +34,23 @@ describe('stepKart', () => {
     expect(run(INITIAL_KART, NO_INPUT, 2)).toEqual(INITIAL_KART)
   })
 
+  it('takes topSpeed / acceleration seconds from a standstill to the top speed', () => {
+    let state = INITIAL_KART
+    let steps = 0
+    while (kartSpeed(state) < KART_TUNING.topSpeed - 1e-9) {
+      state = stepKart(state, THROTTLE)
+      steps++
+    }
+    // 30 / 14 = 2.14 s: 129 steps of 1/60 s
+    expect(steps).toBe(Math.ceil((KART_TUNING.topSpeed / KART_TUNING.acceleration) * 60))
+    expect(steps * STEP_SECONDS).toBeCloseTo(2.15, 2)
+  })
+
+  it('keeps the top speed in a turn: sliding does not add to it', () => {
+    const turning = run(run(INITIAL_KART, THROTTLE, 10), { ...THROTTLE, steer: 1 }, 3)
+    expect(kartSpeed(turning)).toBeLessThanOrEqual(KART_TUNING.topSpeed + 1e-9)
+  })
+
   it('accelerates straight ahead up to the top speed and no further', () => {
     const after1s = run(INITIAL_KART, THROTTLE, 1)
     expect(kartSpeed(after1s)).toBeCloseTo(KART_TUNING.acceleration, 5)
@@ -102,6 +119,75 @@ describe('drifting', () => {
     expect(stepKart(entered, { ...DRIFT_RIGHT, steer: -1 }).driftDirection).toBe(1)
   })
 
+  it('settles on a slip angle under the cap, which the steering widens or narrows', () => {
+    const settled = (steer: number) => {
+      const entered = run(atSpeed(), DRIFT_RIGHT, 0.1)
+      return Math.abs(kartSlip(run(entered, { ...THROTTLE, steer, drift: true }, 3)))
+    }
+    const degrees = (radians: number) => (radians * 180) / Math.PI
+    const tight = settled(1)
+    const centred = settled(0)
+    const wide = settled(-1)
+    // J1's drift sat on its cap the whole time: now the cap is only a safety net
+    expect(degrees(KART_TUNING.driftMaxSlip) - degrees(tight)).toBeGreaterThan(4)
+    expect(degrees(tight)).toBeGreaterThan(28)
+    expect(degrees(centred)).toBeGreaterThan(18)
+    expect(degrees(centred)).toBeLessThan(28)
+    expect(degrees(wide)).toBeGreaterThan(8)
+    expect(wide).toBeLessThan(centred)
+    expect(centred).toBeLessThan(tight)
+  })
+
+  it('keeps its speed when the key is let go, instead of losing the sideways part', () => {
+    const drifting = run(atSpeed(), DRIFT_RIGHT, 2)
+    const released = run(drifting, NO_INPUT, 0.3)
+    // Coasting loses coastDrag each second, and nothing else
+    expect(kartSpeed(released)).toBeCloseTo(kartSpeed(drifting) - KART_TUNING.coastDrag * 0.3, 1)
+  })
+
+  it('cannot start below the minimum speed, nor while reversing', () => {
+    const slow = run(
+      INITIAL_KART,
+      THROTTLE,
+      (KART_TUNING.driftMinSpeed - 1) / KART_TUNING.acceleration,
+    )
+    const tried = run(slow, { ...NO_INPUT, steer: 1, drift: true }, 0.5)
+    expect(tried.drifting).toBe(false)
+    expect(tried.gauge).toBe(0)
+
+    const reversing = run(INITIAL_KART, { ...NO_INPUT, brake: true }, 3)
+    const backwards = run(reversing, { ...NO_INPUT, brake: true, steer: 1, drift: true }, 2)
+    expect(backwards.drifting).toBe(false)
+    expect(backwards.gauge).toBe(0)
+    // Still going backwards: the nose points away from the direction of travel
+    const forward =
+      backwards.vx * Math.sin(backwards.heading) - backwards.vz * Math.cos(backwards.heading)
+    expect(forward).toBeLessThan(0)
+  })
+
+  it('starts when steering begins if the key was already held', () => {
+    const held = run(atSpeed(), { ...THROTTLE, drift: true }, 0.5)
+    expect(held.drifting).toBe(false)
+    expect(stepKart(held, DRIFT_RIGHT).driftDirection).toBe(1)
+  })
+
+  it('carries on through a throttle let go mid-drift, until the speed is gone', () => {
+    let state = run(atSpeed(), DRIFT_RIGHT, 0.5)
+    state = run(state, { ...NO_INPUT, steer: 1, drift: true }, 1)
+    expect(state.drifting).toBe(true)
+    state = run(state, { ...NO_INPUT, steer: 1, drift: true }, 8)
+    expect(state.drifting).toBe(false)
+  })
+
+  it('starts over the other way when the key is let go and pressed again', () => {
+    const right = run(atSpeed(), DRIFT_RIGHT, 1)
+    const gap = stepKart(right, { ...THROTTLE, steer: -1 })
+    expect(gap.drifting).toBe(false)
+    const left = stepKart(gap, { ...THROTTLE, steer: -1, drift: true })
+    expect(left.driftDirection).toBe(-1)
+    expect(left.driftSeconds).toBeCloseTo(STEP_SECONDS, 9)
+  })
+
   it('opens a slip angle that stays under the cap', () => {
     let state = atSpeed()
     let largest = 0
@@ -130,7 +216,11 @@ describe('drifting', () => {
   })
 
   it('ends when the car has slowed down too far', () => {
-    const slowing = run(run(atSpeed(), DRIFT_RIGHT, 1), { ...NO_INPUT, brake: true, drift: true }, 3)
+    const slowing = run(
+      run(atSpeed(), DRIFT_RIGHT, 1),
+      { ...NO_INPUT, brake: true, drift: true },
+      3,
+    )
     expect(slowing.drifting).toBe(false)
   })
 })
@@ -145,6 +235,11 @@ describe('frame rate independence', () => {
     { seconds: 1, input: THROTTLE },
     { seconds: 1 + 1 / 6, input: { ...NO_INPUT, brake: true, steer: -1 } },
     { seconds: 1 + 1 / 3, input: NO_INPUT },
+    { seconds: 2, input: THROTTLE },
+    { seconds: 3, input: { ...THROTTLE, steer: -1, drift: true } },
+    { seconds: 1 / 6, input: { ...THROTTLE, steer: -1, drift: true, boost: true } },
+    { seconds: 1 / 2, input: { ...THROTTLE, steer: -1, drift: true } },
+    { seconds: 1 / 3, input: THROTTLE },
   ]
 
   /** Plays the script as the render loop would, with frames of the durations `frameLength` gives */
@@ -176,6 +271,8 @@ describe('frame rate independence', () => {
     expect(at144.steps).toBe(stepsInScript)
     expect(at144.state).toEqual(at30.state)
     expect(at30.state.x).not.toBe(0)
+    // The script really did fill the gauge, boost and chain
+    expect(at30.state.chain).toBe(1)
   })
 
   it('ends in the same state with uneven frames', () => {

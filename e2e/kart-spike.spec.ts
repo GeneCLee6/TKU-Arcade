@@ -1,6 +1,7 @@
+import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
-// e8-t01: the spike at /kart/spike. Headless Chromium draws with a software renderer here (the flag
+// e8-t01: the spike at /kart/spike; e8-t02a and e8-t12 add the gauge, boosts, gamepad and remapping. Headless Chromium draws with a software renderer here (the flag
 // lets it), so these tests say nothing about speed on a real device.
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } })
 
@@ -16,7 +17,13 @@ interface KartReading {
     vz: number
     drifting: boolean
     driftDirection: number
+    gauge: number
+    storedBoosts: number
+    boostSeconds: number
+    chain: number
   }
+  input: { throttle: boolean; brake: boolean; steer: number; drift: boolean; boost: boolean }
+  gamepad: string | undefined
 }
 
 const reading = (page: Page): Promise<KartReading> =>
@@ -60,6 +67,13 @@ async function screenshotColours(page: Page) {
   }, png)
 }
 
+const speedOf = async (page: Page) => {
+  const { state } = await reading(page)
+  return Math.hypot(state.vx, state.vz)
+}
+
+const LONG = { timeout: 30_000 }
+
 async function drive(page: Page) {
   const start = await reading(page)
   expect(start.state.x).toBe(0)
@@ -78,9 +92,12 @@ async function drive(page: Page) {
   const moved = await reading(page)
   expect(moved.state.z).toBeLessThan(-1)
 
+  // Z, not Shift: five Shift presses open Windows' Sticky Keys prompt
   await page.keyboard.down('ArrowRight')
-  await page.keyboard.down('Shift')
-  await expect.poll(async () => (await reading(page)).state.drifting, { timeout: 20_000 }).toBe(true)
+  await page.keyboard.down('z')
+  await expect
+    .poll(async () => (await reading(page)).state.drifting, { timeout: 20_000 })
+    .toBe(true)
   await expect
     .poll(
       async () => {
@@ -96,8 +113,10 @@ async function drive(page: Page) {
   expect(drifting.state.driftDirection).toBe(1)
   expect(drifting.state.heading).not.toBe(moved.state.heading)
 
-  await page.keyboard.up('Shift')
-  await expect.poll(async () => (await reading(page)).state.drifting, { timeout: 20_000 }).toBe(false)
+  await page.keyboard.up('z')
+  await expect
+    .poll(async () => (await reading(page)).state.drifting, { timeout: 20_000 })
+    .toBe(false)
   await page.keyboard.up('ArrowRight')
   await page.keyboard.up('ArrowUp')
 }
@@ -116,7 +135,8 @@ for (const [name, viewport] of [
       const scene = await screenshotColours(page)
       expect(scene.colours).toBeGreaterThan(10)
       expect(scene.commonest).toBeLessThan(0.9)
-      await expect(page.getByText('Arrows or WASD to drive.')).toBeVisible()
+      await expect(page.getByText('Up arrow to accelerate')).toBeVisible()
+      await expect(page.getByTestId('kart-hud')).toBeVisible()
       await expect(page.getByTestId('kart-fps')).toHaveText(/^\d+$/)
 
       const before = (await page.locator('canvas').screenshot()).toString('base64')
@@ -243,8 +263,7 @@ test.describe('leaving the route', () => {
     const stopped = await reading(page)
     expect(stopped.running).toBe(false)
 
-    const counts = () =>
-      page.evaluate(() => (window as unknown as { __raf: number }).__raf)
+    const counts = () => page.evaluate(() => (window as unknown as { __raf: number }).__raf)
     const before = await counts()
     await page.waitForTimeout(600)
     expect(await counts()).toBe(before)
@@ -279,3 +298,273 @@ test.describe('the lobby', () => {
     expect(scripts.filter((url) => /SpikePage|three|Scene/i.test(url))).toEqual([])
   })
 })
+
+test.describe('the boost gauge', () => {
+  test.use({ locale: 'en-US', viewport: { width: 1280, height: 720 } })
+
+  test('fills while drifting, fires a boost on X, and chains one when the drift is let go', async ({
+    page,
+  }) => {
+    const errors = watchConsole(page)
+    await openSpike(page)
+    await expect(page.getByTestId('kart-stored')).toHaveText('Boosts ready: 0 of 2')
+
+    await page.keyboard.down('ArrowUp')
+    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(20)
+    await page.keyboard.down('ArrowRight')
+    await page.keyboard.down('z')
+    await expect.poll(async () => (await reading(page)).state.drifting, LONG).toBe(true)
+    await expect.poll(async () => (await reading(page)).state.gauge, LONG).toBeGreaterThan(20)
+    await expect(page.getByTestId('kart-gauge')).not.toHaveAttribute('aria-valuenow', '0')
+
+    // 2.5 s of drifting fills the gauge into a stored boost
+    await expect.poll(async () => (await reading(page)).state.storedBoosts, LONG).toBe(1)
+    await expect(page.getByTestId('kart-stored')).toHaveText('Boosts ready: 1 of 2')
+
+    // Fired while still drifting: a quick press is enough
+    await page.keyboard.press('x')
+    await expect.poll(async () => (await reading(page)).state.boostSeconds, LONG).toBeGreaterThan(0)
+    const boosted = await reading(page)
+    expect(boosted.state.storedBoosts).toBe(0)
+    expect(boosted.state.chain).toBe(0)
+
+    // Let go of the drift while the boost runs: a chained boost
+    await page.keyboard.up('z')
+    await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
+    await page.keyboard.up('ArrowRight')
+    // Boosting raises the top speed past the plain 30 m/s
+    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(30.5)
+    await page.keyboard.up('ArrowUp')
+    expect(errors).toEqual([])
+  })
+})
+
+/** A gamepad the test drives, in place of navigator.getGamepads: headless browsers have no pads */
+async function fakeGamepad(page: Page) {
+  await page.addInitScript(() => {
+    const buttons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }))
+    const pad = {
+      id: 'Test gamepad (STANDARD GAMEPAD)',
+      index: 0,
+      connected: true,
+      mapping: 'standard',
+      timestamp: 0,
+      buttons,
+      axes: [0, 0, 0, 0],
+    }
+    ;(window as unknown as { __pad: unknown }).__pad = {
+      press(index: number, down: boolean) {
+        buttons[index] = { pressed: down, touched: down, value: down ? 1 : 0 }
+      },
+      axis(index: number, value: number) {
+        pad.axes[index] = value
+      },
+    }
+    Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad] })
+  })
+}
+
+interface FakePad {
+  press(index: number, down: boolean): void
+  axis(index: number, value: number): void
+}
+
+const padPress = (page: Page, index: number, down: boolean) =>
+  page.evaluate(
+    ([button, isDown]) =>
+      (window as unknown as { __pad: FakePad }).__pad.press(button as number, isDown as boolean),
+    [index, down] as const,
+  )
+
+const padAxis = (page: Page, index: number, value: number) =>
+  page.evaluate(
+    ([axis, amount]) => (window as unknown as { __pad: FakePad }).__pad.axis(axis, amount),
+    [index, value] as const,
+  )
+
+test.describe('a gamepad (simulated: a real pad cannot be tested headless)', () => {
+  test.use({ locale: 'en-US', viewport: { width: 1280, height: 720 } })
+
+  test('drives, steers in proportion, drifts and boosts through the standard mapping', async ({
+    page,
+  }) => {
+    const errors = watchConsole(page)
+    await fakeGamepad(page)
+    await openSpike(page)
+    await expect(page.getByTestId('kart-gamepad')).toHaveText('Test gamepad (STANDARD GAMEPAD)')
+
+    await padPress(page, 0, true) // A
+    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(20)
+    // 0.6 on the stick is half way from the dead zone (0.2) to full
+    await padAxis(page, 0, 0.6)
+    await expect.poll(async () => (await reading(page)).input.steer, LONG).toBeCloseTo(0.5, 5)
+    await padPress(page, 5, true) // RB
+    await expect.poll(async () => (await reading(page)).state.drifting, LONG).toBe(true)
+    expect((await reading(page)).state.driftDirection).toBe(1)
+    await expect.poll(async () => (await reading(page)).state.storedBoosts, LONG).toBe(1)
+
+    await padPress(page, 2, true) // X
+    await expect.poll(async () => (await reading(page)).state.boostSeconds, LONG).toBeGreaterThan(0)
+    await padPress(page, 2, false)
+    await padPress(page, 5, false)
+    await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
+    await padAxis(page, 0, 0)
+    await padPress(page, 0, false)
+    expect(errors).toEqual([])
+  })
+
+  test('can be remapped: Start as the boost', async ({ page }) => {
+    await fakeGamepad(page)
+    await openSpike(page)
+    await page.getByRole('button', { name: 'Controls' }).click()
+    await page.getByRole('button', { name: 'Boost, Gamepad 1: X' }).click()
+    await expect(page.getByTestId('kart-controls-status')).toContainText('Press a gamepad button')
+    await padPress(page, 9, true)
+    await expect(page.getByRole('button', { name: 'Boost, Gamepad 1: Start' })).toBeVisible()
+    await padPress(page, 9, false)
+    await page.getByRole('button', { name: 'Close' }).click()
+
+    await padPress(page, 9, true)
+    await expect.poll(async () => (await reading(page)).input.boost, LONG).toBe(true)
+    await padPress(page, 9, false)
+    // X no longer boosts
+    await padPress(page, 2, true)
+    await page.waitForTimeout(300)
+    expect((await reading(page)).input.boost).toBe(false)
+  })
+})
+
+test.describe('remapping keys', () => {
+  test.use({ locale: 'en-US', viewport: { width: 1280, height: 720 } })
+
+  /** Gets up to speed, holds `key` while steering, and says whether the car was drifting */
+  async function driftsWith(page: Page, key: string) {
+    await page.keyboard.down('ArrowUp')
+    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(15)
+    await page.keyboard.down('ArrowRight')
+    await page.keyboard.down(key)
+    await page.waitForTimeout(500)
+    const { drifting } = (await reading(page)).state
+    await page.keyboard.up(key)
+    await page.keyboard.up('ArrowRight')
+    await page.keyboard.up('ArrowUp')
+    return drifting
+  }
+
+  test('a new drift key works at once and after a reload, and the old one stops', async ({
+    page,
+  }) => {
+    // Three drives and two reloads with a software renderer
+    test.setTimeout(120_000)
+    const errors = watchConsole(page)
+    await openSpike(page)
+    await page.getByRole('button', { name: 'Controls' }).click()
+    await expect(page.getByRole('heading', { name: 'Controls' })).toBeFocused()
+    await page.getByRole('button', { name: 'Drift, Keyboard 1: Z' }).click()
+    await page.keyboard.press('q')
+    await expect(page.getByRole('button', { name: 'Drift, Keyboard 1: Q' })).toBeVisible()
+    await expect(page.getByTestId('kart-controls-status')).toHaveText('Drift: Q.')
+
+    // A key another action has moves, and the panel says where from
+    await page.getByRole('button', { name: 'Boost, Keyboard 2: E' }).click()
+    await page.keyboard.press('Space')
+    await expect(page.getByTestId('kart-controls-status')).toContainText(
+      'It was taken from Drift, Keyboard 2',
+    )
+    await expect(page.getByRole('button', { name: 'Drift, Keyboard 2: None' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('kart-controls')).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Controls' })).toBeFocused()
+    await expect(page.getByText('Hold Q while steering to drift')).toBeVisible()
+
+    expect(await driftsWith(page, 'q')).toBe(true)
+    expect(await driftsWith(page, 'z')).toBe(false)
+
+    await page.reload()
+    await expect.poll(async () => (await reading(page)).frames).toBeGreaterThan(5)
+    await expect(page.getByText('Hold Q while steering to drift')).toBeVisible()
+    expect(await driftsWith(page, 'q')).toBe(true)
+
+    await page.getByRole('button', { name: 'Controls' }).click()
+    await page.getByRole('button', { name: 'Reset to defaults' }).click()
+    await expect(page.getByRole('button', { name: 'Drift, Keyboard 1: Z' })).toBeVisible()
+    await page.reload()
+    await expect(page.getByText('Hold Z while steering to drift')).toBeVisible()
+    expect(errors).toEqual([])
+  })
+
+  test('works without localStorage, keeping the change until the page closes', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        get() {
+          throw new DOMException('blocked', 'SecurityError')
+        },
+      })
+    })
+    const errors = watchConsole(page)
+    await openSpike(page)
+    await page.getByRole('button', { name: 'Controls' }).click()
+    await page.getByRole('button', { name: 'Drift, Keyboard 1: Z' }).click()
+    await page.keyboard.press('q')
+    await expect(page.getByTestId('kart-controls-status')).toContainText("won't keep the change")
+    await expect(page.getByRole('button', { name: 'Drift, Keyboard 1: Q' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    expect(await driftsWith(page, 'q')).toBe(true)
+    expect(errors).toEqual([])
+  })
+
+  test('Space drifts instead of pressing the focused button; Enter still presses it', async ({
+    page,
+  }) => {
+    await openSpike(page)
+    const hide = page.getByRole('button', { name: 'Hide numbers' })
+    await hide.focus()
+    await page.keyboard.press('Space')
+    await expect(hide).toBeVisible()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('button', { name: 'Show numbers' })).toBeVisible()
+  })
+
+  test('the panel works from the keyboard alone', async ({ page }) => {
+    await openSpike(page)
+    await page.getByRole('link', { name: 'Back to the lobby' }).focus()
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Controls' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { name: 'Controls' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Tab')
+    const accelerate = page.getByRole('button', { name: 'Accelerate, Keyboard 1: Up arrow' })
+    await expect(accelerate).toBeFocused()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('i')
+    await expect(page.getByRole('button', { name: 'Accelerate, Keyboard 1: I' })).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('kart-controls')).toBeHidden()
+  })
+})
+
+for (const scheme of ['light', 'dark'] as const) {
+  test.describe(`axe, ${scheme} theme`, () => {
+    test.use({ colorScheme: scheme, locale: 'en-US', viewport: { width: 375, height: 667 } })
+
+    test('the spike page and its controls panel have no problems', async ({ page }) => {
+      await openSpike(page)
+      const problems = async () => {
+        const { violations } = await new AxeBuilder({ page }).analyze()
+        return violations.map(({ id, nodes }) => ({ id, nodes: nodes.map((node) => node.target) }))
+      }
+      expect(await problems()).toEqual([])
+      await page.getByRole('button', { name: 'Controls' }).click()
+      await page.getByRole('button', { name: 'Drift, Keyboard 1: Z' }).click()
+      expect(await problems()).toEqual([])
+      // Nothing sticks out sideways at phone width
+      const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }))
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
+    })
+  })
+}

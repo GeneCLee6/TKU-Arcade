@@ -35,7 +35,7 @@ depends_on: [E7, E12]
   - 固定 60 Hz 的模擬步長（與渲染解耦），**物理函式純粹、可在 Node 跑**（E9 伺服器要用同一份）。
 - **時間賽**：倒數 3-2-1；三圈；檢查點防逆走；分段時間；最佳圈與最佳總時間存 localStorage（M1 帳號者存 D1，E11）；重來；結果畫面。
 - **幽靈車**：錄製每 tick 的位置與朝向（壓縮）；跑時顯示半透明的最佳幽靈；可關。
-- **操作**：鍵盤預設方向鍵＋Shift（甩尾）＋Ctrl（道具／噴射）；WASD 替代；Gamepad API（左搖桿、A 加速、B 煞車、RB 甩尾、X 道具）；按鍵可改並存本機。
+- **操作**：鍵盤預設方向鍵＋Z（甩尾）＋X（噴射），WASD＋空白鍵＋E 替代（J2 改掉原本寫的 Shift／Ctrl，理由見下方「J2 定案的細節」）；Gamepad API（左搖桿、A 加速、B 煞車、RB 甩尾、X 道具）；按鍵可改並存本機。
 - **攝影機與 HUD**：第三人稱跟隨（甩尾時稍微外擺）、速度表、加速條、圈數、分段、小地圖（由賽道 JSON 畫）、倒數、最佳時間差。
 - **音效**：引擎（隨速度變音高）、甩尾輪胎聲、噴射、撞牆、倒數；原創或 CC0；Web Audio。
 - **調參面板**（dev 模式 `?tune=1`）：所有物理參數即時滑桿；存成 preset JSON；preset 進 repo 當「正式手感」。
@@ -44,6 +44,59 @@ depends_on: [E7, E12]
 
 - `shared/kart/{physics.ts, track.ts, input.ts, ghost.ts}`（純邏輯、可測）；`src/kart/{Scene.ts, Renderer.ts, Hud.tsx, …}`；頁面 `/kart`（M2 單機）→ M3 併入房間。
 - 第一批是 **spike**：方塊車＋平面＋甩尾，先看 three.js 與固定步長迴圈在 Vite 下的 bundle 與效能；手感不對就在這裡調，不做賽道。J1 的結果與數字在 `ARCHITECTURE.md` §4.1；`/kart/spike` 不算卡丁車頁（`e8-t14`），上線正式頁時拿掉。
+
+### J2 定案的細節（`e8-t02a`、`e8-t12`）
+
+**加速條、噴射、連噴的規則**（`shared/kart/physics.ts`，`stepKart(state, input, tuning, rules)`）：
+
+- 甩尾中、而且前進速度 ≥ `driftMinSpeed` 才累積加速條（0–100）；滿了變成一次「存著的噴射」，加速條從頭再累積。最多存 `maxStoredBoosts` 次，存滿後加速條停在 100。不甩尾時加速條不增不減。
+- 噴射用鍵發（擁有者 2026-11-09 拍板）：按下那一瞬間發一次，按住不會連發；兩步之間按下又放開也算（迴圈記住「這一步之前按過」）。規則選項 `autoBoost` 打開時，存到就自動發。
+- 噴射中：最高速 ×`boostTopSpeedFactor`（甩尾的最高速也一起乘），不踩油門也往前推（`boostAcceleration`），倒車中噴射也會往前推；踩煞車時煞車優先，噴射時間照走。噴完超過最高速的部分以 `overSpeedDrag` 慢慢降，不會一下掉回 30。
+- **連噴**（規則選項 `chainBoosts`，預設開）：發噴射後到噴完再加 `chainGrace` 秒內，**放開**一段至少 `chainMinDrift` 秒的甩尾，就再噴 `chainDuration` 秒，並重新開一個窗；可以一直連下去。因為減速而結束的甩尾（鍵還按著）不算；輕點甩尾鍵不算；沒有先噴射也不算。`chain` 記連了幾次，從存量發一次噴射就歸零。
+- 側滑角不再貼著上限（J1 的問題）：甩尾時行進方向以 `driftAlign` 的速度轉向車頭、**保持速率**，車頭以 `driftTurnRate ± driftSteerRate` 轉，兩者平衡在一個穩定角度。實測（3 秒後）：往甩尾方向打滿 32°、方向盤置中 22°、反打 12.5°；`driftMaxSlip` 40° 只是安全上限，穩定時碰不到。
+- 側滑不會讓速度超過上限：速度上限套在整個速度向量上（J1 只限前進分量，甩尾時總速度會到 36 m/s）。放開甩尾時速度保留，不會損失側向那一段。
+- 碰牆、復位、出界不在這批（`e8-t02b`，J3）。
+
+**參數**（全部在 `KART_TUNING` 一個物件裡，`e8-t03` 的調參面板直接改它；程式裡每個都有註解）：
+
+| 參數 | 值 | 意思 |
+| --- | --- | --- |
+| `topSpeed` | 30 m/s | 直線最高速；靜止到極速 30 ÷ 14 = 2.14 秒（129 步） |
+| `reverseSpeed` | 8 m/s | 倒車最高速 |
+| `acceleration` | 14 m/s² | 油門加速 |
+| `braking` | 30 m/s² | 煞車減速 |
+| `coastDrag` | 4 m/s² | 放開油門的減速 |
+| `fullTurnSpeed` | 6 m/s | 低於這個速度轉向等比變弱，原地不能轉 |
+| `turnRate` | 2.2 rad/s | 一般轉向速率 |
+| `turnLossAtTopSpeed` | 0.45 | 極速時轉向少掉的比例 |
+| `grip` | 10 /s | 不甩尾時側滑消失的速度 |
+| `driftMinSpeed` | 8 m/s | 甩尾起始速度；也是加速條累積的最低速度 |
+| `driftExitSpeed` | 5 m/s | 低於這個速度甩尾自動結束 |
+| `driftTurnRate` | 1.6 rad/s | 甩尾時方向盤置中的轉速 |
+| `driftSteerRate` | 0.7 rad/s | 往甩尾方向打加、反打減；不會讓車往回轉 |
+| `driftAlign` | 3.5 /s | 甩尾時行進方向轉向車頭的速度；與轉速一起決定穩定側滑角 |
+| `driftMaxSlip` | 40° | 側滑角的安全上限 |
+| `driftTopSpeed` | 26.5 m/s | 甩尾時的最高速（甩尾的速度代價） |
+| `driftDrag` | 8 m/s² | 甩尾開始時從高速降到 `driftTopSpeed` 的速度 |
+| `gaugeFillRate` | 40 /s | 加速條每秒累積；0 到滿 2.5 秒 |
+| `maxStoredBoosts` | 2 | 最多存幾次噴射 |
+| `boostDuration` | 1.2 秒 | 一次噴射多久 |
+| `boostTopSpeedFactor` | 1.3 | 噴射時最高速倍數（30 → 39 m/s） |
+| `boostAcceleration` | 30 m/s² | 噴射推力，加在油門之上 |
+| `overSpeedDrag` | 6 m/s² | 噴完超過最高速時的減速 |
+| `chainDuration` | 0.8 秒 | 一次連噴多久 |
+| `chainGrace` | 0.3 秒 | 噴射結束後還能連噴的寬限 |
+| `chainMinDrift` | 0.2 秒 | 能連噴的最短甩尾 |
+
+都是起始值，不是簽核過的手感（AC-8.8）。
+
+**操作與改鍵**（`shared/kart/input.ts` 純邏輯、`src/kart/devices.ts` 讀手把與存取、`src/kart/ControlsPanel.tsx` 介面）：
+
+- 預設鍵盤：加速 ↑／W、煞車與倒車 ↓／S、左 ←／A、右 →／D、**甩尾 Z／空白鍵**、**噴射 X／E**。不用 Shift：Windows 連按 5 次 Shift 會跳相黏鍵（甩尾常是點按）；不用 Ctrl：Ctrl＋W 會關掉分頁。方向鍵玩家左手放 Z、X；WASD 玩家拇指按空白鍵、食指按 E。Shift 仍然可以自己改上去。
+- 預設手把（瀏覽器的 standard mapping）：左搖桿或十字鍵轉向（搖桿是類比的，0.2 死區之後等比）、A 或 RT 加速、B 或 LT 煞車、RB 或 LB 甩尾、X 或 Y 噴射。鍵盤與手把同時有效，轉向相加最多到全滿。
+- 每個動作 2 個鍵盤位置、2 個手把位置，都能改。一個鍵或手把按鈕只能做一件事：設到新位置就從原本的位置拿走，狀態列說「從哪裡拿走」。Esc 取消、Backspace 清空。Tab、Enter、Esc、F 留給頁面（移動焦點、按按鈕、取消、數字面板），不能設。「恢復預設」一鍵還原。
+- 設定存在 `localStorage`（`tku-arcade.kart.bindings`、`tku-arcade.kart.rules`），讀寫都包 try/catch；存不了會說「改動只到關閉頁面為止」，頁面照常能用。存的值壞掉時一格一格退回預設。
+- 改鍵面板打開時車不吃任何輸入（鍵盤與手把都交給面板）。開車時綁定的鍵會 `preventDefault`，所以焦點停在按鈕上按空白鍵是甩尾，不會按到按鈕；Enter 保留，鍵盤使用者仍能按按鈕。
 - 參考（概念，不抄資產）：MarioKart.js（開源 three.js 卡丁車）的攝影機與甩尾粒子做法；Kenney 的 CC0「Racing Kit」當 placeholder 模型。
 - 第一張賽道主題：原創，例如「淡水河畔」（河、橋、夕陽），以 Blender 做低多邊形。
 
@@ -63,7 +116,7 @@ depends_on: [E7, E12]
 ### M2
 
 - [x] `e8-t01` **Spike**：three.js＋固定步長迴圈＋方塊車在平面上加速、轉向、甩尾（最簡物理）；bundle 與 fps 數字記錄 · AC-8.3 · M · ← e12-t03 · #15
-- [ ] `e8-t02` `shared/kart/physics.ts` 完整街機物理（甩尾、加速條、噴射、連噴、碰牆、復位）與測試 · AC-8.3 · L→拆：t02a 甩尾與加速條、t02b 碰撞與復位 · ← e8-t01
+- [ ] `e8-t02` `shared/kart/physics.ts` 完整街機物理（甩尾、加速條、噴射、連噴、碰牆、復位）與測試 · AC-8.3 · L→拆：t02a 甩尾與加速條、t02b 碰撞與復位 · ← e8-t01 · **t02a 完成（#J2PR）**，t02b 在 J3
 - [ ] `e8-t03` 調參面板與 preset · AC-8.8 · S · ← e8-t02
 - [ ] `e8-t04` 賽道 JSON schema、檢查點、復位點、`build-track.ts` 匯出腳本 · AC-8.2 · M · ← e8-t02
 - [ ] `e8-t05` 第一張賽道（Blender 低多邊形，原創主題）＋資產登記＋R2 上傳腳本 · AC-8.2, 8.1 · L→拆：t05a 灰盒賽道（只有路與牆）、t05b 美術 · ← e8-t04
@@ -73,7 +126,7 @@ depends_on: [E7, E12]
 - [ ] `e8-t09` 小地圖（由賽道 JSON 畫） · AC-8.6 · S · ← e8-t04
 - [ ] `e8-t10` 時間賽：倒數、三圈、防逆走、分段、結果畫面、重來 · AC-8.4 · M · ← e8-t04, e8-t08
 - [ ] `e8-t11` 最佳紀錄（localStorage）與幽靈錄製／重播 · AC-8.4 · M · ← e8-t10
-- [ ] `e8-t12` 鍵盤、Gamepad API、改鍵介面 · AC-8.5 · S · ← e8-t01
+- [x] `e8-t12` 鍵盤、Gamepad API、改鍵介面 · AC-8.5 · S · ← e8-t01 · #J2PR
 - [ ] `e8-t13` 音效（Web Audio、引擎音高、甩尾、噴射、撞牆）與資產登記 · AC-8.7 · S · ← e8-t02
 - [ ] `e8-t14` 卡丁車頁 lazy 與 bundle 分 chunk、JS 預算 · AC-8.1 · S · ← e12-t03
 - [ ] `e8-t15` 手感簽核：擁有者與兩位朋友試玩、記錄回饋、調 preset · AC-8.8 · S · ← e8-t10
@@ -91,5 +144,5 @@ depends_on: [E7, E12]
 
 - [x] **Q:** 視覺風格（總 PRD Q4）。
       **A:** 2026-11-09 擁有者拍板：低多邊形卡通。
-- [ ] **Q:** 噴射是「加速條滿自動噴」還是「按鍵噴」？
-      **A:** _(建議按鍵噴，連噴才有操作感；規則選項可切)_
+- [x] **Q:** 噴射是「加速條滿自動噴」還是「按鍵噴」？
+      **A:** 2026-11-09 擁有者照建議拍板：按鍵噴；規則選項 `autoBoost` 可切成加速條滿自動噴（J2 已實作，spike 頁的操作設定裡有開關）。
