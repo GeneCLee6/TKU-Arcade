@@ -29,6 +29,10 @@ interface KartReading {
 const reading = (page: Page): Promise<KartReading> =>
   page.evaluate(() => (window as unknown as { __kartSpike: KartReading }).__kartSpike)
 
+/** 0 until the lazy chunk has loaded and started the loop, as just after a reload */
+const framesOf = (page: Page): Promise<number> =>
+  page.evaluate(() => (window as unknown as { __kartSpike?: KartReading }).__kartSpike?.frames ?? 0)
+
 /** Fails the test on anything red in the console or any uncaught error */
 function watchConsole(page: Page): string[] {
   const errors: string[] = []
@@ -42,7 +46,7 @@ function watchConsole(page: Page): string[] {
 async function openSpike(page: Page) {
   await page.goto('/kart/spike?fps=1')
   await expect(page.locator('canvas')).toBeVisible()
-  await expect.poll(async () => (await reading(page)).frames).toBeGreaterThan(5)
+  await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
 }
 
 /** What share of the screenshot is the commonest colour, and how many colours there are */
@@ -168,7 +172,7 @@ test.describe('on a phone', () => {
     await expect(page.getByText('這個測試沒有觸控操作')).toBeVisible()
 
     await page.locator('canvas').tap()
-    await expect.poll(async () => (await reading(page)).frames).toBeGreaterThan(5)
+    await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
     const { state } = await reading(page)
     expect(state.x).toBe(0)
     expect(state.z).toBe(0)
@@ -481,7 +485,7 @@ test.describe('remapping keys', () => {
     expect(await driftsWith(page, 'z')).toBe(false)
 
     await page.reload()
-    await expect.poll(async () => (await reading(page)).frames).toBeGreaterThan(5)
+    await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
     await expect(page.getByText('Hold Q while steering to drift')).toBeVisible()
     expect(await driftsWith(page, 'q')).toBe(true)
 
