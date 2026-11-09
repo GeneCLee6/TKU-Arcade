@@ -6,7 +6,8 @@ import { setIntOption, setSelectOption } from './helpers.ts'
 // reader gets, which check-i18n cannot. It cannot tell a bad translation from a good one: read those.
 
 // Words that stay Latin in both languages. Nicknames here are Chinese, so that they need no entry
-const ALLOWED = /TKU Arcade|\bEN\b|QR code|Shift\+Enter|\bEnter\b/g
+// Overtrick is the bridge table's platform, whose name is English only (its DESIGN.md §6; e1-t13)
+const ALLOWED = /TKU Arcade|Overtrick|\bEN\b|QR code|Shift\+Enter|\bEnter\b/g
 
 async function englishLeft(page: Page): Promise<string[]> {
   return page.evaluate((allowed) => {
