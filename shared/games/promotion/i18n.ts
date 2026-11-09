@@ -76,7 +76,7 @@ const en = {
 }
 
 const zhTW: Record<keyof typeof en, string> = {
-  'games.promotion.name': '升官圖',
+  'games.promotion.name': '陞官圖',
   'games.promotion.summary': '從白丁一路擲到位極人臣，看誰先榮歸故里。',
   'games.promotion.simplified': '本遊戲的官階為自行整理的清代簡化版。',
   'games.promotion.option.dice': '骰子',
@@ -91,7 +91,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.glyph.cai': '才',
   'games.promotion.glyph.gong': '功',
   'games.promotion.glyph.zang': '贓',
-  'games.promotion.ui.boardLabel': '升官圖圖版，共 {count} 個官職，從外圈的白丁到中央的榮歸',
+  'games.promotion.ui.boardLabel': '陞官圖圖版，共 {count} 個官職，從外圈的白丁到中央的榮歸',
   'games.promotion.ui.gameOver': '遊戲結束',
   'games.promotion.ui.roll': '擲骰',
   'games.promotion.ui.mostSenior': '{names} 官階最高',

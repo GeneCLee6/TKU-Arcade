@@ -89,7 +89,7 @@ for (const [label, viewport, touch] of [
       await expectAllChinese(page, 'nickname dialog with its error')
       await page.getByRole('button', { name: '關閉' }).click()
 
-      await page.getByRole('link', { name: '升官圖怎麼玩' }).click()
+      await page.getByRole('link', { name: '陞官圖怎麼玩' }).click()
       await expect(page.getByRole('heading', { name: '目標' })).toBeVisible()
       await expectAllChinese(page, 'rules page')
 
@@ -138,7 +138,7 @@ for (const [label, viewport, touch] of [
       }
 
       await host.getByRole('button', { name: '怎麼玩' }).click()
-      const rules = host.getByRole('dialog', { name: '升官圖怎麼玩' })
+      const rules = host.getByRole('dialog', { name: '陞官圖怎麼玩' })
       await expect(rules.getByRole('heading', { name: '目標' })).toBeVisible()
       await expectAllChinese(host, 'how to play')
       await rules.getByRole('button', { name: '關閉' }).click()
