@@ -132,7 +132,11 @@ describe('/ws/<id>', () => {
     const { env, room, names } = setup()
     const request = upgrade(ID, { Origin: 'https://x' })
     expect(await (await handleRequest(request, env)).text()).toBe('upgraded')
-    expect(room.fetch).toHaveBeenCalledWith(request)
+    // A copy, without any account header (e1-t13: sign-in is not configured here)
+    const forwarded = (room.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as Request
+    expect(forwarded.url).toBe(request.url)
+    expect(forwarded.headers.get('Upgrade')).toBe('websocket')
+    expect(forwarded.headers.get('X-Arcade-Account')).toBeNull()
     expect(names).toEqual([ID])
   })
 

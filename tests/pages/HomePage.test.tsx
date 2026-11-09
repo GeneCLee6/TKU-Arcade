@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { GameCard } from '../../src/components/GameCard.tsx'
 import { ToastProvider } from '../../src/components/Toast.tsx'
 import { initLanguage, setLanguage, translate } from '../../src/i18n/t.ts'
+import { resetAccountForTests } from '../../src/lib/account.ts'
 import { HomePage } from '../../src/pages/HomePage.tsx'
 import { getGame } from '../../shared/games/index.ts'
 import { LOBBY_POLL_MS } from '../../shared/protocol.ts'
@@ -84,6 +85,26 @@ describe('changing the nickname', () => {
     expect(screen.getByText('Playing as Typo')).toBeInTheDocument()
     expect(localStorage.getItem(NICKNAME_KEY)).toBe('Typo')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('signed in (e1-t13)', () => {
+  it('shows the account name, offers no change, and creates a room without asking', async () => {
+    resetAccountForTests({ configured: true, account: { id: 'acct-amy', name: 'Amy' } })
+    localStorage.setItem(NICKNAME_KEY, 'Tpyo')
+    const fetchMock = stubFetch(created)
+    renderLobby()
+    expect(screen.getByText('Playing as Amy (Overtrick account)')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
+    fireEvent.click(newRoom())
+    expect(screen.queryByRole('textbox', { name: 'Nickname' })).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(`/r/${ROOM}`))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows no sign-in at all while it is not configured', () => {
+    renderLobby()
+    expect(screen.queryByRole('link', { name: 'Sign in with Overtrick' })).not.toBeInTheDocument()
   })
 })
 

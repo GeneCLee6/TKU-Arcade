@@ -2,6 +2,11 @@ import type { Messages } from './en.ts'
 
 // The annotation makes a missing or an extra key a compile error
 export const zhTW: Messages = {
+  'account.failed': '登入沒有完成，請回到大廳再試一次。',
+  'account.playingAs': '你的暱稱：{name}（Overtrick 帳號）',
+  'account.signIn': '用 Overtrick 登入',
+  'account.signOut': '登出',
+  'account.signOutFailed': '登出失敗，請再試一次。',
   'chat.empty': '還沒有訊息，打聲招呼吧。',
   'chat.heading': '聊天',
   'chat.hint': '按 Enter 傳送，Shift+Enter 換行。',

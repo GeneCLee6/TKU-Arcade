@@ -9,7 +9,9 @@ import {
   type RoomSummary,
   type ServerMessage,
 } from '../shared/protocol.ts'
+import { parseAccount } from '../shared/account.ts'
 import type { Env } from './app.ts'
+import { ACCOUNT_HEADER, decodeAccountHeader } from './auth.ts'
 import { LOBBY_NAME, lobbyReportDue, type LobbyReport } from './lobby-board.ts'
 import { RoomHost, type MemberRecord, type OpenSocket, type RoomRecord } from './room-host.ts'
 import type { StoredGame } from './room-turn.ts'
@@ -141,10 +143,17 @@ export class RoomDO extends DurableObject<Env> {
       server.close(admission.code, admission.reason)
       return new Response(null, { status: 101, webSocket: client })
     }
-    const attachment: OpenSocket = { conn: crypto.randomUUID(), openedAt: Date.now() }
+    // Signed in (e1-t13): the Worker put the session's account here, and the socket keeps it
+    // through hibernation
+    const account = parseAccount(decodeAccountHeader(request.headers.get(ACCOUNT_HEADER)))
+    const attachment: OpenSocket = {
+      conn: crypto.randomUUID(),
+      openedAt: Date.now(),
+      ...(account ? { account } : {}),
+    }
     this.ctx.acceptWebSocket(server, [attachment.conn])
     server.serializeAttachment(attachment)
-    this.host.opened(attachment.conn, attachment.openedAt)
+    this.host.opened(attachment.conn, attachment.openedAt, account)
     await this.settle()
     return new Response(null, { status: 101, webSocket: client })
   }

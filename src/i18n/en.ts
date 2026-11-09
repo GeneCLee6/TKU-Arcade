@@ -1,6 +1,12 @@
 // The source language (docs/DESIGN.md §5): write here first, then translate in zh-TW.ts.
 // Keys name the meaning, not the sentence.
 export const en = {
+  // F1: the optional club account (e1-t13). Overtrick is the bridge table's platform name, English only
+  'account.failed': "Couldn't sign you in. Try again from the lobby.",
+  'account.playingAs': 'Playing as {name} (Overtrick account)',
+  'account.signIn': 'Sign in with Overtrick',
+  'account.signOut': 'Sign out',
+  'account.signOutFailed': "Couldn't sign out. Try again.",
   'chat.empty': 'No messages yet. Say hi.',
   'chat.heading': 'Chat',
   'chat.hint': 'Enter sends, Shift+Enter starts a new line.',

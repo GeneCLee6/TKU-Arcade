@@ -2,6 +2,7 @@ import { createElement, Suspense, useEffect, useState, type ReactNode } from 're
 import { Link, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { isRoomId } from '../../shared/room-id.ts'
+import { AccountControl } from '../components/AccountControl.tsx'
 import { Button } from '../components/Button.tsx'
 import { GameLayout, RoomChatPanel, type RoomParts } from '../components/GameLayout.tsx'
 import { HowToPlay } from '../components/HowToPlay.tsx'
@@ -12,6 +13,7 @@ import { gameScreen } from '../games/screens.ts'
 import { useT } from '../i18n/useT.ts'
 import { ChatDraft } from '../lib/chatState.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
+import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
 import { useRoom } from '../lib/useRoom.ts'
@@ -32,7 +34,11 @@ function RoomEntry({ id }: { id: string }) {
   const t = useT()
   const [lookup, setLookup] = useState<RoomLookup | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const [name, setName] = useState(readNickname)
+  const [guestName, setName] = useState(readNickname)
+  // Signed in (e1-t13): the account's name, never asked for. Wait for /api/me before joining, so a
+  // signed-in person is not asked for a nickname first
+  const accountState = useAccount()
+  const name = accountState?.account?.name ?? guestName
 
   useEffect(() => {
     const controller = new AbortController()
@@ -42,7 +48,7 @@ function RoomEntry({ id }: { id: string }) {
     return () => controller.abort()
   }, [id, attempt])
 
-  if (lookup === null) return <p role="status">{t('common.loading')}</p>
+  if (lookup === null || accountState === null) return <p role="status">{t('common.loading')}</p>
   if (lookup.status === 'notFound') return <NotFound />
   if (lookup.status === 'failed') {
     const retry = () => {
@@ -62,6 +68,10 @@ function RoomEntry({ id }: { id: string }) {
           gameId={lookup.summary.gameId}
         />
         <NicknameForm onSubmit={setName} />
+        {/* Or sign in instead, and come back to this room (e1-t13); nothing when not configured */}
+        <SignInInstead>
+          <AccountControl />
+        </SignInInstead>
       </>
     )
   }
@@ -313,4 +323,12 @@ const BackLink = styled(Link)`
   justify-self: start;
   min-height: 44px;
   color: ${color.text};
+`
+
+const SignInInstead = styled.div`
+  margin-top: ${space.sm}px;
+
+  &:empty {
+    display: none;
+  }
 `

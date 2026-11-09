@@ -3,6 +3,7 @@ import type { OptionValues } from '../shared/games/types.ts'
 import type { CreateRoomResponse } from '../shared/protocol.ts'
 import { isRoomId, newRoomId } from '../shared/room-id.ts'
 import type { Env } from './app.ts'
+import { ACCOUNT_HEADER, encodeAccountHeader, sessionAccount } from './auth.ts'
 
 /** Tries this many fresh ids before giving up (a collision at ~59 bits is not expected at all) */
 const CREATE_ATTEMPTS = 3
@@ -79,5 +80,12 @@ export async function handleRoomSocket(request: Request, env: Env, url: URL): Pr
   // one here. Non-browser clients (no Origin) could forge any header anyway
   const origin = request.headers.get('Origin')
   if (origin !== null && origin !== url.origin) return fail('forbidden_origin', 403)
-  return roomStub(env, match[1]).fetch(request)
+  // Who the session says this is (e1-t13): the room takes a signed-in person's name from here, not
+  // from `join`. A Durable Object cannot be reached from outside, so this header only ever comes
+  // from this line; whatever a browser sent under that name is dropped
+  const headers = new Headers(request.headers)
+  headers.delete(ACCOUNT_HEADER)
+  const account = await sessionAccount(request, env)
+  if (account) headers.set(ACCOUNT_HEADER, encodeAccountHeader(account))
+  return roomStub(env, match[1]).fetch(new Request(request, { headers }))
 }
