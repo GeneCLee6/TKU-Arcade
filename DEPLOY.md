@@ -227,7 +227,7 @@ npx wrangler secret put ARCADE_LOGIN_SECRET
 npx wrangler secret put AUTH_SHARED_SECRET
 ```
 
-**檢查**：`curl -s https://tku-arcade.genelee-pro.workers.dev/api/me` 回 `"configured":true`；開首頁，大廳標題下有「Sign in with Overtrick／用 Overtrick 登入」；按下去 → 牌桌（沒登入會先要你登入）→ 回到原本那一頁，首頁顯示「你的暱稱：<帳號名稱>（Overtrick 帳號）」；進一間房，名字就是帳號的名字，不會問暱稱。Workers Logs 搜尋 `auth_signed_in`、`auth_refused`（`reason` 說是哪一關沒過），牌桌那邊搜尋 `arcadeToken`。
+**檢查**：`curl -s https://tku-arcade.genelee-pro.workers.dev/api/me` 回 `"configured":true`；開首頁，大廳最下面有「Sign in with Overtrick／用 Overtrick 登入」；按下去 → 牌桌（沒登入會先要你登入）→ 回到原本那一頁，首頁顯示「你的暱稱：<帳號名稱>（Overtrick 帳號）」；進一間房，名字就是帳號的名字，不會問暱稱。Workers Logs 搜尋 `auth_signed_in`、`auth_refused`（`reason` 說是哪一關沒過），牌桌那邊搜尋 `arcadeToken`。
 
 ### 11.2 換金鑰
 

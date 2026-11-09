@@ -8,9 +8,9 @@ import { Button } from './Button.tsx'
 import { ToastContext } from './useToast.ts'
 
 /**
- * The sign-in link or the sign-out button (e1-t13), in the lobby beside the nickname and on a
- * room's nickname step. Nothing until the Worker answers, and nothing at all while sign-in is not
- * configured
+ * The sign-in link or the sign-out button (e1-t13): signed in, beside the name in the lobby;
+ * signed out, at the foot of the lobby and on a room's nickname step. Nothing until the Worker
+ * answers, and nothing at all while sign-in is not configured
  */
 export function AccountControl() {
   const t = useT()

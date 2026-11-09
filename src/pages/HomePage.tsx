@@ -66,25 +66,21 @@ export function HomePage() {
         <Intro>
           <Title>{APP_NAME}</Title>
           <Tagline>{t('home.tagline')}</Tagline>
-          {/* The sign-in link or sign-out (e1-t13) lives here, not in the top bar: the bar stays
-              one row on a 360 px phone. Nothing at all while sign-in is not configured */}
+          {/* Signed in (e1-t13): the fixed name and sign-out, where a guest's nickname would be */}
           {account !== null ? (
             <PlayingAs>
               <span>{t('account.playingAs', { name: account.name })}</span>
               <AccountControl />
             </PlayingAs>
           ) : (
-            <PlayingAs>
-              {nickname !== null && (
-                <>
-                  <span>{t('lobby.playingAs', { name: nickname })}</span>
-                  <Button $variant="ghost" onClick={() => setAsking({ gameId: null })}>
-                    {t('lobby.changeNickname')}
-                  </Button>
-                </>
-              )}
-              <AccountControl />
-            </PlayingAs>
+            nickname !== null && (
+              <PlayingAs>
+                <span>{t('lobby.playingAs', { name: nickname })}</span>
+                <Button $variant="ghost" onClick={() => setAsking({ gameId: null })}>
+                  {t('lobby.changeNickname')}
+                </Button>
+              </PlayingAs>
+            )
           )}
         </Intro>
         <JoinRoomForm />
@@ -115,6 +111,14 @@ export function HomePage() {
           </Grid>
         </section>
         <PublicRooms />
+        {/* Signing in (e1-t13) is optional, so it comes last: not in the top bar, which stays one
+            row on a 360 px phone, and not above the games, which must start on a phone's first
+            screen. Nothing at all while sign-in is not configured */}
+        {account === null && (
+          <SignInRow>
+            <AccountControl />
+          </SignInRow>
+        )}
       </Main>
       <Dialog
         open={asking !== null}
@@ -167,6 +171,11 @@ const PlayingAs = styled.p`
   gap: ${space.xs}px;
   margin: ${space.sm}px 0 0;
   overflow-wrap: anywhere;
+`
+
+const SignInRow = styled.div`
+  display: flex;
+  justify-content: center;
 
   &:empty {
     display: none;

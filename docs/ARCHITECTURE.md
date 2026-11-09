@@ -189,7 +189,7 @@ docs/                   本資料夾
 - **暱稱固定，在伺服器擋**：`worker/rooms.ts` 在 WebSocket 升級時讀 session，把帳號放進 header `X-Arcade-Account` 給 `RoomDO`（先刪掉瀏覽器自己送的同名 header；Durable Object 從外面連不到，所以這個 header 只可能來自 Worker）。`RoomDO` 把帳號存在 socket 的 attachment（休眠後還在），`RoomHost.join` 對登入的人一律用帳號的名字，**不看 `join.name`**；同房去重「(2)」照舊（跟訪客、跟同一個帳號的第二台裝置都比）。訪客帶 seat token 回來時已經登入，座位不變、名字換成帳號的。帳號 id 存在 `MemberRecord.account`，不進任何 view。
 - **沒設定就沒有**：`AUTH_SHARED_SECRET`（Worker secret，至少 32 字）與 `AUTH_BRIDGE_URL`（var，`wrangler.jsonc` 頂層，https）都有才開。沒開時 `GET /api/me` 回 `{ configured: false, account: null }`（就算瀏覽器有舊 cookie），其他三條路由回 404 `not_configured`，頁面不出現任何按鈕，房間也不收帳號。所以這批可以在牌桌那邊上線之前合併。
 - **路由**：`GET /api/me`、`GET /api/auth/start`、`POST /api/auth/callback`、`POST /api/auth/signout`（後兩個要同源 `Origin`）。程式在 `worker/auth.ts`、`shared/account.ts`、`src/lib/account.ts`、`src/components/AccountControl.tsx`；牌桌那邊在牌桌 repo 的 `worker/arcade-login.ts`（牌桌 `e1-t37`）。
-- **首屏**：登入的程式只有一個小 store 與一個按鈕（大廳暱稱旁、房間的暱稱步驟；不放頂欄，頂欄在 360 px 要維持一行），跟著主站一起載入（`/api/me` 是開站時的一個請求）；沒有新套件。
+- **首屏**：登入的程式只有一個小 store 與一個按鈕（沒登入時在大廳最下面、房間的暱稱步驟；登入後在大廳的暱稱那一行。不放頂欄：頂欄在 360 px 要維持一行；也不放遊戲上面：手機第一個畫面要看得到「開新房」），跟著主站一起載入（`/api/me` 是開站時的一個請求）；沒有新套件。
 
 ## 7. 部署與環境
 

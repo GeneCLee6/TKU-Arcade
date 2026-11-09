@@ -46,7 +46,7 @@ depends_on: [E2, E7]
   - token 走網址的 `#`，頁面讀到就拿掉、POST 給 Worker；state 放在本站的 HttpOnly cookie、牌桌簽回，擋登入 CSRF；`jti` 存 D1 `auth_token_uses`（`migrations/0002`），同一個 token 只能用一次。
   - session 是簽過的 cookie（`__Host-arcade_session`，30 天），鑰匙從共用 secret 衍生；沒有伺服器端撤銷，換金鑰會讓所有人登出。
   - 暱稱固定在伺服器：WebSocket 升級時 Worker 讀 session、帶 `X-Arcade-Account` 給房間，`RoomHost.join` 用帳號的名字、不看 `join.name`；同房「(2)」照舊。訪客帶 seat token 回來時已登入：座位不變、名字換成帳號的。
-  - 登入的人在大廳看到「你的暱稱：X（Overtrick 帳號）」、沒有「修改」；進房不問暱稱。
+  - 登入的人在大廳看到「你的暱稱：X（Overtrick 帳號）」與「登出」、沒有「修改」；進房不問暱稱。沒登入時「用 Overtrick 登入」在大廳最下面與房間的暱稱步驟（不放頂欄、不放遊戲上面，手機版面的規則）。
   - **沒設 `AUTH_SHARED_SECRET` 就什麼都沒有**（`/api/me` 回 `configured: false`），所以可以先合併。打開與換金鑰的步驟在 `DEPLOY.md` §11。
 
 ## 驗收條件
