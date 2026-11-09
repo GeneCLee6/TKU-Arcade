@@ -12,7 +12,7 @@ A browser game lobby for friends of the Tamkang University Bridge Club: open one
 | --- | --- | --- |
 | Promotion | *Sheng Guan Tu*, a traditional Chinese dice-and-board game (public domain) | M0 |
 | Silent Table | Cooperative poker without talking: rank chips are the only hints | M1 |
-| Spectrum (working title) | Place a clue between two extremes; teammates guess the dial | M1 |
+| Spectrum (working title) | Everyone but the guesser gets a secret 1–10 and answers a two-ended topic; the guesser picks the highest and lowest | M1 |
 | Bluff Reader (working title) | One honest reader, everyone else bluffs, the judge picks | M1 |
 | Kart (working title) | Arcade kart racing: drift, fill the gauge, boost | M2–M3 |
 
@@ -23,7 +23,7 @@ Game mechanics are not protected by copyright; names, art, characters, tracks, m
 | | Scope | Done when |
 | --- | --- | --- |
 | **M0** | Lobby, nicknames, rooms, game-module framework, reconnection, Promotion, chat, EN/zh-TW | Four friends finish a game on their own devices |
-| **M1** | Three party games, prompt decks (100+ bilingual each), rules pages, optional club login, records | One club meetup plays all three |
+| **M1** | Three party games, prompt decks (300+ topics for Spectrum, 100+ for Bluff Reader), rules pages, optional club login, records | One club meetup plays all three |
 | **M2** | Single-player kart: three.js scene, track format, arcade drift physics, time trial, ghost, gamepad | Owner and two friends sign off on the feel |
 | **M3** | Multiplayer kart: binary state sync, interpolation, item race with server-adjudicated hits, 2–3 tracks, characters and karts | Six players finish an item race with nobody dropping |
 | **M4** | Friends, achievements, leaderboards, seasons, next-game vote, track editor, cost dashboard | Monthly cloud cost stays at zero |

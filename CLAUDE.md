@@ -4,7 +4,7 @@
 
 ## 這是什麼
 
-淡江橋藝社朋友圈的遊戲大廳：一個網址、暱稱進場、選一款遊戲一起玩。四款派對桌遊（升官圖、合作撲克、光譜猜題、真假朗讀）＋ 一款瀏覽器 3D 卡丁車（甩尾加速手感致敬 2000 年代的經典卡丁車）。**非營利、只給朋友**。介面**預設 English**，初次依瀏覽器語言自動切繁中，之後以使用者切換為準。GitHub `GeneCLee6/TKU-Arcade`（公開）；**README 只寫英文**（給面試官看），其他文件繁中。技術與淡江牌桌（`C:\dev\TKU-BridgeTable`）、LongTalk（`C:\dev\LongTalk`）相同：React 19 + TypeScript（strict）+ styled-components + Vite；Cloudflare Workers（帶靜態資產）+ Durable Objects + D1 + R2。
+淡江橋藝社朋友圈的遊戲大廳：一個網址、暱稱進場、選一款遊戲一起玩。四款派對桌遊（陞官圖、合作撲克、光譜猜題、真假朗讀）＋ 一款瀏覽器 3D 卡丁車（甩尾加速手感致敬 2000 年代的經典卡丁車）。**非營利、只給朋友**。介面**預設 English**，初次依瀏覽器語言自動切繁中，之後以使用者切換為準。GitHub `GeneCLee6/TKU-Arcade`（公開）；**README 只寫英文**（給面試官看），其他文件繁中。技術與淡江牌桌（`C:\dev\TKU-BridgeTable`）、LongTalk（`C:\dev\LongTalk`）相同：React 19 + TypeScript（strict）+ styled-components + Vite；Cloudflare Workers（帶靜態資產）+ Durable Objects + D1 + R2。
 
 ## 先讀
 
@@ -19,7 +19,7 @@
 
 ## 硬性規則
 
-1. **玩法可學，表達不抄。** 不得加入任何原作（跑跑卡丁車／KartRider、紙牌幫／The Gang、腦洞量表／Wavelength、瞎掰王／9upper）的名稱當作自己的名稱、角色、美術、音樂、題目文字、模型、程式；提到原作只在規則頁用一句描述性的話。不確定就問擁有者。
+1. **玩法可學，表達不抄。** 不得加入任何原作（跑跑卡丁車／KartRider、紙牌幫／The Gang、腦洞量表／Wavelength、ito、瞎掰王／9upper）的名稱當作自己的名稱、角色、美術、音樂、題目文字、模型、程式；提到原作只在規則頁用一句描述性的話。不確定就問擁有者。
 2. **介面文字一律走 i18n**：`t('key')`，`en.ts` 是來源、`zh-TW.ts` 必須同步；JSX 不得有裸字串；`npm run check-i18n` 在 CI 擋。
 3. **規則在伺服器**：遊戲狀態只由 RoomDO 的 `GameModule.reduce` 改變；前端只呈現 `view`；隱藏資訊只能透過 `view` 裁切。
 4. **資產一律登記** `docs/ASSETS.md`（來源、授權）；模型、貼圖、音檔走 R2，不 commit；CI 擋未登記的檔案。

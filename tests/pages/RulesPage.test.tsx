@@ -32,8 +32,8 @@ describe('the rules page', () => {
     open('/games/promotion/rules')
     await screen.findByRole('heading', { name: 'What is Promotion?' })
     act(() => setLanguage('zh-TW'))
-    expect(await screen.findByRole('heading', { name: '什麼是升官圖？' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('升官圖怎麼玩')
+    expect(await screen.findByRole('heading', { name: '什麼是陞官圖？' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('陞官圖怎麼玩')
   })
 
   it.each(['tictactoe', 'no-such-game'])('is not found for %s, which has none', (id) => {

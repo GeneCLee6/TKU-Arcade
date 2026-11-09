@@ -1,5 +1,5 @@
 ---
-title: E3 — 升官圖（Promotion）
+title: E3 — 陞官圖（Promotion）
 date: 2026-11-03
 status: planned
 epic: E3
@@ -10,7 +10,7 @@ depends_on: [E2, E7]
 
 ## 背景
 
-第一款遊戲選升官圖，理由：公有領域沒有版權顧慮；規則是「擲骰→看結果→移動」沒有決策，正好用來驗證 E2 的框架（回合、view、重連、結果）而不被規則拖住；而且中文圈的朋友都聽過。
+第一款遊戲選陞官圖，理由：公有領域沒有版權顧慮；規則是「擲骰→看結果→移動」沒有決策，正好用來驗證 E2 的框架（回合、view、重連、結果）而不被規則拖住；而且中文圈的朋友都聽過。
 
 ## 目標
 
@@ -33,7 +33,7 @@ depends_on: [E2, E7]
 
 - `GameModule<PromotionState, PromotionAction, PromotionView, PromotionOptions>`；action 只有 `roll`；`rng` 決定骰面；view 對所有人相同（沒有隱藏資訊），旁觀者也一樣。
 - 圖版資料與畫面分離：`board.ts` 是純資料，`Board.tsx` 讀資料畫 SVG。
-- 英文呈現：官職用音譯＋括號意譯（例如 "Zhuangyuan (Top Scholar)"），規則頁有一段「什麼是升官圖」給外國朋友。
+- 英文呈現：官職用音譯＋括號意譯（例如 "Zhuangyuan (Top Scholar)"），規則頁有一段「什麼是陞官圖」給外國朋友。
 
 ## 驗收條件
 
