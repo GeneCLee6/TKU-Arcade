@@ -4,7 +4,7 @@
 
 ## 這是什麼
 
-淡江橋藝社朋友圈的遊戲大廳：一個網址、暱稱進場、選一款遊戲一起玩。四款派對桌遊（升官圖、合作撲克、光譜猜題、真假朗讀）＋ 一款瀏覽器 3D 卡丁車（甩尾加速手感致敬 2000 年代的經典卡丁車）。**非營利、只給朋友**。介面**預設 English**，初次依瀏覽器語言自動切繁中，之後以使用者切換為準。GitHub `GeneCLee6/TKU-Arcade`（公開）；**README 只寫英文**（給面試官看），其他文件繁中。技術與淡江牌桌（`C:\dev\TKU-BridgeTable`）、LongTalk（`C:\dev\LongTalk`）相同：React 19 + TypeScript（strict）+ styled-components + Vite；Cloudflare Workers（帶靜態資產）+ Durable Objects + D1 + R2。
+淡江橋藝社朋友圈的遊戲大廳：一個網址、暱稱進場、選一款遊戲一起玩。四款派對桌遊（陞官圖、合作撲克、光譜猜題、真假朗讀）＋ 一款瀏覽器 3D 卡丁車（甩尾加速手感致敬 2000 年代的經典卡丁車）。**非營利、只給朋友**。介面**預設 English**，初次依瀏覽器語言自動切繁中，之後以使用者切換為準。GitHub `GeneCLee6/TKU-Arcade`（公開）；**README 只寫英文**（給面試官看），其他文件繁中。技術與淡江牌桌（`C:\dev\TKU-BridgeTable`）、LongTalk（`C:\dev\LongTalk`）相同：React 19 + TypeScript（strict）+ styled-components + Vite；Cloudflare Workers（帶靜態資產）+ Durable Objects + D1 + R2。
 
 ## 先讀
 
