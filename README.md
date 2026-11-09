@@ -2,21 +2,21 @@
 
 A browser game lobby for friends of the Tamkang University Bridge Club: open one link, pick a nickname, choose a game, play together. Non-commercial, friends only. The UI defaults to English and switches to Traditional Chinese automatically when the browser prefers it (a manual toggle is always available).
 
-**Status: planning complete (2026-11-03), no code yet.** The next step is batch A1 in [`docs/ROADMAP.md`](docs/ROADMAP.md); the current position is tracked in [`docs/NEXT.md`](docs/NEXT.md).
+**Status:** live for friends. Promotion is playable; Silent Table is built and waiting for its IP sign-off; a kart physics spike runs at `/kart/spike`. The current position is tracked in [`docs/NEXT.md`](docs/NEXT.md), the batch order in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 > Design docs are written in Traditional Chinese (the owner's working language). This README, all code, comments, commit messages and PR titles are in English.
 
 ## Games
 
-| Game | Mechanics inspired by | Milestone |
+| Game | How it plays | Milestone |
 | --- | --- | --- |
 | Promotion | *Sheng Guan Tu*, a traditional Chinese dice-and-board game (public domain) | M0 |
-| Silent Table | *The Gang*: cooperative poker, no talking, rank chips as hints | M1 |
-| Spectrum (working title) | *Wavelength*: place a clue between two extremes, teammates guess the dial | M1 |
-| Bluff Reader (working title) | *9upper*: one honest reader, everyone else bluffs, the judge picks | M1 |
-| Kart (working title) | Classic 2000s drift-boost kart racing: drift, fill the gauge, boost | M2–M3 |
+| Silent Table | Cooperative poker without talking: rank chips are the only hints | M1 |
+| Spectrum (working title) | Place a clue between two extremes; teammates guess the dial | M1 |
+| Bluff Reader (working title) | One honest reader, everyone else bluffs, the judge picks | M1 |
+| Kart (working title) | Arcade kart racing: drift, fill the gauge, boost | M2–M3 |
 
-Game mechanics are not protected by copyright; names, art, characters, tracks, music and prompt decks are. Everything of the second kind here is original or CC0/CC BY licensed and registered in `docs/ASSETS.md`. The reasoning is in [`docs/PRD/01-legal-ip-analysis.md`](docs/PRD/01-legal-ip-analysis.md).
+Game mechanics are not protected by copyright; names, art, characters, tracks, music and prompt decks are. Everything of the second kind here is original or CC0/CC BY licensed; asset files will be registered in `docs/ASSETS.md` once the first one lands (none yet). Games that borrow a modern game's mechanics name it only on their own rules page, in one descriptive sentence. The reasoning is in [`docs/PRD/01-legal-ip-analysis.md`](docs/PRD/01-legal-ip-analysis.md).
 
 ## Milestones
 
