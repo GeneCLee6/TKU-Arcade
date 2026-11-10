@@ -26,13 +26,6 @@ const light = {
   seat4: '#0F766E',
   seat5: '#BE185D',
   onSeat: '#FFFFFF',
-  // The promotion board's cells, by how far up the ladder they are; text reads on all of them
-  boardTier0: '#EEF0F4',
-  boardTier1: '#DCF3E6',
-  boardTier2: '#DCE9FB',
-  boardTier3: '#FBEBC4',
-  boardEnd: '#B3261E',
-  onBoardEnd: '#FFFFFF',
   // Silent Table: the same in both themes, as a table and a deck of cards are
   feltPlain: '#14532D',
   feltDiving: '#0C4A6E',
@@ -68,12 +61,6 @@ const dark: Record<ColorName, string> = {
   seat4: '#0F766E',
   seat5: '#BE185D',
   onSeat: '#FFFFFF',
-  boardTier0: '#2A3342',
-  boardTier1: '#17382C',
-  boardTier2: '#1C3355',
-  boardTier3: '#46360F',
-  boardEnd: '#B3261E',
-  onBoardEnd: '#FFFFFF',
   feltPlain: '#14532D',
   feltDiving: '#0C4A6E',
   feltClimbing: '#44403C',
@@ -116,6 +103,50 @@ export const kartScene = {
   lightGround: '#6B7280',
 } as const
 
+// The promotion board (e3-t08): red lacquer with gold trim, rice-paper cells, red seals. Plain
+// values, the same in both themes as a real board is (like Silent Table's felt): the board's SVG
+// takes them as attributes, which cannot read CSS variables
+export const promotionBoard = {
+  lacquerHi: '#5E1616',
+  lacquer: '#3A0B0B',
+  lacquerDeep: '#220505',
+  gold: '#C9A24A',
+  goldDeep: '#8C6A2A',
+  block: '#000000',
+  plaque: '#240606',
+  onPlaque: '#F2D58A',
+  paperHi: '#FBF2DC',
+  paper: '#EEDDB5',
+  paperShade: '#DFC491',
+  edge: '#8C6A3A',
+  drop: '#4A2E12',
+  ink: '#2A170B',
+  seal: '#A81E1E',
+  onSeal: '#FFF3E6',
+  endHi: '#FFF0BE',
+  end: '#EDBE4E',
+  endDeep: '#B57A18',
+  onEnd: '#4A2A05',
+  select: '#2BE6FF',
+  focus: '#FFE066',
+  sheen: '#FFFFFF',
+  shade: '#000000',
+  // The four results, on the destination badges and the faces of the top
+  face: { de: '#F5C542', cai: '#5EE0F5', gong: '#5FD58F', zang: '#F27482' },
+  onFace: '#1A1206',
+  // Hat buttons by grade, first to ninth (illustrative)
+  knob: {
+    ruby: '#D7263D',
+    coral: '#F25C54',
+    sapphire: '#3A86FF',
+    lapis: '#22409A',
+    crystal: '#EAF4FF',
+    shell: '#F4EEDC',
+    gold: '#E0B03A',
+    engravedGold: '#B8892E',
+  },
+} as const
+
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const
 
 export const radius = { component: 8, card: 16 } as const
@@ -128,5 +159,8 @@ export const lineHeight = 1.5
 // where installed and the system's own Latin and Traditional Chinese faces take over elsewhere.
 // A Chinese nickname in the English interface falls through to the CJK faces glyph by glyph.
 export const font = {
+  // The promotion board's brush face (docs/ASSETS.md): LXGW WenKai TC where it loads, else whatever
+  // kai the system has (BiauKai on a Mac, DFKai-SB on Windows), else a serif
+  kai: "'LXGW WenKai TC', 'Kaiti TC', BiauKai, 'DFKai-SB', STKaiti, KaiTi, 'Noto Serif TC', 'PMingLiU', serif",
   sans: "Inter, 'Noto Sans TC', system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang TC', 'Microsoft JhengHei', sans-serif",
 } as const

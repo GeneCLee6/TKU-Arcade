@@ -1,102 +1,208 @@
-// Where each cell of the promotion board goes. BOARD has no coordinates: it is a list in order of
-// seniority, and this winds it into a rectangle from the outside in, the traditional way round, with
-// the end of the game in the middle.
+// Where each cell of the promotion board goes (e3-t08). BOARD has no coordinates and departments.ts
+// only says which block a cell is in; this lays the eight blocks out, each a grid of its cells, most
+// senior first, under a plaque with the department's name.
 //
-// 79 cells have to read on a portrait phone, so the shape is what decides. 7 columns by 12 rows is
-// three rings of 34, 26 and 18 cells, which is exactly the 78 cells before the end, and leaves a
-// 1 by 6 hole in the middle for the end cell. Seven columns also gives the widest cell that still
-// leaves a phone's screen some room for the dock. On a wide screen the same spiral lies on its side.
-import { BOARD, type BoardCell } from '../../../shared/games/promotion/board.ts'
+// Wide screens get the traditional sheet, three columns of blocks:
+//
+//   guard | top     | hanlin
+//   army  | capital | local
+//   wuke  | exam    | local      (local runs down both rows)
+//
+// A phone gets the same blocks one under another, from the top (and the end of the game) down to
+// the examinations: a long board to scroll down, but never sideways, and every cell big enough to
+// read at the width of the phone. Units are the SVG's: the board is scaled to fit its box.
+import { DEPARTMENTS, type DepartmentId } from '../../../shared/games/promotion/departments.ts'
 
-export type BoardShape = 'portrait' | 'landscape'
+export type BoardShape = 'wide' | 'stacked'
 
-export interface CellBox {
-  id: string
+export interface Box {
   x: number
   y: number
   width: number
   height: number
 }
 
+export interface CellBox extends Box {
+  id: string
+}
+
+export interface BlockBox extends Box {
+  id: DepartmentId
+  /** The middle of the plaque with the department's name */
+  plaqueX: number
+  plaqueY: number
+}
+
 export interface BoardLayout {
   shape: BoardShape
   width: number
   height: number
+  blocks: readonly BlockBox[]
+  /** Block by block, each in its own reading order */
   cells: readonly CellBox[]
   byId: ReadonlyMap<string, CellBox>
 }
 
-const PADDING = 4
-const GAP = 4
+export const CELL_WIDTH = 96
+export const CELL_HEIGHT = 88
+const GAP = 8
+const BLOCK_PADDING = 12
+export const PLAQUE_HEIGHT = 36
+const HEAD = PLAQUE_HEIGHT + 14
+const BLOCK_GAP = 14
+/** The end of the game: a wide golden cell across the top block */
+const END_HEIGHT = 132
+/** How far a cell may stretch to fill a block that has room to spare */
+const MAX_STRETCH = 1.15
+const FRAME = { wide: 24, stacked: 14 } as const
 
-const SHAPES: Record<BoardShape, { columns: number; rows: number; cell: [number, number] }> = {
-  // The height that leaves all twelve rows above the dock on a 390 by 844 phone
-  portrait: { columns: 7, rows: 12, cell: [100, 76] },
-  landscape: { columns: 12, rows: 7, cell: [100, 74] },
+interface Spec {
+  id: DepartmentId
+  columns: number
+}
+
+const blockWidth = (columns: number) =>
+  2 * BLOCK_PADDING + columns * CELL_WIDTH + (columns - 1) * GAP
+
+/** The cells of a block below the end cell: all of them except in the top block */
+const ladderOf = (id: DepartmentId) => (id === 'top' ? DEPARTMENTS.top.slice(1) : DEPARTMENTS[id])
+
+/** How tall a block is with its cells at their own size */
+function naturalHeight({ id, columns }: Spec): number {
+  const rows = Math.ceil(ladderOf(id).length / columns)
+  const end = id === 'top' ? END_HEIGHT + GAP : 0
+  return 2 * BLOCK_PADDING + HEAD + end + rows * CELL_HEIGHT + (rows - 1) * GAP
+}
+
+interface Placed {
+  block: BlockBox
+  cells: CellBox[]
 }
 
 /**
- * The grid squares of a columns by rows rectangle, from its bottom left corner: right along the
- * bottom, up, left along the top, down, then the next ring in; `count` of them at most.
+ * One block in the space it is given. More height makes its cells taller, up to a point; in the top
+ * block the end cell takes whatever there is to spare.
  */
-export function spiral(columns: number, rows: number, count: number): [number, number][] {
-  const squares: [number, number][] = []
-  let [left, right, top, bottom] = [0, columns - 1, 0, rows - 1]
-  while (squares.length < count && left <= right && top <= bottom) {
-    for (let x = left; x <= right; x++) squares.push([x, bottom])
-    for (let y = bottom - 1; y >= top; y--) squares.push([right, y])
-    if (top < bottom) for (let x = right - 1; x >= left; x--) squares.push([x, top])
-    if (left < right) for (let y = top + 1; y < bottom; y++) squares.push([left, y])
-    left++
-    right--
-    top++
-    bottom--
+function placeBlock({ id, columns }: Spec, x: number, y: number, height: number): Placed {
+  const width = blockWidth(columns)
+  const ladder = ladderOf(id)
+  const rows = Math.ceil(ladder.length / columns)
+  const spare = Math.max(0, height - naturalHeight({ id, columns }))
+  const cellHeight =
+    id === 'top' ? CELL_HEIGHT : Math.min(CELL_HEIGHT * MAX_STRETCH, CELL_HEIGHT + spare / rows)
+  const left = x + BLOCK_PADDING
+  let top = y + BLOCK_PADDING + HEAD
+  const cells: CellBox[] = []
+  if (id === 'top') {
+    const endHeight = END_HEIGHT + spare
+    const inner = width - 2 * BLOCK_PADDING
+    cells.push({ id: DEPARTMENTS.top[0], x: left, y: top, width: inner, height: endHeight })
+    top += endHeight + GAP
   }
-  return squares.slice(0, count)
+  ladder.forEach((cell, at) => {
+    cells.push({
+      id: cell,
+      x: left + (at % columns) * (CELL_WIDTH + GAP),
+      y: top + Math.floor(at / columns) * (cellHeight + GAP),
+      width: CELL_WIDTH,
+      height: cellHeight,
+    })
+  })
+  const plaqueY = y + BLOCK_PADDING + PLAQUE_HEIGHT / 2
+  return { block: { id, x, y, width, height, plaqueX: x + width / 2, plaqueY }, cells }
 }
 
-function makeLayout(shape: BoardShape, board: readonly BoardCell[]): BoardLayout {
-  const {
-    columns,
-    rows,
-    cell: [cellWidth, cellHeight],
-  } = SHAPES[shape]
-  const rings = board.length - 1
-  const squares = spiral(columns, rows, rings)
-  const taken = new Set(squares.map(([x, y]) => `${x},${y}`))
-  const box = (id: string, x: number, y: number, across = 1, down = 1): CellBox => ({
-    id,
-    x: PADDING + x * (cellWidth + GAP),
-    y: PADDING + y * (cellHeight + GAP),
-    width: across * cellWidth + (across - 1) * GAP,
-    height: down * cellHeight + (down - 1) * GAP,
-  })
-  const cells = squares.map(([x, y], index) => box(board[index].id, x, y))
-
-  // The end cell is whatever the rings leave in the middle
-  const left: [number, number][] = []
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < columns; x++) if (!taken.has(`${x},${y}`)) left.push([x, y])
-  }
-  const xs = left.map(([x]) => x)
-  const ys = left.map(([, y]) => y)
-  const [minX, minY] = [Math.min(...xs), Math.min(...ys)]
-  cells.push(
-    box(board[rings].id, minX, minY, Math.max(...xs) - minX + 1, Math.max(...ys) - minY + 1),
-  )
-
+function finish(shape: BoardShape, width: number, height: number, placed: Placed[]): BoardLayout {
+  const cells = placed.flatMap((entry) => entry.cells)
   return {
     shape,
-    width: 2 * PADDING + columns * cellWidth + (columns - 1) * GAP,
-    height: 2 * PADDING + rows * cellHeight + (rows - 1) * GAP,
+    width,
+    height,
+    blocks: placed.map((entry) => entry.block),
     cells,
     byId: new Map(cells.map((cell) => [cell.id, cell])),
   }
 }
 
+// Three cells across at the sides and four in the middle, where the top block keeps its four
+// highest offices in one row under the end cell
+const WIDE = {
+  left: [
+    { id: 'guard', columns: 3 },
+    { id: 'army', columns: 3 },
+    { id: 'wuke', columns: 3 },
+  ],
+  middle: [
+    { id: 'top', columns: 4 },
+    { id: 'capital', columns: 4 },
+    { id: 'exam', columns: 4 },
+  ],
+  right: [
+    { id: 'hanlin', columns: 3 },
+    { id: 'local', columns: 3 },
+  ],
+} as const satisfies Record<string, readonly Spec[]>
+
+function wideLayout(): BoardLayout {
+  const frame = FRAME.wide
+  const { left, middle, right } = WIDE
+  const first = Math.max(naturalHeight(left[0]), naturalHeight(middle[0]), naturalHeight(right[0]))
+  const third = Math.max(naturalHeight(left[2]), naturalHeight(middle[2]))
+  // The local block runs down the second and third rows; if it is the tallest, the second row grows
+  const lower = Math.max(
+    Math.max(naturalHeight(left[1]), naturalHeight(middle[1])) + BLOCK_GAP + third,
+    naturalHeight(right[1]),
+  )
+  const second = lower - BLOCK_GAP - third
+
+  const x0 = frame
+  const x1 = x0 + blockWidth(left[0].columns) + BLOCK_GAP
+  const x2 = x1 + blockWidth(middle[0].columns) + BLOCK_GAP
+  const y0 = frame
+  const y1 = y0 + first + BLOCK_GAP
+  const y2 = y1 + second + BLOCK_GAP
+  const placed = [
+    placeBlock(left[0], x0, y0, first),
+    placeBlock(middle[0], x1, y0, first),
+    placeBlock(right[0], x2, y0, first),
+    placeBlock(left[1], x0, y1, second),
+    placeBlock(middle[1], x1, y1, second),
+    placeBlock(right[1], x2, y1, lower),
+    placeBlock(left[2], x0, y2, third),
+    placeBlock(middle[2], x1, y2, third),
+  ]
+  return finish('wide', x2 + blockWidth(right[0].columns) + frame, y1 + lower + frame, placed)
+}
+
+/** The phone's order: from the top of the ladder down, as the wide sheet reads row by row */
+const STACKED_ORDER: readonly DepartmentId[] = [
+  'top',
+  'guard',
+  'hanlin',
+  'army',
+  'capital',
+  'local',
+  'wuke',
+  'exam',
+]
+const STACKED_COLUMNS = 4
+
+function stackedLayout(): BoardLayout {
+  const frame = FRAME.stacked
+  let y = frame
+  const placed = STACKED_ORDER.map((id) => {
+    const spec = { id, columns: STACKED_COLUMNS }
+    const height = naturalHeight(spec)
+    const entry = placeBlock(spec, frame, y, height)
+    y += height + BLOCK_GAP
+    return entry
+  })
+  return finish('stacked', 2 * frame + blockWidth(STACKED_COLUMNS), y - BLOCK_GAP + frame, placed)
+}
+
 export const BOARD_LAYOUTS: Record<BoardShape, BoardLayout> = {
-  portrait: makeLayout('portrait', BOARD),
-  landscape: makeLayout('landscape', BOARD),
+  wide: wideLayout(),
+  stacked: stackedLayout(),
 }
 
 export interface Point {
@@ -104,23 +210,25 @@ export interface Point {
   y: number
 }
 
-const PIECE_SPREAD = 33
+const PIECE_STEP = 22
+const END_PIECE_STEP = 32
 
 /**
- * Where the pieces standing on one cell go, relative to its centre: up to three in a row along the
- * bottom, so the name stays readable; a second row above that for more.
+ * Where the pieces standing on one cell go, relative to its centre: along the bottom from the right
+ * corner, overlapping when there are many, so that the name stays readable and the destination
+ * badges at the bottom left mostly stay clear. The end cell lines them up in its middle.
  */
-export function pieceOffsets(count: number, box: CellBox): Point[] {
-  const lower = box.height / 2 - 17
-  const upper = lower - 32
-  const row = (n: number, y: number) =>
-    Array.from({ length: n }, (_, i) => ({ x: (i - (n - 1) / 2) * PIECE_SPREAD * 0.86, y }))
-  if (count <= 3) return row(count, lower)
-  const below = Math.ceil(count / 2)
-  return [...row(below, lower), ...row(count - below, upper)]
+export function pieceOffsets(count: number, box: Box, end = false): Point[] {
+  const y = box.height / 2 - 18
+  if (end) {
+    return Array.from({ length: count }, (_, i) => ({ x: (i - (count - 1) / 2) * END_PIECE_STEP, y }))
+  }
+  const step = count > 1 ? Math.min(PIECE_STEP, (box.width - 36) / (count - 1)) : 0
+  const right = box.width / 2 - 18
+  return Array.from({ length: count }, (_, i) => ({ x: right - i * step, y: y - (i % 2) * 4 }))
 }
 
-export const centre = (box: CellBox): Point => ({
+export const centre = (box: Box): Point => ({
   x: box.x + box.width / 2,
   y: box.y + box.height / 2,
 })
@@ -137,7 +245,7 @@ export function piecePoints(
     const box = layout.byId.get(cell)
     if (!box) continue
     const middle = centre(box)
-    const offsets = pieceOffsets(seats.length, box)
+    const offsets = pieceOffsets(seats.length, box, cell === DEPARTMENTS.top[0])
     seats.forEach((seat, at) => {
       points.set(seat, { x: middle.x + offsets[at].x, y: middle.y + offsets[at].y })
     })
@@ -155,7 +263,7 @@ const MAX_LATIN_LINE = 11
 
 /**
  * A cell's name in lines. English cells show only the transliteration ("Juren"): the gloss in
- * brackets belongs to the detail panel. Chinese breaks in half, Latin at spaces.
+ * brackets belongs to the cell's details. Chinese breaks in half, Latin at spaces.
  */
 export function cellNameLines(fullName: string): NameLines {
   const name = fullName.split(' (')[0]

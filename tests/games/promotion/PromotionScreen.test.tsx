@@ -161,6 +161,41 @@ describe('the board', () => {
     expect(screen.getByRole('heading', { name: /Baiding \(Commoner\)/ })).toBeTruthy()
   })
 
+  it('explains your own cell when nothing is picked, even when someone else is to move', () => {
+    const view = state({ turn: 1 })
+    view.players[0] = { ...view.players[0], cell: 'juren' }
+    const { container } = render(screenOf(parts(), projection(view)))
+    expect(screen.getByRole('heading', { name: /Juren/ })).toBeTruthy()
+    expect(container.querySelector('[data-cell="juren"]')).toHaveAttribute('aria-pressed', 'true')
+    // Where each result leads from there, marked on the board
+    const badges = (cell: string) =>
+      [...container.querySelectorAll(`[data-cell="${cell}"] [data-badge]`)].map((badge) =>
+        badge.getAttribute('data-badge'),
+      )
+    expect(badges('jiaoyu')).toEqual(['de'])
+    expect(badges('xundao')).toEqual(['cai'])
+    expect(badges('gongshi')).toEqual(['gong'])
+    expect(badges('shengyuan')).toEqual(['zang'])
+    expect(container.querySelectorAll('[data-badge]')).toHaveLength(4)
+  })
+
+  it('puts the badges of results that lead to one cell side by side', () => {
+    const view = state()
+    view.players[0] = { ...view.players[0], cell: 'taishi' }
+    const { container } = render(screenOf(parts(), projection(view)))
+    const end = [...container.querySelectorAll('[data-cell="ronggui"] [data-badge]')]
+    expect(end.map((badge) => badge.getAttribute('data-badge'))).toEqual(['de', 'cai', 'gong'])
+  })
+
+  it('names the hat button of a graded office, and says it is illustrative', () => {
+    const { container } = render(screenOf(parts(), projection(state())))
+    fireEvent.click(container.querySelector('[data-cell="zhixian"]') as Element)
+    expect(screen.getByText('Hat button (illustrative): plain gold')).toBeInTheDocument()
+    fireEvent.click(container.querySelector('[data-cell="zhixian"]') as Element)
+    // A commoner wears none
+    expect(screen.queryByText(/Hat button/)).toBeNull()
+  })
+
   it('gives a keyboard the same through the seat buttons', () => {
     const view = state()
     view.players[1] = { ...view.players[1], cell: 'juren' }
@@ -479,13 +514,18 @@ describe('the room around the game', () => {
   describe('on a phone', () => {
     beforeEach(() => stubCompact())
 
-    it('lays the board out for a portrait screen', () => {
+    it('stacks the departments one under another, the top of the ladder first', () => {
       const { container } = render(screenOf(parts(), projection(state())))
       const viewBox = (container.querySelector('svg[role="group"]') as SVGElement).getAttribute(
         'viewBox',
       ) as string
       const [, , width, height] = viewBox.split(' ').map(Number)
-      expect(height).toBeGreaterThan(width)
+      expect(height).toBeGreaterThan(width * 4)
+      const cells = [...container.querySelectorAll('[data-cell]')].map((cell) =>
+        cell.getAttribute('data-cell'),
+      )
+      expect(cells[0]).toBe('ronggui')
+      expect(cells.at(-1)).toBe('baiding')
     })
 
     it('keeps members and chat in the drawer until asked for', () => {

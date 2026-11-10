@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { FACES, getCell } from '../../../shared/games/promotion/board.ts'
+import { knobOf } from '../../../shared/games/promotion/departments.ts'
 import type { LastRoll, PromotionView } from '../../../shared/games/promotion/types.ts'
 import type { Standing } from '../../../shared/games/types.ts'
 import type { RoomMember } from '../../../shared/protocol.ts'
@@ -13,14 +14,29 @@ import type { Translate } from '../../i18n/t.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
 import { initialOf } from '../../lib/avatar.ts'
 import { playCue, setSoundOn, useSoundOn, useSoundUnlock } from '../../lib/sound.ts'
-import { useCompact, useMediaQuery, useReducedMotion } from '../../lib/useMediaQuery.ts'
-import { color, fontSize, radius, seatColor, space } from '../../styles/tokens.ts'
+import { useMediaQuery, useReducedMotion } from '../../lib/useMediaQuery.ts'
+import {
+  color,
+  font,
+  fontSize,
+  promotionBoard,
+  radius,
+  seatColor,
+  space,
+} from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
+import { loadBoardFont } from './boardFont.ts'
 import { BOARD_LAYOUTS } from './boardLayout.ts'
 import { PromotionBoard, type BoardPiece, type PieceFlight } from './PromotionBoard.tsx'
 import { RollDisplay } from './RollDisplay.tsx'
 import { MIN_ZOOM, MAX_ZOOM, useBoardZoom } from './useBoardZoom.ts'
 import { useRollPlayback } from './useRollPlayback.ts'
+
+/**
+ * Below this the board's blocks go one under another: the wide sheet would need a sideways scroll,
+ * or cells too small to read
+ */
+const STACKED_QUERY = '(max-width: 719px)'
 
 /** If the room never answers a roll, the button comes back after this */
 const ROLL_ANSWER_MS = 4000
@@ -35,9 +51,8 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
   const language = useLanguage()
   const state = game.view as unknown as PromotionView
   const reducedMotion = useReducedMotion()
-  const compact = useCompact()
-  const portrait = useMediaQuery('(orientation: portrait)')
-  const layout = BOARD_LAYOUTS[compact && portrait ? 'portrait' : 'landscape']
+  const layout = BOARD_LAYOUTS[useMediaQuery(STACKED_QUERY) ? 'stacked' : 'wide']
+  useEffect(loadBoardFont, [])
   const zoom = useBoardZoom()
   const { viewport, show, zoom: zoomLevel } = zoom
   const [selected, setSelected] = useState<string | null>(null)
@@ -107,15 +122,26 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
     if (box) show((box.x + box.width / 2) / layout.width, (box.y + box.height / 2) / layout.height)
   }, [landing, zoomLevel, layout, show])
 
+  // A seat's chip also brings its cell into sight: on a phone the board is several screens long
+  const showSeat = (cell: string) => {
+    toggleCell(cell)
+    viewport.current
+      ?.querySelector(`[data-cell="${cell}"]`)
+      ?.scrollIntoView?.({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' })
+  }
+
   const roll = () => {
     if (!canRoll) return
     setAsked(true)
     room.act({ type: 'roll' })
   }
 
+  // What the board explains unless asked about another cell: where you stand, or for a spectator
+  // where the one to move stands
+  const ownCell = players.find((player) => player.seat === state.you)?.cell
   const moverCell =
     players.find((player) => player.seat === activeSeat)?.cell ?? last?.to ?? players[0]?.cell
-  const detailCell = selected ?? moverCell
+  const detailCell = selected ?? ownCell ?? moverCell
 
   const officeOf = (seat: number | null) => {
     const player = players.find((candidate) => candidate.seat === seat)
@@ -149,7 +175,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
       resultHeld={playing}
       dock={
         <TurnPanel>
-          <RollDisplay kind={state.dice} shown={rolling ? null : last} rolling={rolling} />
+          <RollDisplay kind={state.dice} roll={last} rolling={rolling} />
           <TurnText>
             <TurnLine
               state={state}
@@ -178,7 +204,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
               type="button"
               $turn={player.seat === activeSeat}
               aria-pressed={selected === player.cell}
-              onClick={() => toggleCell(player.cell)}
+              onClick={() => showSeat(player.cell)}
             >
               <Avatar name={nameOf(player.seat)} tint={seatColor(player.seat)} />
               <ChipName>{nameOf(player.seat)}</ChipName>
@@ -189,7 +215,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
         <Viewport
           ref={viewport}
           $zoomed={zoom.zoom > MIN_ZOOM}
-          $narrow={layout.shape === 'portrait'}
+          $narrow={layout.shape === 'stacked'}
         >
           <PromotionBoard
             layout={layout}
@@ -295,19 +321,31 @@ function SoundButton() {
   )
 }
 
-/** One cell in words: its full name, grade and where each result leads from it */
+/**
+ * One cell in words: its full name (in English with the gloss the board leaves out), grade, hat
+ * button and where each result leads from it, as the badges on the board show
+ */
 function CellDetail({ id }: { id: string }) {
   const t = useT()
   const cell = getCell(id)
+  const knob = knobOf(cell.rank)
   return (
     <Detail>
       <DetailTitle>
         {cellText(t, id)} · {t(`games.promotion.rank.${cell.rank}`)}
       </DetailTitle>
+      {knob && (
+        <Muted>{t('games.promotion.ui.knob', { knob: t(`games.promotion.knob.${knob}`) })}</Muted>
+      )}
       <Moves>
         {FACES.map((face) => (
           <div key={face}>
-            <dt>{t(`games.promotion.face.${face}`)}</dt>
+            <dt>
+              <FaceBadge aria-hidden="true" style={{ background: promotionBoard.face[face] }}>
+                {t(`games.promotion.glyph.${face}`)}
+              </FaceBadge>
+              {t(`games.promotion.face.${face}`)}
+            </dt>
             <dd>{shortCellText(t, cell.moves[face])}</dd>
           </div>
         ))}
@@ -363,7 +401,7 @@ const ChipName = styled.span`
   text-overflow: ellipsis;
 `
 
-// One finger scrolls, two are ours (useBoardZoom). A tablet's portrait board stops growing at a size
+// One finger scrolls, two are ours (useBoardZoom). The stacked board stops growing at a size
 // a person can still see all of
 const Viewport = styled.div<{ $zoomed: boolean; $narrow: boolean }>`
   width: 100%;
@@ -401,8 +439,22 @@ const Detail = styled.section`
 
 const DetailTitle = styled.h3`
   margin: 0;
-  font-size: ${fontSize.sm}px;
+  font-family: ${font.kai};
+  font-size: ${fontSize.lg}px;
   overflow-wrap: anywhere;
+`
+
+const FaceBadge = styled.span`
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: ${space.xs}px;
+  color: ${promotionBoard.onFace};
+  font-family: ${font.kai};
+  font-weight: 700;
+  border-radius: 2px;
+  vertical-align: -4px;
 `
 
 const Moves = styled.dl`
@@ -418,6 +470,7 @@ const Moves = styled.dl`
 
   & dt {
     color: ${color.muted};
+    white-space: nowrap;
   }
 
   & dd {
