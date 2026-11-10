@@ -64,10 +64,14 @@ test('the board can be read and the die rolled with the keyboard alone', async (
   const stop = page.locator('[data-cell][tabindex="0"]')
   await tabTo(page, stop)
   const first = await stop.getAttribute('data-cell')
-  const ring = await stop.locator('rect').evaluate((rect) => getComputedStyle(rect).strokeWidth)
-  expect(ring).toBe('8px')
+  // The focus ring around the cell shows only for the keyboard, in its own colour
+  const ring = await stop
+    .locator('[data-ring]')
+    .evaluate((rect) => [getComputedStyle(rect).stroke, getComputedStyle(rect).strokeWidth])
+  expect(ring[0]).not.toBe('none')
+  expect(ring[1]).toBe('6px')
 
-  // Up the left side, away from the piece, and read that cell
+  // Up into the cell above, away from the piece, and read that cell
   await page.keyboard.press('ArrowUp')
   const moved = page.locator('[data-cell]:focus')
   const cell = await moved.getAttribute('data-cell')

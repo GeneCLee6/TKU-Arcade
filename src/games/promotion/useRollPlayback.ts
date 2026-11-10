@@ -3,7 +3,7 @@ import type { LastRoll, PromotionPlayer } from '../../../shared/games/promotion/
 import { playCue } from '../../lib/sound.ts'
 
 /** How long the top spins or the dice tumble */
-export const ROLL_MS = 900
+export const ROLL_MS = 1100
 /** How long the piece is in the air */
 export const MOVE_MS = 650
 

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { color, colorVariables, palette, space, type ColorName } from '../../src/styles/tokens.ts'
+import {
+  color,
+  colorVariables,
+  palette,
+  promotionBoard as board,
+  space,
+  type ColorName,
+} from '../../src/styles/tokens.ts'
 
 function luminance(hex: string): number {
   const channels = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16) / 255)
@@ -28,11 +35,6 @@ const readablePairs: [ColorName, ColorName][] = [
   ['onSeat', 'seat3'],
   ['onSeat', 'seat4'],
   ['onSeat', 'seat5'],
-  ['text', 'boardTier0'],
-  ['text', 'boardTier1'],
-  ['text', 'boardTier2'],
-  ['text', 'boardTier3'],
-  ['onBoardEnd', 'boardEnd'],
   ['onFelt', 'feltPlain'],
   ['onFelt', 'feltDiving'],
   ['onFelt', 'feltClimbing'],
@@ -46,6 +48,23 @@ describe('tokens', () => {
     for (const [foreground, background] of readablePairs) {
       const ratio = contrast(palette[theme][foreground], palette[theme][background])
       expect(ratio, `${foreground} on ${background}`).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('the promotion board, the same in both themes, has its text pairs at WCAG AA too', () => {
+    const pairs: [string, string, string][] = [
+      ['ink on paper', board.ink, board.paperHi],
+      ['ink on shaded paper', board.ink, board.paperShade],
+      ['seal', board.onSeal, board.seal],
+      ['plaque', board.onPlaque, board.plaque],
+      ['end', board.onEnd, board.end],
+      ['end, light', board.onEnd, board.endHi],
+      ...Object.entries(board.face).map(
+        ([face, fill]): [string, string, string] => [face, board.onFace, fill],
+      ),
+    ]
+    for (const [name, foreground, background] of pairs) {
+      expect(contrast(foreground, background), name).toBeGreaterThanOrEqual(4.5)
     }
   })
 
