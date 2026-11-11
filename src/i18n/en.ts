@@ -25,6 +25,7 @@ export const en = {
   'common.loading': 'Loading…',
   'countdown.label': 'Time left',
   'countdown.seconds': '{seconds}s',
+  'home.eyebrow': 'Round up the crew',
   'home.tagline': 'Pick a game and play with friends.',
   'language.label': 'Language',
   // Each language's own name, so it reads the same in both catalogs
@@ -152,6 +153,7 @@ export const en = {
   'room.waiting.pickSeat': 'Pick a free seat to play.',
   'room.waiting.qrLabel': 'QR code for the room link',
   'room.waiting.ready': 'Ready',
+  'room.waiting.roomId': 'Room ID',
   'room.waiting.seat': 'Seat {seat}',
   'room.waiting.seats': 'Seats',
   'room.waiting.sit': 'Sit',

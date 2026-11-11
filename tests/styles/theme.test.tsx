@@ -15,8 +15,9 @@ afterEach(() => {
 })
 
 describe('theme preference', () => {
-  it('follows the system by default: no pin on <html>', () => {
-    expect(root.dataset.theme).toBeUndefined()
+  it('is dark by default (E1): pinned on <html>, nothing stored', () => {
+    expect(root.dataset.theme).toBe('dark')
+    expect(localStorage.getItem('tku-arcade.theme')).toBeNull()
   })
 
   it('pins a choice on <html> and restores it on the next visit', () => {
@@ -28,7 +29,7 @@ describe('theme preference', () => {
     expect(root.dataset.theme).toBe('dark')
   })
 
-  it('going back to system removes the pin and the stored value', () => {
+  it('following the system removes the pin, and the next visit remembers that', () => {
     setThemePreference('light')
     setThemePreference('system')
     expect(root.dataset.theme).toBeUndefined()
@@ -36,10 +37,17 @@ describe('theme preference', () => {
     expect(root.dataset.theme).toBeUndefined()
   })
 
+  it('going back to dark forgets the stored value', () => {
+    setThemePreference('light')
+    setThemePreference('dark')
+    expect(localStorage.getItem('tku-arcade.theme')).toBeNull()
+    expect(root.dataset.theme).toBe('dark')
+  })
+
   it('ignores an invalid stored value', () => {
     localStorage.setItem('tku-arcade.theme', 'neon')
     initTheme()
-    expect(root.dataset.theme).toBeUndefined()
+    expect(root.dataset.theme).toBe('dark')
   })
 
   it('still works when localStorage is unavailable', () => {
@@ -53,11 +61,11 @@ describe('theme preference', () => {
 
   it('ThemeSwitch shows the current choice and changes it', () => {
     render(<ThemeSwitch />)
-    expect(screen.getByRole('button', { name: 'System' })).toHaveAttribute('aria-pressed', 'true')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Dark' }))
     expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'System' })).toHaveAttribute('aria-pressed', 'false')
-    expect(root.dataset.theme).toBe('dark')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Light' }))
+    expect(screen.getByRole('button', { name: 'Light' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'false')
+    expect(root.dataset.theme).toBe('light')
   })
 })

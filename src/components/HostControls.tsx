@@ -8,7 +8,7 @@ import { Button } from './Button.tsx'
 import { ConfirmButton } from './ConfirmButton.tsx'
 import { FieldLabel, ReadOnlyField, ReadOnlyFields, SelectInput } from './Field.tsx'
 import { OptionsForm } from './OptionsForm.tsx'
-import { Actions, Heading, Muted, Section } from './roomParts.ts'
+import { Actions, Heading, Muted, Section, Stack } from './roomParts.ts'
 
 interface SeatedGateButtonProps {
   label: string
@@ -23,12 +23,12 @@ export function SeatedGateButton({ label, seated, minPlayers, onClick }: SeatedG
   const hintId = useId()
   const enough = seated >= minPlayers
   return (
-    <Section>
+    <Stack>
       <Button disabled={!enough} aria-describedby={enough ? undefined : hintId} onClick={onClick}>
         {label}
       </Button>
       {!enough && <Muted id={hintId}>{t('room.waiting.needPlayers', { count: minPlayers })}</Muted>}
-    </Section>
+    </Stack>
   )
 }
 
@@ -63,7 +63,7 @@ export function HostEndedActions({
 }: HostEndedActionsProps) {
   const t = useT()
   return (
-    <Section>
+    <Stack>
       <SeatedGateButton
         label={t('room.host.rematch')}
         seated={seated}
@@ -76,7 +76,7 @@ export function HostEndedActions({
         </Button>
         <DissolveButton onDissolve={onDissolve} />
       </Actions>
-    </Section>
+    </Stack>
   )
 }
 

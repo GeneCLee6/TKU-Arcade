@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { useT } from '../i18n/useT.ts'
 import type { RoomTimer } from '../lib/roomConnection.ts'
-import { color, fontSize, radius, space } from '../styles/tokens.ts'
+import { monoType, SLANT } from '../styles/esports.ts'
+import { color, fontSize, space } from '../styles/tokens.ts'
 
 /** Often enough for the bar to look alive and for the seconds to turn over on time */
 const TICK_MS = 250
@@ -54,19 +55,20 @@ const Wrapper = styled.div`
 `
 
 const Seconds = styled.span`
+  ${monoType}
   font-size: ${fontSize.lg}px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 `
 
 const Track = styled.div`
   height: ${space.sm}px;
   overflow: hidden;
-  background: ${color.border};
-  border-radius: ${radius.component}px;
+  background: ${color.raised};
+  transform: skewX(${SLANT});
 `
 
 const Fill = styled.div`
   height: 100%;
   background: ${color.accent};
+  box-shadow: 0 0 ${space.md}px ${color.accent};
 `

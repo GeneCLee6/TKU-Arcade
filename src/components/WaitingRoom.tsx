@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react'
 import styled from 'styled-components'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
-import { space } from '../styles/tokens.ts'
+import { monoType } from '../styles/esports.ts'
+import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 import { FreeSeatRow } from './FreeSeatRow.tsx'
 import { DissolveButton, GameSetup, SeatedGateButton } from './HostControls.tsx'
@@ -23,6 +25,8 @@ export interface WaitingRoomProps {
   onDissolve(): void
   onSetGame(gameId: string): void
   onSetOptions(options: OptionValues): void
+  /** Below the setup in the right-hand column of a wide screen: the room's chat */
+  aside?: ReactNode
 }
 
 export function WaitingRoom({
@@ -37,6 +41,7 @@ export function WaitingRoom({
   onDissolve,
   onSetGame,
   onSetOptions,
+  aside,
 }: WaitingRoomProps) {
   const t = useT()
   const members = Object.values(view.members)
@@ -58,14 +63,17 @@ export function WaitingRoom({
   )
 
   return (
-    <Layout>
+    // Two columns when wide: who is here and starting on the left, inviting and setting up on the right.
+    // One on a phone, in the same order
+    <Layout data-room-columns="">
+      <Column>
       <Section>
         <Heading>{t('room.waiting.seats')}</Heading>
         <List>
           {seats.map((seat) => {
             const member = seated.find((other) => other.seat === seat)
             return member ? (
-              <Row key={seat}>
+              <Row key={seat} $mark={seatColor(seat)}>
                 <SeatNumber>{t('room.waiting.seat', { seat: seat + 1 })}</SeatNumber>
                 {entry(member)}
               </Row>
@@ -87,28 +95,34 @@ export function WaitingRoom({
         </Section>
       )}
 
-      {me?.seat === null && <Muted>{t('room.waiting.pickSeat')}</Muted>}
-      {me && me.seat !== null && (
-        <Actions>
-          <Button $variant="secondary" onClick={() => onReady(!me.ready)}>
-            {me.ready ? t('room.waiting.cancelReady') : t('room.waiting.ready')}
-          </Button>
-          <Button $variant="ghost" onClick={() => onSit(null)}>
-            {t('room.waiting.standUp')}
-          </Button>
-        </Actions>
-      )}
+      {/* The start bar */}
+      <StartBar>
+        {me?.seat === null && <Muted>{t('room.waiting.pickSeat')}</Muted>}
+        {me && me.seat !== null && (
+          <Actions>
+            <Button $variant="secondary" onClick={() => onReady(!me.ready)}>
+              {me.ready ? t('room.waiting.cancelReady') : t('room.waiting.ready')}
+            </Button>
+            <Button $variant="ghost" onClick={() => onSit(null)}>
+              {t('room.waiting.standUp')}
+            </Button>
+          </Actions>
+        )}
 
-      {isHost ? (
-        <SeatedGateButton
-          label={t('room.waiting.start')}
-          seated={seated.length}
-          minPlayers={view.room.minPlayers}
-          onClick={onStart}
-        />
-      ) : (
-        <Muted>{t('room.waiting.waitForHost')}</Muted>
-      )}
+        {isHost ? (
+          <SeatedGateButton
+            label={t('room.waiting.start')}
+            seated={seated.length}
+            minPlayers={view.room.minPlayers}
+            onClick={onStart}
+          />
+        ) : (
+          <Muted>{t('room.waiting.waitForHost')}</Muted>
+        )}
+      </StartBar>
+      </Column>
+
+      <Column>
 
       {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
       <Invite roomId={roomId} />
@@ -125,6 +139,8 @@ export function WaitingRoom({
           <DissolveButton onDissolve={onDissolve} />
         </Actions>
       )}
+      {aside}
+      </Column>
     </Layout>
   )
 }
@@ -147,6 +163,11 @@ function Invite({ roomId }: { roomId: string }) {
   return (
     <Section>
       <Heading>{t('room.waiting.invite')}</Heading>
+      <Code>
+        <CodeLabel>{t('room.waiting.roomId')}</CodeLabel>
+        {/* An id, not a word: no translating it, by a browser or the zh-TW walkthrough */}
+        <CodeValue translate="no">{roomId}</CodeValue>
+      </Code>
       <LinkText>{link}</LinkText>
       <Actions>
         <Button $variant="secondary" onClick={() => void copy()}>
@@ -160,11 +181,58 @@ function Invite({ roomId }: { roomId: string }) {
 
 const Layout = styled.div`
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: ${space.xl}px;
+
+  @media (min-width: 900px) {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+`
+
+const Column = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: ${space.xl}px;
 `
 
-const LinkText = styled.p`
+const StartBar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${space.md}px;
+  padding: ${space.lg}px;
+  background: ${color.sunken};
+  box-shadow: inset 0 0 0 1px ${color.line};
+`
+
+// The room's id, big and mono, as people read it out to each other
+const Code = styled.p`
+  display: grid;
   margin: 0;
+`
+
+const CodeLabel = styled.span`
+  ${monoType}
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
+`
+
+const CodeValue = styled.span`
+  ${monoType}
+  font-size: ${fontSize.xxl}px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  overflow-wrap: anywhere;
+`
+
+const LinkText = styled.p`
+  ${monoType}
+  margin: 0;
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
+  letter-spacing: 0;
   overflow-wrap: anywhere;
   user-select: all;
 `

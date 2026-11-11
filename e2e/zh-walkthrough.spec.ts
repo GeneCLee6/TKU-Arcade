@@ -28,6 +28,8 @@ async function englishLeft(page: Page): Promise<string[]> {
     while (walker.nextNode()) {
       const parent = walker.currentNode.parentElement
       if (!parent || ['SCRIPT', 'STYLE', 'OPTION'].includes(parent.tagName)) continue
+      // Data, not words: a room's id says translate="no" (E1)
+      if (parent.closest('[translate="no"]')) continue
       // <title> in an SVG has no box of its own
       if (parent.tagName === 'title' || shown(parent)) check(walker.currentNode.textContent)
     }

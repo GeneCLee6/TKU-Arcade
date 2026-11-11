@@ -26,7 +26,7 @@ import {
   splitLinks,
   subscribeTouchPrimary,
 } from '../lib/chatText.ts'
-import { color, fontSize, radius, space } from '../styles/tokens.ts'
+import { color, fontSize, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 import { FieldError } from './Field.tsx'
 import { Heading, Muted, Section } from './roomParts.ts'
@@ -276,9 +276,7 @@ const Log = styled.div`
   max-height: 320px;
   overflow-y: auto;
   padding: ${space.md}px;
-  background: ${color.surface};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.component}px;
+  background: ${color.sunken};
 `
 
 const Messages = styled.ol`
@@ -317,9 +315,8 @@ const Bubble = styled.p<{ $own: boolean }>`
   max-width: 85%;
   margin: 0;
   padding: ${space.sm}px ${space.md}px;
-  background: ${color.bg};
-  border: 1px solid ${(p) => (p.$own ? color.accent : color.border)};
-  border-radius: ${radius.component}px;
+  background: ${(p) => (p.$own ? `color-mix(in srgb, ${color.accent} 16%, ${color.surface})` : color.surface)};
+  box-shadow: inset 3px 0 0 ${(p) => (p.$own ? color.accent : color.border)};
   /* Newlines as typed; long URLs and words wrap instead of widening the page */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -342,9 +339,8 @@ const Box = styled.div<{ $disabled: boolean }>`
   align-items: flex-end;
   gap: ${space.sm}px;
   padding: ${space.xs}px ${space.xs}px ${space.xs}px ${space.md}px;
-  background: ${color.surface};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.component}px;
+  background: ${color.sunken};
+  box-shadow: inset 0 0 0 1px ${color.border};
   opacity: ${(p) => (p.$disabled ? 0.7 : 1)};
 
   &:focus-within {

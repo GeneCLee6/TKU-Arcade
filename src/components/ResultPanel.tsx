@@ -6,10 +6,11 @@ import type { RoomView } from '../../shared/protocol.ts'
 import type { TextKey } from '../i18n/t.ts'
 import { useT } from '../i18n/useT.ts'
 import { useReducedMotion } from '../lib/useMediaQuery.ts'
-import { color, fontSize, radius, seatColor, space } from '../styles/tokens.ts'
+import { cornerClip, displayType, glass } from '../styles/esports.ts'
+import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
 import { Avatar } from './Avatar.tsx'
 import { HostEndedActions } from './HostControls.tsx'
-import { List, Muted, Section, seatedMembers } from './roomParts.ts'
+import { List, Muted, seatedMembers } from './roomParts.ts'
 
 export interface ResultPanelProps {
   view: RoomView
@@ -86,7 +87,7 @@ export function ResultPanel({
         })}
       </List>
 
-      <Section>
+      <Next>
         <p role="status">{isHost ? t('room.ended.host') : t('room.ended.waitForHost')}</p>
         {isHost && (
           <HostEndedActions
@@ -98,20 +99,34 @@ export function ResultPanel({
           />
         )}
         <BackLink to="/">{t('room.backToLobby')}</BackLink>
-      </Section>
+      </Next>
     </Panel>
   )
 }
 
+// Glass, with the game's hue down from the top edge
 const Panel = styled.section`
+  ${glass}
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: ${space.md}px;
-  padding: ${space.lg}px;
-  background: ${color.surface};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.card}px;
+  padding: ${space.xl}px ${space.lg}px;
   scroll-margin: ${space.lg}px;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      180deg,
+      ${color.accent} 0 3px,
+      color-mix(in srgb, ${color.accent} 18%, transparent) 3px,
+      transparent 50%
+    );
+    clip-path: ${cornerClip(16)};
+    pointer-events: none;
+  }
 
   & p {
     margin: 0;
@@ -120,12 +135,13 @@ const Panel = styled.section`
 
 const Title = styled.h2`
   margin: 0;
-  font-size: ${fontSize.xl}px;
+  ${displayType}
+  font-size: ${fontSize.xxl}px;
 `
 
 const Headline = styled.p`
   font-size: ${fontSize.lg}px;
-  font-weight: 600;
+  font-weight: 700;
   overflow-wrap: anywhere;
 `
 
@@ -136,17 +152,25 @@ const StandingRow = styled.li<{ $top: boolean }>`
   gap: ${space.sm}px;
   min-height: 44px;
   padding: ${space.xs}px ${space.md}px;
-  background: ${color.bg};
-  border: 1px solid ${color.border};
-  outline: ${(p) => (p.$top ? `2px solid ${color.text}` : 'none')};
-  outline-offset: -1px;
-  border-radius: ${radius.component}px;
+  background: ${(p) =>
+    p.$top ? `color-mix(in srgb, ${color.accent} 14%, ${color.surface})` : color.sunken};
+  outline: ${(p) => (p.$top ? `2px solid ${color.accent}` : 'none')};
+  outline-offset: -2px;
 `
 
 const Place = styled.span`
   flex: none;
   min-width: 3.5em;
-  font-weight: 600;
+  ${displayType}
+  font-size: ${fontSize.lg}px;
+`
+
+/** The host's next move and the way back, under the standings */
+const Next = styled.div`
+  display: grid;
+  gap: ${space.sm}px;
+  padding-top: ${space.md}px;
+  border-top: 1px solid ${color.line};
 `
 
 const Who = styled.div`

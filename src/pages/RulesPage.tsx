@@ -5,6 +5,7 @@ import { TopBar } from '../components/TopBar.tsx'
 import { useT } from '../i18n/useT.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
 import { hasRules } from '../lib/rulesDoc.ts'
+import { displayType, glass } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import { NotFoundPage } from './NotFoundPage.tsx'
 
@@ -16,9 +17,12 @@ export function RulesPage() {
   return (
     <>
       <TopBar />
-      <Main>
+      {/* The game's hue for the whole page (GlobalStyle) */}
+      <Main data-game={id}>
         <Title>{t('rules.pageTitle', { game: gameTitle(t, id) })}</Title>
-        <RulesText gameId={id} />
+        <Doc>
+          <RulesText gameId={id} />
+        </Doc>
         <BackLink to="/">{t('room.backToLobby')}</BackLink>
       </Main>
     </>
@@ -28,15 +32,24 @@ export function RulesPage() {
 const Main = styled.main`
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: ${space.lg}px;
-  width: min(720px, 100%);
+  gap: ${space.xl}px;
+  width: min(800px, 100%);
   margin: 0 auto;
-  padding: ${space.xl}px ${space.lg}px;
+  padding: ${space.xl}px ${space.lg}px ${space.xxxl}px;
 `
 
 const Title = styled.h1`
   margin: 0;
-  font-size: ${fontSize.xl}px;
+  ${displayType}
+  font-size: clamp(${fontSize.xl}px, 5vw, 48px);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+`
+
+// The rules on a glass panel, roomy as a page to read
+const Doc = styled.article`
+  ${glass}
+  padding: ${space.xl}px clamp(${space.lg}px, 4vw, ${space.xxxl}px) ${space.xxl}px;
 `
 
 const BackLink = styled(Link)`

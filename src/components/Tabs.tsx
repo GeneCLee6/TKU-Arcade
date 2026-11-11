@@ -1,5 +1,6 @@
 import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import styled from 'styled-components'
+import { clippedFill, displayType, slantClip } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 
 export interface TabItem<Id extends string> {
@@ -77,22 +78,28 @@ export function Tabs<Id extends string>({ label, tabs, value, onChange }: TabsPr
 const List = styled.div`
   display: flex;
   gap: ${space.xs}px;
-  border-bottom: 1px solid ${color.border};
 `
 
-// The selected tab is told by its underline and its weight, not only a colour
+// Slanted. The selected tab is told by its underline and its weight, not only a colour
 const Tab = styled.button<{ $selected: boolean }>`
+  ${clippedFill(slantClip(10), color.raised)}
   flex: 1;
   min-height: 44px;
   padding: 0 ${space.md}px;
   background: transparent;
   color: ${(p) => (p.$selected ? color.text : color.muted)};
   border: none;
-  border-bottom: 3px solid ${(p) => (p.$selected ? color.accent : 'transparent')};
-  font-family: inherit;
+  ${displayType}
   font-size: ${fontSize.md}px;
-  font-weight: ${(p) => (p.$selected ? 600 : 400)};
+  font-weight: ${(p) => (p.$selected ? 900 : 700)};
   cursor: pointer;
+
+  &::before {
+    ${(p) =>
+      p.$selected &&
+      `background: linear-gradient(180deg, color-mix(in srgb, ${color.accent} 24%, transparent), transparent);
+      box-shadow: inset 0 -3px 0 ${color.accent};`}
+  }
 `
 
 const Panel = styled.div`

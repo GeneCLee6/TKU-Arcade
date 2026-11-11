@@ -19,12 +19,36 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
+// A see-through colour (#RRGGBBAA) as it shows over an opaque one
+function over(top: string, under: string): string {
+  if (top.length === 7) return top
+  const alpha = parseInt(top.slice(7, 9), 16) / 255
+  const channel = (start: number) =>
+    Math.round(
+      parseInt(top.slice(start, start + 2), 16) * alpha +
+        parseInt(under.slice(start, start + 2), 16) * (1 - alpha),
+    )
+      .toString(16)
+      .padStart(2, '0')
+  return `#${channel(1)}${channel(3)}${channel(5)}`
+}
+
 const readablePairs: [ColorName, ColorName][] = [
   ['text', 'bg'],
   ['text', 'surface'],
   ['muted', 'bg'],
   ['muted', 'surface'],
   ['onAccent', 'accent'],
+  // The two brand colours, and every game's hue, under the text on a primary button or a tag
+  ['onAccent', 'brand'],
+  ['onAccent', 'magenta'],
+  ['onAccent', 'gamePromotion'],
+  ['onAccent', 'gameSilentTable'],
+  // ...and as text themselves: a public room's game, a link
+  ['brand', 'bg'],
+  ['gamePromotion', 'bg'],
+  ['gameSilentTable', 'bg'],
+  ['danger', 'surface'],
   ['danger', 'bg'],
   ['danger', 'surface'],
   ['success', 'surface'],
@@ -48,6 +72,22 @@ describe('tokens', () => {
     for (const [foreground, background] of readablePairs) {
       const ratio = contrast(palette[theme][foreground], palette[theme][background])
       expect(ratio, `${foreground} on ${background}`).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  // Glass and the sunken fills are see-through: what matters is how they come out over the page
+  it.each(['light', 'dark'] as const)('%s text reads on glass and sunken fills', (theme) => {
+    const p = palette[theme]
+    const panel = over(p.panel, p.bg)
+    const backgrounds = { panel, sunken: over(p.sunken, panel), raised: over(p.raised, panel) }
+    for (const [name, background] of Object.entries(backgrounds)) {
+      for (const foreground of ['text', 'muted', 'danger'] as const) {
+        const ratio = contrast(p[foreground], background)
+        expect(ratio, `${foreground} on ${name}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+    for (const hue of ['accent', 'gamePromotion', 'gameSilentTable'] as const) {
+      expect(contrast(p[hue], panel), `${hue} on panel`).toBeGreaterThanOrEqual(4.5)
     }
   })
 
