@@ -5,6 +5,8 @@ import { promotionMessages } from './promotion/i18n.ts'
 import { promotionInfo } from './promotion/info.ts'
 import { silentTableMessages } from './silent-table/i18n.ts'
 import { silentTableInfo } from './silent-table/info.ts'
+import { spectrumMessages } from './spectrum/i18n.ts'
+import { spectrumInfo } from './spectrum/info.ts'
 import { ticTacToeMessages } from './tictactoe/i18n.ts'
 import { ticTacToeInfo } from './tictactoe/info.ts'
 import type { AnyGameInfo, GameMessages } from './types.ts'
@@ -13,6 +15,7 @@ export const GAME_INFOS = [
   ticTacToeInfo,
   promotionInfo,
   silentTableInfo,
+  spectrumInfo,
 ] as unknown as readonly AnyGameInfo[]
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
@@ -27,10 +30,16 @@ export function getGameInfo(id: string): AnyGameInfo | null {
 
 /** Every game's first-load strings, for src/i18n to merge into its dictionaries */
 export const GAME_MESSAGES: GameMessages = {
-  en: { ...ticTacToeMessages.en, ...promotionMessages.en, ...silentTableMessages.en },
+  en: {
+    ...ticTacToeMessages.en,
+    ...promotionMessages.en,
+    ...silentTableMessages.en,
+    ...spectrumMessages.en,
+  },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
     ...promotionMessages['zh-TW'],
     ...silentTableMessages['zh-TW'],
+    ...spectrumMessages['zh-TW'],
   },
 }
