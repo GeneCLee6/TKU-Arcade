@@ -53,6 +53,9 @@ const readablePairs: [ColorName, ColorName][] = [
   ['danger', 'surface'],
   ['success', 'surface'],
   ['warning', 'surface'],
+  // Silent Table's reveal marks a right guess on the page's own colour (E1 found it short in light)
+  ['success', 'bg'],
+  ['warning', 'bg'],
   ['onSeat', 'seat0'],
   ['onSeat', 'seat1'],
   ['onSeat', 'seat2'],
@@ -81,7 +84,7 @@ describe('tokens', () => {
     const panel = over(p.panel, p.bg)
     const backgrounds = { panel, sunken: over(p.sunken, panel), raised: over(p.raised, panel) }
     for (const [name, background] of Object.entries(backgrounds)) {
-      for (const foreground of ['text', 'muted', 'danger'] as const) {
+      for (const foreground of ['text', 'muted', 'danger', 'success', 'warning'] as const) {
         const ratio = contrast(p[foreground], background)
         expect(ratio, `${foreground} on ${name}`).toBeGreaterThanOrEqual(4.5)
       }

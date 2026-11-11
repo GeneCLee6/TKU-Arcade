@@ -30,9 +30,9 @@ const light = {
   // One hue per game (e7-t12's theme colours); onAccent reads on each of them
   gamePromotion: '#9A5800',
   gameSilentTable: '#0B7A47',
-  success: '#15803D',
+  success: '#13703A',
   danger: '#B91C1C',
-  warning: '#B45309',
+  warning: '#9C4A06',
   overlay: '#0A0D1F80',
   // The same in both themes: a QR code only scans reliably dark on light
   qrDark: '#000000',
