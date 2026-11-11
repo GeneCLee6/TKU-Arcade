@@ -1,6 +1,7 @@
 import {
   expect,
   type Browser,
+  type BrowserContext,
   type BrowserContextOptions,
   type Locator,
   type Page,
@@ -12,7 +13,20 @@ export async function newPerson(
   options: BrowserContextOptions = {},
 ): Promise<Page> {
   const context = await browser.newContext({ locale: 'en-US', ...options })
+  if (options.colorScheme === 'light' || options.colorScheme === 'dark') {
+    await pinTheme(context, options.colorScheme)
+  }
   return context.newPage()
+}
+
+/**
+ * The site is dark until someone picks otherwise (E1), whatever the system says: a test of a theme
+ * picks it the way a person would, by the stored choice the theme switch writes
+ */
+export async function pinTheme(context: BrowserContext, theme: 'light' | 'dark'): Promise<void> {
+  await context.addInitScript((value) => {
+    localStorage.setItem('tku-arcade.theme', value)
+  }, theme)
 }
 
 /** From the lobby to a new room's waiting room; the room's address is then in `page.url()` */

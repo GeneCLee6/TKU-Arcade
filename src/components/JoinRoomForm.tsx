@@ -1,7 +1,9 @@
 import { useId, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import styled from 'styled-components'
 import { parseRoomInput } from '../../shared/room-id.ts'
 import { useT } from '../i18n/useT.ts'
+import { monoType } from '../styles/esports.ts'
 import { Button } from './Button.tsx'
 import { FieldError, FieldLabel, FieldRow, TextInput } from './Field.tsx'
 
@@ -30,7 +32,7 @@ export function JoinRoomForm() {
     <form onSubmit={handleSubmit} noValidate>
       <FieldLabel htmlFor={inputId}>{t('lobby.join.label')}</FieldLabel>
       <FieldRow>
-        <TextInput
+        <CodeInput
           id={inputId}
           name="room"
           autoComplete="off"
@@ -57,3 +59,8 @@ export function JoinRoomForm() {
     </form>
   )
 }
+
+// A link or a room id: mono, as ids are everywhere else
+const CodeInput = styled(TextInput)`
+  ${monoType}
+`

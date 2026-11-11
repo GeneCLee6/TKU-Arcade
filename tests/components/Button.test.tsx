@@ -4,11 +4,12 @@ import { Button } from '../../src/components/Button.tsx'
 import { Card } from '../../src/components/Card.tsx'
 import { color } from '../../src/styles/tokens.ts'
 
-// jsdom cannot compute var() in shorthands, so read the rule styled-components wrote for the element
+// jsdom cannot compute var() in shorthands, so read the rules styled-components wrote for the
+// element, its ::before and ::after included: the esports shapes paint their fill there
 function ownCss(element: Element): string {
   const css = [...document.querySelectorAll('style')].map((style) => style.textContent).join('')
   return [...element.classList]
-    .map((name) => css.match(new RegExp(`\\.${name}\\s*\\{[^}]*\\}`))?.[0] ?? '')
+    .flatMap((name) => css.match(new RegExp(`\\.${name}(?![\\w-])[^{]*\\{[^}]*\\}`, 'g')) ?? [])
     .join('')
 }
 
@@ -63,7 +64,7 @@ describe('Button', () => {
 })
 
 describe('Card', () => {
-  it('renders its children on the surface colour, and accepts another element', () => {
+  it('renders its children on glass, and accepts another element', () => {
     render(
       <Card as="section" aria-label="Panel">
         Content
@@ -72,6 +73,6 @@ describe('Card', () => {
     const card = screen.getByRole('region', { name: 'Panel' })
     expect(card).toHaveTextContent('Content')
     expect(card.tagName).toBe('SECTION')
-    expect(ownCss(card)).toContain(`background:${color.surface}`)
+    expect(ownCss(card)).toContain(`background:${color.panel}`)
   })
 })

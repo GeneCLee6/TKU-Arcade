@@ -1,5 +1,6 @@
 import styled from 'styled-components'
-import { color, fontSize, radius, space } from '../styles/tokens.ts'
+import { clippedFill, slantClip } from '../styles/esports.ts'
+import { color, fontSize, space } from '../styles/tokens.ts'
 
 export interface SegmentedOption<Value extends string> {
   value: Value
@@ -41,44 +42,45 @@ export function SegmentedSwitch<Value extends string>({
 
 const Group = styled.div`
   display: inline-flex;
-  gap: ${space.xs}px;
-  padding: ${space.xs}px;
-  background: ${color.surface};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.component}px;
-
-  @media (max-width: 480px) {
-    gap: 2px;
-    padding: 2px;
-  }
+  gap: 2px;
 `
 
+// Slanted like the tabs and buttons; the fill is on ::before so the focus ring stays whole
 const Segment = styled.button`
+  ${clippedFill(slantClip(7), color.raised)}
   min-height: 32px;
-  padding: 0 ${space.sm}px;
+  padding: 0 ${space.md}px;
   background: transparent;
   color: ${color.muted};
   border: 0;
-  border-radius: ${radius.component - space.xs}px;
   font: inherit;
   font-size: ${fontSize.sm}px;
+  font-weight: 700;
   cursor: pointer;
 
   /* A finger's height, but the top bar still has to stay one row down to a 360px phone */
   @media (max-width: 480px) {
     min-width: 32px;
     min-height: 44px;
-    padding: 0 ${space.xs}px;
+    padding: 0 ${space.xs + 2}px;
+    font-weight: 600;
   }
 
   &:hover {
     color: ${color.text};
   }
 
+  &:hover::before {
+    background: ${color.raisedHover};
+  }
+
   /* Filled and bold, so the state is not carried by colour alone */
   &[aria-pressed='true'] {
-    background: ${color.accent};
     color: ${color.onAccent};
-    font-weight: 600;
+    font-weight: 900;
+  }
+
+  &[aria-pressed='true']::before {
+    background: ${color.accent};
   }
 `

@@ -16,8 +16,10 @@ import { gameTitle } from '../lib/gameTitle.ts'
 import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
+import { useCompact } from '../lib/useMediaQuery.ts'
 import { useRoom } from '../lib/useRoom.ts'
-import { color, fontSize, radius, space } from '../styles/tokens.ts'
+import { clippedFill, displayType, monoType, SLANT, slantClip } from '../styles/esports.ts'
+import { color, fontSize, space } from '../styles/tokens.ts'
 
 // The key gives each room its own state when the address changes without leaving this page
 export function RoomPage() {
@@ -91,6 +93,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
   const { session, retry } = room
   // Here, not in the panel: what someone was writing outlives a connection problem and the retry
   const [chatDraft] = useState(() => new ChatDraft())
+  const compact = useCompact()
 
   if (session.phase === 'ended') {
     switch (session.end) {
@@ -176,8 +179,10 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
             onDissolve={room.dissolve}
             onSetGame={room.setGame}
             onSetOptions={room.setOptions}
+            aside={!compact && <RoomChatPanel room={parts} />}
           />
-          <RoomChatPanel room={parts} />
+          {/* On a phone the chat is a drawer, its bar stuck to the bottom of the whole page */}
+          {compact && <RoomChatPanel room={parts} />}
         </>
       ) : view.game && Screen ? (
         // While its code loads the room is already all there, chat included
@@ -210,9 +215,10 @@ function RoomHeading({
 }) {
   const t = useT()
   return (
-    <HeadingRow>
+    // The game's hue spreads to the whole page from here (GlobalStyle)
+    <HeadingRow data-game={gameId}>
       <Title>{title}</Title>
-      <Muted>{t('room.memberCount', { count: members })}</Muted>
+      <MemberCount>{t('room.memberCount', { count: members })}</MemberCount>
       {gameId !== undefined && (
         <HeadingAction>
           <HowToPlay gameId={gameId} />
@@ -264,6 +270,11 @@ const Main = styled.main`
     margin: 0;
   }
 
+  /* The waiting room's two columns */
+  &:has([data-room-columns]) {
+    width: min(1120px, 100%);
+  }
+
   /* A game needs the width its board can use, and on a phone every pixel of it */
   &:has([data-wide-room]) {
     width: min(1280px, 100%);
@@ -294,23 +305,51 @@ const ReconnectBanner = styled.p`
   color: ${color.text};
   border: 1px solid ${color.border};
   border-left: ${space.xs}px solid ${color.warning};
-  border-radius: ${radius.component}px;
 `
 
 const HeadingRow = styled.div`
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: ${space.md}px;
+  align-items: center;
+  gap: ${space.xs}px ${space.md}px;
 `
 
 const HeadingAction = styled.div`
   margin-left: auto;
 `
 
+// The game's name, in its hue, after a slanted bar
 const Title = styled.h1`
+  display: flex;
+  align-items: center;
+  gap: ${space.md}px;
   margin: 0;
-  font-size: ${fontSize.xl}px;
+  ${displayType}
+  font-size: ${fontSize.xxl}px;
+  overflow-wrap: anywhere;
+
+  &::before {
+    content: '';
+    flex: none;
+    width: ${space.md}px;
+    height: 0.9em;
+    background: ${color.accent};
+    box-shadow: 0 0 ${space.lg}px ${color.accent};
+    transform: skewX(${SLANT});
+  }
+
+  @media (max-width: 480px) {
+    font-size: ${fontSize.xl}px;
+  }
+`
+
+// A slanted tag
+const MemberCount = styled.p`
+  ${clippedFill(slantClip(8), color.raised)}
+  ${monoType}
+  padding: ${space.xs}px ${space.lg}px;
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
 `
 
 const Muted = styled.p`

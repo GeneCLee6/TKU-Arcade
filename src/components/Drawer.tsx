@@ -9,7 +9,8 @@ import {
 } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { useT } from '../i18n/useT.ts'
-import { color, fontSize, radius, space } from '../styles/tokens.ts'
+import { displayType } from '../styles/esports.ts'
+import { color, fontSize, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 
 export interface DrawerProps {
@@ -94,8 +95,8 @@ const Sheet = styled.dialog`
   background: ${color.surface};
   color: ${color.text};
   border: 1px solid ${color.border};
+  border-top: 3px solid ${color.accent};
   border-bottom: none;
-  border-radius: ${radius.card}px ${radius.card}px 0 0;
 
   &[open] {
     display: flex;
@@ -137,6 +138,7 @@ const Header = styled.div`
 const Title = styled.h2`
   min-width: 0;
   margin: 0;
+  ${displayType}
   font-size: ${fontSize.lg}px;
   overflow-wrap: anywhere;
 `

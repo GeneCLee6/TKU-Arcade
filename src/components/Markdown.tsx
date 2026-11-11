@@ -1,6 +1,7 @@
 import { createElement, useMemo, type ReactNode } from 'react'
 import styled from 'styled-components'
 import { parseMarkdown, type Block, type Inline } from '../lib/markdown.ts'
+import { displayType, monoType, SLANT } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 
 function inlines(parts: readonly Inline[]): ReactNode {
@@ -93,9 +94,25 @@ const Prose = styled.div`
   overflow-wrap: anywhere;
 
   & :is(h2, h3, h4, h5, h6) {
-    margin: ${space.sm}px 0 0;
+    margin: ${space.md}px 0 0;
+    ${displayType}
     font-size: ${fontSize.lg}px;
     line-height: 1.3;
+  }
+
+  /* A slanted square in the current hue before each heading */
+  & :is(h2, h3, h4, h5, h6)::before {
+    content: '';
+    display: inline-block;
+    width: ${space.md}px;
+    height: ${space.md}px;
+    margin-right: ${space.md}px;
+    background: ${color.accent};
+    transform: skewX(${SLANT});
+  }
+
+  & > :first-child {
+    margin-top: 0;
   }
 
   & p {
@@ -124,13 +141,16 @@ const TableScroll = styled.div`
   }
 
   & :is(th, td) {
-    padding: ${space.xs}px ${space.md}px;
-    border: 1px solid ${color.border};
+    padding: ${space.sm}px ${space.md}px;
+    border-bottom: 1px solid ${color.border};
     text-align: left;
     overflow-wrap: normal;
   }
 
   & th {
-    background: ${color.surface};
+    ${monoType}
+    color: ${color.muted};
+    font-size: ${fontSize.sm}px;
+    font-weight: 700;
   }
 `

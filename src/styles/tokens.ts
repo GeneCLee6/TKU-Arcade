@@ -1,20 +1,39 @@
 // The only source of colours, spacing, radii and type sizes (CLAUDE.md rule 5, docs/DESIGN.md §2).
 // Components read `color.*`, which are CSS variables, so a theme change needs no re-render.
+//
+// The esports direction (E1, e7-t14): a night palette with cyan and magenta, and one hue per game.
+// Dark is the default look; light is the same design by day, and passes the same contrast tests.
 
 const light = {
-  bg: '#F6F7F9',
+  bg: '#E9EDF7',
+  // Solid: a dialog, a toast, a row that must not show what is behind it
   surface: '#FFFFFF',
-  text: '#111827',
-  muted: '#4B5563',
-  border: '#D1D5DB',
-  // Neutral outside a game (DESIGN §1). A game's theme colour (e7-t12) overrides --color-accent and
-  // --color-onAccent on its own subtree, so components need no per-game logic.
-  accent: '#334155',
+  // Glass: a panel over the grid floor, see-through enough to show it
+  panel: '#FFFFFFD9',
+  // Sunk into a panel: a chat log, an input
+  sunken: '#F4F6FC',
+  // A control's own fill on a panel (a secondary button, an unpressed segment), and its hover
+  raised: '#0A0D1F12',
+  raisedHover: '#0A0D1F21',
+  text: '#0A0D1F',
+  muted: '#474F75',
+  border: '#C3C9E0',
+  // A panel's hairline edge
+  line: '#3A4A9A2E',
+  // The site's own two colours: cyan for what you press, magenta for what is live
+  brand: '#006E80',
+  magenta: '#C2135F',
+  // The current hue: the brand outside a game; a game's hue (gameHue) on its own subtree, and on the
+  // whole page while one of its rooms is open (GlobalStyle), so components need no per-game logic
+  accent: '#006E80',
   onAccent: '#FFFFFF',
-  success: '#15803D',
+  // One hue per game (e7-t12's theme colours); onAccent reads on each of them
+  gamePromotion: '#9A5800',
+  gameSilentTable: '#0B7A47',
+  success: '#13703A',
   danger: '#B91C1C',
-  warning: '#B45309',
-  overlay: '#11182780',
+  warning: '#9C4A06',
+  overlay: '#0A0D1F80',
   // The same in both themes: a QR code only scans reliably dark on light
   qrDark: '#000000',
   qrLight: '#FFFFFF',
@@ -41,17 +60,26 @@ const light = {
 export type ColorName = keyof typeof light
 
 const dark: Record<ColorName, string> = {
-  bg: '#111827',
-  surface: '#1F2937',
-  text: '#F3F4F6',
-  muted: '#9CA3AF',
-  border: '#374151',
-  accent: '#E2E8F0',
-  onAccent: '#0F172A',
-  success: '#4ADE80',
-  danger: '#F87171',
-  warning: '#FBBF24',
-  overlay: '#00000099',
+  bg: '#06070F',
+  surface: '#10142B',
+  panel: '#0C0F22D1',
+  sunken: '#03040A99',
+  raised: '#FFFFFF14',
+  raisedHover: '#FFFFFF24',
+  text: '#EEF1FF',
+  muted: '#A6AED6',
+  border: '#2E3566',
+  line: '#96AAFF29',
+  brand: '#2BE6FF',
+  magenta: '#FF2E8B',
+  accent: '#2BE6FF',
+  onAccent: '#05060D',
+  gamePromotion: '#FFC23D',
+  gameSilentTable: '#5CFFA8',
+  success: '#5CFFA8',
+  danger: '#FF5A6E',
+  warning: '#FFC23D',
+  overlay: '#03040AB8',
   qrDark: '#000000',
   qrLight: '#FFFFFF',
   seat0: '#C2410C',
@@ -87,6 +115,15 @@ export const colorVariables = (theme: Record<ColorName, string>): string =>
 
 /** A seat's colour: its piece, and the avatar of whoever sits there during a game */
 export const seatColor = (seat: number): string => color[`seat${seat % 6}` as ColorName]
+
+/** Each game's hue by its id (DESIGN §1). A game without one has the brand's */
+export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
+  promotion: 'gamePromotion',
+  'silent-table': 'gameSilentTable',
+}
+
+/** A game's hue, for its card and its room: what `--color-accent` becomes there */
+export const gameHue = (gameId: string): string => color[gameHues[gameId] ?? 'brand']
 
 export const avatarColors: readonly string[] = [0, 1, 2, 3, 4, 5].map(seatColor)
 
@@ -149,18 +186,27 @@ export const promotionBoard = {
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const
 
-export const radius = { component: 8, card: 16 } as const
+// Sharp: the esports shell is cut corners and slants (`styles/esports.ts`), not round ones
+export const radius = { component: 4, card: 6 } as const
 
 export const fontSize = { sm: 14, md: 16, lg: 18, xl: 24, xxl: 32 } as const
 
 export const lineHeight = 1.5
 
-// Inter and Noto Sans TC are the design's fonts; no web font is bundled yet, so they apply only
-// where installed and the system's own Latin and Traditional Chinese faces take over elsewhere.
+// Body text stays on the system's own faces (Inter where installed): no web font for it. The display
+// faces load from Google Fonts without blocking the first paint (`styles/webFonts.ts`,
+// docs/ASSETS.md), so every stack ends in faces that are already there. Noto Sans TC is not in the
+// body or mono stacks on purpose: the page loads only its 900, which would turn all text heavy.
 // A Chinese nickname in the English interface falls through to the CJK faces glyph by glyph.
 export const font = {
   // The promotion board's brush face (docs/ASSETS.md): LXGW WenKai TC where it loads, else whatever
   // kai the system has (BiauKai on a Mac, DFKai-SB on Windows), else a serif
   kai: "'LXGW WenKai TC', 'Kaiti TC', BiauKai, 'DFKai-SB', STKaiti, KaiTi, 'Noto Serif TC', 'PMingLiU', serif",
-  sans: "Inter, 'Noto Sans TC', system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang TC', 'Microsoft JhengHei', sans-serif",
+  sans: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang TC', 'Microsoft JhengHei', sans-serif",
+  // Latin headings, buttons and the wordmark: Saira, italic and heavy
+  display: "Saira, 'Noto Sans TC', 'Arial Narrow', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  // Chinese headings: Noto Sans TC at 900, upright
+  displayZh: "'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif",
+  // Numbers, room ids and small labels
+  mono: "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'PingFang TC', 'Microsoft JhengHei', monospace",
 } as const

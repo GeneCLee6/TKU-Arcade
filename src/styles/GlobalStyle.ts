@@ -1,7 +1,12 @@
 import { createGlobalStyle } from 'styled-components'
-import { color, colorVariables, font, fontSize, lineHeight, palette } from './tokens.ts'
+import { color, colorVariables, font, fontSize, gameHues, lineHeight, palette } from './tokens.ts'
 
-// Base page styles. The theme follows the system unless theme.ts pins one with <html data-theme>.
+// While a room of a game is open its hue is the page's accent: the top bar, the glow, the buttons
+const gameHueRules = Object.entries(gameHues)
+  .map(([id, name]) => `:root:has([data-game='${id}']) { --color-accent: var(--color-${name}); }`)
+  .join('\n')
+
+// Base page styles. Dark unless theme.ts pins light or system with <html data-theme>.
 export const GlobalStyle = createGlobalStyle`
   :root {
     color-scheme: light;
@@ -20,13 +25,19 @@ export const GlobalStyle = createGlobalStyle`
     ${colorVariables(palette.dark)}
   }
 
+  ${gameHueRules}
+
   *, *::before, *::after {
     box-sizing: border-box;
   }
 
+  /* On <html>, not <body>: the glow and the grid floor below sit between the two */
+  html {
+    background: ${color.bg};
+  }
+
   body {
     margin: 0;
-    background: ${color.bg};
     color: ${color.text};
     font-family: ${font.sans};
     font-size: ${fontSize.md}px;
@@ -35,10 +46,42 @@ export const GlobalStyle = createGlobalStyle`
     text-size-adjust: 100%;
   }
 
+  /* The night sky: the current hue's glow up at the right, magenta down at the left */
+  body::before,
+  body::after {
+    content: '';
+    position: fixed;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  body::before {
+    inset: 0;
+    background:
+      radial-gradient(55% 45% at 80% 8%, color-mix(in srgb, ${color.accent} 18%, transparent), transparent 70%),
+      radial-gradient(45% 40% at 4% 100%, color-mix(in srgb, ${color.magenta} 12%, transparent), transparent 70%);
+  }
+
+  /* A faint grid floor in perspective. Still on purpose: a moving one repaints the whole page */
+  body::after {
+    left: -60%;
+    right: -60%;
+    bottom: 0;
+    height: 50%;
+    background-image:
+      linear-gradient(color-mix(in srgb, ${color.accent} 24%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, ${color.accent} 24%, transparent) 1px, transparent 1px);
+    background-size: 64px 64px;
+    transform: perspective(520px) rotateX(64deg);
+    transform-origin: bottom;
+    -webkit-mask-image: linear-gradient(to top, ${color.text}, transparent 80%);
+    mask-image: linear-gradient(to top, ${color.text}, transparent 80%);
+  }
+
   /* :root so that it beats a component's own outline, such as the one marking whose turn it is */
   :root :focus-visible {
     outline: 2px solid ${color.accent};
-    outline-offset: 2px;
+    outline-offset: 3px;
   }
 
   /* What Tab lands on must not end up behind the phone layout's dock, stuck to the bottom */

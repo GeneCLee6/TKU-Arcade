@@ -4,6 +4,7 @@ import {
   createRoom,
   joinRoom,
   newPerson,
+  pinTheme,
   playSilentRound,
   playToResult,
   setIntOption,
@@ -35,6 +36,7 @@ test('the lobby in Traditional Chinese', async ({ browser }) => {
 for (const scheme of ['light', 'dark'] as const) {
   test.describe(`axe, ${scheme} theme`, () => {
     test.use({ colorScheme: scheme })
+    test.beforeEach(async ({ context }) => pinTheme(context, scheme))
 
     test('the lobby', async ({ page }) => {
       await page.goto('/')

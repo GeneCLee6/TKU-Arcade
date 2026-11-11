@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, type MouseEvent, type ReactNode, type SyntheticEvent } from 'react'
 import styled from 'styled-components'
 import { useT } from '../i18n/useT.ts'
-import { color, fontSize, radius, space } from '../styles/tokens.ts'
+import { displayType } from '../styles/esports.ts'
+import { color, fontSize, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 
 interface DialogProps {
@@ -75,7 +76,9 @@ const Panel = styled.dialog`
   background: ${color.surface};
   color: ${color.text};
   border: 1px solid ${color.border};
-  border-radius: ${radius.card}px;
+  border-top: 3px solid ${color.accent};
+  border-radius: 0;
+  box-shadow: 0 ${space.xxl}px ${space.xxxl}px ${color.overlay};
 
   &::backdrop {
     background: ${color.overlay};
@@ -86,8 +89,7 @@ const Panel = styled.dialog`
     width: 100%;
     max-width: 100%;
     margin: auto 0 0;
-    border-width: 1px 0 0;
-    border-radius: ${radius.card}px ${radius.card}px 0 0;
+    border-width: 3px 0 0;
   }
 `
 
@@ -113,6 +115,7 @@ const Header = styled.div`
 const Title = styled.h2`
   min-width: 0;
   margin: 0;
+  ${displayType}
   font-size: ${fontSize.lg}px;
   overflow-wrap: anywhere;
 `

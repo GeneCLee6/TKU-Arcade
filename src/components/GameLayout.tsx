@@ -7,7 +7,7 @@ import type { RoomMember } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import { unreadCount } from '../lib/chatState.ts'
 import { useCompact } from '../lib/useMediaQuery.ts'
-import { color, radius, space } from '../styles/tokens.ts'
+import { color, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 import { ChatPanel, type ChatPanelProps } from './ChatPanel.tsx'
 import { Countdown } from './Countdown.tsx'
@@ -250,8 +250,9 @@ const Dock = styled.div<{ $stuck?: boolean }>`
   gap: ${space.sm}px;
   padding: ${space.sm}px ${space.md}px;
   background: ${color.surface};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.component}px;
+  box-shadow:
+    inset 0 2px 0 ${color.accent},
+    inset 0 0 0 1px ${color.line};
   ${(p) =>
     p.$stuck
       ? `

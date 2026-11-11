@@ -1,10 +1,10 @@
 import styled from 'styled-components'
-import { color, radius, space } from '../styles/tokens.ts'
+import { glass } from '../styles/esports.ts'
+import { color, space } from '../styles/tokens.ts'
 
+/** A glass panel with one corner cut (esports.ts); the clipped shape is behind it, not on it */
 export const Card = styled.div`
+  ${glass}
   padding: ${space.xl}px;
-  background: ${color.surface};
   color: ${color.text};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.card}px;
 `

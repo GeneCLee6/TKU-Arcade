@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { useT } from '../i18n/useT.ts'
-import { color, fontSize, radius, space, type ColorName } from '../styles/tokens.ts'
+import { color, fontSize, space, type ColorName } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 import { ToastContext, type ShowToast, type ToastTone } from './useToast.ts'
 
@@ -103,7 +103,6 @@ const Item = styled.div<{ $tone: ToastTone }>`
   color: ${color.text};
   border: 1px solid ${color.border};
   border-left: ${space.xs}px solid ${(p) => color[toneColor[p.$tone]]};
-  border-radius: ${radius.component}px;
   box-shadow: 0 ${space.xs}px ${space.lg}px ${color.overlay};
   font-size: ${fontSize.sm}px;
   pointer-events: auto;
