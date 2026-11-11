@@ -3,9 +3,18 @@
 // would put them all in everyone's first load. A screen adds its own (`registerMessages`).
 import { promotionScreenMessages } from './promotion/i18n.screen.ts'
 import { silentTableScreenMessages } from './silent-table/i18n.screen.ts'
+import { spectrumScreenMessages } from './spectrum/i18n.screen.ts'
 import type { GameMessages } from './types.ts'
 
 export const SCREEN_MESSAGES: GameMessages = {
-  en: { ...promotionScreenMessages.en, ...silentTableScreenMessages.en },
-  'zh-TW': { ...promotionScreenMessages['zh-TW'], ...silentTableScreenMessages['zh-TW'] },
+  en: {
+    ...promotionScreenMessages.en,
+    ...silentTableScreenMessages.en,
+    ...spectrumScreenMessages.en,
+  },
+  'zh-TW': {
+    ...promotionScreenMessages['zh-TW'],
+    ...silentTableScreenMessages['zh-TW'],
+    ...spectrumScreenMessages['zh-TW'],
+  },
 }

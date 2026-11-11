@@ -7,6 +7,9 @@ const raw = (files: Record<string, unknown>) => files as Record<string, string>
 const SOURCES = raw(
   import.meta.glob('/src/**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true }),
 )
+const SHARED = raw(
+  import.meta.glob('/shared/**/*.ts', { query: '?raw', import: 'default', eager: true }),
+)
 const INFO_FILES = raw(
   import.meta.glob(['/shared/games/catalog.ts', '/shared/games/*/info.ts'], {
     query: '?raw',
@@ -18,6 +21,41 @@ const INFO_FILES = raw(
 /** What this source imports at load time: `import type` is erased, so it costs nothing */
 const staticImports = (source: string): string[] =>
   [...source.matchAll(/^import (?!type )[^;]*?from '([^']+)'/gm)].map((match) => match[1])
+
+/** Static imports and re-exports, as paths from the repo root (`/shared/...`); packages left out */
+function localImports(path: string, source: string): string[] {
+  const found = [
+    ...source.matchAll(
+      /^import (?!type )[^;]*?from '([^']+)'|^export (?:\*|\{[^}]*\}) from '([^']+)'|^import '([^']+)'/gm,
+    ),
+  ].map((match) => match[1] ?? match[2] ?? match[3])
+  const folder = path.slice(0, path.lastIndexOf('/'))
+  return found
+    .filter((from) => from.startsWith('.'))
+    .map((from) => {
+      const parts = `${folder}/${from}`.split('/')
+      const out: string[] = []
+      for (const part of parts) {
+        if (part === '..') out.pop()
+        else if (part !== '.') out.push(part)
+      }
+      return out.join('/')
+    })
+}
+
+/** Every file the browser's code pulls in at load time, following imports through shared/ too */
+function reachableFromSite(): Set<string> {
+  const all = { ...SOURCES, ...SHARED }
+  const seen = new Set<string>()
+  const queue = Object.keys(SOURCES)
+  while (queue.length > 0) {
+    const path = queue.pop() as string
+    if (seen.has(path) || all[path] === undefined) continue
+    seen.add(path)
+    queue.push(...localImports(path, all[path]))
+  }
+  return seen
+}
 
 describe('the catalog against the registry', () => {
   it('lists the same games, in the same order', () => {
@@ -52,15 +90,30 @@ describe('the browser loads no rules', () => {
 
   it.each(paths)('%s', (path) => {
     const bad = staticImports(SOURCES[path]).filter((from) =>
-      /shared\/games\/index\.ts$|shared\/games\/[^/]+\/rules\.ts$/.test(from),
+      /shared\/games\/index\.ts$|shared\/games\/[^/]+\/(rules|topics)\.ts$/.test(from),
     )
     expect(bad).toEqual([])
+  })
+
+  // Followed all the way down: a rules file or the topic bank one import away still lands in the download
+  it('reaches no rules and no topic bank through any chain of imports', () => {
+    const reached = [...reachableFromSite()]
+    expect(reached).toContain('/shared/games/catalog.ts')
+    expect(reached).toContain('/shared/games/spectrum/info.ts')
+    expect(
+      reached.filter((path) =>
+        /^\/shared\/games\/index\.ts$|^\/shared\/games\/[^/]+\/(rules|topics)\.ts$/.test(path),
+      ),
+    ).toEqual([])
   })
 
   it('catalog.ts and every info.ts import no rules', () => {
     expect(Object.keys(INFO_FILES)).toHaveLength(GAME_IDS.length + 1)
     for (const source of Object.values(INFO_FILES)) {
-      expect(staticImports(source).filter((from) => /rules\.ts$|index\.ts$/.test(from))).toEqual([])
+      const bad = staticImports(source).filter((from) =>
+        /rules\.ts$|index\.ts$|topics\.ts$/.test(from),
+      )
+      expect(bad).toEqual([])
     }
   })
 })
