@@ -117,7 +117,13 @@ export function isGameError(value: unknown): value is GameError {
 export type OptionValue = boolean | number | string
 export type OptionValues = Record<string, OptionValue>
 
-export type BooleanOption = { kind: 'boolean'; labelKey: string; default: boolean }
+/**
+ * `hidden`: a field only the module's schema has, not the one in its info.ts, so the waiting room
+ * never shows it. It can be set when a room is made (`POST /api/rooms`), and a host changing the
+ * other options keeps it (`keepHidden`, shared/games/options.ts). For a rule a game is not ready to
+ * offer yet (promotion's `edition` until C7).
+ */
+export type BooleanOption = { kind: 'boolean'; labelKey: string; default: boolean; hidden?: true }
 
 export type IntOption = {
   kind: 'int'
@@ -125,6 +131,7 @@ export type IntOption = {
   min: number
   max: number
   default: number
+  hidden?: true
 }
 
 export type SelectOption<T extends string | number> = {
@@ -132,6 +139,7 @@ export type SelectOption<T extends string | number> = {
   labelKey: string
   choices: readonly { value: T; labelKey: string }[]
   default: T
+  hidden?: true
 }
 
 /** Any one field, whatever its value's type */

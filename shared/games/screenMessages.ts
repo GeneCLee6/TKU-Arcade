@@ -2,6 +2,7 @@
 // to see them all: check-i18n and `npm run play`. The site itself must not import this file: that
 // would put them all in everyone's first load. A screen adds its own (`registerMessages`).
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
+import { promotionFullMessages } from './promotion/i18n.full.ts'
 import { promotionScreenMessages } from './promotion/i18n.screen.ts'
 import { silentTableScreenMessages } from './silent-table/i18n.screen.ts'
 import { soonMessages } from './soon.ts'
@@ -12,6 +13,7 @@ export const SCREEN_MESSAGES: GameMessages = {
   en: {
     ...promotionScreenMessages.en,
     ...promotionDetailMessages.en,
+    ...promotionFullMessages.en,
     ...silentTableScreenMessages.en,
     ...spectrumScreenMessages.en,
     ...soonMessages.en,
@@ -19,6 +21,7 @@ export const SCREEN_MESSAGES: GameMessages = {
   'zh-TW': {
     ...promotionScreenMessages['zh-TW'],
     ...promotionDetailMessages['zh-TW'],
+    ...promotionFullMessages['zh-TW'],
     ...silentTableScreenMessages['zh-TW'],
     ...spectrumScreenMessages['zh-TW'],
     ...soonMessages['zh-TW'],

@@ -1,7 +1,7 @@
 import type { Account } from '../shared/account.ts'
 import { CHAT_CHUNK, CHAT_HISTORY, ChatRateLimit, type ChatMessage } from '../shared/chat.ts'
 import type { ReplayStep } from '../shared/games/match.ts'
-import { parseOptions } from '../shared/games/options.ts'
+import { keepHidden, parseOptions } from '../shared/games/options.ts'
 import { createRng } from '../shared/games/rng.ts'
 import type { AnyGameModule, GameProjection, OptionValues, Viewer } from '../shared/games/types.ts'
 import { diff, type JsonValue } from '../shared/patch.ts'
@@ -849,7 +849,8 @@ export class RoomHost {
     const module = this.deps.games(room.gameId)
     if (!module) return this.refuse(conn, 'bad_game')
     this.change(() => {
-      room.options = parseOptions(module.options, rawOptions)
+      // A hidden option (types.ts) stays as the room was made: the form does not know it
+      room.options = keepHidden(module.options, room.options, rawOptions)
       this.deps.storage.saveRoom(room)
       for (const other of this.members.values()) other.ready = false
       this.saveMembers()
