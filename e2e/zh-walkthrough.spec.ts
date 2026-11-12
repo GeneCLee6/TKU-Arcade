@@ -64,7 +64,7 @@ async function person(browser: Browser, viewport: { width: number; height: numbe
 test('the check itself sees English when there is some', async ({ browser }) => {
   const page = await browser.newPage({ locale: 'en-US' })
   await page.goto('/')
-  await expect(page.getByRole('button', { name: 'New room' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New room' }).first()).toBeVisible()
   expect(await englishLeft(page)).toContain('New room')
   await page.close()
 })
@@ -77,7 +77,7 @@ for (const [label, viewport, touch] of [
     test('the lobby, its errors and the rules page', async ({ browser }) => {
       const page = await person(browser, viewport, touch)
       await page.goto('/')
-      await expect(page.getByRole('button', { name: '建立房間' })).toBeVisible()
+      await expect(page.getByRole('button', { name: '建立房間' }).first()).toBeVisible()
       await expectAllChinese(page, 'lobby')
 
       await page.getByRole('textbox', { name: '有連結？貼在這裡' }).fill('nope')
@@ -85,7 +85,7 @@ for (const [label, viewport, touch] of [
       await expect(page.getByRole('alert')).toBeVisible()
       await expectAllChinese(page, 'bad link')
 
-      await page.getByRole('button', { name: '建立房間' }).click()
+      await page.getByRole('button', { name: '建立房間' }).first().click()
       await nicknameBox(page).press('Enter')
       await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible()
       await expectAllChinese(page, 'nickname dialog with its error')
@@ -111,7 +111,7 @@ for (const [label, viewport, touch] of [
       const guest = await person(browser, viewport, touch)
 
       await host.goto('/')
-      await host.getByRole('button', { name: '建立房間' }).click()
+      await host.getByRole('button', { name: '建立房間' }).first().click()
       await nicknameBox(host).fill('小安')
       await nicknameBox(host).press('Enter')
       await host.waitForURL(/\/r\//)

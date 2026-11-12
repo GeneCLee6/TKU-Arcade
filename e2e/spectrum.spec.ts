@@ -170,9 +170,9 @@ test('the guesser puts every answer in order in the full-order mode', async ({ b
   await close(people)
 })
 
-test('the rules are there for a game the lobby does not list yet', async ({ page }) => {
+test('the lobby links to the rules, and the room has them too', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('link', { name: 'How to play Spectrum' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'How to play Spectrum' })).toBeVisible()
   await page.goto('/games/spectrum/rules')
   await expect(page.getByRole('heading', { name: 'One round' })).toBeVisible()
   await createSpectrumRoom(page, 'Ann')
