@@ -5,8 +5,9 @@ import { DEPARTMENTS } from '../../../shared/games/promotion/departments.ts'
 import { BOARD_LAYOUTS, type CellBox } from '../../../src/games/promotion/boardLayout.ts'
 import { cellForKey } from '../../../src/games/promotion/boardKeys.ts'
 import { PromotionBoard } from '../../../src/games/promotion/PromotionBoard.tsx'
+import { rankArtOf } from '../../../src/games/promotion/rankArt.ts'
 
-const layout = BOARD_LAYOUTS.stacked
+const layout = BOARD_LAYOUTS.portrait
 
 function renderBoard(selected: string | null = null) {
   const onSelect = vi.fn()
@@ -19,7 +20,6 @@ function renderBoard(selected: string | null = null) {
       onSelect={onSelect}
       flight={null}
       reducedMotion
-      zoom={1}
     />,
   )
   const cell = (id: string) => container.querySelector(`[data-cell="${id}"]`) as SVGGElement
@@ -27,7 +27,7 @@ function renderBoard(selected: string | null = null) {
   return { onSelect, cell, tabStops }
 }
 
-describe.each(['wide', 'stacked'] as const)('cellForKey on the %s board', (shape) => {
+describe.each(['landscape', 'portrait'] as const)('cellForKey on the %s board', (shape) => {
   const layout = BOARD_LAYOUTS[shape]
   const box = (id: string) => layout.byId.get(id) as CellBox
 
@@ -149,5 +149,66 @@ describe('PromotionBoard with a keyboard', () => {
     expect(fireEvent.keyDown(cell(first), { key: 'Tab' })).toBe(true)
     expect(fireEvent.keyDown(cell(first), { key: 'ArrowLeft', altKey: true })).toBe(true)
     expect(onSelect).not.toHaveBeenCalled()
+  })
+})
+
+describe('PromotionBoard watermarks (e3-t11)', () => {
+  const watermark = (cell: Element) =>
+    [...cell.querySelectorAll('use')].find((use) => /#(?!gate)/.test(use.getAttribute('href') ?? ''))
+
+  it('gives every office its rank drawing behind the name, faint, and the end of the game none', () => {
+    const { cell } = renderBoard()
+    for (const box of layout.cells) {
+      const art = rankArtOf(box.id)
+      const use = watermark(cell(box.id))
+      if (art === null) {
+        expect(use, box.id).toBeUndefined()
+        continue
+      }
+      expect(use?.getAttribute('href'), box.id).toMatch(new RegExp(`rankArt[^#]*#${art}$`))
+      expect(Number(use?.getAttribute('opacity'))).toBeLessThanOrEqual(0.25)
+    }
+  })
+
+  it('draws it bigger the higher the rank, with the hat button in the rank colour', () => {
+    const { cell } = renderBoard()
+    const size = (id: string) => Number(watermark(cell(id))?.getAttribute('height'))
+    expect(size('baiding')).toBeLessThan(size('juren'))
+    expect(size('zhixian')).toBeLessThan(size('zhifu'))
+    expect(size('zhifu')).toBeLessThan(size('taishi'))
+    expect((watermark(cell('taishi')) as SVGElement).style.getPropertyValue('--knob')).toMatch(/^#/)
+    expect((watermark(cell('baiding')) as SVGElement).style.getPropertyValue('--knob')).toBe('')
+  })
+
+  it('drawn small, makes the names bigger and leaves the words off the seals', () => {
+    const font = (dense: boolean) => {
+      const { container } = render(
+        <PromotionBoard
+          layout={layout}
+          pieces={[]}
+          activeSeat={null}
+          selected={null}
+          onSelect={() => {}}
+          flight={null}
+          reducedMotion
+          dense={dense}
+        />,
+      )
+      const name = [...container.querySelectorAll('[data-cell="zhixian"] text')].map(
+        (text) => text.textContent,
+      )
+      const size = parseFloat(
+        (container.querySelector('[data-cell="zhixian"] text:last-of-type') as SVGElement).style
+          .fontSize,
+      )
+      container.remove()
+      return { name, size }
+    }
+    const normal = font(false)
+    const dense = font(true)
+    expect(dense.size).toBeGreaterThan(normal.size)
+    // The seal's words are gone; the name is still there
+    expect(normal.name.length).toBeGreaterThan(dense.name.length)
+    expect(dense.name.join('')).toContain('Zhixian')
   })
 })

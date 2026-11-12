@@ -168,7 +168,15 @@ test.describe('the game at 375 px', () => {
     const guest = await newPerson(browser, device)
     await startGame(page, guest)
     await expectNoSidewaysScroll(page)
-    await expectFingerSizedControls(page, [/^Roll$/, /^Members$/, /^Chat$/, 'Zoom in', 'Zoom out', /^Fit$/])
+    await expectFingerSizedControls(page, [
+      /^Roll$/,
+      /^Members$/,
+      /^Chat$/,
+      'Zoom in',
+      'Zoom out',
+      /^Fit$/,
+      /^Full screen$/,
+    ])
     await expectFingerSizedControls(page, [/^Ann$/, /^Bob$/])
     await guest.context().close()
   })

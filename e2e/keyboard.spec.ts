@@ -76,14 +76,19 @@ test('the board can be read and the die rolled with the keyboard alone', async (
   const moved = page.locator('[data-cell]:focus')
   const cell = await moved.getAttribute('data-cell')
   expect(cell).not.toBe(first)
-  await page.keyboard.press('Enter')
-  await expect(moved).toHaveAttribute('aria-pressed', 'true')
   const title = await moved.locator('title').textContent()
-  await expect(page.getByRole('heading', { level: 3 })).toContainText(title ?? 'no title')
-
-  // Enter again gives the choice back to the game
   await page.keyboard.press('Enter')
-  await expect(page.locator(`[data-cell="${cell}"]`)).toHaveAttribute('aria-pressed', 'false')
+  const chosen = page.locator(`[data-cell="${cell}"]`)
+  await expect(chosen).toHaveAttribute('aria-pressed', 'true')
+  // Its details open in a sheet over the board (e3-t10), which has the focus
+  const sheet = page.getByRole('dialog')
+  await expect(sheet.getByRole('heading')).toContainText(title ?? 'no title')
+
+  // Esc closes it, gives the choice back to the game and the focus back to the cell
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await expect(chosen).toHaveAttribute('aria-pressed', 'false')
+  await expect(chosen).toBeFocused()
 
   // Who goes first is drawn by lot, so whoever it is rolls with the keyboard
   const yourTurn = await page.getByText('Your turn').isVisible()
