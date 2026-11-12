@@ -31,7 +31,9 @@ function renderLobby() {
   )
 }
 
-const newRoom = () => screen.getByRole('button', { name: 'New room' })
+/** Every listed game has its own New room button; these tests make Promotion rooms */
+const cardOf = (name: string) => screen.getByRole('heading', { level: 3, name }).closest('li')!
+const newRoom = () => within(cardOf('Promotion')).getByRole('button', { name: 'New room' })
 /** `implementation` answers everything but the public list, which only `lobby` answers */
 const stubFetch = (
   implementation: () => Promise<Response>,
@@ -111,21 +113,29 @@ describe('signed in (e1-t13)', () => {
 })
 
 describe('lobby cards', () => {
-  it('lists promotion with its facts, and not the unlisted tic-tac-toe', async () => {
+  it('lists promotion, silent table and spectrum with their facts, and not the unlisted tic-tac-toe', async () => {
     renderLobby()
     const card = screen.getByRole('heading', { level: 3, name: 'Promotion' }).closest('li')!
     expect(within(card).getByText('2–6 players')).toBeInTheDocument()
     expect(within(card).getByText('About 20 min')).toBeInTheDocument()
     expect(within(card).getByText(/^Roll your way/)).toBeInTheDocument()
     expect(screen.queryByText(/tic-tac-toe/i)).not.toBeInTheDocument()
-    // One open game; the four Coming soon cards arrive with their lazy chunk
+    // Listed on the owner's request, 2026-11-12
+    const silent = cardOf('Silent Table')
+    expect(within(silent).getByText('3–6 players')).toBeInTheDocument()
+    expect(within(silent).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    const spectrum = cardOf('Spectrum')
+    expect(within(spectrum).getByText('4–11 players')).toBeInTheDocument()
+    expect(within(spectrum).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    // Three open games; the two Coming soon cards arrive with their lazy chunk
     await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(5))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(3)
+    expect(LOBBY_GAMES.map((game) => game.id)).toEqual(['promotion', 'silent-table', 'spectrum'])
   })
 
   it('shows the games that are not open yet as Coming soon, with nothing to press', async () => {
     renderLobby()
-    const names = ['Silent Table', 'Spectrum', 'Bluff Reader', 'Kart']
+    const names = ['Bluff Reader', 'Kart']
     for (const name of names) {
       // The tag is part of the heading, so a screen reader hears it with the name
       const heading = await screen.findByRole('heading', { level: 3, name: `${name} Coming soon` })
@@ -158,10 +168,10 @@ describe('lobby cards', () => {
     renderLobby()
     const name = translate('zh-TW', 'games.promotion.name')
     fireEvent.click(screen.getByRole('button', { name: '繁中' }))
-    expect(screen.getByRole('heading', { level: 3, name })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '建立房間' })).toBeInTheDocument()
-    expect(screen.getByText('2–6 人')).toBeInTheDocument()
-    expect(screen.getByText('約 20 分鐘')).toBeInTheDocument()
+    const card = screen.getByRole('heading', { level: 3, name }).closest('li')!
+    expect(within(card).getByRole('button', { name: '建立房間' })).toBeInTheDocument()
+    expect(within(card).getByText('2–6 人')).toBeInTheDocument()
+    expect(within(card).getByText('約 20 分鐘')).toBeInTheDocument()
     setLanguage('en')
   })
 

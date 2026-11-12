@@ -9,14 +9,13 @@ export const ROUNDS = COMMUNITY_BY_ROUND.length
 
 export const silentTableInfo: GameInfo<SilentTableOptions> = {
   id: 'silent-table',
-  // Unlisted until the owner signs docs/IP-CHECKLIST.md: merging deploys, and a listed game is live.
+  // Listed on the owner's request, 2026-11-12 (the IP-CHECKLIST.md signature lines are still the owner's).
   // No `proxyTurns`: a chip is a decision, and a random one could lose the level
   meta: {
     minPlayers: 3,
     maxPlayers: 6,
     minutes: 20,
     i18nKey: 'games.silent-table',
-    unlisted: true,
   },
 
   options: {

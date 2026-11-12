@@ -10,12 +10,10 @@ import { Body, Heading, Monogram, Name, Summary } from './gameCardParts.ts'
 // first load of the lobby or of a game's room
 registerMessages(soonMessages)
 
-// Shown, not playable. Silent Table and Spectrum are built and stay unlisted (`meta.unlisted`) until
-// the owner signs off; take a game out of here the day it is listed. Its id, then where its strings
+// Shown, not playable: games that are not built yet (Silent Table and Spectrum were listed on the
+// owner's request, 2026-11-12). Take a game out of here the day it is listed. Its id, then where its strings
 // are: `${keys}.name` and `${keys}.summary`
 const SOON: readonly (readonly [id: string, keys: string])[] = [
-  ['silent-table', 'games.silent-table'],
-  ['spectrum', 'games.spectrum'],
   ['bluff-reader', 'games.bluff-reader'],
   ['kart', 'games.kart'],
 ]

@@ -5,8 +5,8 @@ import type { SpectrumOptions } from './types.ts'
 
 export const spectrumInfo: GameInfo<SpectrumOptions> = {
   id: 'spectrum',
-  // Unlisted until the owner picks its name (PRD Q3) and signs docs/IP-CHECKLIST.md: merging deploys,
-  // and a listed game is live. No `proxyTurns`: an answer has to come from a person.
+  // Listed on the owner's request, 2026-11-12, under its working title (PRD Q3 still open). No
+  // `proxyTurns`: an answer has to come from a person.
   // 4 to 11: at least three answerers, so that the largest and the smallest are two different
   // calls; at most ten, so that ten different numbers go round
   meta: {
@@ -14,7 +14,6 @@ export const spectrumInfo: GameInfo<SpectrumOptions> = {
     maxPlayers: 11,
     minutes: 25,
     i18nKey: 'games.spectrum',
-    unlisted: true,
   },
 
   options: {
