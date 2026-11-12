@@ -2,8 +2,8 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Browser, type BrowserContextOptions, type Page } from '@playwright/test'
 import { joinRoom, newPerson, setSelectOption } from './helpers.ts'
 
-// e5-t05, e5-t07: four players through the real room, every round to the result. Spectrum is not in
-// the lobby until the owner signs off, so its room comes from the API, as Silent Table's did.
+// e5-t05, e5-t07: four players through the real room, every round to the result. Its room comes
+// from the API, as Silent Table's does (both were unlisted until the owner listed them, 2026-11-12).
 
 const NAMES = ['Ann', 'Bob', 'Cy', 'Dee'] as const
 /** No digits: the room refuses those */

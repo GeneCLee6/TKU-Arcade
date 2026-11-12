@@ -99,11 +99,12 @@ function rebuildAround(state: SpectrumState, guesser: number): Partial<SpectrumS
 const viewOf = (state: SpectrumState, viewer: Viewer): SpectrumView => spectrum.view(state, viewer)
 
 describe('the module', () => {
-  it('runs on the room for 4 to 11 seats, but no lobby lists it until H2 and the owner signs', () => {
+  it('runs on the room for 4 to 11 seats, and the lobby lists it (owner, 2026-11-12)', () => {
     expect(getGame('spectrum')).toBe(spectrum)
     expect(GAME_IDS).toContain('spectrum')
-    expect(spectrum.meta).toMatchObject({ minPlayers: 4, maxPlayers: 11, unlisted: true })
-    expect(LOBBY_GAMES.map((game) => game.id)).not.toContain('spectrum')
+    expect(spectrum.meta).toMatchObject({ minPlayers: 4, maxPlayers: 11 })
+    expect(spectrum.meta).not.toHaveProperty('unlisted')
+    expect(LOBBY_GAMES.map((game) => game.id)).toContain('spectrum')
   })
 
   it('does not offer to play for an absent seat, since an answer has to come from a person', () => {

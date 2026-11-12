@@ -159,10 +159,10 @@ test('the table theme shows on the table, and a guest sees it too', async ({ bro
   await close(players)
 })
 
-test('the rules are there for a game the lobby does not list yet', async ({ page }) => {
+test('the rules are there from the lobby card and in the room', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('link', { name: 'How to play Silent Table' })).toHaveCount(0)
-  await page.goto('/games/silent-table/rules')
+  await page.getByRole('link', { name: 'How to play Silent Table' }).click()
+  await expect(page).toHaveURL(/\/games\/silent-table\/rules$/)
   await expect(page.getByRole('heading', { name: 'The goal' })).toBeVisible()
   await createSilentTableRoom(page, 'Ann')
   await page.getByRole('button', { name: 'How to play' }).click()
