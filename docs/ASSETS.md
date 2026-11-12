@@ -3,7 +3,7 @@
 每一個不是這個 repo 自己程式碼的資產（模型、貼圖、音檔、字型、圖片）都登記在這裡：來源、授權、作者、放在哪裡、誰用它。規則見 `CLAUDE.md` 硬性規則 4、`docs/PRD/01-legal-ip-analysis.md` §4-4、`DESIGN.md` §7。
 
 - 模型、貼圖、音檔放 R2（`tku-arcade-assets`），**不 commit**；小於 100 kB 的 SVG／PNG 圖示可以進 repo。
-- 程式畫的 SVG（陞官圖圖版、陀螺、骰子，默契牌局的牌與皮膚）與 `src/lib/sound.ts` 用 WebAudio 合成的音效是這個 repo 自己的程式碼，不用登記（DESIGN §7）。
+- 程式畫的 SVG（陞官圖圖版、陀螺、骰子，默契牌局的牌與皮膚）與 `src/lib/sound.ts` 用 WebAudio 合成的音效是這個 repo 自己的程式碼，不用登記（DESIGN §7）。**獨立的圖檔**即使是自己畫的也登記，例如陞官圖的官階浮水印（下面「圖片」）。
 - `check-assets`（`e12-t08`）還沒做；在那之前靠 PR 審查對照這份表。
 
 ## 字型
@@ -19,4 +19,8 @@
 
 ## 圖片、模型、音檔
 
-目前沒有。
+| 資產 | 用在哪裡 | 來源 | 授權 | 怎麼載入 | 登記日期 |
+| --- | --- | --- | --- | --- | --- |
+| 陞官圖官階浮水印 `src/games/promotion/rankArt.svg`（約 18 kB，gzip 約 2 kB）：13 個 `<symbol>`，瓜皮帽、士子暖帽、科甲簪花帽、文官涼帽三級、最高的官帽與朝珠、綠營頭盔三級、侍衛暖帽兩級，加榮歸格子的牌坊 | 陞官圖每個官職格子的浮水印、玩家籤的小帽子、榮歸的牌坊（`rankArt.ts`、`PromotionBoard.tsx`、`PromotionScreen.tsx`） | **本專案原創**：AI 協作者為 TKU Arcade 畫的線稿（座標由程式產生，2026-11-12），沒有描或參考任何現成圖片；服飾只取清代官帽的大意，畫面標「示意」 | 與這個 repo 的程式碼相同（擁有者所有） | 小於 100 kB 的 SVG，**commit 在 repo**、不放 R2。Vite 打包成有雜湊的檔（`?no-inline`，不內嵌成 data URL），格子用 `<use href="…#symbol">` 引用，瀏覽器在首次繪製後才下載，不算 JS 首屏。只用 `currentColor` 與 `var(--knob)`，顏色由 `tokens.ts` 給；測試擋檔內出現顏色、外部參照、腳本與壞掉的 XML（`tests/games/promotion/rankArt.test.ts`） | 2026-11-12（C5） |
+
+模型、音檔目前沒有。

@@ -73,3 +73,12 @@ describe('the rank watermarks (e3-t11)', () => {
     expect(sprite.length).toBeLessThan(100_000)
   })
 })
+
+describe('the sprite file', () => {
+  it('is well-formed XML, which a browser needs to draw any of it', () => {
+    const parsed = new DOMParser().parseFromString(sprite, 'image/svg+xml')
+    expect(parsed.querySelector('parsererror')).toBeNull()
+    // "--" inside a comment breaks the whole file
+    for (const [, comment] of sprite.matchAll(/<!--([\s\S]*?)-->/g)) expect(comment).not.toContain('--')
+  })
+})
