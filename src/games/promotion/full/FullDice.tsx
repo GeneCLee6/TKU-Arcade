@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { PIP_FACE } from '../../../../shared/games/promotion/boardFull.ts'
+import { PIP_FACE } from '../../../../shared/games/promotion/fullFaces.ts'
 import { useT } from '../../../i18n/useT.ts'
 import { font, promotionBoard as paint } from '../../../styles/tokens.ts'
 

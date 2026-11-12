@@ -8,15 +8,8 @@ import {
   type KeyboardEvent,
 } from 'react'
 import styled, { keyframes } from 'styled-components'
-import {
-  BOARD_FULL,
-  FULL_DEPARTMENTS,
-  FULL_FACES,
-  FULL_START,
-  getFullCell,
-  type FullCell,
-  type FullFace,
-} from '../../../../shared/games/promotion/boardFull.ts'
+import type { FullBoard as Board, FullCell } from '../../../../shared/games/promotion/boardFull.ts'
+import { FULL_FACES, FULL_START, type FullFace } from '../../../../shared/games/promotion/fullFaces.ts'
 import { VisuallyHidden } from '../../../components/VisuallyHidden.ts'
 import type { Language, Translate } from '../../../i18n/t.ts'
 import { useLanguage, useT } from '../../../i18n/useT.ts'
@@ -24,7 +17,7 @@ import { color, font, promotionBoard as paint, seatColor } from '../../../styles
 import { fullArtHref, fullArtSize, fullKnob } from './fullArt.ts'
 import { boardCellName, fullCellName, nameLines } from './fullText.ts'
 import { fullCellForKey } from './fullKeys.ts'
-import type { Box, FullBlockBox, FullCellBox, FullLayout } from './fullLayout.ts'
+import type { Box, FullBlockBox, FullCellBox, FullLayout, FullRungBox } from './fullLayout.ts'
 import { STEP_MS } from './useTurnPlayback.ts'
 
 export interface FullPiece {
@@ -45,6 +38,8 @@ export interface FullFlight {
 }
 
 export interface FullBoardProps {
+  /** The board the game plays on (boardFull.ts `fullBoard`), laid out by `layout` */
+  board: Board
   layout: FullLayout
   pieces: readonly FullPiece[]
   activeSeat: number | null
@@ -57,6 +52,10 @@ export interface FullBoardProps {
   width?: string
   /** Drawn small: names grow to fill their cells, seals lose their words */
   dense?: boolean
+  /** The cell a decision is about (C8), outlined dashed in the deciding seat's colour */
+  pending?: { cell: string; seat: number } | null
+  /** Who stands at each grade of the ladder (品級考), as compared at the end */
+  grades?: ReadonlyMap<number, readonly number[]>
 }
 
 type Paints = Record<'l' | 'p' | 'g' | 's', string>
@@ -67,6 +66,7 @@ type Paints = Record<'l' | 'p' | 'g' | 's', string>
  * how senior an office is shows at a glance. It only shows `view`.
  */
 export function FullBoard({
+  board,
   layout,
   pieces,
   activeSeat,
@@ -76,6 +76,8 @@ export function FullBoard({
   reducedMotion,
   width,
   dense = false,
+  pending = null,
+  grades,
 }: FullBoardProps) {
   const t = useT()
   const hintId = useId()
@@ -96,8 +98,8 @@ export function FullBoard({
         style={{ width: width ?? '100%' }}
         role="group"
         aria-label={t('games.promotion.full.boardLabel', {
-          count: BOARD_FULL.length,
-          depts: Object.keys(FULL_DEPARTMENTS).length,
+          count: board.cells.length,
+          depts: board.depts.length,
         })}
         aria-describedby={hintId}
         data-full-board=""
@@ -105,6 +107,7 @@ export function FullBoard({
         <Gradients ids={ids} />
         <Frame layout={layout} lacquer={paints.l} />
         <Cells
+          board={board}
           layout={layout}
           selected={selected}
           here={here}
@@ -113,6 +116,10 @@ export function FullBoard({
           paints={paints}
           dense={dense}
         />
+        {layout.rungs.length > 0 && <Ladder rungs={layout.rungs} grades={grades} />}
+        {pending && layout.byId.get(pending.cell) && (
+          <PendingRing box={layout.byId.get(pending.cell) as FullCellBox} seat={pending.seat} />
+        )}
         {flown && flight && (
           <FlightLine
             key={`${flight.from}>${flight.to}`}
@@ -319,11 +326,11 @@ function Plaque({ block, name, upright }: { block: FullBlockBox; name: string; u
 }
 
 /** Which cells the selected one leads to, and on which results */
-function destinations(selected: string | null): Map<string, FullFace[]> {
+function destinations(board: Board, selected: string | null): Map<string, FullFace[]> {
   const found = new Map<string, FullFace[]>()
-  if (!selected) return found
-  const cell = getFullCell(selected)
-  if (cell.kind === 'end') return found
+  if (!selected || !board.has(selected)) return found
+  const cell = board.get(selected)
+  if (cell.kind === 'end' || cell.kind === 'event') return found
   for (const face of FULL_FACES) {
     const to = cell.moves[face]
     if (to === selected) continue
@@ -332,8 +339,9 @@ function destinations(selected: string | null): Map<string, FullFace[]> {
   return found
 }
 
-// Apart from the pieces: 182 cells need no new drawing each time a piece moves
+// Apart from the pieces: some 200 cells need no new drawing each time a piece moves
 const Cells = memo(function Cells({
+  board,
   layout,
   selected,
   here,
@@ -342,6 +350,7 @@ const Cells = memo(function Cells({
   paints,
   dense,
 }: {
+  board: Board
   layout: FullLayout
   selected: string | null
   here: string | null
@@ -356,7 +365,7 @@ const Cells = memo(function Cells({
   // One Tab stop for the whole board: the cell in focus, else the one being shown
   const [focused, setFocused] = useState<string | null>(null)
   const tabStop = focused ?? selected ?? FULL_START
-  const leadsTo = destinations(selected)
+  const leadsTo = destinations(board, selected)
 
   const onKeyDown = (event: KeyboardEvent, id: string) => {
     if (event.altKey || event.ctrlKey || event.metaKey) return
@@ -374,7 +383,7 @@ const Cells = memo(function Cells({
   return (
     <g ref={group}>
       {layout.cells.map((box) => {
-        const cell = getFullCell(box.id)
+        const cell = board.get(box.id)
         const outline =
           box.id === selected
             ? paint.select
@@ -562,12 +571,32 @@ function Seal({ box, text }: { box: FullCellBox; text: string }) {
   )
 }
 
-/** Silver and requirements, as small stamps along the bottom of the cell */
+/** The kind of choice or event a cell brings (C8): an offered post, a minor post to buy out of, an event */
+const choiceOf = (cell: FullCell) =>
+  cell.offer ? 'offer' : cell.minor ? 'minor' : cell.event !== null ? 'event' : null
+
+/** Silver and requirements, as small stamps along the bottom of the cell; a choice or event on top */
 function Markers({ box, cell, t }: { box: FullCellBox; cell: FullCell; t: Translate }) {
   const bottom = box.y + box.height - 3
   const silver = cell.retire ?? (cell.money !== 0 ? cell.money : null)
+  const choice = choiceOf(cell)
   return (
     <g>
+      {choice && (
+        <g data-choice={choice}>
+          <rect x={box.x + 3} y={box.y + 15} width={15} height={12} rx={6} fill={paint.choice} />
+          <Ink
+            x={box.x + 10.5}
+            y={box.y + 21}
+            fill={paint.onChoice}
+            style={{ fontSize: 8, fontFamily: /[a-z]/i.test(t(`games.promotion.full.tag.${choice}`)) ? font.sans : undefined }}
+            textLength={11}
+            lengthAdjust="spacingAndGlyphs"
+          >
+            {t(`games.promotion.full.tag.${choice}`)}
+          </Ink>
+        </g>
+      )}
       {silver !== null && (
         <g data-silver={silver}>
           <circle cx={box.x + 8} cy={bottom - 6} r={5.5} fill={paint.silver} stroke={paint.silverDeep} />
@@ -608,6 +637,75 @@ function Markers({ box, cell, t }: { box: FullCellBox; cell: FullCell; t: Transl
         </g>
       )}
     </g>
+  )
+}
+
+/** The ladder of grades the end compares (品級考): a rung each, with the seats now at it */
+function Ladder({
+  rungs,
+  grades,
+}: {
+  rungs: readonly FullRungBox[]
+  grades: ReadonlyMap<number, readonly number[]> | undefined
+}) {
+  const t = useT()
+  return (
+    <g data-ladder="">
+      {rungs.map((rung) => {
+        const seats = grades?.get(rung.grade) ?? []
+        const label = t(`games.promotion.full.grade.${rung.grade}`)
+        return (
+          <g key={rung.grade} data-grade={rung.grade}>
+            <title>{t('games.promotion.full.gradeTitle', { grade: rung.grade, name: label })}</title>
+            <rect x={rung.x} y={rung.y} width={rung.width} height={rung.height} rx={3} fill={paint.paper} stroke={paint.edge} />
+            <Ink x={rung.x + rung.width / 2} y={rung.y + 12} fill={paint.seal} style={{ fontSize: 11, fontFamily: font.sans }}>
+              {rung.grade}
+            </Ink>
+            <Ink
+              x={rung.x + rung.width / 2}
+              y={rung.y + rung.height / 2 + 2}
+              fill={paint.ink}
+              style={{ fontSize: 12 }}
+              textLength={[...label].length * 12 > rung.width - 6 ? rung.width - 6 : undefined}
+              lengthAdjust="spacingAndGlyphs"
+            >
+              {label}
+            </Ink>
+            {seats.map((seat, at) => (
+              <circle
+                key={seat}
+                cx={rung.x + 8 + at * 9}
+                cy={rung.y + rung.height - 8}
+                r={4}
+                style={{ fill: seatColor(seat) }}
+                stroke={paint.ink}
+                strokeWidth={0.8}
+                data-ladder-seat={seat}
+              />
+            ))}
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
+/** The cell a decision is about, outlined dashed in the deciding seat's colour */
+function PendingRing({ box, seat }: { box: FullCellBox; seat: number }) {
+  return (
+    <PendingRect
+      x={box.x - 3}
+      y={box.y - 3}
+      width={box.width + 6}
+      height={box.height + 6}
+      rx={5}
+      fill="none"
+      stroke={seatColor(seat)}
+      strokeWidth={4}
+      strokeDasharray="7 5"
+      data-pending-cell={box.id}
+      aria-hidden="true"
+    />
   )
 }
 
@@ -725,6 +823,21 @@ const FlightLine = styled.path`
   opacity: 0.8;
   pointer-events: none;
   animation: ${draw} ${STEP_MS}ms ease-in-out both;
+`
+
+const march = keyframes`
+  to {
+    stroke-dashoffset: -24;
+  }
+`
+
+const PendingRect = styled.rect`
+  pointer-events: none;
+  animation: ${march} 900ms linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 `
 
 const PieceGroup = styled.g<{ $glide: boolean }>`

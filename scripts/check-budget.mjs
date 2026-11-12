@@ -3,7 +3,8 @@
 //
 // A page's JS is what it loads before it can render: the entry chunk and its static imports, plus
 // for a board game the lazy room page (once it exists) and the game's lazy chunk with their static
-// imports. Reads Vite's manifest, so run it after `npm run build`; paths are relative to the
+// imports; what a screen loads after it has painted is listed after it, not counted (C8). Reads
+// Vite's manifest, so run it after `npm run build`; paths are relative to the
 // current directory. `npm run budget -- --chunks` also lists each line's chunks with their size.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -65,6 +66,7 @@ const budgets = [
     name: `first screen of ${game}`,
     keys: collectAll([...entries, ...room, game]),
     limit: MAIN_LIMIT,
+    game,
   })),
 ]
 
@@ -78,8 +80,20 @@ if (kartEntries.length > 0) {
   console.log('skip kart: no lazy chunk under src/kart/ yet')
 }
 
+/**
+ * What a game's screen loads after its first paint (promotion's full board, C8): its dynamic imports
+ * outside src/games/, with their static imports, less what the first screen already has. Reported,
+ * not limited: the first screen is what the budget is for
+ */
+function afterPaint(game, firstKeys) {
+  const later = (manifest[game]?.dynamicImports ?? []).filter((key) => !key.startsWith('src/games/'))
+  const keys = collectAll(later)
+  for (const key of firstKeys) keys.delete(key)
+  return keys
+}
+
 let failed = false
-for (const { name, keys, limit } of budgets) {
+for (const { name, keys, limit, game } of budgets) {
   const size = gzipSize(keys)
   const ok = size <= limit
   if (!ok) failed = true
@@ -88,6 +102,13 @@ for (const { name, keys, limit } of budgets) {
   )
   if (SHOW_CHUNKS) {
     for (const chunk of chunkSizes(keys)) console.log(`       ${chunk.size} B  ${chunk.file}`)
+  }
+  const later = game ? afterPaint(game, keys) : new Set()
+  if (later.size > 0) {
+    console.log(`       + after the first paint: ${(gzipSize(later) / KB).toFixed(1)} kB gzip (not limited)`)
+    if (SHOW_CHUNKS) {
+      for (const chunk of chunkSizes(later)) console.log(`         ${chunk.size} B  ${chunk.file}`)
+    }
   }
 }
 process.exit(failed ? 1 : 0)

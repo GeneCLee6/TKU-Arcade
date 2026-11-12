@@ -1,5 +1,6 @@
 import styled from 'styled-components'
-import { FULL_FACES, getFullCell } from '../../../../shared/games/promotion/boardFull.ts'
+import type { FullBoard } from '../../../../shared/games/promotion/boardFull.ts'
+import { DISMISSED, FULL_FACES } from '../../../../shared/games/promotion/fullFaces.ts'
 import { Drawer } from '../../../components/Drawer.tsx'
 import { Muted } from '../../../components/roomParts.ts'
 import { useLanguage, useT } from '../../../i18n/useT.ts'
@@ -13,10 +14,12 @@ import { deptName, fullCellName, shortCellName } from './fullText.ts'
  * the silver it moves, where each of the six results leads, and who stands there
  */
 export function FullCellDetail({
+  board,
   id,
   here,
   onClose,
 }: {
+  board: FullBoard
   id: string | null
   /** Who stands on the cell, by name */
   here: string[]
@@ -24,7 +27,8 @@ export function FullCellDetail({
 }) {
   const t = useT()
   const language = useLanguage()
-  const cell = id === null ? null : getFullCell(id)
+  const cell = id === null || !board.has(id) ? null : board.get(id)
+  const second = board.version === 2
   const knob = cell && fullKnob(cell.rank)
   const name = (to: string) => shortCellName(to, language)
   return (
@@ -66,6 +70,12 @@ export function FullCellDetail({
             )}
             {cell.keepRank && <li>{t('games.promotion.full.detail.keepRank')}</li>}
             {cell.out && <li>{t('games.promotion.full.detail.out')}</li>}
+            {cell.offer && <li>{t('games.promotion.full.detail.offer')}</li>}
+            {cell.minor && <li>{t('games.promotion.full.detail.minor')}</li>}
+            {cell.fine > 0 && <li>{t('games.promotion.full.detail.fine', { amount: cell.fine })}</li>}
+            {cell.title && <li>{t('games.promotion.full.detail.title')}</li>}
+            {cell.event !== null && <li>{t('games.promotion.full.detail.event')}</li>}
+            {second && cell.id === DISMISSED && <li>{t('games.promotion.full.detail.restore')}</li>}
             {cell.fengjue && (
               <li>{t('games.promotion.full.detail.fengjue', { cell: name(cell.fengjue) })}</li>
             )}
@@ -79,7 +89,29 @@ export function FullCellDetail({
                 </li>
               ))}
           </Rules>
-          {cell.kind !== 'end' && (
+          {cell.event !== null && (
+            <Moves>
+              {FULL_FACES.map((face) => {
+                const outcome = (cell.event as NonNullable<typeof cell.event>)[face]
+                return (
+                  <div key={face}>
+                    <dt>
+                      <FaceBadge aria-hidden="true" style={{ background: promotionBoard.face[face] }}>
+                        {t(`games.promotion.full.glyph.${face}`)}
+                      </FaceBadge>
+                      {t(`games.promotion.full.face.${face}`)}
+                    </dt>
+                    <dd>
+                      {t(`games.promotion.full.go.${outcome.go}`)}
+                      {outcome.money > 0 && `, ${t('games.promotion.full.go.money', { amount: outcome.money })}`}
+                      {outcome.title && `, ${t('games.promotion.full.go.title')}`}
+                    </dd>
+                  </div>
+                )
+              })}
+            </Moves>
+          )}
+          {cell.kind !== 'end' && cell.event === null && !(second && cell.id === DISMISSED) && (
             <Moves>
               {FULL_FACES.map((face) => (
                 <div key={face}>

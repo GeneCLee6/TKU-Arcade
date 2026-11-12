@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { getFullCell } from '../../../../shared/games/promotion/boardFull.ts'
+import type { FullArt } from '../../../../shared/games/promotion/boardFull.ts'
 import { promotionFullMessages } from '../../../../shared/games/promotion/i18n.full.ts'
-import type { FullPlayer, PromotionFullView } from '../../../../shared/games/promotion/types.ts'
+import type {
+  FullPlayer,
+  PromotionAction,
+  PromotionFullView,
+} from '../../../../shared/games/promotion/types.ts'
 import type { Standing } from '../../../../shared/games/types.ts'
 import type { RoomMember } from '../../../../shared/protocol.ts'
 import { Avatar } from '../../../components/Avatar.tsx'
@@ -20,17 +24,20 @@ import type { GameScreenProps } from '../../screens.ts'
 import { useBoardFit } from '../useBoardFit.ts'
 import { MAX_ZOOM, MIN_ZOOM, useBoardZoom } from '../useBoardZoom.ts'
 import { useImmersive } from '../useImmersive.ts'
+import { DecisionPrompt } from './DecisionPrompt.tsx'
 import { fullArtHref, fullKnob } from './fullArt.ts'
 import { FullBoard, type FullFlight, type FullPiece } from './FullBoard.tsx'
 import { loadFullBoardFont } from './fullFont.ts'
 import { FullCellDetail } from './FullCellDetail.tsx'
 import { FullDice } from './FullDice.tsx'
-import { CELL_W, FULL_LAYOUTS, fitFullBoard } from './fullLayout.ts'
+import { useFullData } from './fullData.ts'
+import { CELL_W, fitFullBoard, fullLayouts } from './fullLayout.ts'
 import {
   beforeTransfers,
   comboText,
   degreeText,
   householdText,
+  ladderGrade,
   lastComboText,
   seatInfo,
   transferText,
@@ -40,7 +47,7 @@ import { SETTLE_STEPS, Settlement } from './Settlement.tsx'
 import { useTurnPlayback } from './useTurnPlayback.ts'
 
 // Everything this screen says, with its cell and department names in boardFull.ts: loaded only with
-// a full edition's game
+// a full edition's game, the board's data after the first paint (fullData.ts)
 registerMessages(promotionFullMessages)
 
 /** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
@@ -55,13 +62,22 @@ const ROLL_ANSWER_MS = 4000
  * line of the dock has a fixed height, so that nothing a roll says moves the board. A turn plays out
  * beat by beat (useTurnPlayback): each throw of the four dice and what it makes, each move, then the
  * silver with its reasons. The game ends in a settlement shown a step at a time, then the result.
+ *
+ * Since C8 the board's data (names, moves, layout) comes after the first paint: until it does, the
+ * dock, the seats and their silver show and the board says it is being drawn. A decision the game
+ * waits for (an offered post, buying office) is a card over the foot of the board (DecisionPrompt):
+ * the dock's lines keep their height and the board its size.
  */
 export default function FullScreen({ room, game }: GameScreenProps) {
   const t = useT()
   const language = useLanguage()
   const state = game.view as unknown as PromotionFullView
   const reducedMotion = useReducedMotion()
-  useEffect(loadFullBoardFont, [])
+  const data = useFullData()
+  const board = data ? data.fullBoard(state.rulesVersion) : null
+  useEffect(() => {
+    if (data) loadFullBoardFont()
+  }, [data])
   const zoom = useBoardZoom()
   const { viewport, show, zoom: zoomLevel } = zoom
 
@@ -70,12 +86,15 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   const immersive = useImmersive(frame)
   const immersed = immersive.mode !== 'off'
   const { stage: stageHeight, box, stageRef, boxRef } = useBoardFit(turnPanel, !immersed)
-  const fit = box
-    ? fitFullBoard(box.width - 2 * BOARD_MARGIN, box.height - 2 * BOARD_MARGIN)
-    : { layout: FULL_LAYOUTS.wide, scale: 0 }
-  const { layout } = fit
-  const boardWidth = box ? `${layout.width * fit.scale * zoomLevel}px` : `${zoomLevel * 100}%`
-  const dense = box !== null && CELL_W * fit.scale * zoomLevel < DENSE_CELL
+  const layouts = board ? fullLayouts(board) : null
+  const fit = layouts
+    ? box
+      ? fitFullBoard(layouts, box.width - 2 * BOARD_MARGIN, box.height - 2 * BOARD_MARGIN)
+      : { layout: layouts.wide, scale: 0 }
+    : null
+  const layout = fit?.layout ?? null
+  const boardWidth = box && fit ? `${fit.layout.width * fit.scale * zoomLevel}px` : `${zoomLevel * 100}%`
+  const dense = box !== null && fit !== null && CELL_W * fit.scale * zoomLevel < DENSE_CELL
 
   const [selected, setSelected] = useState<string | null>(null)
   const toggleCell = useCallback(
@@ -87,7 +106,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   useSoundUnlock()
 
   const { last, players } = state
-  const playback = useTurnPlayback(players, last, game.over, reducedMotion)
+  const playback = useTurnPlayback(players, last, game.over, reducedMotion, state.acts)
   const beat = playback.beat
   const playing = beat !== null
 
@@ -119,8 +138,8 @@ export default function FullScreen({ room, game }: GameScreenProps) {
     if (beat?.kind !== 'move' || !last) return null
     const from = beat.index === 0 ? last.from : last.path[beat.index - 1]
     const to = last.path[beat.index]
-    if (from === to) return null
-    return { seat: last.seat, from, to, fall: getFullCell(to).rank < getFullCell(from).rank }
+    if (from === to || !board || !board.has(from) || !board.has(to)) return null
+    return { seat: last.seat, from, to, fall: board.get(to).rank < board.get(from).rank }
   })()
 
   // Silver and the pot as they stood before this turn's transfers, until those play
@@ -131,9 +150,13 @@ export default function FullScreen({ room, game }: GameScreenProps) {
 
   // Until the turn is all shown the move is still the mover's
   const activeSeat = playing && last ? last.seat : state.turn
-  const canRoll = game.legal.length > 0 && !playing && !asked
+  // A decision waits (C8): shown once the turn that brought it has played out
+  const pending = state.pending ?? null
+  const deciding = pending !== null && !playing && !game.over
+  const myDecision = deciding && game.legal.length > 0 && pending.seat === state.you
+  const canRoll = game.legal.length > 0 && !playing && !asked && pending === null
 
-  const answerKey = `${playback.count}:${state.turn}`
+  const answerKey = `${playback.count}:${state.turn}:${state.decisions ?? 0}`
   const [answeredKey, setAnsweredKey] = useState(answerKey)
   if (answerKey !== answeredKey) {
     setAnsweredKey(answerKey)
@@ -155,7 +178,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   // When zoomed in, the board follows the piece
   const landing = flight?.to
   useEffect(() => {
-    if (!landing || zoomLevel === MIN_ZOOM) return
+    if (!landing || zoomLevel === MIN_ZOOM || !layout) return
     const cell = layout.byId.get(landing)
     if (cell) show((cell.x + cell.width / 2) / layout.width, (cell.y + cell.height / 2) / layout.height)
   }, [landing, zoomLevel, layout, show])
@@ -163,6 +186,11 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   // The settlement, a step at a time, once the last turn has played; then the result
   const [settleStep, setSettleStep] = useState(0)
   const [settleClosed, setSettleClosed] = useState(false)
+  // A rematch in the same room starts the next game's settlement afresh
+  if (!game.over && (settleClosed || settleStep !== 0)) {
+    setSettleClosed(false)
+    setSettleStep(0)
+  }
   const settling = game.over && state.settlement !== null && !playing
   const settled = reducedMotion || settleStep >= SETTLE_STEPS
   const showSettlement = settling && !settleClosed
@@ -172,6 +200,13 @@ export default function FullScreen({ room, game }: GameScreenProps) {
     setAsked(true)
     room.act({ type: 'roll' })
   }
+
+  const answer = (action: PromotionAction) => {
+    if (!myDecision || asked) return
+    setAsked(true)
+    room.act(action)
+  }
+  const decisionTimer = room.timers.find((timer) => timer.id.startsWith('decide-')) ?? null
 
   const showSeat = (cell: string) => {
     toggleCell(cell)
@@ -183,13 +218,14 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   const ownCell = playerOf(state.you)?.cell
   const markedCell = selected ?? ownCell ?? playerOf(activeSeat)?.cell ?? null
 
+  // What names a cell waits for the board's data
   const seatDetail = (member: RoomMember) => {
     const player = playerOf(member.seat)
-    return player ? seatInfo(t, language, player) : null
+    return player && data ? seatInfo(t, language, player) : null
   }
   const resultDetail = (standing: Standing) => {
     const player = playerOf(standing.seat)
-    return player ? seatInfo(t, language, player) : null
+    return player && data ? seatInfo(t, language, player) : null
   }
   const topSeats = game.result?.standings.filter((standing) => standing.rank === 1) ?? []
   const resultHeadline = t('games.promotion.full.mostSilver', {
@@ -204,21 +240,25 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   })()
   const tumbling = beat?.kind === 'throw'
   const combo = (() => {
-    if (!last || !shownThrow || tumbling) return ''
-    if (beat?.kind === 'read') return comboText(t, shownThrow, last.birth)
-    return lastComboText(t, last)
+    if (!last || !shownThrow || tumbling || !data) return ''
+    if (beat?.kind === 'read') return comboText(t, shownThrow, last.birth, language)
+    return lastComboText(t, last, language)
   })()
   const throwCount =
     last && beat && (beat.kind === 'throw' || beat.kind === 'read') && last.throws.length > 1
       ? ` (${beat.index + 1}/${last.throws.length})`
       : ''
   const sentence =
-    !playing && last ? turnSentence(t, language, last, playerOf(last.seat), nameOf(last.seat)) : ''
+    !playing && last && data ? turnSentence(t, language, last, playerOf(last.seat), nameOf(last.seat)) : ''
 
   let mainText: string
   if (playing && last) mainText = t('games.promotion.full.rolling', { name: nameOf(last.seat) })
   else if (game.over) mainText = t('games.promotion.full.gameOver')
-  else if (yourTurn) {
+  else if (deciding) {
+    mainText = myDecision
+      ? t('games.promotion.full.yourChoice')
+      : t('games.promotion.full.deciding', { name: nameOf(pending.seat) })
+  } else if (yourTurn) {
     mainText =
       playerOf(state.you)?.origin === null
         ? t('games.promotion.full.yourBirth')
@@ -284,6 +324,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
       {players.map((player) => (
         <SeatChip
           key={player.seat}
+          art={board?.has(player.cell) ? board.get(player.cell).art : null}
           player={player}
           name={nameOf(player.seat)}
           money={moneyOf(player)}
@@ -304,6 +345,16 @@ export default function FullScreen({ room, game }: GameScreenProps) {
     ? players.filter((player) => player.cell === selected).map((player) => nameOf(player.seat))
     : []
 
+  // The ladder of grades (品級考, C8): who stands where in the comparison the end makes
+  const grades = new Map<number, number[]>()
+  if (data && state.rulesVersion === 2) {
+    for (const player of players) {
+      if (player.origin === null) continue
+      const grade = ladderGrade(player, data.gradeOf, true)
+      grades.set(grade, [...(grades.get(grade) ?? []), player.seat])
+    }
+  }
+
   return (
     <GameLayout
       room={room}
@@ -314,6 +365,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
       resultDetail={resultDetail}
       resultHeld={playing || (settling && !settled && !settleClosed)}
       dock={immersed ? undefined : turn}
+      ownCountdown
     >
       <Frame ref={frame} $immersed={immersed} data-immersion={immersive.mode} data-edition="full">
         <Stage
@@ -337,7 +389,9 @@ export default function FullScreen({ room, game }: GameScreenProps) {
 
           <BoardArea ref={boxRef}>
             <Viewport ref={viewport} $zoomed={zoom.zoom > MIN_ZOOM}>
+              {board && layout ? (
               <FullBoard
+                board={board}
                 layout={layout}
                 pieces={pieces}
                 activeSeat={activeSeat}
@@ -347,7 +401,12 @@ export default function FullScreen({ room, game }: GameScreenProps) {
                 reducedMotion={reducedMotion}
                 width={boardWidth}
                 dense={dense}
+                pending={deciding ? { cell: pending.cell, seat: pending.seat } : null}
+                grades={grades}
               />
+              ) : (
+                <Loading role="status">{t('games.promotion.full.loading')}</Loading>
+              )}
             </Viewport>
             {beat?.kind === 'pay' && last && (
               <Payments aria-hidden="true" data-payments="">
@@ -368,7 +427,20 @@ export default function FullScreen({ room, game }: GameScreenProps) {
                 reducedMotion={reducedMotion}
               />
             )}
-            <FullCellDetail id={selected} here={here} onClose={() => setSelected(null)} />
+            {deciding && data && !showSettlement && (
+              <DecisionPrompt
+                pending={pending}
+                mine={myDecision}
+                name={nameOf(pending.seat)}
+                money={moneyOf(players[pending.seat])}
+                timer={decisionTimer}
+                waiting={asked}
+                onAnswer={answer}
+              />
+            )}
+            {board && (
+              <FullCellDetail board={board} id={selected} here={here} onClose={() => setSelected(null)} />
+            )}
           </BoardArea>
 
           {!immersed && <Tip>{t('games.promotion.full.ui.sidewaysTip')}</Tip>}
@@ -402,13 +474,15 @@ export default function FullScreen({ room, game }: GameScreenProps) {
         ) : (
           <Muted>{t('games.promotion.full.ledgerEmpty')}</Muted>
         )}
-        <Ledger>
-          {players.map((player) => (
-            <li key={player.seat}>
-              {nameOf(player.seat)}: {seatInfo(t, language, player)}
-            </li>
-          ))}
-        </Ledger>
+        {data && (
+          <Ledger>
+            {players.map((player) => (
+              <li key={player.seat}>
+                {nameOf(player.seat)}: {seatInfo(t, language, player)}
+              </li>
+            ))}
+          </Ledger>
+        )}
         {state.settlement && (
           <Button
             $variant="secondary"
@@ -432,6 +506,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
  * they hold (degree, household). Retired and exiled seats are marked in words, not by colour alone
  */
 function SeatChip({
+  art,
   player,
   name,
   money,
@@ -439,6 +514,8 @@ function SeatChip({
   pressed,
   onClick,
 }: {
+  /** The watermark of the seat's cell; null until the board's data is there */
+  art: FullArt | null
   player: FullPlayer
   name: string
   money: number
@@ -447,11 +524,12 @@ function SeatChip({
   onClick(): void
 }) {
   const t = useT()
-  const cell = getFullCell(player.cell)
   const knob = fullKnob(player.rank)
   const tags = [
     player.degree > 0 ? t(`games.promotion.full.degreeShort.${player.degree}`) : null,
     player.origin !== null ? householdText(t, player, true) : null,
+    player.bought ? t('games.promotion.full.boughtShort') : null,
+    (player.titles ?? 0) > 0 ? t('games.promotion.full.titlesShort', { count: player.titles ?? 0 }) : null,
     player.status !== 'active' ? t(`games.promotion.full.status.${player.status}`) : null,
   ].filter(Boolean)
   const previous = useRef(money)
@@ -482,10 +560,12 @@ function SeatChip({
         </ChipMeta>
       </ChipText>
       <svg viewBox="0 0 100 100" width={24} height={24} aria-hidden="true">
-        <use
-          href={fullArtHref(cell.art)}
-          style={knob ? ({ '--knob': promotionBoard.knob[knob] } as CSSProperties) : undefined}
-        />
+        {art && (
+          <use
+            href={fullArtHref(art)}
+            style={knob ? ({ '--knob': promotionBoard.knob[knob] } as CSSProperties) : undefined}
+          />
+        )}
       </svg>
       {delta && (
         <Float key={delta.key} aria-hidden="true" $gain={delta.amount > 0}>
@@ -695,6 +775,11 @@ const Viewport = styled.div<{ $zoomed: boolean }>`
     margin: auto;
     flex: none;
   }
+`
+
+const Loading = styled.p`
+  margin: auto;
+  color: ${color.muted};
 `
 
 const slideIn = keyframes`

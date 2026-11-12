@@ -294,6 +294,13 @@ export interface GameModule<
    */
   skipAction?(state: S, seat: SeatId): A | null
 
+  /**
+   * With `meta.proxyTurns`: the actions covering for an absent `seat` may pick from at random, when
+   * that should be fewer than `legalActions` (promotion's full edition rolls for a seat but answers
+   * its decisions with the default). Leaving it out means all of `legalActions`.
+   */
+  proxyActions?(state: S, seat: SeatId): A[]
+
   /** Whether the room's chat is closed in this state; leaving it out means never */
   chatLocked?(state: S): boolean
 }

@@ -337,7 +337,7 @@ describe('the rule options', () => {
     fireEvent.change(limit, { target: { value: '60' } })
     fireEvent.blur(limit)
 
-    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ edition: 'simple', dice: 'six-sided', turnLimit: 60 })
+    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ edition: 'simple', dice: 'six-sided', turnLimit: 60, decisionSeconds: 30, buying: true, endAtDahe: false })
   })
 
   it('are for everyone else to read', () => {
@@ -415,13 +415,17 @@ describe('the promotion edition (C7)', () => {
     expect(edition).toHaveAccessibleDescription(/79 offices/)
     expect(screen.getByRole('spinbutton')).toBeInTheDocument()
     fireEvent.change(edition, { target: { value: 'full' } })
-    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ edition: 'full', dice: 'six-sided', turnLimit: 40 })
+    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ edition: 'full', dice: 'six-sided', turnLimit: 40, decisionSeconds: 30, buying: true, endAtDahe: false })
   })
 
   it('hides the simple edition’s options in a full room', () => {
     renderRoom(withOptions({ edition: 'full' }))
-    expect(screen.getByRole('combobox', { name: 'Edition' })).toHaveAccessibleDescription(/182 offices/)
-    expect(screen.queryByRole('spinbutton')).toBeNull()
+    expect(screen.getByRole('combobox', { name: 'Edition' })).toHaveAccessibleDescription(/236 offices/)
+    expect(screen.queryByRole('spinbutton', { name: 'Round limit' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: 'Dice' })).toBeNull()
+    // The full edition's own (C8)
+    expect(screen.getByRole('spinbutton', { name: /Seconds to answer/ })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /Buying office/ })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /End at the first/ })).not.toBeChecked()
   })
 })

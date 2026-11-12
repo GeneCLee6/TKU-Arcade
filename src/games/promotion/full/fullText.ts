@@ -1,19 +1,27 @@
-// The full board's names in the current language, straight from boardFull.ts: this screen's chunk is
-// the only place in the browser that loads that file (tests/games/catalog.test.ts), so the 182 names
-// cost nothing to anyone playing anything else.
-import {
-  BOARD_FULL,
-  FULL_DEPARTMENTS,
-  getFullCell,
-  type FullCell,
-} from '../../../../shared/games/promotion/boardFull.ts'
+// The full board's names in the current language, from boardFull.ts (loaded after the first paint,
+// fullData.ts): only called for what is drawn once the board is there. Names come from the second
+// board, and from the first for the one cell it alone has (書吏), which a game from before C8 may use.
+import type { FullCell, FullDeptId } from '../../../../shared/games/promotion/boardFull.ts'
 import type { Language } from '../../../i18n/t.ts'
+import { fullData } from './fullData.ts'
 
 const nameIn = (cell: FullCell, language: Language) => cell.name[language === 'zh-TW' ? 'zh-TW' : 'en']
 
+let byId: ReadonlyMap<string, FullCell> | null = null
+
+/** Any cell of either board by id */
+export function anyCell(id: string): FullCell {
+  if (byId === null) {
+    const { BOARD_FULL, BOARD_FULL_V2 } = fullData()
+    byId = new Map([...BOARD_FULL, ...BOARD_FULL_V2].map((cell) => [cell.id, cell]))
+  }
+  const cell = byId.get(id)
+  if (cell === undefined) throw new Error(`promotion: no full-edition cell "${id}"`)
+  return cell
+}
+
 /** A cell's whole name: in English the transliteration and its gloss */
-export const fullCellName = (id: string, language: Language): string =>
-  nameIn(getFullCell(id), language)
+export const fullCellName = (id: string, language: Language): string => nameIn(anyCell(id), language)
 
 /** "Juren (Provincial Graduate)" as "Juren", where a sentence has no room for the gloss */
 export const shortCellName = (id: string, language: Language): string =>
@@ -25,7 +33,7 @@ export const shortCellName = (id: string, language: Language): string =>
  */
 function boardNameOf(cell: FullCell, language: Language): string {
   const short = nameIn(cell, language).split(' (')[0]
-  const dept = FULL_DEPARTMENTS[cell.dept]['zh-TW']
+  const dept = fullData().FULL_DEPARTMENTS[cell.dept]['zh-TW']
   const zh = cell.name['zh-TW']
   // Not a one-character department (縣, 州), nor when what is left would be one character (卿)
   if (dept.length < 2 || !zh.startsWith(dept) || zh.length - dept.length < 2) return short
@@ -34,16 +42,21 @@ function boardNameOf(cell: FullCell, language: Language): string {
   return words.length > 1 ? words.slice(1).join(' ') : short
 }
 
-const BOARD_NAMES: Record<'en' | 'zh-TW', ReadonlyMap<string, string>> = {
-  en: new Map(BOARD_FULL.map((cell) => [cell.id, boardNameOf(cell, 'en')])),
-  'zh-TW': new Map(BOARD_FULL.map((cell) => [cell.id, boardNameOf(cell, 'zh-TW')])),
+const boardNames: Partial<Record<'en' | 'zh-TW', Map<string, string>>> = {}
+
+export function boardCellName(id: string, language: Language): string {
+  const key = language === 'zh-TW' ? 'zh-TW' : 'en'
+  const names = (boardNames[key] ??= new Map())
+  let name = names.get(id)
+  if (name === undefined) {
+    name = boardNameOf(anyCell(id), key)
+    names.set(id, name)
+  }
+  return name
 }
 
-export const boardCellName = (id: string, language: Language): string =>
-  BOARD_NAMES[language === 'zh-TW' ? 'zh-TW' : 'en'].get(id) ?? id
-
-export const deptName = (id: keyof typeof FULL_DEPARTMENTS, language: Language): string =>
-  FULL_DEPARTMENTS[id][language === 'zh-TW' ? 'zh-TW' : 'en']
+export const deptName = (id: FullDeptId, language: Language): string =>
+  fullData().FULL_DEPARTMENTS[id][language === 'zh-TW' ? 'zh-TW' : 'en']
 
 /** A name in lines for a cell: Chinese in rows of up to three, Latin at spaces */
 export function nameLines(name: string): { lines: string[]; latin: boolean } {

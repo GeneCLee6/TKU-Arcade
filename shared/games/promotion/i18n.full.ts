@@ -144,6 +144,69 @@ const en = {
   'games.promotion.full.detail.here': 'Here: {names}',
   'games.promotion.full.detail.note':
     'Real Qing offices arranged for this game after the traditional one; the moves and silver are reconstructions.',
+  // C8: the players' choices, events, restoration, and the money changes
+  'games.promotion.full.result.dahe':
+    'Grand congratulations after {rounds} rounds ends the game: ranks are compared and the pot is shared.',
+  'games.promotion.full.loading': 'Drawing the board…',
+  'games.promotion.full.yourChoice': 'Your choice: answer on the board',
+  'games.promotion.full.deciding': '{name} is deciding…',
+  'games.promotion.full.promptLabel': 'A decision',
+  'games.promotion.full.countdown': 'Time left to decide',
+  'games.promotion.full.offer.title': 'Accept the post of {cell}?',
+  'games.promotion.full.offer.explain':
+    'Accept: move to {cell}; {route}. Decline: stay at {from} and roll as usual next turn.',
+  'games.promotion.full.offer.accept': 'Accept',
+  'games.promotion.full.offer.decline': 'Decline',
+  'games.promotion.full.route.tenglu':
+    'after service there, commendation (議敘) leads into a low regular post',
+  'games.promotion.full.route.jiaoxi': 'teaching there leads to a county magistracy or an instructor post',
+  'games.promotion.full.route.zhaoshi': 'the special examination leads to a drafter’s post at court',
+  'games.promotion.full.buy.title': 'Buy an office instead of {cell}?',
+  'games.promotion.full.buy.explain':
+    'The dice make you {cell}, a minor technical post. You may pay the pot 5 silver a rank step above it for a regular office instead; a bought office is the irregular route, which some posts refuse. You have {money} silver.',
+  'games.promotion.full.buy.option': '{cell} · {price} silver',
+  'games.promotion.full.buy.skip': 'Take {cell}',
+  'games.promotion.full.default.offer': 'If time runs out: decline',
+  'games.promotion.full.default.buy': 'If time runs out: take the post',
+  'games.promotion.full.watching.offer': '{name} is deciding whether to accept {cell}',
+  'games.promotion.full.watching.buy': '{name} is deciding whether to buy an office instead of {cell}',
+  'games.promotion.full.decided.accept': '{name} accepts the post of {cell}',
+  'games.promotion.full.decided.decline': '{name} declines {cell} and stays at {from}',
+  'games.promotion.full.decided.skip': '{name} takes the post of {cell}',
+  'games.promotion.full.decided.buy': '{name} buys {cell} for {price} silver',
+  'games.promotion.full.decided.timedOut': '{sentence} (time ran out)',
+  'games.promotion.full.waits': '{name} waits at {cell}',
+  'games.promotion.full.combo.noMove': 'No combination: no move',
+  'games.promotion.full.combo.event': '{zone}: {face}, {outcome}',
+  'games.promotion.full.combo.eventWait': '{zone}: no combination, waits for the next turn',
+  'games.promotion.full.go.up2': 'up two steps',
+  'games.promotion.full.go.up1': 'up a step',
+  'games.promotion.full.go.stay': 'back to the post',
+  'games.promotion.full.go.down': 'down',
+  'games.promotion.full.go.dismiss': 'dismissed',
+  'games.promotion.full.go.money': '{amount} silver from the pot',
+  'games.promotion.full.go.title': 'an honorary title',
+  'games.promotion.full.restore.de': 'restored to the post',
+  'games.promotion.full.restore.cai': 'restored a grade lower',
+  'games.promotion.full.restore.exile': 'exiled to the frontier',
+  'games.promotion.full.restore.wait': 'still under review',
+  'games.promotion.full.why.fine': 'commission fine',
+  'games.promotion.full.why.buy': 'office bought',
+  'games.promotion.full.tag.offer': 'Off',
+  'games.promotion.full.tag.minor': 'Buy',
+  'games.promotion.full.tag.event': 'Evt',
+  'games.promotion.full.titlesShort': '{count} title(s)',
+  'games.promotion.full.boughtShort': 'Bought',
+  'games.promotion.full.detail.offer':
+    'An offered post: whoever the dice send here may decline and stay where they were',
+  'games.promotion.full.detail.minor':
+    'A minor technical post: anyone with the standing (a licentiate or better) may buy a regular office instead, 5 silver a rank step',
+  'games.promotion.full.detail.fine': 'A commission: rolling Graft while holding it costs a {amount}-silver fine to the pot',
+  'games.promotion.full.detail.title': 'Comes with an honorary title (兼銜): a grade more in the final comparison',
+  'games.promotion.full.detail.event': 'An event: a second throw decides by its face, reckoned from the post held',
+  'games.promotion.full.detail.restore':
+    'Dismissed: on later turns Virtue restores the post, Talent the one below, three Graft exile; anything else waits',
+  'games.promotion.full.gradeTitle': 'Grade {grade} in the final comparison: {name}',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -281,6 +344,62 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.full.detail.banner': '旗籍擲到{face}：到{cell}',
   'games.promotion.full.detail.here': '在這裡：{names}',
   'games.promotion.full.detail.note': '依清代真實官制、照傳統玩法自行整理；去向與銀兩是重建的。',
+  'games.promotion.full.result.dahe': '第 {rounds} 回合有人大賀，遊戲結束：對品、分注後結算。',
+  'games.promotion.full.loading': '正在畫圖版…',
+  'games.promotion.full.yourChoice': '輪到你決定：在圖版上回答',
+  'games.promotion.full.deciding': '{name} 正在決定…',
+  'games.promotion.full.promptLabel': '抉擇',
+  'games.promotion.full.countdown': '剩下的決定時間',
+  'games.promotion.full.offer.title': '接受{cell}這個職位嗎？',
+  'games.promotion.full.offer.explain': '接受：到{cell}，{route}。不接受：留在{from}，下回合照常擲骰。',
+  'games.promotion.full.offer.accept': '接受',
+  'games.promotion.full.offer.decline': '不接受',
+  'games.promotion.full.route.tenglu': '在館裡當差期滿，經議敘授一個低階正職',
+  'games.promotion.full.route.jiaoxi': '教習期滿，可授知縣或教職',
+  'games.promotion.full.route.zhaoshi': '召試之後，可授朝中的中書',
+  'games.promotion.full.buy.title': '要捐官，不當{cell}嗎？',
+  'games.promotion.full.buy.explain':
+    '骰子讓你當{cell}，這是雜職。你可以改捐一個正職：比它高一級付公注 5 兩；捐來的官算異途，有些官職不收。你有 {money} 兩。',
+  'games.promotion.full.buy.option': '{cell}・{price} 兩',
+  'games.promotion.full.buy.skip': '就當{cell}',
+  'games.promotion.full.default.offer': '時間到就當作不接受',
+  'games.promotion.full.default.buy': '時間到就當作不捐',
+  'games.promotion.full.watching.offer': '{name} 正在決定要不要接受{cell}',
+  'games.promotion.full.watching.buy': '{name} 正在決定要不要捐官、不當{cell}',
+  'games.promotion.full.decided.accept': '{name} 接受{cell}',
+  'games.promotion.full.decided.decline': '{name} 不接受{cell}，留在{from}',
+  'games.promotion.full.decided.skip': '{name} 就當{cell}',
+  'games.promotion.full.decided.buy': '{name} 花 {price} 兩捐了{cell}',
+  'games.promotion.full.decided.timedOut': '{sentence}（時間到）',
+  'games.promotion.full.waits': '{name} 在{cell}等候',
+  'games.promotion.full.combo.noMove': '不成組合：不動',
+  'games.promotion.full.combo.event': '{zone}：{face}，{outcome}',
+  'games.promotion.full.combo.eventWait': '{zone}：不成組合，等下一回合',
+  'games.promotion.full.go.up2': '升兩步',
+  'games.promotion.full.go.up1': '升一步',
+  'games.promotion.full.go.stay': '回原職',
+  'games.promotion.full.go.down': '降調',
+  'games.promotion.full.go.dismiss': '革職',
+  'games.promotion.full.go.money': '公注賞 {amount} 兩',
+  'games.promotion.full.go.title': '加一個兼銜',
+  'games.promotion.full.restore.de': '開復原職',
+  'games.promotion.full.restore.cai': '降一級開復',
+  'games.promotion.full.restore.exile': '發往邊疆長戍',
+  'games.promotion.full.restore.wait': '仍在查辦',
+  'games.promotion.full.why.fine': '差事罰銀',
+  'games.promotion.full.why.buy': '捐官',
+  'games.promotion.full.tag.offer': '授',
+  'games.promotion.full.tag.minor': '捐',
+  'games.promotion.full.tag.event': '考',
+  'games.promotion.full.titlesShort': '銜{count}',
+  'games.promotion.full.boughtShort': '捐',
+  'games.promotion.full.detail.offer': '授職：骰子送到這裡的人可以不接受，留在原地',
+  'games.promotion.full.detail.minor': '雜職：有功名（生員、監生以上）的人可以改捐一個正職，高一級付 5 兩',
+  'games.promotion.full.detail.fine': '差事：在任上擲到贓，罰 {amount} 兩給公注',
+  'games.promotion.full.detail.title': '附帶兼銜：結算對品時多算一級',
+  'games.promotion.full.detail.event': '考績：再擲一次，照擲出的那一面、從原來的官職算結果',
+  'games.promotion.full.detail.restore': '革職：之後每回合擲德開復原職、擲才降一級開復、擲三個以上的贓發往長戍，其他等下一回合',
+  'games.promotion.full.gradeTitle': '對品第 {grade} 級：{name}',
 }
 
 const GRADES = '九八七六五四三二一'
@@ -364,7 +483,31 @@ const PLAQUES = {
   gongxian: ['Titles', '宮銜'],
   jue: ['Peerage', '封爵'],
   end: ['Endings', '歸宿'],
+  // C8
+  zongrenfu: ['Clan Court', '宗人府'],
+  neiwufu: ['Household', '內務府'],
+  neiting: ['Inner Court', '內廷'],
+  zhongshuke: ['Drafting', '中書科'],
+  qintianjian: ['Astronomy', '欽天監'],
+  taiyiyuan: ['Medicine', '太醫院'],
+  luanyiwei: ['Equipage', '鑾儀衛'],
+  wucheng: ['Wards', '五城兵馬司'],
+  cangchang: ['Granaries', '倉場'],
+  xueyuan: ['Examiners', '學院'],
+  yanyuan: ['Salt', '鹽院'],
+  heyuan: ['Rivers', '河院'],
+  caoyuan: ['Grain', '漕院'],
+  tenglu: ['Copyists', '各館謄錄'],
+  kaoji: ['Events', '考績'],
+  juanna: ['Bought', '捐納'],
+  ladder: ['Grades', '品級考'],
 } as const
+
+/** The grades of the final comparison (品級考, boardFull.ts `gradeOf`), for the ladder on the board */
+const GRADES_EN = ['None', 'Degree', 'Unclassed', '9th', '8th', '7th', '6th', '5th', '4th', '3rd', '2nd', '1st', 'Peer', 'Top']
+const GRADES_ZH = ['白身', '功名', '未入流', '九品', '八品', '七品', '六品', '五品', '四品', '三品', '二品', '一品', '封爵', '大賀']
+const grades = (names: readonly string[]) =>
+  Object.fromEntries(names.map((name, grade) => [`games.promotion.full.grade.${grade}`, name]))
 
 const plaques = (at: 0 | 1) =>
   Object.fromEntries(
@@ -372,6 +515,6 @@ const plaques = (at: 0 | 1) =>
   )
 
 export const promotionFullMessages = {
-  en: { ...en, ...ranks('en'), ...plaques(0) } as Record<string, string>,
-  'zh-TW': { ...zhTW, ...ranks('zh-TW'), ...plaques(1) } as Record<string, string>,
+  en: { ...en, ...ranks('en'), ...plaques(0), ...grades(GRADES_EN) } as Record<string, string>,
+  'zh-TW': { ...zhTW, ...ranks('zh-TW'), ...plaques(1), ...grades(GRADES_ZH) } as Record<string, string>,
 }

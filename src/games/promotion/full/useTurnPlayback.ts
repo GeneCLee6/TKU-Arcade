@@ -45,9 +45,12 @@ export interface TurnPlayback {
   at: number
 }
 
-/** How many turns have been rolled: one more with each roll, none for a pass */
-export const turnCount = (players: readonly FullPlayer[]): number =>
-  players.reduce((sum, player) => sum + player.rolls, 0)
+/**
+ * How many turns have been played: one more with each roll, none for a pass. Since C8 the state
+ * counts them (`acts`), answers to a decision among them, so that the answer's move plays too
+ */
+export const turnCount = (players: readonly FullPlayer[], acts?: number): number =>
+  acts ?? players.reduce((sum, player) => sum + player.rolls, 0)
 
 /**
  * What a new `view` means for the animation, as in the simple edition: only a turn rolled while this
@@ -75,8 +78,9 @@ export function useTurnPlayback(
   last: FullLastTurn | null,
   over: boolean,
   reducedMotion: boolean,
+  acts?: number,
 ): TurnPlayback {
-  const count = turnCount(players)
+  const count = turnCount(players, acts)
   const [playback, setPlayback] = useState<TurnPlayback>({ count, at: 0, beat: null })
 
   // During render, as React asks for state that follows a prop: no frame shows the end of a turn first

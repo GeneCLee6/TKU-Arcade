@@ -10,12 +10,17 @@ import type { IntOption } from '../../../shared/games/types.ts'
 import { parseMarkdown } from '../../../src/lib/markdown.ts'
 import fullEn from '../../../shared/games/promotion/rulesFull.en.md?raw'
 import fullZh from '../../../shared/games/promotion/rulesFull.zh-TW.md?raw'
-import { getFullCell } from '../../../shared/games/promotion/boardFull.ts'
+import { fullBoard } from '../../../shared/games/promotion/boardFull.ts'
+const getFullCell = (id: string) => fullBoard(2).get(id)
 import {
   birthOf,
+  BUY_DISCOUNT,
+  BUY_STEP,
   COURTESY,
+  DAHE_GIFT,
+  DEFAULT_DECISION_SECONDS,
   FULL_ROUND_LIMIT,
-  MAX_THROWS,
+  MAX_TITLES,
   RANK_STEP,
   readThrow,
   RUN_REWARD,
@@ -81,9 +86,12 @@ describe('the rules of the full edition', () => {
 
   it.each(['en', 'zh-TW'])('states the numbers the module plays by (%s)', (language) => {
     const text = FULL[language]
-    for (const number of [START_MONEY, COURTESY, RUN_REWARD, MAX_THROWS, FULL_ROUND_LIMIT, RANK_STEP]) {
-      expect(text).toContain(`${number}`)
-    }
+    // The second rules (C8), which the page describes: what every new game plays by
+    const numbers = [START_MONEY, COURTESY, RUN_REWARD, FULL_ROUND_LIMIT, RANK_STEP, DAHE_GIFT, BUY_STEP, BUY_DISCOUNT, DEFAULT_DECISION_SECONDS]
+    for (const number of numbers) expect(text).toContain(`${number}`)
+    expect(getFullCell('dahe').retire).toBe(DAHE_GIFT)
+    expect(MAX_TITLES).toBe(2)
+    for (const id of ['xuezheng', 'xunyanyushi']) expect(text).toContain(` ${getFullCell(id).fine} `)
     for (const id of ['zhishi', 'yugao', 'dahe']) expect(text).toContain(`${getFullCell(id).retire}`)
     for (const id of ['jiansheng', 'juanban', 'geizhi']) expect(text).toContain(`${-getFullCell(id).money}`)
     const combos = new Map<string, number>()

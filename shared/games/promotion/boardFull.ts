@@ -1,6 +1,7 @@
-// The full edition's board (e3-t13): pure data, walked by rulesFull.ts. Worker only: the browser
-// must not import this file (tests/games/catalog.test.ts holds it to that), so that it costs no first
-// load. The C7 screen gets the names and the layout another way (docs/ARCHITECTURE.md §3).
+// The full edition's board (e3-t13, C8): pure data, walked by rulesFull.ts. Two boards: the first
+// (C6) for games started before C8, the second (C8) for every game since; see `fullBoard` at the
+// bottom. The browser loads this file only after a full edition's first screen, by a dynamic import
+// in src/games/promotion/full/fullData.ts (tests/games/catalog.test.ts holds it to that).
 //
 // Our own compilation from public-domain history: real Qing titles and grades (mid to late Qing, one
 // post per title), sorted into departments a player can find their way around. Which office leads
@@ -16,19 +17,9 @@
 // Cell ids are stored in running games: rename or remove one and live rooms break, so add instead.
 // Any change to a move also changes what an old replay (seed + actions) plays out to.
 
-/** The six results, best first: the priority order two pairs move in */
-export const FULL_FACES = ['de', 'cai', 'gong', 'liang', 'rou', 'zang'] as const
-export type FullFace = (typeof FULL_FACES)[number]
+import { FULL_FACES, type FullFace } from './fullFaces.ts'
 
-/** Which face each pip of a six-sided die is */
-export const PIP_FACE: Readonly<Record<number, FullFace>> = {
-  4: 'de',
-  6: 'cai',
-  5: 'gong',
-  3: 'liang',
-  2: 'rou',
-  1: 'zang',
-}
+export { DISMISSED, FULL_FACES, FULL_START, FULL_TOP, PIP_FACE, type FullFace } from './fullFaces.ts'
 
 /**
  * Seniority. 0 to 5 are people without a post (commoner, candidate, licentiate, tribute student,
@@ -95,7 +86,15 @@ export function gradeOf(rank: number): number {
  * - `penalty`: dismissal, from which a player buys their way back, starts over, or is exiled.
  * - `end`: a career is over (retired or exiled). Never rolled from.
  */
-export type CellKind = 'origin' | 'exam' | 'palace' | 'appoint' | 'office' | 'penalty' | 'end'
+export type CellKind = 'origin' | 'exam' | 'palace' | 'appoint' | 'office' | 'penalty' | 'end' | 'event'
+
+/**
+ * Where an event's outcome sends a player, from the post they held when they came to it (C8): two
+ * steps up (that post's de), one (its cai), back to it, down (its `demote`, else its zang), or
+ * dismissed. `money` comes from the bank; `title` is a concurrent honorary title (兼銜).
+ */
+export type EventGo = 'up2' | 'up1' | 'stay' | 'down' | 'dismiss'
+export type EventOutcome = { go: EventGo; money: number; title: boolean }
 
 /**
  * What a player must hold to land on a cell; one who does not lands on its `instead`.
@@ -157,6 +156,19 @@ export type FullCell = {
   keepRank: boolean
   /** Moves that differ for a Banner household */
   banner: Partial<Record<FullFace, string>> | null
+  // ── C8, read by the second rules (rulesVersion 2) only ──
+  /** An offered post (謄錄, 教習, a special summons): a player not already on one may decline */
+  offer: boolean
+  /** A minor technical post (天文生, 醫士): a player with standing may buy a regular office instead */
+  minor: boolean
+  /** A commission (差事): rolling graft while holding it costs this fine to the bank; 0 for none */
+  fine: number
+  /** An event zone (京察, 大計, ...): a second throw decides, by face, what happens to the post held */
+  event: Readonly<Record<FullFace, EventOutcome>> | null
+  /** Where an event's `down` leads from here, when zang leads to an event (處分); null: zang */
+  demote: string | null
+  /** Landing here gives a concurrent honorary title (兼銜) */
+  title: boolean
 }
 
 type Extra = Partial<
@@ -173,6 +185,12 @@ type Extra = Partial<
     | 'out'
     | 'keepRank'
     | 'banner'
+    | 'offer'
+    | 'minor'
+    | 'fine'
+    | 'event'
+    | 'demote'
+    | 'title'
   >
 >
 
@@ -205,6 +223,12 @@ function cell(
     out: false,
     keepRank: false,
     banner: null,
+    offer: false,
+    minor: false,
+    fine: 0,
+    event: null,
+    demote: null,
+    title: false,
     ...extra,
   }
 }
@@ -255,6 +279,23 @@ const DEPTS = {
   gongxian: { 'zh-TW': '宮銜', en: 'Palace Titles', section: 'summit', courtesy: true },
   jue: { 'zh-TW': '封爵', en: 'Peerage', section: 'summit', courtesy: true },
   end: { 'zh-TW': '歸宿', en: 'Ends of a Career', section: 'summit', courtesy: false },
+  // ── C8: the second board's departments (BOARD_FULL_V2); the first board has no cells in them ──
+  zongrenfu: { 'zh-TW': '宗人府', en: 'Imperial Clan Court', section: 'capital', courtesy: true },
+  neiwufu: { 'zh-TW': '內務府', en: 'Imperial Household Department', section: 'capital', courtesy: true },
+  neiting: { 'zh-TW': '內廷', en: 'Inner Court', section: 'capital', courtesy: true },
+  zhongshuke: { 'zh-TW': '中書科', en: 'Drafting Office', section: 'capital', courtesy: true },
+  qintianjian: { 'zh-TW': '欽天監', en: 'Directorate of Astronomy', section: 'capital', courtesy: true },
+  taiyiyuan: { 'zh-TW': '太醫院', en: 'Imperial Academy of Medicine', section: 'capital', courtesy: true },
+  luanyiwei: { 'zh-TW': '鑾儀衛', en: 'Imperial Equipage Guard', section: 'military', courtesy: true },
+  wucheng: { 'zh-TW': '五城兵馬司', en: 'Capital Wards Police', section: 'capital', courtesy: true },
+  cangchang: { 'zh-TW': '倉場', en: 'Capital Granaries', section: 'capital', courtesy: true },
+  xueyuan: { 'zh-TW': '學院', en: 'Examination Commissions', section: 'provinces', courtesy: true },
+  yanyuan: { 'zh-TW': '鹽院', en: 'Salt Administration', section: 'provinces', courtesy: true },
+  heyuan: { 'zh-TW': '河院', en: 'River Conservancy', section: 'provinces', courtesy: true },
+  caoyuan: { 'zh-TW': '漕院', en: 'Grain Transport', section: 'provinces', courtesy: true },
+  tenglu: { 'zh-TW': '各館謄錄', en: 'Copyists of the Compilation Offices', section: 'start', courtesy: false },
+  kaoji: { 'zh-TW': '考績', en: 'Evaluations and Events', section: 'summit', courtesy: false },
+  juanna: { 'zh-TW': '捐納', en: 'Office by Purchase', section: 'start', courtesy: false },
 } as const satisfies Record<
   string,
   { 'zh-TW': string; en: string; section: FullSection; courtesy: boolean }
@@ -267,8 +308,7 @@ export const FULL_DEPARTMENTS: Readonly<
 
 /** Where the birth roll may place a player (rulesFull.ts), and where everyone stands before it */
 export const FULL_ORIGINS = ['baiding', 'tongsheng', 'jiansheng', 'shengyuan', 'yinsheng'] as const
-export const FULL_START = 'baiding'
-export const DISMISSED = 'geizhi'
+
 
 export const BOARD_FULL: readonly FullCell[] = [
   // ── origin ──
@@ -492,11 +532,353 @@ export const BOARD_FULL: readonly FullCell[] = [
   cell('changshu', '長戍', 'Changshu (Exiled to the Frontier)', NONE, 'end', 'exile', 'changshu changshu changshu changshu changshu changshu', { kind: 'end', out: true }),
 ]
 
-const FULL_BY_ID: ReadonlyMap<string, FullCell> = new Map(BOARD_FULL.map((entry) => [entry.id, entry]))
+// ── The second board (C8, rulesVersion 2) ─────────────────────────────────────────────────────
+//
+// The first board above is frozen: a game started before C8 keeps playing on it (rulesVersion 1, see
+// rulesFull.ts). The second board is the first one with some moves changed (`V2_CHANGES`), four cells
+// moved into departments of their own (`V2_DEPT`), and new cells (`NEW_CELLS`): more capital and
+// provincial offices, the copyists' offices and other offered posts, minor technical posts,
+// commissions and the event zones. Like the first, its ids are stored in running games: only add.
 
-/** The cell with this id. Every id in a state comes from this board, so a miss is a bug: it throws */
-export function getFullCell(id: string): FullCell {
-  const found = FULL_BY_ID.get(id)
-  if (found === undefined) throw new Error(`promotion: no full-edition cell "${id}"`)
-  return found
+/** An event's six outcomes, best face first: `up2`, `up1+10t` (10 from the bank and a title), ... */
+function outcomes(text: string): Record<FullFace, EventOutcome> {
+  const parts = text.split(' ').map((part): EventOutcome => {
+    const [, go, money, title] = /^([a-z0-9]+)(?:\+(\d+))?(t)?$/.exec(part) as RegExpExecArray
+    return { go: go as EventGo, money: Number(money ?? 0), title: title === 't' }
+  })
+  return Object.fromEntries(FULL_FACES.map((face, at) => [face, parts[at]])) as Record<
+    FullFace,
+    EventOutcome
+  >
 }
+
+const EVENT = { kind: 'event', keepRank: true } as const
+
+const NEW_CELLS: readonly FullCell[] = [
+  // ── exam: two more offered posts ──
+  cell('jiaoxi', '官學教習', 'Guanxue Jiaoxi (Banner School Teacher)', UNCLASSED, 'exam', 'scholar', 'zhixian zhixian jiaoyu zhongshuke-sheren jiaoxi suigong', { offer: true }),
+  cell('zhaoshi', '召試', 'Zhaoshi (Special Examination by Summons)', GONG, 'exam', 'laureate', 'zhongshu zhongshuke-sheren jiaoxi jiaoyu zhaoshi shengyuan', { kind: 'exam', offer: true }),
+  // ── tenglu: the copyists of the compilation offices, then commendation into a post ──
+  cell('guoshi-tenglu', '國史館謄錄', 'Guoshiguan Tenglu (Copyist, State History Office)', UNCLASSED, 'tenglu', 'scholar', 'yixu yixu fanglue-tenglu huidian-tenglu guoshi-tenglu shengyuan', { offer: true }),
+  cell('fanglue-tenglu', '方略館謄錄', 'Fanglueguan Tenglu (Copyist, Military Annals Office)', UNCLASSED, 'tenglu', 'scholar', 'yixu yixu huidian-tenglu guoshi-tenglu fanglue-tenglu shengyuan', { offer: true }),
+  cell('huidian-tenglu', '會典館謄錄', 'Huidianguan Tenglu (Copyist, Statutes Office)', UNCLASSED, 'tenglu', 'scholar', 'yixu yixu guoshi-tenglu fanglue-tenglu huidian-tenglu shengyuan', { offer: true }),
+  cell('yixu', '議敘', 'Yixu (Commendation for Service)', UNCLASSED, 'tenglu', 'official1', 'zhixian zhoupan xiancheng zhubu xunjian dianshi', { kind: 'appoint' }),
+  // ── kaoji: the event zones ──
+  cell('jingcha', '京察', 'Jingcha (Capital Evaluation)', NONE, 'kaoji', 'official2', 'jingcha jingcha jingcha jingcha jingcha jingcha', { ...EVENT, event: outcomes('up1 stay+5 stay stay stay down') }),
+  cell('daji', '大計', 'Daji (Provincial Evaluation)', NONE, 'kaoji', 'official2', 'daji daji daji daji daji daji', { ...EVENT, event: outcomes('up1 stay+5 stay stay stay down') }),
+  cell('dakao', '大考', 'Dakao (Hanlin Grand Examination)', NONE, 'kaoji', 'laureate', 'dakao dakao dakao dakao dakao dakao', { ...EVENT, event: outcomes('up1 stay+5 stay stay down down') }),
+  cell('jungong', '軍功', 'Jungong (Military Merit)', NONE, 'kaoji', 'helmet3', 'jungong jungong jungong jungong jungong jungong', { ...EVENT, event: outcomes('up1+10 stay+5 stay stay stay down') }),
+  cell('chufen', '處分', 'Chufen (Disciplinary Review)', NONE, 'kaoji', 'official1', 'chufen chufen chufen chufen chufen chufen', { ...EVENT, event: outcomes('stay stay down down down dismiss') }),
+  cell('kuangdian', '曠典', 'Kuangdian (Imperial Favour)', NONE, 'kaoji', 'court', 'kuangdian kuangdian kuangdian kuangdian kuangdian kuangdian', { ...EVENT, event: outcomes('up1+20t stay+10t stay+10 stay+5 stay stay') }),
+  // ── luanyiwei ──
+  cell('zhengyiwei', '整儀尉', 'Zhengyiwei (Equipage Lieutenant)', S6, 'luanyiwei', 'guard1', 'yunhuishi zhiyizheng zhiyizheng lanling jungong bazong', { requires: 'guard', instead: 'qianzong' }),
+  cell('zhiyizheng', '治儀正', 'Zhiyizheng (Equipage Captain)', S5, 'luanyiwei', 'guard2', 'guanjunshi yunhuishi yunhuishi sandeng jungong zhengyiwei', { requires: 'guard', instead: 'shoubei' }),
+  cell('yunhuishi', '雲麾使', 'Yunhuishi (Equipage Commander)', S4, 'luanyiwei', 'guard2', 'luanyishi guanjunshi guanjunshi erdeng jungong zhiyizheng', { requires: 'guard', instead: 'dusi' }),
+  cell('guanjunshi', '冠軍使', 'Guanjunshi (Equipage Senior Commander)', S3, 'luanyiwei', 'guard2', 'neidachen luanyishi luanyishi yideng guanjunshi yunhuishi', { fengjue: 'nan', requires: 'guard', instead: 'canjiang' }),
+  cell('luanyishi', '鑾儀使', 'Luanyishi (Commissioner of the Imperial Equipage)', S2, 'luanyiwei', 'court', 'taizitaibao neidachen neidachen zongbing zhishi guanjunshi', { fengjue: 'nan', requires: 'guard', instead: 'zongbing' }),
+  // ── xueyuan: the examination commissions (學政 moves in) ──
+  cell('fukaoguan', '鄉試副考官', 'Xiangshi Fu Kaoguan (Associate Provincial Examiner)', J5, 'xueyuan', 'official2', 'xuezheng zhengkaoguan zhengkaoguan shidu fukaoguan bianxiu', { requires: 'jinshi', instead: 'jiaoshou', money: 10, fine: 15 }),
+  cell('zhengkaoguan', '鄉試正考官', 'Xiangshi Zheng Kaoguan (Chief Provincial Examiner)', J4, 'xueyuan', 'official3', 'shaozhanshi xuezheng shiduxueshi shijiangxueshi zhengkaoguan shidu', { requires: 'jinshi', instead: 'jiaoshou', money: 10, fine: 15 }),
+  // ── yanyuan: salt (鹽運使 moves in) ──
+  cell('yanke-dashi', '鹽課大使', 'Yanke Dashi (Salt Tax Collector)', S8, 'yanyuan', 'official1', 'yanyun-tongzhi xunyanyushi zhixian jingli yanke-dashi xunjian'),
+  cell('xunyanyushi', '巡鹽御史', 'Xunyan Yushi (Salt Censor)', J5, 'yanyuan', 'official2', 'yanyunshi yanyun-tongzhi yanyun-tongzhi jianchayushi xunyanyushi zhixian', { requires: 'zhengtu', instead: 'tongzhi', money: 10, fine: 10 }),
+  cell('yanyun-tongzhi', '鹽運同知', 'Yanyun Tongzhi (Salt Vice-Controller)', J4, 'yanyuan', 'official2', 'anchashi yanyunshi fenshoudao zhifu yanyun-tongzhi tongpan'),
+  // ── heyuan: rivers (河道總督 moves in) ──
+  cell('guanhe-tongzhi', '管河同知', 'Guanhe Tongzhi (River Sub-Prefect)', S5, 'heyuan', 'official2', 'hedao hedao tongzhi tongzhi daji tongpan'),
+  cell('hedao', '管河道', 'Guanhe Dao (River Intendant)', S4, 'heyuan', 'official3', 'anchashi yanyunshi fenxundao fenshoudao daji guanhe-tongzhi'),
+  // ── caoyuan: grain transport (漕運總督 moves in) ──
+  cell('wei-qianzong', '衛千總', 'Wei Qianzong (Grain Fleet Lieutenant)', S6, 'caoyuan', 'helmet2', 'liangdao tongzhi tongpan qianzong wei-qianzong bazong'),
+  cell('liangdao', '督糧道', 'Duliang Dao (Grain Intendant)', S4, 'caoyuan', 'official3', 'buzhengshi anchashi fenxundao fenshoudao daji tongzhi'),
+  // ── zongrenfu ──
+  cell('zongren-zhushi', '宗人府主事', 'Zongrenfu Zhushi (Secretary, Imperial Clan Court)', S6, 'zongrenfu', 'official2', 'zongren-lishiguan zongren-lishiguan personnel-yuanwailang revenue-zhushi jingcha xiancheng'),
+  cell('zongren-lishiguan', '宗人府理事官', 'Zongrenfu Lishiguan (Clan Court Administrator)', S5, 'zongrenfu', 'official2', 'zongren-fucheng taichang-shaoqing taichang-shaoqing personnel-langzhong jingcha zongren-zhushi', { requires: 'banner', instead: 'personnel-langzhong' }),
+  cell('zongren-fucheng', '宗人府府丞', 'Zongrenfu Fucheng (Clan Court Assistant Director)', S3, 'zongrenfu', 'official3', 'personnel-shilang personnel-shilang taichang-qing fuduyushi zongren-fucheng zongren-lishiguan', { fengjue: 'nan' }),
+  // ── neiwufu: Banner households only ──
+  cell('neiwu-zhushi', '內務府主事', 'Neiwufu Zhushi (Secretary, Imperial Household)', S6, 'neiwufu', 'official2', 'neiwu-langzhong neiwu-yuanwailang neiwu-yuanwailang revenue-zhushi jingcha bitieshi', { requires: 'banner', instead: 'revenue-zhushi' }),
+  cell('neiwu-yuanwailang', '內務府員外郎', 'Neiwufu Yuanwailang (Vice-Director, Imperial Household)', J5, 'neiwufu', 'official2', 'taipu-shaoqing neiwu-langzhong neiwu-langzhong revenue-yuanwailang jingcha neiwu-zhushi', { requires: 'banner', instead: 'revenue-yuanwailang' }),
+  cell('neiwu-langzhong', '內務府郎中', 'Neiwufu Langzhong (Director, Imperial Household)', S5, 'neiwufu', 'official2', 'neiwu-dachen taipu-qing taipu-shaoqing revenue-langzhong jingcha neiwu-yuanwailang', { requires: 'banner', instead: 'revenue-langzhong' }),
+  cell('neiwu-dachen', '總管內務府大臣', 'Zongguan Neiwufu Dachen (Minister of the Imperial Household)', S2, 'neiwufu', 'court', 'xieban revenue-shangshu revenue-shangshu junjidachen neiwu-dachen neiwu-langzhong', { fengjue: 'nan', requires: 'banner', instead: 'revenue-shilang' }),
+  // ── neiting: the inner court's duties, held by jinshi ──
+  cell('qijuzhu', '起居注官', 'Qijuzhu Guan (Diarist of the Court)', J5, 'neiting', 'official2', 'nanshufang shijiangxueshi shidu kuangdian qijuzhu xiuzhuan', { requires: 'jinshi', instead: 'zhongshu', money: 5, fine: 10 }),
+  cell('nanshufang', '南書房行走', 'Nanshufang Xingzou (Southern Study Attendant)', S4, 'neiting', 'official3', 'neigexueshi shangshufang shangshufang kuangdian nanshufang shidu', { requires: 'jinshi', instead: 'neigeshidu', money: 5, fine: 10 }),
+  cell('shangshufang', '上書房師傅', 'Shangshufang Shifu (Tutor to the Princes)', J3, 'neiting', 'official3', 'rites-shilang neigexueshi zhanshi kuangdian shangshufang nanshufang', { fengjue: 'nan', requires: 'jinshi', instead: 'tongzheng-fushi', money: 5, fine: 10 }),
+  // ── zhongshuke ──
+  cell('zhongshuke-sheren', '中書科中書舍人', 'Zhongshuke Sheren (Drafter, Drafting Office)', J7, 'zhongshuke', 'official1', 'neigeshidu zhongshuke-zhangyin zhongshuke-zhangyin zhongshu zhongshuke-sheren honglu-mingzan'),
+  cell('zhongshuke-zhangyin', '中書科掌印中書', 'Zhongshuke Zhangyin (Seal-Keeping Drafter)', S7, 'zhongshuke', 'official2', 'honglu-shaoqing neigeshidu neigeshidu dali-pingshi zhongshuke-zhangyin zhongshuke-sheren'),
+  // ── qintianjian: two minor technical posts at the bottom ──
+  cell('tianwensheng', '天文生', 'Tianwensheng (Astronomy Student)', UNCLASSED, 'qintianjian', 'cap', 'wuguanzheng qintian-boshi qintian-boshi yicheng tianwensheng geizhi', { minor: true }),
+  cell('qintian-boshi', '欽天監博士', 'Qintianjian Boshi (Astronomy Erudite)', J9, 'qintianjian', 'official1', 'jianfu wuguanzheng wuguanzheng xunjian qintian-boshi tianwensheng', { minor: true }),
+  cell('wuguanzheng', '五官正', 'Wuguanzheng (Astronomer of the Five Offices)', J6, 'qintianjian', 'official2', 'jianzheng jianfu jianfu guanglu-shuzheng wuguanzheng qintian-boshi'),
+  cell('jianfu', '欽天監監副', 'Qintianjian Jianfu (Vice-Director of Astronomy)', S6, 'qintianjian', 'official2', 'jianzheng jianzheng jianzheng dali-sicheng jianfu wuguanzheng'),
+  cell('jianzheng', '欽天監監正', 'Qintianjian Jianzheng (Director of Astronomy)', S5, 'qintianjian', 'official2', 'taichang-shaoqing honglu-qing guanglu-shaoqing tongzheng-canyi jianzheng jianfu'),
+  // ── taiyiyuan: two minor technical posts at the bottom ──
+  cell('yishi', '醫士', 'Yishi (Court Physician Assistant)', UNCLASSED, 'taiyiyuan', 'cap', 'yuyi taiyi-limu taiyi-limu yicheng yishi geizhi', { minor: true }),
+  cell('taiyi-limu', '太醫院吏目', 'Taiyiyuan Limu (Medical Registrar)', J9, 'taiyiyuan', 'official1', 'yuyi yuyi yuyi xunjian taiyi-limu yishi', { minor: true }),
+  cell('yuyi', '御醫', 'Yuyi (Imperial Physician)', S8, 'taiyiyuan', 'official1', 'yuanshi yuanpan yuanpan jingli yuyi taiyi-limu'),
+  cell('yuanpan', '太醫院院判', 'Taiyiyuan Yuanpan (Vice-Director of Medicine)', S6, 'taiyiyuan', 'official2', 'yuanshi yuanshi yuanshi dali-sicheng yuanpan yuyi'),
+  cell('yuanshi', '太醫院院使', 'Taiyiyuan Yuanshi (Director of Medicine)', S5, 'taiyiyuan', 'official2', 'guanglu-qing guanglu-shaoqing guanglu-shaoqing tongzheng-canyi yuanshi yuanpan'),
+  // ── wucheng ──
+  cell('wucheng-limu', '兵馬司吏目', 'Bingmasi Limu (Ward Registrar)', J9, 'wucheng', 'official1', 'fuzhihui xiancheng zhubu xunjian wucheng-limu dianshi'),
+  cell('fuzhihui', '兵馬司副指揮', 'Bingmasi Fu Zhihui (Ward Vice-Commander)', S7, 'wucheng', 'official1', 'zhihui zhihui zhihui zhixian fuzhihui wucheng-limu'),
+  cell('zhihui', '兵馬司指揮', 'Bingmasi Zhihui (Ward Commander)', S6, 'wucheng', 'official2', 'tongzhi xunchengyushi xunchengyushi dali-sicheng zhihui fuzhihui'),
+  cell('xunchengyushi', '巡城御史', 'Xuncheng Yushi (Ward Censor)', J5, 'wucheng', 'official2', 'dali-shaoqing jishizhong jishizhong jianchayushi xunchengyushi zhihui', { requires: 'zhengtu', instead: 'zhihui', money: 5, fine: 10 }),
+  // ── cangchang ──
+  cell('cang-jiandu', '倉監督', 'Cang Jiandu (Granary Superintendent)', J5, 'cangchang', 'official2', 'taipu-shaoqing zuoliangting zuoliangting revenue-yuanwailang cang-jiandu revenue-zhushi', { requires: 'zhengtu', instead: 'revenue-yuanwailang', money: 10, fine: 10 }),
+  cell('zuoliangting', '坐糧廳', 'Zuoliangting (Grain Receiving Office)', S5, 'cangchang', 'official2', 'taipu-qing taipu-shaoqing taipu-shaoqing revenue-langzhong zuoliangting cang-jiandu'),
+  cell('cangchang-shilang', '倉場侍郎', 'Cangchang Shilang (Vice-Minister of the Granaries)', S2, 'cangchang', 'official3', 'xieban revenue-shangshu revenue-shangshu caoyun cangchang-shilang zuoliangting', { fengjue: 'nan' }),
+]
+
+/** Cells of the first board that the second puts in a department of their own */
+const V2_DEPT: Readonly<Record<string, FullDeptId>> = {
+  xuezheng: 'xueyuan',
+  yanyunshi: 'yanyuan',
+  hedu: 'heyuan',
+  caoyun: 'caoyuan',
+  // A purchased office is a post, not a birth: out of the origins (no move leads back to those)
+  juanban: 'juanna',
+}
+
+/**
+ * Cells of the first board the second leaves out. The yamen clerk (書吏) was a place to fall back to
+ * from the lowest posts; on the second board nothing leads back to the origins (擁有者 2026-11-12),
+ * and no birth places anyone there, so nothing would reach it
+ */
+const V2_DROPPED: ReadonlySet<string> = new Set(['shuli'])
+
+type Change = Partial<Record<FullFace, string>> & {
+  fine?: number
+  title?: boolean
+  kind?: CellKind
+  retire?: number
+}
+
+const MINISTRIES = ['personnel', 'revenue', 'rites', 'war', 'justice', 'works']
+const each = (ids: readonly string[], change: Change): Record<string, Change> =>
+  Object.fromEntries(ids.map((id) => [id, change]))
+
+/**
+ * The second board's changes to the first board's cells. Mostly mediocrity (柔), which on the first
+ * board stays in place, leads to an evaluation instead; graft of a high civil post leads to a
+ * disciplinary review (處分) whose `down` is where graft led before; some lateral moves (良) lead
+ * into the new departments, to offered posts and to minor posts. Later entries add to earlier ones.
+ */
+const V2_CHANGES: Readonly<Record<string, Change>> = merge(
+  // Capital evaluation (京察), provincial evaluation (大計), the Hanlin's (大考), military merit (軍功)
+  each(
+    MINISTRIES.flatMap((m) => ['zhushi', 'yuanwailang', 'langzhong'].map((post) => `${m}-${post}`)),
+    { rou: 'jingcha' },
+  ),
+  each(['jianchayushi', 'jishizhong', 'dali-pingshi', 'dali-sicheng'], { rou: 'jingcha' }),
+  each(
+    ['xiancheng', 'zhixian', 'zhoupan', 'zhoutong', 'zhizhou', 'tongpan', 'tongzhi', 'zhifu', 'fenxundao', 'fenshoudao'],
+    { rou: 'daji' },
+  ),
+  each(['jiantao', 'bianxiu', 'xiuzhuan', 'shijiang', 'shidu', 'shijiangxueshi', 'shiduxueshi'], { rou: 'dakao' }),
+  each(['bazong', 'qianzong', 'shoubei', 'dusi', 'youji', 'canjiang', 'xiaoqixiao', 'fangyu', 'zuoling'], {
+    rou: 'jungong',
+  }),
+  // Disciplinary review (處分) for the highest civil posts
+  each(
+    [
+      ...MINISTRIES.flatMap((m) => [`${m}-shilang`, `${m}-shangshu`]),
+      'anchashi',
+      'buzhengshi',
+      'xunfu',
+      'zongdu',
+      'fuduyushi',
+      'zuoduyushi',
+      'fenxundao',
+    ],
+    { zang: 'chufen' },
+  ),
+  // Imperial favour (曠典) for the palace titles and the assistant grand secretary
+  each(['taizishaobao', 'taizitaibao', 'shaobao', 'xieban'], { liang: 'kuangdian' }),
+  // The lowest posts' graft is dismissal now: nothing leads back to the origins (擁有者 2026-11-12)
+  each(['yicheng', 'dianshi', 'xunjian', 'zhubu', 'limu', 'honglu-mingzan'], {
+    zang: 'geizhi',
+  }),
+  {
+    // The origins are where the birth roll places a seat and nowhere a move leads: a commoner moves on
+    // to study, the military examinations or a post station; a fall from an origin or the first
+    // examinations stays where it is
+    baiding: { cai: 'wutong', gong: 'wutong', rou: 'baiding' },
+    tongsheng: { gong: 'wusheng', rou: 'guoshi-tenglu', zang: 'tongsheng' },
+    jiansheng: { zang: 'jiansheng' },
+    yinsheng: { zang: 'yinsheng' },
+    shengyuan: { zang: 'shengyuan' },
+    xiangshi: { zang: 'shengyuan' },
+    wutong: { zang: 'wutong' },
+    pijia: { zang: 'pijia' },
+    juanban: { kind: 'office', zang: 'geizhi' },
+    // The grand congratulations: 30 from everyone, as tradition has it
+    dahe: { retire: 30 },
+    // Dismissal waits for restoration (開復) or exile: rulesFull.ts throws for it, not these moves
+    geizhi: { de: 'geizhi', cai: 'geizhi', gong: 'geizhi', liang: 'geizhi', rou: 'geizhi', zang: 'changshu' },
+  },
+  {
+    // Offered posts and minor posts, from below
+    jiansheng: { liang: 'huidian-tenglu', rou: 'tianwensheng' },
+    'personnel-zhushi': { liang: 'zongren-zhushi' },
+    'honglu-mingzan': { liang: 'qintian-boshi' },
+    'taichang-qing': { liang: 'zongren-fucheng' },
+    'dali-qing': { liang: 'zongren-fucheng' },
+    shengyuan: { liang: 'yishi', rou: 'fanglue-tenglu' },
+    fubang: { liang: 'guoshi-tenglu', rou: 'juanban' },
+    suigong: { liang: 'taiyi-limu', rou: 'jiaoxi' },
+    juren: { liang: 'jiaoxi' },
+    jieyuan: { liang: 'zhaoshi' },
+    bagong: { liang: 'zhaoshi', rou: 'jiaoxi' },
+    datiao: { rou: 'jiaoxi' },
+    yicheng: { liang: 'tianwensheng' },
+    yinsheng: { rou: 'yishi' },
+    dianshi: { liang: 'yishi' },
+    xunjian: { liang: 'wucheng-limu' },
+    limu: { liang: 'qintian-boshi' },
+    // Into the new departments
+    bitieshi: { liang: 'neiwu-zhushi' },
+    xiaoqixiao: { liang: 'neiwu-zhushi' },
+    lanling: { liang: 'zhengyiwei' },
+    sandeng: { liang: 'zhiyizheng' },
+    xiuzhuan: { liang: 'qijuzhu' },
+    shijiangxueshi: { liang: 'nanshufang' },
+    shiduxueshi: { liang: 'nanshufang' },
+    jiantao: { liang: 'fukaoguan' },
+    shidu: { liang: 'zhengkaoguan' },
+    jianchayushi: { liang: 'xunchengyushi' },
+    jingli: { liang: 'yanke-dashi' },
+    tongzhi: { liang: 'guanhe-tongzhi' },
+    tongpan: { liang: 'wei-qianzong' },
+    fenshoudao: { liang: 'hedao' },
+    fenxundao: { liang: 'liangdao' },
+    'revenue-yuanwailang': { liang: 'cang-jiandu' },
+    caoyun: { liang: 'cangchang-shilang' },
+    // Commissions: rolling graft costs a fine; examiners and education commissioners pay more
+    xuezheng: { fine: 15 },
+    yanyunshi: { fine: 10 },
+    junjizhangjing: { fine: 10 },
+    // Concurrent honorary titles: a governor-general held a minister's, a governor a vice-minister's
+    zongdu: { title: true },
+    xunfu: { title: true },
+  },
+)
+
+function merge(...parts: Readonly<Record<string, Change>>[]): Record<string, Change> {
+  const all: Record<string, Change> = {}
+  for (const part of parts) {
+    for (const [id, change] of Object.entries(part)) all[id] = { ...all[id], ...change }
+  }
+  return all
+}
+
+function changed(old: FullCell): FullCell {
+  const change = V2_CHANGES[old.id]
+  const dept = V2_DEPT[old.id] ?? old.dept
+  if (change === undefined && dept === old.dept) return old
+  const { fine, title, kind, retire, ...faces } = change ?? {}
+  return {
+    ...old,
+    dept,
+    moves: { ...old.moves, ...faces },
+    kind: kind ?? old.kind,
+    retire: retire ?? old.retire,
+    fine: fine ?? old.fine,
+    title: title ?? old.title,
+    // Graft into a review: the review's `down` is where graft led before
+    demote: faces.zang === 'chufen' ? old.moves.zang : null,
+  }
+}
+
+/** Each department's cells together and lowest first, in FULL_DEPARTMENTS order */
+function byDepartment(cells: readonly FullCell[]): FullCell[] {
+  const order = new Map(Object.keys(FULL_DEPARTMENTS).map((id, at) => [id, at]))
+  const moved = (entry: FullCell) => V2_DEPT[entry.id] !== undefined
+  return cells
+    .map((entry, at) => ({ entry, at }))
+    .sort(
+      (a, b) =>
+        (order.get(a.entry.dept) as number) - (order.get(b.entry.dept) as number) ||
+        (moved(a.entry) || moved(b.entry) ? a.entry.rank - b.entry.rank : 0) ||
+        a.at - b.at,
+    )
+    .map(({ entry }) => entry)
+}
+
+export const BOARD_FULL_V2: readonly FullCell[] = byDepartment([
+  ...BOARD_FULL.filter((entry) => !V2_DROPPED.has(entry.id)).map(changed),
+  ...NEW_CELLS,
+])
+
+/**
+ * Where each department of the second board stands on a traditional square board (for C9): rings from
+ * the outside in, each a list of departments in order round the ring. The outer ring is where a
+ * career starts (origins, examinations, the lowest posts), the inner ones hold higher offices, and the
+ * centre the common pot (公注) with the ends of a career and the peerage. A department's cells go
+ * round in board order, lowest first (`BOARD_FULL_V2` keeps each department's cells together that way)
+ */
+export const FULL_RINGS: readonly (readonly FullDeptId[])[] = [
+  ['origin', 'exam', 'tenglu', 'juanna', 'wuke', 'ying', 'xian', 'zhou', 'jiaozhi', 'qintianjian', 'taiyiyuan', 'wucheng', 'zhongshuke', 'honglusi'],
+  ['fu', 'dao', 'xueyuan', 'yanyuan', 'heyuan', 'caoyuan', 'qiying', 'zhen', 'guozijian', 'cangchang', 'guanglusi', 'taichangsi', 'taipusi', 'tongzhengsi', 'dalisi'],
+  ['sansi', 'dufu', 'shiwei', 'luanyiwei', 'qitong', 'personnel', 'revenue', 'rites', 'war', 'justice', 'works', 'duchayuan', 'hanlin', 'zhanshifu', 'neige', 'zongrenfu', 'neiwufu', 'kaoji'],
+  ['junji', 'neiting', 'daxueshi', 'gongxian'],
+]
+/** The centre of the square board: the pot, then these */
+export const FULL_CENTRE: readonly FullDeptId[] = ['jue', 'end']
+
+/** The rules versions there are: 1 is C6's (every game started before C8), 2 is C8's */
+export type RulesVersion = 1 | 2
+export const LATEST_RULES = 2 as const
+
+/** One version's board: its cells and departments, and a cell by id */
+export type FullBoard = {
+  version: RulesVersion
+  cells: readonly FullCell[]
+  /** The departments with cells on this board, in FULL_DEPARTMENTS order */
+  depts: readonly FullDeptId[]
+  /** The cell with this id. Every id in a state comes from its board, so a miss is a bug: it throws */
+  get(id: string): FullCell
+  has(id: string): boolean
+}
+
+function makeBoard(version: RulesVersion, cells: readonly FullCell[]): FullBoard {
+  const byId: ReadonlyMap<string, FullCell> = new Map(cells.map((entry) => [entry.id, entry]))
+  const used = new Set(cells.map((entry) => entry.dept))
+  return {
+    version,
+    cells,
+    depts: (Object.keys(FULL_DEPARTMENTS) as FullDeptId[]).filter((id) => used.has(id)),
+    get(id) {
+      const found = byId.get(id)
+      if (found === undefined) throw new Error(`promotion: no full-edition cell "${id}" (v${version})`)
+      return found
+    },
+    has: (id) => byId.has(id),
+  }
+}
+
+const BOARDS: Readonly<Record<RulesVersion, FullBoard>> = {
+  1: makeBoard(1, BOARD_FULL),
+  2: makeBoard(2, BOARD_FULL_V2),
+}
+
+/** The board a game plays on, by its state's `rulesVersion`; none is 1, a game from before C8 */
+export const fullBoard = (version: number | undefined): FullBoard => BOARDS[version === 2 ? 2 : 1]
+
+/**
+ * The offices a seat may buy instead of a minor post (捐納, C8), lowest first. The caps are
+ * historical: in the capital up to a director (郎中, senior fifth grade), in the provinces up to an
+ * intendant (道員, senior fourth grade).
+ */
+export const BUY_CAPITAL: readonly string[] = [
+  'zhongshu',
+  'revenue-zhushi',
+  'revenue-yuanwailang',
+  'revenue-langzhong',
+]
+export const BUY_PROVINCES: readonly string[] = [
+  'zhixian',
+  'tongpan',
+  'zhizhou',
+  'tongzhi',
+  'zhifu',
+  'fenshoudao',
+]

@@ -1,6 +1,6 @@
 import type { SeatId } from '../types.ts'
 import type { Face } from './board.ts'
-import type { FullFace } from './boardFull.ts'
+import type { FullFace } from './fullFaces.ts'
 
 export type DiceKind = 'four-sided' | 'six-sided'
 
@@ -15,6 +15,13 @@ export type PromotionOptions = {
   dice: DiceKind
   /** How many rounds (every seat rolling once) before the game ends on seniority */
   turnLimit: number
+  // The full edition's (C8): shown only for it
+  /** How long a seat has to answer an offered post or a purchase before the default is taken */
+  decisionSeconds: number
+  /** Whether a seat sent to a minor post may buy a regular office instead (捐納) */
+  buying: boolean
+  /** Whether the game ends as soon as someone reaches grand congratulations (大賀) */
+  endAtDahe: boolean
 }
 
 export type PromotionPlayer = {
@@ -58,7 +65,14 @@ export type PromotionState = {
   winner: SeatId | null
 }
 
-export type PromotionAction = { type: 'roll' } | { type: 'pass' }
+export type PromotionAction =
+  | { type: 'roll' }
+  | { type: 'pass' }
+  // The full edition's decisions (C8)
+  | { type: 'accept' }
+  | { type: 'decline' }
+  | { type: 'skip' }
+  | { type: 'buy'; cell: string }
 
 /** What every viewer sees: the whole state, and which seat is theirs */
 export type PromotionView = PromotionState & {
@@ -90,6 +104,16 @@ export type FullPlayer = {
   status: FullStatus
   /** How many turns this seat has rolled */
   rolls: number
+  // ── Since C8 (rulesVersion 2); a game from before has players without them ──
+  /** Holds an office bought (捐班): an irregular route (異途), which the regular route's posts refuse */
+  bought?: boolean
+  /** Concurrent honorary titles held (兼銜), at most MAX_TITLES: each a grade more in the comparison */
+  titles?: number
+  /**
+   * In an event zone (京察, ...) or dismissed (革職): the post held, which the event's outcome or the
+   * restoration (開復) is reckoned from
+   */
+  post?: string | null
 }
 
 /** How four dice read (rulesFull.ts `readThrow`) */
@@ -112,6 +136,11 @@ export type FullThrow = {
   combo: ComboKind
   /** The steps it moves, in order; empty for a throw that scores nothing */
   steps: FullStep[]
+  /**
+   * A throw for an event zone (C8) rather than a move: the zone, and the face that decided it; null
+   * when the throw scored nothing and the seat waits for its next turn
+   */
+  event?: { cell: string; face: FullFace | null }
 }
 
 /** Why silver changed hands */
@@ -123,6 +152,8 @@ export type TransferReason =
   | 'run'
   | 'rank'
   | 'share'
+  | 'fine'
+  | 'buy'
 
 export type Transfer = {
   /** A seat, or null for the bank */
@@ -142,6 +173,41 @@ export type FullLastTurn = {
   /** Every cell landed on, in order (after a redirect for a missing requirement) */
   path: string[]
   transfers: Transfer[]
+  /** A decision this turn ended with (C8): what was answered, for which cell, at what price */
+  decision?: FullDecision
+}
+
+/** What a seat answered: took or turned down an offered post, took the minor post, or bought */
+export type FullDecisionKind = 'accept' | 'decline' | 'skip' | 'buy'
+
+export type FullDecision = {
+  kind: FullDecisionKind
+  /** The cell offered, or the minor post, or the office bought */
+  cell: string
+  price: number
+  /** Nobody answered: the room took the default when the time ran out, or for an absent seat */
+  timedOut: boolean
+}
+
+/**
+ * A decision the game waits for (C8): an offered post to accept or decline, or a minor post to take
+ * or buy a regular office instead of. The turn stays with `seat` until it is answered.
+ */
+export type FullPending =
+  | { kind: 'offer'; seat: SeatId; cell: string; from: string }
+  | {
+      kind: 'buy'
+      seat: SeatId
+      cell: string
+      from: string
+      choices: { cell: string; price: number }[]
+    }
+
+/** The full edition's room options, as a game since C8 keeps them */
+export type FullRules = {
+  decisionMs: number
+  buying: boolean
+  endAtDahe: boolean
 }
 
 /** One seat's line in the final settlement */
@@ -164,8 +230,8 @@ export type FullSettlement = {
   remainder: { seat: SeatId; amount: number } | null
 }
 
-/** Why the full edition ended: one seat left playing, or the round limit */
-export type FullEnding = 'oneLeft' | 'turnLimit'
+/** Why the full edition ended: one seat left playing, the round limit, or (C8) the first 大賀 */
+export type FullEnding = 'oneLeft' | 'turnLimit' | 'dahe'
 
 export type PromotionFullState = {
   edition: 'full'
@@ -184,6 +250,15 @@ export type PromotionFullState = {
   ending: FullEnding | null
   /** Null until the game is over */
   settlement: FullSettlement | null
+  // ── Since C8. A game from before has none of these and plays on under the first rules ──
+  /** Which rules and board (boardFull.ts `fullBoard`); missing is 1 */
+  rulesVersion?: 2
+  rules?: FullRules
+  pending?: FullPending | null
+  /** How many decisions have been asked: the timer's id, so that each gets a fresh countdown */
+  decisions?: number
+  /** Every roll and every answer so far: what the screen counts to know a new turn has come */
+  acts?: number
 }
 
 /** Nothing in the full edition is hidden either */

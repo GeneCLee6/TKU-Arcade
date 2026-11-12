@@ -1454,7 +1454,7 @@ describe('rule options', () => {
     expect(world.host.create(ROOM_ID, 'promotion', undefined)).toBe(true)
     const a = world.join('A')
     const b = world.join('B')
-    expect(b.view?.room.options).toEqual({ edition: 'simple', dice: 'four-sided', turnLimit: 60 })
+    expect(b.view?.room.options).toEqual({ edition: 'simple', dice: 'four-sided', turnLimit: 60, decisionSeconds: 30, buying: true, endAtDahe: false })
     a.send({ t: 'set_options', options: { edition: 'full', dice: 'four-sided', turnLimit: 60 } })
     expect(b.view?.room.options).toMatchObject({ edition: 'full' })
     a.send({ t: 'start' })
@@ -1946,6 +1946,24 @@ describe('someone gone', () => {
       world.storedSteps(),
     )
     expect(again).toEqual(stored?.match)
+  })
+
+  it('is played for from `proxyActions` when the game narrows them (C8)', () => {
+    const narrow = { ...turnGame, proxyActions: () => [{ type: 'stay' }] } as unknown as AnyGameModule
+    const world = room('turns', { turns: narrow })
+    const a = world.join('A')
+    const b = world.join('B')
+    a.send({ t: 'start' })
+    a.send({ t: 'action', action: { type: 'roll' } })
+    world.disconnect(b)
+    world.clock += RECONNECT_GRACE_MS
+    a.send({ t: 'resync' })
+    world.host.sweep()
+    for (let at = 0; at < 6; at++) {
+      a.send({ t: 'cover', seat: 1, how: 'proxy' })
+      expect((a.game.view as TurnState).log.at(-1)).toBe('stay 1')
+      a.send({ t: 'action', action: { type: 'roll' } })
+    }
   })
 
   it('counts a seat emptied by a kick at once', () => {

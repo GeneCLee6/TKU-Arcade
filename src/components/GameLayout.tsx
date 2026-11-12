@@ -45,6 +45,11 @@ export interface GameLayoutProps {
   resultHeld?: boolean
   /** See `ResultPanel` */
   resultUnranked?: boolean
+  /**
+   * The screen shows the game's countdowns itself, over its board (promotion's full edition, C8): a
+   * phone then shows none above the game, where one appearing would push the board down
+   */
+  ownCountdown?: boolean
 }
 
 type PanelId = 'players' | 'chat'
@@ -66,6 +71,7 @@ export function GameLayout({
   resultDetail,
   resultHeld,
   resultUnranked,
+  ownCountdown,
 }: GameLayoutProps) {
   const compact = useCompact()
   const hasGame = children !== undefined
@@ -116,7 +122,7 @@ export function GameLayout({
   const panelInline = status !== 'playing' || !hasGame
   return (
     <Narrow data-wide-room="">
-      {!panelInline && <UrgentParts room={room} />}
+      {!panelInline && <UrgentParts room={room} countdowns={!ownCountdown} />}
       {resultPanel}
       {children}
       {panelInline && <RoomInPlay {...panelProps} />}
@@ -129,14 +135,12 @@ export function GameLayout({
   )
 }
 
-function UrgentParts({ room }: { room: RoomParts }) {
+function UrgentParts({ room, countdowns }: { room: RoomParts; countdowns: boolean }) {
   const seated = seatedMembers(room.view)
   const me = room.view.members[room.you]
   return (
     <>
-      {room.timers.map((timer) => (
-        <Countdown key={timer.id} timer={timer} />
-      ))}
+      {countdowns && room.timers.map((timer) => <Countdown key={timer.id} timer={timer} />)}
       {room.view.coverable.length > 0 && (
         <CoverSection
           seated={seated}
