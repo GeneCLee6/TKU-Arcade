@@ -1447,6 +1447,32 @@ describe('rule options', () => {
     a.send({ t: 'set_options', options: { rounds: 1 } })
     expect(a.errors).toEqual([{ t: 'error', code: 'wrong_status' }])
   })
+
+  // promotion's `edition` until C7: set when the room is made, kept whatever the form sends
+  it('keep a hidden option as the room was made, and the game gets it', () => {
+    const world = new World({ promotion: promotion as unknown as AnyGameModule })
+    expect(world.host.create(ROOM_ID, 'promotion', { edition: 'full' })).toBe(true)
+    const a = world.join('A')
+    const b = world.join('B')
+    expect(b.view?.room.options).toEqual({ dice: 'four-sided', turnLimit: 60, edition: 'full' })
+
+    // What the form sends: the fields it knows, and an attempt at the hidden one
+    a.send({ t: 'set_options', options: { dice: 'six-sided', turnLimit: 30 } })
+    expect(b.view?.room.options).toEqual({ dice: 'six-sided', turnLimit: 30, edition: 'full' })
+    a.send({ t: 'set_options', options: { dice: 'six-sided', turnLimit: 30, edition: 'simple' } })
+    expect(b.view?.room.options).toMatchObject({ edition: 'full' })
+
+    a.send({ t: 'start' })
+    expect(b.game.view).toMatchObject({ edition: 'full', bank: 200 })
+  })
+
+  it('give a hidden option its default when the room was made without it', () => {
+    const world = new World({ promotion: promotion as unknown as AnyGameModule })
+    expect(world.host.create(ROOM_ID, 'promotion', undefined)).toBe(true)
+    const a = world.join('A')
+    a.send({ t: 'set_options', options: { edition: 'full' } })
+    expect(a.view?.room.options).toMatchObject({ edition: 'simple' })
+  })
 })
 
 describe('timers', () => {

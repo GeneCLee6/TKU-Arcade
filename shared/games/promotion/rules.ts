@@ -1,11 +1,26 @@
 // Promotion (e3-t02, e3-t03): every seat starts as a commoner and takes turns rolling; the cell they
 // stand on says where each result leads (board.ts). The first to reach the end cell wins at once;
 // if nobody has after `turnLimit` rounds, the game ends and seniority decides.
+//
+// That is the simple edition, and the default. The room option `edition: 'full'` plays the full
+// edition instead (C6, rulesFull.ts): `promotion` at the bottom of this file picks one at `init` and
+// tells their states apart by the full one's `edition` field.
 import { DEFAULT_TURN_LIMIT, promotionInfo } from './info.ts'
-import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
+import {
+  gameError,
+  type GameModule,
+  type GameResult,
+  type OptionsSchema,
+  type Rng,
+  type SeatId,
+} from '../types.ts'
 import { END_CELL, FACES, getCell, START_CELL, type Face } from './board.ts'
+import { initFull, reduceFull, resultFull, viewFull } from './rulesFull.ts'
 import type {
   PromotionAction,
+  PromotionAnyState,
+  PromotionAnyView,
+  PromotionFullState,
   PromotionOptions,
   PromotionPlayer,
   PromotionState,
@@ -68,13 +83,37 @@ function noteKey(player: PromotionPlayer): string {
   return 'games.promotion.note.commoner'
 }
 
-export const promotion: GameModule<
+/**
+ * Every option, `edition` too. The waiting room's form is generated from info.ts, which leaves
+ * `edition` out (and `hidden` says so): until C7 builds the full board's screen, a full-edition room
+ * is made only through `POST /api/rooms` with `options.edition: 'full'`, and the waiting room keeps
+ * it when the host changes another option (worker/room-host.ts, `keepHidden`). C7 moves the field
+ * into info.ts and drops `hidden`.
+ */
+export const PROMOTION_OPTIONS: OptionsSchema<PromotionOptions> = {
+  ...promotionInfo.options,
+  edition: {
+    kind: 'select',
+    labelKey: 'games.promotion.option.edition',
+    choices: [
+      { value: 'simple', labelKey: 'games.promotion.option.edition.simple' },
+      { value: 'full', labelKey: 'games.promotion.option.edition.full' },
+    ],
+    default: 'simple',
+    hidden: true,
+  },
+}
+
+/** The simple edition alone: what every promotion game was before C6, and is still by default */
+export const promotionSimple: GameModule<
   PromotionState,
   PromotionAction,
   PromotionView,
   PromotionOptions
 > = {
-  ...promotionInfo,
+  id: promotionInfo.id,
+  meta: promotionInfo.meta,
+  options: PROMOTION_OPTIONS,
 
   init(seats, options, rng) {
     const first = rng.pick(seats).id
@@ -169,5 +208,54 @@ export const promotion: GameModule<
         note: { key: noteKey(player), params: { rolls: player.rolls } },
       })),
     }
+  },
+}
+
+const isFull = (state: PromotionAnyState): state is PromotionFullState =>
+  (state as { edition?: unknown }).edition === 'full'
+
+/** The registered module: either edition, by the `edition` option */
+export const promotion: GameModule<
+  PromotionAnyState,
+  PromotionAction,
+  PromotionAnyView,
+  PromotionOptions
+> = {
+  id: promotionInfo.id,
+  meta: promotionInfo.meta,
+  options: PROMOTION_OPTIONS,
+
+  init(seats, options, rng) {
+    // An option missing (a room from before C6) is the simple edition
+    return options.edition === 'full'
+      ? initFull(seats, rng)
+      : promotionSimple.init(seats, options, rng)
+  },
+
+  reduce(state, action, actor, rng) {
+    if (!isFull(state)) return promotionSimple.reduce(state, action, actor, rng)
+    if (!isRoll(action) && !isPass(action)) return gameError('games.promotion.error.badAction')
+    return reduceFull(state, action, actor, rng)
+  },
+
+  view(state, viewer) {
+    const you = viewer === 'spectator' ? null : viewer
+    return isFull(state) ? viewFull(state, you) : promotionSimple.view(state, viewer)
+  },
+
+  legalActions(state, seat) {
+    return state.turn === seat ? [{ type: 'roll' }] : []
+  },
+
+  skipAction() {
+    return { type: 'pass' }
+  },
+
+  isOver(state) {
+    return state.turn === null
+  },
+
+  result(state) {
+    return isFull(state) ? resultFull(state) : promotionSimple.result(state)
   },
 }

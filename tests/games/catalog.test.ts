@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GAME_INFOS, getGameInfo, LOBBY_GAMES } from '../../shared/games/catalog.ts'
 import { GAME_IDS, getGame } from '../../shared/games/index.ts'
+import type { AnyOptionField } from '../../shared/games/types.ts'
 
 const raw = (files: Record<string, unknown>) => files as Record<string, string>
 
@@ -66,7 +67,16 @@ describe('the catalog against the registry', () => {
     const info = getGameInfo(id)
     const module = getGame(id)
     expect(module?.meta).toBe(info?.meta)
-    expect(module?.options).toBe(info?.options)
+    // Field by field: a module may add hidden fields (types.ts), and only those
+    const fields = Object.entries((module?.options ?? {}) as Record<string, AnyOptionField>)
+    const shown = (info?.options ?? {}) as Record<string, unknown>
+    for (const [key, field] of fields) {
+      if (field.hidden) expect(shown, key).not.toHaveProperty(key)
+      else expect(shown[key], key).toBe(field)
+    }
+    expect(Object.keys(shown)).toEqual(
+      fields.filter(([, field]) => !field.hidden).map(([key]) => key),
+    )
   })
 
   it('answers null for an id it does not know', () => {
@@ -81,17 +91,28 @@ describe('the catalog against the registry', () => {
 
 // A rules file imported from src/ lands in the browser's download, and the budget only says so once
 // it no longer fits. The rules run on the server: a screen shows `view` and needs them for nothing
+/**
+ * What only the Worker may load: the registry, every rules file, the topic bank, and promotion's full
+ * edition (its board and rules, C6): the browser gets none of it until C7 decides how (NEXT.md)
+ */
+const WORKER_ONLY =
+  /(^|\/)shared\/games\/index\.ts$|shared\/games\/[^/]+\/(rules|rulesFull|boardFull|topics)\.ts$/
+
 describe('the browser loads no rules', () => {
   const paths = Object.keys(SOURCES)
+
+  it('knows the full edition is Worker only', () => {
+    expect(WORKER_ONLY.test('/shared/games/promotion/boardFull.ts')).toBe(true)
+    expect(WORKER_ONLY.test('../../../shared/games/promotion/rulesFull.ts')).toBe(true)
+    expect(WORKER_ONLY.test('/shared/games/promotion/board.ts')).toBe(false)
+  })
 
   it('looks at the site, not at nothing', () => {
     expect(paths).toContain('/src/i18n/t.ts')
   })
 
   it.each(paths)('%s', (path) => {
-    const bad = staticImports(SOURCES[path]).filter((from) =>
-      /shared\/games\/index\.ts$|shared\/games\/[^/]+\/(rules|topics)\.ts$/.test(from),
-    )
+    const bad = staticImports(SOURCES[path]).filter((from) => WORKER_ONLY.test(from))
     expect(bad).toEqual([])
   })
 
@@ -100,18 +121,14 @@ describe('the browser loads no rules', () => {
     const reached = [...reachableFromSite()]
     expect(reached).toContain('/shared/games/catalog.ts')
     expect(reached).toContain('/shared/games/spectrum/info.ts')
-    expect(
-      reached.filter((path) =>
-        /^\/shared\/games\/index\.ts$|^\/shared\/games\/[^/]+\/(rules|topics)\.ts$/.test(path),
-      ),
-    ).toEqual([])
+    expect(reached.filter((path) => WORKER_ONLY.test(path))).toEqual([])
   })
 
   it('catalog.ts and every info.ts import no rules', () => {
     expect(Object.keys(INFO_FILES)).toHaveLength(GAME_IDS.length + 1)
     for (const source of Object.values(INFO_FILES)) {
       const bad = staticImports(source).filter((from) =>
-        /rules\.ts$|index\.ts$|topics\.ts$/.test(from),
+        /rules\.ts$|rulesFull\.ts$|boardFull\.ts$|index\.ts$|topics\.ts$/.test(from),
       )
       expect(bad).toEqual([])
     }
