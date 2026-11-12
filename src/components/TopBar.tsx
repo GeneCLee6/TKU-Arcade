@@ -9,7 +9,9 @@ export function TopBar() {
   return (
     <Bar>
       <Brand to="/">
-        <Mark />
+        {/* The mark (public/favicon.svg, E3): a badge with its own night fill, so one file suits both
+            themes. A file, not JSX, so that it costs the first load nothing but its URL */}
+        <img src="/favicon.svg" alt="" width={32} height={32} />
         <BrandName>{APP_NAME}</BrandName>
       </Brand>
       <Switches>
@@ -17,16 +19,6 @@ export function TopBar() {
         <LanguageSwitch />
       </Switches>
     </Bar>
-  )
-}
-
-/** Two slanted chevrons, cyan and magenta: the site's own mark, drawn here */
-function Mark() {
-  return (
-    <MarkSvg viewBox="0 0 40 30" aria-hidden="true" focusable="false">
-      <polygon className="cyan" points="8,0 22,0 14,15 22,30 8,30 16,15" />
-      <polygon className="magenta" points="22,0 36,0 28,15 36,30 22,30 30,15" />
-    </MarkSvg>
   )
 }
 
@@ -76,21 +68,6 @@ const BrandName = styled.span`
     overflow: hidden;
     clip-path: inset(50%);
   }
-`
-
-const MarkSvg = styled.svg`
-  flex: none;
-  width: 34px;
-  height: 26px;
-
-  .cyan {
-    fill: ${color.brand};
-  }
-
-  .magenta {
-    fill: ${color.magenta};
-  }
-
 `
 
 const Switches = styled.div`

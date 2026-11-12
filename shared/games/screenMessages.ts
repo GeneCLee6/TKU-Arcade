@@ -4,6 +4,7 @@
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
 import { promotionScreenMessages } from './promotion/i18n.screen.ts'
 import { silentTableScreenMessages } from './silent-table/i18n.screen.ts'
+import { soonMessages } from './soon.ts'
 import { spectrumScreenMessages } from './spectrum/i18n.screen.ts'
 import type { GameMessages } from './types.ts'
 
@@ -13,11 +14,13 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...promotionDetailMessages.en,
     ...silentTableScreenMessages.en,
     ...spectrumScreenMessages.en,
+    ...soonMessages.en,
   },
   'zh-TW': {
     ...promotionScreenMessages['zh-TW'],
     ...promotionDetailMessages['zh-TW'],
     ...silentTableScreenMessages['zh-TW'],
     ...spectrumScreenMessages['zh-TW'],
+    ...soonMessages['zh-TW'],
   },
 }

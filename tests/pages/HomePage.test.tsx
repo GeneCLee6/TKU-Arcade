@@ -6,6 +6,7 @@ import { ToastProvider } from '../../src/components/Toast.tsx'
 import { initLanguage, setLanguage, translate } from '../../src/i18n/t.ts'
 import { resetAccountForTests } from '../../src/lib/account.ts'
 import { HomePage } from '../../src/pages/HomePage.tsx'
+import { LOBBY_GAMES } from '../../shared/games/catalog.ts'
 import { getGame } from '../../shared/games/index.ts'
 import { LOBBY_POLL_MS } from '../../shared/protocol.ts'
 
@@ -109,14 +110,47 @@ describe('signed in (e1-t13)', () => {
 })
 
 describe('lobby cards', () => {
-  it('lists promotion with its facts, and not the unlisted tic-tac-toe', () => {
+  it('lists promotion with its facts, and not the unlisted tic-tac-toe', async () => {
     renderLobby()
     const card = screen.getByRole('heading', { level: 3, name: 'Promotion' }).closest('li')!
     expect(within(card).getByText('2–6 players')).toBeInTheDocument()
     expect(within(card).getByText('About 20 min')).toBeInTheDocument()
     expect(within(card).getByText(/^Roll your way/)).toBeInTheDocument()
     expect(screen.queryByText(/tic-tac-toe/i)).not.toBeInTheDocument()
-    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(1)
+    // One open game; the four Coming soon cards arrive with their lazy chunk
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(5))
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(1)
+  })
+
+  it('shows the games that are not open yet as Coming soon, with nothing to press', async () => {
+    renderLobby()
+    const names = ['Silent Table', 'Spectrum', 'Bluff Reader', 'Kart']
+    for (const name of names) {
+      // The tag is part of the heading, so a screen reader hears it with the name
+      const heading = await screen.findByRole('heading', { level: 3, name: `${name} Coming soon` })
+      const card = heading.closest('li')!
+      expect(within(card).queryByRole('button')).not.toBeInTheDocument()
+      expect(within(card).queryByRole('link')).not.toBeInTheDocument()
+    }
+    // A Coming soon card never doubles a listed game: take it out of ComingSoon.tsx when it opens
+    for (const game of LOBBY_GAMES) {
+      const name = translate('en', `${game.meta.i18nKey}.name`)
+      expect(
+        screen.getAllByRole('heading', { level: 3, name: new RegExp(`^${name}`) }),
+      ).toHaveLength(1)
+    }
+    // Nothing on the page leads to the kart's hidden spike
+    expect(document.querySelector('a[href^="/kart"]')).toBeNull()
+  })
+
+  it('translates the Coming soon cards', async () => {
+    setLanguage('zh-TW')
+    renderLobby()
+    expect(
+      await screen.findByRole('heading', { level: 3, name: '真假朗讀 即將推出' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: '卡丁車 即將推出' })).toBeInTheDocument()
+    setLanguage('en')
   })
 
   it('switching language translates the card', () => {
