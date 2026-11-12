@@ -42,6 +42,6 @@ describe('the rules of Silent Table', () => {
   })
 
   it.each(LANGUAGES)('name no game this one must not be confused with (%s)', (language) => {
-    expect(DOCS[language]).not.toMatch(/kartrider|跑跑|the gang|紙牌幫|wavelength|腦洞|9upper|瞎掰/i)
+    expect(DOCS[language]).not.toMatch(/kartrider|跑跑|the gang|紙牌幫|wavelength|腦洞|9upper|瞎掰|\bito\b/i)
   })
 })
