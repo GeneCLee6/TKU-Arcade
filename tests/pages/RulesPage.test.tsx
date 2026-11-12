@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { HowToPlay } from '../../src/components/HowToPlay.tsx'
 import { setLanguage } from '../../src/i18n/t.ts'
+import { MemoryRouter, Route, Routes } from '../../src/lib/router.tsx'
 import { RulesPage } from '../../src/pages/RulesPage.tsx'
 import { stubDialog } from '../lib/stubDialog.ts'
 

@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeSeats } from '../../../shared/games/match.ts'
 import { createRng } from '../../../shared/games/rng.ts'
@@ -17,6 +16,7 @@ import { ToastProvider } from '../../../src/components/Toast.tsx'
 import SpectrumScreen from '../../../src/games/spectrum/SpectrumScreen.tsx'
 import { setLanguage } from '../../../src/i18n/t.ts'
 import { ChatDraft } from '../../../src/lib/chatState.ts'
+import { MemoryRouter } from '../../../src/lib/router.tsx'
 import { stubDialog } from '../../lib/stubDialog.ts'
 
 // The screen against the real rules: every view here is what the room would send that seat

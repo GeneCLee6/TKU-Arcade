@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { APP_NAME } from '../../shared/app.ts'
 import { LanguageSwitch } from '../i18n/LanguageSwitch.tsx'
+import { Link } from '../lib/router.tsx'
 import { color, font, fontSize, space } from '../styles/tokens.ts'
 import { ThemeSwitch } from './ThemeSwitch.tsx'
 

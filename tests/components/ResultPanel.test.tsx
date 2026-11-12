@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameResult } from '../../shared/games/types.ts'
 import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { ResultPanel, type ResultPanelProps } from '../../src/components/ResultPanel.tsx'
 import { en } from '../../src/i18n/en.ts'
 import { setLanguage } from '../../src/i18n/t.ts'
+import { MemoryRouter } from '../../src/lib/router.tsx'
 import { stubDialog } from '../lib/stubDialog.ts'
 
 const member = (id: string, seat: number | null, host = false): RoomMember => ({

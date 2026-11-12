@@ -36,7 +36,7 @@ shared/                 前後端共用、純 TS、可在 Node 測
     catalog.ts          瀏覽器用的遊戲清單（id、meta、options、首屏字串），不含規則
     index.ts            Worker 與腳本用的登記表（含規則），瀏覽器不得 import
     tictactoe/          範本（測試用）
-    promotion/          陞官圖：board.ts、rules.ts、i18n.ts、rules.en.md、rules.zh-TW.md
+    promotion/          陞官圖：board.ts、rules.ts、i18n.ts（大廳、等待室、錯誤與結算的字串）、i18n.screen.ts 與 i18n.detail.ts（隨畫面載入，含格名與官階名）、rules.en.md、rules.zh-TW.md
     silent-table/         默契牌局：rules.ts、types.ts、i18n.ts（等待室要的字串）、i18n.screen.ts（隨畫面載入）
     screenMessages.ts     隨畫面載入的字串總表：只給 check-i18n 與 npm run play，網站不能 import
     spectrum/             光譜猜題（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；topics.ts 是題庫（由 scripts/spectrum-topics.mjs 從 CSV 產生，只在 Worker，F3 搬到 D1）
@@ -56,7 +56,7 @@ worker/
 src/
   i18n/                 en.ts、zh-TW.ts、t.ts、useT.ts
   styles/tokens.ts      顏色與間距的唯一來源
-  lib/                  瀏覽器工具（storage 等）
+  lib/                  瀏覽器工具（storage 等）；router.tsx＋useRouter.ts 是站內的小路由（D4 取代 react-router-dom）
   components/           基礎元件
   pages/                Lobby、Room、Rules、Me、Admin
   games/screens.ts      遊戲畫面登記表（gameId → lazy 畫面）；沒登記的遊戲只有房間面板
