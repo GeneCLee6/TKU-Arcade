@@ -193,7 +193,7 @@ export function coverOptions(
     if (legal.length === 0) return null
     return {
       skip: module.skipAction?.(game.match.state, seat) ?? null,
-      proxy: module.meta.proxyTurns ? legal : [],
+      proxy: module.meta.proxyTurns ? (module.proxyActions?.(game.match.state, seat) ?? legal) : [],
     }
   } catch (error) {
     logFailure(module, 'cover', error)

@@ -1,7 +1,9 @@
-// Where each of the full edition's 182 cells goes (e3-t14). boardFull.ts has no coordinates: this lays
-// its 37 departments out as blocks, each a lacquer plaque standing on the left of its cells, which run
-// from the lowest office to the highest, left to right. Blocks sit side by side in rows, rows stack in
-// columns, and columns stand side by side.
+// Where each of the full edition's cells goes (e3-t14, C8). boardFull.ts has no coordinates: this lays
+// a board's departments out as blocks, each a lacquer plaque standing on the left of its cells, which
+// run from the lowest office to the highest, left to right. Blocks sit side by side in rows, rows stack
+// in columns, and columns stand side by side. Each board has its own arrangement: the first (C6, 182
+// cells in 37 departments) for a game from before C8, the second (236 in 53, and the ladder of grades
+// the end compares, 品級考) for every game since. A traditional square board is batch C9.
 //
 // The whole board is on the screen at once (C5's rule), so there are two arrangements of the same
 // blocks and the screen takes whichever shows the cells biggest in the box it has (`fitFullBoard`):
@@ -9,12 +11,7 @@
 // In every one the summit (retirement, peerage, the highest titles) is at the top and the origins and
 // examinations, where every career starts, at the bottom of the middle; the military to one side.
 // Units are the SVG's: the board is scaled to fit its box.
-import {
-  BOARD_FULL,
-  FULL_DEPARTMENTS,
-  type FullCell,
-  type FullDeptId,
-} from '../../../../shared/games/promotion/boardFull.ts'
+import type { FullBoard, FullDeptId } from '../../../../shared/games/promotion/boardFull.ts'
 
 export type FullShape = 'wide' | 'tall'
 
@@ -29,10 +26,18 @@ export interface FullCellBox extends Box {
   id: string
 }
 
+/** A department's block, or the ladder of grades (品級考) */
+export type FullBlockId = FullDeptId | 'ladder'
+
 export interface FullBlockBox extends Box {
-  id: FullDeptId
+  id: FullBlockId
   /** The plaque on the block's left */
   plaque: Box
+}
+
+/** A rung of the ladder of grades: `grade` 13 (大賀) first, down to 0 (白身) */
+export interface FullRungBox extends Box {
+  grade: number
 }
 
 export interface FullLayout {
@@ -43,6 +48,8 @@ export interface FullLayout {
   /** Block by block, each lowest office first */
   cells: readonly FullCellBox[]
   byId: ReadonlyMap<string, FullCellBox>
+  /** The ladder of grades; empty in the first board's arrangement */
+  rungs: readonly FullRungBox[]
 }
 
 export const CELL_W = 70
@@ -57,18 +64,21 @@ const FRAME = 16
 const MAX_WIDEN = 1.6
 const MAX_HEIGHTEN = 1.35
 
-/** A department and how many cells wide its block is */
-type Block = readonly [FullDeptId, number]
+/** A department (or the ladder) and how many cells wide its block is */
+type Block = readonly [FullBlockId, number]
 type Row = readonly Block[]
 type Column = readonly Row[]
 
-const cellsOf = (id: FullDeptId): FullCell[] => BOARD_FULL.filter((cell) => cell.dept === id)
+/** The grades of the final comparison, top first, for the ladder */
+export const LADDER: readonly number[] = [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
 
-const COUNT: ReadonlyMap<FullDeptId, number> = new Map(
-  (Object.keys(FULL_DEPARTMENTS) as FullDeptId[]).map((id) => [id, cellsOf(id).length]),
-)
+/** What a block holds: a department's cells by id, or the ladder's grades */
+type Contents = (id: FullBlockId) => readonly string[]
 
-const rowsOf = ([id, columns]: Block) => Math.ceil((COUNT.get(id) ?? 0) / columns)
+// The board being laid out, while `build` runs
+let contents: Contents = () => []
+
+const rowsOf = ([id, columns]: Block) => Math.ceil(contents(id).length / columns)
 const blockWidth = ([, columns]: Block) =>
   PLAQUE_W + 2 * PAD + columns * CELL_W + (columns - 1) * GAP
 const blockHeight = (block: Block) => {
@@ -91,6 +101,7 @@ function placeBlock(
   width: number,
   height: number,
   cells: FullCellBox[],
+  rungs: FullRungBox[],
 ): FullBlockBox {
   const [id, columns] = block
   const rows = rowsOf(block)
@@ -102,14 +113,15 @@ function placeBlock(
   const left = x + PLAQUE_W + PAD
   // What the cells do not take is left round them, the plaque keeping the block's whole height
   const top = y + (height - (rows * cellHeight + (rows - 1) * GAP)) / 2
-  cellsOf(id).forEach((cell, at) => {
-    cells.push({
-      id: cell.id,
+  contents(id).forEach((entry, at) => {
+    const box = {
       x: left + (at % columns) * (cellWidth + GAP),
       y: top + Math.floor(at / columns) * (cellHeight + GAP),
       width: cellWidth,
       height: cellHeight,
-    })
+    }
+    if (id === 'ladder') rungs.push({ ...box, grade: Number(entry) })
+    else cells.push({ ...box, id: entry })
   })
   const used = PLAQUE_W + 2 * PAD + columns * cellWidth + (columns - 1) * GAP
   return {
@@ -122,10 +134,12 @@ function placeBlock(
   }
 }
 
-function build(shape: FullShape, columns: readonly Column[]): FullLayout {
+function build(shape: FullShape, columns: readonly Column[], what: Contents): FullLayout {
+  contents = what
   const height = Math.max(...columns.map(columnHeight))
   const blocks: FullBlockBox[] = []
   const cells: FullCellBox[] = []
+  const rungs: FullRungBox[] = []
   let x = FRAME
   for (const column of columns) {
     const width = columnWidth(column)
@@ -139,7 +153,7 @@ function build(shape: FullShape, columns: readonly Column[]): FullLayout {
       let left = x
       for (const block of row) {
         const wide = blockWidth(block) + extraPerCell * block[1]
-        blocks.push(placeBlock(block, left, y, wide, tall, cells))
+        blocks.push(placeBlock(block, left, y, wide, tall, cells, rungs))
         left += wide + BLOCK_GAP
       }
       y += tall + BLOCK_GAP
@@ -153,6 +167,7 @@ function build(shape: FullShape, columns: readonly Column[]): FullLayout {
     blocks,
     cells,
     byId: new Map(cells.map((cell) => [cell.id, cell])),
+    rungs,
   }
 }
 
@@ -242,9 +257,119 @@ const TALL: readonly Column[] = [
   ],
 ]
 
-export const FULL_LAYOUTS: Record<FullShape, FullLayout> = {
-  wide: build('wide', WIDE),
-  tall: build('tall', TALL),
+// ── The second board (C8): 16 more departments, the event zones and the ladder of grades ──
+
+/**
+ * Wide: the military and the provinces on the left; in the middle the summit over the court, the
+ * events and where careers start; the capital on the right, with the ladder of grades at its foot
+ */
+const WIDE_2: readonly Column[] = [
+  [
+    [['qitong', 4], ['wuke', 4]],
+    [['shiwei', 7]],
+    [['zhen', 7]],
+    [['qiying', 6], ['juanna', 1]],
+    [['luanyiwei', 5]],
+    [['ying', 5]],
+    [['dufu', 2], ['sansi', 2], ['dao', 2]],
+    [['xueyuan', 3], ['jiaozhi', 3]],
+    [['yanyuan', 4], ['heyuan', 3]],
+    [['caoyuan', 3], ['fu', 4]],
+    [['zhou', 4], ['neige', 3]],
+    [['xian', 6]],
+  ],
+  [
+    [['end', 5]],
+    [['jue', 5]],
+    [['gongxian', 6]],
+    [['daxueshi', 6]],
+    [['junji', 3], ['neiting', 3]],
+    [['kaoji', 6]],
+    [['hanlin', 5]],
+    [['exam', 6]],
+    [['origin', 4]],
+    [['tenglu', 4]],
+  ],
+  [
+    [['personnel', 5], ['zongrenfu', 3]],
+    [['revenue', 5], ['cangchang', 3]],
+    [['rites', 5], ['guozijian', 3]],
+    [['war', 5], ['taipusi', 2]],
+    [['justice', 5], ['taichangsi', 3]],
+    [['works', 5], ['guanglusi', 3]],
+    [['zhanshifu', 5], ['zhongshuke', 2]],
+    [['duchayuan', 4], ['dalisi', 4]],
+    [['neiwufu', 4], ['wucheng', 4]],
+    [['qintianjian', 5], ['honglusi', 3]],
+    [['taiyiyuan', 5], ['tongzhengsi', 3]],
+    [['ladder', 7]],
+  ],
+]
+
+/** Tall, for a phone held upright: the civil career on the left, the rest on the right */
+const TALL_2: readonly Column[] = [
+  [
+    [['end', 5]],
+    [['jue', 5]],
+    [['gongxian', 3], ['junji', 2]],
+    [['daxueshi', 3], ['neige', 2]],
+    [['kaoji', 3], ['neiting', 2]],
+    [['hanlin', 5]],
+    [['personnel', 5]],
+    [['revenue', 5]],
+    [['rites', 5]],
+    [['war', 5]],
+    [['justice', 5]],
+    [['works', 5]],
+    [['zhanshifu', 5]],
+    [['exam', 5]],
+    [['origin', 4], ['juanna', 1]],
+    [['tenglu', 4]],
+    [['qintianjian', 5]],
+    [['taiyiyuan', 5]],
+    [['ladder', 5]],
+  ],
+  [
+    [['qitong', 4]],
+    [['wuke', 4]],
+    [['shiwei', 4]],
+    [['luanyiwei', 5]],
+    [['zhen', 4]],
+    [['qiying', 3], ['sansi', 2]],
+    [['ying', 5]],
+    [['dufu', 2], ['dao', 2]],
+    [['xueyuan', 3], ['heyuan', 2]],
+    [['yanyuan', 4]],
+    [['caoyuan', 3], ['taipusi', 2]],
+    [['xian', 3], ['zhou', 2]],
+    [['fu', 4]],
+    [['jiaozhi', 3], ['zhongshuke', 2]],
+    [['duchayuan', 4]],
+    [['dalisi', 4]],
+    [['taichangsi', 3], ['tongzhengsi', 2]],
+    [['guanglusi', 3], ['honglusi', 2]],
+    [['guozijian', 3], ['cangchang', 2]],
+    [['zongrenfu', 3], ['neiwufu', 2]],
+    [['wucheng', 4]],
+  ],
+]
+
+export type FullLayouts = Record<FullShape, FullLayout>
+
+const built = new Map<number, FullLayouts>()
+
+/** Both arrangements of a board, made once */
+export function fullLayouts(board: FullBoard): FullLayouts {
+  const known = built.get(board.version)
+  if (known) return known
+  const byDept = new Map<FullBlockId, string[]>()
+  for (const cell of board.cells) byDept.set(cell.dept, [...(byDept.get(cell.dept) ?? []), cell.id])
+  byDept.set('ladder', LADDER.map(String))
+  const what: Contents = (id) => byDept.get(id) ?? []
+  const [wide, tall] = board.version === 2 ? [WIDE_2, TALL_2] : [WIDE, TALL]
+  const layouts = { wide: build('wide', wide, what), tall: build('tall', tall, what) }
+  built.set(board.version, layouts)
+  return layouts
 }
 
 export interface FullFit {
@@ -254,9 +379,9 @@ export interface FullFit {
 }
 
 /** The arrangement that shows the board biggest in a box of this many CSS pixels, and how big */
-export function fitFullBoard(width: number, height: number): FullFit {
+export function fitFullBoard(layouts: FullLayouts, width: number, height: number): FullFit {
   let best: FullFit | null = null
-  for (const layout of Object.values(FULL_LAYOUTS)) {
+  for (const layout of Object.values(layouts)) {
     const scale = Math.min(width / layout.width, height / layout.height)
     if (!best || scale > best.scale) best = { layout, scale }
   }

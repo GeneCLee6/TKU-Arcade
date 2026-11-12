@@ -1,9 +1,9 @@
 // Moving round the full board with a keyboard (e3-t14), as on the simple one (boardKeys.ts): the
 // arrows go by what is on the screen, Home and End to where a career starts and where it ends best.
-import { FULL_START } from '../../../../shared/games/promotion/boardFull.ts'
+import { FULL_START, FULL_TOP } from '../../../../shared/games/promotion/fullFaces.ts'
 import type { FullCellBox, FullLayout } from './fullLayout.ts'
 
-export const FULL_TOP = 'dahe'
+export { FULL_TOP }
 
 type Axis = { main: 'x' | 'y'; size: 'width' | 'height'; sign: 1 | -1 }
 

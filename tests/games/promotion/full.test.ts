@@ -1,6 +1,8 @@
 // @vitest-environment node
-// Promotion's full edition (C6, e3-t12, e3-t13): the board's consistency, the dice, silver, the
-// ending and settlement, the harness, and that the simple edition plays exactly as before.
+// Promotion's full edition (C6, e3-t12, e3-t13): the first board's consistency, the dice, and the
+// first rules' turns, silver, ending and settlement, which every game from before C8 still plays by;
+// whole games on the latest rules through the harness; and that the simple edition plays exactly as
+// before. The second board and rules (C8) are in fullChoices.test.ts.
 import { describe, expect, it, vi } from 'vitest'
 import { applyAction, makeSeats, replayMatch, startMatch, type Match } from '../../../shared/games/match.ts'
 import {
@@ -8,7 +10,7 @@ import {
   FULL_DEPARTMENTS,
   FULL_FACES,
   FULL_ORIGINS,
-  getFullCell,
+  fullBoard,
   gradeOf,
   type FullCell,
   type FullFace,
@@ -19,6 +21,7 @@ import { promotion } from '../../../shared/games/promotion/rules.ts'
 import {
   birthOf,
   COURTESY,
+  initFullV1,
   FULL_ROUND_LIMIT,
   MAX_THROWS,
   meets,
@@ -40,7 +43,17 @@ import { playRandom } from '../harness.ts'
 
 vi.setConfig({ testTimeout: 120_000 })
 
-const FULL: PromotionOptions = { dice: 'four-sided', turnLimit: 60, edition: 'full' }
+const FULL: PromotionOptions = {
+  dice: 'four-sided',
+  turnLimit: 60,
+  edition: 'full',
+  decisionSeconds: 30,
+  buying: true,
+  endAtDahe: false,
+}
+/** The first board: what the C6 tests below hold, and what a game from before C8 still plays on */
+const B1 = fullBoard(1)
+const getFullCell = (id: string) => B1.get(id)
 const ROLL = { type: 'roll' as const }
 const ids = new Set(BOARD_FULL.map((cell) => cell.id))
 const isEnd = (cell: FullCell) => cell.kind === 'end'
@@ -61,7 +74,8 @@ function dice(pips: readonly number[]): Rng {
   }
 }
 
-const start = (seats: number) => promotion.init(makeSeats(seats), FULL, dice([])) as PromotionFullState
+/** A game under the first rules (C6), as a room from before C8 holds it */
+const start = (seats: number) => initFullV1(makeSeats(seats), dice([]))
 
 function roll(state: PromotionFullState, pips: readonly number[]): PromotionFullState {
   const next = promotion.reduce(state, ROLL, state.turn as number, dice(pips))
@@ -94,8 +108,10 @@ describe('the full board', () => {
     expect(BOARD_FULL.length).toBeLessThanOrEqual(250)
     expect(ids.size).toBe(BOARD_FULL.length)
     for (const cell of BOARD_FULL) expect(FULL_DEPARTMENTS, cell.id).toHaveProperty(cell.dept)
+    // The first 37 departments are the first board's; the second board (C8) adds the rest
     const used = new Set(BOARD_FULL.map((cell) => cell.dept))
-    expect([...used].sort()).toEqual(Object.keys(FULL_DEPARTMENTS).sort())
+    expect([...used].sort()).toEqual(Object.keys(FULL_DEPARTMENTS).slice(0, 37).sort())
+    expect(B1.depts).toEqual(Object.keys(FULL_DEPARTMENTS).slice(0, 37))
   })
 
   it('names every cell in both languages: Chinese, and English as "Pinyin (Gloss)"', () => {
@@ -124,7 +140,7 @@ describe('the full board', () => {
   it('every player can land somewhere for every cell: no requirement chain loops', () => {
     for (const profile of PROFILES) {
       for (const cell of BOARD_FULL) {
-        const landed = getFullCell(resolveCell(profile, cell.id))
+        const landed = getFullCell(resolveCell(B1, profile, cell.id))
         expect(landed.requires === null || meets(profile, landed.requires)).toBe(true)
       }
     }
@@ -233,12 +249,12 @@ function successors(from: Profile): Profile[] {
   if (isEnd(cell)) return []
   const player = { ...PROFILES[0], ...from }
   const raws = [
-    ...FULL_FACES.map((face) => stepTarget(player, face)),
-    stepTarget(player, 'dismiss'),
-    cell.fengjue ?? stepTarget(player, 'de'),
+    ...FULL_FACES.map((face) => stepTarget(B1, player, face)),
+    stepTarget(B1, player, 'dismiss'),
+    cell.fengjue ?? stepTarget(B1, player, 'de'),
   ]
   return raws.map((raw) => {
-    const landed = getFullCell(resolveCell(player, raw))
+    const landed = getFullCell(resolveCell(B1, player, raw))
     return {
       cell: landed.id,
       degree: Math.max(from.degree, landed.degree) as Profile['degree'],
@@ -426,10 +442,10 @@ describe('a full-edition turn', () => {
 
   it('a requirement redirects: a Hanlin post without jinshi lands on its instead', () => {
     const player = { ...PROFILES[0], cell: 'zhongshu' }
-    expect(resolveCell(player, 'jiantao')).toBe('zhongshu')
-    expect(resolveCell({ ...player, degree: 3 }, 'jiantao')).toBe('jiantao')
-    expect(resolveCell(player, 'lanling')).toBe('qianzong')
-    expect(resolveCell({ ...player, wu: true }, 'lanling')).toBe('lanling')
+    expect(resolveCell(B1, player, 'jiantao')).toBe('zhongshu')
+    expect(resolveCell(B1, { ...player, degree: 3 }, 'jiantao')).toBe('jiantao')
+    expect(resolveCell(B1, player, 'lanling')).toBe('qianzong')
+    expect(resolveCell(B1, { ...player, wu: true }, 'lanling')).toBe('lanling')
   })
 
   it('a Banner commoner on good conduct joins the Banner companies; a civilian takes the military exam', () => {
@@ -554,7 +570,10 @@ function playOut(seats: number, seed: number) {
   let match: Match<PromotionAnyState> = startMatch(promotion, makeSeats(seats), FULL, seed)
   const sums: number[] = []
   while (!promotion.isOver(match.state)) {
-    const next = applyAction(promotion, match, ROLL, match.state.turn as number)
+    // The latest rules: a decision is answered with its first answer (accept, or take the post)
+    const state = match.state as PromotionFullState
+    const seat = state.pending?.seat ?? (state.turn as number)
+    const next = applyAction(promotion, match, promotion.legalActions(state, seat)[0], seat)
     if (isGameError(next)) throw new Error(next.gameError)
     match = next
     sums.push(total(match.state as PromotionFullState))

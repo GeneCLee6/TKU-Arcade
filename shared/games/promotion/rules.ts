@@ -15,7 +15,15 @@ import {
   type SeatId,
 } from '../types.ts'
 import { END_CELL, FACES, getCell, START_CELL, type Face } from './board.ts'
-import { initFull, reduceFull, resultFull, viewFull } from './rulesFull.ts'
+import {
+  defaultDecision,
+  initFull,
+  legalFull,
+  reduceFull,
+  resultFull,
+  timersFull,
+  viewFull,
+} from './rulesFull.ts'
 import type {
   PromotionAction,
   PromotionAnyState,
@@ -68,6 +76,12 @@ function isRoll(action: unknown): action is { type: 'roll' } {
 
 function isPass(action: unknown): action is { type: 'pass' } {
   return hasType(action, 'pass')
+}
+
+/** The full edition's answers to a decision (C8): `buy` names an office by id */
+function isDecision(action: unknown): action is PromotionAction {
+  if (hasType(action, 'accept') || hasType(action, 'decline') || hasType(action, 'skip')) return true
+  return hasType(action, 'buy') && typeof (action as { cell?: unknown }).cell === 'string'
 }
 
 const rankOf = (player: PromotionPlayer) => getCell(player.cell).rank
@@ -208,15 +222,17 @@ export const promotion: GameModule<
   options: PROMOTION_OPTIONS,
 
   init(seats, options, rng) {
-    // An option missing (a room from before C6) is the simple edition
+    // An option missing (a room from before C6) is the simple edition. A full game starts on the
+    // latest rules; one from before C8 has no `rulesVersion` and plays on under the first (rulesFull.ts)
     return options.edition === 'full'
-      ? initFull(seats, rng)
+      ? initFull(seats, rng, options)
       : promotionSimple.init(seats, options, rng)
   },
 
   reduce(state, action, actor, rng) {
     if (!isFull(state)) return promotionSimple.reduce(state, action, actor, rng)
-    if (!isRoll(action) && !isPass(action)) return gameError('games.promotion.error.badAction')
+    const decision = state.rulesVersion === 2 && isDecision(action)
+    if (!isRoll(action) && !isPass(action) && !decision) return gameError('games.promotion.error.badAction')
     return reduceFull(state, action, actor, rng)
   },
 
@@ -226,11 +242,24 @@ export const promotion: GameModule<
   },
 
   legalActions(state, seat) {
+    if (isFull(state)) return legalFull(state, seat)
     return state.turn === seat ? [{ type: 'roll' }] : []
   },
 
-  skipAction() {
-    return { type: 'pass' }
+  // A seat whose player is gone: a turn is passed, a decision gets its default answer
+  skipAction(state) {
+    const pending = isFull(state) ? (state.pending ?? null) : null
+    return pending === null ? { type: 'pass' } : defaultDecision(pending)
+  },
+
+  // Covering for a seat rolls for it, but never decides for it: a decision gets the default
+  proxyActions(state, seat) {
+    const pending = isFull(state) ? (state.pending ?? null) : null
+    return pending === null ? this.legalActions(state, seat) : [defaultDecision(pending)]
+  },
+
+  timers(state) {
+    return isFull(state) ? timersFull(state) : []
   },
 
   isOver(state) {

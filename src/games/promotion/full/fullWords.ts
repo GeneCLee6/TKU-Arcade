@@ -1,4 +1,6 @@
-// The full edition's sentences: what a throw makes, what a turn did, where silver went and why
+// The full edition's sentences: what a throw makes, what a turn did, where silver went and why. The
+// ones that name cells need the board's data (fullData.ts): the screen asks for them once it is there.
+import { DISMISSED } from '../../../../shared/games/promotion/fullFaces.ts'
 import type {
   FullLastTurn,
   FullPlayer,
@@ -6,13 +8,44 @@ import type {
   Transfer,
 } from '../../../../shared/games/promotion/types.ts'
 import type { Language, Translate } from '../../../i18n/t.ts'
-import { shortCellName } from './fullText.ts'
+import { anyCell, shortCellName } from './fullText.ts'
 
 const face = (t: Translate, step: string) => t(`games.promotion.full.face.${step}`)
 
+/** What an event zone's throw (C8) or a restoration's decided, in words */
+function eventText(t: Translate, thrown: FullThrow, language: Language): string {
+  const { cell, face: decided } = thrown.event as NonNullable<FullThrow['event']>
+  const zone = shortCellName(cell, language)
+  if (decided === null) return t('games.promotion.full.combo.eventWait', { zone })
+  let outcome: string
+  if (cell === DISMISSED) {
+    const exiled = decided === 'zang' && (thrown.combo === 'three' || thrown.combo === 'allGraft')
+    outcome = t(
+      decided === 'de'
+        ? 'games.promotion.full.restore.de'
+        : decided === 'cai'
+          ? 'games.promotion.full.restore.cai'
+          : exiled
+            ? 'games.promotion.full.restore.exile'
+            : 'games.promotion.full.restore.wait',
+    )
+  } else {
+    const result = anyCell(cell).event?.[decided]
+    outcome = result
+      ? [
+          t(`games.promotion.full.go.${result.go}`),
+          ...(result.money > 0 ? [t('games.promotion.full.go.money', { amount: result.money })] : []),
+          ...(result.title ? [t('games.promotion.full.go.title')] : []),
+        ].join(', ')
+      : ''
+  }
+  return t('games.promotion.full.combo.event', { zone, face: face(t, decided), outcome })
+}
+
 /** "A pair of Talent: one move", "Virtue over Graft: void, throw again" */
-export function comboText(t: Translate, thrown: FullThrow, birth: boolean): string {
+export function comboText(t: Translate, thrown: FullThrow, birth: boolean, language: Language = 'en'): string {
   if (birth) return t('games.promotion.full.combo.birth')
+  if (thrown.event) return eventText(t, thrown, language)
   const [first, second] = thrown.steps
   switch (thrown.combo) {
     case 'pair':
@@ -51,6 +84,16 @@ export function turnSentence(
   name: string,
 ): string {
   const cell = (id: string) => shortCellName(id, language)
+  if (last.decision) {
+    const { kind, price, timedOut } = last.decision
+    const said = t(`games.promotion.full.decided.${kind}`, {
+      name,
+      cell: cell(last.decision.cell),
+      from: cell(last.from),
+      price,
+    })
+    return timedOut ? t('games.promotion.full.decided.timedOut', { sentence: said }) : said
+  }
   if (last.birth && player) {
     return t('games.promotion.full.born', {
       name,
@@ -59,6 +102,11 @@ export function turnSentence(
     })
   }
   const to = last.path.at(-1)
+  // Still in an event zone or under review after its throw (C8)
+  const waiting = last.throws.at(-1)?.event
+  if (to === undefined && waiting && waiting.face === null) {
+    return t('games.promotion.full.waits', { name, cell: cell(waiting.cell) })
+  }
   if (to === undefined || to === last.from) {
     return t('games.promotion.full.stayed', { name, from: cell(last.from) })
   }
@@ -71,12 +119,15 @@ export function turnSentence(
   })
 }
 
-/** The last throw of a turn that went nowhere says so */
-export function lastComboText(t: Translate, last: FullLastTurn): string {
+/** The last throw of a turn that went nowhere says so: after three throws (C6), or the one (C8) */
+export function lastComboText(t: Translate, last: FullLastTurn, language: Language = 'en'): string {
   const thrown = last.throws.at(-1)
   if (!thrown) return ''
-  if (!last.birth && thrown.steps.length === 0) return t('games.promotion.full.combo.stuck')
-  return comboText(t, thrown, last.birth)
+  if (thrown.event) return comboText(t, thrown, false, language)
+  if (!last.birth && thrown.steps.length === 0) {
+    return t(last.throws.length >= 3 ? 'games.promotion.full.combo.stuck' : 'games.promotion.full.combo.noMove')
+  }
+  return comboText(t, thrown, last.birth, language)
 }
 
 export function transferText(t: Translate, transfer: Transfer, nameOf: (seat: number) => string): string {
@@ -104,6 +155,18 @@ export function beforeTransfers(
     else money.set(to, (money.get(to) ?? 0) - amount)
   }
   return { money, bank: pot }
+}
+
+/** Each seat's grade for the ladder (品級考), as the end compares it: honorary titles add (C8) */
+export function ladderGrade(
+  player: FullPlayer,
+  gradeOf: (rank: number) => number,
+  second: boolean,
+): number {
+  if (player.status === 'out') return 0
+  const grade = gradeOf(player.rank)
+  if (!second || grade >= 13) return grade
+  return Math.min(12, grade + (player.titles ?? 0))
 }
 
 /** "Juren · Banner" — what someone holds, for the members' list and the result */

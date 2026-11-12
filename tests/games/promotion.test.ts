@@ -27,10 +27,13 @@ import type {
 import { isGameError, type Actor, type GameError, type Rng } from '../../shared/games/types.ts'
 import { playRandom } from './harness.ts'
 
+/** The full edition's options (C8), which a simple game ignores */
+const FULL_ONLY = { decisionSeconds: 30, buying: true, endAtDahe: false }
+
 // The harness plays whole games over many seeds, which goes past 5 s on a busy machine
 vi.setConfig({ testTimeout: 60_000 })
 
-const options: PromotionOptions = { dice: 'four-sided', turnLimit: DEFAULT_TURN_LIMIT, edition: 'simple' }
+const options: PromotionOptions = { dice: 'four-sided', turnLimit: DEFAULT_TURN_LIMIT, edition: 'simple', ...FULL_ONLY }
 const ROLL = { type: 'roll' as const }
 
 /** An Rng that answers the four-sided top from a list of results, and opens with the first seat */
@@ -370,16 +373,19 @@ describe('promotion options', () => {
       dice: 'four-sided',
       turnLimit: DEFAULT_TURN_LIMIT,
       edition: 'simple',
+      ...FULL_ONLY,
     })
     expect(parseOptions(promotion.options, { dice: 'loaded', turnLimit: 5 })).toEqual({
       dice: 'four-sided',
       turnLimit: DEFAULT_TURN_LIMIT,
       edition: 'simple',
+      ...FULL_ONLY,
     })
     expect(parseOptions(promotion.options, { dice: 'six-sided', turnLimit: 25 })).toEqual({
       dice: 'six-sided',
       turnLimit: 25,
       edition: 'simple',
+      ...FULL_ONLY,
     })
   })
 
@@ -413,7 +419,7 @@ describe('promotion options', () => {
     const counts: Record<Face, number> = { de: 0, cai: 0, gong: 0, zang: 0 }
     let total = 0
     for (let seed = 1; seed <= 200; seed++) {
-      let match = startMatch(promotion, makeSeats(2), { dice, turnLimit: 30, edition: 'simple' }, seed)
+      let match = startMatch(promotion, makeSeats(2), { dice, turnLimit: 30, edition: 'simple', ...FULL_ONLY }, seed)
       while (!promotion.isOver(match.state)) {
         const next = applyAction(promotion, match, ROLL, match.state.turn as number)
         if (isGameError(next)) throw new Error(next.gameError)
@@ -477,7 +483,7 @@ describe('promotion options', () => {
   })
 
   it('the options reach the later turns through the state alone', () => {
-    const { state } = startMatch(promotion, makeSeats(2), { dice: 'six-sided', turnLimit: 25, edition: 'simple' }, 1)
+    const { state } = startMatch(promotion, makeSeats(2), { dice: 'six-sided', turnLimit: 25, edition: 'simple', ...FULL_ONLY }, 1)
     expect(state).toMatchObject({ dice: 'six-sided', turnLimit: 25 })
   })
 })
@@ -494,7 +500,7 @@ describe('promotion through the harness', () => {
   it.each([2, 3, 4, 5, 6])('%i seats, both dice, breaks no rule over many seeds', (seats) => {
     for (const dice of ['four-sided', 'six-sided'] as const) {
       for (let seed = 1; seed <= 20; seed++) {
-        playRandom(promotion, { seed, seats, options: { dice, turnLimit: DEFAULT_TURN_LIMIT, edition: 'simple' } })
+        playRandom(promotion, { seed, seats, options: { dice, turnLimit: DEFAULT_TURN_LIMIT, edition: 'simple', ...FULL_ONLY } })
       }
     }
   })

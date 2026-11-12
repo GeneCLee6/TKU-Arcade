@@ -503,7 +503,7 @@ describe('host controls in the waiting room, over the wire', () => {
     fireEvent.blur(limit)
     expect(lastSent()).toEqual({
       t: 'set_options',
-      options: { edition: 'simple', dice: 'four-sided', turnLimit: 77 },
+      options: { edition: 'simple', dice: 'four-sided', turnLimit: 77, decisionSeconds: 30, buying: true, endAtDahe: false },
     })
   })
 

@@ -196,6 +196,9 @@ export const promotionBoard = {
   requirement: '#1F4E8C',
   onRequirement: '#FFFFFF',
   onFace: '#1A1206',
+  // A cell that asks a choice or holds an event (C8): an offered post, a minor post, an evaluation
+  choice: '#0F6E5C',
+  onChoice: '#FFFFFF',
   // Hat buttons by grade, first to ninth (illustrative)
   knob: {
     ruby: '#D7263D',
