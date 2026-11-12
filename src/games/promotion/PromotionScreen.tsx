@@ -178,6 +178,8 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
           ),
         })
 
+  // The whole sentence stays in the page for a screen reader and on hover, however it is cut short
+  const sentence = !rolling && last ? rollSentence(t, last, nameOf(last.seat)) : ''
   const turn = (
     <TurnPanel ref={turnPanel}>
       <RollDisplay kind={state.dice} roll={last} rolling={rolling} />
@@ -189,9 +191,10 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
           nameOf={nameOf}
           rolling={rolling}
         />
-        <SmallText role="status">
-          {!rolling && last ? rollSentence(t, last, nameOf(last.seat)) : ''}
-        </SmallText>
+        {/* Two lines kept for it whether or not there is a roll to tell: the dock never changes height */}
+        <RollLine role="status" title={sentence || undefined}>
+          {sentence}
+        </RollLine>
         <SmallText>
           {t('games.promotion.ui.round', { round: state.round, limit: state.turnLimit })}
         </SmallText>
@@ -507,34 +510,59 @@ const Tip = styled.p`
 
 
 
+// The whole width of the dock or the rail, whatever it says: a panel as wide as its words would
+// rearrange itself as they change
 const TurnPanel = styled.div`
+  width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: ${space.sm}px ${space.md}px;
 `
 
-// Wraps under the top in the narrow rail of full screen, rather than squeeze into a column
+// Wraps under the top in the narrow rail of full screen, rather than squeeze into a column. Every line
+// has a fixed height and cuts what does not fit short, so that no roll, turn or name changes the dock's
+// height: the board's room is what the dock leaves (useBoardFit), and a dock that grew by a line on
+// one roll and shrank on the next refitted the board each time (the screen jumped on phones)
 const TurnText = styled.div`
   flex: 1 1 140px;
   min-width: 0;
-  overflow-wrap: anywhere;
+`
+
+const MAIN_LINE = 22
+const SMALL_LINE = 17
+
+const oneLine = `
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 `
 
 const MainLine = styled.p`
   margin: 0;
+  height: ${MAIN_LINE}px;
+  line-height: ${MAIN_LINE}px;
   font-weight: 600;
+  ${oneLine}
 `
 
 const SmallText = styled.p`
   margin: 0;
+  height: ${SMALL_LINE}px;
   color: ${color.muted};
   font-size: ${fontSize.sm}px;
-  line-height: 1.3;
+  line-height: ${SMALL_LINE}px;
+  ${oneLine}
+`
 
-  &:empty {
-    display: none;
-  }
+// The roll's sentence: up to two lines, an ellipsis after that, and the two lines kept while empty
+const RollLine = styled(SmallText)`
+  height: ${2 * SMALL_LINE}px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 `
 
 // aria-disabled, not disabled: focus stays on the button through the other players' turns
