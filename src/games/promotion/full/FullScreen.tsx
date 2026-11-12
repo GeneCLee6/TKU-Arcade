@@ -31,6 +31,7 @@ import { loadFullBoardFont } from './fullFont.ts'
 import { FullCellDetail } from './FullCellDetail.tsx'
 import { FullDice } from './FullDice.tsx'
 import { useFullData } from './fullData.ts'
+import { shortCellName } from './fullText.ts'
 import { CELL_W, fitFullBoard, fullLayouts } from './fullLayout.ts'
 import {
   beforeTransfers,
@@ -248,8 +249,18 @@ export default function FullScreen({ room, game }: GameScreenProps) {
     last && beat && (beat.kind === 'throw' || beat.kind === 'read') && last.throws.length > 1
       ? ` (${beat.index + 1}/${last.throws.length})`
       : ''
-  const sentence =
-    !playing && last && data ? turnSentence(t, language, last, playerOf(last.seat), nameOf(last.seat)) : ''
+  // While a decision waits, the line under the dice says what is being decided
+  const sentence = !playing && last && data
+    ? deciding
+      ? t(`games.promotion.full.watching.${pending.kind}`, {
+          name: nameOf(pending.seat),
+          cell: shortCellName(pending.cell, language),
+        })
+      : turnSentence(t, language, last, playerOf(last.seat), nameOf(last.seat))
+    : ''
+  // The card goes where it does not hide the cell it is about
+  const pendingBox = deciding && layout ? layout.byId.get(pending.cell) : undefined
+  const promptOnTop = pendingBox !== undefined && layout !== null && pendingBox.y + pendingBox.height / 2 > layout.height / 2
 
   let mainText: string
   if (playing && last) mainText = t('games.promotion.full.rolling', { name: nameOf(last.seat) })
@@ -436,6 +447,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
                 timer={decisionTimer}
                 waiting={asked}
                 onAnswer={answer}
+                top={promptOnTop}
               />
             )}
             {board && (

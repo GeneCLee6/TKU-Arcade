@@ -157,7 +157,7 @@ describe('a decision on the full board (C8)', () => {
   it('shows everyone else who is deciding what, with nothing to press', async () => {
     show(asked('shengyuan', [2, 2, 3, 5]), 'spectator', 'Cy')
     await act(async () => {})
-    expect(screen.getByText('Al is deciding whether to accept Fanglueguan Tenglu')).toBeInTheDocument()
+    expect(screen.getAllByText('Al is deciding whether to accept Fanglueguan Tenglu')).toHaveLength(2)
     expect(screen.getByText('Al is deciding…')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
     expect(screen.queryByRole('region', { name: /Accept the post/ })).toBeNull()

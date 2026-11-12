@@ -15,7 +15,8 @@ const routeOf = (cell: string) => {
 }
 
 /**
- * A decision the game waits for (C8), over the foot of the board: never in the page's flow, so that
+ * A decision the game waits for (C8), over the foot of the board, or its top when the cell it is about
+ * is in the lower half (that cell stays in sight): never in the page's flow, so that
  * the dock and the board keep their size while it shows. To the seat that decides, the question, what
  * each answer does and costs, a countdown and the answers (44 px buttons, the first focused); to
  * everyone else who is deciding what. Rules stay on the server: these buttons only send an answer.
@@ -28,6 +29,7 @@ export function DecisionPrompt({
   timer,
   waiting,
   onAnswer,
+  top = false,
 }: {
   pending: FullPending
   /** This viewer is the one deciding */
@@ -40,6 +42,8 @@ export function DecisionPrompt({
   /** An answer was sent and the room has not replied yet */
   waiting: boolean
   onAnswer(action: PromotionAction): void
+  /** Over the top of the board rather than its foot: the cell it is about is in the lower half */
+  top?: boolean
 }) {
   const t = useT()
   const language = useLanguage()
@@ -55,7 +59,7 @@ export function DecisionPrompt({
 
   if (!mine) {
     return (
-      <Banner role="status" data-decision="watching">
+      <Banner role="status" data-decision="watching" $top={top}>
         {t(`games.promotion.full.watching.${pending.kind}`, { name, cell: cell(pending.cell) })}
       </Banner>
     )
@@ -66,7 +70,7 @@ export function DecisionPrompt({
   }
 
   return (
-    <Card role="region" aria-labelledby={titleId} data-decision={pending.kind}>
+    <Card role="region" aria-labelledby={titleId} data-decision={pending.kind} $top={top}>
       <Title id={titleId}>
         {pending.kind === 'offer'
           ? t('games.promotion.full.offer.title', { cell: cell(pending.cell) })
@@ -117,10 +121,10 @@ export function DecisionPrompt({
   )
 }
 
-const overBoard = `
+const overBoard = (top: boolean) => `
   position: absolute;
   left: 50%;
-  bottom: ${space.sm}px;
+  ${top ? 'top' : 'bottom'}: ${space.sm}px;
   z-index: 2;
   transform: translateX(-50%);
   width: min(560px, calc(100% - ${2 * space.sm}px));
@@ -131,8 +135,8 @@ const overBoard = `
   box-shadow: 0 0 0 4px ${color.bg};
 `
 
-const Card = styled.section`
-  ${overBoard}
+const Card = styled.section<{ $top: boolean }>`
+  ${(p) => overBoard(p.$top)}
   display: grid;
   gap: ${space.xs}px;
   max-height: calc(100% - ${2 * space.sm}px);
@@ -140,8 +144,8 @@ const Card = styled.section`
   padding: ${space.sm}px ${space.md}px;
 `
 
-const Banner = styled.p`
-  ${overBoard}
+const Banner = styled.p<{ $top: boolean }>`
+  ${(p) => overBoard(p.$top)}
   margin: 0;
   padding: ${space.xs}px ${space.md}px;
   font-size: ${fontSize.sm}px;
