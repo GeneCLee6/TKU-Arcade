@@ -280,6 +280,11 @@ const Main = styled.main`
     width: min(1280px, 100%);
   }
 
+  /* A board that fits itself to the screen (the promotion board, e3-t10) can use all of a big one */
+  &:has([data-fit-screen]) {
+    width: min(2200px, 100%);
+  }
+
   @media (max-width: 899px) {
     &:has([data-wide-room]) {
       padding: ${space.md}px ${space.sm}px ${space.sm}px;

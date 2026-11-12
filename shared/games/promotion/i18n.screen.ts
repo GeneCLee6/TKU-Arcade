@@ -1,6 +1,6 @@
-// What only the board needs: department plaques, rank seals and hat buttons (e3-t08). Loaded with the
-// screen (src/games/promotion/), so that it costs the lobby and the other games nothing. check-i18n
-// and `npm run play` find it through shared/games/screenMessages.ts. `en` is the source.
+// What only the board needs: department plaques and rank seals (e3-t08).
+// Loaded with the screen (src/games/promotion/), so that it costs the lobby and the other games
+// nothing. Words the board does not draw are in i18n.detail.ts, out of the board font's request. check-i18n and `npm run play` find it through shared/games/screenMessages.ts. `en` is the source.
 const en = {
   'games.promotion.dept.top': 'Highest Offices',
   'games.promotion.dept.guard': 'Imperial Guard',
@@ -11,17 +11,7 @@ const en = {
   'games.promotion.dept.wuke': 'Military Exams',
   'games.promotion.dept.exam': 'Civil Exams',
   'games.promotion.end.motto': 'Retire home · first one there wins',
-  'games.promotion.knob.ruby': 'ruby',
-  'games.promotion.knob.coral': 'coral',
-  'games.promotion.knob.sapphire': 'sapphire',
-  'games.promotion.knob.lapis': 'lapis lazuli',
-  'games.promotion.knob.crystal': 'crystal',
-  'games.promotion.knob.shell': 'white shell',
-  'games.promotion.knob.gold': 'plain gold',
-  'games.promotion.knob.engravedGold': 'engraved gold',
-  'games.promotion.ui.knob': 'Hat button (illustrative): {knob}',
-  'games.promotion.ui.boardLabel':
-    'Promotion board of {count} offices in eight departments, from commoner up to retiring in glory',
+  'games.promotion.ui.boardLabel': 'Promotion board of {count} offices in eight departments',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -34,16 +24,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.dept.wuke': '武科',
   'games.promotion.dept.exam': '科舉',
   'games.promotion.end.motto': '致仕還鄉・先到者勝',
-  'games.promotion.knob.ruby': '紅寶石',
-  'games.promotion.knob.coral': '珊瑚',
-  'games.promotion.knob.sapphire': '藍寶石',
-  'games.promotion.knob.lapis': '青金石',
-  'games.promotion.knob.crystal': '水晶',
-  'games.promotion.knob.shell': '硨磲',
-  'games.promotion.knob.gold': '素金',
-  'games.promotion.knob.engravedGold': '鏤花金',
-  'games.promotion.ui.knob': '頂戴（示意）：{knob}',
-  'games.promotion.ui.boardLabel': '陞官圖圖版，八個部門共 {count} 個官職，從白丁一路到榮歸',
+  'games.promotion.ui.boardLabel': '陞官圖圖版，八個部門共 {count} 個官職',
 }
 
 const GRADES = '九八七六五四三二一'

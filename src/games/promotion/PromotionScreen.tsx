@@ -1,60 +1,74 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
-import { FACES, getCell } from '../../../shared/games/promotion/board.ts'
-import { knobOf } from '../../../shared/games/promotion/departments.ts'
+import { getCell } from '../../../shared/games/promotion/board.ts'
 import type { LastRoll, PromotionView } from '../../../shared/games/promotion/types.ts'
 import type { Standing } from '../../../shared/games/types.ts'
 import type { RoomMember } from '../../../shared/protocol.ts'
 import { Avatar } from '../../components/Avatar.tsx'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
-import { Muted } from '../../components/roomParts.ts'
-import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import type { Translate } from '../../i18n/t.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
 import { initialOf } from '../../lib/avatar.ts'
 import { playCue, setSoundOn, useSoundOn, useSoundUnlock } from '../../lib/sound.ts'
-import { useMediaQuery, useReducedMotion } from '../../lib/useMediaQuery.ts'
+import { useReducedMotion } from '../../lib/useMediaQuery.ts'
 import {
   color,
-  font,
   fontSize,
-  promotionBoard,
   radius,
   seatColor,
   space,
 } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { loadBoardFont } from './boardFont.ts'
-import { BOARD_LAYOUTS } from './boardLayout.ts'
+import { BOARD_LAYOUTS, CELL_WIDTH, fitBoard } from './boardLayout.ts'
+import { CellDetail } from './CellDetail.tsx'
+import { cellText, shortCellText } from './cellText.ts'
 import { PromotionBoard, type BoardPiece, type PieceFlight } from './PromotionBoard.tsx'
+import { artHref, knobStyle, rankArtOf } from './rankArt.ts'
 import { RollDisplay } from './RollDisplay.tsx'
+import { useBoardFit } from './useBoardFit.ts'
 import { MIN_ZOOM, MAX_ZOOM, useBoardZoom } from './useBoardZoom.ts'
+import { useImmersive } from './useImmersive.ts'
 import { useRollPlayback } from './useRollPlayback.ts'
 
-/**
- * Below this the board's blocks go one under another: the wide sheet would need a sideways scroll,
- * or cells too small to read
- */
-const STACKED_QUERY = '(max-width: 719px)'
+/** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
+const DENSE_CELL = 60
+/** Room left round the board inside its box, for the focus ring of a cell at the edge */
+const BOARD_MARGIN = 8
 
 /** If the room never answers a roll, the button comes back after this */
 const ROLL_ANSWER_MS = 4000
 
-const cellText = (t: Translate, id: string) => t(`games.promotion.cell.${id}`)
-/** "Juren (Provincial Graduate)" as "Juren", where a sentence has no room for the gloss */
-const shortCellText = (t: Translate, id: string) => cellText(t, id).split(' (')[0]
 
-/** The promotion game's screen (e3-t04, e3-t05). Rules stay on the server: this draws `view` */
+/**
+ * The promotion game's screen (e3-t04, e3-t05, e3-t10). Rules stay on the server: this draws `view`.
+ * The whole board, whose turn it is and the roll are on one screen without scrolling: the stage takes
+ * the height the page leaves it, and the board the arrangement and size that fill it best. Full
+ * screen puts the board on the whole screen with a rail for the turn.
+ */
 export default function PromotionScreen({ room, game }: GameScreenProps) {
   const t = useT()
   const language = useLanguage()
   const state = game.view as unknown as PromotionView
   const reducedMotion = useReducedMotion()
-  const layout = BOARD_LAYOUTS[useMediaQuery(STACKED_QUERY) ? 'stacked' : 'wide']
   useEffect(loadBoardFont, [])
   const zoom = useBoardZoom()
   const { viewport, show, zoom: zoomLevel } = zoom
+
+  const frame = useRef<HTMLDivElement>(null)
+  const turnPanel = useRef<HTMLDivElement>(null)
+  const immersive = useImmersive(frame)
+  const immersed = immersive.mode !== 'off'
+  const { stage: stageHeight, box, stageRef, boxRef } = useBoardFit(turnPanel, !immersed)
+  // Until the box is measured (and in tests, where nothing is) the board on its side, as wide as it may
+  const fit = box
+    ? fitBoard(box.width - 2 * BOARD_MARGIN, box.height - 2 * BOARD_MARGIN)
+    : { layout: BOARD_LAYOUTS.landscape, scale: 0 }
+  const { layout } = fit
+  const boardWidth = box ? `${layout.width * fit.scale * zoomLevel}px` : `${zoomLevel * 100}%`
+  const dense = box !== null && CELL_WIDTH * fit.scale * zoomLevel < DENSE_CELL
+
   const [selected, setSelected] = useState<string | null>(null)
   // Stable, so that the board's memoised cells sit out a chat message or someone's move
   const toggleCell = useCallback(
@@ -118,11 +132,11 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
   const landing = flight?.to
   useEffect(() => {
     if (!landing || zoomLevel === MIN_ZOOM) return
-    const box = layout.byId.get(landing)
-    if (box) show((box.x + box.width / 2) / layout.width, (box.y + box.height / 2) / layout.height)
+    const cell = layout.byId.get(landing)
+    if (cell) show((cell.x + cell.width / 2) / layout.width, (cell.y + cell.height / 2) / layout.height)
   }, [landing, zoomLevel, layout, show])
 
-  // A seat's chip also brings its cell into sight: on a phone the board is several screens long
+  // A seat's chip also brings its cell into sight when the board is zoomed in
   const showSeat = (cell: string) => {
     toggleCell(cell)
     viewport.current
@@ -136,12 +150,12 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
     room.act({ type: 'roll' })
   }
 
-  // What the board explains unless asked about another cell: where you stand, or for a spectator
-  // where the one to move stands
+  // What the board marks unless asked about another cell: where you stand, or for a spectator where
+  // the one to move stands. Its details open only when asked for, over the board
   const ownCell = players.find((player) => player.seat === state.you)?.cell
   const moverCell =
     players.find((player) => player.seat === activeSeat)?.cell ?? last?.to ?? players[0]?.cell
-  const detailCell = selected ?? ownCell ?? moverCell
+  const markedCell = selected ?? ownCell ?? moverCell
 
   const officeOf = (seat: number | null) => {
     const player = players.find((candidate) => candidate.seat === seat)
@@ -164,6 +178,58 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
           ),
         })
 
+  const turn = (
+    <TurnPanel ref={turnPanel}>
+      <RollDisplay kind={state.dice} roll={last} rolling={rolling} />
+      <TurnText>
+        <TurnLine
+          state={state}
+          over={game.over}
+          yourTurn={yourTurn}
+          nameOf={nameOf}
+          rolling={rolling}
+        />
+        <SmallText role="status">
+          {!rolling && last ? rollSentence(t, last, nameOf(last.seat)) : ''}
+        </SmallText>
+        <SmallText>
+          {t('games.promotion.ui.round', { round: state.round, limit: state.turnLimit })}
+        </SmallText>
+      </TurnText>
+      {state.you !== null && !game.over && (
+        <RollButton aria-disabled={!canRoll} $waiting={!canRoll} onClick={roll}>
+          {t('games.promotion.ui.roll')}
+        </RollButton>
+      )}
+    </TurnPanel>
+  )
+
+  const zoomButtons = (
+    <>
+      <Button
+        $variant="secondary"
+        $size="sm"
+        aria-label={t('games.promotion.ui.zoomOut')}
+        disabled={zoom.zoom <= MIN_ZOOM}
+        onClick={zoom.zoomOut}
+      >
+        −
+      </Button>
+      <Button
+        $variant="secondary"
+        $size="sm"
+        aria-label={t('games.promotion.ui.zoomIn')}
+        disabled={zoom.zoom >= MAX_ZOOM}
+        onClick={zoom.zoomIn}
+      >
+        +
+      </Button>
+      <Button $variant="secondary" $size="sm" disabled={zoom.zoom === MIN_ZOOM} onClick={zoom.reset}>
+        {t('games.promotion.ui.zoomFit')}
+      </Button>
+    </>
+  )
+
   return (
     <GameLayout
       room={room}
@@ -173,100 +239,81 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
       resultHeadline={resultHeadline}
       resultDetail={resultDetail}
       resultHeld={playing}
-      dock={
-        <TurnPanel>
-          <RollDisplay kind={state.dice} roll={last} rolling={rolling} />
-          <TurnText>
-            <TurnLine
-              state={state}
-              over={game.over}
-              yourTurn={yourTurn}
-              nameOf={nameOf}
-              rolling={rolling}
-            />
-            <SmallText role="status">
-              {!rolling && last ? rollSentence(t, last, nameOf(last.seat)) : ''}
-            </SmallText>
-          </TurnText>
-          {state.you !== null && !game.over && (
-            <RollButton aria-disabled={!canRoll} $waiting={!canRoll} onClick={roll}>
-              {t('games.promotion.ui.roll')}
-            </RollButton>
-          )}
-        </TurnPanel>
-      }
+      // Full screen has its own in the rail beside the board: one roll button at a time
+      dock={immersed ? undefined : turn}
     >
-      <Stage>
-        <SeatStrip aria-label={t('games.promotion.ui.seats')}>
-          {players.map((player) => (
-            <SeatChip
-              key={player.seat}
-              type="button"
-              $turn={player.seat === activeSeat}
-              aria-pressed={selected === player.cell}
-              onClick={() => showSeat(player.cell)}
-            >
-              <Avatar name={nameOf(player.seat)} tint={seatColor(player.seat)} />
-              <ChipName>{nameOf(player.seat)}</ChipName>
-            </SeatChip>
-          ))}
-        </SeatStrip>
-
-        <Viewport
-          ref={viewport}
-          $zoomed={zoom.zoom > MIN_ZOOM}
-          $narrow={layout.shape === 'stacked'}
+      <Frame ref={frame} $immersed={immersed} data-immersion={immersive.mode}>
+        <Stage
+          ref={stageRef}
+          data-fit-screen=""
+          style={!immersed && stageHeight !== null ? { height: stageHeight } : undefined}
         >
-          <PromotionBoard
-            layout={layout}
-            pieces={pieces}
-            activeSeat={activeSeat}
-            selected={detailCell ?? null}
-            onSelect={toggleCell}
-            flight={flight}
-            reducedMotion={reducedMotion}
-            zoom={zoom.zoom}
-          />
-        </Viewport>
+          {!immersed && (
+            <Toolbar>
+              <SeatStrip aria-label={t('games.promotion.ui.seats')}>
+                {players.map((player) => (
+                  <SeatChip
+                    key={player.seat}
+                    type="button"
+                    $turn={player.seat === activeSeat}
+                    aria-pressed={selected === player.cell}
+                    onClick={() => showSeat(player.cell)}
+                  >
+                    <Avatar name={nameOf(player.seat)} tint={seatColor(player.seat)} />
+                    <ChipName>{nameOf(player.seat)}</ChipName>
+                    {/* Their stage of career at a glance: the hat of their cell's watermark */}
+                    <svg viewBox="0 0 100 100" width={26} height={26} aria-hidden="true">
+                      <use
+                        href={artHref(rankArtOf(player.cell) ?? 'court')}
+                        style={knobStyle(getCell(player.cell).rank)}
+                      />
+                    </svg>
+                  </SeatChip>
+                ))}
+              </SeatStrip>
+              <Tools>
+                {zoomButtons}
+                <Button $variant="secondary" $size="sm" onClick={() => void immersive.enter()}>
+                  {t('games.promotion.ui.fullscreen')}
+                </Button>
+                <SoundButton />
+              </Tools>
+            </Toolbar>
+          )}
 
-        <Toolbar>
-          <Button
-            $variant="secondary"
-            $size="sm"
-            aria-label={t('games.promotion.ui.zoomOut')}
-            disabled={zoom.zoom <= MIN_ZOOM}
-            onClick={zoom.zoomOut}
-          >
-            −
-          </Button>
-          <Button
-            $variant="secondary"
-            $size="sm"
-            aria-label={t('games.promotion.ui.zoomIn')}
-            disabled={zoom.zoom >= MAX_ZOOM}
-            onClick={zoom.zoomIn}
-          >
-            +
-          </Button>
-          <Button
-            $variant="secondary"
-            $size="sm"
-            disabled={zoom.zoom === MIN_ZOOM}
-            onClick={zoom.reset}
-          >
-            {t('games.promotion.ui.zoomFit')}
-          </Button>
-          <SoundButton />
-          <RoundText>
-            {t('games.promotion.ui.round', { round: state.round, limit: state.turnLimit })}
-          </RoundText>
-        </Toolbar>
+          <BoardArea ref={boxRef}>
+            <Viewport ref={viewport} $zoomed={zoom.zoom > MIN_ZOOM}>
+              <PromotionBoard
+                layout={layout}
+                pieces={pieces}
+                activeSeat={activeSeat}
+                selected={markedCell ?? null}
+                onSelect={toggleCell}
+                flight={flight}
+                reducedMotion={reducedMotion}
+                width={boardWidth}
+                dense={dense}
+              />
+            </Viewport>
+            <CellDetail id={selected} onClose={() => setSelected(null)} />
+          </BoardArea>
 
-        {/* Only what someone asked to see: the moves of the game have their own status line */}
-        <VisuallyHidden role="status">{selected ? cellText(t, selected) : ''}</VisuallyHidden>
-        {detailCell && <CellDetail id={detailCell} />}
-        <Muted>{t('games.promotion.simplified')}</Muted>
-      </Stage>
+          {/* On a phone held upright the names are small: the board is biggest on its side */}
+          {!immersed && <Tip>{t('games.promotion.ui.sidewaysTip')}</Tip>}
+        </Stage>
+
+        {immersed && (
+          <Rail>
+            {turn}
+            <Tools>
+              {zoomButtons}
+              <Button $variant="secondary" $size="sm" onClick={immersive.exit}>
+                {t('games.promotion.ui.exitFullscreen')}
+              </Button>
+            </Tools>
+          </Rail>
+        )}
+      </Frame>
     </GameLayout>
   )
 }
@@ -321,51 +368,59 @@ function SoundButton() {
   )
 }
 
-/**
- * One cell in words: its full name (in English with the gloss the board leaves out), grade, hat
- * button and where each result leads from it, as the badges on the board show
- */
-function CellDetail({ id }: { id: string }) {
-  const t = useT()
-  const cell = getCell(id)
-  const knob = knobOf(cell.rank)
-  return (
-    <Detail>
-      <DetailTitle>
-        {cellText(t, id)} · {t(`games.promotion.rank.${cell.rank}`)}
-      </DetailTitle>
-      {knob && (
-        <Muted>{t('games.promotion.ui.knob', { knob: t(`games.promotion.knob.${knob}`) })}</Muted>
-      )}
-      <Moves>
-        {FACES.map((face) => (
-          <div key={face}>
-            <dt>
-              <FaceBadge aria-hidden="true" style={{ background: promotionBoard.face[face] }}>
-                {t(`games.promotion.glyph.${face}`)}
-              </FaceBadge>
-              {t(`games.promotion.face.${face}`)}
-            </dt>
-            <dd>{shortCellText(t, cell.moves[face])}</dd>
-          </div>
-        ))}
-      </Moves>
-    </Detail>
-  )
-}
+// Full screen and focus mode are the same layout: the frame over the whole screen, the board beside
+// a rail (below it when the screen stands upright). Focus mode is what a browser without the
+// Fullscreen API gets, the page's chrome covered instead of the browser's
+const Frame = styled.div<{ $immersed: boolean }>`
+  ${(p) =>
+    p.$immersed
+      ? `
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+    gap: ${space.sm}px;
+    padding: ${space.sm}px;
+    background: ${color.bg};
+
+    @media (orientation: portrait) {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+  `
+      : ''}
+`
 
 const Stage = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: ${space.sm}px;
+  min-height: 0;
+`
+
+const Toolbar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${space.xs}px ${space.sm}px;
 `
 
 const SeatStrip = styled.div`
+  flex: 1 1 200px;
   display: flex;
   gap: ${space.xs}px;
+  min-width: 0;
   overflow-x: auto;
   /* Room for the focus ring, which this scrolling strip would otherwise cut off */
   padding: ${space.xs}px;
+`
+
+const Tools = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${space.xs}px;
 `
 
 // Whose turn is told by the thick outline, not only by which colour it is
@@ -374,9 +429,9 @@ const SeatChip = styled.button<{ $turn: boolean }>`
   display: inline-flex;
   align-items: center;
   gap: ${space.xs}px;
-  max-width: 140px;
+  max-width: 160px;
   min-height: 36px;
-  padding: 2px ${space.sm}px 2px 2px;
+  padding: 2px ${space.xs}px 2px 2px;
 
   @media (pointer: coarse) {
     min-height: 44px;
@@ -401,91 +456,67 @@ const ChipName = styled.span`
   text-overflow: ellipsis;
 `
 
-// One finger scrolls, two are ours (useBoardZoom). The stacked board stops growing at a size
-// a person can still see all of
-const Viewport = styled.div<{ $zoomed: boolean; $narrow: boolean }>`
-  width: 100%;
-  max-width: ${(p) => (p.$narrow ? '560px' : 'none')};
-  max-height: ${(p) => (p.$zoomed ? '75dvh' : 'none')};
-  justify-self: center;
+
+// The board's box: whatever height the stage has left. The details float over it
+const BoardArea = styled.div`
+  position: relative;
+  flex: 1;
+  min-height: 0;
+`
+
+// One finger scrolls a zoomed board, two are ours (useBoardZoom). Auto margins centre the board
+// without cutting off the top or left of a zoomed one
+const Viewport = styled.div<{ $zoomed: boolean }>`
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: ${BOARD_MARGIN}px;
   overflow: ${(p) => (p.$zoomed ? 'auto' : 'hidden')};
   touch-action: pan-x pan-y;
   background: ${color.bg};
   border-radius: ${radius.component}px;
+
+  & > svg {
+    margin: auto;
+    flex: none;
+  }
 `
 
-const Toolbar = styled.div`
+// Beside the board in full screen, or under it on a screen standing upright: what wraps, wraps
+const Rail = styled.div`
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: ${space.xs}px;
+  align-content: center;
+  gap: ${space.md}px;
+  min-width: 0;
+  overflow-y: auto;
 `
 
-const RoundText = styled.span`
-  margin-left: auto;
+// Only on a phone held upright, where the board is at its smallest (e3-t10)
+const Tip = styled.p`
+  display: none;
   color: ${color.muted};
   font-size: ${fontSize.sm}px;
-`
+  line-height: 1.3;
 
-const Detail = styled.section`
-  display: grid;
-  gap: ${space.xs}px;
-  padding: ${space.sm}px ${space.md}px;
-  background: ${color.surface};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.component}px;
-  font-size: ${fontSize.sm}px;
-`
-
-const DetailTitle = styled.h3`
-  margin: 0;
-  font-family: ${font.kai};
-  font-size: ${fontSize.lg}px;
-  overflow-wrap: anywhere;
-`
-
-const FaceBadge = styled.span`
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  margin-right: ${space.xs}px;
-  color: ${promotionBoard.onFace};
-  font-family: ${font.kai};
-  font-weight: 700;
-  border-radius: 2px;
-  vertical-align: -4px;
-`
-
-const Moves = styled.dl`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 0 ${space.md}px;
-  margin: 0;
-
-  & > div {
-    display: flex;
-    gap: ${space.sm}px;
-  }
-
-  & dt {
-    color: ${color.muted};
-    white-space: nowrap;
-  }
-
-  & dd {
-    margin: 0;
+  @media (max-width: 599px) and (orientation: portrait) {
+    display: block;
   }
 `
+
+
+
 
 const TurnPanel = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: ${space.md}px;
+  gap: ${space.sm}px ${space.md}px;
 `
 
+// Wraps under the top in the narrow rail of full screen, rather than squeeze into a column
 const TurnText = styled.div`
-  flex: 1;
+  flex: 1 1 140px;
   min-width: 0;
   overflow-wrap: anywhere;
 `

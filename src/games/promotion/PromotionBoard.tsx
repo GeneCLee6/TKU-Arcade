@@ -1,4 +1,11 @@
-import { memo, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  memo,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
 import styled, { keyframes } from 'styled-components'
 import {
   BOARD,
@@ -27,6 +34,7 @@ import {
   type Point,
 } from './boardLayout.ts'
 import { cellForKey } from './boardKeys.ts'
+import { artHref, knobStyle, rankArtOf, rankArtSize } from './rankArt.ts'
 import { MOVE_MS } from './useRollPlayback.ts'
 
 // The board's own strings: plaques, seals, hat buttons. They load with the game's screen
@@ -57,8 +65,14 @@ export interface PromotionBoardProps {
   /** The piece in the air: `pieces` already has it where it lands */
   flight: PieceFlight | null
   reducedMotion: boolean
-  /** How wide the board is, as a share of its viewport */
-  zoom: number
+  /** How wide the board is drawn, as CSS; without one it fills the width it is given */
+  width?: string
+  /**
+   * The board is drawn small (a phone, or a small window with the whole board on it): names grow to
+   * fill their cells and the seals lose their words, which would be too small to read anyway. The
+   * watermark, the hat button and the details still tell the rank
+   */
+  dense?: boolean
 }
 
 /** `url(#…)` of the board's gradients: lacquer, rice paper, gold and the shine on round things */
@@ -76,7 +90,8 @@ export function PromotionBoard({
   onSelect,
   flight,
   reducedMotion,
-  zoom,
+  width,
+  dense = false,
 }: PromotionBoardProps) {
   const t = useT()
   const points = piecePoints(pieces, layout)
@@ -95,7 +110,7 @@ export function PromotionBoard({
       <VisuallyHidden id={hintId}>{t('board.keyboardHint')}</VisuallyHidden>
       <Svg
         viewBox={`0 0 ${layout.width} ${layout.height}`}
-        style={{ width: `${zoom * 100}%` }}
+        style={{ width: width ?? '100%' }}
         role="group"
         aria-label={t('games.promotion.ui.boardLabel', { count: BOARD.length })}
         aria-describedby={hintId}
@@ -109,6 +124,7 @@ export function PromotionBoard({
           hereSeat={activeSeat}
           onSelect={onSelect}
           paints={paints}
+          dense={dense}
         />
         {flown && flight && (
           <FlightLine
@@ -285,6 +301,7 @@ const Cells = memo(function Cells({
   hereSeat,
   onSelect,
   paints,
+  dense,
 }: {
   layout: BoardLayout
   selected: string | null
@@ -292,6 +309,7 @@ const Cells = memo(function Cells({
   hereSeat: number | null
   onSelect(cell: string): void
   paints: Paints
+  dense: boolean
 }) {
   const t = useT()
   const group = useRef<SVGGElement>(null)
@@ -363,7 +381,11 @@ const Cells = memo(function Cells({
               fill={end ? paints.g : paints.p}
               stroke={paint.edge}
             />
-            {end ? <EndCell box={box} t={t} full={full} /> : <Tile box={box} full={full} t={t} sheen={paints.s} />}
+            {end ? (
+              <EndCell box={box} t={t} full={full} />
+            ) : (
+              <Tile box={box} full={full} t={t} sheen={paints.s} dense={dense} />
+            )}
             {outline && (
               <rect
                 x={x + 1.5}
@@ -384,19 +406,49 @@ const Cells = memo(function Cells({
   )
 })
 
-/** An office's paper: its hat button, its rank's seal and its name */
-function Tile({ box, full, t, sheen }: { box: CellBox; full: string; t: Translate; sheen: string }) {
+/**
+ * An office's paper: the faint watermark of its rank (e3-t11), its hat button, its rank's seal and
+ * its name
+ */
+function Tile({
+  box,
+  full,
+  t,
+  sheen,
+  dense,
+}: {
+  box: CellBox
+  full: string
+  t: Translate
+  sheen: string
+  dense: boolean
+}) {
   const { rank } = getCell(box.id)
   const knob = knobOf(rank)
   const { lines, latin } = cellNameLines(full)
-  const size = latin ? 16 : 21
-  const gap = latin ? 17 : 23
+  const size = (latin ? 16 : 21) * (dense ? 1.3 : 1)
+  const gap = size * 1.1
   // Clear of the seal on the right when the name is in Chinese; Latin seals are short and flat
-  const middleX = box.x + (latin ? box.width / 2 : box.width / 2 - 7)
+  const middleX = box.x + (latin || dense ? box.width / 2 : box.width / 2 - 7)
   const middleY = box.y + Math.min(box.height / 2 - 2, 42)
-  const room = box.width - (latin ? 14 : 30)
+  const room = box.width - (dense ? 8 : latin ? 14 : 30)
+  const art = rankArtOf(box.id)
+  const artSize = rankArtSize(rank) * box.height
   return (
     <>
+      {/* Faint, behind the name: tells the rank at a glance, never the only way to tell */}
+      {art && (
+        <use
+          href={artHref(art)}
+          x={box.x + (box.width - artSize) / 2}
+          y={box.y + (box.height - artSize) / 2}
+          width={artSize}
+          height={artSize}
+          color={paint.ink}
+          opacity={0.22}
+          style={knobStyle(rank)}
+        />
+      )}
       {knob && (
         <>
           <circle
@@ -410,7 +462,7 @@ function Tile({ box, full, t, sheen }: { box: CellBox; full: string; t: Translat
           <circle cx={box.x + 12} cy={box.y + 12} r={5.5} fill={sheen} />
         </>
       )}
-      <Seal box={box} text={t(`games.promotion.seal.${rank}`)} />
+      <Seal box={box} text={dense ? '' : t(`games.promotion.seal.${rank}`)} />
       {lines.map((line, at) => {
         const wide = line.length * size * (latin ? 0.56 : 1) > room
         return (
@@ -439,6 +491,7 @@ function Seal({ box, text }: { box: CellBox; text: string }) {
   const latin = /[a-z]/i.test(text)
   const lines = latin ? [text] : [...text]
   const width = latin ? text.length * 5.6 + 8 : 14
+  // No words, on a board drawn too small for them: a red mark where the seal is
   const height = latin ? 15 : lines.length * 11.5 + 6
   const x = box.x + box.width - width - 4
   const y = box.y + 5
@@ -473,16 +526,8 @@ function EndCell({ box, t, full }: { box: CellBox; t: Translate; full: string })
         strokeOpacity={0.5}
         strokeWidth={1.5}
       />
-      {/* A gateway: a roof, two beams' ends and four posts */}
-      <path
-        d={`M${x - 36} ${top + 8}L${x} ${top}L${x + 36} ${top + 8}M${x - 30} ${top + 14}h60M${x - 30} ${top + 8}v18m16-18v18m28-18v18m16-18v18`}
-        fill="none"
-        stroke={paint.onEnd}
-        strokeWidth={2.4}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity={0.8}
-      />
+      {/* A gateway (rankArt.svg): a roof, two beams' ends and four posts */}
+      <use href={artHref('gate')} x={x - 40} y={top - 1} width={80} height={28} color={paint.onEnd} opacity={0.8} />
       <Ink
         x={x + (latin ? 0 : 7)}
         y={nameY}

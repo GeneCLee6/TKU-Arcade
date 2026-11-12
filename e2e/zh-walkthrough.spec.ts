@@ -157,8 +157,11 @@ for (const [label, viewport, touch] of [
       await expectAllChinese(guest, 'in play, guest')
 
       await host.locator('[data-cell="juren"]').click()
-      await expect(host.getByRole('heading', { level: 3 })).toContainText('舉人')
+      const sheet = host.getByRole('dialog')
+      await expect(sheet.getByRole('heading')).toContainText('舉人')
       await expectAllChinese(host, 'a cell explained')
+      await sheet.getByRole('button', { name: '關閉' }).click()
+      await expect(sheet).toBeHidden()
 
       if (touch) {
         await host.getByRole('button', { name: '成員', exact: true }).click()

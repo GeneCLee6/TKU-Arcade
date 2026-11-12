@@ -140,9 +140,10 @@ describe('the board', () => {
     expect(container.querySelector('[data-cell="baiding"]')).toHaveTextContent('白丁')
   })
 
-  it('says the ladder is simplified', () => {
-    render(screenOf(parts(), projection(state())))
-    expect(screen.getByText(/simplified version/)).toBeInTheDocument()
+  it("says the ladder is simplified, in a cell's details", () => {
+    const { container } = render(screenOf(parts(), projection(state())))
+    fireEvent.click(container.querySelector('[data-cell="juren"]') as Element)
+    expect(within(screen.getByRole('dialog')).getByText(/simplified version/)).toBeInTheDocument()
   })
 
   it('has a piece for a seat nobody holds now, marked with its number', () => {
@@ -152,20 +153,28 @@ describe('the board', () => {
     expect(container.querySelector('[data-seat="1"]')).toHaveTextContent('2')
   })
 
-  it('tells about a cell when it is tapped, and goes back when tapped again', () => {
+  it('tells about a cell in a sheet when it is tapped, and closing it goes back to the game', () => {
     const { container } = render(screenOf(parts(), projection(state())))
     const juren = container.querySelector('[data-cell="juren"]') as Element
     fireEvent.click(juren)
-    expect(screen.getByRole('heading', { name: /Juren \(Provincial Graduate\)/ })).toBeTruthy()
-    fireEvent.click(juren)
-    expect(screen.getByRole('heading', { name: /Baiding \(Commoner\)/ })).toBeTruthy()
+    const sheet = screen.getByRole('dialog')
+    expect(
+      within(sheet).getByRole('heading', { name: /Juren \(Provincial Graduate\)/ }),
+    ).toBeTruthy()
+    expect(juren).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(sheet).getByRole('button', { name: en['common.close'] }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(juren).toHaveAttribute('aria-pressed', 'false')
+    // Back to marking your own cell
+    expect(container.querySelector('[data-cell="baiding"]')).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('explains your own cell when nothing is picked, even when someone else is to move', () => {
+  it('marks your own cell when nothing is picked, even when someone else is to move', () => {
     const view = state({ turn: 1 })
     view.players[0] = { ...view.players[0], cell: 'juren' }
     const { container } = render(screenOf(parts(), projection(view)))
-    expect(screen.getByRole('heading', { name: /Juren/ })).toBeTruthy()
+    // Its details open only when asked for: the whole board stays in sight
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(container.querySelector('[data-cell="juren"]')).toHaveAttribute('aria-pressed', 'true')
     // Where each result leads from there, marked on the board
     const badges = (cell: string) =>
@@ -187,13 +196,26 @@ describe('the board', () => {
     expect(end.map((badge) => badge.getAttribute('data-badge'))).toEqual(['de', 'cai', 'gong'])
   })
 
-  it('names the hat button of a graded office, and says it is illustrative', () => {
+  it('names the hat button and the watermark of an office, and says both are illustrative', () => {
     const { container } = render(screenOf(parts(), projection(state())))
     fireEvent.click(container.querySelector('[data-cell="zhixian"]') as Element)
     expect(screen.getByText('Hat button (illustrative): plain gold')).toBeInTheDocument()
-    fireEvent.click(container.querySelector('[data-cell="zhixian"]') as Element)
-    // A commoner wears none
+    expect(screen.getByText(/^Watermark \(illustrative\)/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: en['common.close'] }))
+    // A commoner wears no button, but has a cap
+    fireEvent.click(container.querySelector('[data-cell="tongsheng"]') as Element)
     expect(screen.queryByText(/Hat button/)).toBeNull()
+    expect(screen.getByText(/^Watermark \(illustrative\)/)).toBeInTheDocument()
+  })
+
+  it("shows each seat's stage of career as a small hat on its chip", () => {
+    const view = state()
+    view.players[1] = { ...view.players[1], cell: 'taishi' }
+    render(screenOf(parts(), projection(view)))
+    const hat = (name: string) =>
+      screen.getAllByRole('button', { name })[0].querySelector('use')?.getAttribute('href')
+    expect(hat('Al')).toMatch(/#cap$/)
+    expect(hat('Bo')).toMatch(/#court$/)
   })
 
   it('gives a keyboard the same through the seat buttons', () => {
@@ -366,6 +388,62 @@ describe('zoom', () => {
   })
 })
 
+describe('full screen (e3-t10)', () => {
+  const frame = (container: HTMLElement) =>
+    container.querySelector('[data-immersion]') as HTMLElement
+  const enter = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Full screen' }))
+    })
+  }
+  const original = HTMLElement.prototype.requestFullscreen
+
+  afterEach(() => {
+    HTMLElement.prototype.requestFullscreen = original
+  })
+
+  it('puts the board, whose turn it is and the one roll button over the whole screen', async () => {
+    const requested = vi.fn(() => Promise.resolve())
+    HTMLElement.prototype.requestFullscreen = requested
+    const { container } = render(screenOf(parts(), projection(state())))
+    expect(frame(container)).toHaveAttribute('data-immersion', 'off')
+    await enter()
+    expect(requested).toHaveBeenCalledTimes(1)
+    expect(requested.mock.contexts[0]).toBe(frame(container))
+    expect(frame(container)).toHaveAttribute('data-immersion', 'fullscreen')
+    expect(screen.getAllByRole('button', { name: 'Roll' })).toHaveLength(1)
+    expect(within(frame(container)).getByText('Your turn')).toBeInTheDocument()
+    expect(within(frame(container)).getByRole('button', { name: 'Roll' })).toBeInTheDocument()
+    expect(container.querySelectorAll('[data-cell]')).toHaveLength(79)
+  })
+
+  it('falls back to focus mode where the browser refuses or has no Fullscreen API', async () => {
+    HTMLElement.prototype.requestFullscreen = () => Promise.reject(new Error('denied'))
+    const { container } = render(screenOf(parts(), projection(state())))
+    await enter()
+    expect(frame(container)).toHaveAttribute('data-immersion', 'focus')
+    fireEvent.click(screen.getByRole('button', { name: 'Exit full screen' }))
+    expect(frame(container)).toHaveAttribute('data-immersion', 'off')
+
+    // An iPhone: no API at all
+    HTMLElement.prototype.requestFullscreen = undefined as unknown as typeof original
+    await enter()
+    expect(frame(container)).toHaveAttribute('data-immersion', 'focus')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(frame(container)).toHaveAttribute('data-immersion', 'off')
+    expect(screen.getByRole('button', { name: 'Full screen' })).toBeInTheDocument()
+  })
+
+  it("follows the browser's own way out of full screen", async () => {
+    HTMLElement.prototype.requestFullscreen = () => Promise.resolve()
+    const { container } = render(screenOf(parts(), projection(state())))
+    await enter()
+    // Esc in real full screen is the browser's: the page only hears that it is over
+    act(() => void document.dispatchEvent(new Event('fullscreenchange')))
+    expect(frame(container)).toHaveAttribute('data-immersion', 'off')
+  })
+})
+
 describe('the room around the game', () => {
   it('keeps everything the placeholder had: members with host controls, end and dissolve', () => {
     render(screenOf(parts(), projection(state())))
@@ -514,18 +592,9 @@ describe('the room around the game', () => {
   describe('on a phone', () => {
     beforeEach(() => stubCompact())
 
-    it('stacks the departments one under another, the top of the ladder first', () => {
-      const { container } = render(screenOf(parts(), projection(state())))
-      const viewBox = (container.querySelector('svg[role="group"]') as SVGElement).getAttribute(
-        'viewBox',
-      ) as string
-      const [, , width, height] = viewBox.split(' ').map(Number)
-      expect(height).toBeGreaterThan(width * 4)
-      const cells = [...container.querySelectorAll('[data-cell]')].map((cell) =>
-        cell.getAttribute('data-cell'),
-      )
-      expect(cells[0]).toBe('ronggui')
-      expect(cells.at(-1)).toBe('baiding')
+    it('suggests turning the phone sideways for bigger names', () => {
+      render(screenOf(parts(), projection(state())))
+      expect(screen.getByText(/Turn sideways/)).toBeInTheDocument()
     })
 
     it('keeps members and chat in the drawer until asked for', () => {

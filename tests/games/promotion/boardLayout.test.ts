@@ -6,6 +6,8 @@ import {
   BOARD_LAYOUTS,
   cellNameLines,
   centre,
+  CELL_WIDTH,
+  fitBoard,
   piecePoints,
   pieceOffsets,
   type BoardShape,
@@ -13,7 +15,7 @@ import {
   type CellBox,
 } from '../../../src/games/promotion/boardLayout.ts'
 
-const SHAPES: BoardShape[] = ['wide', 'stacked']
+const SHAPES: BoardShape[] = ['landscape', 'portrait']
 
 const overlap = (a: Box, b: Box) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
@@ -96,45 +98,79 @@ describe.each(SHAPES)('the %s layout', (shape) => {
 })
 
 describe('the shapes', () => {
-  it('is the traditional sheet on a wide screen: guard, top, hanlin across the first row', () => {
-    const { blocks } = BOARD_LAYOUTS.wide
-    const at = (id: string) => blocks.find((block) => block.id === id) as Box
-    expect(at('guard').x).toBeLessThan(at('top').x)
-    expect(at('top').x).toBeLessThan(at('hanlin').x)
-    expect(at('guard').y).toBe(at('top').y)
-    expect(at('army').y).toBe(at('capital').y)
-    expect(at('wuke').y).toBe(at('exam').y)
-    // The local block runs down beside both lower rows
-    expect(at('local').y).toBe(at('army').y)
-    expect(at('local').y + at('local').height).toBe(at('exam').y + at('exam').height)
+  const at = (shape: BoardShape, id: string) =>
+    BOARD_LAYOUTS[shape].blocks.find((block) => block.id === id) as Box
+
+  it('lies on its side in two rows: the military on the left, the end above the examinations', () => {
+    const row = (id: string) => at('landscape', id).y
+    for (const id of ['guard', 'hanlin', 'top', 'capital']) expect(row(id)).toBe(row('guard'))
+    for (const id of ['army', 'wuke', 'exam', 'local']) expect(row(id)).toBe(row('army'))
+    expect(row('army')).toBeGreaterThan(row('guard'))
+    expect(at('landscape', 'guard').x).toBe(at('landscape', 'army').x)
+    // Both rows as wide as each other: the narrower one is stretched
+    const right = (id: string) => at('landscape', id).x + at('landscape', id).width
+    expect(right('capital')).toBeCloseTo(right('local'))
+    const { width, height } = BOARD_LAYOUTS.landscape
+    expect(width / height).toBeGreaterThan(1.4)
   })
 
-  it('stacks the blocks in one column on a phone, from the top block down to the examinations', () => {
-    const { blocks } = BOARD_LAYOUTS.stacked
-    expect(blocks.map((block) => block.id)).toEqual([
-      'top',
-      'guard',
-      'hanlin',
-      'army',
-      'capital',
-      'local',
-      'wuke',
-      'exam',
-    ])
-    expect(new Set(blocks.map((block) => block.x)).size).toBe(1)
-    blocks.slice(1).forEach((block, at) => expect(block.y).toBeGreaterThan(blocks[at].y))
+  it('stands upright in two columns: the civil ladder down the left, the end at the top', () => {
+    const column = (id: string) => at('portrait', id).x
+    for (const id of ['top', 'hanlin', 'capital', 'exam']) expect(column(id)).toBe(column('top'))
+    for (const id of ['guard', 'army', 'local', 'wuke']) expect(column(id)).toBe(column('guard'))
+    expect(column('guard')).toBeGreaterThan(column('top'))
+    expect(at('portrait', 'top').y).toBeLessThan(at('portrait', 'exam').y)
+    const bottom = (id: string) => at('portrait', id).y + at('portrait', id).height
+    expect(bottom('exam')).toBeCloseTo(bottom('wuke'))
+    const { width, height } = BOARD_LAYOUTS.portrait
+    expect(width / height).toBeLessThan(0.7)
+  })
+})
+
+describe('fitBoard', () => {
+  it('lays the board on its side in a wide box and upright in a tall one', () => {
+    expect(fitBoard(1200, 600).layout.shape).toBe('landscape')
+    expect(fitBoard(374, 700).layout.shape).toBe('portrait')
   })
 
-  it('leaves a phone cell at least 70px wide when the stacked board fills a 390px screen', () => {
-    const scale = (390 - 16) / BOARD_LAYOUTS.stacked.width
-    const cell = BOARD_LAYOUTS.stacked.byId.get(START_CELL) as CellBox
-    expect(cell.width * scale).toBeGreaterThanOrEqual(70)
+  it('always fits the whole board inside the box, as big as that arrangement allows', () => {
+    for (const [width, height] of [
+      [1500, 760],
+      [1000, 560],
+      [820, 420],
+      [374, 480],
+      [700, 360],
+    ]) {
+      const { layout, scale } = fitBoard(width, height)
+      expect(layout.width * scale).toBeLessThanOrEqual(width + 1e-9)
+      expect(layout.height * scale).toBeLessThanOrEqual(height + 1e-9)
+      expect(Math.max(layout.width * scale - width, layout.height * scale - height)).toBeCloseTo(0)
+    }
+  })
+
+  it('picks whichever arrangement shows the cells biggest', () => {
+    for (const [width, height] of [
+      [900, 900],
+      [600, 1000],
+      [1600, 500],
+    ]) {
+      const { scale } = fitBoard(width, height)
+      for (const layout of Object.values(BOARD_LAYOUTS)) {
+        expect(scale).toBeGreaterThanOrEqual(Math.min(width / layout.width, height / layout.height))
+      }
+    }
+  })
+
+  it('gives a desktop window cells big enough to read', () => {
+    // The board's box at 1280 by 720 once the page around it has its share
+    expect(CELL_WIDTH * fitBoard(860, 420).scale).toBeGreaterThan(40)
+    expect(CELL_WIDTH * fitBoard(1500, 760).scale).toBeGreaterThan(70)
   })
 })
 
 describe('piecePoints', () => {
   it('puts pieces on one cell apart and in seat order, others on their own cells', () => {
-    const layout = BOARD_LAYOUTS.stacked
+    const layout = BOARD_LAYOUTS.landscape
     const points = piecePoints(
       [
         { seat: 0, cell: 'baiding' },
@@ -149,7 +185,7 @@ describe('piecePoints', () => {
   })
 
   it('leaves out a cell it does not know, rather than draw it at the corner', () => {
-    expect(piecePoints([{ seat: 0, cell: 'nowhere' }], BOARD_LAYOUTS.stacked).size).toBe(0)
+    expect(piecePoints([{ seat: 0, cell: 'nowhere' }], BOARD_LAYOUTS.landscape).size).toBe(0)
   })
 })
 
