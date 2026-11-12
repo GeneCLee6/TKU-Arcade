@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameProjection } from '../../../shared/games/types.ts'
 import type { PromotionView } from '../../../shared/games/promotion/types.ts'
@@ -12,6 +11,7 @@ import { MOVE_MS, ROLL_MS } from '../../../src/games/promotion/useRollPlayback.t
 import { en } from '../../../src/i18n/en.ts'
 import { setLanguage } from '../../../src/i18n/t.ts'
 import { ChatDraft } from '../../../src/lib/chatState.ts'
+import { MemoryRouter } from '../../../src/lib/router.tsx'
 import { stubDialog } from '../../lib/stubDialog.ts'
 
 const member = (id: string, seat: number | null, over: Partial<RoomMember> = {}): RoomMember => ({

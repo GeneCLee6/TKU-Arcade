@@ -1,8 +1,12 @@
-// The words of the promotion screen that the board does not draw, so that they stay out of the board
-// font's request (boardFont.ts): full screen and the tip to turn a phone (e3-t10), a cell's details
-// with its hat button and watermark, both illustrative (e3-t11). Loaded with the screen
-// (src/games/promotion/CellDetail.tsx); check-i18n and `npm run play` find them through
-// shared/games/screenMessages.ts. `en` is the source.
+// The words of the promotion screen that stay out of the board font's request (boardFont.ts): full
+// screen and the tip to turn a phone (e3-t10), a cell's details with its hat button and watermark,
+// both illustrative (e3-t11), the status line, the four results, rank names, and the cell names.
+// The board does draw those, but the font takes them from board.ts. Loaded with the screen
+// (src/games/promotion/PromotionScreen.tsx), so that they cost the lobby and the other games nothing
+// (D4); check-i18n and `npm run play` find them through shared/games/screenMessages.ts. `en` is the
+// source; the type makes zh-TW keep the same keys.
+import { BOARD } from './board.ts'
+
 const en = {
   'games.promotion.ui.fullscreen': 'Full screen',
   'games.promotion.ui.exitFullscreen': 'Exit full screen',
@@ -17,6 +21,52 @@ const en = {
   'games.promotion.knob.engravedGold': 'engraved gold',
   'games.promotion.ui.knob': 'Hat button (illustrative): {knob}',
   'games.promotion.ui.hat': 'Watermark (illustrative): the hat of this stage of a career',
+  'games.promotion.simplified': 'A simplified version of the Qing ladder, written for this game.',
+  'games.promotion.face.de': 'Virtue',
+  'games.promotion.face.cai': 'Talent',
+  'games.promotion.face.gong': 'Merit',
+  'games.promotion.face.zang': 'Graft',
+  'games.promotion.ui.gameOver': 'Game over',
+  'games.promotion.ui.roll': 'Roll',
+  'games.promotion.ui.mostSenior': '{names} ended the most senior',
+  'games.promotion.ui.rolled': '{name} rolled {face}: {from} → {to}',
+  'games.promotion.ui.rolledStayed': '{name} rolled {face} and stays at {from}',
+  'games.promotion.ui.rolling': '{name} rolls…',
+  'games.promotion.ui.round': 'Round {round} of {limit}',
+  'games.promotion.ui.seats': 'Players: pick one to see their office',
+  'games.promotion.ui.soundOff': 'Sound off',
+  'games.promotion.ui.soundOn': 'Sound on',
+  'games.promotion.ui.turnOf': "{name}'s turn",
+  'games.promotion.ui.winner': '{name} retires in glory',
+  'games.promotion.ui.yourTurn': 'Your turn',
+  'games.promotion.ui.zoomFit': 'Fit',
+  'games.promotion.ui.zoomIn': 'Zoom in',
+  'games.promotion.ui.zoomOut': 'Zoom out',
+  'games.promotion.rank.0': 'Commoner',
+  'games.promotion.rank.1': 'Not in office',
+  'games.promotion.rank.2': 'Not in office',
+  'games.promotion.rank.3': 'Not in office',
+  'games.promotion.rank.4': 'Not in office',
+  'games.promotion.rank.5': 'Below the nine grades',
+  'games.promotion.rank.6': 'Junior 9th grade',
+  'games.promotion.rank.7': 'Senior 9th grade',
+  'games.promotion.rank.8': 'Junior 8th grade',
+  'games.promotion.rank.9': 'Senior 8th grade',
+  'games.promotion.rank.10': 'Junior 7th grade',
+  'games.promotion.rank.11': 'Senior 7th grade',
+  'games.promotion.rank.12': 'Junior 6th grade',
+  'games.promotion.rank.13': 'Senior 6th grade',
+  'games.promotion.rank.14': 'Junior 5th grade',
+  'games.promotion.rank.15': 'Senior 5th grade',
+  'games.promotion.rank.16': 'Junior 4th grade',
+  'games.promotion.rank.17': 'Senior 4th grade',
+  'games.promotion.rank.18': 'Junior 3rd grade',
+  'games.promotion.rank.19': 'Senior 3rd grade',
+  'games.promotion.rank.20': 'Junior 2nd grade',
+  'games.promotion.rank.21': 'Senior 2nd grade',
+  'games.promotion.rank.22': 'Junior 1st grade',
+  'games.promotion.rank.23': 'Senior 1st grade',
+  'games.promotion.rank.24': 'Retired',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -33,9 +83,59 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.knob.engravedGold': '鏤花金',
   'games.promotion.ui.knob': '頂戴（示意）：{knob}',
   'games.promotion.ui.hat': '浮水印（示意）：這個階段的帽子',
+  'games.promotion.simplified': '本遊戲的官階為自行整理的清代簡化版。',
+  'games.promotion.face.de': '德',
+  'games.promotion.face.cai': '才',
+  'games.promotion.face.gong': '功',
+  'games.promotion.face.zang': '贓',
+  'games.promotion.ui.gameOver': '遊戲結束',
+  'games.promotion.ui.roll': '擲骰',
+  'games.promotion.ui.mostSenior': '{names} 官階最高',
+  'games.promotion.ui.rolled': '{name} 擲出「{face}」：{from} → {to}',
+  'games.promotion.ui.rolledStayed': '{name} 擲出「{face}」，留在 {from}',
+  'games.promotion.ui.rolling': '{name} 擲骰中…',
+  'games.promotion.ui.round': '第 {round} 回合，共 {limit} 回合',
+  'games.promotion.ui.seats': '玩家：點一位看他的官職',
+  'games.promotion.ui.soundOff': '音效關',
+  'games.promotion.ui.soundOn': '音效開',
+  'games.promotion.ui.turnOf': '輪到 {name}',
+  'games.promotion.ui.winner': '{name} 榮歸故里',
+  'games.promotion.ui.yourTurn': '輪到你了',
+  'games.promotion.ui.zoomFit': '還原',
+  'games.promotion.ui.zoomIn': '放大',
+  'games.promotion.ui.zoomOut': '縮小',
+  'games.promotion.rank.0': '白身',
+  'games.promotion.rank.1': '未仕',
+  'games.promotion.rank.2': '未仕',
+  'games.promotion.rank.3': '未仕',
+  'games.promotion.rank.4': '未仕',
+  'games.promotion.rank.5': '未入流',
+  'games.promotion.rank.6': '從九品',
+  'games.promotion.rank.7': '正九品',
+  'games.promotion.rank.8': '從八品',
+  'games.promotion.rank.9': '正八品',
+  'games.promotion.rank.10': '從七品',
+  'games.promotion.rank.11': '正七品',
+  'games.promotion.rank.12': '從六品',
+  'games.promotion.rank.13': '正六品',
+  'games.promotion.rank.14': '從五品',
+  'games.promotion.rank.15': '正五品',
+  'games.promotion.rank.16': '從四品',
+  'games.promotion.rank.17': '正四品',
+  'games.promotion.rank.18': '從三品',
+  'games.promotion.rank.19': '正三品',
+  'games.promotion.rank.20': '從二品',
+  'games.promotion.rank.21': '正二品',
+  'games.promotion.rank.22': '從一品',
+  'games.promotion.rank.23': '正一品',
+  'games.promotion.rank.24': '致仕',
 }
 
+// Cell names live with the board they belong to and become `games.promotion.cell.<id>` here
+const cellNames = (locale: 'en' | 'zh-TW') =>
+  Object.fromEntries(BOARD.map((cell) => [`games.promotion.cell.${cell.id}`, cell.name[locale]]))
+
 export const promotionDetailMessages = {
-  en: en as Record<string, string>,
-  'zh-TW': zhTW as Record<string, string>,
+  en: { ...en, ...cellNames('en') } as Record<string, string>,
+  'zh-TW': { ...zhTW, ...cellNames('zh-TW') } as Record<string, string>,
 }

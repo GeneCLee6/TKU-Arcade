@@ -48,7 +48,7 @@
 | 3 | 文字 | 查核部分通過，「不是改寫」待擁有者確認 | 遊戲內字串逐條讀過 `i18n.ts`：短句與官職、品級名稱，沒有出版社或書名，畫面標示「自行整理的清代簡化版」。官職與品級是史實名稱（§2.1）；「哪一格通往哪一格」是本專案自己設計（`board.ts` 開頭註解）。規則頁兩份（`shared/games/promotion/rules.{en,zh-TW}.md`）讀過：寫明起源沒有定論、不自稱正宗，六面骰換算表註明是自訂的，沒有引用任何出版物。**沒有**和任何出版社的說明書比對。 |
 | 4 | 題庫 | 不適用 | 這款沒有題庫。 |
 | 5 | 音樂與音效 | 通過 | 沒有音檔；`src/lib/sound.ts` 用 WebAudio 即時合成，搜尋 `.mp3`、`.ogg`、`new Audio` 零筆。DESIGN §7：程式合成的不用登記。 |
-| 6 | 程式與資料檔 | 通過，待擁有者確認 | `board.ts` 是手寫資料，出處見檔頭註解。執行期相依只有 5 個（`react`、`react-dom`、`react-router-dom`、`styled-components`、`qrcode-generator`），`package.json` 的 license 都是 MIT。開發用的 `@axe-core/playwright` 不進網站。 |
+| 6 | 程式與資料檔 | 通過，待擁有者確認 | `board.ts` 是手寫資料，出處見檔頭註解。執行期相依只有 5 個（`react`、`react-dom`、`react-router-dom`、`styled-components`、`qrcode-generator`），`package.json` 的 license 都是 MIT。開發用的 `@axe-core/playwright` 不進網站。（D4 起拿掉了 `react-router-dom`，換成站內的 `src/lib/router.tsx`。） |
 | 7 | 字型 | 通過（C4 更新，2026-11-10） | C4 起圖版用 LXGW WenKai TC（SIL OFL 1.1），從 Google Fonts 載入、只要圖版用到的字，沒有打包或 commit 字型檔（`src/games/promotion/boardFont.ts`）。其他畫面仍只用系統字型堆疊。 |
 | 8 | 資產登記 | 通過（C5 更新，2026-11-12） | C4 的字型（外部服務）與 C5 的浮水印 SVG（repo 裡唯一的圖檔，原創）登記在 `docs/ASSETS.md`。`git ls-files` 查圖片、音檔、字型、模型副檔名：只有 `src/games/promotion/rankArt.svg`。`check-assets` 要到 `e12-t08`（M2）才有。 |
 | 9 | 對外 | | 只有擁有者知道。 |

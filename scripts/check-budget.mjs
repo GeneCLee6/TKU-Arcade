@@ -4,7 +4,7 @@
 // A page's JS is what it loads before it can render: the entry chunk and its static imports, plus
 // for a board game the lazy room page (once it exists) and the game's lazy chunk with their static
 // imports. Reads Vite's manifest, so run it after `npm run build`; paths are relative to the
-// current directory.
+// current directory. `npm run budget -- --chunks` also lists each line's chunks with their size.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
@@ -37,11 +37,15 @@ const collectAll = (keys) => {
   return seen
 }
 
-const gzipSize = (keys) =>
+const SHOW_CHUNKS = process.argv.includes('--chunks')
+
+const chunkSizes = (keys) =>
   [...keys]
     .map((key) => manifest[key].file)
     .filter((file) => file.endsWith('.js'))
-    .reduce((sum, file) => sum + gzipSync(readFileSync(join(CLIENT_DIR, file))).length, 0)
+    .map((file) => ({ file, size: gzipSync(readFileSync(join(CLIENT_DIR, file))).length }))
+
+const gzipSize = (keys) => chunkSizes(keys).reduce((sum, { size }) => sum + size, 0)
 
 const lazyEntriesUnder = (prefix) =>
   Object.keys(manifest).filter((key) => key.startsWith(prefix) && manifest[key].isDynamicEntry)
@@ -82,5 +86,8 @@ for (const { name, keys, limit } of budgets) {
   console.log(
     `${ok ? 'ok  ' : 'FAIL'} ${name}: ${(size / KB).toFixed(1)} kB / ${limit / KB} kB gzip`,
   )
+  if (SHOW_CHUNKS) {
+    for (const chunk of chunkSizes(keys)) console.log(`       ${chunk.size} B  ${chunk.file}`)
+  }
 }
 process.exit(failed ? 1 : 0)

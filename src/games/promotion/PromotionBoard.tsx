@@ -16,6 +16,7 @@ import {
   type Face,
 } from '../../../shared/games/promotion/board.ts'
 import { knobOf } from '../../../shared/games/promotion/departments.ts'
+import { promotionDetailMessages } from '../../../shared/games/promotion/i18n.detail.ts'
 import { promotionScreenMessages } from '../../../shared/games/promotion/i18n.screen.ts'
 import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { registerMessages, type Translate } from '../../i18n/t.ts'
@@ -37,8 +38,10 @@ import { cellForKey } from './boardKeys.ts'
 import { artHref, knobStyle, rankArtOf, rankArtSize } from './rankArt.ts'
 import { MOVE_MS } from './useRollPlayback.ts'
 
-// The board's own strings: plaques, seals, hat buttons. They load with the game's screen
+// The board's own strings (plaques, seals) and the rest of the screen's, cell and rank names among
+// them: they load with the game's screen, not with the site (D4)
 registerMessages(promotionScreenMessages)
+registerMessages(promotionDetailMessages)
 
 export interface BoardPiece {
   seat: number

@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import type { AnyGameInfo } from '../../shared/games/types.ts'
 import { useT } from '../i18n/useT.ts'
+import { Link } from '../lib/router.tsx'
 import { hasRules } from '../lib/rulesDoc.ts'
 import { monoType } from '../styles/esports.ts'
 import { color, fontSize, gameHue, space } from '../styles/tokens.ts'

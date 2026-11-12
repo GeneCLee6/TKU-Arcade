@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import styled, { css, keyframes } from 'styled-components'
 import { APP_NAME } from '../../shared/app.ts'
 import { LOBBY_GAMES } from '../../shared/games/catalog.ts'
@@ -16,6 +15,7 @@ import { useT } from '../i18n/useT.ts'
 import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { createRoom } from '../lib/rooms.ts'
+import { useNavigate } from '../lib/useRouter.ts'
 import { clippedFill, displayType, slantClip } from '../styles/esports.ts'
 import { color, font, fontSize, space } from '../styles/tokens.ts'
 

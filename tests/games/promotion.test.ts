@@ -11,6 +11,7 @@ import {
   START_CELL,
   type Face,
 } from '../../shared/games/promotion/board.ts'
+import { promotionDetailMessages } from '../../shared/games/promotion/i18n.detail.ts'
 import { promotionMessages } from '../../shared/games/promotion/i18n.ts'
 import {
   DEFAULT_TURN_LIMIT,
@@ -164,7 +165,7 @@ describe('promotion board data', () => {
     const ranks = new Set(BOARD.map((cell) => cell.rank))
     for (let rank = 0; rank <= MAX_RANK; rank++) {
       expect(ranks.has(rank), `a cell of rank ${rank}`).toBe(true)
-      expect(promotionMessages.en[`games.promotion.rank.${rank}`]).toBeTruthy()
+      expect(promotionDetailMessages.en[`games.promotion.rank.${rank}`]).toBeTruthy()
     }
     expect(Math.max(...ranks)).toBe(MAX_RANK)
   })
@@ -553,7 +554,10 @@ describe('promotion strings', () => {
   })
 
   it('has every key the module refers to', () => {
-    const keys = new Set(Object.keys(promotionMessages.en))
+    const keys = new Set([
+      ...Object.keys(promotionMessages.en),
+      ...Object.keys(promotionDetailMessages.en),
+    ])
     const { dice, turnLimit } = promotion.options
     const referred = [
       `${promotion.meta.i18nKey}.name`,
@@ -573,6 +577,11 @@ describe('promotion strings', () => {
       referred.push(result.summary.key, ...result.standings.map((line) => line.note.key))
     }
     for (const key of referred) expect(keys, key).toContain(key)
+  })
+
+  it('keeps the screen words out of the first load: no cell, rank, face or status line (D4)', () => {
+    const keys = Object.keys(promotionMessages.en)
+    expect(keys.filter((key) => /\.(cell|rank|face|ui)\./.test(key))).toEqual([])
   })
 
   it('the same params fill the same placeholders in both languages', () => {

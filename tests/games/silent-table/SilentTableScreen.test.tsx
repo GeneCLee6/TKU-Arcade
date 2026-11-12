@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   Reveal,
@@ -16,6 +15,7 @@ import SilentTableScreen from '../../../src/games/silent-table/SilentTableScreen
 import { REVEAL_STEP_MS } from '../../../src/games/silent-table/useRevealPlayback.ts'
 import { setLanguage } from '../../../src/i18n/t.ts'
 import { ChatDraft } from '../../../src/lib/chatState.ts'
+import { MemoryRouter } from '../../../src/lib/router.tsx'
 import { stubDialog } from '../../lib/stubDialog.ts'
 
 const member = (id: string, seat: number | null): RoomMember => ({
