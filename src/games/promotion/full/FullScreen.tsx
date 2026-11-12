@@ -286,7 +286,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
           {combo}
           {throwCount}
         </SmallLine>
-        <RollLine role="status" title={sentence || undefined}>
+        <RollLine role="status" title={sentence || undefined} data-roll-line="">
           {sentence}
         </RollLine>
       </TurnText>

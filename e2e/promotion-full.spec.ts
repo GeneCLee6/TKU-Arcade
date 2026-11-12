@@ -235,7 +235,8 @@ async function startRecording(page: Page) {
     const record = window as unknown as { frames: number[][] }
     record.frames = []
     const frame = () => {
-      const panel = document.querySelector('[role="status"]')?.parentElement?.parentElement
+      // The dock's sentence (not the status line over the board a watcher sees while someone decides)
+      const panel = document.querySelector('[data-roll-line]')?.parentElement?.parentElement
       const bar = document.querySelector('[data-immersion="off"]') ? panel?.parentElement : panel
       const board = document.querySelector('[data-full-board]')?.getBoundingClientRect()
       const prompt = document.querySelector('[data-decision]') ? 1 : 0
