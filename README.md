@@ -1,5 +1,10 @@
 # TKU Arcade
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/lockup-dark.svg" />
+  <img src="docs/brand/lockup-light.svg" alt="TKU Arcade · 淡江遊樂場" height="64" />
+</picture>
+
 A browser game lobby for friends of the Tamkang University Bridge Club: open one link, pick a nickname, choose a game, play together. Non-commercial, friends only. The UI defaults to English and switches to Traditional Chinese automatically when the browser prefers it (a manual toggle is always available).
 
 **Status:** live for friends. Promotion is playable; Silent Table is built and waiting for its IP sign-off; a kart physics spike runs at `/kart/spike`. The current position is tracked in [`docs/NEXT.md`](docs/NEXT.md), the batch order in [`docs/ROADMAP.md`](docs/ROADMAP.md).

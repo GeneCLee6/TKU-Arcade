@@ -31,6 +31,7 @@ const light = {
   gamePromotion: '#9A5800',
   gameSilentTable: '#0B7A47',
   gameSpectrum: '#1D5FC4',
+  gameBluffReader: '#6B3FD1',
   success: '#13703A',
   danger: '#B91C1C',
   warning: '#9C4A06',
@@ -78,6 +79,7 @@ const dark: Record<ColorName, string> = {
   gamePromotion: '#FFC23D',
   gameSilentTable: '#5CFFA8',
   gameSpectrum: '#4DA3FF',
+  gameBluffReader: '#B48CFF',
   success: '#5CFFA8',
   danger: '#FF5A6E',
   warning: '#FFC23D',
@@ -123,6 +125,8 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   promotion: 'gamePromotion',
   'silent-table': 'gameSilentTable',
   spectrum: 'gameSpectrum',
+  // Its card only, for now (E3's Coming soon); the kart keeps the brand's cyan (DESIGN §1)
+  'bluff-reader': 'gameBluffReader',
 }
 
 /** A game's hue, for its card and its room: what `--color-accent` becomes there */

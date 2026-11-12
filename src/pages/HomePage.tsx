@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import styled, { css, keyframes } from 'styled-components'
 import { APP_NAME } from '../../shared/app.ts'
 import { LOBBY_GAMES } from '../../shared/games/catalog.ts'
@@ -18,6 +18,10 @@ import { createRoom } from '../lib/rooms.ts'
 import { useNavigate } from '../lib/useRouter.ts'
 import { clippedFill, displayType, slantClip } from '../styles/esports.ts'
 import { color, font, fontSize, space } from '../styles/tokens.ts'
+
+// The games that are not open yet (E3): their own chunk, strings included, so they cost the first load
+// only this line
+const ComingSoon = lazy(() => import('../components/ComingSoon.tsx'))
 
 /** The lobby: the games, a link box and the public rooms (e1-t02, e1-t09) */
 export function HomePage() {
@@ -115,6 +119,9 @@ export function HomePage() {
                 />
               </li>
             ))}
+            <Suspense>
+              <ComingSoon />
+            </Suspense>
           </Grid>
         </section>
         <PublicRooms />
