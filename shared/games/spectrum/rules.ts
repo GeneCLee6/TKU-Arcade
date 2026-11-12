@@ -7,6 +7,7 @@
 // each round; everyone guesses once (or twice), and the highest total wins.
 //
 // The decisions the epic left open are recorded in docs/PRD/e5-spectrum-guess.md, "H1 定案的規則細節".
+import { answerProblem, MAX_ANSWER_LENGTH, normaliseAnswer } from './answer.ts'
 import { spectrumInfo } from './info.ts'
 import { SPECTRUM_TOPICS } from './topics.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
@@ -24,18 +25,11 @@ import type {
 
 export const LOWEST = 1
 export const HIGHEST = 10
-/** Characters, not bytes: an answer is one thing or one word, and this is plenty for either */
-export const MAX_ANSWER_LENGTH = 30
+export { MAX_ANSWER_LENGTH, normaliseAnswer }
 /** Fewer answers than this leave nothing to compare, and the round scores nothing */
 export const MIN_ANSWERS = 2
 export const ANSWER_MS = 90_000
 export const GUESS_MS = 60_000
-
-/**
- * Any decimal digit (0-9, ０-９ and the other scripts') and any other number sign (①, ², ½). Chinese
- * numerals are words too ("一般", "十足"), so they stay allowed: the rules page asks for no numbers.
- */
-const DIGIT = /[\p{Nd}\p{No}]/u
 
 /** What `legalActions` lists for an answer: the browser asks for the real one */
 export const SAMPLE_ANSWERS: readonly string[] = ['滷肉飯', '一杯珍奶', 'a bowl of noodles']
@@ -74,22 +68,6 @@ function parseAction(action: unknown): SpectrumAction | null {
     return { type, seats: [...seats] }
   }
   if (type === 'skip' && isSeat(seat)) return { type, seat }
-  return null
-}
-
-/** Spaces of any kind become one, the ends are trimmed, and control characters go */
-export function normaliseAnswer(text: string): string {
-  return text
-    .replace(/\s+/gu, ' ')
-    .replace(/\p{Cc}/gu, '')
-    .trim()
-}
-
-/** Why this answer is refused, or null when it is fine. Expects `normaliseAnswer`'s output */
-function answerProblem(text: string): string | null {
-  if (text === '') return ERROR.empty
-  if ([...text].length > MAX_ANSWER_LENGTH) return ERROR.tooLong
-  if (DIGIT.test(text)) return ERROR.digits
   return null
 }
 

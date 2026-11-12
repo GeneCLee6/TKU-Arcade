@@ -40,6 +40,6 @@ describe('the rules of promotion', () => {
   })
 
   it.each(['en', 'zh-TW'])('name no game this one must not be confused with (%s)', (language) => {
-    expect(read(language)).not.toMatch(/kartrider|跑跑|the gang|紙牌幫|wavelength|腦洞|9upper|瞎掰/i)
+    expect(read(language)).not.toMatch(/kartrider|跑跑|the gang|紙牌幫|wavelength|腦洞|9upper|瞎掰|\bito\b/i)
   })
 })
