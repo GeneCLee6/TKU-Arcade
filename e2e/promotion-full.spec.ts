@@ -42,8 +42,12 @@ const close = async (people: Page[]) => {
 }
 
 const rollOf = (page: Page) => page.getByRole('button', { name: 'Roll', exact: true })
+// The button goes when the game ends: never wait for one that has just gone
 const free = async (page: Page) =>
-  (await rollOf(page).count()) > 0 && (await rollOf(page).getAttribute('aria-disabled')) === 'false'
+  (await rollOf(page).count()) > 0 &&
+  (await rollOf(page)
+    .getAttribute('aria-disabled', { timeout: 1000 })
+    .catch(() => null)) === 'false'
 
 /** The decision card a seat sees when the game waits for its answer (C8) */
 const promptOf = (page: Page) => page.locator('[data-decision="offer"], [data-decision="buy"]')
@@ -76,9 +80,10 @@ async function stepOnce(
         if (await people[0].getByText('Game over').first().isVisible()) return 'over'
         for (const person of people) {
           const prompt = promptOf(person)
-          if ((await prompt.count()) > 0) {
+          const kind = (await prompt.count()) > 0 ? await prompt.getAttribute('data-decision', { timeout: 1000 }).catch(() => null) : null
+          if (kind) {
             mover = person
-            what = (await prompt.getAttribute('data-decision')) as Kind
+            what = kind as Kind
             return 'decide'
           }
           if (await free(person)) {
@@ -97,7 +102,9 @@ async function stepOnce(
   const page = mover as Page
   lastMover = page
   if (what === 'roll') {
-    await rollOf(page).evaluate((button) => (button as HTMLElement).click())
+    await rollOf(page)
+      .evaluate((button) => (button as HTMLElement).click(), undefined, { timeout: 2000 })
+      .catch(() => {})
     return 'roll'
   }
   const kind = what as Kind
