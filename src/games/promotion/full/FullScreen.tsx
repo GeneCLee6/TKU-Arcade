@@ -554,11 +554,18 @@ const SeatStrip = styled.div`
   scrollbar-width: thin;
 `
 
+// One row, scrolling sideways on a narrow screen rather than wrapping into more: the board keeps the height
 const Tools = styled.div`
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: ${space.xs}px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  & > * {
+    flex: none;
+  }
 `
 
 const Chip = styled.button<{ $turn: boolean; $done: boolean }>`
@@ -745,6 +752,12 @@ const Rail = styled.div`
   min-width: 0;
   overflow-y: auto;
 
+  /* The rail is narrow but tall: its buttons wrap, "Exit full screen" always in sight */
+  & ${Tools} {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
   @media (orientation: portrait) {
     flex-direction: row;
     flex-wrap: wrap;
@@ -774,7 +787,7 @@ const TurnPanel = styled.div`
 // Every line a fixed height, cut short rather than wrapped: no roll changes the dock's height, and so
 // none refits the board (useBoardFit)
 const TurnText = styled.div`
-  flex: 1 1 160px;
+  flex: 1 1 100px;
   min-width: 0;
 `
 
