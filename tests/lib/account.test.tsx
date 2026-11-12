@@ -1,10 +1,10 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountControl } from '../../src/components/AccountControl.tsx'
 import { ToastProvider } from '../../src/components/Toast.tsx'
 import { initLanguage, setLanguage } from '../../src/i18n/t.ts'
 import { resetAccountForTests, startAccount } from '../../src/lib/account.ts'
+import { MemoryRouter } from '../../src/lib/router.tsx'
 
 // The optional club account in the browser (e1-t13)
 

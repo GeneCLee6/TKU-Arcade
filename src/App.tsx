@@ -1,8 +1,9 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { ToastProvider } from './components/Toast.tsx'
 import { useT } from './i18n/useT.ts'
+import { BrowserRouter, Route, Routes } from './lib/router.tsx'
+import { useLocation } from './lib/useRouter.ts'
 import { HomePage } from './pages/HomePage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
 
