@@ -159,7 +159,7 @@ docs/                   本資料夾
 
 **J2 怎麼處理上面幾件**（#19，細節與參數表在 `docs/PRD/e8-kart-single-player-core.md` 的「J2 定案的細節」）：側滑角改成由轉速與 `driftAlign` 平衡出來（打滿 32°、置中 22°、反打 12.5°），40° 上限碰不到；預設甩尾鍵改成 Z／空白鍵、噴射 X／E，不用 Shift 與 Ctrl；手把的搖桿是類比轉向。`stepKart` 多了 `tuning` 與 `rules` 兩個參數（預設 `KART_TUNING`、`DEFAULT_RULES`），J3 的調參面板改傳自己的物件即可。`window.__kartSpike` 多了 `input`（最後一步用的輸入）與 `gamepad`。鍵盤輸入的模組從 `src/kart/keyboard.ts` 移到 `shared/kart/input.ts`（純邏輯）與 `src/kart/devices.ts`（手把、儲存、按鍵名稱）。
 
-### 4.2 J3：碰牆、復位、調參、攝影機與 HUD（`e8-t02b` `e8-t03` `e8-t08`，PR #PR）
+### 4.2 J3：碰牆、復位、調參、攝影機與 HUD（`e8-t02b` `e8-t03` `e8-t08`，PR #28）
 
 細節與所有數字在 `docs/PRD/e8-kart-single-player-core.md` 的「J3 定案的細節」。這裡只記結構：
 
