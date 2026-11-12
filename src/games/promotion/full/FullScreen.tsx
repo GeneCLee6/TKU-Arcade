@@ -100,7 +100,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   const [selected, setSelected] = useState<string | null>(null)
   const toggleCell = useCallback(
     (cell: string) => setSelected((current) => (current === cell ? null : cell)),
-    [],
+    [setSelected],
   )
   const [ledgerOpen, setLedgerOpen] = useState(false)
   const [asked, setAsked] = useState(false)
