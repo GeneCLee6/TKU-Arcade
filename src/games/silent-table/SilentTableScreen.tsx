@@ -65,9 +65,12 @@ export default function SilentTableScreen({ room, game }: GameScreenProps) {
   const others = players.filter((player) => player.seat !== you)
   const readyCount = players.filter((player) => player.ready).length
 
-  // The button waits for the answer, so that a double tap is not refused with "already ready"
+  // The button waits for the answer, so that a double tap is not refused with "already ready". Any
+  // change to what this seat may do is the answer, and forgets the press: the same moves come back
+  // every round once all the chips are held, and must not find the button still waiting
   const legalKey = JSON.stringify(game.legal)
   const [askedAt, setAskedAt] = useState<string | null>(null)
+  if (askedAt !== null && askedAt !== legalKey) setAskedAt(null)
   const asked = askedAt === legalKey
   useEffect(() => {
     if (!asked) return undefined

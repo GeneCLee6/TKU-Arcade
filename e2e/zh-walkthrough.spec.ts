@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
-import { setIntOption, setSelectOption } from './helpers.ts'
+import { everyoneReady, setIntOption, setSelectOption, takeFirstChip } from './helpers.ts'
 
 // e7-t08 (AC-7.3): the site in Traditional Chinese, screen by screen, with nothing left in English.
 // The list of screens is docs/ZH-WALKTHROUGH.md. It reads what is on the screen and what a screen
@@ -251,18 +251,13 @@ for (const [label, viewport, touch] of [
       await expect(host.getByRole('timer')).toBeVisible()
       await expectAllChinese(host, 'Silent Table with its countdown')
 
+      const labels = { take: /^拿籌碼 \d+$/, yours: /在你手上$/, ready: '準備好了' }
       for (let round = 0; round < 3; round++) {
-        for (const page of people) {
-          // Again if somebody else's move had not reached this person yet
-          await expect(async () => {
-            await page.getByRole('button', { name: /^拿籌碼 \d+$/ }).first().click()
-            await expect(page.getByRole('button', { name: /在你手上$/ })).toBeVisible({ timeout: 1000 })
-          }).toPass({ timeout: 15_000 })
+        for (const [index, page] of people.entries()) {
+          await takeFirstChip(page, people.length - index, labels)
         }
         await expectAllChinese(host, 'Silent Table, chips taken')
-        for (const page of people) {
-          await page.getByRole('button', { name: '準備好了', exact: true }).click()
-        }
+        await everyoneReady(people, labels)
         if (round < 2) await expect(host.getByText(`第 ${round + 2}/3 輪`)).toBeVisible()
       }
 

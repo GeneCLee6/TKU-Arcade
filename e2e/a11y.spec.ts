@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import {
   createRoom,
+  everyoneReady,
   joinRoom,
   newPerson,
   pinTheme,
@@ -116,13 +117,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(host.getByRole('group', { name: 'Rank chips' })).toBeVisible()
       await expectNoSeriousProblems(host)
 
-      await takeFirstChip(host)
+      await takeFirstChip(host, 3)
       await expect(people[1].getByRole('button', { name: /^Take chip \d+ from Ann$/ })).toBeVisible()
       await expectNoSeriousProblems(people[1])
 
-      await takeFirstChip(people[1])
-      await takeFirstChip(people[2])
-      for (const person of people) await person.getByRole('button', { name: 'Ready', exact: true }).click()
+      await takeFirstChip(people[1], 2)
+      await takeFirstChip(people[2], 1)
+      await everyoneReady(people)
       await expect(host.getByText('Round 2/3')).toBeVisible()
       await playSilentRound(people)
       await expect(host.getByText('Round 3/3')).toBeVisible()

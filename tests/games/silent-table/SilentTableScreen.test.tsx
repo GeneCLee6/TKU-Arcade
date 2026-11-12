@@ -322,6 +322,31 @@ describe('ready', () => {
     expect(readyButton()).toHaveAttribute('aria-disabled', 'false')
   })
 
+  it('is pressable in the next round, when the moves on offer are the same as when it was pressed', () => {
+    // Every chip held, as when the round is about to end: the legal actions are the same every round
+    const allHeld = (round: number, ready = false) =>
+      state({
+        round,
+        tableChips: [],
+        players: [player(0, { chip: 1, ready }), player(1, { chip: 2 }), player(2, { chip: 3 })],
+      })
+    const offered: SilentTableAction[] = [
+      { type: 'ready' },
+      { type: 'takeFrom', seat: 1 },
+      { type: 'takeFrom', seat: 2 },
+    ]
+    const room = parts()
+    const { rerender } = render(screenOf(room, projection(allHeld(1), offered)))
+    fireEvent.click(readyButton())
+    // The room answers: ready, then the next round, where this seat takes a chip and the others too
+    rerender(screenOf(room, projection(allHeld(1, true), offered.slice(1))))
+    rerender(screenOf(room, projection(state({ round: 2 }), FREE)))
+    rerender(screenOf(room, projection(allHeld(2), offered)))
+    expect(readyButton()).toHaveAttribute('aria-disabled', 'false')
+    fireEvent.click(readyButton())
+    expect(room.act).toHaveBeenCalledTimes(2)
+  })
+
   it('counts who is ready and says so in words', () => {
     const view = state({
       players: [player(0, { chip: 1, ready: true }), player(1, { chip: 2, ready: true }), player(2, { chip: 3 })],

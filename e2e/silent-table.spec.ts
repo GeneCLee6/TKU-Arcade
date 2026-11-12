@@ -1,8 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
   createSilentTableRoom,
+  everyoneReady,
   newPerson,
   playSilentRound,
+  SILENT_TABLE_EN,
   setIntOption,
   setSelectOption,
   silentTablePlayers,
@@ -54,9 +56,9 @@ test('three players and a spectator play to the result', async ({ browser }) => 
   await expect(hostReady).toHaveAttribute('aria-disabled', 'true')
   await host.getByRole('button', { name: 'Take chip 1', exact: true }).click()
   await players[2].getByRole('button', { name: 'Take chip 3', exact: true }).click()
-  for (const person of players) {
-    await person.getByRole('button', { name: 'Ready', exact: true }).click()
-  }
+  await expect(host.getByRole('button', { name: 'Chip 1: you hold it' })).toBeVisible()
+  await expect(players[2].getByRole('button', { name: 'Chip 3: you hold it' })).toBeVisible()
+  await everyoneReady(players)
 
   // The next card, the chips back on the table
   await expect(host.getByText('Round 2/3')).toBeVisible()
@@ -103,9 +105,7 @@ test('a failed level comes back round with a new deal after a reveal everyone ac
   await expect(host.getByRole('region', { name: 'The cards' })).toBeVisible()
   await expect(host.getByText(/In a row [01]\/7/)).toBeVisible()
   await expect(host.getByRole('textbox', { name: 'Message to the room' })).toBeEnabled()
-  for (const person of players) {
-    await person.getByRole('button', { name: 'Next level' }).click()
-  }
+  await everyoneReady(players, { ...SILENT_TABLE_EN, ready: 'Next level' })
   await expect(host.getByText('Level 2', { exact: true })).toBeVisible()
   await expect(host.getByText('Round 1/3')).toBeVisible()
   await expect(host.getByRole('region', { name: 'The cards' })).toHaveCount(0)
