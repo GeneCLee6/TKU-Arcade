@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "test:browser": "playwright test",
     "play": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/play.ts",
+    "sim:promotion": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/promotion-sim.ts",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy"
   },

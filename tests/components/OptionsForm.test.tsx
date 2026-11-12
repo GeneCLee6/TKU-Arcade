@@ -6,7 +6,7 @@ import type {
 } from '../../shared/games/types.ts'
 import { OptionsForm } from '../../src/components/OptionsForm.tsx'
 import { setLanguage } from '../../src/i18n/t.ts'
-import { promotion } from '../../shared/games/promotion/rules.ts'
+import { promotionInfo } from '../../shared/games/promotion/info.ts'
 
 // Keys no catalog has come back as themselves, which proves they went through t(); the real strings
 // are checked below against a real game
@@ -232,8 +232,9 @@ describe('everyone else', () => {
 })
 
 describe('a real game', () => {
+  // What the browser has: the info's schema, without the module's hidden fields (promotion's `edition`)
   it('shows its translated strings', () => {
-    const props = { schema: promotion.options, values: {}, onChange: vi.fn() }
+    const props = { schema: promotionInfo.options, values: {}, onChange: vi.fn() }
     render(<OptionsForm {...props} editable />)
     expect(screen.getByRole('combobox', { name: /dice/i })).toBeInTheDocument()
     expect(screen.queryByText(/games\.promotion/)).toBeNull()
