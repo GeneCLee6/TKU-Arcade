@@ -1,7 +1,9 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+import { pinTheme } from './helpers.ts'
 
-// e8-t01: the spike at /kart/spike; e8-t02a and e8-t12 add the gauge, boosts, gamepad and remapping. Headless Chromium draws with a software renderer here (the flag
+// e8-t01: the spike at /kart/spike; e8-t02a and e8-t12 add the gauge, boosts, gamepad and remapping;
+// e8-t02b, e8-t03 and e8-t08 add walls and the reset, the tuning panel and the HUD. Headless Chromium draws with a software renderer here (the flag
 // lets it), so these tests say nothing about speed on a real device.
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } })
 
@@ -24,6 +26,11 @@ interface KartReading {
   }
   input: { throttle: boolean; brake: boolean; steer: number; drift: boolean; boost: boolean }
   gamepad: string | undefined
+  safe: { x: number; z: number; heading: number }
+  impact: number
+  hits: number
+  resets: number
+  tuning: Record<string, number> | undefined
 }
 
 const reading = (page: Page): Promise<KartReading> =>
@@ -311,7 +318,8 @@ test.describe('the boost gauge', () => {
   }) => {
     const errors = watchConsole(page)
     await openSpike(page)
-    await expect(page.getByTestId('kart-stored')).toHaveText('Boosts ready: 0 of 2')
+    const stored = page.getByTestId('kart-stored')
+    await expect(stored).toHaveAttribute('aria-label', 'Boosts ready: 0 of 2')
 
     await page.keyboard.down('ArrowUp')
     await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(20)
@@ -323,7 +331,7 @@ test.describe('the boost gauge', () => {
 
     // 2.5 s of drifting fills the gauge into a stored boost
     await expect.poll(async () => (await reading(page)).state.storedBoosts, LONG).toBe(1)
-    await expect(page.getByTestId('kart-stored')).toHaveText('Boosts ready: 1 of 2')
+    await expect(stored).toHaveAttribute('aria-label', 'Boosts ready: 1 of 2')
 
     // Fired while still drifting: a quick press is enough
     await page.keyboard.press('x')
@@ -332,9 +340,13 @@ test.describe('the boost gauge', () => {
     expect(boosted.state.storedBoosts).toBe(0)
     expect(boosted.state.chain).toBe(0)
 
-    // Let go of the drift while the boost runs: a chained boost
+    await expect(page.getByTestId('kart-boosting')).toBeVisible()
+
+    // Let go of the drift while the boost runs: a chained boost, which the HUD and a callout say
     await page.keyboard.up('z')
     await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
+    await expect(page.getByTestId('kart-boosting')).toHaveText('Chain ×1')
+    await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'chain')
     await page.keyboard.up('ArrowRight')
     // Boosting raises the top speed past the plain 30 m/s
     await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(30.5)
@@ -564,6 +576,141 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'Drift, Keyboard 1: Z' }).click()
       expect(await problems()).toEqual([])
       // Nothing sticks out sideways at phone width
+      const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }))
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
+    })
+  })
+}
+
+test.describe('walls and the reset', () => {
+  test.use({ locale: 'en-US', viewport: { width: 1280, height: 720 } })
+
+  test('a wall stops the car without letting it through, and R puts it back at a safe place', async ({
+    page,
+  }) => {
+    const errors = watchConsole(page)
+    await openSpike(page)
+    // Straight ahead of the start, 120 m away, is a wall across the way
+    await page.keyboard.down('ArrowUp')
+    await expect.poll(async () => (await reading(page)).hits, LONG).toBeGreaterThan(0)
+    await expect(page.getByTestId('kart-wall-flash')).toBeAttached()
+    await page.waitForTimeout(500)
+    const crashed = await reading(page)
+    expect(crashed.state.z).toBeGreaterThan(-120)
+    expect(crashed.state.z).toBeLessThan(-115)
+    expect(Math.hypot(crashed.state.vx, crashed.state.vz)).toBeLessThan(8)
+    await page.keyboard.up('ArrowUp')
+
+    // The safe place is behind, clear of the wall, facing the way the car drove
+    const { safe } = crashed
+    expect(safe.z).toBeGreaterThan(-116)
+    expect(safe.z).toBeLessThan(-10)
+    expect(Math.abs(safe.heading)).toBeLessThan(0.01)
+
+    await page.keyboard.press('r')
+    await expect.poll(async () => (await reading(page)).resets, LONG).toBe(1)
+    const reset = await reading(page)
+    expect(reset.state.x).toBeCloseTo(safe.x, 6)
+    expect(reset.state.z).toBeCloseTo(safe.z, 6)
+    expect(reset.state.heading).toBeCloseTo(safe.heading, 6)
+    expect(Math.hypot(reset.state.vx, reset.state.vz)).toBe(0)
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('the tuning panel', () => {
+  test.use({ locale: 'en-US', viewport: { width: 1280, height: 720 } })
+
+  test('switches presets from the keyboard, keeps the choice, and refuses bad JSON', async ({
+    page,
+  }) => {
+    const errors = watchConsole(page)
+    await openSpike(page)
+    const tuningButton = page.getByRole('button', { name: 'Tuning' })
+    await tuningButton.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { name: 'Tuning' })).toBeFocused()
+
+    const preset = page.getByRole('combobox', { name: 'Preset' })
+    await expect(preset).toHaveValue('standard')
+    await preset.focus()
+    await preset.selectOption('planted')
+    await expect(page.getByTestId('kart-tuning-status')).toHaveText('Preset: Planted.')
+    await expect.poll(async () => (await reading(page)).tuning?.grip).toBe(16)
+
+    // A slider keeps the arrow keys: the car does not move
+    const topSpeed = page.getByRole('slider', { name: 'Top speed', exact: true })
+    await topSpeed.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(topSpeed).toHaveValue('30.5')
+    await expect.poll(async () => (await reading(page)).tuning?.topSpeed).toBe(30.5)
+    expect((await reading(page)).state.z).toBe(0)
+    await expect(preset).toHaveValue('custom')
+
+    // Bad JSON changes nothing and says why
+    const box = page.getByRole('textbox', { name: /The numbers as JSON/ })
+    await box.fill('{"grip": "lots"}')
+    await page.getByRole('button', { name: 'Import' }).click()
+    await expect(page.getByTestId('kart-tuning-status')).toHaveText(
+      'Grip has to be a number from 1 to 30. Nothing changed.',
+    )
+    await box.fill('not json at all')
+    await page.getByRole('button', { name: 'Import' }).click()
+    await expect(page.getByTestId('kart-tuning-status')).toContainText("That isn't JSON")
+    expect((await reading(page)).tuning?.grip).toBe(16)
+
+    // Good JSON goes in whole
+    await box.fill('{"kind": "tku-arcade.kart.tuning", "version": 1, "tuning": {"grip": 7.5}}')
+    await page.getByRole('button', { name: 'Import' }).click()
+    await expect(page.getByTestId('kart-tuning-status')).toContainText('Imported.')
+    await expect.poll(async () => (await reading(page)).tuning?.grip).toBe(7.5)
+
+    // Kept across a reload
+    await page.reload()
+    await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
+    expect((await reading(page)).tuning).toMatchObject({ grip: 7.5, topSpeed: 30.5 })
+
+    await page.getByRole('button', { name: 'Tuning' }).click()
+    await page.getByRole('button', { name: 'Back to Standard' }).click()
+    await expect(page.getByRole('combobox', { name: 'Preset' })).toHaveValue('standard')
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('kart-tuning')).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Tuning' })).toBeFocused()
+    expect(errors).toEqual([])
+  })
+})
+
+for (const scheme of ['light', 'dark'] as const) {
+  test.describe(`axe on the tuning panel and the HUD, ${scheme} theme`, () => {
+    test.use({ colorScheme: scheme, locale: 'zh-TW', viewport: { width: 375, height: 667 } })
+    // The site is dark until someone picks a theme, whatever the system says
+    test.beforeEach(({ context }) => pinTheme(context, scheme))
+
+    test('has no problems, mid-boost and with the panel open', async ({ page }) => {
+      await openSpike(page)
+      const problems = async () => {
+        const { violations } = await new AxeBuilder({ page }).analyze()
+        return violations.map(({ id, nodes }) => ({ id, nodes: nodes.map((node) => node.target) }))
+      }
+      // A boost under way, so the HUD's tag and a callout are on screen
+      await page.keyboard.down('ArrowUp')
+      await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(20)
+      await page.keyboard.down('ArrowRight')
+      await page.keyboard.down('z')
+      await expect.poll(async () => (await reading(page)).state.storedBoosts, LONG).toBe(1)
+      await page.keyboard.press('x')
+      await expect(page.getByTestId('kart-boosting')).toBeVisible()
+      expect(await problems()).toEqual([])
+      await page.keyboard.up('z')
+      await page.keyboard.up('ArrowRight')
+      await page.keyboard.up('ArrowUp')
+
+      await page.getByRole('button', { name: '調參' }).click()
+      await expect(page.getByTestId('kart-tuning')).toBeVisible()
+      expect(await problems()).toEqual([])
       const { scrollWidth, clientWidth } = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,

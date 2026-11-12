@@ -159,6 +159,34 @@ docs/                   本資料夾
 
 **J2 怎麼處理上面幾件**（#19，細節與參數表在 `docs/PRD/e8-kart-single-player-core.md` 的「J2 定案的細節」）：側滑角改成由轉速與 `driftAlign` 平衡出來（打滿 32°、置中 22°、反打 12.5°），40° 上限碰不到；預設甩尾鍵改成 Z／空白鍵、噴射 X／E，不用 Shift 與 Ctrl；手把的搖桿是類比轉向。`stepKart` 多了 `tuning` 與 `rules` 兩個參數（預設 `KART_TUNING`、`DEFAULT_RULES`），J3 的調參面板改傳自己的物件即可。`window.__kartSpike` 多了 `input`（最後一步用的輸入）與 `gamepad`。鍵盤輸入的模組從 `src/kart/keyboard.ts` 移到 `shared/kart/input.ts`（純邏輯）與 `src/kart/devices.ts`（手把、儲存、按鍵名稱）。
 
+### 4.2 J3：碰牆、復位、調參、攝影機與 HUD（`e8-t02b` `e8-t03` `e8-t08`，PR #PR）
+
+細節與所有數字在 `docs/PRD/e8-kart-single-player-core.md` 的「J3 定案的細節」。這裡只記結構：
+
+```
+shared/kart/
+  physics.ts   stepKart：一台車一步（J1、J2），KART_TUNING 多了 3 個牆的參數
+  walls.ts     collideWalls：stepKart 之後把車推出牆（線段＋圓，切小段防穿牆）
+  course.ts    Run＝車＋安全點＋復位；stepRun 是迴圈每步呼叫的那一個
+  arena.ts     TEST_ARENA：spike 用的圍牆空地（J4 換成賽道 JSON）
+  tuning.ts    TUNING_SPECS（範圍）、PRESETS（標準／抓地／滑胎）、JSON 讀寫與檢查、steadySlips
+src/kart/
+  camera.ts    追行進方向的鏡頭與噴射視角（純函式）
+  callouts.ts  兩步之間的 DRIFT／BOOST／CHAIN
+  Hud.tsx      電競風 HUD 與大字提示
+  TuningPanel.tsx  調參面板
+  layout.ts    窄螢幕時面板從哪裡開始
+```
+
+- **一步的順序**：`stepRun` → 復位鍵剛按下就直接復位、這一步不跑物理；否則 `stepKart` → `collideWalls` → 更新安全點。全部是純函式、固定 60 Hz，所以 30、144 fps 與不規則畫面在撞牆、復位後結果仍然**完全相同**（`tests/shared/kart-walls.test.ts`）。E9 的伺服器要裁定時可以直接跑 `stepRun`。
+- **牆是線段**：`Wall = {ax, az, bx, bz}`。J4 的賽道 JSON 不管怎麼描述牆（中線、網格邊界），最後轉成線段就能用；只有 `walls.ts` 認得這個格式。牆多了（> 幾百段）要加空間索引，現在每步每段都檢查。
+- **安全點**是 `Run` 自己算的（離牆、往前、連續 1 秒），J4 有檢查點與復位點後，`stepRun` 改成用最近通過的檢查點；`resetRun` 不用動。
+- **調參**：迴圈每格讀頁面給的 `tuning`（`SpikeControls.tuning`），所以滑桿改了下一步就用新的數字，不用重開迴圈。匯入的 JSON 是不可信的文字，`parseTuning` 每個數字都檢查範圍，一個不對就整份不收。
+- **鍵盤與表單**：開車的鍵在 `window` 上 `preventDefault`；焦點在 `input`、`select`、`textarea` 時迴圈不吃鍵，所以面板可以開著開車。
+- **HUD 更新**：迴圈每格算一份 `SpikeHud`（速度取整數 km/h），和上一份不同才 `setState`，所以停著時 React 不重繪；開車時速度幾乎每格變，HUD 每格重繪一次（只有 HUD 這個 memo 元件）。
+- **卡丁車 chunk**：143.0 → **151.0 kB** gzip（預算 600 kB）。主站 121.1、陞官圖 148.5、默契牌局 144.5、光譜 147.8 kB 都沒變：新的東西全在 lazy chunk 裡，`tokens.ts` 只多一個 `kartScene.wall` 色碼。
+- **已知**：Playwright 的軟體繪圖截圖裡，面板打開時頂部按鈕後面會出現一塊深色長方形（J2 的操作設定面板也有），在 DOM 裡找不到對應的元素，推測是 SwiftShader 合成層的問題，實機沒看過。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

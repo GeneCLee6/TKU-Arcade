@@ -13,16 +13,19 @@ import {
   Scene,
   WebGLRenderer,
 } from 'three'
+import type { Wall } from '../../shared/kart/walls.ts'
 import { kartScene } from '../styles/tokens.ts'
+import { fieldOfView, followCar, startRig, type Chased } from './camera.ts'
 
 const GROUND_SIZE = 400
 const GRID_CELL = 5
 const CAMERA_BACK = 7.5
 const CAMERA_UP = 3.4
 const CAMERA_LOOK_AHEAD = 3
-// How fast the camera's angle catches up with the car, per second: it lags, so a drift shows
-const CAMERA_FOLLOW = 4
 const MAX_PIXEL_RATIO = 2
+/** Walls are drawn this high and this thick; the physics sees only their centre line */
+const WALL_HEIGHT = 1.1
+const WALL_THICKNESS = 0.5
 
 export interface Pose {
   readonly x: number
@@ -34,14 +37,15 @@ export interface KartScene {
   /** The GPU's name where the browser tells, so that an fps number says what it was measured on */
   readonly rendererName: string
   readonly canvas: HTMLCanvasElement
-  draw(pose: Pose, frameSeconds: number): void
+  /** `chased` is what the chase camera follows: the direction of travel, and whether it boosts */
+  draw(pose: Pose, chased: Chased, frameSeconds: number): void
+  /** Puts the camera straight behind the car at once, as after a reset */
+  snapCamera(heading: number): void
   /** `{width}x{height}` of the drawing buffer */
   drawingBuffer(): string
   /** Frees everything on the GPU and takes the canvas out of the page */
   dispose(): void
 }
-
-const wrap = (angle: number): number => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI))
 
 /** Asks for a throwaway context, so that a browser without WebGL 2 never reaches three.js */
 export function supportsWebGL2(): boolean {
@@ -51,8 +55,8 @@ export function supportsWebGL2(): boolean {
   return true
 }
 
-/** Builds the scene inside `container`. Throws when three.js cannot start. */
-export function createKartScene(container: HTMLElement): KartScene {
+/** Builds the scene inside `container`, with `walls`. Throws when three.js cannot start. */
+export function createKartScene(container: HTMLElement, walls: readonly Wall[]): KartScene {
   const renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO))
   renderer.domElement.style.display = 'block'
@@ -98,8 +102,24 @@ export function createKartScene(container: HTMLElement): KartScene {
   car.add(body, nose)
   scene.add(car)
 
+  // One box per wall, along its centre line
+  const wallGeometry = new BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS)
+  const wallMaterial = new MeshLambertMaterial({ color: kartScene.wall })
+  for (const wall of walls) {
+    const length = Math.hypot(wall.bx - wall.ax, wall.bz - wall.az)
+    const mesh = new Mesh(wallGeometry, wallMaterial)
+    // Long enough to close the gap at a corner
+    mesh.scale.x = length + WALL_THICKNESS
+    mesh.position.set((wall.ax + wall.bx) / 2, WALL_HEIGHT / 2, (wall.az + wall.bz) / 2)
+    mesh.rotation.y = -Math.atan2(wall.bz - wall.az, wall.bx - wall.ax)
+    scene.add(mesh)
+  }
+
   const camera = new PerspectiveCamera(60, 1, 1, 260)
-  let cameraHeading = 0
+  let rig = startRig(0)
+  let baseFov = 60
+  // The boost's wider view is motion: not for a viewer who asked for less (read live, it can change)
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
 
   const resize = () => {
     const { clientWidth: width, clientHeight: height } = container
@@ -107,7 +127,8 @@ export function createKartScene(container: HTMLElement): KartScene {
     renderer.setSize(width, height)
     camera.aspect = width / height
     // Held upright, a fixed vertical angle leaves almost nothing to the sides
-    camera.fov = camera.aspect < 1 ? 80 : 60
+    baseFov = camera.aspect < 1 ? 80 : 60
+    camera.fov = baseFov
     camera.updateProjectionMatrix()
   }
   resize()
@@ -121,7 +142,7 @@ export function createKartScene(container: HTMLElement): KartScene {
   return {
     rendererName,
     canvas: renderer.domElement,
-    draw({ x, z, heading }, frameSeconds) {
+    draw({ x, z, heading }, chased, frameSeconds) {
       car.position.set(x, 0, z)
       car.rotation.y = -heading
 
@@ -131,22 +152,37 @@ export function createKartScene(container: HTMLElement): KartScene {
       ground.position.set(snappedX, 0, snappedZ)
       grid.position.set(snappedX, 0.01, snappedZ)
 
-      const follow = 1 - Math.exp(-CAMERA_FOLLOW * frameSeconds)
-      cameraHeading = wrap(cameraHeading + wrap(heading - cameraHeading) * follow)
-      const sin = Math.sin(cameraHeading)
-      const cos = Math.cos(cameraHeading)
+      rig = followCar(rig, chased, frameSeconds)
+      const fov = fieldOfView(baseFov, rig, reducedMotion?.matches ?? false)
+      if (fov !== camera.fov) {
+        camera.fov = fov
+        camera.updateProjectionMatrix()
+      }
+      const sin = Math.sin(rig.heading)
+      const cos = Math.cos(rig.heading)
       camera.position.set(x - sin * CAMERA_BACK, CAMERA_UP, z + cos * CAMERA_BACK)
       camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6, z - cos * CAMERA_LOOK_AHEAD)
 
       renderer.render(scene, camera)
     },
+    snapCamera(heading) {
+      rig = startRig(heading)
+    },
     drawingBuffer: () => `${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`,
     dispose() {
       observer.disconnect()
-      for (const geometry of [groundGeometry, grid.geometry, bodyGeometry, noseGeometry]) {
+      for (const geometry of [
+        groundGeometry,
+        grid.geometry,
+        bodyGeometry,
+        noseGeometry,
+        wallGeometry,
+      ]) {
         geometry.dispose()
       }
-      for (const material of [groundMaterial, bodyMaterial, noseMaterial]) material.dispose()
+      for (const material of [groundMaterial, bodyMaterial, noseMaterial, wallMaterial]) {
+        material.dispose()
+      }
       grid.material.dispose()
       renderer.dispose()
       // Browsers allow a handful of live contexts: don't wait for the collector to free this one

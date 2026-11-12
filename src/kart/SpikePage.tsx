@@ -1,28 +1,53 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
 import { KART_ACTIONS, type Bindings, type KartAction } from '../../shared/kart/input.ts'
-import { KART_TUNING, type KartRules } from '../../shared/kart/physics.ts'
+import type { KartRules, KartTuning } from '../../shared/kart/physics.ts'
 import { Button } from '../components/Button.tsx'
 import { registerMessages, type MessageParams } from '../i18n/t.ts'
 import { useT } from '../i18n/useT.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
+import type { Callout } from './callouts.ts'
 import { ControlsPanel } from './ControlsPanel.tsx'
-import { keyLabel, loadBindings, loadRules, padLabel, saveBindings, saveRules } from './devices.ts'
-import { Hud } from './Hud.tsx'
+import {
+  keyLabel,
+  loadBindings,
+  loadRules,
+  loadTuning,
+  padLabel,
+  saveBindings,
+  saveRules,
+  saveTuning,
+} from './devices.ts'
+import { CalloutText, Hud } from './Hud.tsx'
 import { supportsWebGL2 } from './Scene.ts'
 import { startSpikeLoop, type SpikeHud, type SpikeStats } from './spikeLoop.ts'
+import { NARROW_PANEL_TOP, NARROW_TOP } from './layout.ts'
+import { TuningPanel } from './TuningPanel.tsx'
 
 registerMessages(KART_MESSAGES)
 
 type Failure = 'noWebgl' | 'contextLost'
 
-const EMPTY_HUD: SpikeHud = { gauge: 0, storedBoosts: 0, boosting: false, chain: 0 }
+const EMPTY_HUD: SpikeHud = {
+  speed: 0,
+  gauge: 0,
+  storedBoosts: 0,
+  boosting: false,
+  chain: 0,
+  hits: 0,
+}
+
+/** How long a callout stays up; its animation fades it out by then */
+const CALLOUT_MS = 900
+
+type Open = 'controls' | 'tuning' | undefined
 
 /**
  * e8-t01: three.js, a fixed-step loop and a box car, to see whether the stack holds up in a browser.
- * e8-t02a and e8-t12 add the boost gauge, boosts, a gamepad and changeable controls.
+ * e8-t02a and e8-t12 add the boost gauge, boosts, a gamepad and changeable controls; e8-t02b, e8-t03
+ * and e8-t08 add a walled test arena with a reset, the tuning panel, the chase camera and the HUD.
  * Reached only by typing /kart/spike: nothing links here, and the lobby does not know about it.
  */
 export function SpikePage() {
@@ -35,13 +60,18 @@ export function SpikePage() {
   const [hud, setHud] = useState<SpikeHud>(EMPTY_HUD)
   const [bindings, setBindings] = useState<Bindings>(loadBindings)
   const [rules, setRules] = useState<KartRules>(loadRules)
-  const [controlsOpen, setControlsOpen] = useState(false)
-  const opener = useRef<HTMLButtonElement>(null)
-  // The loop reads these every frame without restarting
-  const controls = useRef({ bindings, rules, enabled: !controlsOpen })
+  const [tuning, setTuning] = useState<KartTuning>(() => loadTuning().tuning)
+  const [open, setOpen] = useState<Open>()
+  const controlsOpen = open === 'controls'
+  const [callout, setCallout] = useState<{ callout: Callout; id: number }>()
+  const controlsOpener = useRef<HTMLButtonElement>(null)
+  const tuningOpener = useRef<HTMLButtonElement>(null)
+  // The loop reads these every frame without restarting. The tuning panel leaves the car drivable:
+  // its fields keep their own keys (spikeLoop.ts), and a change is best felt at once.
+  const controls = useRef({ bindings, rules, tuning, enabled: !controlsOpen })
   useEffect(() => {
-    controls.current = { bindings, rules, enabled: !controlsOpen }
-  }, [bindings, rules, controlsOpen])
+    controls.current = { bindings, rules, tuning, enabled: !controlsOpen }
+  }, [bindings, rules, tuning, controlsOpen])
   const [showNumbers, setShowNumbers] = useState(() =>
     new URLSearchParams(window.location.search).has('fps'),
   )
@@ -55,6 +85,7 @@ export function SpikePage() {
         controls: () => controls.current,
         onStats: setStats,
         onHud: setHud,
+        onCallout: (next) => setCallout((last) => ({ callout: next, id: (last?.id ?? 0) + 1 })),
         onContextLost: () => setFailure('contextLost'),
       })
     } catch {
@@ -63,8 +94,17 @@ export function SpikePage() {
     }
   }, [])
 
+  // Each callout shows for a moment; a new one replaces it and starts its own moment
+  useEffect(() => {
+    if (!callout) return
+    const timer = window.setTimeout(() => setCallout(undefined), CALLOUT_MS)
+    return () => window.clearTimeout(timer)
+  }, [callout])
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // F typed into the tuning panel's text box is a letter, not the numbers
+      if (event.target instanceof HTMLTextAreaElement) return
       if (event.code === 'KeyF' && !event.repeat) setShowNumbers((shown) => !shown)
     }
     window.addEventListener('keydown', onKeyDown)
@@ -79,10 +119,18 @@ export function SpikePage() {
     setRules(next)
     return saveRules(next)
   }, [])
+  const changeTuning = useCallback((next: KartTuning) => {
+    setTuning(next)
+    return saveTuning(next)
+  }, [])
   const closeControls = useCallback(() => {
-    setControlsOpen(false)
+    setOpen(undefined)
     // Back where the keyboard was before the panel opened
-    queueMicrotask(() => opener.current?.focus())
+    queueMicrotask(() => controlsOpener.current?.focus())
+  }, [])
+  const closeTuning = useCallback(() => {
+    setOpen(undefined)
+    queueMicrotask(() => tuningOpener.current?.focus())
   }, [])
 
   /** The first control of an action, for the hint: a key, else a gamepad control */
@@ -115,13 +163,22 @@ export function SpikePage() {
         </Panel>
         <Buttons>
           <Button
-            ref={opener}
+            ref={controlsOpener}
             $variant="secondary"
             $size="sm"
             aria-expanded={controlsOpen}
-            onClick={() => (controlsOpen ? closeControls() : setControlsOpen(true))}
+            onClick={() => (controlsOpen ? closeControls() : setOpen('controls'))}
           >
             {t('kart.controls.open')}
+          </Button>
+          <Button
+            ref={tuningOpener}
+            $variant="secondary"
+            $size="sm"
+            aria-expanded={open === 'tuning'}
+            onClick={() => (open === 'tuning' ? closeTuning() : setOpen('tuning'))}
+          >
+            {t('kart.tuning.open')}
           </Button>
           <Button $variant="secondary" $size="sm" onClick={() => setShowNumbers((shown) => !shown)}>
             {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
@@ -148,13 +205,20 @@ export function SpikePage() {
           <dd data-testid="kart-gamepad">{stats.gamepad ?? t('kart.spike.noGamepad')}</dd>
         </Numbers>
       )}
+      {hud.hits > 0 && (
+        <WallFlash key={hud.hits} aria-hidden="true" data-testid="kart-wall-flash" />
+      )}
+      {callout && <CalloutText key={callout.id} t={t} callout={callout.callout} />}
       <Bottom>
-        <Hud t={t} hud={hud} maxStored={KART_TUNING.maxStoredBoosts} />
+        <Hud t={t} hud={hud} maxStored={tuning.maxStoredBoosts} />
         <Hint>
           <HintTitle>{t('kart.spike.title')}</HintTitle>
           {coarsePointer ? t('kart.spike.noTouch') : t('kart.spike.keys', hintKeys)}
         </Hint>
       </Bottom>
+      {open === 'tuning' && (
+        <TuningPanel t={t} tuning={tuning} onTuning={changeTuning} onClose={closeTuning} />
+      )}
       {controlsOpen && (
         <ControlsPanel
           t={t}
@@ -180,6 +244,21 @@ const Stage = styled.div`
   inset: 0;
 `
 
+const flash = keyframes`
+  from { opacity: 1; }
+  to { opacity: 0; }
+`
+
+/** A red edge round the screen for a moment after a crash: a fade, not motion */
+const WallFlash = styled.div`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 64px ${color.danger};
+  opacity: 0;
+  animation: ${flash} 0.5s ease-out;
+`
+
 const Panel = styled.div`
   padding: ${space.sm}px ${space.md}px;
   border-radius: ${radius.component}px;
@@ -195,14 +274,22 @@ const TopRow = styled.div`
   right: ${space.sm}px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: ${space.sm}px;
+
+  a {
+    white-space: nowrap;
+  }
 `
 
 const Numbers = styled(Panel).attrs({ as: 'dl' })`
   position: absolute;
   top: 64px;
   left: ${space.sm}px;
+
+  @media ${NARROW_TOP} {
+    top: ${NARROW_PANEL_TOP}px;
+  }
   max-width: calc(100% - ${2 * space.sm}px);
   margin: 0;
   display: grid;
@@ -221,6 +308,8 @@ const Numbers = styled(Panel).attrs({ as: 'dl' })`
 
 const Buttons = styled.div`
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: ${space.sm}px;
 `
 

@@ -92,7 +92,14 @@ describe('the gamepad', () => {
         p.buttons[14] = 1
       }),
     })
-    expect(input).toEqual({ throttle: true, brake: false, steer: -1, drift: true, boost: true })
+    expect(input).toEqual({
+      throttle: true,
+      brake: false,
+      steer: -1,
+      drift: true,
+      boost: true,
+      reset: false,
+    })
     expect(
       readInput(DEFAULT_BINDINGS, { held: new Set(), pad: pad((p) => (p.buttons[1] = 1)) }).brake,
     ).toBe(true)
