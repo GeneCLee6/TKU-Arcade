@@ -304,7 +304,11 @@ test.describe('the lobby', () => {
     await page.waitForLoadState('networkidle')
 
     await expect(page.locator('a[href*="kart"]')).toHaveCount(0)
-    await expect(page.getByText(/kart/i)).toHaveCount(0)
+    // Since E3 the kart is a Coming soon card, which is not a link: its heading is the only mention
+    const card = page.getByRole('heading', { level: 3, name: 'Kart Coming soon' })
+    await expect(card).toBeVisible()
+    await expect(page.getByText(/kart/i)).toHaveCount(1)
+    await expect(page.locator('li', { has: card }).locator('a, button')).toHaveCount(0)
     expect(scripts.length).toBeGreaterThan(0)
     expect(scripts.filter((url) => /SpikePage|three|Scene/i.test(url))).toEqual([])
   })
