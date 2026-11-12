@@ -3,7 +3,15 @@
 // it saw, so that this file runs and is tested in Node.
 import { NO_INPUT, type KartInput } from './physics.ts'
 
-export const KART_ACTIONS = ['throttle', 'brake', 'left', 'right', 'drift', 'boost'] as const
+export const KART_ACTIONS = [
+  'throttle',
+  'brake',
+  'left',
+  'right',
+  'drift',
+  'boost',
+  'reset',
+] as const
 export type KartAction = (typeof KART_ACTIONS)[number]
 
 /** Every action has this many places for a key, and as many for a gamepad control */
@@ -32,7 +40,8 @@ const axis = (index: number, direction: -1 | 1): PadBinding => ({ kind: 'axis', 
  * drift is often a tap), and Ctrl with W closes the tab. Arrows with Z and X for the right hand on
  * the arrows; WASD with Space and E for the left hand on the letters. The gamepad follows the
  * browser's standard mapping: left stick or d-pad to steer, A or RT to accelerate, B or LT to brake,
- * RB or LB to drift, X or Y to boost.
+ * RB or LB to drift, X or Y to boost. Reset (e8-t02b) is R, and Back (View) on a gamepad: away from
+ * the driving keys, so that it is not pressed by accident, with a second place left empty.
  */
 export const DEFAULT_BINDINGS: Bindings = {
   keys: {
@@ -42,6 +51,7 @@ export const DEFAULT_BINDINGS: Bindings = {
     right: ['ArrowRight', 'KeyD'],
     drift: ['KeyZ', 'Space'],
     boost: ['KeyX', 'KeyE'],
+    reset: ['KeyR', null],
   },
   pad: {
     throttle: [button(0), button(7)],
@@ -50,6 +60,7 @@ export const DEFAULT_BINDINGS: Bindings = {
     right: [axis(0, 1), button(15)],
     drift: [button(5), button(4)],
     boost: [button(2), button(3)],
+    reset: [button(8), null],
   },
 }
 
@@ -92,10 +103,15 @@ export interface InputSources {
   readonly pad?: PadSnapshot
   /** The boost was pressed since the last step, even if it is already up again */
   readonly boostTapped?: boolean
+  /** The same for the reset */
+  readonly resetTapped?: boolean
 }
 
 /** Keyboard and gamepad together: either can press, and their steering adds up to at most full */
-export function readInput(bindings: Bindings, { held, pad, boostTapped }: InputSources): KartInput {
+export function readInput(
+  bindings: Bindings,
+  { held, pad, boostTapped, resetTapped }: InputSources,
+): KartInput {
   const amount = (action: KartAction): number => {
     let value = 0
     for (const code of bindings.keys[action]) if (code && held.has(code)) value = 1
@@ -114,14 +130,18 @@ export function readInput(bindings: Bindings, { held, pad, boostTapped }: InputS
     steer: Math.min(1, Math.max(-1, amount('right') - amount('left'))),
     drift: pressed('drift'),
     boost: pressed('boost') || (boostTapped ?? false),
+    reset: pressed('reset') || (resetTapped ?? false),
   }
 }
 
 export const isBoundKey = (bindings: Bindings, code: string): boolean =>
   KART_ACTIONS.some((action) => bindings.keys[action].includes(code))
 
-export const boostKeys = (bindings: Bindings): readonly string[] =>
-  bindings.keys.boost.filter((code): code is string => code !== null)
+/** The keys of an action that fires once per press, so that a tap between two steps still counts */
+export const actionKeys = (bindings: Bindings, action: KartAction): readonly string[] =>
+  bindings.keys[action].filter((code): code is string => code !== null)
+
+export const boostKeys = (bindings: Bindings): readonly string[] => actionKeys(bindings, 'boost')
 
 export interface Moved {
   readonly action: KartAction
