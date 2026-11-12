@@ -83,26 +83,8 @@ function noteKey(player: PromotionPlayer): string {
   return 'games.promotion.note.commoner'
 }
 
-/**
- * Every option, `edition` too. The waiting room's form is generated from info.ts, which leaves
- * `edition` out (and `hidden` says so): until C7 builds the full board's screen, a full-edition room
- * is made only through `POST /api/rooms` with `options.edition: 'full'`, and the waiting room keeps
- * it when the host changes another option (worker/room-host.ts, `keepHidden`). C7 moves the field
- * into info.ts and drops `hidden`.
- */
-export const PROMOTION_OPTIONS: OptionsSchema<PromotionOptions> = {
-  ...promotionInfo.options,
-  edition: {
-    kind: 'select',
-    labelKey: 'games.promotion.option.edition',
-    choices: [
-      { value: 'simple', labelKey: 'games.promotion.option.edition.simple' },
-      { value: 'full', labelKey: 'games.promotion.option.edition.full' },
-    ],
-    default: 'simple',
-    hidden: true,
-  },
-}
+/** Every option, `edition` (C6, shown since C7) among them: info.ts, as the waiting room has them */
+export const PROMOTION_OPTIONS: OptionsSchema<PromotionOptions> = promotionInfo.options
 
 /** The simple edition alone: what every promotion game was before C6, and is still by default */
 export const promotionSimple: GameModule<

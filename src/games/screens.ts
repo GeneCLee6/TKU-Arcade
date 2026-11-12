@@ -18,4 +18,11 @@ const SCREENS: Partial<Record<string, GameScreen>> = {
   spectrum: lazy(() => import('./spectrum/SpectrumScreen.tsx')),
 }
 
-export const gameScreen = (gameId: string): GameScreen | null => SCREENS[gameId] ?? null
+// The full edition of promotion (C7) is a screen of its own: a simple game never loads its board
+const PROMOTION_FULL: GameScreen = lazy(() => import('./promotion/full/FullScreen.tsx'))
+
+/** The screen for a game, by its view where a game has more than one (promotion's `edition`) */
+export const gameScreen = (gameId: string, view?: unknown): GameScreen | null =>
+  gameId === 'promotion' && (view as { edition?: unknown } | undefined)?.edition === 'full'
+    ? PROMOTION_FULL
+    : (SCREENS[gameId] ?? null)

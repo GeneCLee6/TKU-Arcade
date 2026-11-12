@@ -7,17 +7,14 @@ export type DiceKind = 'four-sided' | 'six-sided'
 /** The simplified ladder of 79 cells (board.ts), or the full board with money (boardFull.ts, C6) */
 export type Edition = 'simple' | 'full'
 
-/** The options the waiting room shows (info.ts): `edition` stays server-only until C7 */
-export type PromotionShownOptions = {
+/** The room's options (info.ts) */
+export type PromotionOptions = {
+  /** The simple edition (the default) or the full one; the other two are the simple edition's */
+  edition: Edition
   /** A four-sided top showing the result, or four six-sided dice read through SIX_SIDED_TABLE */
   dice: DiceKind
   /** How many rounds (every seat rolling once) before the game ends on seniority */
   turnLimit: number
-}
-
-export type PromotionOptions = PromotionShownOptions & {
-  /** Hidden from the waiting room (rules.ts): set only when a room is made, through the API */
-  edition: Edition
 }
 
 export type PromotionPlayer = {

@@ -177,8 +177,24 @@ export const promotionBoard = {
   focus: '#FFE066',
   sheen: '#FFFFFF',
   shade: '#000000',
-  // The four results, on the destination badges and the faces of the top
-  face: { de: '#F5C542', cai: '#5EE0F5', gong: '#5FD58F', zang: '#F27482' },
+  // The results, on the destination badges and the faces of the top; the full edition's six (C7)
+  face: {
+    de: '#F5C542',
+    cai: '#5EE0F5',
+    gong: '#5FD58F',
+    liang: '#C3A6FF',
+    rou: '#D9D2C0',
+    zang: '#F27482',
+  },
+  // The full edition (C7): silver, the pot, the cells that end a career
+  silver: '#D8DDE6',
+  silverDeep: '#7D8796',
+  gain: '#1F7A3A',
+  loss: '#A81E1E',
+  exile: '#5A5F66',
+  onExile: '#F2F2F2',
+  requirement: '#1F4E8C',
+  onRequirement: '#FFFFFF',
   onFace: '#1A1206',
   // Hat buttons by grade, first to ninth (illustrative)
   knob: {

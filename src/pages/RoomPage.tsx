@@ -9,6 +9,7 @@ import { NicknameForm } from '../components/NicknameForm.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { WaitingRoom } from '../components/WaitingRoom.tsx'
 import { gameScreen } from '../games/screens.ts'
+import type { RulesEdition } from '../lib/rulesDoc.ts'
 import { useT } from '../i18n/useT.ts'
 import { ChatDraft } from '../lib/chatState.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
@@ -154,7 +155,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
       draftStore: chatDraft,
     },
   }
-  const Screen = gameScreen(view.room.gameId)
+  const Screen = gameScreen(view.room.gameId, view.game?.view)
   return (
     <>
       {/* Always in the page: screen readers only announce changes in a region they already know */}
@@ -165,6 +166,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         title={gameTitle(t, view.room.gameId)}
         members={Object.keys(view.members).length}
         gameId={view.room.gameId}
+        edition={view.room.options.edition === 'full' ? 'full' : 'simple'}
       />
       {view.room.status === 'waiting' ? (
         <>
@@ -209,10 +211,13 @@ function RoomHeading({
   title,
   members,
   gameId,
+  edition,
 }: {
   title: string
   members: number
   gameId?: string
+  /** Which rules "how to play" opens, for a game with two editions */
+  edition?: RulesEdition
 }) {
   const t = useT()
   return (
@@ -222,7 +227,7 @@ function RoomHeading({
       <MemberCount>{t('room.memberCount', { count: members })}</MemberCount>
       {gameId !== undefined && (
         <HeadingAction>
-          <HowToPlay gameId={gameId} />
+          <HowToPlay gameId={gameId} edition={edition} />
         </HeadingAction>
       )}
     </HeadingRow>

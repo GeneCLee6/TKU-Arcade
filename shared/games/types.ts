@@ -118,12 +118,24 @@ export type OptionValue = boolean | number | string
 export type OptionValues = Record<string, OptionValue>
 
 /**
+ * `showIf`: the waiting room shows the field only while another field has this value (promotion's
+ * dice and round limit, which only the simple edition uses). The value is kept either way.
+ */
+export type ShowIf = { field: string; value: OptionValue }
+
+/**
  * `hidden`: a field only the module's schema has, not the one in its info.ts, so the waiting room
  * never shows it. It can be set when a room is made (`POST /api/rooms`), and a host changing the
  * other options keeps it (`keepHidden`, shared/games/options.ts). For a rule a game is not ready to
  * offer yet (promotion's `edition` until C7).
  */
-export type BooleanOption = { kind: 'boolean'; labelKey: string; default: boolean; hidden?: true }
+export type BooleanOption = {
+  kind: 'boolean'
+  labelKey: string
+  default: boolean
+  hidden?: true
+  showIf?: ShowIf
+}
 
 export type IntOption = {
   kind: 'int'
@@ -132,14 +144,17 @@ export type IntOption = {
   max: number
   default: number
   hidden?: true
+  showIf?: ShowIf
 }
 
 export type SelectOption<T extends string | number> = {
   kind: 'select'
   labelKey: string
-  choices: readonly { value: T; labelKey: string }[]
+  /** `hintKey`: one line under the control on what the chosen value means */
+  choices: readonly { value: T; labelKey: string; hintKey?: string }[]
   default: T
   hidden?: true
+  showIf?: ShowIf
 }
 
 /** Any one field, whatever its value's type */

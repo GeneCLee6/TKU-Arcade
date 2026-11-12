@@ -14,6 +14,7 @@ import {
   type FullFace,
 } from '../../../shared/games/promotion/boardFull.ts'
 import { promotionFullMessages } from '../../../shared/games/promotion/i18n.full.ts'
+import { promotionMessages } from '../../../shared/games/promotion/i18n.ts'
 import { promotion } from '../../../shared/games/promotion/rules.ts'
 import {
   birthOf,
@@ -632,11 +633,13 @@ describe('full-edition games', () => {
       expect(en, key).toHaveProperty(key)
       expect(zh, key).toHaveProperty(key)
     }
+    // The option is shown since C7: its labels are in the waiting room's strings
     const edition = promotion.options.edition
-    expect(edition.kind === 'select' && edition.hidden).toBe(true)
+    expect(edition.kind === 'select' && edition.hidden).toBeFalsy()
     if (edition.kind === 'select') {
-      for (const label of [edition.labelKey, ...edition.choices.map((c) => c.labelKey)]) {
-        expect(en, label).toHaveProperty(label)
+      for (const label of [edition.labelKey, ...edition.choices.flatMap((c) => [c.labelKey, c.hintKey ?? ''])]) {
+        expect(promotionMessages.en, label).toHaveProperty(label)
+        expect(promotionMessages['zh-TW'], label).toHaveProperty(label)
       }
     }
   })
