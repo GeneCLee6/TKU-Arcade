@@ -320,6 +320,24 @@ describe('a roll arriving', () => {
     expect(rollButton()).toHaveAttribute('aria-disabled', 'false')
   })
 
+  it('keeps the line of the roll in place while the top spins, and the whole sentence in it', () => {
+    vi.useFakeTimers()
+    const room = parts({ you: 'Bo' })
+    const { rerender } = render(screenOf(room, projection(state({ you: 1 }))))
+    const line = screen.getByRole('status')
+
+    rerender(screenOf(room, projection(rolled)))
+    // The same element, empty, not taken out: the dock keeps its height through the spin
+    expect(screen.getByRole('status')).toBe(line)
+    expect(line).toHaveTextContent('')
+
+    act(() => void vi.advanceTimersByTime(ROLL_MS))
+    expect(screen.getByRole('status')).toBe(line)
+    // However short the screen cuts it, a screen reader and a hover get all of it
+    expect(line).toHaveTextContent('Al rolled Virtue: Baiding → Shengyuan')
+    expect(line).toHaveAttribute('title', 'Al rolled Virtue: Baiding → Shengyuan')
+  })
+
   it('with reduced motion goes straight to the result', () => {
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: query.includes('reduced-motion'),
