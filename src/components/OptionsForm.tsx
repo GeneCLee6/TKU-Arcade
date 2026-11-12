@@ -28,11 +28,13 @@ export interface OptionsFormProps {
 /** The rule options, generated from a game's schema. A game with none renders nothing */
 export function OptionsForm({ schema, values, editable, onChange }: OptionsFormProps) {
   const t = useT()
-  const fields = Object.entries(schema as Record<string, AnyOptionField>)
-  if (fields.length === 0) return null
+  const all = Object.entries(schema as Record<string, AnyOptionField>)
+  if (all.length === 0) return null
 
   // A field the room has no valid value for (an older room, say) shows what the server would use
   const complete = parseOptions(schema, values)
+  // A field that only matters for another field's value is left out otherwise (`showIf`), its value kept
+  const fields = all.filter(([, field]) => !field.showIf || complete[field.showIf.field] === field.showIf.value)
 
   if (!editable) {
     return (
@@ -71,7 +73,13 @@ function ValueText({ field, value }: { field: AnyOptionField; value: OptionValue
       return <>{value}</>
     case 'select': {
       const choice = choicesOf(field).find((other) => other.value === value)
-      return <>{choice ? t(choice.labelKey as TextKey) : value}</>
+      if (!choice) return <>{value}</>
+      return (
+        <>
+          {t(choice.labelKey as TextKey)}
+          {choice.hintKey && <Hint>{t(choice.hintKey as TextKey)}</Hint>}
+        </>
+      )
     }
   }
 }
@@ -108,7 +116,7 @@ function BooleanControl({ field, value, onPick }: ControlProps<BooleanOption, bo
 }
 
 const choicesOf = (field: SelectOption<string> | SelectOption<number>) =>
-  field.choices as readonly { value: string | number; labelKey: string }[]
+  field.choices as readonly { value: string | number; labelKey: string; hintKey?: string }[]
 
 function SelectControl({
   field,
@@ -117,12 +125,15 @@ function SelectControl({
 }: ControlProps<SelectOption<string> | SelectOption<number>, OptionValue>) {
   const t = useT()
   const id = useId()
+  const hintId = useId()
   const choices = choicesOf(field)
+  const hint = choices.find((choice) => choice.value === value)?.hintKey
   return (
     <div>
       <FieldLabel htmlFor={id}>{t(field.labelKey as TextKey)}</FieldLabel>
       <SelectInput
         id={id}
+        aria-describedby={hint ? hintId : undefined}
         value={String(value)}
         onChange={(event) => {
           // The DOM speaks strings; a choice's value may be a number
@@ -136,6 +147,7 @@ function SelectControl({
           </option>
         ))}
       </SelectInput>
+      {hint && <Hint id={hintId}>{t(hint as TextKey)}</Hint>}
     </div>
   )
 }

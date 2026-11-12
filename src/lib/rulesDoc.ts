@@ -4,16 +4,24 @@ import { useEffect, useState } from 'react'
 import type { Language } from '../i18n/t.ts'
 import { useLanguage } from '../i18n/useT.ts'
 
-const DOCS = import.meta.glob<string>('../../shared/games/*/rules.*.md', {
-  query: '?raw',
-  import: 'default',
-})
+// A game with a second edition (promotion's full one, C7) has a second pair, `rulesFull.*.md`
+const DOCS = {
+  ...import.meta.glob<string>('../../shared/games/*/rules.*.md', { query: '?raw', import: 'default' }),
+  ...import.meta.glob<string>('../../shared/games/*/rulesFull.*.md', {
+    query: '?raw',
+    import: 'default',
+  }),
+}
 
-const docPath = (gameId: string, language: Language) =>
-  `../../shared/games/${gameId}/rules.${language}.md`
+/** Which of a game's rules: its own, or its full edition's */
+export type RulesEdition = 'simple' | 'full'
+
+const docPath = (gameId: string, language: Language, edition: RulesEdition = 'simple') =>
+  `../../shared/games/${gameId}/${edition === 'full' ? 'rulesFull' : 'rules'}.${language}.md`
 
 /** English is where a game's rules start, so that one decides whether it has any */
-export const hasRules = (gameId: string): boolean => docPath(gameId, 'en') in DOCS
+export const hasRules = (gameId: string, edition: RulesEdition = 'simple'): boolean =>
+  docPath(gameId, 'en', edition) in DOCS
 
 export type RulesDoc =
   | { status: 'loading' }
@@ -23,13 +31,13 @@ export type RulesDoc =
 type Loaded = { key: string; doc: RulesDoc }
 
 /** The rules in the current language: a change of language loads the other file */
-export function useRulesDoc(gameId: string): RulesDoc {
+export function useRulesDoc(gameId: string, edition: RulesEdition = 'simple'): RulesDoc {
   const language = useLanguage()
-  const key = `${gameId}:${language}`
+  const key = `${gameId}:${edition}:${language}`
   const [loaded, setLoaded] = useState<Loaded | null>(null)
 
   useEffect(() => {
-    const load = DOCS[docPath(gameId, language)] ?? DOCS[docPath(gameId, 'en')]
+    const load = DOCS[docPath(gameId, language, edition)] ?? DOCS[docPath(gameId, 'en', edition)]
     if (!load) return undefined
     let stale = false
     load().then(
@@ -43,8 +51,8 @@ export function useRulesDoc(gameId: string): RulesDoc {
     return () => {
       stale = true
     }
-  }, [gameId, language, key])
+  }, [gameId, language, edition, key])
 
-  if (!hasRules(gameId)) return { status: 'failed' }
+  if (!hasRules(gameId, edition)) return { status: 'failed' }
   return loaded?.key === key ? loaded.doc : { status: 'loading' }
 }

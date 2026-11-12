@@ -45,10 +45,10 @@ function localImports(path: string, source: string): string[] {
 }
 
 /** Every file the browser's code pulls in at load time, following imports through shared/ too */
-function reachableFromSite(): Set<string> {
+function reachableFromSite(skip = (_path: string) => false): Set<string> {
   const all = { ...SOURCES, ...SHARED }
   const seen = new Set<string>()
-  const queue = Object.keys(SOURCES)
+  const queue = Object.keys(SOURCES).filter((path) => !skip(path))
   while (queue.length > 0) {
     const path = queue.pop() as string
     if (seen.has(path) || all[path] === undefined) continue
@@ -93,10 +93,16 @@ describe('the catalog against the registry', () => {
 // it no longer fits. The rules run on the server: a screen shows `view` and needs them for nothing
 /**
  * What only the Worker may load: the registry, every rules file, the topic bank, and promotion's full
- * edition (its board and rules, C6): the browser gets none of it until C7 decides how (NEXT.md)
+ * edition's rules (C6). Its board, boardFull.ts, only the full edition's own screen (C7): a lazy chunk
+ * that only a full game loads, so that the 182 names cost nobody else anything
  */
 const WORKER_ONLY =
   /(^|\/)shared\/games\/index\.ts$|shared\/games\/[^/]+\/(rules|rulesFull|boardFull|topics)\.ts$/
+const FULL_SCREEN = /^\/src\/games\/promotion\/full\//
+const FULL_BOARD = /shared\/games\/promotion\/boardFull\.ts$/
+/** What a file may not import: the full screen may have the full board */
+const forbidden = (path: string, from: string) =>
+  WORKER_ONLY.test(from) && !(FULL_SCREEN.test(path) && FULL_BOARD.test(from))
 
 describe('the browser loads no rules', () => {
   const paths = Object.keys(SOURCES)
@@ -112,7 +118,7 @@ describe('the browser loads no rules', () => {
   })
 
   it.each(paths)('%s', (path) => {
-    const bad = staticImports(SOURCES[path]).filter((from) => WORKER_ONLY.test(from))
+    const bad = staticImports(SOURCES[path]).filter((from) => forbidden(path, from))
     expect(bad).toEqual([])
   })
 
@@ -121,7 +127,12 @@ describe('the browser loads no rules', () => {
     const reached = [...reachableFromSite()]
     expect(reached).toContain('/shared/games/catalog.ts')
     expect(reached).toContain('/shared/games/spectrum/info.ts')
-    expect(reached.filter((path) => WORKER_ONLY.test(path))).toEqual([])
+    expect(reached.filter((path) => WORKER_ONLY.test(path))).toEqual(
+      reached.some((path) => FULL_SCREEN.test(path)) ? ['/shared/games/promotion/boardFull.ts'] : [],
+    )
+    // Outside the full screen, nothing reaches the full board either
+    const elsewhere = [...reachableFromSite((path) => FULL_SCREEN.test(path))]
+    expect(elsewhere.filter((path) => WORKER_ONLY.test(path))).toEqual([])
   })
 
   it('catalog.ts and every info.ts import no rules', () => {

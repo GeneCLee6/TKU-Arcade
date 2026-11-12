@@ -337,7 +337,7 @@ describe('the rule options', () => {
     fireEvent.change(limit, { target: { value: '60' } })
     fireEvent.blur(limit)
 
-    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ dice: 'six-sided', turnLimit: 60 })
+    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ edition: 'simple', dice: 'six-sided', turnLimit: 60 })
   })
 
   it('are for everyone else to read', () => {
@@ -400,5 +400,28 @@ describe('in Traditional Chinese', () => {
     expect(screen.getByRole('button', { name: '開始遊戲' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '坐到座位 2' })).toBeInTheDocument()
     expect(screen.getByText('房主')).toBeInTheDocument()
+  })
+})
+
+describe('the promotion edition (C7)', () => {
+  const withOptions = (extra: Record<string, string> = {}): RoomView => {
+    const view = viewOf([al(), bo()])
+    return { ...view, room: { ...view.room, options: { dice: 'six-sided', turnLimit: 40, ...extra } } }
+  }
+
+  it('says what each edition is, and shows the dice and round limit only for the simple one', () => {
+    const { onSetOptions } = renderRoom(withOptions())
+    const edition = screen.getByRole('combobox', { name: 'Edition' })
+    expect(edition).toHaveAccessibleDescription(/79 offices/)
+    expect(screen.getByRole('spinbutton')).toBeInTheDocument()
+    fireEvent.change(edition, { target: { value: 'full' } })
+    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ edition: 'full', dice: 'six-sided', turnLimit: 40 })
+  })
+
+  it('hides the simple edition’s options in a full room', () => {
+    renderRoom(withOptions({ edition: 'full' }))
+    expect(screen.getByRole('combobox', { name: 'Edition' })).toHaveAccessibleDescription(/182 offices/)
+    expect(screen.queryByRole('spinbutton')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Dice' })).toBeNull()
   })
 })
