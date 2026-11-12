@@ -18,6 +18,7 @@ import { fullArtHref, fullArtSize, fullKnob } from './fullArt.ts'
 import { boardCellName, fullCellName, nameLines } from './fullText.ts'
 import { fullCellForKey } from './fullKeys.ts'
 import type { Box, FullBlockBox, FullCellBox, FullLayout, FullRungBox } from './fullLayout.ts'
+import type { SquareLayout, SquareParts } from './fullSquare.ts'
 import { STEP_MS } from './useTurnPlayback.ts'
 
 export interface FullPiece {
@@ -56,6 +57,8 @@ export interface FullBoardProps {
   pending?: { cell: string; seat: number } | null
   /** Who stands at each grade of the ladder (品級考), as compared at the end */
   grades?: ReadonlyMap<number, readonly number[]>
+  /** The common pot (公注), written large in the centre of the square board (C9) */
+  bank?: number
 }
 
 type Paints = Record<'l' | 'p' | 'g' | 's', string>
@@ -78,6 +81,7 @@ export function FullBoard({
   dense = false,
   pending = null,
   grades,
+  bank,
 }: FullBoardProps) {
   const t = useT()
   const hintId = useId()
@@ -106,6 +110,7 @@ export function FullBoard({
       >
         <Gradients ids={ids} />
         <Frame layout={layout} lacquer={paints.l} />
+        {isSquare(layout) && <Centre square={layout.square} gold={paints.g} bank={bank} />}
         <Cells
           board={board}
           layout={layout}
@@ -148,6 +153,9 @@ interface Point {
   x: number
   y: number
 }
+
+// Not fullSquare.ts's own: that loads with the board's data, after the first paint (fullData.ts)
+const isSquare = (layout: FullLayout): layout is SquareLayout => 'square' in layout
 
 const centre = (box: Box): Point => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 })
 
@@ -256,6 +264,7 @@ const Frame = memo(function Frame({ layout, lacquer }: { layout: FullLayout; lac
         stroke={paint.goldDeep}
         strokeWidth={1.2}
       />
+      {isSquare(layout) && <Rings square={layout.square} />}
       {layout.blocks.map((block) => (
         <Plaque
           key={block.id}
@@ -267,6 +276,69 @@ const Frame = memo(function Frame({ layout, lacquer }: { layout: FullLayout; lac
     </g>
   )
 })
+
+/**
+ * The square board's rings (C9): each a lacquer band a shade darker than the one round it, edged in
+ * gold, so that the frames going in read at a glance
+ */
+function Rings({ square }: { square: SquareParts }) {
+  return (
+    <g data-rings={square.rings.length}>
+      {square.rings.map(({ outer, inner }, at) => (
+        <g key={at} data-ring-frame={at}>
+          <path
+            d={`${rectPath(outer)} ${rectPath(inner)}`}
+            fillRule="evenodd"
+            fill={paint.block}
+            fillOpacity={0.12 + at * 0.07}
+          />
+          <rect {...outer} rx={6} fill="none" stroke={paint.gold} strokeOpacity={0.7} strokeWidth={1.5} />
+        </g>
+      ))}
+      <rect
+        {...square.rings[square.rings.length - 1].inner}
+        rx={8}
+        fill={paint.block}
+        fillOpacity={0.4}
+        stroke={paint.gold}
+        strokeWidth={2.5}
+      />
+    </g>
+  )
+}
+
+const grow = (box: Box, by: number): Box => ({
+  x: box.x - by,
+  y: box.y - by,
+  width: box.width + 2 * by,
+  height: box.height + 2 * by,
+})
+
+const rectPath = ({ x, y, width, height }: Box) =>
+  `M ${x} ${y} h ${width} v ${height} h ${-width} Z`
+
+/** The centre of the square board: the pot's medallion, the silver in it written large */
+function Centre({ square, gold, bank }: { square: SquareParts; gold: string; bank: number | undefined }) {
+  const t = useT()
+  const { pot } = square
+  const middle = centre(pot)
+  const label = t('games.promotion.full.bank')
+  const amount = bank === undefined ? '' : t('games.promotion.full.silver', { amount: bank })
+  const big = Math.min(pot.height * 0.42, (pot.width - 24) / Math.max(3, [...amount].length * 0.62))
+  const small = big * 0.5
+  return (
+    <g data-centre-pot={bank ?? ''} aria-hidden="true">
+      <rect {...pot} rx={10} fill={gold} stroke={paint.gold} strokeWidth={3} />
+      <rect {...grow(pot, -6)} rx={6} fill="none" stroke={paint.endDeep} strokeWidth={1.5} />
+      <Ink x={middle.x} y={pot.y + pot.height * 0.3} fill={paint.seal} style={{ fontSize: small, letterSpacing: 4 }}>
+        {label}
+      </Ink>
+      <Ink x={middle.x} y={pot.y + pot.height * 0.66} fill={paint.onEnd} style={{ fontSize: big }}>
+        {amount}
+      </Ink>
+    </g>
+  )
+}
 
 function Plaque({ block, name, upright }: { block: FullBlockBox; name: string; upright: boolean }) {
   const { plaque } = block

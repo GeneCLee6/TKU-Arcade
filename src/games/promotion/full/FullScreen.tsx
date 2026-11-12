@@ -31,8 +31,8 @@ import { loadFullBoardFont } from './fullFont.ts'
 import { FullCellDetail } from './FullCellDetail.tsx'
 import { FullDice } from './FullDice.tsx'
 import { useFullData } from './fullData.ts'
+import type { SquareLayout } from './fullSquare.ts'
 import { shortCellName } from './fullText.ts'
-import { CELL_W, fitFullBoard, fullLayouts } from './fullLayout.ts'
 import {
   beforeTransfers,
   comboText,
@@ -54,6 +54,9 @@ registerMessages(promotionFullMessages)
 /** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
 const DENSE_CELL = 48
 const BOARD_MARGIN = 8
+/** The least room inside the square board's outer ring for a decision's card to go there */
+const PROMPT_MIN_W = 300
+const PROMPT_MIN_H = 150
 /** If the room never answers a roll, the button comes back after this */
 const ROLL_ANSWER_MS = 4000
 
@@ -87,15 +90,16 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   const immersive = useImmersive(frame)
   const immersed = immersive.mode !== 'off'
   const { stage: stageHeight, box, stageRef, boxRef } = useBoardFit(turnPanel, !immersed)
-  const layouts = board ? fullLayouts(board) : null
-  const fit = layouts
-    ? box
-      ? fitFullBoard(layouts, box.width - 2 * BOARD_MARGIN, box.height - 2 * BOARD_MARGIN)
-      : { layout: layouts.wide, scale: 0 }
-    : null
+  const layouts = data?.layouts ?? null
+  const fit =
+    board && layouts
+      ? box
+        ? layouts.fitBoard(board, box.width - 2 * BOARD_MARGIN, box.height - 2 * BOARD_MARGIN)
+        : { layout: layouts.unfitted(board), scale: 0 }
+      : null
   const layout = fit?.layout ?? null
   const boardWidth = box && fit ? `${fit.layout.width * fit.scale * zoomLevel}px` : `${zoomLevel * 100}%`
-  const dense = box !== null && fit !== null && CELL_W * fit.scale * zoomLevel < DENSE_CELL
+  const dense = box !== null && fit !== null && layouts !== null && layouts.CELL_W * fit.scale * zoomLevel < DENSE_CELL
 
   const [selected, setSelected] = useState<string | null>(null)
   const toggleCell = useCallback(
@@ -261,6 +265,21 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   // The card goes where it does not hide the cell it is about
   const pendingBox = deciding && layout ? layout.byId.get(pending.cell) : undefined
   const promptOnTop = pendingBox !== undefined && layout !== null && pendingBox.y + pendingBox.height / 2 > layout.height / 2
+  // On the square board, inside the outer ring (where every cell that asks is), if the card has room
+  const promptArea = (() => {
+    if (!deciding || !layout || !box || !fit || zoomLevel !== MIN_ZOOM) return null
+    if (!('square' in layout)) return null
+    const { inner } = (layout as SquareLayout).square
+    const left = (box.width - layout.width * fit.scale) / 2
+    const top = (box.height - layout.height * fit.scale) / 2
+    const area = {
+      x: left + inner.x * fit.scale,
+      y: top + inner.y * fit.scale,
+      width: inner.width * fit.scale,
+      height: inner.height * fit.scale,
+    }
+    return area.width >= PROMPT_MIN_W && area.height >= PROMPT_MIN_H ? area : null
+  })()
 
   let mainText: string
   if (playing && last) mainText = t('games.promotion.full.rolling', { name: nameOf(last.seat) })
@@ -414,6 +433,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
                 dense={dense}
                 pending={deciding ? { cell: pending.cell, seat: pending.seat } : null}
                 grades={grades}
+                bank={bank}
               />
               ) : (
                 <Loading role="status">{t('games.promotion.full.loading')}</Loading>
@@ -448,6 +468,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
                 waiting={asked}
                 onAnswer={answer}
                 top={promptOnTop}
+                area={promptArea}
               />
             )}
             {board && (

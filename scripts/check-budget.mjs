@@ -60,9 +60,15 @@ if (entries.length === 0) {
 const mainKeys = collectAll(entries)
 const room = manifest[ROOM_PAGE] ? [ROOM_PAGE] : []
 
+// A lazy chunk a game's screen loads after its first paint (the full board's layout, C9) is that
+// screen's, not a game of its own
+const gameChunks = lazyEntriesUnder('src/games/')
+const loadedByGame = new Set(gameChunks.flatMap((key) => manifest[key].dynamicImports ?? []))
+const games = gameChunks.filter((key) => !loadedByGame.has(key))
+
 const budgets = [
   { name: 'main site', keys: mainKeys, limit: MAIN_LIMIT },
-  ...lazyEntriesUnder('src/games/').map((game) => ({
+  ...games.map((game) => ({
     name: `first screen of ${game}`,
     keys: collectAll([...entries, ...room, game]),
     limit: MAIN_LIMIT,
@@ -81,12 +87,12 @@ if (kartEntries.length > 0) {
 }
 
 /**
- * What a game's screen loads after its first paint (promotion's full board, C8): its dynamic imports
- * outside src/games/, with their static imports, less what the first screen already has. Reported,
+ * What a game's screen loads after its first paint (promotion's full board, C8, and its layout, C9):
+ * its dynamic imports, with their static imports, less what the first screen already has. Reported,
  * not limited: the first screen is what the budget is for
  */
 function afterPaint(game, firstKeys) {
-  const later = (manifest[game]?.dynamicImports ?? []).filter((key) => !key.startsWith('src/games/'))
+  const later = manifest[game]?.dynamicImports ?? []
   const keys = collectAll(later)
   for (const key of firstKeys) keys.delete(key)
   return keys

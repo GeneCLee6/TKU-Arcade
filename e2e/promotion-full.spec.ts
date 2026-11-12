@@ -230,11 +230,41 @@ for (const size of [
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     )
     expect(sideways).toBeLessThanOrEqual(0)
+    // A square board (C9): four rings round the pot
+    await expect(host.locator('[data-rings="4"]')).toHaveCount(1)
+    await expect(host.locator('[data-centre-pot="200"]')).toHaveCount(1)
     for (let turn = 0; turn < 3; turn++) await stepOnce(people)
     await expect.poll(() => cellsOnScreen(host)).toBe(CELLS)
     await close(people)
   })
 }
+
+// A phone on its side in focus mode (C9): the square board, the turn and the roll with no scrolling
+test('at 844x390 in focus mode the square board fits with nothing to scroll', async ({ browser }) => {
+  const people = await fullRoom(browser, 2, {
+    viewport: { width: 844, height: 390 },
+    hasTouch: true,
+    isMobile: true,
+  })
+  const [host] = people
+  await host.evaluate(() => {
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { value: undefined })
+  })
+  await host.getByRole('button', { name: 'Full screen' }).click()
+  await expect(host.locator('[data-immersion="focus"]')).toBeVisible()
+  await expect(host.locator('[data-rings="4"]')).toHaveCount(1)
+  await expect.poll(() => cellsOnScreen(host)).toBe(CELLS)
+  await expect(rollOf(host)).toBeInViewport({ ratio: 1 })
+  const scroll = await host.evaluate(() => {
+    const page = document.documentElement
+    return [page.scrollWidth - page.clientWidth, page.scrollHeight - page.clientHeight]
+  })
+  expect(scroll[0]).toBeLessThanOrEqual(0)
+  expect(scroll[1]).toBeLessThanOrEqual(0)
+  for (let turn = 0; turn < 3; turn++) await stepOnce(people)
+  await expect.poll(() => cellsOnScreen(host)).toBe(CELLS)
+  await close(people)
+})
 
 /** Every frame from here on: the height of the bar the turn is in, the board's box, and a prompt */
 async function startRecording(page: Page) {
@@ -298,16 +328,22 @@ for (const size of [
   }
 }
 
-// A decision on a phone (C8): the card comes over the board; the dock and the board hold still
-for (const immersed of [false, true]) {
-  test(`at 844x390${immersed ? ' in focus mode' : ''} a decision waits without moving anything`, async ({
+// A decision on a phone (C8) and a laptop (C9): the card comes over the board; the dock and the
+// board hold still. Where the board has room (focus mode, a laptop) the card leaves the cell it asks
+// about in sight; a phone on its side outside focus mode has too little board for that
+for (const { width, height, immersed, phone } of [
+  { width: 844, height: 390, immersed: false, phone: true },
+  { width: 844, height: 390, immersed: true, phone: true },
+  { width: 1280, height: 720, immersed: false, phone: false },
+]) {
+  const uncovered = immersed || !phone
+  test(`at ${width}x${height}${immersed ? ' in focus mode' : ''} a decision waits without moving anything`, async ({
     browser,
   }) => {
     test.setTimeout(900_000)
     const options = {
-      viewport: { width: 844, height: 390 },
-      hasTouch: true,
-      isMobile: true,
+      viewport: { width, height },
+      ...(phone ? { hasTouch: true, isMobile: true } : {}),
       reducedMotion: 'reduce' as const,
     }
     const people = await fullRoom(browser, 4, options, { decisionSeconds: 60 })
@@ -332,6 +368,21 @@ for (const immersed of [false, true]) {
     expect(decider, 'a decision came up').not.toBeNull()
     const page = decider as Page
     await expect(promptOf(page)).toBeInViewport()
+    // The card does not hide the cell it asks about, where the board has room for that (C9)
+    const asked = await page.locator('[data-pending-cell]').getAttribute('data-pending-cell')
+    const [card, cell] = [
+      await promptOf(page).boundingBox(),
+      await page.locator(`[data-cell="${asked}"]`).boundingBox(),
+    ]
+    expect(card && cell).toBeTruthy()
+    if (uncovered && card && cell) {
+      const covers =
+        card.x < cell.x + cell.width &&
+        cell.x < card.x + card.width &&
+        card.y < cell.y + cell.height &&
+        cell.y < card.y + card.height
+      expect(covers, `the card over ${asked}`).toBe(false)
+    }
     for (const button of await promptOf(page).locator('button').all()) {
       const box = await button.boundingBox()
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
