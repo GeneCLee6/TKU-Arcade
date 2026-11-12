@@ -1,18 +1,12 @@
 import styled from 'styled-components'
 import { FACES, getCell } from '../../../shared/games/promotion/board.ts'
 import { knobOf } from '../../../shared/games/promotion/departments.ts'
-import { promotionDetailMessages } from '../../../shared/games/promotion/i18n.detail.ts'
 import { Drawer } from '../../components/Drawer.tsx'
 import { Muted } from '../../components/roomParts.ts'
-import { registerMessages } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, font, promotionBoard, space } from '../../styles/tokens.ts'
 import { cellText, shortCellText } from './cellText.ts'
 import { rankArtOf } from './rankArt.ts'
-
-// The words only the details and the screen around the board use: not drawn in the board's font
-registerMessages(promotionDetailMessages)
-
 
 /**
  * One cell in words, in a sheet over the board when asked for (e3-t10): its full name (in English
