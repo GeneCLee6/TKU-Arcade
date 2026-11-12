@@ -117,22 +117,66 @@ export const setSelectOption = (host: Page, guest: Page, label: string, value: s
     shown,
   )
 
-/** Takes the first chip this person can. Again if somebody else's move had not reached them yet */
-export async function takeFirstChip(person: Page): Promise<void> {
-  await expect(async () => {
-    await person.getByRole('button', { name: /^Take chip \d+$/ }).first().click()
-    await expect(person.getByRole('button', { name: /you hold it$/ })).toBeVisible({ timeout: 1000 })
-  }).toPass({ timeout: 15_000 })
+/** What Silent Table's chips and button are called, so that a walkthrough in Chinese plays the same way */
+export interface SilentTableLabels {
+  /** A chip on the table this person may take */
+  take: RegExp
+  /** The chip in this person's hand */
+  yours: RegExp
+  ready: string
 }
 
-/** Everyone takes the first chip they can and says ready: one round of Silent Table */
-export async function playSilentRound(people: readonly Page[]): Promise<void> {
-  for (const person of people) await takeFirstChip(person)
+export const SILENT_TABLE_EN: SilentTableLabels = {
+  take: /^Take chip \d+$/,
+  yours: /you hold it$/,
+  ready: 'Ready',
+}
+
+/**
+ * Takes the first chip on the table, once this person's own screen shows the table as it is: nothing
+ * in their hand and `free` chips left on it. Their own screen, not the host's: one that still showed
+ * an earlier move, or the round before, would press a chip that has since changed hands. Everyone
+ * acts in turn, so nothing moves under the press once that is so.
+ */
+export async function takeFirstChip(
+  person: Page,
+  free: number,
+  labels: SilentTableLabels = SILENT_TABLE_EN,
+): Promise<void> {
+  const onTable = person.getByRole('button', { name: labels.take })
+  const mine = person.getByRole('button', { name: labels.yours })
+  await expect(mine).toHaveCount(0)
+  await expect(onTable).toHaveCount(free)
+  await onTable.first().click()
+  await expect(mine).toBeVisible()
+}
+
+/**
+ * Everyone says ready, each once their own button can be pressed: a press on a held-back button is
+ * dropped without a word, so pressing it blind would leave the round waiting
+ */
+export async function everyoneReady(
+  people: readonly Page[],
+  labels: SilentTableLabels = SILENT_TABLE_EN,
+): Promise<void> {
   for (const person of people) {
-    const ready = person.getByRole('button', { name: 'Ready', exact: true })
+    const ready = person.getByRole('button', { name: labels.ready, exact: true })
     await expect(ready).toHaveAttribute('aria-disabled', 'false')
     await ready.click()
+    // Held back again, or gone: the room has this seat ready, or has moved on to what comes next
+    await expect(ready.and(person.locator('[aria-disabled="false"]'))).toHaveCount(0)
   }
+}
+
+/** Everyone in turn takes the first chip on the table and says ready: one round of Silent Table */
+export async function playSilentRound(
+  people: readonly Page[],
+  labels: SilentTableLabels = SILENT_TABLE_EN,
+): Promise<void> {
+  for (const [index, person] of people.entries()) {
+    await takeFirstChip(person, people.length - index, labels)
+  }
+  await everyoneReady(people, labels)
 }
 
 /**
