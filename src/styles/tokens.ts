@@ -30,6 +30,7 @@ const light = {
   // One hue per game (e7-t12's theme colours); onAccent reads on each of them
   gamePromotion: '#9A5800',
   gameSilentTable: '#0B7A47',
+  gameSpectrum: '#1D5FC4',
   success: '#13703A',
   danger: '#B91C1C',
   warning: '#9C4A06',
@@ -76,6 +77,7 @@ const dark: Record<ColorName, string> = {
   onAccent: '#05060D',
   gamePromotion: '#FFC23D',
   gameSilentTable: '#5CFFA8',
+  gameSpectrum: '#4DA3FF',
   success: '#5CFFA8',
   danger: '#FF5A6E',
   warning: '#FFC23D',
@@ -120,6 +122,7 @@ export const seatColor = (seat: number): string => color[`seat${seat % 6}` as Co
 export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   promotion: 'gamePromotion',
   'silent-table': 'gameSilentTable',
+  spectrum: 'gameSpectrum',
 }
 
 /** A game's hue, for its card and its room: what `--color-accent` becomes there */

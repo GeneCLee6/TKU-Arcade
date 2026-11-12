@@ -2,6 +2,7 @@ import styled, { css, keyframes } from 'styled-components'
 import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import type { Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
+import { displayType, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, radius, seatColor, space } from '../../styles/tokens.ts'
 import './messages.ts'
 import { LANE_GAP, lanes, lineOrder, position, type NumberLineMark } from './numberLine.ts'
@@ -69,6 +70,8 @@ export function NumberLine({ low, high, marks, animate = true }: NumberLineProps
                 $animate={animate}
                 style={{
                   left: `${position(mark.number) * 100}%`,
+                  // A higher lane's stem runs down past the lower lanes: their bubbles stay on top
+                  zIndex: laneCount - laneOf[index],
                   animationDelay: animate ? `${index * STAGGER_MS}ms` : undefined,
                 }}
               >
@@ -89,8 +92,9 @@ export function NumberLine({ low, high, marks, animate = true }: NumberLineProps
           })}
         </Track>
       </Plot>
-      {/* The same, in order, for a screen reader: the drawing above is hidden from it */}
-      <VisuallyHidden as="ol">
+      {/* The same, in order, for a screen reader: the drawing above is hidden from it. On a phone the
+          marks are too narrow for a whole answer, so there the list shows too (H2) */}
+      <Readout>
         {ordered.map((mark) => {
           const label = pickLabel(mark, t)
           const verdict =
@@ -110,7 +114,7 @@ export function NumberLine({ low, high, marks, animate = true }: NumberLineProps
             </li>
           )
         })}
-      </VisuallyHidden>
+      </Readout>
     </Figure>
   )
 }
@@ -122,12 +126,12 @@ const rise = keyframes`
   }
 `
 
+// Sunk into the reveal's panel (H2): the shell has no rounded boxes
 const Figure = styled.figure`
   margin: 0;
   padding: ${space.md}px;
-  background: ${color.surface};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.component}px;
+  background: ${color.sunken};
+  box-shadow: inset 0 0 0 1px ${color.line};
 `
 
 const Ends = styled.div`
@@ -143,6 +147,28 @@ const Ends = styled.div`
 // nine steps wide, a third of the track, so the track is three quarters of the whole
 const Plot = styled.div`
   padding: 0 12.5%;
+
+  /* A narrow mark wraps its answer and verdict onto more lines than a lane allows for */
+  @media (max-width: 599px) {
+    padding-top: ${space.xl}px;
+  }
+`
+
+const Readout = styled(VisuallyHidden).attrs({ as: 'ol' })`
+  @media (max-width: 599px) {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: ${space.sm}px 0 0;
+    padding: 0 0 0 ${space.lg}px;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    display: grid;
+    gap: ${space.xs}px;
+    font-size: ${fontSize.sm}px;
+    overflow-wrap: anywhere;
+  }
 `
 
 const Track = styled.div`
@@ -154,9 +180,9 @@ const Line = styled.div`
   left: 0;
   right: 0;
   bottom: ${LINE_Y}px;
-  height: 6px;
-  background: ${color.accent};
-  border-radius: 3px;
+  height: 8px;
+  background: linear-gradient(90deg, ${color.accent}, ${color.magenta});
+  transform: skewX(${SLANT});
 `
 
 const Tick = styled.span`
@@ -164,8 +190,8 @@ const Tick = styled.span`
   bottom: ${space.xs}px;
   transform: translateX(-50%);
   color: ${color.muted};
+  ${monoType}
   font-size: ${fontSize.sm}px;
-  font-variant-numeric: tabular-nums;
 `
 
 const Mark = styled.div<{ $animate: boolean }>`
@@ -195,7 +221,7 @@ const Bubble = styled.div<{ $correct: boolean | null }>`
   width: 100%;
   padding: ${space.xs}px ${space.sm}px;
   text-align: center;
-  background: ${color.bg};
+  background: ${color.surface};
   border: ${(p) =>
     p.$correct === null
       ? `1px solid ${color.border}`
@@ -235,13 +261,14 @@ const NumberChip = styled.span`
   z-index: 1;
   display: grid;
   place-items: center;
-  min-width: 28px;
-  height: 28px;
+  min-width: 32px;
+  height: 32px;
   margin-top: ${space.xs}px;
   color: ${color.onSeat};
-  font-weight: 800;
+  ${displayType}
+  font-size: ${fontSize.lg}px;
   font-variant-numeric: tabular-nums;
-  border-radius: 14px;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
 `
 
 const Stem = styled.span`
