@@ -2,7 +2,8 @@ import { useState } from 'react'
 import styled from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import { useT } from '../../i18n/useT.ts'
-import { color, fontSize, radius, seatColor, space } from '../../styles/tokens.ts'
+import { clippedFill, displayType, slantClip } from '../../styles/esports.ts'
+import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import './messages.ts'
 import { moveSeat } from './order.ts'
 
@@ -112,10 +113,11 @@ const Row = styled.li<{ $dragging: boolean }>`
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: ${space.sm}px;
-  padding: ${space.sm}px;
-  background: ${color.surface};
-  border: 1px solid ${(p) => (p.$dragging ? color.accent : color.border)};
-  border-radius: ${radius.component}px;
+  padding: ${space.sm}px ${space.sm}px ${space.sm}px ${space.md}px;
+  background: ${color.sunken};
+  box-shadow:
+    inset 4px 0 0 ${color.accent},
+    inset 0 0 0 1px ${(p) => (p.$dragging ? color.accent : color.line)};
   opacity: ${(p) => (p.$dragging ? 0.6 : 1)};
   cursor: grab;
 `
@@ -126,9 +128,9 @@ const Place = styled.span`
   min-width: 28px;
   height: 28px;
   color: ${color.onSeat};
-  font-weight: 800;
+  ${displayType}
   font-variant-numeric: tabular-nums;
-  border-radius: 14px;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
 `
 
 const Who = styled.div`
@@ -152,14 +154,22 @@ const Buttons = styled.div`
 
 // 44 px: a finger, not a cursor
 const MoveButton = styled.button`
-  min-width: 44px;
+  ${clippedFill(slantClip(8), color.raised)}
+  min-width: 48px;
   min-height: 44px;
   color: ${color.text};
   font-size: ${fontSize.lg}px;
-  background: ${color.bg};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.component}px;
+  background: transparent;
+  border: 0;
   cursor: pointer;
+
+  &::before {
+    box-shadow: inset 0 0 0 1px ${color.border};
+  }
+
+  &:hover:not(:disabled)::before {
+    background: ${color.raisedHover};
+  }
 
   &:disabled {
     color: ${color.muted};

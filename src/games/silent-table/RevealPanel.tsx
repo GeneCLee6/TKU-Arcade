@@ -6,9 +6,11 @@ import type {
   SilentTableSkin,
 } from '../../../shared/games/silent-table/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
+import { Heading, Section } from '../../components/roomParts.ts'
 import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { useT } from '../../i18n/useT.ts'
-import { color, fontSize, radius, seatColor, space } from '../../styles/tokens.ts'
+import { clippedFill, displayType, monoType, slantClip } from '../../styles/esports.ts'
+import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { ChipMark } from './ChipRail.tsx'
 import { CardBack, CardFace } from './PlayingCard.tsx'
 
@@ -31,8 +33,8 @@ export function RevealPanel({ reveal, players, shown, skin, felt, nameOf }: Reve
   const t = useT()
   const done = shown >= reveal.seats.length
   return (
-    <Panel aria-label={t('games.silent-table.ui.revealHeading')}>
-      <Title>{t('games.silent-table.ui.revealHeading')}</Title>
+    <Section aria-label={t('games.silent-table.ui.revealHeading')}>
+      <Heading>{t('games.silent-table.ui.revealHeading')}</Heading>
       <Hint>{t('games.silent-table.ui.revealOrder')}</Hint>
       <Rows>
         {revealOrder(reveal).map((seat, index) => {
@@ -44,7 +46,7 @@ export function RevealPanel({ reveal, players, shown, skin, felt, nameOf }: Reve
               ? String(low)
               : t('games.silent-table.ui.neededRange', { low, high })
           return (
-            <Row key={seat.seat} $wrong={open && !seat.correct}>
+            <Row key={seat.seat} $state={open ? (seat.correct ? 'right' : 'wrong') : 'closed'}>
               <Avatar name={nameOf(seat.seat)} tint={seatColor(seat.seat)} />
               <Who>
                 <Name>{nameOf(seat.seat)}</Name>
@@ -88,24 +90,9 @@ export function RevealPanel({ reveal, players, shown, skin, felt, nameOf }: Reve
           ? t(reveal.passed ? 'games.silent-table.ui.passed' : 'games.silent-table.ui.failed')
           : ''}
       </Verdict>
-    </Panel>
+    </Section>
   )
 }
-
-const Panel = styled.section`
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: ${space.sm}px;
-  padding: ${space.md}px;
-  background: ${color.surface};
-  border: 1px solid ${color.border};
-  border-radius: ${radius.component}px;
-`
-
-const Title = styled.h2`
-  margin: 0;
-  font-size: ${fontSize.lg}px;
-`
 
 const Hint = styled.p`
   margin: 0;
@@ -116,22 +103,24 @@ const Hint = styled.p`
 
 const Rows = styled.ol`
   display: grid;
-  gap: ${space.sm}px;
+  gap: ${space.xs}px;
   margin: 0;
   padding: 0;
   list-style: none;
 `
 
-// A wrong row is told by the word and the cross as well as by its outline
-const Row = styled.li<{ $wrong: boolean }>`
+const edge = { closed: color.line, right: color.success, wrong: color.danger }
+
+// A row sunk into the panel, its left edge green or red once it is turned over: a wrong row is told
+// by the word and the cross as well
+const Row = styled.li<{ $state: keyof typeof edge }>`
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: ${space.xs}px ${space.sm}px;
-  padding: ${space.sm}px;
-  background: ${color.bg};
-  border: ${(p) => (p.$wrong ? `2px solid ${color.danger}` : `1px solid ${color.border}`)};
-  border-radius: ${radius.component}px;
+  padding: ${space.sm}px ${space.md}px;
+  background: ${color.sunken};
+  box-shadow: inset 4px 0 0 ${(p) => edge[p.$state]};
 `
 
 const Who = styled.div`
@@ -142,13 +131,12 @@ const Name = styled.div`
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-weight: 600;
+  font-weight: 700;
 `
 
 const Small = styled.div`
-  color: ${color.muted};
+  ${displayType}
   font-size: ${fontSize.sm}px;
-  line-height: 1.3;
 `
 
 const Cards = styled.div`
@@ -160,13 +148,18 @@ const Compare = styled.div`
   grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  gap: 0 ${space.md}px;
+  align-items: center;
+  gap: ${space.xs}px ${space.md}px;
+  ${monoType}
   font-size: ${fontSize.sm}px;
 `
 
+// A slanted tag in the verdict's colour, with the word on it
 const Mark = styled.span<{ $right: boolean }>`
-  color: ${(p) => (p.$right ? color.success : color.danger)};
-  font-weight: 700;
+  ${(p) => clippedFill(slantClip(6), p.$right ? color.success : color.danger)}
+  padding: 2px ${space.md}px;
+  color: ${color.onAccent};
+  ${displayType}
 `
 
 const Best = styled.div`
@@ -177,7 +170,14 @@ const Best = styled.div`
 
 const Verdict = styled.p<{ $passed: boolean }>`
   margin: 0;
-  color: ${(p) => (p.$passed ? color.success : color.danger)};
   min-height: 1.5em;
-  font-weight: 700;
+  color: ${(p) => (p.$passed ? color.success : color.danger)};
+  ${displayType}
+  font-size: ${fontSize.xl}px;
+
+  &:not(:empty) {
+    padding: ${space.sm}px ${space.md}px;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    box-shadow: inset 4px 0 0 currentColor;
+  }
 `

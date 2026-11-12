@@ -3,7 +3,7 @@ import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import type { Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { displayType, monoType, SLANT } from '../../styles/esports.ts'
-import { color, fontSize, radius, seatColor, space } from '../../styles/tokens.ts'
+import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import './messages.ts'
 import { LANE_GAP, lanes, lineOrder, position, type NumberLineMark } from './numberLine.ts'
 
@@ -226,7 +226,6 @@ const Bubble = styled.div<{ $correct: boolean | null }>`
     p.$correct === null
       ? `1px solid ${color.border}`
       : `2px solid ${p.$correct ? color.success : color.danger}`};
-  border-radius: ${radius.component}px;
 `
 
 const Answer = styled.div<{ $out: boolean }>`

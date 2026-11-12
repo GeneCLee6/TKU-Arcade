@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import styled from 'styled-components'
 import { silentTableScreenMessages } from '../../../shared/games/silent-table/i18n.screen.ts'
 import { ROUNDS } from '../../../shared/games/silent-table/info.ts'
@@ -14,7 +14,8 @@ import { GameLayout } from '../../components/GameLayout.tsx'
 import { registerMessages, type Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { useReducedMotion } from '../../lib/useMediaQuery.ts'
-import { color, fontSize, radius, seatColor, space } from '../../styles/tokens.ts'
+import { clippedFill, cornerClip, displayType, glass, monoType, SLANT } from '../../styles/esports.ts'
+import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { ChipMark, ChipRail } from './ChipRail.tsx'
 import { tableNews, type TableNews } from './news.ts'
@@ -131,15 +132,19 @@ export default function SilentTableScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage>
-        <Felt data-skin={skin} style={{ background: felt }}>
+        <Progress state={state} />
+        {game.chatLocked && (
+          <Locked>
+            <svg width="14" height="16" viewBox="0 0 14 16" aria-hidden="true">
+              <path d="M3 7V5a4 4 0 0 1 8 0v2M1.5 7h11v8h-11z" fill="none" stroke="currentColor" strokeWidth="2" />
+            </svg>
+            {t('games.silent-table.ui.noTalking')}
+          </Locked>
+        )}
+        <Felt data-skin={skin} style={{ '--felt': felt } as CSSProperties}>
           <Motif skin={skin} />
-          <Progress state={state} />
           {/* While it counts, a phone has no line to spare for scenery */}
-          {game.chatLocked ? (
-            <Notice>{t('games.silent-table.ui.noTalking')}</Notice>
-          ) : (
-            <Tagline>{t(`games.silent-table.ui.skin.${skin}`)}</Tagline>
-          )}
+          {!game.chatLocked && <Tagline>{t(`games.silent-table.ui.skin.${skin}`)}</Tagline>}
 
           <Shared role="group" aria-label={t('games.silent-table.ui.sharedCards')}>
             {Array.from({ length: SHARED_CARDS }, (_, index) => {
@@ -243,71 +248,41 @@ function NewsText({
 /** Which level and round this is, and how far the table is from either end of the game */
 function Progress({ state }: { state: SilentTableView }) {
   const t = useT()
+  const round = state.phase === 'round'
   return (
-    <ProgressBar>
-      <strong>{t('games.silent-table.ui.level', { level: state.level })}</strong>
-      {state.phase === 'round' && (
-        <span>{t('games.silent-table.ui.round', { round: state.round, rounds: ROUNDS })}</span>
-      )}
-      <Pips
-        label={t('games.silent-table.ui.streak', {
-          streak: state.streak,
-          levels: state.levelsToWin,
-        })}
-        filled={state.streak}
-        total={state.levelsToWin}
-      />
-      <Pips
-        label={t('games.silent-table.ui.failures', {
-          failures: state.failures,
-          limit: state.failureLimit,
-        })}
-        filled={state.failures}
-        total={state.failureLimit}
-        crossed
-      />
-    </ProgressBar>
+    <Stats>
+      <Stat>
+        <StatValue>{t('games.silent-table.ui.level', { level: state.level })}</StatValue>
+        {round && <StatNote>{t('games.silent-table.ui.round', { round: state.round, rounds: ROUNDS })}</StatNote>}
+        <Segments filled={round ? state.round : ROUNDS} total={ROUNDS} tone={color.accent} />
+      </Stat>
+      <Stat>
+        <StatValue>
+          {t('games.silent-table.ui.streak', { streak: state.streak, levels: state.levelsToWin })}
+        </StatValue>
+        <Segments filled={state.streak} total={state.levelsToWin} tone={color.success} />
+      </Stat>
+      <Stat>
+        <StatValue>
+          {t('games.silent-table.ui.failures', {
+            failures: state.failures,
+            limit: state.failureLimit,
+          })}
+        </StatValue>
+        <Segments filled={state.failures} total={state.failureLimit} tone={color.danger} />
+      </Stat>
+    </Stats>
   )
 }
 
-function Pips({
-  label,
-  filled,
-  total,
-  crossed,
-}: {
-  label: string
-  filled: number
-  total: number
-  crossed?: boolean
-}) {
+/** A slanted bar in parts, as many lit as `filled`: the numbers beside it say the same in words */
+function Segments({ filled, total, tone }: { filled: number; total: number; tone: string }) {
   return (
-    <PipGroup>
-      <span>{label}</span>
-      <svg width={total * 12} height="10" viewBox={`0 0 ${total * 12} 10`} aria-hidden="true">
-        {Array.from({ length: total }, (_, index) => {
-          const x = index * 12 + 5
-          const on = index < filled
-          return crossed && on ? (
-            <path
-              key={index}
-              d={`M${x - 4} 1l8 8m0-8l-8 8`}
-              stroke={color.onFelt}
-              strokeWidth="2"
-            />
-          ) : (
-            <circle
-              key={index}
-              cx={x}
-              cy="5"
-              r="4"
-              fill={on ? color.onFelt : 'none'}
-              stroke={color.onFelt}
-            />
-          )
-        })}
-      </svg>
-    </PipGroup>
+    <Bar aria-hidden="true">
+      {Array.from({ length: total }, (_, index) => (
+        <span key={index} style={index < filled ? { background: tone } : undefined} />
+      ))}
+    </Bar>
   )
 }
 
@@ -378,7 +353,7 @@ function SeatRow({
       ? ''
       : t(player.ready ? 'games.silent-table.ui.seatReady' : 'games.silent-table.ui.seatDeciding')
   return (
-    <SeatItem $ready={player.ready}>
+    <SeatItem $ready={player.ready} $mark={seatColor(player.seat)}>
       <Avatar name={name} tint={seatColor(player.seat)} />
       <SeatWho>
         <SeatName>{name}</SeatName>
@@ -400,17 +375,24 @@ const Stage = styled.div`
   gap: ${space.sm}px;
 `
 
+/** The felt's corners cut off, all four: a table, not a panel */
+const FELT_CUT = 18
+const feltClip = `polygon(${FELT_CUT}px 0, calc(100% - ${FELT_CUT}px) 0, 100% ${FELT_CUT}px, 100% calc(100% - ${FELT_CUT}px), calc(100% - ${FELT_CUT}px) 100%, ${FELT_CUT}px 100%, 0 calc(100% - ${FELT_CUT}px), 0 ${FELT_CUT}px)`
+
+// The skin's felt is --felt, drawn on ::before (esports.ts) so that no focus ring on it is clipped.
 // The ring around whatever has the focus has to show on the felt too
 const Felt = styled.div`
+  ${clippedFill(feltClip, 'var(--felt)')}
   --color-accent: ${color.onFelt};
-  position: relative;
-  overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: ${space.sm}px;
-  padding: ${space.md}px;
+  padding: ${space.md}px ${space.lg}px ${space.lg}px;
   color: ${color.onFelt};
-  border-radius: ${radius.card}px;
+
+  &::before {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, ${color.gameSilentTable} 55%, transparent);
+  }
 
   & > * {
     position: relative;
@@ -430,24 +412,64 @@ const MotifSvg = styled.svg`
   pointer-events: none;
 `
 
-const ProgressBar = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: ${space.xs}px ${space.md}px;
+const Stats = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: ${space.sm}px;
+`
+
+const Stat = styled.div`
+  ${glass}
+  display: grid;
+  align-content: start;
+  gap: ${space.xs}px;
+  padding: ${space.sm}px ${space.md}px ${space.md}px;
+`
+
+const StatValue = styled.strong`
+  ${displayType}
+  font-size: ${fontSize.xl}px;
+  overflow-wrap: anywhere;
+
+  @media (max-width: 599px) {
+    font-size: ${fontSize.md}px;
+  }
+`
+
+const StatNote = styled.span`
+  ${monoType}
+  color: ${color.muted};
   font-size: ${fontSize.sm}px;
 `
 
-const PipGroup = styled.span`
-  display: inline-flex;
-  align-items: center;
+const Bar = styled.span`
+  display: flex;
   gap: ${space.xs}px;
+  margin-top: auto;
 
-  /* The numbers say the same, and a phone has one line for all of this */
-  @media (max-width: 899px) {
-    & > svg {
-      display: none;
-    }
+  & > span {
+    flex: 1;
+    height: 6px;
+    background: ${color.raised};
+    transform: skewX(${SLANT});
+  }
+`
+
+// Magenta is the colour of what is live: the chat is shut while this shows
+const Locked = styled.p`
+  display: flex;
+  align-items: center;
+  gap: ${space.sm}px;
+  margin: 0;
+  padding: ${space.sm}px ${space.md}px;
+  background: color-mix(in srgb, ${color.magenta} 14%, ${color.panel});
+  box-shadow: inset 3px 0 0 ${color.magenta};
+  ${displayType}
+  font-size: ${fontSize.md}px;
+
+  & > svg {
+    flex: none;
+    color: ${color.magenta};
   }
 `
 
@@ -457,11 +479,6 @@ const Tagline = styled.p`
   font-style: italic;
 `
 
-const Notice = styled.p`
-  margin: 0;
-  font-weight: 600;
-`
-
 const Shared = styled.div`
   display: flex;
   justify-content: center;
@@ -469,10 +486,14 @@ const Shared = styled.div`
   padding: ${space.xs}px 0;
 `
 
+// Your own place at the table: a darker inset on the felt, as the seats round it are
 const Yours = styled.div`
   display: flex;
   align-items: center;
   gap: ${space.md}px;
+  padding: ${space.sm}px;
+  background: color-mix(in srgb, ${color.chipInk} 28%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, ${color.onFelt} 18%, transparent);
 `
 
 const Cards = styled.div`
@@ -484,12 +505,14 @@ const Cards = styled.div`
 const YourFacts = styled.div`
   min-width: 0;
   display: grid;
+  gap: 2px;
   font-size: ${fontSize.sm}px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 
   & > strong {
-    font-size: ${fontSize.md}px;
+    ${displayType}
+    font-size: ${fontSize.lg}px;
   }
 `
 
@@ -509,17 +532,21 @@ const SeatList = styled.ul`
   list-style: none;
 `
 
-// Ready is told by the word as well as by the outline
-const SeatItem = styled.li<{ $ready: boolean }>`
+// A glass row with the seat's colour down its left edge. Ready is told by the word as well as by the
+// outline
+const SeatItem = styled.li<{ $ready: boolean; $mark: string }>`
+  ${clippedFill(cornerClip(12), color.panel)}
   display: flex;
   align-items: center;
   gap: ${space.sm}px;
-  padding: ${space.xs}px ${space.sm}px;
-  background: ${color.surface};
-  border: 1px solid ${color.border};
-  outline: ${(p) => (p.$ready ? `2px solid ${color.success}` : 'none')};
-  outline-offset: -1px;
-  border-radius: ${radius.component}px;
+  min-height: 52px;
+  padding: ${space.xs}px ${space.md}px ${space.xs}px ${space.md + 2}px;
+
+  &::before {
+    box-shadow:
+      inset 4px 0 0 ${(p) => p.$mark},
+      inset 0 0 0 ${(p) => (p.$ready ? `2px ${color.success}` : `1px ${color.line}`)};
+  }
 `
 
 const SeatWho = styled.div`
@@ -531,10 +558,11 @@ const SeatName = styled.div`
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-weight: 600;
+  font-weight: 700;
 `
 
 const SeatFacts = styled.div`
+  ${monoType}
   color: ${color.muted};
   font-size: ${fontSize.sm}px;
   line-height: 1.3;
