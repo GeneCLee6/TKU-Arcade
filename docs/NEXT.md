@@ -1,6 +1,6 @@
 # NEXT — 接下來怎麼做（給 AI 協作者與自己的交接手冊）
 
-最後更新 2026-11-12（2026-11-12 路線圖外修正默契牌局「準備好了」卡住；Phase A、Phase B、Phase C（含 C4 圖版重做、C5 一屏與浮水印）、D1、D3、批次 E1（電競風介面）、G1、G2、批次 E2（遊戲內面板，陞官圖除外）、H1、H2（`e5-t06` 除外）、J1、J2、J3 完成，D2 的程式與文件完成，F1 的本站程式完成；2026-11-09 記下陞官圖改名、光譜猜題改規則、電競風介面方向；2026-11-10 記下光譜猜題未決問題的決定；2026-11-11 擁有者同意 H1 排在 F3 之前）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
+最後更新 2026-11-12（2026-11-12 路線圖外修正默契牌局「準備好了」卡住；Phase A、Phase B、Phase C（含 C4 圖版重做、C5 一屏與浮水印）、D1、D3、D4（首屏預算騰空間）、批次 E1（電競風介面）、G1、G2、批次 E2（遊戲內面板，陞官圖除外）、H1、H2（`e5-t06` 除外）、J1、J2、J3 完成，D2 的程式與文件完成，F1 的本站程式完成；2026-11-09 記下陞官圖改名、光譜猜題改規則、電競風介面方向；2026-11-10 記下光譜猜題未決問題的決定；2026-11-11 擁有者同意 H1 排在 F3 之前）。**完整順序在 [`ROADMAP.md`](ROADMAP.md)**（一批一個 PR）；這份只記「現在的位置」與工作方式。每完成一批就更新「現在的位置」；每個 AI session 開頭只需要讀 `CLAUDE.md` 和這一份。
 
 ## 1. 現在的位置
 
@@ -34,7 +34,20 @@
 - **J3 留給擁有者試的**（AC-8.3、AC-8.5、AC-8.6、AC-8.8 都沒勾：手感是擁有者簽，AC-8.6 還差圈數與小地圖）：(1) 開 `/kart/spike` 撞正前方那面牆、擦左邊的斜牆、繞柱子，看「貼牆滑」與「正面撞」的掉速（`wallImpactLoss` 0.5、`wallBounce` 0.2、`wallScrapeDrag` 6）對不對，正面撞會不會太黏或太彈；(2) 撞完按 R，看回去的地方合不合理（安全點落後撞牆處 1–2 秒，直線全速約 50 m）；(3) 按「調參」切「抓地」「滑胎」各開幾圈，說哪一組比較接近想要的，或調完按「匯出」把 JSON 貼回來，我把它做成正式的預設；(4) 鏡頭：甩尾時車身斜出去的角度看起來夠不夠、鏡頭追得太快或太慢（`CAMERA_FOLLOW` 5）、噴射時視角變寬會不會暈；(5) HUD 的字與位置在自己的螢幕上擋不擋路，km/h 用真的換算（108）還是要像原型灌水。
 - J3 看到但沒改：Playwright 的軟體繪圖截圖裡，面板打開時頂部按鈕後面有一塊深色長方形（J2 的操作設定面板也有，DOM 裡沒有對應的元素，推測是 SwiftShader 的合成問題，實機沒看過）；頁面上方的次要按鈕在淺色天空上有點淡（E1 的按鈕樣式，不是這批改的）；車撞牆時車頭不會被轉向牆的方向，一直往牆裡打方向盤會一直擦牆減速；牆每步全部檢查一次，賽道牆多了要加空間索引；仍然沒上實體手機（手機開不了車，M4）。
 - **C5 完成（#29，擁有者 2026-11-12 要求，`e3-t10` `e3-t11`）**：陞官圖一屏不捲動。圖版有橫式（約 5:3）與直式（約 3:5）兩種排法（`boardLayout.ts` 的 `LANDSCAPE`、`PORTRAIT`，C4 的三欄與手機一欄拿掉了），畫面量出舞台能用的高度與圖版盒子的大小（`useBoardFit.ts`），選放得最大的那種、用 px 畫；1920、1440、1280 寬與 390 × 844 直拿，79 格、輪到誰與擲骰都同時在畫面上。一格不到 60 px 時官名放大、印章不寫字。全螢幕按鈕（`useImmersive.ts`：Fullscreen API，沒有或被拒時改專注模式，同樣的版面蓋住頁面；圖版旁一條欄放陀螺、輪到誰與唯一的擲骰鈕；Esc 或「離開全螢幕」離開；不記住）。格子說明改成點了才開的底部 `Drawer`。每個官職格子有淡淡的原創線稿浮水印（`rankArt.svg`，13 個 symbol，靜態檔、首次繪製後才下載；`rankArt.ts` 依部門與品級選圖、官越大畫越大，頂珠是品級色），玩家籤上一頂自己那格的小帽子。手機直拿時提示轉橫。細節（排法、手機的決定、分級表、預算取捨、缺口）在 e3 epic 的「C5 定案的細節」。
-- **首屏預算（C5 之後）**：主站 121.1 kB、**陞官圖 150.0 kB（149,977 bytes，只剩約 20 bytes）**、默契牌局 145.0 kB、光譜 147.8 kB。lazy 載入說明面板試過：打包器把 preload helper 拆出來，每條首屏多約 0.4 kB，所以沒做。**下一個動陞官圖畫面或共用外框（`GameLayout`、`RoomPage`、`Button` 等）的批次要先騰出空間**，例如先處理 preload helper 的拆法（`vite.config.ts` 的 chunk 設定），之後才能把說明面板、音效合成器改成 lazy。
+- **首屏預算（C5 之後）**：主站 121.1 kB、**陞官圖 150.0 kB（149,977 bytes，只剩約 20 bytes）**、默契牌局 145.0 kB、光譜 147.8 kB。lazy 載入說明面板試過：打包器把 preload helper 拆出來，每條首屏多約 0.4 kB，所以沒做。**下一個動陞官圖畫面或共用外框（`GameLayout`、`RoomPage`、`Button` 等）的批次要先騰出空間**，例如先處理 preload helper 的拆法（`vite.config.ts` 的 chunk 設定），之後才能把說明面板、音效合成器改成 lazy。（D4 已騰出空間，見下一條。）
+- **D4 完成（#PR，擁有者 2026-11-12 要求，`e12-t12`）**：首屏預算騰空間，畫面與行為不變，150 kB 上限與 `check-budget.mjs` 的量法都沒動（只多了 `npm run budget -- --chunks`，列出每條線載入哪些 chunk、各多大）。
+
+  | 首屏（gzip bytes） | D4 之前 | 併成一個入口 chunk | ＋陞官圖字串移出 | ＋換掉 react-router-dom（D4 之後） | 少了 |
+  | --- | --- | --- | --- | --- | --- |
+  | 主站 | 121,137 | 118,781 | 114,690 | 102,438 | 18,699 |
+  | 陞官圖 | 149,982 | 147,222 | 147,125 | 134,922 | 15,060 |
+  | 默契牌局 | 145,022 | 142,292 | 138,192 | 125,961 | 19,061 |
+  | 光譜 | 147,829 | 145,077 | 140,985 | 128,750 | 19,079 |
+
+  （本機 Node 22 的 zlib；CI 印的陞官圖是 149,977，差幾個 bytes 是 zlib 版本。）**量出來首屏裡最大的**（D4 之前，主站）：`react-dom`＋`scheduler` 約 65 kB、**`react-router-dom` 13.3 kB**（我們只用 `Link`、`Routes`、三個 hook，它卻帶整套資料路由）、`styled-components`＋`stylis` 約 11 kB、站內程式約 24 kB（大廳、i18n、token、外框）、`react` 約 3 kB、站內字串 en＋zh-TW 約 6 kB、**陞官圖的 `board.ts`（約 3.2 kB）與 79 格的兩種語言格名**（`i18n.ts` 從 `BOARD` 產生，所以整張圖版跟著進了每個人的首屏）、分開的 chunk 本身（5 個入口 chunk 各自一個 gzip 串流，加上彼此的 import／export 名稱）。
+  **做了什麼**：(1) `vite.config.ts` 的 `environments.client` 用 rolldown 的 `codeSplitting.groups`（`tags: ['$initial']`）把入口靜態載入的全部併成一個 chunk，每條線少約 2.4–2.8 kB；只套在瀏覽器，Worker 的打包不變。(2) 陞官圖的格名、官階名、德才功贓、狀態列（`ui.*`）與 `simplified` 從 `i18n.ts` 移到 `i18n.detail.ts`（字型請求不變：格名本來就從 `board.ts` 取），在 `PromotionBoard.tsx` 登記；`i18n.ts` 只留大廳、等待室、錯誤、結算要的與 4 個印章字（大廳首頁用「德」）。主站與另兩款少約 4.1 kB，**陞官圖自己那條線只少 97 bytes**（D3 時說的沒錯：字串只是從共用 chunk 搬到陞官圖的 chunk）。測試擋 `i18n.ts` 再放回 `cell`／`rank`／`face`／`ui` 的 key。(3) `react-router-dom` 拿掉，換成 `src/lib/router.tsx`（`BrowserRouter`、`MemoryRouter`、`Routes`、`Route`、`Link`）與 `src/lib/useRouter.ts`（`useLocation`、`useNavigate`、`useParams`），照 react-router 7 的行為：路徑不分大小寫、可多個結尾斜線、`:id` 解碼、`*` 不管排第幾都是最後的備案；換頁包在 `startTransition`（lazy 頁載入時舊頁留著，不閃 Suspense 的「載入中」）；連結只接沒有修飾鍵的左鍵、沒有 `target`，連到目前所在的網址用 replace。每條線少約 12.2 kB。`tests/lib/router.test.tsx` 擋這些行為。唯一看不到的差別：`<a>` 少了 react-router 自己加的 `data-discover` 屬性（只有它的 framework 模式用）。
+  **沒做或沒用的**：CSS 樣板的空白壓縮估過，陞官圖那條線只省約 0.7 kB，要自己寫一個改 CSS 的外掛，風險不值得；只載入目前語言的字串能省約 3 kB，但切換語言要等網路，算行為改變；`VisuallyHidden` 自己一個 0.2 kB 的 chunk（三款遊戲共用、房間頁沒用到），併進去只省約 0.2 kB，沒動。把格子說明（`CellDetail`）改成 lazy 試過：preload helper 現在留在唯一的入口 chunk 裡、沒有再被拆出來（主站只多 35 bytes），但 `CellDetail` 只有 768 bytes，陞官圖那條線只少約 0.1 kB，還讓 `check-budget.mjs` 把它當成一條「遊戲首屏」（它把 `src/games/` 下每個 lazy 入口都算一條），所以沒做。說明面板、音效合成器之後要 lazy，先確認省的比多一個 chunk 的代價大。
+  **之後的規則**：動首屏的東西前後都跑 `npm run build && npm run budget -- --chunks`，在 PR 寫每條線的 bytes。新的相依先量它進首屏多少（`react-router-dom` 就是沒量過才進來的）。遊戲的字串照默契牌局的做法：`i18n.ts` 只放大廳、等待室、錯誤與結算要的，其他放跟畫面一起載入的檔案；`i18n.ts` 不 import 圖版、題目之類的資料。不要讓入口的 chunk 再拆開：`codeSplitting.groups` 那一行拿掉就會回到五個 chunk。
 - C5 留下的缺口：只在 Playwright（Chromium）與預覽站看過，沒上實體手機、沒試過 iPhone Safari 的專注模式與 iPad 的真全螢幕；專注模式時頁面其他部分沒有設 `inert`（預算），Tab 可能走到被蓋住的元素；專注模式裡開著說明按 Esc 會一起離開；兩指縮放在視窗跨過 900 px 後要重新整理（C2 就有）；手機直拿時官名約 8–9 px，要轉橫全螢幕或縮放才好讀；浮水印分級只是示意，`IP-CHECKLIST.md` 的美術一行要擁有者重新看過。
 - **C4 完成（#22，擁有者 2026-11-09 要求，`e3-t08` `e3-t09`）**：陞官圖圖版照部門重畫。79 格分進八個部門（`shared/games/promotion/departments.ts`；`board.ts` 的 id 與去向沒動，測試擋每格剛好在一個部門），`boardLayout.ts` 換成兩種排法：寬螢幕（720 px 以上）三欄傳統排法、手機一欄由中樞排到科舉（理由在 e3 epic 的「C4 定案的細節」）。朱漆金邊、宣紙格子、楷書官名、紅色品級印章、示意頂戴、選中格子（預設自己那格）的德才功贓去向小印、有光澤的棋子；四面陀螺是 CSS 3D，轉四圈以上停到擲出的面（`ROLL_MS` 900 → 1100 ms）。字型 LXGW WenKai TC 從 Google Fonts 只要 175 個字（約 63 kB），登記在新的 `docs/ASSETS.md`。圖版顏色是 `tokens.ts` 的 `promotionBoard`（深淺色相同、一般值）。鍵盤改成「整格在那個方向」才算，跨部門時找最近的格子，測試擋「中間卡住」。
 - **首屏預算（C4 之後）**：主站 117.3 kB、陞官圖 143.9 kB、默契牌局 139.9 kB（上限 150 kB）。C4 讓陞官圖的畫面 chunk 多約 4 kB，原本放不下（151.9 kB）；把 QR code 編碼器 `qrcode-generator` 改成等待室畫 QR 時才載入（`src/components/QrCode.tsx`），房間頁少約 7 kB，兩款都受惠。**注意**：在共用模組裡加 `import()` 會讓打包器多拆一個共用 chunk、別人的首屏反而變大（C4 試過把字型程式與音效合成器改成 lazy，都是淨增加，所以沒做）。
@@ -91,7 +104,7 @@
 
 1. **在 worktree 開分支**：`git worktree add ../_wt/<分支> -b feat/<第一個 task 編號>-<slug>`。
 2. **只讀需要的段落**：`CLAUDE.md`、這份、`ROADMAP.md` 的該批、該批 task 所在的 epic 段落、相關的 `ARCHITECTURE.md` 章節。不要整本讀。
-3. **做完跑** `npm run lint && npm run typecheck && npm test && npm run build`，只看最後 5 行。
+3. **做完跑** `npm run lint && npm run typecheck && npm test && npm run build`，只看最後 5 行。動到前端的批次再跑 `npm run budget -- --chunks`，把每條首屏線的 bytes 寫進 PR（D4 的規則）。
 4. **一批一個 ready PR**：標題英文、結尾列出全部 task 編號；本文（繁中）寫對應 AC、怎麼驗證、實測結果（卡丁車多人要兩台裝置）。
 5. **在同一個 PR 更新文件**：epic 勾選 task（寫 PR 號）、AC 勾選（有驗證才勾）、`PRD/README.md` 進度表、`ROADMAP.md` 該批 `[x]` 與 PR 號、這份「現在的位置」。
 6. **CI 綠了直接合併**（`gh pr merge --squash --delete-branch`），需要人決定的事才停下來問。
