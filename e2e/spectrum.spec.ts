@@ -192,8 +192,16 @@ async function answerAll(answerers: readonly Page[]): Promise<void> {
 // DESIGN §6: no serious or critical problems, in both themes, at every step of a round (AC-7.6)
 const BLOCKING = new Set(['serious', 'critical'])
 
+/**
+ * The page as tall as its content while axe looks: otherwise text that happens to sit behind the
+ * sticky dock is measured against the dock (seen once on the preview, for the topic's category tag)
+ */
 async function expectNoSeriousProblems(page: Page, step: string) {
+  const size = page.viewportSize() ?? { width: 1280, height: 720 }
+  const height = await page.evaluate(() => document.documentElement.scrollHeight)
+  await page.setViewportSize({ width: size.width, height: Math.max(height, size.height) })
   const { violations } = await new AxeBuilder({ page }).analyze()
+  await page.setViewportSize(size)
   const blocking = violations
     .filter((violation) => BLOCKING.has(violation.impact ?? ''))
     .map(({ id, nodes }) => ({ id, nodes: nodes.map((node) => node.target.join(' ')) }))
