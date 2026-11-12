@@ -1,21 +1,31 @@
+import { TEST_ARENA } from '../../shared/kart/arena.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
-import { boostKeys, isBoundKey, readInput, type Bindings } from '../../shared/kart/input.ts'
+import { startRun, stepRun, type Spot } from '../../shared/kart/course.ts'
+import { actionKeys, isBoundKey, readInput, type Bindings } from '../../shared/kart/input.ts'
 import {
-  INITIAL_KART,
-  KART_TUNING,
   kartSlip,
   kartSpeed,
   NO_INPUT,
   poseBetween,
-  stepKart,
   type KartInput,
   type KartRules,
   type KartState,
+  type KartTuning,
 } from '../../shared/kart/physics.ts'
+import { calloutBetween, louder, type Callout } from './callouts.ts'
 import { readGamepad } from './devices.ts'
 import { createKartScene } from './Scene.ts'
 
 const STATS_EVERY_MS = 500
+
+/**
+ * The HUD's speed: metres per second times 3.6, the real conversion, since the world is in metres.
+ * The standard top speed of 30 m/s reads 108 km/h, and 140 km/h in a boost.
+ */
+export const KMH_PER_MPS = 3.6
+
+/** A hit at least this fast into the wall (m/s) counts as one for the debug count and the HUD flash */
+const HIT_SPEED = 4
 
 export interface SpikeStats {
   readonly fps: number
@@ -29,13 +39,18 @@ export interface SpikeStats {
   readonly gamepad: string | undefined
 }
 
-/** What the gauge display shows; sent only when it changes */
+/** What the HUD shows; sent only when it changes */
 export interface SpikeHud {
+  /** Whole km/h */
+  readonly speed: number
   /** Whole points, 0 to 100 */
   readonly gauge: number
   readonly storedBoosts: number
   readonly boosting: boolean
+  /** The chain count while a chained boost runs, else 0 */
   readonly chain: number
+  /** Counts wall hits, so that the HUD can flash on each one */
+  readonly hits: number
 }
 
 /** What tests and a curious owner can read from the console. It stays after the loop stops. */
@@ -47,6 +62,15 @@ export interface SpikeDebug {
   /** The input the last step ran with */
   input: KartInput
   gamepad: string | undefined
+  /** Where a reset puts the car now */
+  safe: Spot
+  /** The hardest wall hit of the last step, 0 to 1 */
+  impact: number
+  /** Wall hits so far, and resets so far */
+  hits: number
+  resets: number
+  /** The tuning the last step ran with */
+  tuning: KartTuning | undefined
 }
 
 declare global {
@@ -59,6 +83,8 @@ declare global {
 export interface SpikeControls {
   readonly bindings: Bindings
   readonly rules: KartRules
+  /** The tuning panel's numbers (e8-t03) */
+  readonly tuning: KartTuning
   /** False while the controls panel is open: the panel has the keyboard and the gamepad */
   readonly enabled: boolean
 }
@@ -67,12 +93,16 @@ export interface SpikeOptions {
   readonly controls: () => SpikeControls
   readonly onStats: (stats: SpikeStats) => void
   readonly onHud: (hud: SpikeHud) => void
+  /** DRIFT, BOOST or CHAIN: called once for each */
+  readonly onCallout: (callout: Callout) => void
   readonly onContextLost: () => void
 }
 
 const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
   !!a &&
+  a.speed === b.speed &&
   a.gauge === b.gauge &&
+  a.hits === b.hits &&
   a.storedBoosts === b.storedBoosts &&
   a.boosting === b.boosting &&
   a.chain === b.chain
@@ -83,22 +113,31 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
  * Throws when WebGL is unavailable.
  */
 export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): () => void {
-  const scene = createKartScene(container)
+  const course = TEST_ARENA
+  const scene = createKartScene(container, course.walls)
   const held = new Set<string>()
-  // A boost key pressed and let go between two steps still fires
+  // A boost or reset key pressed and let go between two steps still counts
   let boostTapped = false
+  let resetTapped = false
+  let run = startRun(course)
   const debug: SpikeDebug = {
     running: true,
     tick: 0,
     frames: 0,
-    state: INITIAL_KART,
+    state: run.kart,
     input: NO_INPUT,
     gamepad: undefined,
+    safe: run.safe,
+    impact: 0,
+    hits: 0,
+    resets: 0,
+    tuning: undefined,
   }
   window.__kartSpike = debug
+  scene.snapCamera(run.kart.heading)
 
-  let previous = INITIAL_KART
-  let current = INITIAL_KART
+  let previous: KartState = run.kart
+  let hits = 0
   let accumulator = 0
   let lastFrame: number | undefined
   let handle = 0
@@ -113,34 +152,61 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     const frameMs = lastFrame === undefined ? 0 : now - lastFrame
     lastFrame = now
 
-    const { bindings, rules, enabled } = options.controls()
+    const { bindings, rules, tuning, enabled } = options.controls()
     const pad = readGamepad()
     if (!enabled) {
       held.clear()
       boostTapped = false
+      resetTapped = false
     }
     const clock = advanceClock(accumulator, frameMs / 1000)
     accumulator = clock.accumulator
+    let callout: Callout | undefined
     for (let step = 0; step < clock.steps; step++) {
       const input = enabled
-        ? readInput(bindings, { held, pad: pad?.snapshot, boostTapped })
+        ? readInput(bindings, { held, pad: pad?.snapshot, boostTapped, resetTapped })
         : NO_INPUT
       boostTapped = false
-      previous = current
-      current = stepKart(current, input, KART_TUNING, rules)
+      resetTapped = false
+      const before = run
+      run = stepRun(run, input, course, tuning, rules)
+      if (run.resets !== before.resets) {
+        // A jump, not a move: nothing to draw in between, and the camera starts behind the car
+        previous = run.kart
+        scene.snapCamera(run.kart.heading)
+      } else {
+        previous = before.kart
+        callout = louder(callout, calloutBetween(before.kart, run.kart))
+      }
+      // One hit per crash, not one per step of pushing against the wall after it
+      if (run.hitSpeed >= HIT_SPEED && before.hitSpeed < HIT_SPEED) hits++
       debug.input = input
     }
+    const current = run.kart
     debug.tick += clock.steps
     debug.frames++
     debug.state = current
     debug.gamepad = pad?.id
-    scene.draw(poseBetween(previous, current, clock.alpha), frameMs / 1000)
+    debug.safe = run.safe
+    debug.impact = run.impact
+    debug.hits = hits
+    debug.resets = run.resets
+    debug.tuning = tuning
+    const boosting = current.boostSeconds > 0
+    scene.draw(
+      poseBetween(previous, current, clock.alpha),
+      { heading: current.heading, vx: current.vx, vz: current.vz, boosting },
+      frameMs / 1000,
+    )
+    if (callout) options.onCallout(callout)
 
     const hud: SpikeHud = {
+      speed: Math.round(kartSpeed(current) * KMH_PER_MPS),
       gauge: Math.floor(current.gauge),
       storedBoosts: current.storedBoosts,
-      boosting: current.boostSeconds > 0,
-      chain: current.chain,
+      boosting,
+      chain: boosting ? current.chain : 0,
+      hits,
     }
     if (!sameHud(lastHud, hud)) {
       lastHud = hud
@@ -175,15 +241,19 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   const onKeyDown = (event: KeyboardEvent) => {
     const { bindings, enabled } = options.controls()
     if (!enabled || event.altKey || event.ctrlKey || event.metaKey) return
+    // A slider, a list or a text box keeps its keys: the tuning panel is used while the car waits
+    if (isField(event.target)) return
     if (!ownsKey(event.code, bindings)) return
     event.preventDefault()
     held.add(event.code)
-    if (!event.repeat && boostKeys(bindings).includes(event.code)) boostTapped = true
+    if (event.repeat) return
+    if (actionKeys(bindings, 'boost').includes(event.code)) boostTapped = true
+    if (actionKeys(bindings, 'reset').includes(event.code)) resetTapped = true
   }
   const onKeyUp = (event: KeyboardEvent) => {
     held.delete(event.code)
     const { bindings, enabled } = options.controls()
-    if (enabled && ownsKey(event.code, bindings)) event.preventDefault()
+    if (enabled && !isField(event.target) && ownsKey(event.code, bindings)) event.preventDefault()
   }
   // The key-up of a key let go in another window never arrives
   const onBlur = () => held.clear()
@@ -211,4 +281,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   scene.canvas.addEventListener('webglcontextlost', onContextLost)
   handle = requestAnimationFrame(frame)
   return stop
+}
+
+/** Form fields that use the keys a car drives with */
+function isField(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLSelectElement ||
+    target instanceof HTMLTextAreaElement
+  )
 }

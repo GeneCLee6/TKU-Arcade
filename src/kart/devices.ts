@@ -6,7 +6,8 @@ import {
   type PadBinding,
   type PadSnapshot,
 } from '../../shared/kart/input.ts'
-import { DEFAULT_RULES, type KartRules } from '../../shared/kart/physics.ts'
+import { DEFAULT_RULES, type KartRules, type KartTuning } from '../../shared/kart/physics.ts'
+import { parseStoredTuning, serializeTuning, type StoredTuning } from '../../shared/kart/tuning.ts'
 import type { MessageParams } from '../i18n/t.ts'
 
 // The browser side of e8-t12: storage, the Gamepad API and how controls are named on screen
@@ -15,6 +16,7 @@ type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
 const BINDINGS_KEY = 'tku-arcade.kart.bindings'
 const RULES_KEY = 'tku-arcade.kart.rules'
+const TUNING_KEY = 'tku-arcade.kart.tuning'
 
 // localStorage can be missing, blocked or full: the page then keeps everything in memory
 function read(key: string): string | null {
@@ -54,6 +56,12 @@ export function loadRules(): KartRules {
 }
 
 export const saveRules = (rules: KartRules): boolean => write(RULES_KEY, JSON.stringify(rules))
+
+/** e8-t03: the tuning panel's numbers, in the same JSON as an export; broken ones give the standard */
+export const loadTuning = (): StoredTuning => parseStoredTuning(read(TUNING_KEY))
+
+export const saveTuning = (tuning: KartTuning): boolean =>
+  write(TUNING_KEY, serializeTuning(tuning))
 
 export interface PadReading {
   readonly id: string

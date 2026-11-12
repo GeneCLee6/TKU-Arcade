@@ -1,6 +1,7 @@
 // The kart's step function: pure, no DOM and no clock, so that Node and the server can run the same
 // code (docs/ARCHITECTURE.md §4). e8-t01 gave the spike's minimum (accelerate, steer, drift); e8-t02a
-// adds the boost gauge, boosts and chained boosts. Walls and respawn are e8-t02b and build on this.
+// adds the boost gauge, boosts and chained boosts. Walls and the reset (e8-t02b) are in walls.ts and
+// course.ts, and run after this step.
 //
 // Units are metres, seconds and radians. Seen from above, heading 0 faces -z and heading grows
 // clockwise, so a positive steer turns right.
@@ -19,6 +20,11 @@ export interface KartInput {
   readonly drift: boolean
   /** Fires a stored boost when it goes from up to down (held down, it fires only once) */
   readonly boost: boolean
+  /**
+   * Puts the car back at the last safe place when it goes from up to down (e8-t02b). stepKart
+   * ignores it: the course does it (shared/kart/course.ts), since only the course knows where.
+   */
+  readonly reset?: boolean
 }
 
 export interface KartState {
@@ -70,6 +76,7 @@ export const NO_INPUT: KartInput = {
   steer: 0,
   drift: false,
   boost: false,
+  reset: false,
 }
 
 /**
@@ -130,6 +137,15 @@ export const KART_TUNING = {
   chainGrace: 0.3,
   /** The shortest drift that chains, so that a tap of the key is not enough */
   chainMinDrift: 0.2,
+
+  // Walls (e8-t02b, shared/kart/walls.ts). A hit takes away the speed going into the wall and keeps
+  // the speed along it, so the car slides; the more head-on the hit, the more of the rest goes too.
+  /** The share of the speed into the wall that comes back out of it, so a head-on hit bounces */
+  wallBounce: 0.2,
+  /** The share of the speed along the wall lost by a hit, times how head-on it was (0 to 1) */
+  wallImpactLoss: 0.5,
+  /** While touching a wall the car slows by this much per second: scraping along it costs speed */
+  wallScrapeDrag: 6,
 }
 
 export type KartTuning = { readonly [K in keyof typeof KART_TUNING]: number }

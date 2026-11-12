@@ -4,6 +4,7 @@ import type {
   SilentTablePlayerView,
 } from '../../../shared/games/silent-table/types.ts'
 import { useT } from '../../i18n/useT.ts'
+import { displayType, monoType } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 
 interface ChipRailProps {
@@ -96,7 +97,9 @@ const Rail = styled.div`
 const Ends = styled.div`
   display: flex;
   justify-content: space-between;
+  ${monoType}
   font-size: ${fontSize.sm}px;
+  opacity: 0.85;
 `
 
 const Slots = styled.div<{ $count: number }>`
@@ -159,8 +162,9 @@ const Holder = styled.span<{ $mine: boolean }>`
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  ${displayType}
   font-size: ${fontSize.sm}px;
-  font-weight: ${(p) => (p.$mine ? 700 : 400)};
+  font-weight: ${(p) => (p.$mine ? 900 : 700)};
 `
 
 const markShape = `

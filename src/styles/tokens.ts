@@ -139,6 +139,8 @@ export const kartScene = {
   gridLine: '#6B7A6E',
   body: '#C2410C',
   nose: '#F3F4F6',
+  // The test arena's walls (e8-t02b)
+  wall: '#3F4A5C',
   lightSky: '#FFFFFF',
   lightGround: '#6B7280',
 } as const
