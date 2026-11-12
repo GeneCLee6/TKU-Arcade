@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, type CSSProperties } from 'react'
 import styled from 'styled-components'
 import type { FullPending, PromotionAction } from '../../../../shared/games/promotion/types.ts'
 import { Button } from '../../../components/Button.tsx'
@@ -16,7 +16,8 @@ const routeOf = (cell: string) => {
 
 /**
  * A decision the game waits for (C8), over the foot of the board, or its top when the cell it is about
- * is in the lower half (that cell stays in sight): never in the page's flow, so that
+ * is in the lower half (that cell stays in sight); on the square board (C9) in the space inside its
+ * outer ring, where every cell that asks a question is, so it hides none: never in the page's flow, so that
  * the dock and the board keep their size while it shows. To the seat that decides, the question, what
  * each answer does and costs, a countdown and the answers (44 px buttons, the first focused); to
  * everyone else who is deciding what. Rules stay on the server: these buttons only send an answer.
@@ -30,6 +31,7 @@ export function DecisionPrompt({
   waiting,
   onAnswer,
   top = false,
+  area = null,
 }: {
   pending: FullPending
   /** This viewer is the one deciding */
@@ -44,12 +46,24 @@ export function DecisionPrompt({
   onAnswer(action: PromotionAction): void
   /** Over the top of the board rather than its foot: the cell it is about is in the lower half */
   top?: boolean
+  /** In the middle of this box instead (CSS pixels in the board's box): inside the square board's outer ring */
+  area?: { x: number; y: number; width: number; height: number } | null
 }) {
   const t = useT()
   const language = useLanguage()
   const titleId = useId()
   const first = useRef<HTMLButtonElement>(null)
   const cell = (id: string) => shortCellName(id, language)
+  const placed: CSSProperties | undefined = area
+    ? {
+        left: area.x + area.width / 2,
+        top: area.y + area.height / 2,
+        bottom: 'auto',
+        transform: 'translate(-50%, -50%)',
+        width: `min(560px, ${Math.floor(area.width - 2 * space.sm)}px)`,
+        maxHeight: Math.floor(area.height - 2 * space.sm),
+      }
+    : undefined
 
   // The question just came: the first answer takes the focus, as a dialog's would
   const key = `${pending.kind}:${pending.cell}:${pending.from}`
@@ -59,7 +73,7 @@ export function DecisionPrompt({
 
   if (!mine) {
     return (
-      <Banner role="status" data-decision="watching" $top={top}>
+      <Banner role="status" data-decision="watching" $top={top} style={placed}>
         {t(`games.promotion.full.watching.${pending.kind}`, { name, cell: cell(pending.cell) })}
       </Banner>
     )
@@ -70,7 +84,7 @@ export function DecisionPrompt({
   }
 
   return (
-    <Card role="region" aria-labelledby={titleId} data-decision={pending.kind} $top={top}>
+    <Card role="region" aria-labelledby={titleId} data-decision={pending.kind} $top={top} style={placed}>
       <Title id={titleId}>
         {pending.kind === 'offer'
           ? t('games.promotion.full.offer.title', { cell: cell(pending.cell) })

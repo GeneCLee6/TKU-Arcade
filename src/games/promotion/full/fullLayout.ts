@@ -1,9 +1,10 @@
 // Where each of the full edition's cells goes (e3-t14, C8). boardFull.ts has no coordinates: this lays
 // a board's departments out as blocks, each a lacquer plaque standing on the left of its cells, which
 // run from the lowest office to the highest, left to right. Blocks sit side by side in rows, rows stack
-// in columns, and columns stand side by side. Each board has its own arrangement: the first (C6, 182
-// cells in 37 departments) for a game from before C8, the second (236 in 53, and the ladder of grades
-// the end compares, 品級考) for every game since. A traditional square board is batch C9.
+// in columns, and columns stand side by side. These columns are the first board's (C6, 182 cells in 37
+// departments), for a game from before C8; the second board (236 in 53, and the ladder of grades the
+// end compares, 品級考) is a traditional square board since C9 (fullSquare.ts), which shares the
+// types, the cell's size and the ladder here.
 //
 // The whole board is on the screen at once (C5's rule), so there are two arrangements of the same
 // blocks and the screen takes whichever shows the cells biggest in the box it has (`fitFullBoard`):
@@ -13,7 +14,7 @@
 // Units are the SVG's: the board is scaled to fit its box.
 import type { FullBoard, FullDeptId } from '../../../../shared/games/promotion/boardFull.ts'
 
-export type FullShape = 'wide' | 'tall'
+export type FullShape = 'wide' | 'tall' | 'square'
 
 export interface Box {
   x: number
@@ -257,108 +258,11 @@ const TALL: readonly Column[] = [
   ],
 ]
 
-// ── The second board (C8): 16 more departments, the event zones and the ladder of grades ──
-
-/**
- * Wide: the military and the provinces on the left; in the middle the summit over the court, the
- * events and where careers start; the capital on the right, with the ladder of grades at its foot
- */
-const WIDE_2: readonly Column[] = [
-  [
-    [['qitong', 4], ['wuke', 4]],
-    [['shiwei', 7]],
-    [['zhen', 7]],
-    [['qiying', 6], ['juanna', 1]],
-    [['luanyiwei', 5]],
-    [['ying', 5]],
-    [['dufu', 2], ['sansi', 2], ['dao', 2]],
-    [['xueyuan', 3], ['jiaozhi', 3]],
-    [['yanyuan', 4], ['heyuan', 3]],
-    [['caoyuan', 3], ['fu', 4]],
-    [['zhou', 4], ['neige', 3]],
-    [['xian', 6]],
-  ],
-  [
-    [['end', 5]],
-    [['jue', 5]],
-    [['gongxian', 6]],
-    [['daxueshi', 6]],
-    [['junji', 3], ['neiting', 3]],
-    [['kaoji', 6]],
-    [['hanlin', 5]],
-    [['exam', 6]],
-    [['origin', 4]],
-    [['tenglu', 4]],
-  ],
-  [
-    [['personnel', 5], ['zongrenfu', 3]],
-    [['revenue', 5], ['cangchang', 3]],
-    [['rites', 5], ['guozijian', 3]],
-    [['war', 5], ['taipusi', 2]],
-    [['justice', 5], ['taichangsi', 3]],
-    [['works', 5], ['guanglusi', 3]],
-    [['zhanshifu', 5], ['zhongshuke', 2]],
-    [['duchayuan', 4], ['dalisi', 4]],
-    [['neiwufu', 4], ['wucheng', 4]],
-    [['qintianjian', 5], ['honglusi', 3]],
-    [['taiyiyuan', 5], ['tongzhengsi', 3]],
-    [['ladder', 7]],
-  ],
-]
-
-/** Tall, for a phone held upright: the civil career on the left, the rest on the right */
-const TALL_2: readonly Column[] = [
-  [
-    [['end', 5]],
-    [['jue', 5]],
-    [['gongxian', 3], ['junji', 2]],
-    [['daxueshi', 3], ['neige', 2]],
-    [['kaoji', 3], ['neiting', 2]],
-    [['hanlin', 5]],
-    [['personnel', 5]],
-    [['revenue', 5]],
-    [['rites', 5]],
-    [['war', 5]],
-    [['justice', 5]],
-    [['works', 5]],
-    [['zhanshifu', 5]],
-    [['exam', 5]],
-    [['origin', 4], ['juanna', 1]],
-    [['tenglu', 4]],
-    [['qintianjian', 5]],
-    [['taiyiyuan', 5]],
-    [['ladder', 5]],
-  ],
-  [
-    [['qitong', 4]],
-    [['wuke', 4]],
-    [['shiwei', 4]],
-    [['luanyiwei', 5]],
-    [['zhen', 4]],
-    [['qiying', 3], ['sansi', 2]],
-    [['ying', 5]],
-    [['dufu', 2], ['dao', 2]],
-    [['xueyuan', 3], ['heyuan', 2]],
-    [['yanyuan', 4]],
-    [['caoyuan', 3], ['taipusi', 2]],
-    [['xian', 3], ['zhou', 2]],
-    [['fu', 4]],
-    [['jiaozhi', 3], ['zhongshuke', 2]],
-    [['duchayuan', 4]],
-    [['dalisi', 4]],
-    [['taichangsi', 3], ['tongzhengsi', 2]],
-    [['guanglusi', 3], ['honglusi', 2]],
-    [['guozijian', 3], ['cangchang', 2]],
-    [['zongrenfu', 3], ['neiwufu', 2]],
-    [['wucheng', 4]],
-  ],
-]
-
-export type FullLayouts = Record<FullShape, FullLayout>
+export type FullLayouts = Record<'wide' | 'tall', FullLayout>
 
 const built = new Map<number, FullLayouts>()
 
-/** Both arrangements of a board, made once */
+/** Both arrangements of a board in columns, made once: the first board's (the second is square) */
 export function fullLayouts(board: FullBoard): FullLayouts {
   const known = built.get(board.version)
   if (known) return known
@@ -366,8 +270,7 @@ export function fullLayouts(board: FullBoard): FullLayouts {
   for (const cell of board.cells) byDept.set(cell.dept, [...(byDept.get(cell.dept) ?? []), cell.id])
   byDept.set('ladder', LADDER.map(String))
   const what: Contents = (id) => byDept.get(id) ?? []
-  const [wide, tall] = board.version === 2 ? [WIDE_2, TALL_2] : [WIDE, TALL]
-  const layouts = { wide: build('wide', wide, what), tall: build('tall', tall, what) }
+  const layouts = { wide: build('wide', WIDE, what), tall: build('tall', TALL, what) }
   built.set(board.version, layouts)
   return layouts
 }

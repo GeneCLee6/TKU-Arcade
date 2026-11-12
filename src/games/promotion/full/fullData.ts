@@ -2,11 +2,13 @@
 // both boards, loaded by a dynamic import after the full edition's screen has painted, so that the
 // screen's first load is its own code alone (`npm run budget -- --chunks`). The screen draws its dock,
 // seats and silver at once and the board when this arrives. The only import of boardFull.ts in the
-// browser (tests/games/catalog.test.ts).
+// browser (tests/games/catalog.test.ts). Since C9 the code that lays the board out (the square board
+// and the columns, fullSquare.ts) comes with it: nothing is laid out before there is a board.
 import { useEffect, useSyncExternalStore } from 'react'
 import type * as BoardData from '../../../../shared/games/promotion/boardFull.ts'
+import type * as Layouts from './fullSquare.ts'
 
-export type FullData = typeof BoardData
+export type FullData = typeof BoardData & { layouts: typeof Layouts }
 
 let loaded: FullData | null = null
 let loading: Promise<FullData> | null = null
@@ -14,7 +16,11 @@ const listeners = new Set<() => void>()
 
 /** Starts loading the board once; resolves with it */
 export function loadFullData(): Promise<FullData> {
-  loading ??= import('../../../../shared/games/promotion/boardFull.ts').then((data) => {
+  loading ??= Promise.all([
+    import('../../../../shared/games/promotion/boardFull.ts'),
+    import('./fullSquare.ts'),
+  ]).then(([board, layouts]) => {
+    const data: FullData = { ...board, layouts }
     loaded = data
     for (const listener of listeners) listener()
     return data
