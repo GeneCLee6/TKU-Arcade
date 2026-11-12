@@ -55,7 +55,7 @@ export async function startGame(host: Page, guest: Page): Promise<void> {
   await expect(host.locator('[data-cell]').first()).toBeVisible()
 }
 
-/** Silent Table is not in the lobby until the owner signs off: its rooms come from the API */
+/** Silent Table's rooms come from the API (it was unlisted when these were written; listed 2026-11-12) */
 export async function createSilentTableRoom(page: Page, nickname: string): Promise<void> {
   const response = await page.request.post('/api/rooms', { data: { gameId: 'silent-table' } })
   const { id } = (await response.json()) as { id: string }

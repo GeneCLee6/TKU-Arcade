@@ -107,11 +107,12 @@ const viewOf = (state: SilentTableState, viewer: Viewer): SilentTableView =>
   silentTable.view(state, viewer)
 
 describe('the module', () => {
-  it('runs on the room, for 3 to 6 seats, but no lobby or menu lists it until the owner signs', () => {
+  it('runs on the room, for 3 to 6 seats, and the lobby lists it (owner, 2026-11-12)', () => {
     expect(getGame('silent-table')).toBe(silentTable)
     expect(GAME_IDS).toContain('silent-table')
-    expect(silentTable.meta).toMatchObject({ minPlayers: 3, maxPlayers: 6, unlisted: true })
-    expect(LOBBY_GAMES.map((game) => game.id)).not.toContain('silent-table')
+    expect(silentTable.meta).toMatchObject({ minPlayers: 3, maxPlayers: 6 })
+    expect(silentTable.meta).not.toHaveProperty('unlisted')
+    expect(LOBBY_GAMES.map((game) => game.id)).toContain('silent-table')
   })
 
   it('does not offer to play for an absent seat, since a chip is a decision', () => {

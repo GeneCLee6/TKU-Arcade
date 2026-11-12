@@ -9,6 +9,8 @@ milestones: [M1]
 depends_on: [E2, E7]
 ---
 
+> **2026-11-12 上大廳**：擁有者要求把光譜放上大廳，`meta.unlisted` 已拿掉；先用暫名，題庫是審過的草稿 CSV。Q3 正式名稱與 `IP-CHECKLIST.md` 簽名待擁有者補。
+>
 > **2026-11-12 H2（#26）**：遊戲畫面（`e5-t05`）與雙語規則頁（`e5-t07`）完成，可以用房間網址完整玩一局；仍 `meta.unlisted`（大廳看不到），等 Q3 正式名稱與擁有者簽 `IP-CHECKLIST.md` 光譜那一節。`e5-t06`（題目管理頁與 AI 草稿）**沒做**：要 F1 的登入、F3 的 D1 `prompts` 表與 Q5，見「H2 定案的細節」。
 >
 > **2026-11-11 H1（#23）**：擁有者同意 H1 排在 F3 之前。規則引擎、view 裁切、數線與排序元件完成（`e5-t02`～`e5-t04`）；題目**暫時**用審過的草稿 CSV 產生的 `shared/games/spectrum/topics.ts`（只在 Worker），F3 的 D1 `prompts` 表做好之後搬過去。遊戲仍 `meta.unlisted`，畫面在 H2。規則細節見「H1 定案的規則細節」。

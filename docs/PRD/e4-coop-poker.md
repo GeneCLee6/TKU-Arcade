@@ -50,7 +50,7 @@ depends_on: [E2, E7]
 
 ### G2 定案的細節（畫面在 `src/games/silent-table/`）
 
-- **`meta.unlisted` 留著**：合併就上線，擁有者要先簽 `docs/IP-CHECKLIST.md` 默契牌局那一節。**擁有者簽名之後**才拿掉 `meta.unlisted`，並改 `tests/games/silent-table.test.ts` 第一個測試；在那之前只能用 `POST /api/rooms` `{"gameId":"silent-table"}` 開房。
+- **2026-11-12 更新：擁有者要求上大廳，`meta.unlisted` 已拿掉**（IP 清單的簽名欄仍待擁有者補）。原本的說明：**`meta.unlisted` 留著**：合併就上線，擁有者要先簽 `docs/IP-CHECKLIST.md` 默契牌局那一節。**擁有者簽名之後**才拿掉 `meta.unlisted`，並改 `tests/games/silent-table.test.ts` 第一個測試；在那之前只能用 `POST /api/rooms` `{"gameId":"silent-table"}` 開房。
 - **時間到不用 `pass`，新增只有房間能送的 `timeUp`**：`pass` 是一次一個座位，而籌碼一動就會清掉全員 ready，一個一個 pass 會互相抵消，這一輪推不動。`timeUp` 一次處理：手上沒籌碼的人依座位順序拿桌上最小的籌碼，已經有籌碼的人不動，全員算 ready，這一輪結束。
 - **倒數預設關閉**（`roundSeconds`：不限時、60、90、120 秒）：每輪移動次數有上限，不倒數也一定會結束，朋友之間不用被趕。揭牌階段沒有倒數：那是大家討論的時候，缺席的人由房主代按。
 - `chatLocked`：`phase === 'round'` 時為 `true`；揭牌與結束時開放。
