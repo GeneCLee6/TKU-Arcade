@@ -139,6 +139,7 @@ export const en = {
   'room.options.on': 'On',
   'room.options.range': '{min} to {max}',
   'room.reconnecting': 'Connection lost, reconnecting…',
+  'room.reconnecting.lostTap': 'The connection dropped, so your last move may not have arrived. Make it again once you are back.',
   'room.reconnecting.notSent': "Not sent: you're offline. Try again once you're reconnected.",
   'room.reload': 'Reload',
   'room.replaced': 'This room was opened in another tab. Reload to play here instead.',
