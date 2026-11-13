@@ -7,15 +7,15 @@ import { everyoneReady, setIntOption, setSelectOption, takeFirstChip } from './h
 
 // Words that stay Latin in both languages. Nicknames here are Chinese, so that they need no entry
 // Overtrick is the bridge table's platform, whose name is English only (its DESIGN.md §6; e1-t13)
-const ALLOWED = /TKU Arcade|Overtrick|\bEN\b|QR code|Shift\+Enter|\bEnter\b/g
+// The originals' own names, in the one sentence a rules page gives them (CLAUDE.md rule 1)
+const ALLOWED =
+  /TKU Arcade|Overtrick|\bEN\b|QR code|Shift\+Enter|\bEnter\b|9upper|TIME2PLAY GAMES|\bito\b|Arclight/g
 
 async function englishLeft(page: Page): Promise<string[]> {
   return page.evaluate((allowed) => {
     const found = new Set<string>()
     const check = (text: string | null) => {
-      const rest = (text ?? '')
-        .replace(/https?:\/\/\S+/g, '')
-        .replace(new RegExp(allowed, 'g'), '')
+      const rest = (text ?? '').replace(/https?:\/\/\S+/g, '').replace(new RegExp(allowed, 'g'), '')
       if (/[A-Za-z]{2,}/.test(rest)) found.add(rest.trim().slice(0, 80))
     }
     const shown = (element: Element) => {
@@ -50,7 +50,11 @@ async function expectAllChinese(page: Page, screen: string) {
 
 const nicknameBox = (page: Page) => page.getByRole('textbox', { name: '暱稱' })
 
-async function person(browser: Browser, viewport: { width: number; height: number }, touch: boolean) {
+async function person(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  touch: boolean,
+) {
   const context = await browser.newContext({
     locale: 'zh-TW',
     viewport,
@@ -217,7 +221,9 @@ for (const [label, viewport, touch] of [
       for (const name of names) {
         const page = await person(browser, viewport, touch)
         if (people.length === 0) {
-          const response = await page.request.post('/api/rooms', { data: { gameId: 'silent-table' } })
+          const response = await page.request.post('/api/rooms', {
+            data: { gameId: 'silent-table' },
+          })
           const { id } = (await response.json()) as { id: string }
           await page.goto(`/r/${id}`)
         } else {
@@ -268,6 +274,130 @@ for (const [label, viewport, touch] of [
       await expect(over).toBeVisible()
       await expect(over.getByText('名')).toHaveCount(0)
       await expectAllChinese(host, 'Silent Table reveal and result')
+      for (const page of people) await page.context().close()
+    })
+
+    // e7-t13: the M1 games and I3/I4's room parts, walked again in Chinese
+    async function roomOf(gameId: string, names: readonly string[]) {
+      const people: Page[] = []
+      for (const name of names) {
+        const page = await person(browser_, viewport, touch)
+        if (people.length === 0) {
+          const response = await page.request.post('/api/rooms', { data: { gameId } })
+          const { id } = (await response.json()) as { id: string }
+          await page.goto(`/r/${id}`)
+        } else {
+          await page.goto(people[0].url())
+        }
+        await nicknameBox(page).fill(name)
+        await nicknameBox(page).press('Enter')
+        await expect(page.getByRole('heading', { name: '座位', exact: true })).toBeVisible()
+        people.push(page)
+      }
+      return people
+    }
+    let browser_: Browser
+
+    test('Bluff Reader, from the rules to the result, with reactions and the replay', async ({
+      browser,
+    }) => {
+      test.setTimeout(150_000)
+      browser_ = browser
+      const people = await roomOf('bluff', ['小安', '小博', '小綺'])
+      const [host] = people
+      await host.goto('/games/bluff/rules')
+      await expect(host.getByRole('heading', { name: '真假朗讀是什麼？' })).toBeVisible()
+      await expectAllChinese(host, 'Bluff Reader rules page')
+      await host.goBack()
+      await expect(host.getByRole('heading', { name: '座位', exact: true })).toBeVisible()
+      await expectAllChinese(host, 'Bluff Reader waiting room')
+
+      // The host's room password setting, and the reactions open
+      await expect(host.getByLabel('房間密碼（選填）')).toBeVisible()
+      await host.getByRole('button', { name: '表情' }).click()
+      await expectAllChinese(host, 'reactions open, password setting')
+      await host.getByRole('button', { name: '拍手' }).click()
+      await expect(people[1].getByText('小安').last()).toBeVisible()
+
+      await host.getByRole('button', { name: '開始遊戲' }).click()
+      for (let round = 1; round <= people.length; round++) {
+        await expect(host.getByText(`第 ${round}／${people.length} 回合`).first()).toBeVisible()
+        let judge: Page | null = null
+        await expect(async () => {
+          judge = null
+          for (const page of people)
+            if ((await page.getByTestId('role').textContent()) === '你是裁判') judge = page
+          expect(judge).not.toBeNull()
+        }).toPass({ timeout: 15_000 })
+        const theJudge = judge as unknown as Page
+        if (round === 1)
+          for (const page of people) await expectAllChinese(page, 'Bluff Reader cards')
+        await theJudge.getByRole('button', { name: '開始朗讀' }).click()
+        for (let reader = 0; reader < people.length - 1; reader++) {
+          if (round === 1 && reader === 0) await expectAllChinese(theJudge, 'Bluff Reader reading')
+          await theJudge.getByRole('button', { name: '結束這一段' }).click()
+        }
+        await expect(theJudge.getByTestId('vote')).toBeVisible()
+        for (const page of people.filter((one) => one !== theJudge)) {
+          if (round === 1) await expectAllChinese(page, 'Bluff Reader stickers')
+          await page.getByTestId('sticker').getByRole('button', { name: '不貼' }).click()
+          await page.getByRole('button', { name: '確定不貼' }).click()
+        }
+        if (round === 1) await expectAllChinese(theJudge, 'Bluff Reader vote')
+        await theJudge.getByTestId('vote').getByRole('button').first().click()
+        await theJudge.getByRole('button', { name: /^投給 / }).click()
+        await expect(host.getByTestId('round-reveal')).toBeVisible()
+        if (round === 1) await expectAllChinese(host, 'Bluff Reader reveal')
+        if (round < people.length) await theJudge.getByRole('button', { name: '下一回合' }).click()
+      }
+      const over = host.getByRole('region', { name: '結果' })
+      await expect(over).toBeVisible()
+      await expectAllChinese(host, 'Bluff Reader result')
+
+      await over.getByRole('link', { name: '看重播' }).click()
+      await expect(host.getByRole('heading', { name: '重播' })).toBeVisible()
+      await host.getByRole('button', { name: '下一步' }).click()
+      await expectAllChinese(host, 'the replay')
+      for (const page of people) await page.context().close()
+    })
+
+    test('Spectrum, a round from the card to the reveal', async ({ browser }) => {
+      test.setTimeout(120_000)
+      browser_ = browser
+      const people = await roomOf('spectrum', ['小安', '小博', '小綺', '小迪'])
+      const [host] = people
+      await host.goto('/games/spectrum/rules')
+      await expectAllChinese(host, 'Spectrum rules page')
+      await host.goBack()
+      await expect(host.getByRole('heading', { name: '座位', exact: true })).toBeVisible()
+      await expectAllChinese(host, 'Spectrum waiting room')
+      await host.getByRole('button', { name: '開始遊戲' }).click()
+
+      let guesser: Page | null = null
+      await expect(async () => {
+        guesser = null
+        for (const page of people)
+          if ((await page.getByRole('button', { name: /問這題$/ }).count()) > 0) guesser = page
+        expect(guesser).not.toBeNull()
+      }).toPass({ timeout: 15_000 })
+      const theGuesser = guesser as unknown as Page
+      await expectAllChinese(theGuesser, 'Spectrum topic card')
+      await theGuesser
+        .getByRole('button', { name: /問這題$/ })
+        .first()
+        .click()
+      const answers = ['白飯', '熱湯', '夜市小吃']
+      const answerers = people.filter((page) => page !== theGuesser)
+      await expectAllChinese(answerers[0], 'Spectrum answering')
+      for (const [index, page] of answerers.entries()) {
+        await page.getByRole('textbox', { name: '你的回答' }).fill(answers[index])
+        await page.getByRole('button', { name: '送出回答' }).click()
+      }
+      await expect(theGuesser.getByRole('button', { name: '確定' })).toBeVisible()
+      await expectAllChinese(theGuesser, 'Spectrum guessing')
+      await theGuesser.getByRole('button', { name: '確定' }).click()
+      await expect(host.getByTestId('round-reveal')).toBeVisible()
+      await expectAllChinese(host, 'Spectrum reveal')
       for (const page of people) await page.context().close()
     })
   })

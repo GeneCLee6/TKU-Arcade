@@ -134,7 +134,12 @@ describe('lobby cards', () => {
     // Four open games; the Coming soon card arrives with its lazy chunk
     await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(5))
     expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(4)
-    expect(LOBBY_GAMES.map((game) => game.id)).toEqual(['promotion', 'silent-table', 'spectrum', 'bluff'])
+    expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
+      'promotion',
+      'silent-table',
+      'spectrum',
+      'bluff',
+    ])
   })
 
   it('shows the games that are not open yet as Coming soon, with nothing to press', async () => {
@@ -161,7 +166,9 @@ describe('lobby cards', () => {
   it('translates the Coming soon cards', async () => {
     setLanguage('zh-TW')
     renderLobby()
-    expect(await screen.findByRole('heading', { level: 3, name: '卡丁車 即將推出' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 3, name: '卡丁車 即將推出' }),
+    ).toBeInTheDocument()
     setLanguage('en')
   })
 
@@ -188,11 +195,13 @@ describe('lobby cards', () => {
     expect(screen.queryByText(/4–4/)).not.toBeInTheDocument()
   })
 
-  it('hides the monogram from screen readers', () => {
+  // e7-t12: the first letter until the card's picture has loaded, then the picture; neither is read
+  it('hides the monogram and the picture from screen readers', async () => {
     renderLobby()
     const heading = screen.getByRole('heading', { level: 3, name: 'Promotion' })
-    const monogram = heading.parentElement!.querySelector('[aria-hidden]')
-    expect(monogram).toHaveTextContent(/^P$/)
+    const monogram = heading.parentElement!.querySelector('[aria-hidden]')!
+    await waitFor(() => expect(monogram.querySelector('svg')).not.toBeNull())
+    expect(monogram.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
 })
 

@@ -253,8 +253,17 @@ export type ChatServerMessage = { t: 'chat'; messages: ChatMessage[]; reset?: tr
 
 export type { ChatMessage }
 
+/** Someone's reaction (e7-t11), to everyone in the room, the sender too. Gone once it has floated */
+export type ReactionMessage = { t: 'reaction'; member: string; reaction: number }
+
 export type ServerMessage =
-  WelcomeMessage | SnapshotMessage | PatchMessage | ErrorMessage | TimerMessage | ChatServerMessage
+  | WelcomeMessage
+  | SnapshotMessage
+  | PatchMessage
+  | ErrorMessage
+  | TimerMessage
+  | ChatServerMessage
+  | ReactionMessage
 
 // ── Browser → server ─────────────────────────────────────────────────────────────────────────
 
@@ -315,6 +324,14 @@ export type SetGameMessage = { t: 'set_game'; gameId: string; options?: OptionVa
 /** The host replaces the rule options while `waiting`. A missing or invalid one gets its default */
 export type SetOptionsMessage = { t: 'set_options'; options: OptionValues }
 
+/** How many reactions there are (e7-t11); the browser draws them, the room only passes on a number */
+export const REACTION_COUNT = 6
+/** One member's reactions are passed on at most this often; faster ones are dropped quietly */
+export const REACTION_MIN_MS = 500
+
+/** A quick reaction for everyone in the room to see float up (e7-t11). Never stored, never locked */
+export type ReactMessage = { t: 'react'; reaction: number }
+
 /**
  * The host sets the room's password, or takes it away with null (e1-t16). Someone new needs it to
  * join; a room with one is never listed. Members already in are not asked
@@ -338,6 +355,7 @@ export type ClientMessage =
   | SetGameMessage
   | SetOptionsMessage
   | SetPasswordMessage
+  | ReactMessage
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -356,6 +374,15 @@ export type CreateRoomRequest = {
 /** 201 from POST /api/rooms */
 /** `code`: the room's short number, null when none could be given (the link still works) */
 export type CreateRoomResponse = { id: string; code: string | null }
+
+/** What the daily metrics count (e12-t07) */
+export type MetricName = 'room_created' | 'game_started' | 'game_finished'
+
+/** One day's count of one metric for one game */
+export type DailyMetricRow = { day: string; metric: MetricName; game: string; count: number }
+
+/** GET /api/stats (e12-t07): the owner's daily counts, from `since` (YYYY-MM-DD, Taipei) on */
+export type StatsResponse = { since: string; rows: DailyMetricRow[] }
 
 /** GET /api/voice (e1-t14): whether this site can open a LongTalk voice room */
 export type VoiceStatus = { available: boolean }
@@ -543,6 +570,12 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return isPlainObject(value.options)
         ? { t: 'set_options', options: value.options as OptionValues }
         : null
+    case 'react':
+      return Number.isInteger(value.reaction) &&
+        (value.reaction as number) >= 0 &&
+        (value.reaction as number) < REACTION_COUNT
+        ? { t: 'react', reaction: value.reaction as number }
+        : null
     case 'set_password': {
       if (value.password === null) return { t: 'set_password', password: null }
       const password = normalizePassword(value.password)
@@ -595,6 +628,13 @@ export function parseServerMessage(raw: string): ServerMessage | null {
       return Array.isArray(value.timers) ? (value as TimerMessage) : null
     case 'chat':
       return Array.isArray(value.messages) ? (value as ChatServerMessage) : null
+    case 'reaction':
+      return typeof value.member === 'string' &&
+        Number.isInteger(value.reaction) &&
+        (value.reaction as number) >= 0 &&
+        (value.reaction as number) < REACTION_COUNT
+        ? (value as ReactionMessage)
+        : null
     default:
       return null
   }

@@ -1,4 +1,5 @@
 import type { HealthResponse } from '../shared/health.ts'
+import { handleStats } from './metrics.ts'
 import { handleVoice } from './voice.ts'
 import type { LobbyResponse } from '../shared/protocol.ts'
 import { handleAuth, isAuthPath } from './auth.ts'
@@ -36,6 +37,8 @@ export interface Env {
    */
   LONGTALK_URL?: string
   LONGTALK?: Fetcher
+  /** The owner's key to the daily metrics (e12-t07, worker/metrics.ts): a secret; no secret, no stats */
+  STATS_KEY?: string
 }
 
 const noStore = { 'cache-control': 'no-store' }
@@ -69,6 +72,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   if (url.pathname.startsWith('/api/codes/')) return handleRoomCode(request, env, url)
   if (url.pathname === '/api/lobby') return handleLobby(request, env)
   if (url.pathname === '/api/voice') return handleVoice(request, env)
+  if (url.pathname === '/api/stats') return handleStats(request, env)
   if (isAuthPath(url.pathname)) return handleAuth(request, env, url)
   if (url.pathname === '/api/errors') return handleClientError(request, env, url)
   if (url.pathname.startsWith('/api/')) return notFound()

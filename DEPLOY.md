@@ -253,3 +253,15 @@ printf '%s' "https://tku-bridge-table.genelee-pro.workers.dev" | npx wrangler se
 
 （預覽的設定沒有 `AUTH_BRIDGE_URL` 這個 var，所以可以用同名的 secret 補上。）牌桌不會替預覽簽 token（它沒有這個測試值），所以自己簽：`GET /api/auth/start` 拿到 state cookie 與轉址裡的 `state`，用同一個測試值照牌桌的格式（`v1.<base64url JSON>.<HMAC-SHA256>`，claims 見 `ARCHITECTURE.md` §6）簽一個 `aud` 是預覽網址、`nonce` 是那個 `state` 的 token，開 `<預覽網址>/#overtrick_token=<token>`。預覽在 PR 關閉時整個刪掉，secret 一起消失。staging D1 的 `auth_token_uses` 是所有預覽共用的，只有隨機 id，不用清。
 
+
+## 12. 每日指標（I4，`e12-t07`）
+
+每個房間開房、開局、完局時在 D1 `daily_metrics` 加一（台灣日期、遊戲別，只有數字）。看的地方是 `/stats`（沒有任何地方連過去），要一把金鑰：
+
+```sh
+KEY=$(node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))")
+printf '%s' "$KEY" | npx wrangler secret put STATS_KEY --name tku-arcade
+echo "$KEY"   # 自己記下來，在 /stats 貼上一次，那個瀏覽器會記住
+```
+
+沒設 `STATS_KEY` 時 `GET /api/stats` 回 404，頁面說「沒有開指標」。換金鑰就重新 `secret put`；不要了就 `npx wrangler secret delete STATS_KEY --name tku-arcade`（計數照樣寫，只是看不到）。D1 的表由 `migrations/0003_daily_metrics.sql` 建，部署時自動套用（§6）。

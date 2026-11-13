@@ -53,3 +53,37 @@ jobs:
 
       - name: JS budgets
         run: npm run budget
+
+  # e7-t10 (AC-7.8): visual regression and axe. The real app on Vite's dev server, its API answered by
+  # fixtures (e2e-visual/pages.visual.ts), screenshotted in Playwright's container so that fonts
+  # match the baselines in e2e-visual/__screenshots__. When a screenshot differs, the diffs and a
+  # fresh set of baselines are uploaded as the `visual` artifact: if the change was meant, commit
+  # those baselines (playwright.visual.config.ts says how).
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Screenshots and axe
+        id: compare
+        run: npm run test:visual
+
+      - name: New baselines, for a change meant to look different
+        if: failure() && steps.compare.outcome == 'failure'
+        run: npm run test:visual -- --update-snapshots || true
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: visual
+          path: |
+            test-results/
+            playwright-report/
+            e2e-visual/__screenshots__/
+          retention-days: 7

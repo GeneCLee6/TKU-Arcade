@@ -51,6 +51,8 @@ export type RoomHandlers = {
   onTimers: (timers: RoomTimer[]) => void
   /** `reset`: these replace every message so far. Otherwise they are new, or may be repeats */
   onChat: (messages: ChatMessage[], reset: boolean) => void
+  /** Someone's reaction (e7-t11), to float up and be gone */
+  onReaction?: (member: string, reaction: number) => void
   onEnd: (end: RoomEnd) => void
 }
 
@@ -281,6 +283,9 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
       case 'chat':
         if (!joined) return
         handlers.onChat(message.messages.filter(isChatMessage), message.reset === true)
+        return
+      case 'reaction':
+        if (joined) handlers.onReaction?.(message.member, message.reaction)
         return
     }
   }
