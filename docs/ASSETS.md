@@ -5,6 +5,7 @@
 - 模型、貼圖、音檔放 R2（`tku-arcade-assets`），**不 commit**；小於 100 kB 的 SVG／PNG 圖示可以進 repo。
 - 程式畫的 SVG（陞官圖圖版、陀螺、骰子，默契牌局的牌與皮膚）與 `src/lib/sound.ts` 用 WebAudio 合成的音效是這個 repo 自己的程式碼，不用登記（DESIGN §7）。**獨立的圖檔**即使是自己畫的也登記，例如陞官圖的官階浮水印（下面「圖片」）。
 - `check-assets`（`e12-t08`）還沒做；在那之前靠 PR 審查對照這份表。
+- **測試的基準圖不是資產**：`e2e-visual/__screenshots__/*.png`（I4，`e7-t10`）是網站自己畫面的截圖，由 CI 的 Playwright 容器產生，只給視覺回歸比對用，不出現在網站上，不登記、不放 R2（13 張，共約 3.6 MB；畫面改了才換）。大廳卡片的小圖（`src/components/GameArt.tsx`）是程式畫的 SVG，同上不用登記。
 
 ## 字型
 
