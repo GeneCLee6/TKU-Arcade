@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
 import { KART_ACTIONS, type Bindings, type KartAction } from '../../shared/kart/input.ts'
@@ -23,12 +23,15 @@ import {
 import { CalloutText, Hud } from './Hud.tsx'
 import { supportsWebGL2 } from './Scene.ts'
 import { Minimap, type MinimapHandle } from './Minimap.tsx'
+import { RaceCenter, RaceClock, type RaceClockHandle } from './RaceOverlay.tsx'
 import {
+  SPIKE_COURSES,
   spikeTrack,
   startSpikeLoop,
   type SpikeCourse,
   type SpikeHud,
   type SpikeStats,
+  type SpikeTrial,
 } from './spikeLoop.ts'
 import { NARROW_PANEL_TOP, NARROW_TOP } from './layout.ts'
 import { TuningPanel } from './TuningPanel.tsx'
@@ -79,12 +82,16 @@ export function SpikePage() {
   useEffect(() => {
     controls.current = { bindings, rules, tuning, enabled: !controlsOpen }
   }, [bindings, rules, tuning, controlsOpen])
-  // e8-t04: the yard, or the test oval with its minimap and laps (?track=oval)
-  const [course, setCourse] = useState<SpikeCourse>(() =>
-    new URLSearchParams(window.location.search).get('track') === 'oval' ? 'oval' : 'arena',
-  )
-  const [track] = useState(spikeTrack)
+  // e8-t04, e8-t05a: the yard, or a track with its minimap and a time trial (?track=oval|riverside)
+  const [course, setCourse] = useState<SpikeCourse>(() => {
+    const asked = new URLSearchParams(window.location.search).get('track')
+    return SPIKE_COURSES.find((one) => one === asked) ?? 'arena'
+  })
+  const track = useMemo(() => spikeTrack(course), [course])
   const minimap = useRef<MinimapHandle>(null)
+  const clock = useRef<RaceClockHandle>(null)
+  const race = useRef<{ restart: () => void } | null>(null)
+  const [trial, setTrial] = useState<SpikeTrial>()
   const [showNumbers, setShowNumbers] = useState(() =>
     new URLSearchParams(window.location.search).has('fps'),
   )
@@ -102,6 +109,11 @@ export function SpikePage() {
         onContextLost: () => setFailure('contextLost'),
         course,
         onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
+        onTrial: setTrial,
+        onClock: (total, lap) => clock.current?.set(total, lap),
+        onReady: (handle) => {
+          race.current = handle
+        },
       })
     } catch {
       // The probe passed but three.js still could not start
@@ -109,13 +121,13 @@ export function SpikePage() {
     }
   }, [course])
 
-  const switchCourse = () => {
-    const next: SpikeCourse = course === 'oval' ? 'arena' : 'oval'
+  const switchCourse = (next: SpikeCourse) => {
     const url = new URL(window.location.href)
-    if (next === 'oval') url.searchParams.set('track', 'oval')
-    else url.searchParams.delete('track')
+    if (next === 'arena') url.searchParams.delete('track')
+    else url.searchParams.set('track', next)
     window.history.replaceState(null, '', url)
     setHud(EMPTY_HUD)
+    setTrial(undefined)
     setCourse(next)
   }
 
@@ -205,9 +217,20 @@ export function SpikePage() {
           >
             {t('kart.tuning.open')}
           </Button>
-          <Button $variant="secondary" $size="sm" onClick={switchCourse} data-testid="kart-course">
-            {t(course === 'oval' ? 'kart.spike.toArena' : 'kart.spike.toOval')}
-          </Button>
+          <CourseLabel>
+            <span>{t('kart.spike.course')}</span>
+            <select
+              value={course}
+              onChange={(event) => switchCourse(event.target.value as SpikeCourse)}
+              data-testid="kart-course"
+            >
+              {SPIKE_COURSES.map((one) => (
+                <option key={one} value={one}>
+                  {t(`kart.course.${one}`)}
+                </option>
+              ))}
+            </select>
+          </CourseLabel>
           <Button $variant="secondary" $size="sm" onClick={() => setShowNumbers((shown) => !shown)}>
             {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
           </Button>
@@ -237,15 +260,14 @@ export function SpikePage() {
         <WallFlash key={hud.hits} aria-hidden="true" data-testid="kart-wall-flash" />
       )}
       {callout && <CalloutText key={callout.id} t={t} callout={callout.callout} />}
-      {course === 'oval' && (
+      {track && (
         <MapCorner>
-          {hud.lap && (
-            <LapText data-testid="kart-lap">
-              {t('kart.hud.lap', { count: Math.max(1, hud.lap.count), of: hud.lap.of })}
-            </LapText>
-          )}
+          {trial && <RaceClock ref={clock} t={t} trial={trial} />}
           <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
         </MapCorner>
+      )}
+      {track && trial && (
+        <RaceCenter t={t} trial={trial} onRestart={() => race.current?.restart()} />
       )}
       <Bottom>
         <Hud t={t} hud={hud} maxStored={tuning.maxStoredBoosts} />
@@ -362,12 +384,24 @@ const MapCorner = styled.div`
   pointer-events: none;
 `
 
-const LapText = styled.p`
-  margin: 0;
-  padding: 2px ${space.sm}px;
+const CourseLabel = styled.label`
+  display: inline-flex;
+  align-items: center;
+  gap: ${space.xs}px;
+  min-height: 32px;
+  padding: 0 ${space.sm}px;
   color: ${color.text};
   background: color-mix(in srgb, ${color.bg} 55%, transparent);
-  font-weight: 800;
+  font-size: ${fontSize.sm}px;
+  font-weight: 700;
+
+  & > select {
+    min-height: 28px;
+    color: ${color.text};
+    background: ${color.sunken};
+    border: 1px solid ${color.border};
+    font: inherit;
+  }
 `
 
 const Bottom = styled.div`

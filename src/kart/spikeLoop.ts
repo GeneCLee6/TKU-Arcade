@@ -1,6 +1,17 @@
 import { TEST_ARENA } from '../../shared/kart/arena.ts'
 import { courseOf, parseTrack, type Track } from '../../shared/kart/track.ts'
+import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
+import {
+  currentLap,
+  lapSteps,
+  seconds,
+  startTrial,
+  stepTrial,
+  type Trial,
+  type TrialCourse,
+  type TrialPhase,
+} from '../../shared/kart/timeTrial.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
 import { startRun, stepRun, type Spot } from '../../shared/kart/course.ts'
 import { actionKeys, isBoundKey, readInput, type Bindings } from '../../shared/kart/input.ts'
@@ -53,19 +64,42 @@ export interface SpikeHud {
   readonly chain: number
   /** Counts wall hits, so that the HUD can flash on each one */
   readonly hits: number
-  /** On a track: laps begun (finish line crossings) and the track's laps */
-  readonly lap?: { readonly count: number; readonly of: number }
 }
 
-/** What /kart/spike drives on: the walled yard of J3, or J4's test track */
-export type SpikeCourse = 'arena' | 'oval'
+/** What /kart/spike drives on: the walled yard of J3, J4's test oval, or J5's first track */
+export type SpikeCourse = 'arena' | 'oval' | 'riverside'
 
-/** The test oval, checked like any track file */
-export function spikeTrack(): Track {
-  const parsed = parseTrack(TEST_OVAL)
-  if ('problems' in parsed) throw new Error(`test oval: ${parsed.problems.join('; ')}`)
+export const SPIKE_COURSES: readonly SpikeCourse[] = ['arena', 'oval', 'riverside']
+
+/** A course's track, checked like any track file; null for the yard, which is not a track */
+export function spikeTrack(course: SpikeCourse): Track | null {
+  if (course === 'arena') return null
+  const parsed = parseTrack(course === 'oval' ? TEST_OVAL : RIVERSIDE)
+  if ('problems' in parsed) throw new Error(`${course}: ${parsed.problems.join('; ')}`)
   return parsed.track
 }
+
+/** What the page shows of a time trial (e8-t10); sent only when it changes */
+export interface SpikeTrial {
+  readonly phase: TrialPhase
+  /** Whole seconds left of the countdown: 3, 2, 1, then 0 at GO */
+  readonly countdown: number
+  readonly lap: number
+  readonly laps: number
+  /** Each finished lap, seconds */
+  readonly lapTimes: readonly number[]
+  readonly wrongWay: boolean
+  /** Seconds from GO to the finish, once finished */
+  readonly total: number | null
+}
+
+const sameTrial = (a: SpikeTrial | undefined, b: SpikeTrial): boolean =>
+  !!a &&
+  a.phase === b.phase &&
+  a.countdown === b.countdown &&
+  a.lap === b.lap &&
+  a.wrongWay === b.wrongWay &&
+  a.lapTimes.length === b.lapTimes.length
 
 /** What tests and a curious owner can read from the console. It stays after the loop stops. */
 export interface SpikeDebug {
@@ -116,6 +150,12 @@ export interface SpikeOptions {
   readonly course?: SpikeCourse
   /** Every frame, where the car is: the minimap moves its marker with it, outside React */
   readonly onPose?: (x: number, z: number, heading: number, nextGate: number) => void
+  /** On a track: the time trial's state, when it changes */
+  readonly onTrial?: (trial: SpikeTrial) => void
+  /** On a track, every frame: the race time and the lap's, seconds, written straight into the page */
+  readonly onClock?: (total: number, lap: number) => void
+  /** Called once, with a way to start the race over from the grid */
+  readonly onReady?: (handle: { restart: () => void }) => void
 }
 
 const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
@@ -125,8 +165,7 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
   a.hits === b.hits &&
   a.storedBoosts === b.storedBoosts &&
   a.boosting === b.boosting &&
-  a.chain === b.chain &&
-  a.lap?.count === b.lap?.count
+  a.chain === b.chain
 
 /**
  * The game loop, outside React (docs/ARCHITECTURE.md §4): rendering follows the display, the physics
@@ -134,8 +173,13 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
  * Throws when WebGL is unavailable.
  */
 export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): () => void {
-  const track = options.course === 'oval' ? spikeTrack() : null
+  const track = spikeTrack(options.course ?? 'arena')
   const course = track ? courseOf(track) : TEST_ARENA
+  const trialCourse: TrialCourse | null = track
+    ? { ...courseOf(track), checkpoints: courseOf(track).checkpoints!, road: track.road }
+    : null
+  let trial: Trial | null = trialCourse ? startTrial(trialCourse) : null
+  let lastTrial: SpikeTrial | undefined
   const scene = createKartScene(container, course.walls, track ?? undefined)
   const held = new Set<string>()
   // A boost or reset key pressed and let go between two steps still counts
@@ -193,7 +237,12 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       boostTapped = false
       resetTapped = false
       const before = run
-      run = stepRun(run, input, course, tuning, rules)
+      if (trial && trialCourse) {
+        trial = stepTrial(trial, input, trialCourse, tuning, rules)
+        run = trial.run
+      } else {
+        run = stepRun(run, input, course, tuning, rules)
+      }
       if (run.resets !== before.resets) {
         // A jump, not a move: nothing to draw in between, and the camera starts behind the car
         previous = run.kart
@@ -233,9 +282,24 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       boosting,
       chain: boosting ? current.chain : 0,
       hits,
-      ...(track ? { lap: { count: run.crossings, of: track.laps } } : {}),
     }
     options.onPose?.(current.x, current.z, current.heading, run.nextGate)
+    if (trial && track) {
+      const view: SpikeTrial = {
+        phase: trial.phase,
+        countdown: Math.ceil(trial.countdown - 1e-9),
+        lap: currentLap(trial),
+        laps: track.laps,
+        lapTimes: trial.laps.map(seconds),
+        wrongWay: trial.wrongWay,
+        total: trial.phase === 'finished' ? seconds(trial.steps) : null,
+      }
+      if (!sameTrial(lastTrial, view)) {
+        lastTrial = view
+        options.onTrial?.(view)
+      }
+      options.onClock?.(seconds(trial.steps), seconds(lapSteps(trial)))
+    }
     if (!sameHud(lastHud, hud)) {
       lastHud = hud
       options.onHud(hud)
@@ -303,6 +367,16 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     options.onContextLost()
   }
 
+  options.onReady?.({
+    restart: () => {
+      if (!trialCourse) return
+      trial = startTrial(trialCourse)
+      run = trial.run
+      previous = run.kart
+      lastTrial = undefined
+      scene.snapCamera(run.kart.heading)
+    },
+  })
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   window.addEventListener('blur', onBlur)
