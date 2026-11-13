@@ -237,7 +237,8 @@ export const font = {
   kai: "'LXGW WenKai TC', 'Kaiti TC', BiauKai, 'DFKai-SB', STKaiti, KaiTi, 'Noto Serif TC', 'PMingLiU', serif",
   sans: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang TC', 'Microsoft JhengHei', sans-serif",
   // Latin headings, buttons and the wordmark: Saira, italic and heavy
-  display: "Saira, 'Noto Sans TC', 'Arial Narrow', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  display:
+    "Saira, 'Noto Sans TC', 'Arial Narrow', system-ui, -apple-system, 'Segoe UI', sans-serif",
   // Chinese headings: Noto Sans TC at 900, upright
   displayZh: "'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif",
   // Numbers, room ids and small labels

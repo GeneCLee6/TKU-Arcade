@@ -104,7 +104,13 @@ describe('gates', () => {
       }
     }
     // From just behind the line, once round and a bit
-    progress = passGates(progress, { x: road[0]!.x, z: road[0]!.z + 1 }, road[1]!, checkpoints, start)
+    progress = passGates(
+      progress,
+      { x: road[0]!.x, z: road[0]!.z + 1 },
+      road[1]!,
+      checkpoints,
+      start,
+    )
     expect(progress).toMatchObject({ nextGate: 1, crossings: 1 })
     drive(1, road.length + 1)
     expect(progress).toMatchObject({ nextGate: 1, crossings: 2 })
@@ -127,7 +133,10 @@ describe('driving the test oval', () => {
     let nearest = 0
     road.forEach((point, index) => {
       const best = road[nearest]!
-      if (Math.hypot(point.x - run.kart.x, point.z - run.kart.z) < Math.hypot(best.x - run.kart.x, best.z - run.kart.z)) {
+      if (
+        Math.hypot(point.x - run.kart.x, point.z - run.kart.z) <
+        Math.hypot(best.x - run.kart.x, best.z - run.kart.z)
+      ) {
         nearest = index
       }
     })
@@ -196,7 +205,11 @@ describe('build-track: a track from a glTF scene', () => {
     scenes: [{ nodes: [], extras: { gateEvery: 10 } }],
     nodes: [
       // Out of order on purpose: the numbers give the order
-      ...square.map(([x, z], index) => empty(`road.${String(index).padStart(3, '0')}`, x, z, { width: 10 })).reverse(),
+      ...square
+        .map(([x, z], index) =>
+          empty(`road.${String(index).padStart(3, '0')}`, x, z, { width: 10 }),
+        )
+        .reverse(),
       { ...empty('grid.0', -50, 58) },
       { ...empty('grid.1', -45, 64), rotation: quarter },
       empty('wall.island.000', -10, -10, { closed: true }),
