@@ -90,3 +90,21 @@ test('nothing to replay before a game has ended', async ({ browser }) => {
   await expect(ann.getByText('There is no finished game to replay in this room.')).toBeVisible()
   await close([ann])
 })
+
+// e1-t14: only where the site can reach LongTalk (a PR preview or production, not `npm run dev`)
+test('opens a LongTalk voice room and posts its link in the chat', async ({ browser, baseURL }) => {
+  // The dev server has no service binding to LongTalk
+  test.skip(baseURL?.includes('localhost') ?? true, 'no LongTalk binding on the dev server')
+  const ann = await newPerson(browser)
+  const status = await ann.request.get('/api/voice')
+  const { available } = (await status.json()) as { available: boolean }
+  test.skip(!available, 'no LongTalk here')
+  await createRoom(ann, 'Ann')
+  await ann.getByRole('button', { name: 'Open a voice room' }).click()
+  await expect(
+    ann
+      .getByRole('log')
+      .getByRole('link', { name: /^https:\/\/longtalk\..*\/r\/[1-9A-HJ-NP-Za-km-z]{10}$/ }),
+  ).toBeVisible()
+  await close([ann])
+})

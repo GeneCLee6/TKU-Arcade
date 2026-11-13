@@ -58,7 +58,7 @@ depends_on: [E2, E7]
 - [x] AC-1.5 — 聊天：200 則、速率限制、連結、`chatLocked`。
 - [x] AC-1.6 — 旁觀：旁觀者視角、補位。
 - [ ] AC-1.7 — 選用帳號：牌桌 token 驗簽、本站 session、暱稱固定。
-- [ ] AC-1.8 — 語音連結：一鍵建 LongTalk 房並貼連結。
+- [x] AC-1.8 — 語音連結：一鍵建 LongTalk 房並貼連結。（I3，#46，在 PR 預覽站實測：按鈕開出 LongTalk 房、連結出現在聊天）
 
 ## Task 拆分
 
