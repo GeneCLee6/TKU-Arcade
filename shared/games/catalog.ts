@@ -1,6 +1,8 @@
 // What the browser needs of every game: names, player counts, rule options and the strings for them.
 // No rules: src/ imports this file, and whatever it imports is in everyone's first load. The Worker's
 // registry with the rules is shared/games/index.ts; a new game adds itself to both.
+import { bluffMessages } from './bluff/i18n.ts'
+import { bluffInfo } from './bluff/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
 import { promotionInfo } from './promotion/info.ts'
 import { silentTableMessages } from './silent-table/i18n.ts'
@@ -16,6 +18,7 @@ export const GAME_INFOS = [
   promotionInfo,
   silentTableInfo,
   spectrumInfo,
+  bluffInfo,
 ] as unknown as readonly AnyGameInfo[]
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
@@ -35,11 +38,13 @@ export const GAME_MESSAGES: GameMessages = {
     ...promotionMessages.en,
     ...silentTableMessages.en,
     ...spectrumMessages.en,
+    ...bluffMessages.en,
   },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
     ...promotionMessages['zh-TW'],
     ...silentTableMessages['zh-TW'],
     ...spectrumMessages['zh-TW'],
+    ...bluffMessages['zh-TW'],
   },
 }

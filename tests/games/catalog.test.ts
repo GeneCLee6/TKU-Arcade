@@ -97,7 +97,7 @@ describe('the catalog against the registry', () => {
  * edition's screen loads it after its first paint, by a dynamic import in fullData.ts alone
  */
 const WORKER_ONLY =
-  /(^|\/)shared\/games\/index\.ts$|shared\/games\/[^/]+\/(rules|rulesFull|boardFull|topics)\.ts$/
+  /(^|\/)shared\/games\/index\.ts$|shared\/games\/[^/]+\/(rules|rulesFull|boardFull|topics|bank)\.ts$/
 const FULL_SCREEN = /^\/src\/games\/promotion\/full\//
 const FULL_BOARD = /shared\/games\/promotion\/boardFull\.ts$/
 /** What a file may not import statically */
@@ -142,7 +142,7 @@ describe('the browser loads no rules', () => {
     expect(Object.keys(INFO_FILES)).toHaveLength(GAME_IDS.length + 1)
     for (const source of Object.values(INFO_FILES)) {
       const bad = staticImports(source).filter((from) =>
-        /rules\.ts$|rulesFull\.ts$|boardFull\.ts$|index\.ts$|topics\.ts$/.test(from),
+        /rules\.ts$|rulesFull\.ts$|boardFull\.ts$|index\.ts$|topics\.ts$|bank\.ts$/.test(from),
       )
       expect(bad).toEqual([])
     }
