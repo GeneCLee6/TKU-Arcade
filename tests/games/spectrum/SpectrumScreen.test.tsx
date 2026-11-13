@@ -205,7 +205,7 @@ describe('answering', () => {
     const state = start()
     show(state, state.guesser)
     expect(
-      screen.getByText('Chat is closed while the answers are written and guessed.'),
+      screen.getByText('Chat is closed until the numbers are revealed.'),
     ).toBeInTheDocument()
   })
 
@@ -287,7 +287,7 @@ describe('the reveal', () => {
     const gained = state.reveal?.points.reduce((sum, points) => sum + points, 0) ?? 0
     if (gained === 0) expect(within(reveal).getByText('Nobody scored this round.')).toBeInTheDocument()
     else expect(within(reveal).getByText(/\+\d/)).toBeInTheDocument()
-    expect(screen.queryByText('Chat is closed while the answers are written and guessed.')).toBeNull()
+    expect(screen.queryByText('Chat is closed until the numbers are revealed.')).toBeNull()
   })
 
   it('gives only the guesser the button to the next round', () => {

@@ -98,7 +98,7 @@ test('four players play every round to the result', async ({ browser }) => {
     // Answering: the clock runs, chat is closed, and only answerers hold a number
     await expect(host.getByRole('timer')).toBeVisible()
     await expect(host.getByRole('textbox', { name: 'Message to the room' })).toBeDisabled()
-    await expect(host.getByText('Chat is closed while the answers are written and guessed.')).toBeVisible()
+    await expect(host.getByText('Chat is closed until the numbers are revealed.')).toBeVisible()
     await expect(guesser.getByTestId('secret-number')).toHaveCount(0)
     await expect(guesser.getByRole('textbox', { name: 'Your answer' })).toHaveCount(0)
     for (const answerer of answerers) {
