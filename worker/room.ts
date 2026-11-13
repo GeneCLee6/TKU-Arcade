@@ -115,8 +115,9 @@ export class RoomDO extends DurableObject<Env> {
     gameId: string,
     options: OptionValues | undefined,
     isPublic: boolean,
+    code: string | null = null,
   ): Promise<boolean> {
-    const created = this.host.create(id, gameId, options, isPublic)
+    const created = this.host.create(id, gameId, options, isPublic, code)
     // A room nobody ever joins is cleaned up too
     await this.settle()
     return created

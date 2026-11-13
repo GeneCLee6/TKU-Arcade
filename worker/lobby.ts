@@ -4,6 +4,8 @@ import type { Env } from './app.ts'
 import { LobbyBoard, type LobbyEntry } from './lobby-board.ts'
 
 const ENTRY_PREFIX = 'room:'
+/** `code:<four digits>` → the id of the room that number belongs to (shared/room-code.ts) */
+const CODE_PREFIX = 'code:'
 
 /**
  * One object for the whole deployment: the public room list (e1-t09). Only the glue to Cloudflare;
@@ -43,6 +45,30 @@ export class LobbyDO extends DurableObject<Env> {
   /** RPC from GET /api/lobby */
   async list(): Promise<RoomListing[]> {
     return this.board.list()
+  }
+
+  /**
+   * RPC from POST /api/rooms: gives `code` to `roomId` if it is free, or if it still belongs to
+   * `replacing` (a room the caller found gone). Answers null when the number is now the room's,
+   * otherwise the room that holds it. One object, one call at a time: two rooms never get one number
+   */
+  async claimCode(code: string, roomId: string, replacing: string | null): Promise<string | null> {
+    const key = CODE_PREFIX + code
+    const holder = (await this.ctx.storage.get<string>(key)) ?? null
+    if (holder !== null && holder !== roomId && holder !== replacing) return holder
+    await this.ctx.storage.put(key, roomId)
+    return null
+  }
+
+  /** RPC from GET /api/codes/<code>: the room the number belongs to, or null */
+  async lookupCode(code: string): Promise<string | null> {
+    return (await this.ctx.storage.get<string>(CODE_PREFIX + code)) ?? null
+  }
+
+  /** RPC from GET /api/codes/<code>: the room was found gone, so its number is free again */
+  async releaseCode(code: string, roomId: string): Promise<void> {
+    const key = CODE_PREFIX + code
+    if ((await this.ctx.storage.get<string>(key)) === roomId) await this.ctx.storage.delete(key)
   }
 
   override async alarm(): Promise<void> {

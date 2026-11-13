@@ -292,8 +292,8 @@ describe('new room', () => {
   })
 })
 
-describe('join by link', () => {
-  const box = () => screen.getByLabelText('Got a link? Paste it here')
+describe('join by number or link', () => {
+  const box = () => screen.getByLabelText('Got a room number or a link?')
   const join = (value: string) => {
     fireEvent.change(box(), { target: { value } })
     fireEvent.click(screen.getByRole('button', { name: 'Join' }))
@@ -318,8 +318,29 @@ describe('join by link', () => {
   ])('shows an inline error for %s, and no toast', (_, value) => {
     renderLobby()
     join(value)
-    expect(screen.getByRole('alert')).toHaveTextContent("That's not a room link or ID.")
+    expect(screen.getByRole('alert')).toHaveTextContent("That's not a room number or link.")
     expect(box()).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.queryByTestId('where')).not.toBeInTheDocument()
+  })
+
+  it('goes to the room a four-digit number belongs to, spaces and all', async () => {
+    const fetchMock = stubFetch(() => Promise.resolve(Response.json({ id: ROOM })))
+    renderLobby()
+    join(' 48 27 ')
+    expect(await screen.findByTestId('where')).toHaveTextContent(`/r/${ROOM}`)
+    expect(fetchMock).toHaveBeenCalledWith('/api/codes/4827', expect.anything())
+  })
+
+  it('says so when no open room has the number, or the lookup fails', async () => {
+    stubFetch(() => Promise.resolve(Response.json({ error: 'not_found' }, { status: 404 })))
+    renderLobby()
+    join('4827')
+    expect(await screen.findByRole('alert')).toHaveTextContent('No open room has that number.')
+    cleanup()
+    stubFetch(() => Promise.reject(new Error('offline')))
+    renderLobby()
+    join('4827')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not look the room up.')
     expect(screen.queryByTestId('where')).not.toBeInTheDocument()
   })
 

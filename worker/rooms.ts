@@ -1,9 +1,11 @@
 import { getGame } from '../shared/games/index.ts'
 import type { OptionValues } from '../shared/games/types.ts'
-import type { CreateRoomResponse } from '../shared/protocol.ts'
+import type { CreateRoomResponse, RoomCodeResponse } from '../shared/protocol.ts'
+import { isRoomCode, newRoomCode } from '../shared/room-code.ts'
 import { isRoomId, newRoomId } from '../shared/room-id.ts'
 import type { Env } from './app.ts'
 import { ACCOUNT_HEADER, encodeAccountHeader, sessionAccount } from './auth.ts'
+import { LOBBY_NAME } from './lobby-board.ts'
 
 /** Tries this many fresh ids before giving up (a collision at ~59 bits is not expected at all) */
 const CREATE_ATTEMPTS = 3
@@ -11,7 +13,11 @@ const CREATE_ATTEMPTS = 3
 /** Far more than any game's options; a longer POST /api/rooms is refused without parsing */
 const MAX_CREATE_BODY_CHARS = 4_096
 
+/** Random numbers tried for a new room before it goes without one (9000 numbers, a few rooms open) */
+const CODE_ATTEMPTS = 12
+
 const ROOM_PATH = /^\/api\/rooms\/([^/]+)$/
+const CODE_PATH = /^\/api\/codes\/([^/]+)$/
 const SOCKET_PATH = /^\/ws\/([^/]+)$/
 
 const noStore = { 'cache-control': 'no-store' }
@@ -22,6 +28,46 @@ function fail(error: string, status: number, headers: Record<string, string> = {
 
 function roomStub(env: Env, id: string) {
   return env.ROOM.get(env.ROOM.idFromName(id))
+}
+
+const lobbyStub = (env: Env) => env.LOBBY.get(env.LOBBY.idFromName(LOBBY_NAME))
+
+/**
+ * A short number for the new room `id`: a random one that is free, or whose room has been cleaned
+ * up. Null when a dozen draws all hit open rooms, or the lobby cannot be reached: the room still
+ * works by its link, only without a number
+ */
+async function claimCode(env: Env, id: string): Promise<string | null> {
+  try {
+    const lobby = lobbyStub(env)
+    for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
+      const code = newRoomCode()
+      const holder = await lobby.claimCode(code, id, null)
+      if (holder === null) return code
+      if ((await roomStub(env, holder).summary()) !== null) continue
+      if ((await lobby.claimCode(code, id, holder)) === null) return code
+    }
+  } catch (error) {
+    console.error('room code failed', error)
+  }
+  return null
+}
+
+/** GET /api/codes/<code>: the room behind a short number, while that room exists */
+export async function handleRoomCode(request: Request, env: Env, url: URL): Promise<Response> {
+  const match = CODE_PATH.exec(url.pathname)
+  if (!match || !isRoomCode(match[1])) return fail('not_found', 404)
+  if (request.method !== 'GET') return fail('method_not_allowed', 405, { allow: 'GET' })
+  const code = match[1]
+  const lobby = lobbyStub(env)
+  const id = await lobby.lookupCode(code)
+  if (id === null) return fail('not_found', 404)
+  if ((await roomStub(env, id).summary()) === null) {
+    await lobby.releaseCode(code, id)
+    return fail('not_found', 404)
+  }
+  const body: RoomCodeResponse = { id }
+  return Response.json(body, { headers: noStore })
 }
 
 /** POST /api/rooms creates a room and answers its id; GET /api/rooms/<id> answers its summary */
@@ -58,9 +104,12 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
   if (typeof gameId !== 'string' || !getGame(gameId)) return fail('unknown_game', 400)
   for (let attempt = 0; attempt < CREATE_ATTEMPTS; attempt++) {
     const id = newRoomId()
+    // The number first, so that the room can show it from the start. Should the id be taken (not
+    // expected at ~59 bits), the number points at a room that is not there and is soon reused
+    const code = await claimCode(env, id)
     // The room checks `options` against the game's schema: this only keeps them plain for the RPC
-    if (await roomStub(env, id).create(id, gameId, plainOptions(options), isPublic === true)) {
-      const created: CreateRoomResponse = { id }
+    if (await roomStub(env, id).create(id, gameId, plainOptions(options), isPublic === true, code)) {
+      const created: CreateRoomResponse = { id, code }
       return Response.json(created, { status: 201, headers: noStore })
     }
   }

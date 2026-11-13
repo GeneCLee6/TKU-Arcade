@@ -6,7 +6,9 @@ import { AccountControl } from '../components/AccountControl.tsx'
 import { Button } from '../components/Button.tsx'
 import { Dialog } from '../components/Dialog.tsx'
 import { GameCard } from '../components/GameCard.tsx'
+import { InstallApp } from '../components/InstallApp.tsx'
 import { JoinRoomForm } from '../components/JoinRoomForm.tsx'
+import { isStandalone } from '../lib/installApp.ts'
 import { NicknameForm } from '../components/NicknameForm.tsx'
 import { PublicRooms } from '../components/PublicRooms.tsx'
 import { TopBar } from '../components/TopBar.tsx'
@@ -26,6 +28,8 @@ const ComingSoon = lazy(() => import('../components/ComingSoon.tsx'))
 /** The lobby: the games, a link box and the public rooms (e1-t02, e1-t09) */
 export function HomePage() {
   const t = useT()
+  // Opened as the installed app: joining by number is what it is for, so that comes first
+  const [app] = useState(isStandalone)
   const navigate = useNavigate()
   const toast = useToast()
   const [guestName, setNickname] = useState(readNickname)
@@ -68,6 +72,12 @@ export function HomePage() {
     <>
       <TopBar />
       <Main>
+        {app && (
+          <AppJoin aria-labelledby="app-join-title">
+            <SectionTitle id="app-join-title">{t('lobby.join.appTitle')}</SectionTitle>
+            <JoinRoomForm prominent />
+          </AppJoin>
+        )}
         <Hero>
           <Intro>
             <Eyebrow>
@@ -91,7 +101,8 @@ export function HomePage() {
                 </PlayingAs>
               )
             )}
-            <JoinRoomForm />
+            {!app && <JoinRoomForm />}
+            <InstallApp />
           </Intro>
           <HeroArt />
         </Hero>
@@ -359,4 +370,13 @@ const Grid = styled.ul`
   margin: 0;
   padding: 0;
   list-style: none;
+`
+
+// The installed app's join box, above everything else on the page
+const AppJoin = styled.section`
+  display: grid;
+  gap: ${space.sm}px;
+  padding: ${space.md}px;
+  background: ${color.sunken};
+  box-shadow: inset 4px 0 0 ${color.accent};
 `

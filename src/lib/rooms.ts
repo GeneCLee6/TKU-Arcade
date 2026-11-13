@@ -2,6 +2,7 @@ import type {
   CreateRoomRequest,
   CreateRoomResponse,
   LobbyResponse,
+  RoomCodeResponse,
   RoomListing,
   RoomSummary,
 } from '../../shared/protocol.ts'
@@ -23,6 +24,22 @@ export async function createRoom(
     })
     if (!response.ok) return null
     const { id } = (await response.json()) as CreateRoomResponse
+    return isRoomId(id) ? id : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The room a short number belongs to (shared/room-code.ts): its id, `missing` when no open room has
+ * that number, or null when there was no clear answer (offline, a server error)
+ */
+export async function findRoomByCode(code: string, signal?: AbortSignal): Promise<string | 'missing' | null> {
+  try {
+    const response = await fetch(`/api/codes/${encodeURIComponent(code)}`, { signal })
+    if (response.status === 404) return 'missing'
+    if (!response.ok) return null
+    const { id } = (await response.json()) as RoomCodeResponse
     return isRoomId(id) ? id : null
   } catch {
     return null

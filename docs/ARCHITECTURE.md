@@ -114,6 +114,15 @@ docs/                   本資料夾
 - 前端（B2 起）：`src/lib/roomConnection.ts` 管一條 socket（`join`、心跳、rev 與 patch、缺口時 `resync`），`src/lib/useRoom.ts` 把它接進 React 並把 `error` 轉成 toast。畫面只讀 `view`，送出只走 `useRoom()` 的函式。
 - 準備狀態（`RoomMember.ready`）只是告知，不擋 `start`：E1 的開始條件只有人數。離座與開局會清掉。這是向後相容的新增，所以 `PROTOCOL_VERSION` 不變。
 
+### 房號（四位數，擁有者 2026-11-13）
+
+房間的正式識別仍是 10 碼的 room id（不可列舉）。另外每個新房間拿一個 **1000–9999 的房號**，給朋友用嘴巴講或在手機數字鍵盤打（`shared/room-code.ts`）。
+
+- 房號簿在**唯一的 `LobbyDO`**（`code:<房號>` → room id），一個物件一次處理一個呼叫，所以兩個房間不會拿到同一個號碼。不用 D1：沒有 migration，也不用另外清資料。
+- `POST /api/rooms`：先產生 room id，隨機抽房號請 `LobbyDO.claimCode` 給它；號碼被占用時問那個房間還在不在（`summary()`），已經被清掉就接手，還在就再抽，最多 12 次。都抽不到或大廳連不上，房間照樣建立，只是沒有房號（連結照常可用）。房號存在房間自己的資料（`RoomRecord.code`），房間 view 的 `room.code` 帶出去，等待室顯示。
+- `GET /api/codes/<房號>`：查到 room id 後確認房間還在才回 `{ id }`；房間已經不在就把號碼還回去，回 404。
+- 號碼不設到期：房間沒人 10 分鐘就會被清掉（`ROOM_CLEANUP_MS`），之後誰抽到那個號碼就接手。房號好猜沒關係：它只是好打的入口，房間本來就靠連結分享。
+
 ## 4. 卡丁車（即時）
 
 - **物理在客戶端**：`shared/kart/physics.ts` 固定 60 Hz 步長、純函式；每台車由自己的瀏覽器模擬。

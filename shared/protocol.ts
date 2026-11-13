@@ -133,6 +133,8 @@ export type RoomInfo = {
   minPlayers: number
   /** Seats are numbered 0 to maxSeats - 1 */
   maxSeats: number
+  /** The room's short number (shared/room-code.ts), when it has one */
+  code?: string
 }
 
 /** One person in the room. The seat token is never part of the view: only its owner gets it */
@@ -323,7 +325,11 @@ export type ClientMessage =
 export type CreateRoomRequest = { gameId: string; options?: OptionValues; public?: boolean }
 
 /** 201 from POST /api/rooms */
-export type CreateRoomResponse = { id: string }
+/** `code`: the room's short number, null when none could be given (the link still works) */
+export type CreateRoomResponse = { id: string; code: string | null }
+
+/** GET /api/codes/<code>: the room a short number belongs to */
+export type RoomCodeResponse = { id: string }
 
 /** GET /api/rooms/<id>: what the screen before joining shows; nothing about anyone's game */
 export type RoomSummary = {

@@ -248,6 +248,14 @@ describe('a room', () => {
     })
   })
 
+  it('shows everyone its short number, when it has one (owner, 2026-11-13)', () => {
+    const numbered = new World()
+    expect(numbered.host.create(ROOM_ID, 'tictactoe', undefined, false, '4827')).toBe(true)
+    expect(numbered.join('Xia').view?.room.code).toBe('4827')
+    // A room without one, or from before numbers, has no `code` in its view at all
+    expect(room().join('Ou').view?.room).not.toHaveProperty('code')
+  })
+
   it('refuses another protocol version, and more sockets than it takes', () => {
     const world = room()
     expect(world.host.admit('0')).toMatchObject({ code: CloseCode.versionMismatch })
