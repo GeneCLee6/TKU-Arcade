@@ -80,8 +80,8 @@ for (const [label, viewport, touch] of [
       await expect(page.getByRole('button', { name: '建立房間' }).first()).toBeVisible()
       await expectAllChinese(page, 'lobby')
 
-      await page.getByRole('textbox', { name: '有連結？貼在這裡' }).fill('nope')
-      await page.getByRole('textbox', { name: '有連結？貼在這裡' }).press('Enter')
+      await page.getByRole('textbox', { name: '有房號或連結？' }).fill('nope')
+      await page.getByRole('textbox', { name: '有房號或連結？' }).press('Enter')
       await expect(page.getByRole('alert')).toBeVisible()
       await expectAllChinese(page, 'bad link')
 
