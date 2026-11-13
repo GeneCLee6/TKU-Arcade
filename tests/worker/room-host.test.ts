@@ -24,6 +24,8 @@ import {
   MAX_CONNECTIONS,
   MAX_MEMBERS,
   PROTOCOL_VERSION,
+  REACTION_COUNT,
+  REACTION_MIN_MS,
   RECONNECT_GRACE_MS,
   ROOM_CLEANUP_MS,
   STALE_AFTER_MS,
@@ -2470,5 +2472,58 @@ describe('a room password', () => {
     const world = room()
     expect(world.join('Ann').errors).toEqual([])
     expect(world.host.summary()).not.toHaveProperty('locked')
+  })
+})
+
+// e12-t07: the room counts what it does, nothing else
+describe('daily metrics', () => {
+  it('counts a room opened, a game started and a game finished', () => {
+    const world = new World()
+    const metric = vi.fn()
+    ;(world.host as unknown as { deps: { metric: typeof metric } }).deps.metric = metric
+    world.host.create(ROOM_ID, 'tictactoe', undefined)
+    const x = world.join('Xia')
+    const o = world.join('Ou')
+    x.send({ t: 'start' })
+    for (const [who, cell] of [
+      [x, 0],
+      [o, 3],
+      [x, 1],
+      [o, 4],
+      [x, 2],
+    ] as const)
+      who.send(place(cell))
+    expect(metric.mock.calls).toEqual([
+      ['room_created', 'tictactoe'],
+      ['game_started', 'tictactoe'],
+      ['game_finished', 'tictactoe'],
+    ])
+  })
+})
+
+// e7-t11
+describe('reactions', () => {
+  const reactions = (client: Client) =>
+    client.received.filter((message) => message.t === 'reaction')
+
+  it('passes a reaction to everyone, even with the chat locked, and stores nothing', () => {
+    const { world, x, o } = started()
+    const before = world.stored()
+    x.send({ t: 'react', reaction: 2 })
+    for (const client of [x, o])
+      expect(reactions(client).at(-1)).toEqual({ t: 'reaction', member: x.you, reaction: 2 })
+    expect(world.stored()).toEqual(before)
+  })
+
+  it('drops one that comes too soon after the last, and refuses nonsense', () => {
+    const { world, x, o } = started()
+    x.send({ t: 'react', reaction: 0 })
+    x.send({ t: 'react', reaction: 1 })
+    expect(reactions(o)).toHaveLength(1)
+    world.clock += REACTION_MIN_MS
+    x.send({ t: 'react', reaction: 1 })
+    expect(reactions(o)).toHaveLength(2)
+    x.send({ t: 'react', reaction: REACTION_COUNT })
+    expect(x.closed).not.toBeNull()
   })
 })

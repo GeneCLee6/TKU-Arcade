@@ -18,6 +18,11 @@ const ReplayPage = lazy(() =>
   import('./pages/RoomPage.tsx').then(({ ReplayEntry }) => ({ default: ReplayEntry })),
 )
 
+// e12-t07: the owner's daily counts. Nothing links here
+const StatsPage = lazy(() =>
+  import('./pages/StatsPage.tsx').then(({ StatsPage }) => ({ default: StatsPage })),
+)
+
 const RulesPage = lazy(() =>
   import('./pages/RulesPage.tsx').then(({ RulesPage }) => ({ default: RulesPage })),
 )
@@ -44,6 +49,7 @@ function AppRoutes() {
           <Route path="/r/:id/replay" element={<ReplayPage />} />
           <Route path="/games/:id/rules" element={<RulesPage />} />
           <Route path="/kart/spike" element={<KartSpikePage />} />
+          <Route path="/stats" element={<StatsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>

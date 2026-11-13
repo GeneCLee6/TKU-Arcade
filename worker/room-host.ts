@@ -27,6 +27,8 @@ import {
   type RoomView,
   type ServerMessage,
   type TimerInfo,
+  type MetricName,
+  REACTION_MIN_MS,
 } from '../shared/protocol.ts'
 import {
   beginGame,
@@ -136,6 +138,8 @@ export type RoomHostDeps = {
   newToken(): string
   /** A uint32 for a new game's Rng, or for picking a turn played for someone */
   newSeed(): number
+  /** Counts a daily metric (e12-t07); without waiting, and a failure is the counter's own */
+  metric?(name: MetricName, gameId: string): void
 }
 
 export type Admission = { ok: true } | { ok: false; code: number; reason: string }
@@ -176,6 +180,8 @@ export class RoomHost {
   /** In memory: forgetting it in an eviction only ever lets a member send sooner */
   private readonly chatRate = new ChatRateLimit()
   private readonly deps: RoomHostDeps
+  /** When each member last reacted (e7-t11); forgotten on hibernation, which costs nothing */
+  private readonly reactedAt = new Map<string, number>()
 
   constructor(deps: RoomHostDeps) {
     this.deps = deps
@@ -255,6 +261,7 @@ export class RoomHost {
       idleSince: null,
     }
     this.deps.storage.saveRoom(this.room)
+    this.deps.metric?.('room_created', gameId)
     return true
   }
 
@@ -403,6 +410,9 @@ export class RoomHost {
         return
       case 'set_password':
         this.setPassword(conn, member, message.password)
+        return
+      case 'react':
+        this.react(member, message.reaction)
         return
       case 'chat':
         this.postChat(conn, member, message.text)
@@ -676,6 +686,7 @@ export class RoomHost {
       room.status = 'playing'
       this.deps.storage.saveRoom(room)
     })
+    this.deps.metric?.('game_started', game.gameId)
   }
 
   private act(conn: string, member: MemberRecord, action: JsonValue): void {
@@ -709,6 +720,7 @@ export class RoomHost {
         this.deps.storage.saveRoom(room)
       }
     })
+    if (outcome.over) this.deps.metric?.('game_finished', outcome.game.gameId)
   }
 
   /**
@@ -858,6 +870,17 @@ export class RoomHost {
     }
     for (const [open, { member: id }] of this.conns) {
       if (id !== null) this.deps.sockets.send(open, { t: 'chat', messages: [message] })
+    }
+  }
+
+  /** e7-t11: passed on, never stored; allowed when the chat is not, since it says nothing */
+  private react(member: MemberRecord, reaction: number): void {
+    const now = this.deps.now()
+    const last = this.reactedAt.get(member.id)
+    if (last !== undefined && now - last < REACTION_MIN_MS) return
+    this.reactedAt.set(member.id, now)
+    for (const [open, { member: id }] of this.conns) {
+      if (id !== null) this.deps.sockets.send(open, { t: 'reaction', member: member.id, reaction })
     }
   }
 

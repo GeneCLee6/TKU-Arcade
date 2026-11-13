@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers'
+import { countMetric } from './metrics.ts'
 import type { ChatMessage } from '../shared/chat.ts'
 import { getGame } from '../shared/games/index.ts'
 import type { ReplayStep } from '../shared/games/match.ts'
@@ -88,6 +89,8 @@ export class RoomDO extends DurableObject<Env> {
       newMemberId: () => crypto.randomUUID(),
       newToken: newSeatToken,
       newSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],
+      // e12-t07: counted after the change, never holding it up
+      metric: (name, gameId) => ctx.waitUntil(countMetric(env.DB, name, gameId, Date.now())),
     })
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG))
     void ctx.blockConcurrencyWhile(async () => {

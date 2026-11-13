@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { REACTION_FLOAT_MS, type FloatingReaction } from './reactions.ts'
 import { normalizeChatText, type ChatMessage } from '../../shared/chat.ts'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { JsonValue } from '../../shared/patch.ts'
@@ -41,7 +42,13 @@ export type RoomHandle = {
   setPassword(password: string | null): void
   /** Settles when the room has answered or won't: anything but `sent` means it did not arrive */
   sendChat(text: string): Promise<ChatSendResult>
+  /** e7-t11: the reactions floating now, oldest first */
+  reactions: readonly FloatingReaction[]
+  react(reaction: number): void
 }
+
+/** More than this many on screen and the oldest go first */
+const MAX_FLOATING = 12
 
 function errorText(error: ErrorMessage): string {
   if (error.code === 'game_error') return t(error.error.gameError as TextKey, error.error.params)
@@ -58,6 +65,8 @@ export function useRoom(roomId: string, name: string): RoomHandle {
   const [attempt, setAttempt] = useState(0)
   const connection = useRef<RoomConnection | null>(null)
   const [chat, setChat] = useState<readonly ChatMessage[]>([])
+  const [reactions, setReactions] = useState<readonly FloatingReaction[]>([])
+  const reactionId = useRef(0)
   const chatSends = useRef(new ChatSends())
   const you = useRef<string | null>(null)
 
@@ -95,6 +104,14 @@ export function useRoom(roomId: string, name: string): RoomHandle {
         if (!chatSends.current.refused(error.code)) toast(errorText(error), { tone: 'danger' })
       },
       onTimers: setTimers,
+      onReaction: (member, reaction) => {
+        const id = ++reactionId.current
+        setReactions((current) => [...current, { id, member, reaction }].slice(-MAX_FLOATING))
+        setTimeout(
+          () => setReactions((current) => current.filter((one) => one.id !== id)),
+          REACTION_FLOAT_MS,
+        )
+      },
       onChat: (messages, reset) => {
         setChat((current) => mergeChat(current, messages, reset))
         chatSends.current.heard(messages, you.current)
@@ -150,6 +167,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     (options: OptionValues) => send({ t: 'set_options', options }),
     [send],
   )
+  const react = useCallback((reaction: number) => send({ t: 'react', reaction }), [send])
   const setPassword = useCallback(
     (password: string | null) => send({ t: 'set_password', password }),
     [send],
@@ -182,6 +200,8 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     setGame,
     setOptions,
     setPassword,
+    reactions,
+    react,
     sendChat,
   }
 }

@@ -24,6 +24,9 @@ import { useParams } from '../lib/useRouter.ts'
 import { clippedFill, displayType, monoType, SLANT, slantClip } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 
+// e7-t11: its own chunk, with its strings
+const Reactions = lazy(() => import('../components/Reactions.tsx'))
+
 // e1-t16: only a room with a password, and only for someone new, ever needs it
 const PasswordForm = lazy(() => import('../components/PasswordForm.tsx'))
 
@@ -202,6 +205,15 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         members={Object.keys(view.members).length}
         gameId={view.room.gameId}
         edition={view.room.options.edition === 'full' ? 'full' : 'simple'}
+        extra={
+          <Suspense>
+            <Reactions
+              reactions={room.reactions}
+              onReact={room.react}
+              nameOf={(member) => view.members[member]?.name ?? ''}
+            />
+          </Suspense>
+        }
       />
       {view.room.status === 'waiting' ? (
         <>
@@ -248,12 +260,15 @@ function RoomHeading({
   members,
   gameId,
   edition,
+  extra,
 }: {
   title: string
   members: number
   gameId?: string
   /** Which rules "how to play" opens, for a game with two editions */
   edition?: RulesEdition
+  /** Beside "how to play": the reactions (e7-t11), so that they take no row of their own */
+  extra?: ReactNode
 }) {
   const t = useT()
   return (
@@ -263,6 +278,7 @@ function RoomHeading({
       <MemberCount>{t('room.memberCount', { count: members })}</MemberCount>
       {gameId !== undefined && (
         <HeadingAction>
+          {extra}
           <HowToPlay gameId={gameId} edition={edition} />
         </HeadingAction>
       )}
@@ -362,6 +378,9 @@ const HeadingRow = styled.div`
 `
 
 const HeadingAction = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${space.sm}px;
   margin-left: auto;
 `
 

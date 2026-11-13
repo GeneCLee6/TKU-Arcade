@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import styled from 'styled-components'
 import type { AnyGameInfo } from '../../shared/games/types.ts'
 import { useT } from '../i18n/useT.ts'
@@ -7,6 +8,9 @@ import { monoType } from '../styles/esports.ts'
 import { color, fontSize, gameHue, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 import { Body, Heading, Monogram, Name, Summary } from './gameCardParts.ts'
+
+// e7-t12: after the first paint; the first letter until then
+const GameArt = lazy(() => import('./GameArt.tsx'))
 
 interface GameCardProps {
   game: AnyGameInfo
@@ -27,7 +31,11 @@ export function GameCard({ game, disabled, onNewRoom }: GameCardProps) {
   return (
     <Body $hue={gameHue(game.id)}>
       <Heading>
-        <Monogram aria-hidden>{[...name][0]}</Monogram>
+        <Monogram aria-hidden>
+          <Suspense fallback={[...name][0]}>
+            <GameArt gameId={game.id} fallback={[...name][0]} />
+          </Suspense>
+        </Monogram>
         <Name>{name}</Name>
       </Heading>
       <Facts>
