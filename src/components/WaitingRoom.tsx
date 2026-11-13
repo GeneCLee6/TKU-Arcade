@@ -125,7 +125,7 @@ export function WaitingRoom({
       <Column>
 
       {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
-      <Invite roomId={roomId} />
+      <Invite roomId={roomId} code={view.room.code ?? null} />
 
       <GameSetup
         room={view.room}
@@ -145,7 +145,8 @@ export function WaitingRoom({
   )
 }
 
-function Invite({ roomId }: { roomId: string }) {
+/** The room's number (four digits) to say aloud, else its id; the link and the QR code for phones */
+function Invite({ roomId, code }: { roomId: string; code: string | null }) {
   const t = useT()
   const toast = useToast()
   const link = `${window.location.origin}/r/${roomId}`
@@ -164,9 +165,12 @@ function Invite({ roomId }: { roomId: string }) {
     <Section>
       <Heading>{t('room.waiting.invite')}</Heading>
       <Code>
-        <CodeLabel>{t('room.waiting.roomId')}</CodeLabel>
+        <CodeLabel>{t(code !== null ? 'room.waiting.roomCode' : 'room.waiting.roomId')}</CodeLabel>
         {/* An id, not a word: no translating it, by a browser or the zh-TW walkthrough */}
-        <CodeValue translate="no">{roomId}</CodeValue>
+        <CodeValue translate="no" data-testid="room-code">
+          {code ?? roomId}
+        </CodeValue>
+        {code !== null && <CodeHint>{t('room.waiting.roomCodeHint')}</CodeHint>}
       </Code>
       <LinkText>{link}</LinkText>
       <Actions>
@@ -225,6 +229,11 @@ const CodeValue = styled.span`
   font-weight: 700;
   letter-spacing: 0.12em;
   overflow-wrap: anywhere;
+`
+
+const CodeHint = styled.span`
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
 `
 
 const LinkText = styled.p`

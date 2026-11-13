@@ -5,7 +5,7 @@ import { handleClientError } from './errors.ts'
 import { LOBBY_NAME } from './lobby-board.ts'
 import type { LobbyDO } from './lobby.ts'
 import type { RoomDO } from './room.ts'
-import { handleRooms, handleRoomSocket } from './rooms.ts'
+import { handleRoomCode, handleRooms, handleRoomSocket } from './rooms.ts'
 
 export interface Env {
   /** The React app's static assets (wrangler `assets`) */
@@ -59,6 +59,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   if (url.pathname === '/api/rooms' || url.pathname.startsWith('/api/rooms/')) {
     return handleRooms(request, env, url)
   }
+  if (url.pathname.startsWith('/api/codes/')) return handleRoomCode(request, env, url)
   if (url.pathname === '/api/lobby') return handleLobby(request, env)
   if (isAuthPath(url.pathname)) return handleAuth(request, env, url)
   if (url.pathname === '/api/errors') return handleClientError(request, env, url)

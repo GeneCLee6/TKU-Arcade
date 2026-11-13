@@ -55,6 +55,8 @@ export type RoomRecord = {
   bans: { token: string; until: number }[]
   /** Listed on the home page while waiting for people; otherwise reachable by link only */
   public: boolean
+  /** Its short number (shared/room-code.ts); null when none was free, or the room is older */
+  code?: string | null
   /** Since when no socket has been open; null while one is (`settleCleanup`) */
   emptySince: number | null
   /** While `ended`: when something last happened; null in any other status (`settleCleanup`) */
@@ -214,7 +216,7 @@ export class RoomHost {
   // ── Before joining ─────────────────────────────────────────────────────────────────────────
 
   /** False when the room exists already, or there is no such game: the caller checks that first */
-  create(id: string, gameId: string, rawOptions: unknown, isPublic = false): boolean {
+  create(id: string, gameId: string, rawOptions: unknown, isPublic = false, code: string | null = null): boolean {
     const module = this.deps.games(gameId)
     if (this.room || !module) return false
     this.room = {
@@ -228,6 +230,7 @@ export class RoomHost {
       createdAt: this.deps.now(),
       bans: [],
       public: isPublic,
+      code,
       emptySince: this.deps.now(),
       idleSince: null,
     }
@@ -982,6 +985,7 @@ export class RoomHost {
       options: room.options,
       minPlayers: room.minPlayers,
       maxSeats: room.maxSeats,
+      ...(room.code ? { code: room.code } : {}),
     }
     const members: Record<string, RoomMember> = {}
     for (const member of this.members.values()) {

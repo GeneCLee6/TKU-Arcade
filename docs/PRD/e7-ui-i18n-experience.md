@@ -69,7 +69,7 @@ depends_on: []
 
 ### M1
 
-- [ ] `e7-t09` PWA manifest、安裝提示、離線提示 · AC-7.5 · S
+- [x] `e7-t09` PWA manifest、安裝提示、離線提示 · AC-7.5 · S · 擁有者 2026-11-13 要求提前（`feat/pwa-room-codes`）：`public/manifest.webmanifest`（standalone、`start_url` `/?app=1`、192／512／maskable 圖示）、`public/sw.js` 只在**完全沒網路**時回 `public/offline.html`（雙語、不快取 App 本身，部署永遠拿到新版）、大廳的「安裝成 App」：Chrome／Edge 有 `beforeinstallprompt` 時是按鈕，iPhone Safari 寫「分享 → 加入主畫面」，已安裝時不顯示。**以 App 開啟時大廳第一塊是「加入房間」**：大字、手機數字鍵盤的房號欄。同一批加了**四位數房號**（見 `ARCHITECTURE.md` §3「房號」）。iPhone 的主畫面 App 和 Safari 的儲存是分開的，所以在 App 裡要再輸入一次暱稱，之後就記住
 - [ ] `e7-t10` Playwright 視覺回歸與 axe job · AC-7.8 · M · ← e12-t02
 - [ ] `e7-t11` 表情反應（六種、浮出、禁聊時可用） · — · S · ← e1-t07
 - [ ] `e7-t12` 每款遊戲主題色與大廳卡片插圖（原創） · AC-7.1 · S（主題色在批次 E1 做了，#24：`tokens.ts` 的 `gameHue`；插圖還沒做，卡片上仍是字首）
