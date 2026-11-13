@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import type { FullPending, PromotionAction } from '../../../../shared/games/promotion/types.ts'
 import { Button } from '../../../components/Button.tsx'
 import { Countdown } from '../../../components/Countdown.tsx'
+import { VisuallyHidden } from '../../../components/VisuallyHidden.ts'
 import { useLanguage, useT } from '../../../i18n/useT.ts'
 import type { RoomTimer } from '../../../lib/roomConnection.ts'
 import { color, fontSize, promotionBoard, radius, space } from '../../../styles/tokens.ts'
@@ -145,10 +146,12 @@ export function DecisionPrompt({
               onClick={() => answer({ type: 'buy', cell: choice.cell })}
               data-answer="buy"
               data-buy={choice.cell}
-              aria-label={t('games.promotion.full.buy.option', { cell: cell(choice.cell), price: choice.price })}
             >
+              {/* The name is what shows, with a separator only heard: an aria-label that does not
+                  contain the visible text trips axe's label-content-name-mismatch */}
               <Post>
                 <span>{cell(choice.cell)}</span>
+                <VisuallyHidden>{t('games.promotion.full.buy.separator')}</VisuallyHidden>
                 <Price>{t('games.promotion.full.buy.price', { price: choice.price })}</Price>
               </Post>
             </Button>
