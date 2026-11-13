@@ -83,7 +83,7 @@ const slideIn = keyframes`
 const Region = styled.div`
   position: fixed;
   right: ${space.lg}px;
-  bottom: ${space.lg}px;
+  bottom: calc(${space.lg}px + env(safe-area-inset-bottom));
   left: ${space.lg}px;
   z-index: 10;
   display: grid;

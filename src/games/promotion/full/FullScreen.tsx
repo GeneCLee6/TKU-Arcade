@@ -246,7 +246,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   const tumbling = beat?.kind === 'throw'
   const combo = (() => {
     if (!last || !shownThrow || tumbling || !data) return ''
-    if (beat?.kind === 'read') return comboText(t, shownThrow, last.birth, language)
+    if (beat?.kind === 'read') return comboText(t, shownThrow, last.birth, language, beat.index < last.throws.length - 1)
     return lastComboText(t, last, language)
   })()
   const throwCount =
@@ -629,7 +629,9 @@ const Frame = styled.div<{ $immersed: boolean }>`
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(170px, 240px);
     gap: ${space.sm}px;
-    padding: ${space.sm}px;
+    /* Out from under the status bar, the notch and the home indicator (installed as an app) */
+    padding: calc(${space.sm}px + env(safe-area-inset-top)) calc(${space.sm}px + env(safe-area-inset-right))
+      calc(${space.sm}px + env(safe-area-inset-bottom)) calc(${space.sm}px + env(safe-area-inset-left));
     background: ${color.bg};
 
     @media (orientation: portrait) {

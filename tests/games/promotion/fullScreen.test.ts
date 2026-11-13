@@ -20,7 +20,7 @@ import {
   type SquareLayout,
 } from '../../../src/games/promotion/full/fullSquare.ts'
 import { boardCellName, shortCellName } from '../../../src/games/promotion/full/fullText.ts'
-import { beforeTransfers, ladderGrade, lastComboText, turnSentence } from '../../../src/games/promotion/full/fullWords.ts'
+import { beforeTransfers, comboText, ladderGrade, lastComboText, turnSentence } from '../../../src/games/promotion/full/fullWords.ts'
 import { beatsOf, nextTurnPlayback } from '../../../src/games/promotion/full/useTurnPlayback.ts'
 import sprite from '../../../src/games/promotion/rankArt.svg?raw'
 
@@ -310,6 +310,20 @@ describe('the second rules in words (C8)', () => {
     expect(lastComboText(t, decided, 'en')).toMatch(/^games\.promotion\.full\.combo\.event\{/)
     const none = { ...waiting, throws: [{ dice: [1, 2, 4, 6], combo: 'none' as const, steps: [] }] }
     expect(lastComboText(t, none, 'en')).toBe('games.promotion.full.combo.noMove')
+  })
+
+  // Since C8 a turn is one throw: a throw that scores nothing must not say "throw again" while it is
+  // read out, only the first board's three throws do (owner, 2026-11-13: does a failed roll pass?)
+  it('says "throw again" only when the turn throws again', () => {
+    const none = { dice: [1, 2, 4, 6], combo: 'none' as const, steps: [] }
+    const cancel = { dice: [4, 4, 1, 3], combo: 'cancel' as const, steps: [] }
+    expect(comboText(t, none, false, 'en')).toBe('games.promotion.full.combo.noMove')
+    expect(comboText(t, none, false, 'en', true)).toBe('games.promotion.full.combo.none')
+    expect(comboText(t, cancel, false, 'en')).toBe('games.promotion.full.combo.cancelStay')
+    expect(comboText(t, cancel, false, 'en', true)).toBe('games.promotion.full.combo.cancel')
+    const turnOf = (throws: FullLastTurn['throws']) => ({ ...turn, throws, path: [], transfers: [] })
+    expect(lastComboText(t, turnOf([cancel]), 'en')).toBe('games.promotion.full.combo.cancelStay')
+    expect(lastComboText(t, turnOf([none, none, cancel]), 'en')).toBe('games.promotion.full.combo.stuck')
   })
 
   it('puts each seat on the ladder at the grade the end compares, titles included', () => {
