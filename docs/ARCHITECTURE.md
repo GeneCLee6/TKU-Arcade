@@ -123,6 +123,25 @@ docs/                   本資料夾
 - `GET /api/codes/<房號>`：查到 room id 後確認房間還在才回 `{ id }`；房間已經不在就把號碼還回去，回 404。
 - 號碼不設到期：房間沒人 10 分鐘就會被清掉（`ROOM_CLEANUP_MS`），之後誰抽到那個號碼就接手。房號好猜沒關係：它只是好打的入口，房間本來就靠連結分享。
 
+### 房間密碼（I3，`e1-t16`）
+
+- **房主在等待室的邀請區設定或拿掉**（`set_password`，任何狀態都可以；去頭尾空白後 1–32 字）。一開始放在大廳的「新房間」上方，但 375 px 手機會把「新房間」擠出第一屏（D2 的規則），所以改到等待室：房間建好、分享連結之前設定。`POST /api/rooms` 也可以直接帶 `password`（太長或只有空白回 400 `bad_password`）。有密碼的房間**不會公開列出**（`listing()` 擋）。
+- 密碼原樣存在 `RoomRecord.password`：它是給朋友的門號，不是任何人自己的密碼。**房裡的成員**在 view 的 `room.password` 看得到（他們都是帶密碼進來或本來就在，方便轉告）；summary 只有 `locked: true`，listing 沒有這種房間，日誌不記。
+- `join` 可帶 `password`。**新的人**沒帶回 `password_required`、帶錯回 `wrong_password`，同一條 socket 錯 `PASSWORD_TRIES`（5）次就關掉；**拿著 seat token 回來的成員不用密碼**。前端（`src/lib/roomPassword.ts`）把密碼放 sessionStorage，重連時一起送；收到這兩個錯誤就停止連線、顯示密碼表單（`PasswordForm.tsx`，lazy），送出後重連。
+- 首屏預算：密碼表單、房主的設定（`RoomPasswordSetting.tsx`）、語音按鈕、公開房篩選、重播頁都是各自的 lazy chunk，字串放 `shared/games/roomExtras.ts`（`room.extra.*`，check-i18n 照樣檢查）；重播頁經由房間的 chunk 載入，否則 Vite 會把房間 chunk 拆成兩個、多出約 1.8 kB。
+
+### 重播（I3，`e2-t09`）
+
+- `GET /api/rooms/<id>/replay`：**只有最後一局已經結束**才回（進行中回 404，免得看到還藏著的東西；重新開局後上一局的步驟就刪了）。RoomDO 讀 `step:` 鍵，用 `shared/games/replay.ts` 的 `buildReplay` 以同一個 `reduce` 從種子重放，回 `{ gameId, options, names, start, frames }`：`start` 是旁觀者一開始看到的 projection，每步一個 patch（`shared/patch.ts` 的 diff），大小只跟變化有關。重放不出原局（模組改過）就回 404 並記日誌。RPC 回 JSON 字串，因為 projection 的型別對 RPC 的型別推導太深。
+- 前端 `/r/<id>/replay`（`src/pages/ReplayPage.tsx`）：套 patch 算出每一步，用**遊戲自己的畫面**以旁觀者身分顯示（`act` 什麼都不做），上一步、下一步、播放、拉桿；最後一步才顯示結果。結果面板有「看重播」連結。
+- 測試：`tests/games/replay.test.ts` 對每一款遊戲隨機玩完一局，patch 逐步套回去必須等於最後的旁觀者 projection（AC-2.5）。
+
+### 語音連結（I3，`e1-t14`）
+
+- `GET /api/voice` 回 `{ available }`（有 `LONGTALK_URL` 才是 true）；`POST /api/voice` 請 LongTalk 的 `POST /api/rooms` 開一間，回 `{ url: <LONGTALK_URL>/r/<id> }`，LongTalk 拒絕、回奇怪的 id 或連不上都回 503。
+- **同一個 workers.dev 子網域的 Worker 不能直接 fetch 另一個 Worker**，所以走 service binding `LONGTALK`（`wrangler.jsonc`，正式與預覽都綁正式的 `longtalk`；預覽開的是會自己清掉的空房）。沒有 binding 時退回一般 fetch。
+- 前端：聊天面板標題旁的「開語音房」按鈕（`src/components/ChatPanel.tsx`），網站說可以才出現，聊天鎖住時不能按；開好後把連結當一般聊天訊息送出（聊天本來就把網址變成連結）。拿掉 `LONGTALK_URL` 就把按鈕藏起來。
+
 ## 4. 卡丁車（即時）
 
 - **物理在客戶端**：`shared/kart/physics.ts` 固定 60 Hz 步長、純函式；每台車由自己的瀏覽器模擬。

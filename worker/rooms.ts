@@ -1,6 +1,10 @@
 import { getGame } from '../shared/games/index.ts'
 import type { OptionValues } from '../shared/games/types.ts'
-import type { CreateRoomResponse, RoomCodeResponse } from '../shared/protocol.ts'
+import {
+  normalizePassword,
+  type CreateRoomResponse,
+  type RoomCodeResponse,
+} from '../shared/protocol.ts'
 import { isRoomCode, newRoomCode } from '../shared/room-code.ts'
 import { isRoomId, newRoomId } from '../shared/room-id.ts'
 import type { Env } from './app.ts'
@@ -17,6 +21,7 @@ const MAX_CREATE_BODY_CHARS = 4_096
 const CODE_ATTEMPTS = 12
 
 const ROOM_PATH = /^\/api\/rooms\/([^/]+)$/
+const REPLAY_PATH = /^\/api\/rooms\/([^/]+)\/replay$/
 const CODE_PATH = /^\/api\/codes\/([^/]+)$/
 const SOCKET_PATH = /^\/ws\/([^/]+)$/
 
@@ -76,6 +81,14 @@ export async function handleRooms(request: Request, env: Env, url: URL): Promise
     if (request.method !== 'POST') return fail('method_not_allowed', 405, { allow: 'POST' })
     return createRoom(request, env)
   }
+  const replay = REPLAY_PATH.exec(url.pathname)
+  if (replay && isRoomId(replay[1])) {
+    if (request.method !== 'GET') return fail('method_not_allowed', 405, { allow: 'GET' })
+    // Only a finished game: the room answers null while one is being played (e2-t09)
+    const body = await roomStub(env, replay[1]).replay()
+    if (body === null) return fail('not_found', 404)
+    return new Response(body, { headers: { ...noStore, 'content-type': 'application/json' } })
+  }
   const match = ROOM_PATH.exec(url.pathname)
   if (!match || !isRoomId(match[1])) return fail('not_found', 404)
   if (request.method !== 'GET') return fail('method_not_allowed', 405, { allow: 'GET' })
@@ -96,19 +109,33 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
     gameId,
     options,
     public: isPublic,
+    password,
   } = (typeof body === 'object' && body !== null ? body : {}) as {
     gameId?: unknown
     options?: unknown
     public?: unknown
+    password?: unknown
   }
   if (typeof gameId !== 'string' || !getGame(gameId)) return fail('unknown_game', 400)
+  // A password that is there but no good (too long, only spaces) is refused, not dropped silently
+  if (password !== undefined && password !== '' && normalizePassword(password) === null) {
+    return fail('bad_password', 400)
+  }
   for (let attempt = 0; attempt < CREATE_ATTEMPTS; attempt++) {
     const id = newRoomId()
     // The number first, so that the room can show it from the start. Should the id be taken (not
     // expected at ~59 bits), the number points at a room that is not there and is soon reused
     const code = await claimCode(env, id)
     // The room checks `options` against the game's schema: this only keeps them plain for the RPC
-    if (await roomStub(env, id).create(id, gameId, plainOptions(options), isPublic === true, code)) {
+    const created = await roomStub(env, id).create(
+      id,
+      gameId,
+      plainOptions(options),
+      isPublic === true,
+      code,
+      normalizePassword(password),
+    )
+    if (created) {
       const created: CreateRoomResponse = { id, code }
       return Response.json(created, { status: 201, headers: noStore })
     }

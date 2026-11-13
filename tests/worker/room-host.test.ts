@@ -32,7 +32,12 @@ import {
   type ServerMessage,
 } from '../../shared/protocol.ts'
 import type { Account } from '../../shared/account.ts'
-import { RoomHost, type OpenSocket, type StoredRoom } from '../../worker/room-host.ts'
+import {
+  PASSWORD_TRIES,
+  RoomHost,
+  type OpenSocket,
+  type StoredRoom,
+} from '../../worker/room-host.ts'
 
 const ROOM_ID = 'abcdefghij'
 
@@ -1462,7 +1467,14 @@ describe('rule options', () => {
     expect(world.host.create(ROOM_ID, 'promotion', undefined)).toBe(true)
     const a = world.join('A')
     const b = world.join('B')
-    expect(b.view?.room.options).toEqual({ edition: 'simple', dice: 'four-sided', turnLimit: 60, decisionSeconds: 30, buying: true, endAtDahe: false })
+    expect(b.view?.room.options).toEqual({
+      edition: 'simple',
+      dice: 'four-sided',
+      turnLimit: 60,
+      decisionSeconds: 30,
+      buying: true,
+      endAtDahe: false,
+    })
     a.send({ t: 'set_options', options: { edition: 'full', dice: 'four-sided', turnLimit: 60 } })
     expect(b.view?.room.options).toMatchObject({ edition: 'full' })
     a.send({ t: 'start' })
@@ -1957,7 +1969,10 @@ describe('someone gone', () => {
   })
 
   it('is played for from `proxyActions` when the game narrows them (C8)', () => {
-    const narrow = { ...turnGame, proxyActions: () => [{ type: 'stay' }] } as unknown as AnyGameModule
+    const narrow = {
+      ...turnGame,
+      proxyActions: () => [{ type: 'stay' }],
+    } as unknown as AnyGameModule
     const world = room('turns', { turns: narrow })
     const a = world.join('A')
     const b = world.join('B')
@@ -2378,5 +2393,82 @@ describe('the public listing (e1-t09)', () => {
     expect(world.host.listing()).toMatchObject({ host: 'Ann' })
     a.send({ t: 'dissolve' })
     expect(world.host.listing()).toBeNull()
+  })
+})
+
+// e1-t16: a room password lets in someone new only with it; a member coming back needs none
+describe('a room password', () => {
+  function locked() {
+    const world = new World()
+    expect(world.host.create(ROOM_ID, 'tictactoe', undefined, true, null, 'tamsui')).toBe(true)
+    return world
+  }
+
+  it('asks someone new for it, refuses a wrong one, and lets the right one in', () => {
+    const world = locked()
+    const ann = world.join('Ann')
+    expect(ann.errors.at(-1)).toEqual({ t: 'error', code: 'password_required' })
+    expect(ann.view).toBeNull()
+    ann.send({ t: 'join', name: 'Ann', token: null, password: 'danshui' })
+    expect(ann.errors.at(-1)).toEqual({ t: 'error', code: 'wrong_password' })
+    ann.send({ t: 'join', name: 'Ann', token: null, password: '  tamsui ' })
+    expect(Object.values(ann.view?.members ?? {}).map((member) => member.name)).toEqual(['Ann'])
+  })
+
+  it('lets a member back with their token alone, and shows it only to members', () => {
+    const world = locked()
+    const ann = world.open()
+    ann.send({ t: 'join', name: 'Ann', token: null, password: 'tamsui' })
+    const token = ann.token
+    world.disconnect(ann)
+    const back = world.join('Ann', token)
+    expect(back.errors).toEqual([])
+    expect(back.view?.room.password).toBe('tamsui')
+    expect(JSON.stringify(world.host.summary())).not.toContain('tamsui')
+    expect(world.host.summary()).toMatchObject({ locked: true })
+  })
+
+  it('is set and taken away by the host only, in the waiting room or later', () => {
+    const world = room()
+    const ann = world.join('Ann')
+    const bob = world.join('Bob')
+    bob.send({ t: 'set_password', password: 'mine' })
+    expect(bob.errors.at(-1)).toEqual({ t: 'error', code: 'forbidden' })
+    ann.send({ t: 'set_password', password: ' tamsui ' })
+    expect(bob.fresh().room.password).toBe('tamsui')
+    const cy = world.join('Cy')
+    expect(cy.errors.at(-1)).toEqual({ t: 'error', code: 'password_required' })
+    ann.send({ t: 'set_password', password: null })
+    expect(ann.fresh().room).not.toHaveProperty('password')
+    expect(world.join('Di').errors).toEqual([])
+  })
+
+  it('takes a public room off the list while it has one', () => {
+    const world = new World()
+    world.host.create(ROOM_ID, 'tictactoe', undefined, true)
+    const ann = world.join('Ann')
+    expect(world.host.listing()).not.toBeNull()
+    ann.send({ t: 'set_password', password: 'tamsui' })
+    expect(world.host.listing()).toBeNull()
+    ann.send({ t: 'set_password', password: null })
+    expect(world.host.listing()).not.toBeNull()
+  })
+
+  it('is never public, and closes a socket after too many wrong ones', () => {
+    const world = locked()
+    const ann = world.open()
+    ann.send({ t: 'join', name: 'Ann', token: null, password: 'tamsui' })
+    expect(world.host.listing()).toBeNull()
+    const guesser = world.open()
+    for (let attempt = 0; attempt < PASSWORD_TRIES; attempt++) {
+      guesser.send({ t: 'join', name: 'Eve', token: null, password: `guess-${attempt}` })
+    }
+    expect(guesser.closed).not.toBeNull()
+  })
+
+  it('leaves an open room open', () => {
+    const world = room()
+    expect(world.join('Ann').errors).toEqual([])
+    expect(world.host.summary()).not.toHaveProperty('locked')
   })
 })

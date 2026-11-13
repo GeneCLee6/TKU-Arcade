@@ -1,4 +1,4 @@
-import { createElement, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { createElement, lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import styled from 'styled-components'
 import { isRoomId } from '../../shared/room-id.ts'
 import { AccountControl } from '../components/AccountControl.tsx'
@@ -15,6 +15,7 @@ import { ChatDraft } from '../lib/chatState.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
 import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
+import { keepRoomPassword } from '../lib/roomPassword.ts'
 import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
 import { Link } from '../lib/router.tsx'
 import { useCompact } from '../lib/useMediaQuery.ts'
@@ -22,6 +23,23 @@ import { useRoom } from '../lib/useRoom.ts'
 import { useParams } from '../lib/useRouter.ts'
 import { clippedFill, displayType, monoType, SLANT, slantClip } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
+
+// e1-t16: only a room with a password, and only for someone new, ever needs it
+const PasswordForm = lazy(() => import('../components/PasswordForm.tsx'))
+
+const ReplayPage = lazy(() =>
+  import('./ReplayPage.tsx').then(({ ReplayPage }) => ({ default: ReplayPage })),
+)
+
+/** `/r/<id>/replay` (e2-t09), loaded after this chunk: see src/App.tsx */
+export function ReplayEntry() {
+  const t = useT()
+  return (
+    <Suspense fallback={<p role="status">{t('common.loading')}</p>}>
+      <ReplayPage />
+    </Suspense>
+  )
+}
 
 // The key gives each room its own state when the address changes without leaving this page
 export function RoomPage() {
@@ -125,6 +143,23 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
     }
   }
 
+  if (session.phase === 'password') {
+    return (
+      <>
+        <RoomHeading title={title} members={members} />
+        <Suspense fallback={<p role="status">{t('common.loading')}</p>}>
+          <PasswordForm
+            wrong={session.wrong}
+            onSubmit={(password) => {
+              keepRoomPassword(id, password)
+              retry()
+            }}
+          />
+        </Suspense>
+      </>
+    )
+  }
+
   if (session.phase === 'joining') {
     return (
       <>
@@ -182,6 +217,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
             onDissolve={room.dissolve}
             onSetGame={room.setGame}
             onSetOptions={room.setOptions}
+            onSetPassword={room.setPassword}
             aside={!compact && <RoomChatPanel room={parts} />}
           />
           {/* On a phone the chat is a drawer, its bar stuck to the bottom of the whole page */}

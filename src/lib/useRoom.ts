@@ -13,6 +13,8 @@ export type RoomSession =
   | { phase: 'joining' }
   /** `reconnecting`: the connection dropped; `view` is the last one seen, nothing can be sent */
   | { phase: 'joined'; you: string; view: RoomView; reconnecting: boolean }
+  /** The room has a password (e1-t16) and this browser has none, or the wrong one */
+  | { phase: 'password'; wrong: boolean }
   | { phase: 'ended'; end: RoomEnd }
 
 export type RoomHandle = {
@@ -35,6 +37,8 @@ export type RoomHandle = {
   cover(seat: number, how: CoverMessage['how']): void
   setGame(gameId: string, options?: OptionValues): void
   setOptions(options: OptionValues): void
+  /** e1-t16: the host's; null takes the password away */
+  setPassword(password: string | null): void
   /** Settles when the room has answered or won't: anything but `sent` means it did not arrive */
   sendChat(text: string): Promise<ChatSendResult>
 }
@@ -81,6 +85,12 @@ export function useRoom(roomId: string, name: string): RoomHandle {
         ),
       onUnanswered: () => toast(t('room.reconnecting.lostTap'), { tone: 'warning' }),
       onError: (error) => {
+        // Not let in: ask for the password, and stop knocking until it is typed (`retry`)
+        if (error.code === 'password_required' || error.code === 'wrong_password') {
+          opened.leave()
+          setSession({ phase: 'password', wrong: error.code === 'wrong_password' })
+          return
+        }
         // A refused message is the composer's to explain, with its text back in the box
         if (!chatSends.current.refused(error.code)) toast(errorText(error), { tone: 'danger' })
       },
@@ -140,6 +150,10 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     (options: OptionValues) => send({ t: 'set_options', options }),
     [send],
   )
+  const setPassword = useCallback(
+    (password: string | null) => send({ t: 'set_password', password }),
+    [send],
+  )
   const sendChat = useCallback((raw: string): Promise<ChatSendResult> => {
     // The room closes the socket over a message that does not parse
     const text = normalizeChatText(raw)
@@ -167,6 +181,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     cover,
     setGame,
     setOptions,
+    setPassword,
     sendChat,
   }
 }

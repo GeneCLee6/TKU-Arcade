@@ -1,5 +1,7 @@
 import {
+  lazy,
   memo,
+  Suspense,
   useId,
   useLayoutEffect,
   useRef,
@@ -26,10 +28,14 @@ import {
   splitLinks,
   subscribeTouchPrimary,
 } from '../lib/chatText.ts'
+import { useVoiceAvailable } from '../lib/voice.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 import { FieldError } from './Field.tsx'
 import { Heading, Muted, Section } from './roomParts.ts'
+
+// e1-t14
+const VoiceButton = lazy(() => import('./VoiceButton.tsx'))
 
 export interface ChatPanelProps {
   messages: readonly ChatMessage[]
@@ -62,6 +68,8 @@ const SEND_PROBLEM: Record<Exclude<ChatSendResult, 'sent'>, MessageKey> = {
  */
 export function ChatPanel({ messages, you, locked, onSend, draftStore }: ChatPanelProps) {
   const t = useT()
+  // e1-t14: its own chunk, loaded only where the site can open a voice room
+  const voice = useVoiceAvailable()
   const [draft, setDraftState] = useState(() => draftStore.read())
   const [problem, setProblem] = useState<MessageKey | null>(null)
   const [limit] = useState(() => new ChatRateLimit())
@@ -148,7 +156,14 @@ export function ChatPanel({ messages, you, locked, onSend, draftStore }: ChatPan
 
   return (
     <Panel>
-      <Heading>{t('chat.heading')}</Heading>
+      <Top>
+        <Heading>{t('chat.heading')}</Heading>
+        {voice && (
+          <Suspense>
+            <VoiceButton locked={locked} onSend={onSend} />
+          </Suspense>
+        )}
+      </Top>
       <Log
         ref={log}
         role="log"
@@ -381,4 +396,12 @@ const Footer = styled.div`
   gap: ${space.sm}px;
   color: ${color.muted};
   font-size: ${fontSize.sm}px;
+`
+
+const Top = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${space.sm}px;
 `

@@ -57,6 +57,12 @@ export type RoomRecord = {
   public: boolean
   /** Its short number (shared/room-code.ts); null when none was free, or the room is older */
   code?: string | null
+  /**
+   * What someone new must bring to join (e1-t16); absent for an open room. Kept as typed (trimmed):
+   * it is a door code for friends, never a person's own password. Members see it in the view, to
+   * pass it on; a summary only says the room is locked, and a listing never has such a room
+   */
+  password?: string
   /** Since when no socket has been open; null while one is (`settleCleanup`) */
   emptySince: number | null
   /** While `ended`: when something last happened; null in any other status (`settleCleanup`) */
@@ -139,7 +145,12 @@ type Connection = {
   lastSeen: number
   member: string | null
   account: Account | null
+  /** Wrong room passwords this socket has sent (e1-t16); lost on hibernation, which only helps them */
+  wrongPasswords?: number
 }
+
+/** Wrong passwords one socket may send before it is closed (e1-t16) */
+export const PASSWORD_TRIES = 5
 
 /**
  * One room, without Cloudflare: members, seats, the host, waiting → playing → ended → waiting, and
@@ -216,7 +227,14 @@ export class RoomHost {
   // ── Before joining ─────────────────────────────────────────────────────────────────────────
 
   /** False when the room exists already, or there is no such game: the caller checks that first */
-  create(id: string, gameId: string, rawOptions: unknown, isPublic = false, code: string | null = null): boolean {
+  create(
+    id: string,
+    gameId: string,
+    rawOptions: unknown,
+    isPublic = false,
+    code: string | null = null,
+    password: string | null = null,
+  ): boolean {
     const module = this.deps.games(gameId)
     if (this.room || !module) return false
     this.room = {
@@ -229,13 +247,32 @@ export class RoomHost {
       hostId: null,
       createdAt: this.deps.now(),
       bans: [],
-      public: isPublic,
+      // A room with a password is a private one: never listed for anyone to walk into
+      public: isPublic && password === null,
       code,
+      ...(password !== null ? { password } : {}),
       emptySince: this.deps.now(),
       idleSince: null,
     }
     this.deps.storage.saveRoom(this.room)
     return true
+  }
+
+  /**
+   * What a replay of the last game needs (e2-t09), once that game is over: never while it is being
+   * played, when a replay would show what players are keeping to themselves. The steps themselves
+   * are in storage, `game.steps` of them. Null when there is no finished game
+   */
+  replaySource(): { game: StoredGame; names: Record<string, string> } | null {
+    const game = this.game
+    if (!game) return null
+    const module = this.deps.games(game.gameId)
+    if (!module || !module.isOver(game.match.state as never)) return null
+    const names: Record<string, string> = {}
+    for (const member of this.members.values()) {
+      if (member.seat !== null) names[String(member.seat)] = member.name
+    }
+    return { game, names }
   }
 
   summary(): RoomSummary | null {
@@ -248,13 +285,15 @@ export class RoomHost {
       members: members.length,
       seated: members.filter((member) => member.seat !== null).length,
       maxSeats: this.room.maxSeats,
+      ...(this.room.password !== undefined ? { locked: true } : {}),
     }
   }
 
   /** What the home page shows of this room; null while it should not be listed (e1-t09) */
   listing(): RoomListing | null {
     const room = this.room
-    if (!room?.public || room.status !== 'waiting') return null
+    // A room with a password (e1-t16) is not for anyone to walk into
+    if (!room?.public || room.status !== 'waiting' || room.password !== undefined) return null
     const host = room.hostId === null ? undefined : this.members.get(room.hostId)
     const members = [...this.members.values()]
     const seated = members.filter((member) => member.seat !== null).length
@@ -311,7 +350,7 @@ export class RoomHost {
     if (message.t !== 'resync') this.noteActivity()
     if (message.t === 'join') {
       if (connection.member !== null) this.refuse(conn, 'forbidden')
-      else this.join(conn, connection, message.name, message.token)
+      else this.join(conn, connection, message.name, message.token, message.password ?? null)
       return
     }
     const member = connection.member === null ? undefined : this.members.get(connection.member)
@@ -361,6 +400,9 @@ export class RoomHost {
         return
       case 'set_options':
         this.setOptions(conn, member, message.options)
+        return
+      case 'set_password':
+        this.setPassword(conn, member, message.password)
         return
       case 'chat':
         this.postChat(conn, member, message.text)
@@ -484,7 +526,13 @@ export class RoomHost {
     )
   }
 
-  private join(conn: string, connection: Connection, name: string, token: string | null): void {
+  private join(
+    conn: string,
+    connection: Connection,
+    name: string,
+    token: string | null,
+    password: string | null = null,
+  ): void {
     // Who the session says this is (e1-t13): the name `join` sent is only a guest's
     const account = connection.account
     if (token !== null && this.isBanned(token)) {
@@ -511,6 +559,21 @@ export class RoomHost {
         this.saveMembers()
       })
       this.welcome(conn, known)
+      return
+    }
+    // Someone new to a room with a password (e1-t16); a member coming back has their token instead
+    const required = this.requireRoom().password
+    if (required !== undefined && password !== required) {
+      if (password === null) {
+        this.refuse(conn, 'password_required')
+        return
+      }
+      connection.wrongPasswords = (connection.wrongPasswords ?? 0) + 1
+      if (connection.wrongPasswords >= PASSWORD_TRIES) {
+        this.drop(conn, CloseCode.badMessage, 'too many wrong passwords')
+        return
+      }
+      this.refuse(conn, 'wrong_password')
       return
     }
     if (this.members.size >= MAX_MEMBERS) {
@@ -548,8 +611,7 @@ export class RoomHost {
     if (room.status === 'playing') return this.refuse(conn, 'wrong_status')
     if (seat !== null && seat >= room.maxSeats) return this.refuse(conn, 'bad_seat')
     if (seat === member.seat) return
-    const taken =
-      seat !== null && [...this.members.values()].some((other) => other.seat === seat)
+    const taken = seat !== null && [...this.members.values()].some((other) => other.seat === seat)
     if (taken) return this.refuse(conn, 'seat_taken')
     this.change(() => {
       member.seat = seat
@@ -860,6 +922,17 @@ export class RoomHost {
     })
   }
 
+  /** e1-t16: in any status, since it only decides who new may come in */
+  private setPassword(conn: string, member: MemberRecord, password: string | null): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    this.change(() => {
+      if (password === null) delete room.password
+      else room.password = password
+      this.deps.storage.saveRoom(room)
+    })
+  }
+
   private transfer(conn: string, member: MemberRecord, targetId: string): void {
     const room = this.requireRoom()
     if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
@@ -986,6 +1059,7 @@ export class RoomHost {
       minPlayers: room.minPlayers,
       maxSeats: room.maxSeats,
       ...(room.code ? { code: room.code } : {}),
+      ...(room.password !== undefined ? { password: room.password } : {}),
     }
     const members: Record<string, RoomMember> = {}
     for (const member of this.members.values()) {

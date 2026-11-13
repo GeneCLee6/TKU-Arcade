@@ -1,4 +1,5 @@
 import { isChatMessage } from '../../shared/chat.ts'
+import { readRoomPassword } from './roomPassword.ts'
 import {
   CloseCode,
   HEARTBEAT_INTERVAL_MS,
@@ -212,7 +213,13 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
 
   socket.onopen = () => {
     if (!current) return
-    const join: JoinMessage = { t: 'join', name, token: readSeatToken(roomId) }
+    const password = readRoomPassword(roomId)
+    const join: JoinMessage = {
+      t: 'join',
+      name,
+      token: readSeatToken(roomId),
+      ...(password !== null ? { password } : {}),
+    }
     sendRaw(JSON.stringify(join))
     // Without it the server closes the socket as stale
     heartbeat = setInterval(() => {

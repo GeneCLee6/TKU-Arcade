@@ -6,7 +6,7 @@ import { zhTW } from './zh-TW.ts'
 export type Language = 'en' | 'zh-TW'
 export type MessageParams = Record<string, string | number>
 /** A site string, or a game's (shared/games/<id>/i18n.ts): `${game.meta.i18nKey}.name` */
-export type TextKey = MessageKey | `games.${string}` | `kart.${string}`
+export type TextKey = MessageKey | `games.${string}` | `kart.${string}` | `room.extra.${string}`
 export type Translate = (key: TextKey, params?: MessageParams) => string
 
 // Partial: the types require every site key, but a catalog can still come up short at runtime
