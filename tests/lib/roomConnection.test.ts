@@ -8,7 +8,9 @@ import {
 } from '../../shared/protocol.ts'
 import {
   connectRoom,
+  PROBE_TIMEOUT_MS,
   reconnectDelay,
+  REPLY_TIMEOUT_MS,
   RECONNECT_ATTEMPT_TIMEOUT_MS,
   RECONNECT_GIVE_UP_MS,
   type RoomConnection,
@@ -27,6 +29,7 @@ function handlers() {
     onTimers: vi.fn(),
     onChat: vi.fn(),
     onEnd: vi.fn(),
+    onUnanswered: vi.fn(),
   } satisfies RoomHandlers
 }
 
@@ -68,12 +71,12 @@ afterEach(() => {
 
 describe('joining', () => {
   it('opens the room socket on this host, ws: on http', () => {
-    connectRoom(ROOM, 'Al', handlers())
+    connectAndTrack(ROOM, handlers())
     expect(FakeWebSocket.last.url).toBe(`ws://${window.location.host}${roomSocketPath(ROOM)}`)
   })
 
   it('sends nothing until open, then join with the name and no token', () => {
-    connectRoom(ROOM, 'Al', handlers())
+    connectAndTrack(ROOM, handlers())
     const socket = FakeWebSocket.last
     expect(socket.sent).toEqual([])
 
@@ -82,24 +85,24 @@ describe('joining', () => {
     expect(socket.joins).toEqual([{ t: 'join', name: 'Al', token: null }])
   })
 
-  it('sends the token this room gave last time, and not another room’s', () => {
+  it('sends the token this room gave last time, and not another room?', () => {
     localStorage.setItem(SEAT_KEY, TOKEN_A)
     localStorage.setItem('tku-arcade.seat.zzzzzzzzzz', TOKEN_B)
-    connectRoom(ROOM, 'Al', handlers())
+    connectAndTrack(ROOM, handlers())
     FakeWebSocket.last.open()
     expect(FakeWebSocket.last.joins[0].token).toBe(TOKEN_A)
   })
 
   it('treats a malformed stored token as none', () => {
     localStorage.setItem(SEAT_KEY, 'not-a-token')
-    connectRoom(ROOM, 'Al', handlers())
+    connectAndTrack(ROOM, handlers())
     FakeWebSocket.last.open()
     expect(FakeWebSocket.last.joins[0].token).toBeNull()
   })
 
   it('reports who this is and the room, and saves the token per room', () => {
     const h = handlers()
-    connectRoom(ROOM, 'Al', h)
+    connectAndTrack(ROOM, h)
     const socket = FakeWebSocket.last
     socket.open()
 
@@ -117,7 +120,7 @@ describe('joining', () => {
 
   it('ignores pong, junk, and what later batches handle', () => {
     const h = handlers()
-    connectRoom(ROOM, 'Al', h)
+    connectAndTrack(ROOM, h)
     const socket = FakeWebSocket.last
     socket.open()
 
@@ -134,7 +137,7 @@ describe('joining', () => {
 
   it('ignores a patch or snapshot before welcome', () => {
     const h = handlers()
-    connectRoom(ROOM, 'Al', h)
+    connectAndTrack(ROOM, h)
     const socket = FakeWebSocket.last
     socket.open()
     socket.sent.length = 0
@@ -150,7 +153,7 @@ describe('joining', () => {
 
   it('sends a heartbeat every interval while open, and stops when it closes', () => {
     vi.useFakeTimers()
-    connectRoom(ROOM, 'Al', handlers())
+    connectAndTrack(ROOM, handlers())
     const socket = FakeWebSocket.last
     const pings = () => socket.sent.filter((data) => data === 'ping')
 
@@ -247,7 +250,7 @@ describe('timers', () => {
   const timerMessage = (...timers: { id: string; remainingMs: number; totalMs: number }[]) =>
     JSON.stringify({ t: 'timer', timers })
 
-  it('turns each duration into a deadline on this browser’s clock, from when it arrived', () => {
+  it('turns each duration into a deadline on this browser? clock, from when it arrived', () => {
     vi.useFakeTimers()
     const { h, socket } = welcomed()
     vi.advanceTimersByTime(1_000)
@@ -341,7 +344,8 @@ describe('reconnecting', () => {
   /** The first attempt, its socket open and joined but not welcomed */
   function attempting() {
     const room = dropped()
-    vi.advanceTimersByTime(1_000)
+    // The first attempt goes at once
+    vi.advanceTimersByTime(0)
     const attempt = FakeWebSocket.last
     attempt.open()
     return { ...room, attempt }
@@ -369,13 +373,16 @@ describe('reconnecting', () => {
     expect(FakeWebSocket.last.joins).toEqual([{ t: 'join', name: 'Al', token: TOKEN_A }])
   })
 
-  it('backs off 1, 2, 4, 8, 15, then 30 s, and stays at the cap', () => {
+  it('tries at once, then backs off 1, 2, 4, 8, 15, then 30 s, and stays at the cap', () => {
     dropped()
+    vi.advanceTimersByTime(0)
+    expect(sockets()).toBe(2)
+    FakeWebSocket.last.serverClose(1006)
     for (const [i, delay] of [1, 2, 4, 8, 15, 30, 30, 30].entries()) {
       vi.advanceTimersByTime(delay * 1_000 - 1)
-      expect(sockets()).toBe(i + 1)
-      vi.advanceTimersByTime(1)
       expect(sockets()).toBe(i + 2)
+      vi.advanceTimersByTime(1)
+      expect(sockets()).toBe(i + 3)
       FakeWebSocket.last.serverClose(1006)
     }
   })
@@ -384,10 +391,10 @@ describe('reconnecting', () => {
     const random = vi.spyOn(Math, 'random')
     random.mockReturnValue(0)
     expect([0, 1, 2, 3, 4, 5, 6, 50].map(reconnectDelay)).toEqual([
-      1_000, 2_000, 4_000, 8_000, 15_000, 30_000, 30_000, 30_000,
+      0, 1_000, 2_000, 4_000, 8_000, 15_000, 30_000, 30_000,
     ])
     random.mockReturnValue(1)
-    expect(reconnectDelay(0)).toBe(750)
+    expect(reconnectDelay(1)).toBe(750)
     expect(reconnectDelay(9)).toBe(22_500)
   })
 
@@ -402,7 +409,7 @@ describe('reconnecting', () => {
   it('gives up after 5 minutes of failures, as disconnected, and stops', () => {
     const { h } = dropped()
     let waited = 0
-    for (const delay of [1, 2, 4, 8, 15]) {
+    for (const delay of [0, 1, 2, 4, 8, 15]) {
       vi.advanceTimersByTime(delay * 1_000)
       waited += delay * 1_000
       FakeWebSocket.last.serverClose(1006)
@@ -425,7 +432,7 @@ describe('reconnecting', () => {
     expect(sockets()).toBe(opened)
   })
 
-  it('does not count a phone’s sleep as failing: it gets its attempt on waking', () => {
+  it('does not count a phone? sleep as failing: it gets its attempt on waking', () => {
     const { h } = dropped()
     vi.setSystemTime(Date.now() + 60 * 60_000)
 
@@ -493,7 +500,7 @@ describe('reconnecting', () => {
       expect(localStorage.getItem(SEAT_KEY)).toBe(TOKEN_B)
     })
 
-    it('leaves nothing waiting, and a later drop starts over from 1 s', () => {
+    it('leaves nothing waiting, and a later drop tries again at once', () => {
       const { h, attempt } = attempting()
       attempt.receive(welcome({}))
       attempt.sent.length = 0
@@ -502,9 +509,8 @@ describe('reconnecting', () => {
       expect(vi.getTimerCount()).toBe(1)
       attempt.serverClose(1006)
       expect(h.onReconnecting).toHaveBeenCalledTimes(2)
-      vi.advanceTimersByTime(999)
       expect(sockets()).toBe(2)
-      vi.advanceTimersByTime(1)
+      vi.advanceTimersByTime(0)
       expect(sockets()).toBe(3)
     })
 
@@ -654,6 +660,69 @@ describe('reconnecting', () => {
       }
       expect(h.onReconnecting).not.toHaveBeenCalled()
       expect(socket.closedByClient).toBe(false)
+    })
+  })
+
+  // Owner, 2026-11-13: in Silent Table some players were stuck for a long time. A phone back from
+  // another app keeps a socket that looks open and is dead; this finds out in seconds, not 45 s
+  describe('a socket that died without a word', () => {
+    const action = { t: 'action', action: { type: 'ready' } } as const
+
+    it('is checked when a send gets no answer, and replaced when the check gets none', () => {
+      vi.useFakeTimers()
+      const { h, socket, connection } = welcomed()
+      expect(connection.send(action)).toBe(true)
+      vi.advanceTimersByTime(REPLY_TIMEOUT_MS - 1)
+      expect(socket.sent.at(-1)).not.toBe('ping')
+      vi.advanceTimersByTime(1)
+      expect(socket.sent.at(-1)).toBe('ping')
+      vi.advanceTimersByTime(PROBE_TIMEOUT_MS)
+      expect(socket.closedByClient).toBe(true)
+      expect(h.onReconnecting).toHaveBeenCalledOnce()
+      // The tap most likely never arrived: the person is told to make it again
+      expect(h.onUnanswered).toHaveBeenCalledOnce()
+      // A new socket straight away
+      vi.advanceTimersByTime(10)
+      expect(FakeWebSocket.instances).toHaveLength(2)
+    })
+
+    it('is left alone when the answer comes, or the check is answered', () => {
+      vi.useFakeTimers()
+      const { h, socket, connection } = welcomed()
+      connection.send(action)
+      socket.receive(patch(1))
+      vi.advanceTimersByTime(REPLY_TIMEOUT_MS + PROBE_TIMEOUT_MS)
+      expect(socket.sent.filter((data) => data === 'ping')).toHaveLength(0)
+      connection.send(action)
+      vi.advanceTimersByTime(REPLY_TIMEOUT_MS)
+      socket.receive('pong')
+      vi.advanceTimersByTime(PROBE_TIMEOUT_MS)
+      expect(socket.closedByClient).toBe(false)
+      expect(h.onReconnecting).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['the page comes back into view', () => setVisibility('visible')],
+      ['the network comes back', () => window.dispatchEvent(new Event('online'))],
+      ['the window gets the focus', () => window.dispatchEvent(new Event('focus'))],
+    ])('is checked at once when %s', (_, event) => {
+      vi.useFakeTimers()
+      const { h, socket } = welcomed()
+      event()
+      expect(socket.sent.at(-1)).toBe('ping')
+      vi.advanceTimersByTime(PROBE_TIMEOUT_MS)
+      expect(socket.closedByClient).toBe(true)
+      expect(h.onReconnecting).toHaveBeenCalledOnce()
+      // Nothing was waiting for an answer: no "make it again"
+      expect(h.onUnanswered).not.toHaveBeenCalled()
+    })
+
+    it('is given up at once when the browser already knows it is closed', () => {
+      vi.useFakeTimers()
+      const { h, socket, connection } = welcomed()
+      socket.gone = true
+      expect(connection.send(action)).toBe(false)
+      expect(h.onReconnecting).toHaveBeenCalledOnce()
     })
   })
 
@@ -829,7 +898,7 @@ describe('leaving and closing', () => {
     expect(socket.sent.filter((data) => data === 'ping')).toHaveLength(0)
   })
 
-  it('does not join from a socket it has already left (StrictMode’s first effect)', () => {
+  it('does not join from a socket it has already left (StrictMode? first effect)', () => {
     const h = handlers()
     const { leave } = connectRoom(ROOM, 'Al', h)
     const stale = FakeWebSocket.last

@@ -4,6 +4,9 @@ import type { RoomMember, WelcomeMessage } from '../../shared/protocol.ts'
 /** Stands in for the browser's WebSocket: tests play the server's side of each socket */
 export class FakeWebSocket {
   static instances: FakeWebSocket[] = []
+  static readonly CONNECTING = 0
+  static readonly OPEN = 1
+  static readonly CLOSED = 3
 
   /** Replaces the global; vi.unstubAllGlobals() takes it away */
   static install(): void {
@@ -22,6 +25,11 @@ export class FakeWebSocket {
   closedByClient = false
   /** Closed, by either side */
   gone = false
+  private opened = false
+
+  get readyState(): number {
+    return this.gone ? FakeWebSocket.CLOSED : this.opened ? FakeWebSocket.OPEN : FakeWebSocket.CONNECTING
+  }
   onopen: (() => void) | null = null
   onmessage: ((event: { data: unknown }) => void) | null = null
   onclose: ((event: { code: number }) => void) | null = null
@@ -44,6 +52,7 @@ export class FakeWebSocket {
   // ── The server's side ──────────────────────────────────────────────────────────────────────
 
   open(): void {
+    this.opened = true
     this.onopen?.()
   }
 

@@ -79,6 +79,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
         setSession((current) =>
           current.phase === 'joined' ? { ...current, reconnecting: true } : current,
         ),
+      onUnanswered: () => toast(t('room.reconnecting.lostTap'), { tone: 'warning' }),
       onError: (error) => {
         // A refused message is the composer's to explain, with its text back in the box
         if (!chatSends.current.refused(error.code)) toast(errorText(error), { tone: 'danger' })

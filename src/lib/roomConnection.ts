@@ -40,6 +40,11 @@ export type RoomHandlers = {
   onView: (you: string, view: RoomView) => void
   /** The socket dropped and it is trying again; the next `onView` means it is back */
   onReconnecting: () => void
+  /**
+   * The socket was found dead while something sent on it had no answer yet: that tap most likely
+   * never arrived, and the person should make it again once back
+   */
+  onUnanswered?: () => void
   onError: (error: ErrorMessage) => void
   /** The countdowns running now, replacing the previous list; an empty list means none */
   onTimers: (timers: RoomTimer[]) => void
@@ -56,7 +61,9 @@ export type RoomConnection = {
 }
 
 /** How long to wait after each failed attempt; the last one repeats */
-const RECONNECT_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000]
+// The first try is at once: a phone back from the background should be in the game again before
+// anyone notices (owner, 2026-11-13: players stuck for a long time in Silent Table)
+const RECONNECT_DELAYS_MS = [0, 1_000, 2_000, 4_000, 8_000, 15_000, 30_000]
 /** At most this share comes off a delay, at random: a room that lost its server returns spread out */
 const RECONNECT_JITTER = 0.25
 /** An attempt not welcomed by then has failed: without this, a hung one would block all others */
@@ -65,6 +72,15 @@ export const RECONNECT_ATTEMPT_TIMEOUT_MS = 10_000
 export const RECONNECT_GIVE_UP_MS = 5 * 60_000
 /** Sent without hearing anything back, by which time the server has given up on this socket too */
 const MAX_UNANSWERED_PINGS = STALE_AFTER_MS / HEARTBEAT_INTERVAL_MS
+/**
+ * A socket can look open and be dead: a phone that slept, went to another app or changed networks
+ * reports no close for a long time, and everything sent on it is lost. The server answers every
+ * message in well under a second (~75 ms measured from Taiwan, 2026-11-13), so silence this long
+ * after a send means trouble; a ping then settles it.
+ */
+export const REPLY_TIMEOUT_MS = 3_000
+/** A ping sent to check the socket: no answer by then, and it is given up for a new one */
+export const PROBE_TIMEOUT_MS = 4_000
 /** "Abnormal closure": what a browser reports for a connection that just went away */
 const CLOSE_ABNORMAL = 1006
 
@@ -116,13 +132,19 @@ function finalEnd(code: number): RoomEnd | null {
 /** shared/protocol.ts CloseCode: after any close but the 44xx ones, except `stale` */
 const canReconnectAfter = (code: number) => code === CloseCode.stale || code < 4400 || code >= 4500
 
-type RoomSocket = Pick<RoomConnection, 'send' | 'leave'>
+type RoomSocket = Pick<RoomConnection, 'send' | 'leave'> & {
+  /** Checks that the socket still answers; replaced if it does not */
+  probe: () => void
+}
 
 type RoomSocketHandlers = Omit<RoomHandlers, 'onEnd' | 'onReconnecting'> & {
   /** Before the `onView` of the same `welcome` */
   onWelcome: () => void
-  /** This socket is over; `welcomed`: it had joined. Not called after `leave` */
-  onClosed: (code: number, welcomed: boolean) => void
+  /**
+   * This socket is over; `welcomed`: it had joined; `unanswered`: something sent on it was still
+   * waiting for an answer. Not called after `leave`
+   */
+  onClosed: (code: number, welcomed: boolean, unanswered: boolean) => void
 }
 
 /**
@@ -138,6 +160,24 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
   let joined: { you: string; rev: number; view: RoomView } | null = null
   let resyncing = false
   let unansweredPings = 0
+  /** A message went out and nothing has come back since */
+  let awaiting = false
+  /** No reply after a send: time to ping */
+  let replyTimer: ReturnType<typeof setTimeout> | undefined
+  /** A ping is out to check the socket: no answer by then and it is dead */
+  let probeTimer: ReturnType<typeof setTimeout> | undefined
+
+  const dead = () => {
+    closed(CLOSE_ABNORMAL)
+    socket.close()
+  }
+
+  const probe = () => {
+    if (!current || !joined || probeTimer !== undefined) return
+    if (socket.readyState !== WebSocket.OPEN) return dead()
+    sendRaw(HEARTBEAT_PING)
+    probeTimer = setTimeout(dead, PROBE_TIMEOUT_MS)
+  }
 
   // The socket can be closing before its close event arrives, and then `send` throws
   const sendRaw = (data: string) => {
@@ -189,6 +229,12 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
 
   socket.onmessage = (event: MessageEvent) => {
     unansweredPings = 0
+    // Anything at all from the server: the socket is alive
+    awaiting = false
+    clearTimeout(replyTimer)
+    clearTimeout(probeTimer)
+    replyTimer = undefined
+    probeTimer = undefined
     if (!current || typeof event.data !== 'string' || event.data === HEARTBEAT_PONG) return
     const message = parseServerMessage(event.data)
     switch (message?.t) {
@@ -234,9 +280,11 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
 
   const closed = (code: number) => {
     clearInterval(heartbeat)
+    clearTimeout(replyTimer)
+    clearTimeout(probeTimer)
     if (!current) return
     current = false
-    handlers.onClosed(code, joined !== null)
+    handlers.onClosed(code, joined !== null, awaiting)
   }
 
   socket.onclose = (event: CloseEvent) => closed(event.code)
@@ -244,12 +292,26 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
   return {
     send: (message) => {
       if (!current || !joined) return false
+      if (socket.readyState !== WebSocket.OPEN) {
+        dead()
+        return false
+      }
       sendRaw(JSON.stringify(message))
+      awaiting = true
+      if (replyTimer === undefined && probeTimer === undefined) {
+        replyTimer = setTimeout(() => {
+          replyTimer = undefined
+          probe()
+        }, REPLY_TIMEOUT_MS)
+      }
       return true
     },
+    probe,
     leave: () => {
       current = false
       clearInterval(heartbeat)
+      clearTimeout(replyTimer)
+      clearTimeout(probeTimer)
       socket.close()
     },
   }
@@ -309,6 +371,7 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
 
   const finish = (end: RoomEnd) => {
     stopReconnecting()
+    unwatch()
     handlers.onEnd(end)
   }
 
@@ -319,9 +382,10 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
     handlers.onTimers([])
   }
 
-  const onClosed = (code: number, welcomed: boolean) => {
+  const onClosed = (code: number, welcomed: boolean, unanswered: boolean) => {
     socket = null
     clearTimeout(timer)
+    if (welcomed && unanswered && finalEnd(code) === null) handlers.onUnanswered?.()
     const final = finalEnd(code)
     if (final) return finish(final)
     if (!welcomed && lostAt === null) return finish('connectionLost')
@@ -336,12 +400,28 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
     attemptFailed()
   }
 
+  // Back on the page, the network or the window: a socket that looks open may have died meanwhile.
+  // Checked at once rather than at the next heartbeat, up to 45 s later
+  const check = () => {
+    if (document.visibilityState === 'hidden') return
+    if (socket) socket.probe()
+    else if (lostAt !== null) wake()
+  }
+  const watched = ['online', 'focus', 'pageshow'] as const
+  for (const event of watched) window.addEventListener(event, check)
+  document.addEventListener('visibilitychange', check)
+  function unwatch() {
+    for (const event of watched) window.removeEventListener(event, check)
+    document.removeEventListener('visibilitychange', check)
+  }
+
   open()
 
   return {
     send: (message) => socket?.send(message) ?? false,
     leave: () => {
       stopReconnecting()
+      unwatch()
       socket?.leave()
       socket = null
     },

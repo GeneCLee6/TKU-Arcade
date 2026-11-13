@@ -136,6 +136,7 @@ export const zhTW: Messages = {
   'room.options.on': '開',
   'room.options.range': '{min} 到 {max}',
   'room.reconnecting': '連線中斷，正在重新連線…',
+  'room.reconnecting.lostTap': '連線斷了，剛才那一下可能沒送到。連回來後請再按一次。',
   'room.reconnecting.notSent': '沒有送出：目前離線，請等連線恢復後再試一次。',
   'room.reload': '重新載入',
   'room.replaced': '這個房間已在另一個分頁開啟。要在這裡玩，請重新載入。',
