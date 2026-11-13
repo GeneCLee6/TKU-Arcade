@@ -29,7 +29,7 @@ import {
 } from 'three'
 import { roadClearance, roadDistances, scatter } from '../../../shared/kart/scenery.ts'
 import { roadDirection, trackBounds, type Track } from '../../../shared/kart/track.ts'
-import { kartScene } from '../../styles/tokens.ts'
+import { kartScene } from '../../styles/kartTokens.ts'
 import { ASPHALT_LENGTH, BARRIER_LENGTH, KERB_LENGTH, trackTextures } from './textures.ts'
 
 /** How much the art does: set by the quality option (quality.ts) */

@@ -9,7 +9,7 @@ import {
   type Texture,
 } from 'three'
 import { createRng } from '../../../shared/games/rng.ts'
-import { kartScene } from '../../styles/tokens.ts'
+import { kartScene } from '../../styles/kartTokens.ts'
 
 type Paint = (context: CanvasRenderingContext2D, size: number, random: () => number) => void
 

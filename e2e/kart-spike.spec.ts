@@ -735,8 +735,7 @@ test('drives the test oval: a countdown, then the minimap follows and the line i
   const minimap = page.getByRole('img', { name: 'Track map' })
   await expect(minimap).toBeVisible()
   await expect(page.getByTestId('kart-lap')).toHaveText('Lap 1/3')
-  // 3, 2, 1, then GO
-  await expect(page.getByTestId('kart-countdown')).toBeVisible()
+  // 3, 2, 1, then GO (on a slow software renderer it may be over already)
   await page.locator('canvas').click()
   await page.keyboard.down('ArrowUp')
   // That the car is held still during it is tests/kart/timeTrial.test.ts's: here the countdown can
@@ -770,5 +769,38 @@ test('the riverside graybox opens from the course picker, with its own minimap',
   await expect(page).toHaveURL(/track=riverside/)
   await expect(page.getByRole('img', { name: 'Track map' })).toBeVisible()
   await expect(page.getByTestId('kart-countdown')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+// e8-t14: the kart page itself, a time trial without the spike's tools; e8-t07 its kart and effects
+test('the kart page races on Riverside without the tuning tools, and the sound switches', async ({
+  page,
+}) => {
+  const errors = watchConsole(page)
+  await page.goto('/kart')
+  await expect(page.locator('canvas')).toBeVisible()
+  await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
+  await expect(page.getByTestId('kart-course')).toHaveValue('riverside')
+  await expect(page.getByTestId('kart-course').locator('option')).toHaveText([
+    'Test oval',
+    'Riverside (graybox)',
+  ])
+  await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
+  await expect(page.getByText('Time trial')).toBeVisible()
+  const sound = page.getByTestId('kart-sound')
+  const before = await sound.textContent()
+  await sound.click()
+  await expect(sound).not.toHaveText(before ?? '')
+  // Drive and drift a moment: the kart, its smoke and its marks run without a complaint
+  await expect(page.getByTestId('kart-countdown')).toHaveCount(0, { timeout: 8000 })
+  await page.locator('canvas').click()
+  await page.keyboard.down('ArrowUp')
+  await page.waitForTimeout(2500)
+  await page.keyboard.down('ArrowLeft')
+  await page.keyboard.down('KeyZ')
+  await page.waitForTimeout(600)
+  await page.keyboard.up('KeyZ')
+  await page.keyboard.up('ArrowLeft')
+  await page.keyboard.up('ArrowUp')
   expect(errors).toEqual([])
 })
