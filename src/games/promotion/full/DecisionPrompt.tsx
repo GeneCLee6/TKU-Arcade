@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type CSSProperties } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import styled from 'styled-components'
 import type { FullPending, PromotionAction } from '../../../../shared/games/promotion/types.ts'
 import { Button } from '../../../components/Button.tsx'
@@ -54,14 +54,37 @@ export function DecisionPrompt({
   const titleId = useId()
   const first = useRef<HTMLButtonElement>(null)
   const cell = (id: string) => shortCellName(id, language)
+  // Buying office can offer ten posts: the card takes the width it has, so the answers wrap into a
+  // row or two more instead of the card scrolling
+  const wide = mine && pending.kind === 'buy'
+  const card = useRef<HTMLElement>(null)
+  const [fit, setFit] = useState({ height: 0, room: 0 })
+  useLayoutEffect(() => {
+    const element = card.current
+    if (!wide || !area || !element) return
+    const measure = () =>
+      setFit({ height: element.offsetHeight, room: (element.offsetParent as HTMLElement | null)?.clientHeight ?? 0 })
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [wide, area])
+  // Inside the square board's ring the short cards sit in the middle. Buying office's can be taller
+  // than the room inside the ring (a phone on its side), so it rests on the edge of that room away
+  // from the cell it is about and grows from there, over the far side of the ring (never over the
+  // cell), and no further than the board's box
+  const wideTop = (box: NonNullable<typeof area>) => {
+    const y = top ? box.y + box.height - space.sm - fit.height : box.y + space.sm
+    const lowest = fit.room > 0 ? fit.room - space.sm - fit.height : y
+    return Math.max(space.sm, Math.min(y, lowest))
+  }
   const placed: CSSProperties | undefined = area
     ? {
         left: area.x + area.width / 2,
-        top: area.y + area.height / 2,
+        top: wide ? wideTop(area) : area.y + area.height / 2,
         bottom: 'auto',
-        transform: 'translate(-50%, -50%)',
-        width: `min(560px, ${Math.floor(area.width - 2 * space.sm)}px)`,
-        maxHeight: Math.floor(area.height - 2 * space.sm),
+        transform: wide ? 'translateX(-50%)' : 'translate(-50%, -50%)',
+        width: `min(${wide ? WIDE : NARROW}px, ${Math.floor(area.width - 2 * space.sm)}px)`,
       }
     : undefined
 
@@ -73,7 +96,7 @@ export function DecisionPrompt({
 
   if (!mine) {
     return (
-      <Banner role="status" data-decision="watching" $top={top} style={placed}>
+      <Banner role="status" data-decision="watching" $top={top} $wide={false} style={placed}>
         {t(`games.promotion.full.watching.${pending.kind}`, { name, cell: cell(pending.cell) })}
       </Banner>
     )
@@ -84,7 +107,7 @@ export function DecisionPrompt({
   }
 
   return (
-    <Card role="region" aria-labelledby={titleId} data-decision={pending.kind} $top={top} style={placed}>
+    <Card ref={card} role="region" aria-labelledby={titleId} data-decision={pending.kind} $top={top} $wide={wide} style={placed}>
       <Title id={titleId}>
         {pending.kind === 'offer'
           ? t('games.promotion.full.offer.title', { cell: cell(pending.cell) })
@@ -113,7 +136,7 @@ export function DecisionPrompt({
           </Button>
         </Answers>
       ) : (
-        <Answers $grid>
+        <Answers $wrap>
           {pending.choices.map((choice, at) => (
             <Button
               key={choice.cell}
@@ -122,8 +145,12 @@ export function DecisionPrompt({
               onClick={() => answer({ type: 'buy', cell: choice.cell })}
               data-answer="buy"
               data-buy={choice.cell}
+              aria-label={t('games.promotion.full.buy.option', { cell: cell(choice.cell), price: choice.price })}
             >
-              {t('games.promotion.full.buy.option', { cell: cell(choice.cell), price: choice.price })}
+              <Post>
+                <span>{cell(choice.cell)}</span>
+                <Price>{t('games.promotion.full.buy.price', { price: choice.price })}</Price>
+              </Post>
             </Button>
           ))}
           <Button $variant="secondary" aria-disabled={waiting} onClick={() => answer({ type: 'skip' })} data-answer="skip">
@@ -135,13 +162,17 @@ export function DecisionPrompt({
   )
 }
 
-const overBoard = (top: boolean) => `
+/** The card's widest: an offered post's two answers, and buying office's up to eleven */
+const NARROW = 560
+const WIDE = 880
+
+const overBoard = (top: boolean, wide: boolean) => `
   position: absolute;
   left: 50%;
   ${top ? 'top' : 'bottom'}: ${space.sm}px;
   z-index: 2;
   transform: translateX(-50%);
-  width: min(560px, calc(100% - ${2 * space.sm}px));
+  width: min(${wide ? WIDE : NARROW}px, calc(100% - ${2 * space.sm}px));
   background: ${color.surface};
   color: ${color.text};
   border: 2px solid ${promotionBoard.gold};
@@ -149,17 +180,16 @@ const overBoard = (top: boolean) => `
   box-shadow: 0 0 0 4px ${color.bg};
 `
 
-const Card = styled.section<{ $top: boolean }>`
-  ${(p) => overBoard(p.$top)}
+// Never a scrollbar: what does not fit across wraps downwards
+const Card = styled.section<{ $top: boolean; $wide: boolean }>`
+  ${(p) => overBoard(p.$top, p.$wide)}
   display: grid;
   gap: ${space.xs}px;
-  max-height: calc(100% - ${2 * space.sm}px);
-  overflow-y: auto;
   padding: ${space.sm}px ${space.md}px;
 `
 
-const Banner = styled.p<{ $top: boolean }>`
-  ${(p) => overBoard(p.$top)}
+const Banner = styled.p<{ $top: boolean; $wide: boolean }>`
+  ${(p) => overBoard(p.$top, p.$wide)}
   margin: 0;
   padding: ${space.xs}px ${space.md}px;
   font-size: ${fontSize.sm}px;
@@ -191,13 +221,25 @@ const Default = styled.span`
   font-size: ${fontSize.sm}px;
 `
 
-const Answers = styled.div<{ $grid?: boolean }>`
-  display: ${(p) => (p.$grid ? 'grid' : 'flex')};
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+// Buying office: as many posts to a row as fit, each its name over its price, the rest on the next
+// row; on a phone held upright two or three to a row rather than one
+const Answers = styled.div<{ $wrap?: boolean }>`
+  display: ${(p) => (p.$wrap ? 'grid' : 'flex')};
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(96px, 14%)), 1fr));
   gap: ${space.xs}px;
 
   & > button {
     min-height: 44px;
-    ${(p) => (p.$grid ? '' : 'flex: 1;')}
+    ${(p) => (p.$wrap ? `padding-inline: ${space.xs}px; overflow-wrap: anywhere;` : 'flex: 1;')}
   }
+`
+
+const Post = styled.span`
+  display: grid;
+  justify-items: center;
+  line-height: 1.15;
+`
+
+const Price = styled.span`
+  font-size: ${fontSize.sm}px;
 `
