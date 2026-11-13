@@ -29,6 +29,7 @@ import {
   type GuessPicks,
 } from './screenState.ts'
 import { TopicCard } from './TopicCard.tsx'
+import { TopicChoice } from './TopicChoice.tsx'
 
 /** If the room never answers a guess or "next", the button comes back after this */
 const ANSWER_WAIT_MS = 4000
@@ -80,6 +81,7 @@ export default function SpectrumScreen({ room, game }: GameScreenProps) {
     (action) => action.type === 'guessExtremes' || action.type === 'guessOrder',
   )
   const canNext = legal.some((action) => action.type === 'next')
+  const canChoose = legal.some((action) => action.type === 'chooseTopic')
   const picksReady = picks.max !== null && picks.min !== null && picks.max !== picks.min
   const confirm = () => {
     if (asked || !canGuess) return
@@ -92,7 +94,7 @@ export default function SpectrumScreen({ room, game }: GameScreenProps) {
   const shown = view.phase === 'reveal' || view.phase === 'over'
   const animate = shown && opened !== `${view.round}:${view.phase}` && !reducedMotion
   const marks = view.answerers.length
-  const held = useHold(game.over && animate ? `${view.round}:${view.topic.id}` : null, marks * STAGGER_MS + 900)
+  const held = useHold(game.over && animate ? `${view.round}:${view.topic?.id}` : null, marks * STAGGER_MS + 900)
 
   const prompt = promptKey(view)
   const seatDetail = (member: RoomMember) => {
@@ -142,9 +144,23 @@ export default function SpectrumScreen({ room, game }: GameScreenProps) {
         </Header>
         {game.chatLocked && <Notice role="note">{t('games.spectrum.ui.chatLocked')}</Notice>}
 
-        <TopicCard topic={view.topic} />
+        {view.phase === 'choosing' && (
+          <>
+            {role !== 'guesser' && (
+              <Waiting role="status">{t('games.spectrum.ui.waitChoose', { name: guesserName })}</Waiting>
+            )}
+            {role === 'guesser' && <Body>{t('games.spectrum.ui.chooseHint')}</Body>}
+            <TopicChoice
+              card={view.card}
+              onChoose={canChoose ? (id) => send({ type: 'chooseTopic', id }) : undefined}
+              disabled={asked}
+            />
+          </>
+        )}
 
-        {view.phase === 'answering' && (
+        {view.topic && <TopicCard topic={view.topic} />}
+
+        {view.phase === 'answering' && view.topic && (
           <>
             {role === 'answerer' && own && own.number !== null && own.status !== 'out' && (
               <Pair>
@@ -172,7 +188,7 @@ export default function SpectrumScreen({ room, game }: GameScreenProps) {
           </>
         )}
 
-        {view.phase === 'guessing' && (
+        {view.phase === 'guessing' && view.topic && (
           <>
             {role === 'answerer' && own?.number != null && (
               <SecretNumber key={view.round} number={own.number} topic={view.topic} compact />
@@ -244,17 +260,18 @@ function useHold(key: string | null, ms: number): boolean {
   return key !== null && doneKey !== key
 }
 
-const PHASES = ['answering', 'guessing', 'reveal'] as const
+const PHASES = ['choosing', 'answering', 'guessing', 'reveal'] as const
 const STEP_KEYS = {
+  choosing: 'games.spectrum.ui.step.choose',
   answering: 'games.spectrum.ui.step.answer',
   guessing: 'games.spectrum.ui.step.guess',
   reveal: 'games.spectrum.ui.step.reveal',
 } as const
 
-/** Where this round is: answer, guess, reveal */
+/** Where this round is: choose, answer, guess, reveal */
 function Steps({ phase }: { phase: SpectrumView['phase'] }) {
   const t = useT()
-  const now = phase === 'over' ? 2 : PHASES.indexOf(phase)
+  const now = phase === 'over' ? PHASES.length - 1 : PHASES.indexOf(phase)
   return (
     <StepList aria-label={t('games.spectrum.ui.steps')}>
       {PHASES.map((step, index) => (

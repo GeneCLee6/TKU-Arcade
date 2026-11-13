@@ -12,8 +12,12 @@ const ANSWERS = ['cold rice', 'a warm bowl of soup', 'street food', 'a feast']
 const close = (people: readonly Page[]) =>
   Promise.all(people.map((person) => person.context().close()))
 
+// Most tests here pick the largest and the smallest; the whole order, the default since 2026-11-13,
+// has its own test that picks it in the waiting room
 async function createSpectrumRoom(page: Page, nickname: string): Promise<void> {
-  const response = await page.request.post('/api/rooms', { data: { gameId: 'spectrum' } })
+  const response = await page.request.post('/api/rooms', {
+    data: { gameId: 'spectrum', options: { mode: 'extremes' } },
+  })
   const { id } = (await response.json()) as { id: string }
   await joinRoom(page, `/r/${id}`, nickname)
 }
@@ -34,8 +38,31 @@ async function spectrumPlayers(
 
 const youGuess = (page: Page) => page.getByRole('heading', { name: 'This round you are the guesser' })
 
-/** Whoever's screen says they guess this round; the others answer */
+const askButtons = (page: Page) => page.getByRole('button', { name: /Ask this one$/ })
+
+/** The guesser asks the first topic on the round's card; returns its text */
+async function chooseTopic(people: readonly Page[]): Promise<string> {
+  let chooser: Page | null = null
+  await expect(async () => {
+    for (const person of people) {
+      if ((await askButtons(person).count()) > 0) chooser = person
+    }
+    expect(chooser).not.toBeNull()
+  }).toPass({ timeout: 15_000 })
+  const page = chooser as unknown as Page
+  await expect(askButtons(page)).toHaveCount(4)
+  for (const person of people) {
+    if (person !== page) await expect(askButtons(person)).toHaveCount(0)
+  }
+  const first = askButtons(page).first()
+  const text = (await first.textContent()) ?? ''
+  await first.click()
+  return text
+}
+
+/** The guesser chooses a topic; then whoever's screen says they guess this round, and the others */
 async function rolesOf(people: readonly Page[]): Promise<{ guesser: Page; answerers: Page[] }> {
+  await chooseTopic(people)
   let guesser: Page | null = null
   await expect(async () => {
     for (const person of people) {
@@ -71,7 +98,7 @@ test('four players play every round to the result', async ({ browser }) => {
     // Answering: the clock runs, chat is closed, and only answerers hold a number
     await expect(host.getByRole('timer')).toBeVisible()
     await expect(host.getByRole('textbox', { name: 'Message to the room' })).toBeDisabled()
-    await expect(host.getByText('Chat is closed while the answers are written and guessed.')).toBeVisible()
+    await expect(host.getByText('Chat is closed until the numbers are revealed.')).toBeVisible()
     await expect(guesser.getByTestId('secret-number')).toHaveCount(0)
     await expect(guesser.getByRole('textbox', { name: 'Your answer' })).toHaveCount(0)
     for (const answerer of answerers) {
@@ -216,6 +243,10 @@ for (const scheme of ['light', 'dark'] as const) {
     await host.getByRole('button', { name: 'Start game' }).click()
     for (let round = 1; round <= NAMES.length; round++) {
       await expect(host.getByText(`Round ${round}/${NAMES.length}`).first()).toBeVisible()
+      if (round === 1) {
+        await expect(host.getByTestId('topic-choice')).toBeVisible()
+        await expectNoSeriousProblems(host, 'choosing the topic')
+      }
       const { guesser, answerers } = await rolesOf(people)
       if (round === 1) {
         await expectNoSeriousProblems(answerers[0], 'answering, an answerer')

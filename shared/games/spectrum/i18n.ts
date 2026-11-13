@@ -4,24 +4,24 @@
 const en = {
   'games.spectrum.name': 'Spectrum',
   'games.spectrum.summary':
-    'Say where your secret number sits on a scale; the guesser finds the top and the bottom.',
+    'Say where your secret number sits on a scale; the guesser puts everyone in order.',
   'games.spectrum.option.mode': 'The guesser picks',
   'games.spectrum.option.mode.extremes': 'The largest and the smallest',
   'games.spectrum.option.mode.order': 'Everyone in order',
   'games.spectrum.option.duplicates': 'Numbers can repeat',
   'games.spectrum.option.twoRounds': 'Everyone guesses twice',
-  'games.spectrum.option.clock': '90 s to answer, 60 s to guess',
+  'games.spectrum.option.clock': '30 s to choose, 90 s to answer, 60 s to guess',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
   'games.spectrum.name': '光譜',
-  'games.spectrum.summary': '用一個回答說出祕密數字在兩端之間的位置，猜題者找出最大和最小。',
+  'games.spectrum.summary': '用一個回答說出祕密數字在兩端之間的位置，猜題者排出大家的順序。',
   'games.spectrum.option.mode': '猜題者要猜',
   'games.spectrum.option.mode.extremes': '最大和最小',
   'games.spectrum.option.mode.order': '所有人的順序',
   'games.spectrum.option.duplicates': '數字可以重複',
   'games.spectrum.option.twoRounds': '每人當兩次猜題者',
-  'games.spectrum.option.clock': '作答 90 秒、猜題 60 秒',
+  'games.spectrum.option.clock': '選題 30 秒、作答 90 秒、猜題 60 秒',
 }
 
 export const spectrumMessages = { en, 'zh-TW': zhTW } as {

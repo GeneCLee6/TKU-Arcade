@@ -33,6 +33,11 @@ export function promptKey(view: SpectrumView): { key: TextKey; withGuesser: bool
   const plain = (key: TextKey) => ({ key, withGuesser: false })
   if (view.phase === 'over') return plain('games.spectrum.ui.prompt.over')
   if (view.phase === 'reveal') return plain('games.spectrum.ui.prompt.reveal')
+  if (view.phase === 'choosing') {
+    return role === 'guesser'
+      ? plain('games.spectrum.ui.prompt.choose')
+      : { key: 'games.spectrum.ui.prompt.watchChoose', withGuesser: true }
+  }
   if (view.phase === 'answering') {
     if (role === 'guesser') return plain('games.spectrum.ui.prompt.guesserWait')
     if (role === 'spectator') return plain('games.spectrum.ui.prompt.watchAnswers')
