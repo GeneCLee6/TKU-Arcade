@@ -40,6 +40,8 @@ import type {
   FullLastTurn,
   FullPending,
   FullPlayer,
+  FullRouteStep,
+  FullRouteThrow,
   FullRules,
   FullSettlement,
   FullStep,
@@ -60,6 +62,12 @@ export const MAX_THROWS = 3
  * games too short once the second board's events and restorations came in (scripts/promotion-sim.ts)
  */
 export const THROWS_V2 = 1
+/**
+ * Since 2026-11-13 (擁有者): a turn throws until something scores, so it never passes without a
+ * result. This only guards the loop: about one throw in four scores nothing (scripts/promotion-sim.ts),
+ * so this many in a row is never thrown
+ */
+export const RETHROW_CAP = 50
 export const START_MONEY = 100
 /** What a junior pays a senior on landing in the senior's department (參見) */
 export const COURTESY = 5
@@ -214,6 +222,7 @@ export function fullRules(options: Partial<PromotionOptions>): FullRules {
     decisionMs: Math.round(seconds) * 1000,
     buying: options.buying ?? true,
     endAtDahe: options.endAtDahe ?? false,
+    rethrow: true,
   }
 }
 
@@ -229,6 +238,10 @@ type Work = {
   throws: FullThrow[]
   pending: FullPending | null
 }
+
+/** How many throws a turn may take until one scores, by the game's rules */
+const throwsOf = (work: Work): number =>
+  work.rules === null ? MAX_THROWS : work.rules.rethrow ? RETHROW_CAP : THROWS_V2
 
 function pay(work: Work, from: SeatId | null, to: SeatId | null, wanted: number, why: TransferReason) {
   // The bank never goes below nothing; a player may (a debt the end settles)
@@ -424,7 +437,7 @@ function move(work: Work, seat: SeatId, steps: readonly FullStep[], rng: Rng) {
       if (cell.event !== null) {
         player.post = player.cell
         land(work, seat, id)
-        decideEvent(work, seat, rng, 1)
+        decideEvent(work, seat, rng, rules.rethrow ? RETHROW_CAP : 1)
         return
       }
       if (cell.offer && !here.offer) {
@@ -456,6 +469,51 @@ function courtesy(work: Work, seat: SeatId) {
     if (other.rank > player.rank) pay(work, seat, other.seat, COURTESY, 'courtesy')
     else pay(work, other.seat, seat, COURTESY, 'courtesy')
   }
+}
+
+/** What a turn's transfers did to one seat's silver */
+const silverOf = (work: Work, seat: SeatId): number =>
+  work.transfers.reduce(
+    (sum, transfer) => sum + (transfer.to === seat ? transfer.amount : 0) - (transfer.from === seat ? transfer.amount : 0),
+    0,
+  )
+
+/**
+ * Adds the roll just played to the seat's career route, if it did anything: landed somewhere, asked
+ * something (the answer joins this step, `answered`) or moved silver. A game from before keeps none
+ */
+function record(work: Work, seat: SeatId, round: number, birth: boolean) {
+  const player = work.players[seat]
+  if (player.route === undefined) return
+  const silver = silverOf(work, seat)
+  if (!birth && work.path.length === 0 && work.pending === null && silver === 0) return
+  const throws = work.throws
+    .filter((thrown) => birth || thrown.steps.length > 0 || (thrown.event?.face ?? null) !== null)
+    .map((thrown): FullRouteThrow => {
+      const kept: FullRouteThrow = { combo: thrown.combo }
+      if (thrown.event?.face) {
+        kept.zone = thrown.event.cell
+        kept.face = thrown.event.face
+      } else if (!birth && (FULL_FACES as readonly string[]).includes(thrown.steps[0] as string)) {
+        kept.face = thrown.steps[0] as FullFace
+      }
+      return kept
+    })
+  const step: FullRouteStep = { round, throws, path: [...work.path], silver }
+  if (birth) step.birth = true
+  player.route = [...player.route, step]
+}
+
+/** The answer to a decision completes the step of the roll that asked it */
+function answered(work: Work, seat: SeatId, decision: FullDecision) {
+  const player = work.players[seat]
+  const route = player.route
+  if (route === undefined || route.length === 0) return
+  const asked = route[route.length - 1]
+  player.route = [
+    ...route.slice(0, -1),
+    { ...asked, path: [...asked.path, ...work.path], decision, silver: asked.silver + silverOf(work, seat) },
+  ]
 }
 
 const throwDice = (rng: Rng) => Array.from({ length: FULL_DICE }, () => rng.int(6) + 1)
@@ -583,7 +641,13 @@ export function initFull(
   const state = initFullV1(seats, rng)
   return {
     ...state,
-    players: state.players.map((player) => ({ ...player, bought: false, titles: 0, post: null })),
+    players: state.players.map((player) => ({
+      ...player,
+      bought: false,
+      titles: 0,
+      post: null,
+      route: [],
+    })),
     rulesVersion: LATEST_RULES,
     rules: fullRules(options),
     pending: null,
@@ -656,6 +720,7 @@ function decide(
     return gameError('games.promotion.error.decide')
   }
   courtesy(w, seat)
+  answered(w, seat, decision)
   const last: FullLastTurn = {
     seat,
     birth: false,
@@ -715,13 +780,13 @@ export function reduceFull(
     land(w, seat, origin)
   } else if (w.rules !== null && held.event !== null) {
     // Waiting in an event zone: this turn's throws decide it
-    decideEvent(w, seat, rng, THROWS_V2)
+    decideEvent(w, seat, rng, throwsOf(w))
     courtesy(w, seat)
   } else if (w.rules !== null && from === DISMISSED) {
-    restore(w, seat, rng, THROWS_V2)
+    restore(w, seat, rng, throwsOf(w))
     courtesy(w, seat)
   } else {
-    const tries = w.rules === null ? MAX_THROWS : THROWS_V2
+    const tries = throwsOf(w)
     for (let at = 0; at < tries; at++) {
       const dice = throwDice(rng)
       const reading = readThrow(dice)
@@ -747,6 +812,7 @@ export function reduceFull(
     last: { seat, birth, throws, from, path: w.path, transfers: w.transfers },
   }
   if (w.rules === null) return advance(next, seat)
+  record(w, seat, state.round, birth)
   const counted = { ...next, acts: (state.acts ?? 0) + 1 }
   if (w.pending !== null) {
     return { ...counted, pending: w.pending, decisions: (state.decisions ?? 0) + 1 }

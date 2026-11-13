@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { getCell } from '../../../shared/games/promotion/board.ts'
 import type { LastRoll, PromotionView } from '../../../shared/games/promotion/types.ts'
@@ -31,6 +31,9 @@ import { useBoardFit } from './useBoardFit.ts'
 import { MIN_ZOOM, MAX_ZOOM, useBoardZoom } from './useBoardZoom.ts'
 import { useImmersive } from './useImmersive.ts'
 import { useRollPlayback } from './useRollPlayback.ts'
+
+// Each player's way through the game, once it is over: out of the first screen
+const SimpleRoutes = lazy(() => import('./SimpleRoutes.tsx'))
 
 /** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
 const DENSE_CELL = 60
@@ -242,6 +245,13 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
       resultHeadline={resultHeadline}
       resultDetail={resultDetail}
       resultHeld={playing}
+      resultExtra={
+        game.over ? (
+          <Suspense fallback={null}>
+            <SimpleRoutes players={players} nameOf={nameOf} />
+          </Suspense>
+        ) : undefined
+      }
       // Full screen has its own in the rail beside the board: one roll button at a time
       dock={immersed ? undefined : turn}
     >

@@ -324,6 +324,10 @@ describe('the second rules in words (C8)', () => {
     const turnOf = (throws: FullLastTurn['throws']) => ({ ...turn, throws, path: [], transfers: [] })
     expect(lastComboText(t, turnOf([cancel]), 'en')).toBe('games.promotion.full.combo.cancelStay')
     expect(lastComboText(t, turnOf([none, none, cancel]), 'en')).toBe('games.promotion.full.combo.stuck')
+    // Since 2026-11-13 an event zone's throw is thrown again too
+    const zone = { ...none, event: { cell: 'daji', face: null } }
+    expect(comboText(t, zone, false, 'en', true)).toMatch(/^games\.promotion\.full\.combo\.eventAgain/)
+    expect(comboText(t, zone, false, 'en')).toMatch(/^games\.promotion\.full\.combo\.eventWait/)
   })
 
   it('puts each seat on the ladder at the grade the end compares, titles included', () => {

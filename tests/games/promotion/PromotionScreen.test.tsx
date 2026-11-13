@@ -638,3 +638,42 @@ describe('the room around the game', () => {
     })
   })
 })
+describe('career routes at the end (2026-11-13)', () => {
+  it("lists each seat's rolls in order under the result, saying where each led", async () => {
+    const ended = state({
+      turn: null,
+      ending: 'turnLimit',
+      round: 2,
+      players: [
+        {
+          seat: 0,
+          cell: 'tongsheng',
+          rolls: 2,
+          demotions: 0,
+          route: [
+            { round: 1, face: 'de', to: 'tongsheng' },
+            { round: 2, face: 'zang', to: 'tongsheng' },
+          ],
+        },
+        { seat: 1, cell: 'baiding', rolls: 1, demotions: 1, route: [{ round: 1, face: 'zang', to: 'baiding' }] },
+      ],
+    })
+    const game = projection(ended, {
+      result: {
+        summary: { key: 'games.promotion.result.turnLimit', params: { rounds: 2 } },
+        standings: [
+          { seat: 0, rank: 1, score: 1, note: { key: 'games.promotion.note.student', params: { rolls: 2 } } },
+          { seat: 1, rank: 2, score: 0, note: { key: 'games.promotion.note.commoner', params: { rolls: 1 } } },
+        ],
+      },
+    })
+    render(screenOf(parts({ status: 'ended' }), game))
+    const routes = await screen.findByRole('region', { name: 'Career routes' }, { timeout: 10_000 })
+    const first = routes.querySelectorAll('[data-route-seat="0"] li')
+    expect(first).toHaveLength(2)
+    expect(first[0]).toHaveTextContent('Round 1')
+    expect(first[0]).toHaveTextContent('Virtue')
+    expect(first[1]).toHaveTextContent('stays')
+    expect(within(routes).getAllByText(/2 rolls/)).toHaveLength(1)
+  })
+})

@@ -22,6 +22,8 @@ export interface ResultPanelProps {
   detail?(standing: Standing): ReactNode
   /** Everyone shares the outcome, as in a co-operative game: "1st" for all of them would say nothing */
   unranked?: boolean
+  /** What the game shows under the standings, such as each player's way through it */
+  extra?: ReactNode
   onRematch(): void
   onReopen(): void
   onDissolve(): void
@@ -35,6 +37,7 @@ export function ResultPanel({
   headline,
   detail,
   unranked,
+  extra,
   onRematch,
   onReopen,
   onDissolve,
@@ -86,6 +89,8 @@ export function ResultPanel({
           )
         })}
       </List>
+
+      {extra}
 
       <Next>
         <p role="status">{isHost ? t('room.ended.host') : t('room.ended.waitForHost')}</p>
