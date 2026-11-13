@@ -72,7 +72,7 @@ export function RaceCenter({
 }) {
   if (trial.phase === 'countdown') {
     return (
-      <Big key={trial.countdown} role="status" data-testid="kart-countdown">
+      <Big key={`countdown-${trial.countdown}`} role="status" data-testid="kart-countdown">
         {trial.countdown > 0 ? String(trial.countdown) : t('kart.race.go')}
       </Big>
     )

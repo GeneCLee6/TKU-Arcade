@@ -28,6 +28,12 @@ const RulesPage = lazy(() =>
 )
 
 // e8-t01: reached only by typing the address. Nothing links here, and three.js loads with this chunk
+// e8-t14: the kart's time trial, the same chunk as the spike without its tools. Not in the lobby
+// until the handling is signed off (K3)
+const KartPlayPage = lazy(() =>
+  import('./kart/SpikePage.tsx').then(({ SpikePage }) => ({ default: () => <SpikePage play /> })),
+)
+
 const KartSpikePage = lazy(() =>
   import('./kart/SpikePage.tsx').then(({ SpikePage }) => ({ default: SpikePage })),
 )
@@ -49,6 +55,7 @@ function AppRoutes() {
           <Route path="/r/:id/replay" element={<ReplayPage />} />
           <Route path="/games/:id/rules" element={<RulesPage />} />
           <Route path="/kart/spike" element={<KartSpikePage />} />
+          <Route path="/kart" element={<KartPlayPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

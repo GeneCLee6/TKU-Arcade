@@ -4,7 +4,6 @@ import {
   DirectionalLight,
   Fog,
   GridHelper,
-  Group,
   HemisphereLight,
   PCFSoftShadowMap,
   Mesh,
@@ -18,7 +17,11 @@ import type { Wall } from '../../shared/kart/walls.ts'
 import type { Track } from '../../shared/kart/track.ts'
 import { buildTrackArt, type TrackArt } from './art/trackArt.ts'
 import { QUALITY, type Quality } from './quality.ts'
-import { kartScene } from '../styles/tokens.ts'
+import { createKartEffects } from './art/effects.ts'
+import { buildKartModel, type KartLook } from './art/kartModel.ts'
+
+const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
+import { kartScene } from '../styles/kartTokens.ts'
 import { fieldOfView, followCar, startRig, type Chased } from './camera.ts'
 
 const GROUND_SIZE = 400
@@ -42,7 +45,7 @@ export interface KartScene {
   readonly rendererName: string
   readonly canvas: HTMLCanvasElement
   /** `chased` is what the chase camera follows: the direction of travel, and whether it boosts */
-  draw(pose: Pose, chased: Chased, frameSeconds: number): void
+  draw(pose: Pose, chased: Chased, frameSeconds: number, look?: KartLook): void
   /** Puts the camera straight behind the car at once, as after a reset */
   snapCamera(heading: number): void
   /** `{width}x{height}` of the drawing buffer */
@@ -135,20 +138,11 @@ export function createKartScene(
     scene.add(ground, grid)
   }
 
-  const bodyGeometry = new BoxGeometry(1.5, 0.55, 2.6)
-  const bodyMaterial = new MeshLambertMaterial({ color: kartScene.body })
-  const body = new Mesh(bodyGeometry, bodyMaterial)
-  body.position.y = 0.45
-  // A box looks the same from every side: the nose shows which way the car points
-  const noseGeometry = new BoxGeometry(1.1, 0.3, 0.8)
-  const noseMaterial = new MeshLambertMaterial({ color: kartScene.nose })
-  const nose = new Mesh(noseGeometry, noseMaterial)
-  nose.position.set(0, 0.85, -0.7)
-  const car = new Group()
-  car.add(body, nose)
-  body.castShadow = shadows
-  nose.castShadow = shadows
+  // The first kart and its driver (e8-t07), with its smoke, tyre marks and boost flame
+  const kart = buildKartModel(shadows)
+  const car = kart.group
   scene.add(car)
+  const effects = createKartEffects(scene, kart)
 
   // One box per wall, along its centre line: the test yard's. A track's art draws its own barriers
   const wallGeometry = new BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS)
@@ -190,9 +184,11 @@ export function createKartScene(
   return {
     rendererName,
     canvas: renderer.domElement,
-    draw({ x, z, heading }, chased, frameSeconds) {
+    draw({ x, z, heading }, chased, frameSeconds, look = STILL) {
       car.position.set(x, 0, z)
       car.rotation.y = -heading
+      kart.update(look, frameSeconds)
+      effects.update({ x, z, heading }, look, frameSeconds)
 
       // The plane has no end: ground and grid follow the car in whole cells, so the lines stay put
       const snappedX = Math.round(x / GRID_CELL) * GRID_CELL
@@ -220,22 +216,19 @@ export function createKartScene(
     },
     snapCamera(heading) {
       rig = startRig(heading)
+      effects.lift()
     },
     drawingBuffer: () => `${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`,
     dispose() {
       observer.disconnect()
-      for (const geometry of [
-        groundGeometry,
-        grid.geometry,
-        bodyGeometry,
-        noseGeometry,
-        wallGeometry,
-      ]) {
+      for (const geometry of [groundGeometry, grid.geometry, wallGeometry]) {
         geometry.dispose()
       }
-      for (const material of [groundMaterial, bodyMaterial, noseMaterial, wallMaterial]) {
+      for (const material of [groundMaterial, wallMaterial]) {
         material.dispose()
       }
+      effects.dispose()
+      kart.dispose()
       art?.dispose()
       grid.material.dispose()
       renderer.dispose()

@@ -39,8 +39,9 @@ describe('the spike route', () => {
     expect(addresses.filter((address) => address?.includes('kart'))).toEqual([])
   })
 
-  it('leaves /kart itself unknown', async () => {
-    window.history.pushState({}, '', '/kart')
+  // e8-t14: /kart is the time trial now; only an address under it that is not a page is unknown
+  it('leaves an unknown address under /kart unknown', async () => {
+    window.history.pushState({}, '', '/kart/nothing-here')
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
   })

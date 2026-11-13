@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { setSoundOn, useSoundOn } from '../lib/sound.ts'
 import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
 import styled, { keyframes } from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
@@ -61,7 +62,11 @@ type Open = 'controls' | 'tuning' | undefined
  * and e8-t08 add a walled test arena with a reset, the tuning panel, the chase camera and the HUD.
  * Reached only by typing /kart/spike: nothing links here, and the lobby does not know about it.
  */
-export function SpikePage() {
+/**
+ * `play`: the kart page itself (/kart, e8-t14): a time trial on a track, without the test yard,
+ * the tuning panel or the numbers, which stay on /kart/spike for tuning
+ */
+export function SpikePage({ play = false }: { play?: boolean } = {}) {
   const t: (key: KartMessageKey, params?: MessageParams) => string = useT()
   const stage = useRef<HTMLDivElement>(null)
   const [failure, setFailure] = useState<Failure | undefined>(() =>
@@ -84,9 +89,11 @@ export function SpikePage() {
     controls.current = { bindings, rules, tuning, enabled: !controlsOpen }
   }, [bindings, rules, tuning, controlsOpen])
   // e8-t04, e8-t05a: the yard, or a track with its minimap and a time trial (?track=oval|riverside)
+  const courses = play ? SPIKE_COURSES.filter((one) => one !== 'arena') : SPIKE_COURSES
+  const soundOn = useSoundOn()
   const [course, setCourse] = useState<SpikeCourse>(() => {
     const asked = new URLSearchParams(window.location.search).get('track')
-    return SPIKE_COURSES.find((one) => one === asked) ?? 'arena'
+    return courses.find((one) => one === asked) ?? (play ? 'riverside' : 'arena')
   })
   const track = useMemo(() => spikeTrack(course), [course])
   const minimap = useRef<MinimapHandle>(null)
@@ -211,14 +218,25 @@ export function SpikePage() {
           >
             {t('kart.controls.open')}
           </Button>
+          {!play && (
+            <Button
+              ref={tuningOpener}
+              $variant="secondary"
+              $size="sm"
+              aria-expanded={open === 'tuning'}
+              onClick={() => (open === 'tuning' ? closeTuning() : setOpen('tuning'))}
+            >
+              {t('kart.tuning.open')}
+            </Button>
+          )}
           <Button
-            ref={tuningOpener}
             $variant="secondary"
             $size="sm"
-            aria-expanded={open === 'tuning'}
-            onClick={() => (open === 'tuning' ? closeTuning() : setOpen('tuning'))}
+            aria-pressed={soundOn}
+            onClick={() => setSoundOn(!soundOn)}
+            data-testid="kart-sound"
           >
-            {t('kart.tuning.open')}
+            {t(soundOn ? 'kart.spike.soundOn' : 'kart.spike.soundOff')}
           </Button>
           <CourseLabel>
             <span>{t('kart.spike.quality')}</span>
@@ -246,16 +264,22 @@ export function SpikePage() {
               onChange={(event) => switchCourse(event.target.value as SpikeCourse)}
               data-testid="kart-course"
             >
-              {SPIKE_COURSES.map((one) => (
+              {courses.map((one) => (
                 <option key={one} value={one}>
                   {t(`kart.course.${one}`)}
                 </option>
               ))}
             </select>
           </CourseLabel>
-          <Button $variant="secondary" $size="sm" onClick={() => setShowNumbers((shown) => !shown)}>
-            {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
-          </Button>
+          {!play && (
+            <Button
+              $variant="secondary"
+              $size="sm"
+              onClick={() => setShowNumbers((shown) => !shown)}
+            >
+              {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
+            </Button>
+          )}
         </Buttons>
       </TopRow>
       {showNumbers && stats && (
@@ -279,9 +303,9 @@ export function SpikePage() {
         </Numbers>
       )}
       {hud.hits > 0 && (
-        <WallFlash key={hud.hits} aria-hidden="true" data-testid="kart-wall-flash" />
+        <WallFlash key={`hit-${hud.hits}`} aria-hidden="true" data-testid="kart-wall-flash" />
       )}
-      {callout && <CalloutText key={callout.id} t={t} callout={callout.callout} />}
+      {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       {track && (
         <MapCorner>
           {trial && <RaceClock ref={clock} t={t} trial={trial} />}
@@ -294,7 +318,7 @@ export function SpikePage() {
       <Bottom>
         <Hud t={t} hud={hud} maxStored={tuning.maxStoredBoosts} />
         <Hint>
-          <HintTitle>{t('kart.spike.title')}</HintTitle>
+          <HintTitle>{t(play ? 'kart.play.title' : 'kart.spike.title')}</HintTitle>
           {coarsePointer ? t('kart.spike.noTouch') : t('kart.spike.keys', hintKeys)}
         </Hint>
       </Bottom>

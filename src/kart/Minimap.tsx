@@ -3,7 +3,8 @@ import styled from 'styled-components'
 import { trackBounds, type Gate, type RoadPoint } from '../../shared/kart/track.ts'
 import type { KartMessageKey } from '../../shared/kart/i18n.ts'
 import type { MessageParams } from '../i18n/t.ts'
-import { color, kartScene } from '../styles/tokens.ts'
+import { color } from '../styles/tokens.ts'
+import { kartScene } from '../styles/kartTokens.ts'
 
 /** Moves the car's marker without a React render: the loop calls it every frame */
 export interface MinimapHandle {

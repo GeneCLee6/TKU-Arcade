@@ -1,4 +1,5 @@
 import { TEST_ARENA } from '../../shared/kart/arena.ts'
+import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
 import { courseOf, parseTrack, type Track } from '../../shared/kart/track.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
@@ -184,6 +185,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let trial: Trial | null = trialCourse ? startTrial(trialCourse) : null
   let lastTrial: SpikeTrial | undefined
   const scene = createKartScene(container, course.walls, track ?? undefined, options.quality)
+  const audio = createKartAudio()
   const held = new Set<string>()
   // A boost or reset key pressed and let go between two steps still counts
   let boostTapped = false
@@ -255,7 +257,10 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         callout = louder(callout, calloutBetween(before.kart, run.kart))
       }
       // One hit per crash, not one per step of pushing against the wall after it
-      if (run.hitSpeed >= HIT_SPEED && before.hitSpeed < HIT_SPEED) hits++
+      if (run.hitSpeed >= HIT_SPEED && before.hitSpeed < HIT_SPEED) {
+        hits++
+        audio.hit(run.impact)
+      }
       debug.input = input
     }
     const current = run.kart
@@ -271,11 +276,24 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     debug.crossings = run.crossings
     debug.nextGate = run.nextGate
     const boosting = current.boostSeconds > 0
+    const look = {
+      speed: current.vx * Math.sin(current.heading) - current.vz * Math.cos(current.heading),
+      steer: debug.input.steer,
+      drift: current.driftDirection,
+      boosting,
+    }
     scene.draw(
       poseBetween(previous, current, clock.alpha),
       { heading: current.heading, vx: current.vx, vz: current.vz, boosting },
       frameMs / 1000,
+      look,
     )
+    audio.update({
+      speed: look.speed,
+      throttle: debug.input.throttle,
+      drifting: current.drifting,
+      boosting,
+    })
     if (callout) options.onCallout(callout)
 
     const hud: SpikeHud = {
@@ -334,6 +352,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     isBoundKey(bindings, code) || code.startsWith('Arrow')
 
   const onKeyDown = (event: KeyboardEvent) => {
+    // Sound may start only after a gesture: the first key is one
+    audio.unlock()
     const { bindings, enabled } = options.controls()
     if (!enabled || event.altKey || event.ctrlKey || event.metaKey) return
     // A slider, a list or a text box keeps its keys: the tuning panel is used while the car waits
@@ -364,6 +384,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     window.removeEventListener('blur', onBlur)
     scene.canvas.removeEventListener('webglcontextlost', onContextLost)
     scene.dispose()
+    audio.dispose()
   }
   const onContextLost = () => {
     stop()

@@ -23,7 +23,7 @@
 2. **介面文字一律走 i18n**：`t('key')`，`en.ts` 是來源、`zh-TW.ts` 必須同步；JSX 不得有裸字串；`npm run check-i18n` 在 CI 擋。
 3. **規則在伺服器**：遊戲狀態只由 RoomDO 的 `GameModule.reduce` 改變；前端只呈現 `view`；隱藏資訊只能透過 `view` 裁切。
 4. **資產一律登記** `docs/ASSETS.md`（來源、授權）；模型、貼圖、音檔走 R2，不 commit；CI 擋未登記的檔案。
-5. **顏色只來自 `src/styles/tokens.ts`**；只用於樣式的 prop 加 `$` 前綴。
+5. **顏色只來自 `src/styles/tokens.ts`**（卡丁車 3D 場景的色值在同資料夾的 `kartTokens.ts`：WebGL 讀不到 CSS 變數，放在 tokens.ts 會進每個人的首屏，K2 起）；只用於樣式的 prop 加 `$` 前綴。
 6. **不要直接推送到 `main`，也不要 force-push。** 功能走分支＋PR，合併用 `gh pr merge <號> --squash --delete-branch`。
 7. **合併到 `main` 就會自動上線**；PR 要 CI 全綠、看過預覽站才合併。
 8. 程式碼、註解、commit、**PR 標題**用英文；文件用繁體中文（台灣用語）；介面兩語都要。

@@ -4,6 +4,9 @@
 const en = {
   'kart.spike.title': 'Kart physics test',
   'kart.spike.course': 'Course',
+  'kart.spike.soundOn': 'Sound on',
+  'kart.spike.soundOff': 'Sound off',
+  'kart.play.title': 'Time trial',
   'kart.spike.quality': 'Graphics',
   'kart.quality.low': 'Low',
   'kart.quality.medium': 'Medium',
@@ -215,6 +218,9 @@ export type KartMessageKey = keyof typeof en
 const zhTW: Record<KartMessageKey, string> = {
   'kart.spike.title': '卡丁車物理測試',
   'kart.spike.course': '場地',
+  'kart.spike.soundOn': '聲音開',
+  'kart.spike.soundOff': '聲音關',
+  'kart.play.title': '計時賽',
   'kart.spike.quality': '畫質',
   'kart.quality.low': '低',
   'kart.quality.medium': '中',
