@@ -1,6 +1,7 @@
 // Every string that loads with a game's screen instead of with the site, in one place for what has
 // to see them all: check-i18n and `npm run play`. The site itself must not import this file: that
 // would put them all in everyone's first load. A screen adds its own (`registerMessages`).
+import { bluffScreenMessages } from './bluff/i18n.screen.ts'
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
 import { promotionFullMessages } from './promotion/i18n.full.ts'
 import { promotionScreenMessages } from './promotion/i18n.screen.ts'
@@ -16,6 +17,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...promotionFullMessages.en,
     ...silentTableScreenMessages.en,
     ...spectrumScreenMessages.en,
+    ...bluffScreenMessages.en,
     ...soonMessages.en,
   },
   'zh-TW': {
@@ -24,6 +26,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...promotionFullMessages['zh-TW'],
     ...silentTableScreenMessages['zh-TW'],
     ...spectrumScreenMessages['zh-TW'],
+    ...bluffScreenMessages['zh-TW'],
     ...soonMessages['zh-TW'],
   },
 }
