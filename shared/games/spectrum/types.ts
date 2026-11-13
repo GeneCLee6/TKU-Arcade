@@ -71,6 +71,8 @@ export type SpectrumRound = {
 }
 
 export type SpectrumPhase =
+  /** The guesser picks this round's topic from a card of four; the numbers are already dealt */
+  | 'choosing'
   /** Answerers write; nobody sees anyone else's answer yet */
   | 'answering'
   /** The answers are locked and shown; the guesser guesses */
@@ -104,8 +106,14 @@ export type SpectrumState = {
   round: number
   totalRounds: number
   guesser: SeatId
-  topic: SpectrumTopic
-  /** Every topic this room has had, so that none comes twice */
+  /**
+   * This round's card: the topics the guesser chooses from (owner, 2026-11-13). Absent in a state
+   * saved before cards came in
+   */
+  card?: SpectrumTopic[]
+  /** The topic the guesser chose; null while choosing */
+  topic: SpectrumTopic | null
+  /** Every topic this room has had on a card, so that none comes twice */
   usedTopics: number[]
   /** Everyone but the guesser, in seat order */
   answerers: SpectrumAnswerer[]
@@ -116,6 +124,8 @@ export type SpectrumState = {
 }
 
 export type SpectrumAction =
+  /** The guesser, while choosing: one of the card's topics, by id */
+  | { type: 'chooseTopic'; id: number }
   /** An answerer's answer, which a later one replaces until the answers are locked */
   | { type: 'submitAnswer'; text: string }
   | { type: 'guessExtremes'; max: SeatId; min: SeatId }
@@ -125,7 +135,7 @@ export type SpectrumAction =
   | { type: 'next' }
   /** From the room only (`skipAction`): a seat whose player is gone */
   | { type: 'skip'; seat: SeatId }
-  /** From the room only (`timers`): the answering or the guessing time is up */
+  /** From the room only (`timers`): the choosing, the answering or the guessing time is up */
   | { type: 'timeUp' }
 
 export type SpectrumAnswerStatus = 'thinking' | 'answered' | 'out'
@@ -143,7 +153,9 @@ export type SpectrumAnswererView = {
  * What one viewer sees: an answerer their own number only, the guesser and spectators none, and
  * nobody another's answer before the answers are locked. The reveal shows everything.
  */
-export type SpectrumView = Omit<SpectrumState, 'answerers' | 'usedTopics' | 'firstGuesser'> & {
+export type SpectrumView = Omit<SpectrumState, 'answerers' | 'usedTopics' | 'firstGuesser' | 'card'> & {
+  /** This round's card, which everyone sees (empty in a round from before cards) */
+  card: SpectrumTopic[]
   /** The viewer's own seat; null for a spectator */
   you: SeatId | null
   answerers: SpectrumAnswererView[]

@@ -24,8 +24,15 @@ import { stubDialog } from '../../lib/stubDialog.ts'
 const NAMES = ['Al', 'Bo', 'Cy', 'Di']
 const OPTIONS: SpectrumOptions = { mode: 'extremes', duplicates: false, twoRounds: false, clock: true }
 
-const start = (options: Partial<SpectrumOptions> = {}) =>
+/** A new game as dealt: the guesser still choosing from the card */
+const dealt = (options: Partial<SpectrumOptions> = {}) =>
   spectrum.init(makeSeats(4), { ...OPTIONS, ...options }, createRng(7))
+
+/** A new game with the first topic on the card chosen */
+const start = (options: Partial<SpectrumOptions> = {}) => {
+  const state = dealt(options)
+  return act(state, { type: 'chooseTopic', id: (state.card ?? [])[0].id }, state.guesser)
+}
 
 function act(state: SpectrumState, action: SpectrumAction, actor: Actor): SpectrumState {
   const next = spectrum.reduce(state, action, actor, createRng(3))
@@ -107,14 +114,40 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals())
 
+describe('choosing the topic', () => {
+  it('lets the guesser ask one of the four topics on the card', () => {
+    const state = dealt()
+    const room = show(state, state.guesser)
+    const card = state.card ?? []
+    const choice = screen.getByTestId('topic-choice')
+    const asks = within(choice).getAllByRole('button')
+    expect(asks).toHaveLength(4)
+    card.forEach((topic, index) => expect(asks[index]).toHaveTextContent(topic.topic))
+    expect(screen.queryByTestId('topic-card')).toBeNull()
+    expect(screen.getAllByText('Choose a topic to ask').length).toBeGreaterThan(0)
+    fireEvent.click(asks[2])
+    expect(room.act).toHaveBeenCalledWith({ type: 'chooseTopic', id: card[2].id })
+  })
+
+  it('shows everyone else the same card, nothing to press, and who is choosing', () => {
+    const state = dealt()
+    show(state, state.answerers[0].seat)
+    const choice = screen.getByTestId('topic-choice')
+    expect(within(choice).queryAllByRole('button')).toHaveLength(0)
+    for (const topic of state.card ?? []) expect(within(choice).getByText(topic.topic)).toBeInTheDocument()
+    expect(screen.getByText(`${NAMES[state.guesser]} is choosing a topic from the card`)).toBeInTheDocument()
+  })
+})
+
 describe('answering', () => {
   it('shows the topic, its two ends and the round', () => {
     const state = start()
     show(state, state.answerers[0].seat)
     const card = screen.getByTestId('topic-card')
-    expect(within(card).getByRole('heading')).toHaveTextContent(state.topic.topic)
-    expect(within(card).getByText(state.topic.low)).toBeInTheDocument()
-    expect(within(card).getByText(state.topic.high)).toBeInTheDocument()
+    expect(within(card).getByRole('heading')).toHaveTextContent(state.topic?.topic ?? '')
+    expect(within(card).getByText(state.topic?.low ?? '')).toBeInTheDocument()
+    expect(within(card).getByText(state.topic?.high ?? '')).toBeInTheDocument()
+    expect(screen.queryByTestId('topic-choice')).toBeNull()
     expect(screen.getAllByText('Round 1/4').length).toBeGreaterThan(0)
     expect(screen.getByText('The topics are only in Chinese for now.')).toBeInTheDocument()
   })
@@ -287,7 +320,10 @@ describe('the reveal', () => {
       state = answered(state)
       const [first, second] = state.answerers
       state = act(state, { type: 'guessExtremes', max: first.seat, min: second.seat }, state.guesser)
-      if (round < 4) state = act(state, { type: 'next' }, state.guesser)
+      if (round < 4) {
+        state = act(state, { type: 'next' }, state.guesser)
+        state = act(state, { type: 'chooseTopic', id: (state.card ?? [])[0].id }, state.guesser)
+      }
     }
     show(state, 0)
     expect(screen.getByRole('region', { name: 'Results' })).toBeInTheDocument()

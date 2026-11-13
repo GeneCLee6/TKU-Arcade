@@ -7,6 +7,8 @@ import { SCREEN_MESSAGES } from '../../shared/games/screenMessages.ts'
 import { GAME_MESSAGES } from '../../shared/games/catalog.ts'
 import {
   ANSWER_MS,
+  CARD_SIZE,
+  CHOOSE_MS,
   GUESS_MS,
   MAX_ANSWER_LENGTH,
   SAMPLE_ANSWERS,
@@ -32,8 +34,17 @@ const OPTIONS: SpectrumOptions = {
   clock: true,
 }
 
-const start = (seats: number, overrides: Partial<SpectrumOptions> = {}, seed = 1) =>
+/** A new game as the room deals it: the guesser still choosing from the card */
+const dealt = (seats: number, overrides: Partial<SpectrumOptions> = {}, seed = 1) =>
   spectrum.init(makeSeats(seats), { ...OPTIONS, ...overrides }, createRng(seed))
+
+/** The guesser asks the first topic on the card, and the answerers can write */
+const chosen = (state: SpectrumState): SpectrumState =>
+  act(state, { type: 'chooseTopic', id: (state.card ?? [])[0].id }, state.guesser)
+
+/** A new game with its first topic chosen */
+const start = (seats: number, overrides: Partial<SpectrumOptions> = {}, seed = 1) =>
+  chosen(dealt(seats, overrides, seed))
 
 const answer = (text: string): SpectrumAction => ({ type: 'submitAnswer', text })
 const extremes = (max: number, min: number): SpectrumAction => ({ type: 'guessExtremes', max, min })
@@ -125,8 +136,8 @@ describe('the module', () => {
 })
 
 describe('rule options', () => {
-  it('defaults to largest and smallest, no repeats, one round each, the clock on', () => {
-    expect(defaultOptions(spectrum.options)).toEqual(OPTIONS)
+  it('defaults to the whole order (owner, 2026-11-13), no repeats, one round each, the clock on', () => {
+    expect(defaultOptions(spectrum.options)).toEqual({ ...OPTIONS, mode: 'order' })
   })
 
   it('replaces what is invalid with the default', () => {
@@ -137,7 +148,7 @@ describe('rule options', () => {
         twoRounds: 2,
         clock: null,
       }),
-    ).toEqual(OPTIONS)
+    ).toEqual({ ...OPTIONS, mode: 'order' })
   })
 
   it('keeps what is valid and copies it into the state', () => {
@@ -193,35 +204,46 @@ describe('the deal', () => {
   })
 })
 
+const cardIds = (state: SpectrumState) => (state.card ?? []).map((topic) => topic.id)
+
 describe('topics', () => {
-  it('draws a topic from the bank, its two ends with it', () => {
-    const { topic } = start(4)
-    const [category, text, low, high] = SPECTRUM_TOPICS[topic.id - 1]
-    expect(topic).toEqual({ id: topic.id, category, topic: text, low, high })
+  it('deals a card of four topics from the bank, each with its two ends, each of another category', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const { card = [] } = dealt(4, {}, seed)
+      expect(card).toHaveLength(CARD_SIZE)
+      expect(CARD_SIZE).toBe(4)
+      for (const topic of card) {
+        const [category, text, low, high] = SPECTRUM_TOPICS[topic.id - 1]
+        expect(topic).toEqual({ id: topic.id, category, topic: text, low, high })
+      }
+      expect(new Set(card.map((topic) => topic.category)).size).toBe(CARD_SIZE)
+    }
   })
 
-  it('never draws one twice in a room, over the longest game', () => {
-    let state = start(11, { twoRounds: true }, 5)
-    const seen = [state.topic.id]
+  it('never puts a topic on a card twice in a room, over the longest game', () => {
+    let state = dealt(11, { twoRounds: true }, 5)
+    const seen = [...cardIds(state)]
     while (state.phase !== 'over') {
+      if (state.phase === 'choosing') state = chosen(state)
       state = answerAll(state)
       const [max, min] = answererSeats(state)
       state = act(state, extremes(max, min), state.guesser)
       if (state.phase === 'reveal') {
         state = act(state, NEXT, state.guesser)
-        seen.push(state.topic.id)
+        seen.push(...cardIds(state))
       }
     }
-    expect(seen).toHaveLength(22)
-    expect(new Set(seen).size).toBe(22)
+    expect(seen).toHaveLength(22 * CARD_SIZE)
+    expect(new Set(seen).size).toBe(22 * CARD_SIZE)
     expect(state.usedTopics).toEqual(seen)
   })
 
   it('starts the bank over rather than run dry', () => {
     const all = SPECTRUM_TOPICS.map((_, index) => index + 1)
-    const state = answerAll({ ...start(4), usedTopics: all })
+    const state = answerAll({ ...start(4), usedTopics: all.slice(0, all.length - 2) })
     const shown = act(act(state, extremes(...firstTwo(state)), state.guesser), NEXT, state.guesser)
-    expect(shown.usedTopics).toEqual([shown.topic.id])
+    expect(shown.card).toHaveLength(CARD_SIZE)
+    expect(shown.usedTopics).toEqual(cardIds(shown))
   })
 
   const firstTwo = (state: SpectrumState): [number, number] => {
@@ -436,7 +458,7 @@ describe('rounds and the end of the game', () => {
     const answered = answerAll(state)
     const [first, second] = answererSeats(answered)
     const guessed = act(answered, extremes(first, second), answered.guesser)
-    return guessed.phase === 'reveal' ? act(guessed, NEXT, guessed.guesser) : guessed
+    return guessed.phase === 'reveal' ? chosen(act(guessed, NEXT, guessed.guesser)) : guessed
   }
 
   it('moves the guesser one seat on each round, so everyone guesses once', () => {
@@ -469,14 +491,14 @@ describe('rounds and the end of the game', () => {
   it('keeps each finished round, deals new numbers, and clears the answers', () => {
     const state = act(guessing(4, { 1: 7, 2: 2, 3: 9 }), extremes(3, 2), 0)
     const next = act(state, NEXT, 0)
-    expect(next).toMatchObject({ phase: 'answering', round: 2, guesser: 1, reveal: null })
+    expect(next).toMatchObject({ phase: 'choosing', round: 2, guesser: 1, reveal: null, topic: null })
     expect(next.history).toHaveLength(1)
     expect(next.history[0]).toMatchObject({ round: 1, guesser: 0, topic: state.topic })
     expect(next.history[0].reveal).toEqual(state.reveal)
     expect(next.history[0].answerers.map((answerer) => answerer.number)).toEqual([7, 2, 9])
     expect(answererSeats(next)).toEqual([0, 2, 3])
     expect(next.answerers.every((answerer) => answerer.text === null)).toBe(true)
-    expect(next.topic.id).not.toBe(state.topic.id)
+    expect(cardIds(next)).not.toContain(state.topic?.id)
   })
 
   it('only the guesser moves on, and only after the reveal', () => {
@@ -535,7 +557,9 @@ describe('rounds and the end of the game', () => {
 describe('the clock', () => {
   const timers = (state: SpectrumState) => spectrum.timers?.(state) ?? []
 
-  it('gives 90 seconds to answer and 60 to guess, a fresh one every round', () => {
+  it('gives 30 seconds to choose, 90 to answer and 60 to guess, a fresh one every round', () => {
+    expect(timers(dealt(4))).toEqual([{ id: 'choose-1', ms: CHOOSE_MS, action: TIME_UP }])
+    expect(CHOOSE_MS).toBe(30_000)
     const state = start(4)
     expect(timers(state)).toEqual([{ id: 'answer-1', ms: ANSWER_MS, action: TIME_UP }])
     expect(ANSWER_MS).toBe(90_000)
@@ -544,7 +568,7 @@ describe('the clock', () => {
     expect(GUESS_MS).toBe(60_000)
     const shown = act(guess, extremes(3, 2), 0)
     expect(timers(shown)).toEqual([])
-    expect(timers(act(shown, NEXT, 0))[0].id).toBe('answer-2')
+    expect(timers(act(shown, NEXT, 0))[0].id).toBe('choose-2')
   })
 
   it('keeps the same countdown while answers come in', () => {
@@ -629,7 +653,7 @@ describe('covering for an absent seat', () => {
     })
     expect(spectrum.skipAction?.(shown, 0)).toEqual(skip(0))
     const next = act(shown, skip(0), 'system')
-    expect(next).toMatchObject({ phase: 'answering', round: 2, guesser: 1 })
+    expect(next).toMatchObject({ phase: 'choosing', round: 2, guesser: 1 })
   })
 
   it('comes only from the room, for a seat at the table', () => {
@@ -643,13 +667,73 @@ describe('covering for an absent seat', () => {
 
   it('goes through the same match code the room uses', () => {
     const match = startMatch(spectrum, makeSeats(4), OPTIONS, 5)
-    const seat = match.state.answerers[0].seat
-    expect(isGameError(applyAction(spectrum, match, skip(seat), 'system'))).toBe(false)
+    expect(isGameError(applyAction(spectrum, match, skip(match.state.guesser), 'system'))).toBe(false)
+  })
+})
+
+describe('choosing the topic (owner, 2026-11-13)', () => {
+  it('starts every round with the guesser choosing, the numbers already dealt', () => {
+    const state = dealt(4)
+    expect(state).toMatchObject({ phase: 'choosing', topic: null, round: 1 })
+    expect(state.answerers.every((answerer) => answerer.number >= 1 && answerer.number <= 10)).toBe(true)
+  })
+
+  it('takes the guesser’s pick from the card and lets the answerers write', () => {
+    const state = dealt(4)
+    const [, second] = state.card ?? []
+    const next = act(state, { type: 'chooseTopic', id: second.id }, state.guesser)
+    expect(next).toMatchObject({ phase: 'answering', topic: second })
+  })
+
+  it('offers the guesser each topic on the card, and nobody else anything', () => {
+    const state = dealt(4)
+    expect(spectrum.legalActions(state, state.guesser)).toEqual(
+      cardIds(state).map((id) => ({ type: 'chooseTopic', id })),
+    )
+    expect(spectrum.legalActions(state, state.answerers[0].seat)).toEqual([])
+  })
+
+  it('refuses a topic not on the card, anyone but the guesser, and choosing twice', () => {
+    const state = dealt(4)
+    const off = SPECTRUM_TOPICS.map((_, index) => index + 1).find((id) => !cardIds(state).includes(id))
+    expect(refusal(state, { type: 'chooseTopic', id: off }, state.guesser).gameError).toBe(error('notOnCard'))
+    expect(refusal(state, { type: 'chooseTopic', id: cardIds(state)[0] }, state.answerers[0].seat).gameError).toBe(
+      error('notGuesser'),
+    )
+    expect(refusal(state, { type: 'chooseTopic', id: 'one' }, state.guesser).gameError).toBe(error('badAction'))
+    expect(refusal(chosen(state), { type: 'chooseTopic', id: cardIds(state)[0] }, state.guesser).gameError).toBe(
+      error('notChoosing'),
+    )
+    expect(refusal(state, answer('滷肉飯'), state.answerers[0].seat).gameError).toBe(error('notAnswering'))
+  })
+
+  it('when the time runs out or the guesser is gone, the room asks one of the card’s topics', () => {
+    const state = dealt(4)
+    const timed = act(state, TIME_UP, 'system')
+    expect(timed.phase).toBe('answering')
+    expect(cardIds(state)).toContain(timed.topic?.id)
+    expect(spectrum.skipAction?.(state, state.guesser)).toEqual(skip(state.guesser))
+    expect(spectrum.skipAction?.(state, state.answerers[0].seat)).toBeNull()
+    const skipped = act(state, skip(state.guesser), 'system')
+    expect(cardIds(state)).toContain(skipped.topic?.id)
+  })
+
+  it('shows everyone the card, the guesser and spectators too', () => {
+    const state = dealt(4)
+    for (const viewer of [state.guesser, state.answerers[0].seat, 'spectator'] as const) {
+      expect(spectrum.view(state, viewer).card).toEqual(state.card)
+    }
+  })
+
+  it('still shows a round from before cards, with an empty card', () => {
+    const { card: _card, ...old } = start(4)
+    expect(spectrum.view(old, 0).card).toEqual([])
   })
 })
 
 describe('chat', () => {
   it('is closed while answering and guessing, so nobody can type a number, and open at the reveal', () => {
+    expect(spectrum.chatLocked?.(dealt(4))).toBe(true)
     expect(spectrum.chatLocked?.(start(4))).toBe(true)
     const guess = guessing(4, { 1: 7, 2: 2, 3: 9 })
     expect(spectrum.chatLocked?.(guess)).toBe(true)

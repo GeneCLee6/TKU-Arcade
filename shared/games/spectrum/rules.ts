@@ -1,8 +1,8 @@
 // Spectrum (e5-t02, e5-t03): each round one seat is the guesser and everyone else gets a secret
-// number from 1 to 10. A topic with two ends is drawn ("late-night snacks": 1 = least wanted,
-// 10 = most wanted), and each answerer sends one answer that says where their number sits between
+// number from 1 to 10. The guesser is dealt a card of four topics with two ends each and picks one
+// to ask (owner, 2026-11-13; "late-night snacks": 1 = least wanted, 10 = most wanted), and each answerer sends one answer that says where their number sits between
 // the two ends, without saying the number. Once every answer is in they are shown, and the guesser
-// picks the largest and the smallest (or, as a rule option, puts every answer in order). Every
+// puts every answer in order (or, as a rule option, picks only the largest and the smallest). Every
 // right pick scores one for the guesser and one for that answerer. The guesser moves one seat on
 // each round; everyone guesses once (or twice), and the highest total wins.
 //
@@ -29,6 +29,9 @@ export { MAX_ANSWER_LENGTH, normaliseAnswer }
 /** Fewer answers than this leave nothing to compare, and the round scores nothing */
 export const MIN_ANSWERS = 2
 export const ANSWER_MS = 90_000
+/** Topics on a round's card, each from a different category where the bank allows */
+export const CARD_SIZE = 4
+export const CHOOSE_MS = 30_000
 export const GUESS_MS = 60_000
 
 /** What `legalActions` lists for an answer: the browser asks for the real one */
@@ -52,6 +55,8 @@ const ERROR = {
   sameSeat: 'games.spectrum.error.sameSeat',
   badOrder: 'games.spectrum.error.badOrder',
   notReveal: 'games.spectrum.error.notReveal',
+  notChoosing: 'games.spectrum.error.notChoosing',
+  notOnCard: 'games.spectrum.error.notOnCard',
   nothingToSkip: 'games.spectrum.error.nothingToSkip',
 } as const
 
@@ -60,8 +65,9 @@ const isSeat = (value: unknown): value is SeatId => Number.isInteger(value)
 /** `action` comes off the network: its static type promises nothing at run time */
 function parseAction(action: unknown): SpectrumAction | null {
   if (typeof action !== 'object' || action === null) return null
-  const { type, text, max, min, seats, seat } = action as Record<string, unknown>
+  const { type, text, max, min, seats, seat, id } = action as Record<string, unknown>
   if (type === 'next' || type === 'timeUp') return { type }
+  if (type === 'chooseTopic' && Number.isInteger(id)) return { type, id: id as number }
   if (type === 'submitAnswer' && typeof text === 'string') return { type, text }
   if (type === 'guessExtremes' && isSeat(max) && isSeat(min)) return { type, max, min }
   if (type === 'guessOrder' && Array.isArray(seats) && seats.every(isSeat)) {
@@ -76,13 +82,35 @@ const topicAt = (id: number): SpectrumTopic => {
   return { id, category, topic, low, high }
 }
 
-/** A topic this room has not had yet; once every one has come up, the bank starts over */
-function drawTopic(used: readonly number[], rng: Rng): { topic: SpectrumTopic; used: number[] } {
+/**
+ * A card of CARD_SIZE topics this room has not had yet, each from a different category while the
+ * fresh ones span enough categories. Once the bank runs short, it starts over
+ */
+function drawCard(used: readonly number[], rng: Rng): { card: SpectrumTopic[]; used: number[] } {
+  const all = SPECTRUM_TOPICS.map((_, index) => index + 1)
   const seen = new Set(used)
-  const fresh = SPECTRUM_TOPICS.map((_, index) => index + 1).filter((id) => !seen.has(id))
-  const pool = fresh.length > 0 ? fresh : SPECTRUM_TOPICS.map((_, index) => index + 1)
-  const id = rng.pick(pool)
-  return { topic: topicAt(id), used: fresh.length > 0 ? [...used, id] : [id] }
+  let fresh = all.filter((id) => !seen.has(id))
+  let start = [...used]
+  if (fresh.length < CARD_SIZE) {
+    fresh = all
+    start = []
+  }
+  const shuffled = rng.shuffle(fresh)
+  const picked: number[] = []
+  const categories = new Set<string>()
+  for (const id of shuffled) {
+    if (picked.length === CARD_SIZE) break
+    const category = SPECTRUM_TOPICS[id - 1][0]
+    if (categories.has(category)) continue
+    categories.add(category)
+    picked.push(id)
+  }
+  // Fewer categories left than places on the card: the rest from any category
+  for (const id of shuffled) {
+    if (picked.length === CARD_SIZE) break
+    if (!picked.includes(id)) picked.push(id)
+  }
+  return { card: picked.map(topicAt), used: [...start, ...picked] }
 }
 
 /** One number for each answerer: all different, unless the room allows repeats */
@@ -102,17 +130,18 @@ function dealRound(
   rng: Rng,
 ): Pick<
   SpectrumState,
-  'phase' | 'round' | 'guesser' | 'topic' | 'usedTopics' | 'answerers' | 'reveal'
+  'phase' | 'round' | 'guesser' | 'card' | 'topic' | 'usedTopics' | 'answerers' | 'reveal'
 > {
   const guesser = guesserOf(state, round)
-  const { topic, used } = drawTopic(state.usedTopics, rng)
+  const { card, used } = drawCard(state.usedTopics, rng)
   const seats = state.players.map((player) => player.seat).filter((seat) => seat !== guesser)
   const numbers = dealNumbers(seats.length, state.duplicates, rng)
   return {
-    phase: 'answering',
+    phase: 'choosing',
     round,
     guesser,
-    topic,
+    card,
+    topic: null,
     usedTopics: used,
     answerers: seats.map((seat, index) => ({
       seat,
@@ -190,11 +219,22 @@ function lock(state: SpectrumState): SpectrumState {
 const lockIfAllIn = (state: SpectrumState): SpectrumState =>
   state.answerers.every((answerer) => answerer.out || answerer.text !== null) ? lock(state) : state
 
+/** The topic is set and the answerers start writing */
+const choose = (state: SpectrumState, topic: SpectrumTopic): SpectrumState => ({
+  ...state,
+  phase: 'answering',
+  topic,
+})
+
+/** The room's pick for a guesser who is gone or out of time */
+const randomChoice = (state: SpectrumState, rng: Rng): SpectrumState =>
+  choose(state, rng.pick(state.card ?? []))
+
 function nextRound(state: SpectrumState, rng: Rng): SpectrumState {
   const finished = {
     round: state.round,
     guesser: state.guesser,
-    topic: state.topic,
+    topic: state.topic as SpectrumTopic,
     answerers: state.answerers,
     reveal: state.reveal as SpectrumReveal,
   }
@@ -230,6 +270,7 @@ function skip(state: SpectrumState, seat: SeatId, rng: Rng): SpectrumState | nul
     })
   }
   if (seat !== state.guesser) return null
+  if (state.phase === 'choosing') return randomChoice(state, rng)
   if (state.phase === 'guessing') return reveal(state, null, 'skipped')
   return nextRound(state, rng)
 }
@@ -267,6 +308,7 @@ export const spectrum: GameModule<SpectrumState, SpectrumAction, SpectrumView, S
         }
         return skip(state, action.seat, rng) ?? gameError(ERROR.nothingToSkip)
       }
+      if (state.phase === 'choosing') return randomChoice(state, rng)
       if (state.phase === 'answering') return lock(state)
       if (state.phase === 'guessing') return reveal(state, null, 'time')
       return gameError(ERROR.nothingToSkip)
@@ -274,6 +316,13 @@ export const spectrum: GameModule<SpectrumState, SpectrumAction, SpectrumView, S
 
     if (actor === 'system') return gameError(ERROR.badAction)
     if (!state.players.some((player) => player.seat === actor)) return gameError(ERROR.notAPlayer)
+
+    if (action.type === 'chooseTopic') {
+      if (state.phase !== 'choosing') return gameError(ERROR.notChoosing)
+      if (actor !== state.guesser) return gameError(ERROR.notGuesser)
+      const topic = (state.card ?? []).find((option) => option.id === action.id)
+      return topic ? choose(state, topic) : gameError(ERROR.notOnCard)
+    }
 
     if (action.type === 'submitAnswer') {
       if (state.phase !== 'answering') return gameError(ERROR.notAnswering)
@@ -312,9 +361,10 @@ export const spectrum: GameModule<SpectrumState, SpectrumAction, SpectrumView, S
   view(state, viewer) {
     const shown = state.phase === 'reveal' || state.phase === 'over'
     const locked = state.phase !== 'answering'
-    const { usedTopics: _used, firstGuesser: _first, ...open } = state
+    const { usedTopics: _used, firstGuesser: _first, card, ...open } = state
     return {
       ...open,
+      card: card ?? [],
       you: viewer === 'spectator' ? null : viewer,
       answerers: state.answerers.map((answerer) => {
         const own = answerer.seat === viewer
@@ -329,6 +379,11 @@ export const spectrum: GameModule<SpectrumState, SpectrumAction, SpectrumView, S
   },
 
   legalActions(state, seat) {
+    if (state.phase === 'choosing') {
+      return seat === state.guesser
+        ? (state.card ?? []).map((topic) => ({ type: 'chooseTopic', id: topic.id }))
+        : []
+    }
     if (state.phase === 'answering') {
       const answerer = state.answerers.find((other) => other.seat === seat)
       if (!answerer || answerer.out) return []
@@ -349,6 +404,7 @@ export const spectrum: GameModule<SpectrumState, SpectrumAction, SpectrumView, S
 
   // The table waits for an absent answerer who has not answered, and for an absent guesser
   skipAction(state, seat) {
+    if (state.phase === 'choosing') return seat === state.guesser ? { type: 'skip', seat } : null
     if (state.phase === 'answering') {
       const answerer = state.answerers.find((other) => other.seat === seat)
       return answerer && !answerer.out && answerer.text === null ? { type: 'skip', seat } : null
@@ -359,6 +415,9 @@ export const spectrum: GameModule<SpectrumState, SpectrumAction, SpectrumView, S
   // The round in the id, so that every round gets a fresh clock. None at a reveal: the guesser moves on
   timers(state) {
     if (!state.clock) return []
+    if (state.phase === 'choosing') {
+      return [{ id: `choose-${state.round}`, ms: CHOOSE_MS, action: { type: 'timeUp' } }]
+    }
     if (state.phase === 'answering') {
       return [{ id: `answer-${state.round}`, ms: ANSWER_MS, action: { type: 'timeUp' } }]
     }
@@ -369,9 +428,10 @@ export const spectrum: GameModule<SpectrumState, SpectrumAction, SpectrumView, S
   },
 
   // The answer is the only thing an answerer may say until the numbers are shown: chat would let
-  // them tell the guesser their number, which scores them a point
+  // them tell the guesser their number, which scores them a point. The numbers are dealt before
+  // the guesser chooses, so chat closes from then
   chatLocked(state) {
-    return state.phase === 'answering' || state.phase === 'guessing'
+    return state.phase === 'choosing' || state.phase === 'answering' || state.phase === 'guessing'
   },
 
   isOver(state) {

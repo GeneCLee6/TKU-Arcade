@@ -24,7 +24,8 @@ export const spectrumInfo: GameInfo<SpectrumOptions> = {
         { value: 'extremes', labelKey: 'games.spectrum.option.mode.extremes' },
         { value: 'order', labelKey: 'games.spectrum.option.mode.order' },
       ],
-      default: 'extremes',
+      // Every answer in order by default (owner, 2026-11-13); the largest and smallest stay an option
+      default: 'order',
     },
     duplicates: {
       kind: 'boolean',

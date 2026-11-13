@@ -22,7 +22,7 @@ interface RoundRevealProps {
 export function RoundReveal({ view, nameOf, animate }: RoundRevealProps) {
   const t = useT()
   const reveal = view.reveal
-  if (!reveal) return null
+  if (!reveal || !view.topic) return null
   const marks = revealMarks(view.answerers, reveal, nameOf)
   const verdict = (seat: SeatId) =>
     t(reveal.correct.includes(seat) ? 'games.spectrum.ui.right' : 'games.spectrum.ui.wrong')
