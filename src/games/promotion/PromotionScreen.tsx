@@ -384,7 +384,9 @@ const Frame = styled.div<{ $immersed: boolean }>`
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
     gap: ${space.sm}px;
-    padding: ${space.sm}px;
+    /* Out from under the status bar, the notch and the home indicator (installed as an app) */
+    padding: calc(${space.sm}px + env(safe-area-inset-top)) calc(${space.sm}px + env(safe-area-inset-right))
+      calc(${space.sm}px + env(safe-area-inset-bottom)) calc(${space.sm}px + env(safe-area-inset-left));
     background: ${color.bg};
 
     @media (orientation: portrait) {

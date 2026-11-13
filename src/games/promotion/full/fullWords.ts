@@ -42,12 +42,26 @@ function eventText(t: Translate, thrown: FullThrow, language: Language): string 
   return t('games.promotion.full.combo.event', { zone, face: face(t, decided), outcome })
 }
 
-/** "A pair of Talent: one move", "Virtue over Graft: void, throw again" */
-export function comboText(t: Translate, thrown: FullThrow, birth: boolean, language: Language = 'en'): string {
+/**
+ * "A pair of Talent: one move", "Virtue over Graft: void, throw again". `again` is whether this turn
+ * throws once more after this one: only the first board's three throws (C6) ever did; since C8 a
+ * throw that scores nothing ends the turn where it stands, and must not say "throw again"
+ */
+export function comboText(
+  t: Translate,
+  thrown: FullThrow,
+  birth: boolean,
+  language: Language = 'en',
+  again = false,
+): string {
   if (birth) return t('games.promotion.full.combo.birth')
   if (thrown.event) return eventText(t, thrown, language)
   const [first, second] = thrown.steps
   switch (thrown.combo) {
+    case 'none':
+      return t(again ? 'games.promotion.full.combo.none' : 'games.promotion.full.combo.noMove')
+    case 'cancel':
+      return t(again ? 'games.promotion.full.combo.cancel' : 'games.promotion.full.combo.cancelStay')
     case 'pair':
     case 'three':
       return t(`games.promotion.full.combo.${thrown.combo}`, { face: face(t, first) })
@@ -125,7 +139,8 @@ export function lastComboText(t: Translate, last: FullLastTurn, language: Langua
   if (!thrown) return ''
   if (thrown.event) return comboText(t, thrown, false, language)
   if (!last.birth && thrown.steps.length === 0) {
-    return t(last.throws.length >= 3 ? 'games.promotion.full.combo.stuck' : 'games.promotion.full.combo.noMove')
+    if (last.throws.length >= 3) return t('games.promotion.full.combo.stuck')
+    return t(thrown.combo === 'cancel' ? 'games.promotion.full.combo.cancelStay' : 'games.promotion.full.combo.noMove')
   }
   return comboText(t, thrown, last.birth, language)
 }

@@ -22,7 +22,9 @@ export function TopBar() {
   )
 }
 
-// Glass, stuck to the top. One row down to a 360 px phone (e2e/mobile.spec.ts)
+// Glass, stuck to the top. One row down to a 360 px phone (e2e/mobile.spec.ts). The page runs under
+// the status bar and the notch (viewport-fit=cover, iOS's black-translucent bar when installed as an
+// app), so the bar pads itself out of them: without it the switches sat under the clock, untappable
 const Bar = styled.header`
   position: sticky;
   top: 0;
@@ -32,14 +34,16 @@ const Bar = styled.header`
   align-items: center;
   justify-content: space-between;
   gap: ${space.sm}px;
-  padding: ${space.sm}px ${space.lg}px;
+  padding: calc(${space.sm}px + env(safe-area-inset-top)) max(${space.lg}px, env(safe-area-inset-right))
+    ${space.sm}px max(${space.lg}px, env(safe-area-inset-left));
   background: ${color.panel};
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   box-shadow: 0 1px 0 ${color.line};
 
   @media (min-width: 900px) {
-    padding: ${space.sm}px ${space.xxl}px;
+    padding-right: max(${space.xxl}px, env(safe-area-inset-right));
+    padding-left: max(${space.xxl}px, env(safe-area-inset-left));
   }
 `
 

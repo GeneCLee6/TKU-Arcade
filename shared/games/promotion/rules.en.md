@@ -13,6 +13,7 @@ Everyone starts as a commoner. **The first to reach Ronggui (Retired in Glory), 
 1. Press **Roll**.
 2. The result is Virtue, Talent, Merit or Graft.
 3. Your piece moves to the office your current cell names for that result.
+4. One roll a turn, then the next player. Every roll moves you, except graft on the commoner's cell, where you stay put (and the turn still passes).
 
 There is nothing to decide: the fun is in the swings, and in watching your friends fall.
 

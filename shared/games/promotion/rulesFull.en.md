@@ -28,7 +28,8 @@ Once you have left your origin, nothing ever sends you back to one.
 
 1. Press **Roll** and the server rolls four six-sided dice for you.
 2. Each die is a result: 4 virtue, 6 talent, 5 merit, 3 good conduct, 2 mediocre, 1 graft, from best to worst.
-3. Move by the combination. **One roll a turn**: with no combination you do not move.
+3. Move by the combination.
+4. **One roll a turn, never a second.** If the roll makes no combination (or virtue cancels graft), you stay where you are and the turn passes to the next player; you roll again on your next turn.
 
 ## Combinations
 
@@ -41,8 +42,8 @@ Once you have left your origin, nothing ever sends you back to one.
 | A straight (four pips in a row) | One virtue step, and the pot pays a reward of 10 taels | 5.6% |
 | Four of a kind | A peerage from junior third grade up (the next peerage for a peer; the palace examination's top place for a palace candidate, and the military one's for a military jinshi); three virtue steps for anyone else | 0.4% |
 | Four grafts (four 1s) | Dismissal (not from an origin, where there is no post to lose) | 0.1% |
-| Two or more virtues with a graft | The graft is forgiven, and the roll moves nothing | 4.5% |
-| No combination | No move | 22.2% |
+| Two or more virtues with a graft | The graft is forgiven, and the roll moves nothing: stay, next player | 4.5% |
+| No combination | No move: stay, next player | 22.2% |
 
 Every cell of the board says where each of the six results leads from it. Roughly: virtue goes up two steps, talent and merit one, good conduct moves you to another post of the same grade, mediocre keeps you where you are or sends you to an evaluation (in the senior first grade or a peerage it means retiring with honours, and for officers of the army, the Banners and the Guard in the second grade or the junior first, retiring), and graft demotes you. Some tables play a variant where virtue and graft in one roll simply cancel out; we keep the rule above.
 
