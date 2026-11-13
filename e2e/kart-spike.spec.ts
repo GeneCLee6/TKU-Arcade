@@ -735,12 +735,12 @@ test('drives the test oval: a countdown, then the minimap follows and the line i
   const minimap = page.getByRole('img', { name: 'Track map' })
   await expect(minimap).toBeVisible()
   await expect(page.getByTestId('kart-lap')).toHaveText('Lap 1/3')
-  // 3, 2, 1: the car is held on the grid whatever is pressed
+  // 3, 2, 1, then GO
   await expect(page.getByTestId('kart-countdown')).toBeVisible()
   await page.locator('canvas').click()
   await page.keyboard.down('ArrowUp')
-  const held = await reading(page)
-  expect(Math.hypot(held.state.vx, held.state.vz)).toBe(0)
+  // That the car is held still during it is tests/kart/timeTrial.test.ts's: here the countdown can
+  // be over before the key goes down, on a slow software renderer
   await expect(page.getByTestId('kart-countdown')).toHaveCount(0, { timeout: 6000 })
   const marker = minimap.locator('g')
   const before = await marker.getAttribute('transform')

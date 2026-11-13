@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
 import styled, { keyframes } from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
 import { KART_ACTIONS, type Bindings, type KartAction } from '../../shared/kart/input.ts'
@@ -92,6 +93,7 @@ export function SpikePage() {
   const clock = useRef<RaceClockHandle>(null)
   const race = useRef<{ restart: () => void } | null>(null)
   const [trial, setTrial] = useState<SpikeTrial>()
+  const [quality, setQuality] = useState<Quality>(loadQuality)
   const [showNumbers, setShowNumbers] = useState(() =>
     new URLSearchParams(window.location.search).has('fps'),
   )
@@ -108,6 +110,7 @@ export function SpikePage() {
         onCallout: (next) => setCallout((last) => ({ callout: next, id: (last?.id ?? 0) + 1 })),
         onContextLost: () => setFailure('contextLost'),
         course,
+        quality,
         onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
         onTrial: setTrial,
         onClock: (total, lap) => clock.current?.set(total, lap),
@@ -119,7 +122,7 @@ export function SpikePage() {
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course])
+  }, [course, quality])
 
   const switchCourse = (next: SpikeCourse) => {
     const url = new URL(window.location.href)
@@ -217,6 +220,25 @@ export function SpikePage() {
           >
             {t('kart.tuning.open')}
           </Button>
+          <CourseLabel>
+            <span>{t('kart.spike.quality')}</span>
+            <select
+              value={quality}
+              onChange={(event) => {
+                const next = event.target.value as Quality
+                saveQuality(next)
+                setTrial(undefined)
+                setQuality(next)
+              }}
+              data-testid="kart-quality"
+            >
+              {QUALITIES.map((one) => (
+                <option key={one} value={one}>
+                  {t(`kart.quality.${one}`)}
+                </option>
+              ))}
+            </select>
+          </CourseLabel>
           <CourseLabel>
             <span>{t('kart.spike.course')}</span>
             <select

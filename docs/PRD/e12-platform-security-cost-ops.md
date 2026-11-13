@@ -50,7 +50,7 @@ depends_on: []
 - [ ] AC-12.3 — 遙測：錯誤回報與每日指標可見。
 - [ ] AC-12.4 — 成本：儀表板與 80% 警示。
 - [ ] AC-12.5 — 濫用防護：速率、過濾、連線上限，有測試。
-- [ ] AC-12.6 — 資產授權清單：`ASSETS.md`、上傳腳本、CI 擋未登記。
+- [x] AC-12.6 — 資產授權清單：`ASSETS.md`、上傳腳本、CI 擋未登記。
 - [ ] AC-12.7 — 功能旗標：每款遊戲可關；關閉行為有測試。
 - [ ] AC-12.8 — IP 檢查清單：文件存在；每款遊戲上線前有簽名紀錄。
 
@@ -73,7 +73,7 @@ depends_on: []
 
 ### M2
 
-- [ ] `e12-t08` `docs/ASSETS.md` 格式、`scripts/assets/upload.ts`（R2、雜湊、Cache-Control）、`check-assets.mjs` 進 CI · AC-12.6 · M · ← e12-t02
+- [x] `e12-t08` `docs/ASSETS.md` 格式、`scripts/assets/upload.ts`（R2、雜湊、Cache-Control）、`check-assets.mjs` 進 CI · AC-12.6 · M · ← e12-t02 · K1（#51）
 - [ ] `e12-t10` 卡丁車 fps 與載入時間遙測（匿名） · AC-12.3 · S · ← e8-t06
 
 ### M4

@@ -1,6 +1,7 @@
 // e8-t05a: the first track, as a graybox: only the road and its kerbs, no art (that is e8-t05b).
 // Its theme is the PRD's own, an original riverside circuit (淡水河畔); this is just its layout, made
-// for drifting: a long straight to the line, a fast right sweeper, an S, a tight hairpin and a
+// for drifting, about seven kart widths wide (owner, 2026-11-13: proportions like the classic kart
+// racers'): a long straight to the line, a fast right sweeper, an S, a tight hairpin and a
 // flowing run home. Written in code as control points smoothed by a closed Catmull-Rom spline, then
 // sampled about every SAMPLE metres; build-track.ts will make the same JSON from the Blender scene.
 import { gatesAlong, headingOf, TRACK_FORMAT, type RoadPoint, type TrackJson } from '../track.ts'
@@ -11,35 +12,37 @@ const SAMPLE = 6
 /** [x, z, width]: the line through the middle of the road, in driving order */
 const CONTROL: readonly (readonly [number, number, number])[] = [
   // The main straight, up to the line and beyond (towards -z)
-  [0, 150, 16],
-  [0, 40, 16],
-  [0, -70, 16],
+  [0, 150, 13],
+  [0, 40, 13],
+  [0, -70, 13],
   // A fast right sweeper
-  [25, -160, 15],
-  [95, -205, 14],
-  [175, -190, 14],
+  [25, -160, 12],
+  [95, -205, 11],
+  [175, -190, 11],
   // Down the far side into the S
-  [215, -125, 13],
-  [195, -60, 13],
-  [140, -40, 13],
-  [125, 10, 13],
-  [165, 55, 13],
+  [215, -125, 10],
+  [195, -60, 10],
+  [140, -40, 10],
+  [125, 10, 10],
+  [165, 55, 10],
   // The hairpin: tight, a place to drift
-  [215, 95, 12],
-  [225, 150, 12],
-  [190, 185, 12],
-  [140, 165, 12],
+  [215, 95, 9],
+  [225, 150, 9],
+  [190, 185, 9],
+  [140, 165, 9],
   // Home through a long left onto the straight
-  [95, 140, 14],
-  [60, 190, 15],
-  [20, 215, 16],
+  [95, 140, 11],
+  [60, 190, 12],
+  [20, 215, 13],
 ]
 
 /** A point `t` (0 to 1) of the way from b to c, with a and d shaping the curve */
 function catmullRom(a: number, b: number, c: number, d: number, t: number): number {
   const t2 = t * t
   const t3 = t2 * t
-  return 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3)
+  return (
+    0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3)
+  )
 }
 
 function centreLine(): RoadPoint[] {
