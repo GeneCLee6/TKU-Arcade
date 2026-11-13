@@ -219,6 +219,15 @@ src/kart/
 - **卡丁車 chunk**：143.0 → **151.0 kB** gzip（預算 600 kB）。主站 121.1、陞官圖 148.5、默契牌局 144.5、光譜 147.8 kB 都沒變：新的東西全在 lazy chunk 裡，`tokens.ts` 只多一個 `kartScene.wall` 色碼。
 - **已知**：Playwright 的軟體繪圖截圖裡，面板打開時頂部按鈕後面會出現一塊深色長方形（J2 的操作設定面板也有），在 DOM 裡找不到對應的元素，推測是 SwiftShader 合成層的問題，實機沒看過。
 
+### 4.3 J4：賽道格式、檢查點、復位點、匯出腳本與小地圖（`e8-t04` `e8-t09`，PR #49）
+
+- **格式**（`shared/kart/track.ts`，`TRACK_FORMAT` 1）：`id`、雙語 `name`、`laps`；`road` 是**封閉的中線**（照行駛順序，每點 `x`、`z`、`width`）；`gates` 依序（gate 0 是起終點線，`a` 在駕駛者左邊的路緣、`b` 在右邊）；`respawns` 每個 gate 一個；`grid` 起跑格（第一個是桿位）；`walls` 是路緣以外的牆；`boostPads`、`itemBoxes`、`decor` 先留位置（E9、K1）。**`parseTrack` 一次列出所有問題**，路緣牆由中線往兩側各半個路寬自己算（`kerbs`），所以牆、檢查點、復位點、小地圖都來自同一份資料（AC-8.2）。
+- **判圈**（`gateCrossing`、`course.ts` 的 `passGates`）：只認**下一個** gate 往前穿過；剛穿過的那個往回穿就退回一個（來回壓線不會多算一圈）；抄捷徑跳過 gate，後面的都不算。停在線上算穿過、從線上離開不算，所以剛好壓在 gate 上的那一步只算一次。`Run.crossings` 是往前穿過起終點線的次數（起跑在線後，第一次穿過是「第 1 圈開始」），J5 的時間賽由它算圈數與完賽。
+- **復位**：在有 gate 的賽道上，R 回到**最後一個穿過的 gate 的復位點**（還沒穿過起點線就回桿位），取代 J3 的「離牆 4 m 連續 1 秒」；測試場（沒有 gate）照舊。
+- **測試橢圓**（`shared/kart/tracks/testOval.ts`）：兩段 160 m 直線接半徑 50 m 的半圓、寬 14 m，原創、刻意樸素；`/kart/spike?track=oval`（或「開測試橢圓賽道」）。三維畫面是一條灰色路面與白色起終點線（`Scene.ts` 的 `roadGeometry`），模型等 `e8-t05b`。測試裡有一個簡單的自動駕駛真的開完 3 次起點線。
+- **匯出腳本**（`scripts/kart/build-track.ts`，純邏輯在 `gltfTrack.ts`）：讀 Blender 匯出的 **.gltf（JSON）**，只看**空物件的名字與位置**，不讀網格：`road.000…`（中線，自訂屬性 `width`）、可選的 `gate.00…`（不放就每 `gateEvery` 個路點一個，場景的自訂屬性，預設 6）、`grid.0…`、`wall.<名>.000…`（`.000` 上 `closed: true` 就封閉）、`boost.N`（`length`、`width`）、`item.N`、`decor.<模型>.N`（縮放取空物件的）。空物件放在場景最上層、不要有父物件；朝向是 Blender 的 +Y（匯出後 glTF 的 -Z）。輸出前用同一個 `parseTrack` 檢查，有問題就列出來、exit 1。
+- **小地圖**（`src/kart/Minimap.tsx`）：SVG，北（-z）朝上，不跟車轉；路照寬度畫、中線虛線、起終點線、下一個 gate（黃）、車是箭頭。車的位置每幀由迴圈直接改 SVG 屬性（`onPose`），不經過 React。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

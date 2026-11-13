@@ -723,3 +723,36 @@ for (const scheme of ['light', 'dark'] as const) {
     })
   })
 }
+
+// e8-t04, e8-t09: the test oval, its laps and minimap
+test('drives the test oval: the minimap follows, the line counts a lap begun', async ({ page }) => {
+  const errors = watchConsole(page)
+  await page.goto('/kart/spike?track=oval')
+  await expect(page.locator('canvas')).toBeVisible()
+  await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
+  const minimap = page.getByRole('img', { name: 'Track map' })
+  await expect(minimap).toBeVisible()
+  await expect(page.getByTestId('kart-lap')).toHaveText('Lap 1/3')
+  const marker = minimap.locator('g')
+  const before = await marker.getAttribute('transform')
+  await page.locator('canvas').click()
+  await page.keyboard.down('ArrowUp')
+  // The grid is 8 m behind the line: a second of throttle takes the car over it
+  await expect
+    .poll(
+      async () =>
+        await page.evaluate(
+          () => (window as unknown as { __kartSpike: { crossings: number } }).__kartSpike.crossings,
+        ),
+      { timeout: 5000 },
+    )
+    .toBe(1)
+  await page.keyboard.up('ArrowUp')
+  expect(await marker.getAttribute('transform')).not.toBe(before)
+  await expect(page.getByTestId('kart-lap')).toHaveText('Lap 1/3')
+  // And back to the yard, without a minimap
+  await page.getByTestId('kart-course').click()
+  await expect(minimap).toHaveCount(0)
+  await expect(page).toHaveURL(/\/kart\/spike$/)
+  expect(errors).toEqual([])
+})

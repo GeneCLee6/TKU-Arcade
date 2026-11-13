@@ -1,6 +1,9 @@
 import {
   BoxGeometry,
+  BufferGeometry,
   Color,
+  Float32BufferAttribute,
+  DoubleSide,
   DirectionalLight,
   Fog,
   GridHelper,
@@ -14,6 +17,7 @@ import {
   WebGLRenderer,
 } from 'three'
 import type { Wall } from '../../shared/kart/walls.ts'
+import { roadDirection, type Track } from '../../shared/kart/track.ts'
 import { kartScene } from '../styles/tokens.ts'
 import { fieldOfView, followCar, startRig, type Chased } from './camera.ts'
 
@@ -25,6 +29,9 @@ const CAMERA_LOOK_AHEAD = 3
 const MAX_PIXEL_RATIO = 2
 /** Walls are drawn this high and this thick; the physics sees only their centre line */
 const WALL_HEIGHT = 1.1
+/** The road sits this far above the ground, under the grid's lines it would otherwise flicker with */
+const ROAD_LIFT = 0.03
+const FINISH_WIDTH = 1.2
 const WALL_THICKNESS = 0.5
 
 export interface Pose {
@@ -56,7 +63,36 @@ export function supportsWebGL2(): boolean {
 }
 
 /** Builds the scene inside `container`, with `walls`. Throws when three.js cannot start. */
-export function createKartScene(container: HTMLElement, walls: readonly Wall[]): KartScene {
+/**
+ * The road as one flat ribbon from kerb to kerb (e8-t04), just above the ground, and the finish line
+ * across it. A grey box stand-in until the track's own model (e8-t05b)
+ */
+function roadGeometry(track: Pick<Track, 'road'>): BufferGeometry {
+  const positions: number[] = []
+  const indices: number[] = []
+  const { road } = track
+  road.forEach((point, index) => {
+    const { dx, dz } = roadDirection(road, index)
+    const half = point.width / 2
+    positions.push(point.x + dz * half, ROAD_LIFT, point.z - dx * half)
+    positions.push(point.x - dz * half, ROAD_LIFT, point.z + dx * half)
+    const a = index * 2
+    const b = ((index + 1) % road.length) * 2
+    // Two triangles from this point's pair to the next, facing up
+    indices.push(a, b, a + 1, a + 1, b, b + 1)
+  })
+  const geometry = new BufferGeometry()
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
+export function createKartScene(
+  container: HTMLElement,
+  walls: readonly Wall[],
+  track?: Pick<Track, 'road' | 'gates'>,
+): KartScene {
   const renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO))
   renderer.domElement.style.display = 'block'
@@ -113,6 +149,29 @@ export function createKartScene(container: HTMLElement, walls: readonly Wall[]):
     mesh.position.set((wall.ax + wall.bx) / 2, WALL_HEIGHT / 2, (wall.az + wall.bz) / 2)
     mesh.rotation.y = -Math.atan2(wall.bz - wall.az, wall.bx - wall.ax)
     scene.add(mesh)
+  }
+
+  const extraGeometries: BufferGeometry[] = []
+  const extraMaterials: MeshLambertMaterial[] = []
+  if (track) {
+    const ribbon = roadGeometry(track)
+    // Both sides: which way round the triangles go then never decides whether the road shows
+    const roadMaterial = new MeshLambertMaterial({ color: kartScene.road, side: DoubleSide })
+    scene.add(new Mesh(ribbon, roadMaterial))
+    extraGeometries.push(ribbon)
+    extraMaterials.push(roadMaterial)
+    const finish = track.gates[0]
+    if (finish) {
+      const lineGeometry = new BoxGeometry(1, 0.02, FINISH_WIDTH)
+      const lineMaterial = new MeshLambertMaterial({ color: kartScene.finish })
+      const line = new Mesh(lineGeometry, lineMaterial)
+      line.scale.x = Math.hypot(finish.bx - finish.ax, finish.bz - finish.az)
+      line.position.set((finish.ax + finish.bx) / 2, ROAD_LIFT + 0.01, (finish.az + finish.bz) / 2)
+      line.rotation.y = -Math.atan2(finish.bz - finish.az, finish.bx - finish.ax)
+      scene.add(line)
+      extraGeometries.push(lineGeometry)
+      extraMaterials.push(lineMaterial)
+    }
   }
 
   const camera = new PerspectiveCamera(60, 1, 1, 260)
@@ -183,6 +242,8 @@ export function createKartScene(container: HTMLElement, walls: readonly Wall[]):
       for (const material of [groundMaterial, bodyMaterial, noseMaterial, wallMaterial]) {
         material.dispose()
       }
+      for (const geometry of extraGeometries) geometry.dispose()
+      for (const material of extraMaterials) material.dispose()
       grid.material.dispose()
       renderer.dispose()
       // Browsers allow a handful of live contexts: don't wait for the collector to free this one

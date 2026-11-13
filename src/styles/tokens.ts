@@ -145,6 +145,11 @@ export const kartScene = {
   nose: '#F3F4F6',
   // The test arena's walls (e8-t02b)
   wall: '#3F4A5C',
+  // A track's road, its centre line on the minimap, the finish line and the next gate (e8-t04)
+  road: '#4B5563',
+  roadLine: '#E5E7EB',
+  finish: '#F9FAFB',
+  nextGate: '#FACC15',
   lightSky: '#FFFFFF',
   lightGround: '#6B7280',
 } as const
