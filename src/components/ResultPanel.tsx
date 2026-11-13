@@ -98,6 +98,10 @@ export function ResultPanel({
             onDissolve={onDissolve}
           />
         )}
+        {/* Not inside a replay, which is the only place nobody is `you` */}
+        {you !== '' && (
+          <BackLink to={`/r/${view.room.id}/replay`}>{t('room.result.replay')}</BackLink>
+        )}
         <BackLink to="/">{t('room.backToLobby')}</BackLink>
       </Next>
     </Panel>

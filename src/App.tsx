@@ -12,6 +12,12 @@ const RoomPage = lazy(() =>
   import('./pages/RoomPage.tsx').then(({ RoomPage }) => ({ default: RoomPage })),
 )
 
+// e2-t09: a finished game played back. Through the room's chunk, whose code it shares (the game
+// screens, the layout): imported straight from here, it would split that chunk in two
+const ReplayPage = lazy(() =>
+  import('./pages/RoomPage.tsx').then(({ ReplayEntry }) => ({ default: ReplayEntry })),
+)
+
 const RulesPage = lazy(() =>
   import('./pages/RulesPage.tsx').then(({ RulesPage }) => ({ default: RulesPage })),
 )
@@ -35,6 +41,7 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/r/:id" element={<RoomPage />} />
+          <Route path="/r/:id/replay" element={<ReplayPage />} />
           <Route path="/games/:id/rules" element={<RulesPage />} />
           <Route path="/kart/spike" element={<KartSpikePage />} />
           <Route path="*" element={<NotFoundPage />} />

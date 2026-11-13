@@ -23,10 +23,13 @@ function fakeLobby() {
   }
 }
 
-function setup(stub: { create?: unknown; summary?: unknown; fetch?: unknown } = {}) {
+function setup(
+  stub: { create?: unknown; summary?: unknown; fetch?: unknown; replay?: unknown } = {},
+) {
   const room = {
     create: vi.fn(async () => true),
     summary: vi.fn(async () => null),
+    replay: vi.fn(async (): Promise<string | null> => null),
     fetch: vi.fn(async () => new Response('upgraded')),
     ...stub,
   }
@@ -59,7 +62,14 @@ describe('POST /api/rooms', () => {
     const { id } = (await res.json()) as { id: string }
     expect(isRoomId(id)).toBe(true)
     expect(names).toEqual([id])
-    expect(room.create).toHaveBeenCalledWith(id, 'tictactoe', options, false, expect.any(String))
+    expect(room.create).toHaveBeenCalledWith(
+      id,
+      'tictactoe',
+      options,
+      false,
+      expect.any(String),
+      null,
+    )
   })
 
   it('makes a room public only when asked in so many words', async () => {
@@ -79,6 +89,7 @@ describe('POST /api/rooms', () => {
         undefined,
         expected,
         expect.any(String),
+        null,
       )
     }
   })
@@ -88,7 +99,7 @@ describe('POST /api/rooms', () => {
     const res = await handleRequest(post(JSON.stringify({ gameId: 'tictactoe' })), env)
     const { id, code } = (await res.json()) as { id: string; code: string }
     expect(isRoomCode(code)).toBe(true)
-    expect(room.create).toHaveBeenCalledWith(id, 'tictactoe', undefined, false, code)
+    expect(room.create).toHaveBeenCalledWith(id, 'tictactoe', undefined, false, code, null)
     expect(lobby.codes.get(code)).toBe(id)
   })
 
@@ -98,7 +109,14 @@ describe('POST /api/rooms', () => {
     const res = await handleRequest(post(JSON.stringify({ gameId: 'tictactoe' })), env)
     expect(res.status).toBe(201)
     expect(((await res.json()) as { code: unknown }).code).toBeNull()
-    expect(room.create).toHaveBeenCalledWith(expect.any(String), 'tictactoe', undefined, false, null)
+    expect(room.create).toHaveBeenCalledWith(
+      expect.any(String),
+      'tictactoe',
+      undefined,
+      false,
+      null,
+      null,
+    )
     expect([...lobby.codes.values()].every((holder) => holder.startsWith('open'))).toBe(true)
   })
 
@@ -117,7 +135,14 @@ describe('POST /api/rooms', () => {
     const res = await handleRequest(post(JSON.stringify({ gameId: 'tictactoe' })), env)
     expect(res.status).toBe(201)
     expect(((await res.json()) as { code: unknown }).code).toBeNull()
-    expect(room.create).toHaveBeenCalledWith(expect.any(String), 'tictactoe', undefined, false, null)
+    expect(room.create).toHaveBeenCalledWith(
+      expect.any(String),
+      'tictactoe',
+      undefined,
+      false,
+      null,
+      null,
+    )
   })
 
   it('tries another id on a collision, and gives up in the end', async () => {
@@ -235,9 +260,66 @@ describe('GET /api/codes/<code>', () => {
 
   it('says not found for a free number or anything that is not one, and takes only GET', async () => {
     const { env } = setup()
-    for (const path of ['/api/codes/4827', '/api/codes/0123', '/api/codes/12345', '/api/codes/abcd']) {
+    for (const path of [
+      '/api/codes/4827',
+      '/api/codes/0123',
+      '/api/codes/12345',
+      '/api/codes/abcd',
+    ]) {
       expect((await handleRequest(get(path), env)).status, path).toBe(404)
     }
     expect((await handleRequest(get('/api/codes/4827', 'POST'), env)).status).toBe(405)
+  })
+})
+
+// e1-t16
+describe('a room password at creation', () => {
+  it('hands the room a trimmed password', async () => {
+    const { env, room } = setup()
+    await handleRequest(post(JSON.stringify({ gameId: 'tictactoe', password: ' tamsui ' })), env)
+    expect(room.create).toHaveBeenCalledWith(
+      expect.any(String),
+      'tictactoe',
+      undefined,
+      false,
+      expect.any(String),
+      'tamsui',
+    )
+  })
+
+  it('refuses one that is too long rather than drop it', async () => {
+    const { env, room } = setup()
+    const res = await handleRequest(
+      post(JSON.stringify({ gameId: 'tictactoe', password: 'x'.repeat(33) })),
+      env,
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'bad_password' })
+    expect(room.create).not.toHaveBeenCalled()
+  })
+})
+
+// e2-t09
+describe('GET /api/rooms/<id>/replay', () => {
+  it('passes on the room’s replay, or 404 while there is no finished game', async () => {
+    const none = setup()
+    expect(
+      (await handleRequest(new Request(`https://x/api/rooms/${ID}/replay`), none.env)).status,
+    ).toBe(404)
+    const body = JSON.stringify({ gameId: 'tictactoe', frames: [] })
+    const { env } = setup({ replay: vi.fn(async () => body) })
+    const res = await handleRequest(new Request(`https://x/api/rooms/${ID}/replay`), env)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/json')
+    expect(await res.text()).toBe(body)
+  })
+
+  it('only answers GET', async () => {
+    const { env } = setup()
+    const res = await handleRequest(
+      new Request(`https://x/api/rooms/${ID}/replay`, { method: 'POST' }),
+      env,
+    )
+    expect(res.status).toBe(405)
   })
 })

@@ -1,0 +1,90 @@
+// Strings that load after the page they are on: the password form (e1-t16), the voice link (e1-t14),
+// the replay (e2-t09) and the lobby's room filter (e1-t15). Registered by the room's chunk (src/i18n/roomExtras.ts), so
+// that they stay out of everyone's first load; screenMessages.ts lists them for check-i18n.
+// `en` is the source.
+const en = {
+  'room.extra.password.is': 'Room password:',
+  'room.extra.password.setLabel': 'Room password (optional)',
+  'room.extra.password.set': 'Set password',
+  'room.extra.password.remove': 'Remove the password',
+  'room.extra.password.setHint':
+    'Someone new needs it to join; nobody already here is asked. A room with a password is never listed.',
+  'room.extra.lobby.filters': 'Filter the public rooms',
+  'room.extra.lobby.filterGame': 'Game',
+  'room.extra.lobby.anyGame': 'Every game',
+  'room.extra.lobby.filterSeats': 'Free seats',
+  'room.extra.lobby.seatsFor': '{count} or more',
+  'room.extra.lobby.random': 'Join a random one',
+  'room.extra.voice.open': 'Open a voice room',
+  'room.extra.voice.opening': 'Opening…',
+  'room.extra.voice.message': 'Voice room on LongTalk: {url}',
+  'room.extra.voice.failed': 'Could not open a voice room just now.',
+  'room.extra.voice.notPosted':
+    'The voice room is open, but the link did not reach the chat: {url}',
+  'room.extra.password.title': 'This room has a password',
+  'room.extra.password.hint': 'Ask whoever opened the room. You only need it the first time.',
+  'room.extra.password.label': 'Room password',
+  'room.extra.password.enter': 'Enter',
+  'room.extra.password.wrong': 'That is not the password. Check with whoever opened the room.',
+  'room.extra.replay.title': 'Replay',
+  'room.extra.replay.missing':
+    'There is no finished game to replay in this room. A replay is there once a game ends, until the next one starts.',
+  'room.extra.replay.failed': 'The replay could not be loaded. Try again in a moment.',
+  'room.extra.replay.back': 'Back to the room',
+  'room.extra.replay.controls': 'Replay controls',
+  'room.extra.replay.first': 'Start',
+  'room.extra.replay.previous': 'Back a step',
+  'room.extra.replay.play': 'Play',
+  'room.extra.replay.pause': 'Pause',
+  'room.extra.replay.next': 'Next step',
+  'room.extra.replay.last': 'End',
+  'room.extra.replay.step': 'Step',
+  'room.extra.replay.stepOf': 'Step {step} of {total}',
+  'room.extra.replay.by': 'by {name}',
+  'room.extra.replay.byRoom': 'by the room (time ran out, or a seat was skipped)',
+}
+
+const zhTW: Record<keyof typeof en, string> = {
+  'room.extra.password.is': '房間密碼：',
+  'room.extra.password.setLabel': '房間密碼（選填）',
+  'room.extra.password.set': '設定密碼',
+  'room.extra.password.remove': '拿掉密碼',
+  'room.extra.password.setHint':
+    '新來的人要輸入才能進房，已經在房裡的人不用。有密碼的房間不會公開列出。',
+  'room.extra.lobby.filters': '篩選公開房間',
+  'room.extra.lobby.filterGame': '遊戲',
+  'room.extra.lobby.anyGame': '所有遊戲',
+  'room.extra.lobby.filterSeats': '空位',
+  'room.extra.lobby.seatsFor': '{count} 個以上',
+  'room.extra.lobby.random': '隨機加入一間',
+  'room.extra.voice.open': '開語音房',
+  'room.extra.voice.opening': '開房中…',
+  'room.extra.voice.message': 'LongTalk 語音房：{url}',
+  'room.extra.voice.failed': '現在開不了語音房。',
+  'room.extra.voice.notPosted': '語音房開好了，但連結沒送到聊天室：{url}',
+  'room.extra.password.title': '這個房間有密碼',
+  'room.extra.password.hint': '問開房的人。只有第一次進來要輸入。',
+  'room.extra.password.label': '房間密碼',
+  'room.extra.password.enter': '進房',
+  'room.extra.password.wrong': '密碼不對，跟開房的人確認一下。',
+  'room.extra.replay.title': '重播',
+  'room.extra.replay.missing': '這個房間沒有可以重播的對局。一局結束後就能看，直到下一局開始。',
+  'room.extra.replay.failed': '重播載入失敗，等一下再試。',
+  'room.extra.replay.back': '回到房間',
+  'room.extra.replay.controls': '重播控制',
+  'room.extra.replay.first': '開頭',
+  'room.extra.replay.previous': '上一步',
+  'room.extra.replay.play': '播放',
+  'room.extra.replay.pause': '暫停',
+  'room.extra.replay.next': '下一步',
+  'room.extra.replay.last': '結尾',
+  'room.extra.replay.step': '步驟',
+  'room.extra.replay.stepOf': '第 {step}／{total} 步',
+  'room.extra.replay.by': '{name} 動作',
+  'room.extra.replay.byRoom': '房間代為動作（時間到或跳過）',
+}
+
+export const roomExtraMessages = { en, 'zh-TW': zhTW } as {
+  en: Record<string, string>
+  'zh-TW': Record<string, string>
+}

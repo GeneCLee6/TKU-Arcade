@@ -135,6 +135,11 @@ export type RoomInfo = {
   maxSeats: number
   /** The room's short number (shared/room-code.ts), when it has one */
   code?: string
+  /**
+   * The room's password, when it has one (e1-t16): only members are sent a view, and each of them
+   * got in with it or was already there, so they may see it to pass it on
+   */
+  password?: string
 }
 
 /** One person in the room. The seat token is never part of the view: only its owner gets it */
@@ -205,6 +210,8 @@ export type PatchMessage = { t: 'patch'; rev: number; ops: PatchOp[] }
  * - `game_failed`: the game module threw (a bug, not your mistake); nothing changed
  * - `cannot_cover`: `cover` of a seat that is not in `RoomView.coverable`, or in a way it does not allow
  * - `unavailable`: this server does not do that yet
+ * - `password_required`: `join` of someone new, without a password, to a room that has one (e1-t16)
+ * - `wrong_password`: `join` with the wrong one; after PASSWORD_TRIES of them the socket is closed
  */
 export type ErrorCode =
   | 'forbidden'
@@ -222,11 +229,12 @@ export type ErrorCode =
   | 'cannot_cover'
   | 'game_failed'
   | 'unavailable'
+  | 'password_required'
+  | 'wrong_password'
 
 /** A refusal, to the sender only. `game_error`: the game refused the action, `error` says why */
 export type ErrorMessage =
-  | { t: 'error'; code: ErrorCode }
-  | { t: 'error'; code: 'game_error'; error: GameError }
+  { t: 'error'; code: ErrorCode } | { t: 'error'; code: 'game_error'; error: GameError }
 
 /** One countdown: `GameModule.timers`, with the time the room has counted */
 export type TimerInfo = {
@@ -246,17 +254,25 @@ export type ChatServerMessage = { t: 'chat'; messages: ChatMessage[]; reset?: tr
 export type { ChatMessage }
 
 export type ServerMessage =
-  | WelcomeMessage
-  | SnapshotMessage
-  | PatchMessage
-  | ErrorMessage
-  | TimerMessage
-  | ChatServerMessage
+  WelcomeMessage | SnapshotMessage | PatchMessage | ErrorMessage | TimerMessage | ChatServerMessage
 
 // ── Browser → server ─────────────────────────────────────────────────────────────────────────
 
-/** The first message on every socket; `token` is null for someone new */
-export type JoinMessage = { t: 'join'; name: string; token: string | null }
+/**
+ * The first message on every socket; `token` is null for someone new. `password`: a room that has
+ * one (e1-t16) lets in someone new only with it; a member coming back with their token needs none
+ */
+export type JoinMessage = { t: 'join'; name: string; token: string | null; password?: string }
+
+/** A room password's length, in characters (e1-t16) */
+export const MAX_PASSWORD_CHARS = 32
+
+/** A password as the room compares it: trimmed; null when empty or too long */
+export function normalizePassword(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length === 0 || [...trimmed].length > MAX_PASSWORD_CHARS ? null : trimmed
+}
 
 /** A `patch` went missing: send a `snapshot` */
 export type ResyncMessage = { t: 'resync' }
@@ -299,6 +315,12 @@ export type SetGameMessage = { t: 'set_game'; gameId: string; options?: OptionVa
 /** The host replaces the rule options while `waiting`. A missing or invalid one gets its default */
 export type SetOptionsMessage = { t: 'set_options'; options: OptionValues }
 
+/**
+ * The host sets the room's password, or takes it away with null (e1-t16). Someone new needs it to
+ * join; a room with one is never listed. Members already in are not asked
+ */
+export type SetPasswordMessage = { t: 'set_password'; password: string | null }
+
 export type ClientMessage =
   | JoinMessage
   | ResyncMessage
@@ -315,6 +337,7 @@ export type ClientMessage =
   | DissolveMessage
   | SetGameMessage
   | SetOptionsMessage
+  | SetPasswordMessage
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -322,11 +345,23 @@ export type ClientMessage =
  * POST /api/rooms. Options the game does not accept fall back to its defaults. `public` lists the
  * room on the home page while it waits for people; without it the room is reachable by link only.
  */
-export type CreateRoomRequest = { gameId: string; options?: OptionValues; public?: boolean }
+/** `password` (e1-t16): someone new must bring it to join; a room with one is never public */
+export type CreateRoomRequest = {
+  gameId: string
+  options?: OptionValues
+  public?: boolean
+  password?: string
+}
 
 /** 201 from POST /api/rooms */
 /** `code`: the room's short number, null when none could be given (the link still works) */
 export type CreateRoomResponse = { id: string; code: string | null }
+
+/** GET /api/voice (e1-t14): whether this site can open a LongTalk voice room */
+export type VoiceStatus = { available: boolean }
+
+/** 201 from POST /api/voice: the new voice room's address, to post in the chat */
+export type VoiceResponse = { url: string }
 
 /** GET /api/codes/<code>: the room a short number belongs to */
 export type RoomCodeResponse = { id: string }
@@ -340,6 +375,8 @@ export type RoomSummary = {
   members: number
   seated: number
   maxSeats: number
+  /** The room has a password (e1-t16): someone new is asked for it before joining */
+  locked?: true
 }
 
 /** A public room waiting for people, as GET /api/lobby shows it to anyone. No member but the host */
@@ -454,7 +491,13 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       const name = normalizeName(value.name)
       if (name === null) return null
       // A malformed token is someone new, not an error: the browser may hold an old one
-      return { t: 'join', name, token: isSeatToken(value.token) ? value.token : null }
+      const password = normalizePassword(value.password)
+      return {
+        t: 'join',
+        name,
+        token: isSeatToken(value.token) ? value.token : null,
+        ...(password !== null ? { password } : {}),
+      }
     }
     case 'resync':
       return { t: 'resync' }
@@ -500,6 +543,11 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return isPlainObject(value.options)
         ? { t: 'set_options', options: value.options as OptionValues }
         : null
+    case 'set_password': {
+      if (value.password === null) return { t: 'set_password', password: null }
+      const password = normalizePassword(value.password)
+      return password === null ? null : { t: 'set_password', password }
+    }
     default:
       return null
   }

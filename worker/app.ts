@@ -1,4 +1,5 @@
 import type { HealthResponse } from '../shared/health.ts'
+import { handleVoice } from './voice.ts'
 import type { LobbyResponse } from '../shared/protocol.ts'
 import { handleAuth, isAuthPath } from './auth.ts'
 import { handleClientError } from './errors.ts'
@@ -29,6 +30,12 @@ export interface Env {
    */
   AUTH_SHARED_SECRET?: string
   AUTH_BRIDGE_URL?: string
+  /**
+   * The voice link (e1-t14, worker/voice.ts): LongTalk's address (a var) and, to reach it from this
+   * Worker on the same workers.dev subdomain, a service binding to it. Off unless the address is set
+   */
+  LONGTALK_URL?: string
+  LONGTALK?: Fetcher
 }
 
 const noStore = { 'cache-control': 'no-store' }
@@ -61,6 +68,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   }
   if (url.pathname.startsWith('/api/codes/')) return handleRoomCode(request, env, url)
   if (url.pathname === '/api/lobby') return handleLobby(request, env)
+  if (url.pathname === '/api/voice') return handleVoice(request, env)
   if (isAuthPath(url.pathname)) return handleAuth(request, env, url)
   if (url.pathname === '/api/errors') return handleClientError(request, env, url)
   if (url.pathname.startsWith('/api/')) return notFound()

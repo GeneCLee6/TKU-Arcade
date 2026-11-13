@@ -58,7 +58,7 @@ depends_on: [E2, E7]
 - [x] AC-1.5 — 聊天：200 則、速率限制、連結、`chatLocked`。
 - [x] AC-1.6 — 旁觀：旁觀者視角、補位。
 - [ ] AC-1.7 — 選用帳號：牌桌 token 驗簽、本站 session、暱稱固定。
-- [ ] AC-1.8 — 語音連結：一鍵建 LongTalk 房並貼連結。
+- [x] AC-1.8 — 語音連結：一鍵建 LongTalk 房並貼連結。（I3，#46，在 PR 預覽站實測：按鈕開出 LongTalk 房、連結出現在聊天）
 
 ## Task 拆分
 
@@ -80,9 +80,9 @@ depends_on: [E2, E7]
 - [ ] `e1-t11` 牌桌 repo：對外簽發短效 token 的端點（記在牌桌 ROADMAP） · AC-1.7 · S（牌桌 PR GeneCLee6/TKU-BridgeTable#331，牌桌的 `e1-t37`、ROADMAP O7；等擁有者審核合併、設 secret，正式站整條流程通了才勾）
 - [x] `e1-t12` 本站 `worker/auth.ts` 驗簽、session cookie、`/api/me` · AC-1.7 · M · ← e1-t11 · #20
 - [x] `e1-t13` 前端登入按鈕、回跳、登入者暱稱固定 · AC-1.7 · S · ← e1-t12 · #20
-- [ ] `e1-t14` 語音連結：呼叫 LongTalk 建房、貼聊天、不可用時隱藏 · AC-1.8 · S · ← e1-t07
-- [ ] `e1-t15` 公開房列表篩選（遊戲、人數）與「隨機加入一間」 · AC-1.1 · S · ← e1-t09
-- [ ] `e1-t16` 房間密碼（私密房可選） · AC-1.3 · S · ← e1-t04
+- [x] `e1-t14` 語音連結：呼叫 LongTalk 建房、貼聊天、不可用時隱藏 · AC-1.8 · S · ← e1-t07 · I3（#46）：service binding
+- [x] `e1-t15` 公開房列表篩選（遊戲、人數）與「隨機加入一間」 · AC-1.1 · S · ← e1-t09 · I3（#46）：人數是「至少幾個空位」
+- [x] `e1-t16` 房間密碼（私密房可選） · AC-1.3 · S · ← e1-t04 · I3（#46）
 
 ## 風險與對策
 

@@ -42,11 +42,15 @@
   ],
   // The deployed commit; the deploy workflows override it with --var APP_VERSION:<sha>.
   // AUTH_BRIDGE_URL: the bridge table that signs club sign-in tokens (e1-t12, DEPLOY.md §11). Sign-in
-  // stays off until the secret AUTH_SHARED_SECRET is set too
+  // stays off until the secret AUTH_SHARED_SECRET is set too.
+  // LONGTALK_URL: where voice rooms are opened (e1-t14, worker/voice.ts); remove it to hide the button
   "vars": {
     "APP_VERSION": "local",
-    "AUTH_BRIDGE_URL": "https://tku-bridge-table.genelee-pro.workers.dev"
+    "AUTH_BRIDGE_URL": "https://tku-bridge-table.genelee-pro.workers.dev",
+    "LONGTALK_URL": "https://longtalk.genelee-pro.workers.dev"
   },
+  // LongTalk, reached Worker to Worker: a fetch to its workers.dev address from here would be refused
+  "services": [{ "binding": "LONGTALK", "service": "longtalk" }],
   // Staging and pull request previews (DEPLOY.md): separate Workers, so each has its own Durable
   // Object storage and never touches production's. Bindings and vars are not inherited from the
   // top level: repeat each one here. Selected at build time with CLOUDFLARE_ENV=preview (the Vite
@@ -74,7 +78,9 @@
       // Previews read the same assets as production (content-hashed, read-only in practice) and
       // write no backups
       "r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "tku-arcade-assets" }],
-      "vars": { "APP_VERSION": "local" }
+      "vars": { "APP_VERSION": "local", "LONGTALK_URL": "https://longtalk.genelee-pro.workers.dev" },
+      // Previews open voice rooms on production LongTalk: they are empty rooms that clean themselves up
+      "services": [{ "binding": "LONGTALK", "service": "longtalk" }]
     }
   }
 }

@@ -1,12 +1,23 @@
+import { lazy, Suspense, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { getGameInfo } from '../../shared/games/catalog.ts'
 import { useT } from '../i18n/useT.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
+import {
+  ANY_ROOM,
+  filterRooms,
+  freeSeatsOf,
+  randomRoom,
+  type RoomFilter,
+} from '../lib/publicRoomFilter.ts'
 import { usePublicRooms } from '../lib/usePublicRooms.ts'
 import { useNavigate } from '../lib/useRouter.ts'
 import { clippedFill, displayType, monoType, slantClip } from '../styles/esports.ts'
 import { color, fontSize, gameHue, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
+
+// e1-t15: its own chunk, only once there is a room to filter
+const PublicRoomFilters = lazy(() => import('./PublicRoomFilters.tsx'))
 
 /** The home page's list of public rooms waiting for people (e1-t09) */
 export function PublicRooms() {
@@ -14,7 +25,12 @@ export function PublicRooms() {
   const navigate = useNavigate()
   const { rooms, failed } = usePublicRooms()
   // A game that is not on offer stays out even if someone made a room of it by hand
-  const shown = (rooms ?? []).filter(({ gameId }) => getGameInfo(gameId)?.meta.unlisted !== true)
+  const listed = (rooms ?? []).filter(({ gameId }) => getGameInfo(gameId)?.meta.unlisted !== true)
+  // e1-t15: which game, and room for how many of us
+  const [filter, setFilter] = useState<RoomFilter>(ANY_ROOM)
+  const shown = filterRooms(listed, filter)
+  const filtering = filter.gameId !== null || filter.freeSeats > 1
+  const most = Math.max(1, ...listed.map(freeSeatsOf))
 
   return (
     <section>
@@ -22,6 +38,23 @@ export function PublicRooms() {
         <Live aria-hidden="true" />
         {t('lobby.publicRooms.heading')}
       </Heading>
+      {listed.length > 0 && (
+        <Suspense>
+          <PublicRoomFilters
+            filter={filter}
+            onFilter={setFilter}
+            most={most}
+            onRandom={
+              shown.length === 0
+                ? null
+                : () => {
+                    const room = randomRoom(shown)
+                    if (room) navigate(`/r/${room.id}`)
+                  }
+            }
+          />
+        </Suspense>
+      )}
       {shown.length > 0 && (
         <List>
           {shown.map((room) => (
@@ -50,7 +83,16 @@ export function PublicRooms() {
       {failed ? (
         <Note role="status">{t('lobby.publicRooms.failed')}</Note>
       ) : (
-        rooms !== null && shown.length === 0 && <Note>{t('lobby.publicRooms.empty')}</Note>
+        rooms !== null &&
+        shown.length === 0 && (
+          <Note>
+            {t(
+              filtering && listed.length > 0
+                ? 'lobby.publicRooms.noneMatch'
+                : 'lobby.publicRooms.empty',
+            )}
+          </Note>
+        )
       )}
     </section>
   )
