@@ -1,7 +1,10 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { ChatMessage } from '../shared/chat.ts'
 import { getGame } from '../shared/games/index.ts'
+import type { ReplayStep } from '../shared/games/match.ts'
+import { buildReplay, type ReplayResponse } from '../shared/games/replay.ts'
 import type { OptionValues } from '../shared/games/types.ts'
+import type { JsonValue } from '../shared/patch.ts'
 import {
   HEARTBEAT_PING,
   HEARTBEAT_PONG,
@@ -116,8 +119,9 @@ export class RoomDO extends DurableObject<Env> {
     options: OptionValues | undefined,
     isPublic: boolean,
     code: string | null = null,
+    password: string | null = null,
   ): Promise<boolean> {
-    const created = this.host.create(id, gameId, options, isPublic, code)
+    const created = this.host.create(id, gameId, options, isPublic, code, password)
     // A room nobody ever joins is cleaned up too
     await this.settle()
     return created
@@ -128,6 +132,37 @@ export class RoomDO extends DurableObject<Env> {
     // A room from before clean-up has no alarm: being looked at is what starts its clock
     await this.settle()
     return this.host.summary()
+  }
+
+  /**
+   * RPC from GET /api/rooms/<id>/replay (e2-t09): the last game played back, once it is over; null
+   * when there is none. Built here, from the stored seed and steps, with the module the room ran.
+   * As JSON text: a projection's type is too deep for the RPC's own typing, and the Worker only
+   * passes it on
+   */
+  async replay(): Promise<string | null> {
+    const source = this.host.replaySource()
+    if (!source) return null
+    const { game, names } = source
+    const module = getGame(game.gameId)
+    if (!module) return null
+    const stored = await this.ctx.storage.list<ReplayStep<JsonValue>>({ prefix: STEP_PREFIX })
+    const steps = [...stored.values()].slice(0, game.steps)
+    try {
+      const { start, frames } = buildReplay(module, game.seats, game.options, game.seed, steps)
+      const body: ReplayResponse = {
+        gameId: game.gameId,
+        options: game.options,
+        names,
+        start,
+        frames,
+      }
+      return JSON.stringify(body)
+    } catch (error) {
+      // The log no longer gives the game: a module changed under a finished game
+      console.error('replay failed', error)
+      return null
+    }
   }
 
   /** Only the WebSocket upgrade, forwarded by the Worker from /ws/<id> */

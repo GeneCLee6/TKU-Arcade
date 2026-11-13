@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import styled from 'styled-components'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { RoomMember, RoomView } from '../../shared/protocol.ts'
@@ -25,9 +25,14 @@ export interface WaitingRoomProps {
   onDissolve(): void
   onSetGame(gameId: string): void
   onSetOptions(options: OptionValues): void
+  /** e1-t16: the host sets or takes away the room's password */
+  onSetPassword?(password: string | null): void
   /** Below the setup in the right-hand column of a wide screen: the room's chat */
   aside?: ReactNode
 }
+
+// e1-t16: its own chunk, with its strings
+const RoomPasswordSetting = lazy(() => import('./RoomPasswordSetting.tsx'))
 
 export function WaitingRoom({
   roomId,
@@ -41,6 +46,7 @@ export function WaitingRoom({
   onDissolve,
   onSetGame,
   onSetOptions,
+  onSetPassword,
   aside,
 }: WaitingRoomProps) {
   const t = useT()
@@ -67,86 +73,102 @@ export function WaitingRoom({
     // One on a phone, in the same order
     <Layout data-room-columns="">
       <Column>
-      <Section>
-        <Heading>{t('room.waiting.seats')}</Heading>
-        <List>
-          {seats.map((seat) => {
-            const member = seated.find((other) => other.seat === seat)
-            return member ? (
-              <Row key={seat} $mark={seatColor(seat)}>
-                <SeatNumber>{t('room.waiting.seat', { seat: seat + 1 })}</SeatNumber>
-                {entry(member)}
-              </Row>
-            ) : (
-              <FreeSeatRow key={seat} seat={seat} onSit={onSit} />
-            )
-          })}
-        </List>
-      </Section>
-
-      {spectators.length > 0 && (
         <Section>
-          <Heading>{t('room.waiting.spectators')}</Heading>
+          <Heading>{t('room.waiting.seats')}</Heading>
           <List>
-            {spectators.map((member) => (
-              <Row key={member.id}>{entry(member)}</Row>
-            ))}
+            {seats.map((seat) => {
+              const member = seated.find((other) => other.seat === seat)
+              return member ? (
+                <Row key={seat} $mark={seatColor(seat)}>
+                  <SeatNumber>{t('room.waiting.seat', { seat: seat + 1 })}</SeatNumber>
+                  {entry(member)}
+                </Row>
+              ) : (
+                <FreeSeatRow key={seat} seat={seat} onSit={onSit} />
+              )
+            })}
           </List>
         </Section>
-      )}
 
-      {/* The start bar */}
-      <StartBar>
-        {me?.seat === null && <Muted>{t('room.waiting.pickSeat')}</Muted>}
-        {me && me.seat !== null && (
-          <Actions>
-            <Button $variant="secondary" onClick={() => onReady(!me.ready)}>
-              {me.ready ? t('room.waiting.cancelReady') : t('room.waiting.ready')}
-            </Button>
-            <Button $variant="ghost" onClick={() => onSit(null)}>
-              {t('room.waiting.standUp')}
-            </Button>
-          </Actions>
+        {spectators.length > 0 && (
+          <Section>
+            <Heading>{t('room.waiting.spectators')}</Heading>
+            <List>
+              {spectators.map((member) => (
+                <Row key={member.id}>{entry(member)}</Row>
+              ))}
+            </List>
+          </Section>
         )}
 
-        {isHost ? (
-          <SeatedGateButton
-            label={t('room.waiting.start')}
-            seated={seated.length}
-            minPlayers={view.room.minPlayers}
-            onClick={onStart}
-          />
-        ) : (
-          <Muted>{t('room.waiting.waitForHost')}</Muted>
-        )}
-      </StartBar>
+        {/* The start bar */}
+        <StartBar>
+          {me?.seat === null && <Muted>{t('room.waiting.pickSeat')}</Muted>}
+          {me && me.seat !== null && (
+            <Actions>
+              <Button $variant="secondary" onClick={() => onReady(!me.ready)}>
+                {me.ready ? t('room.waiting.cancelReady') : t('room.waiting.ready')}
+              </Button>
+              <Button $variant="ghost" onClick={() => onSit(null)}>
+                {t('room.waiting.standUp')}
+              </Button>
+            </Actions>
+          )}
+
+          {isHost ? (
+            <SeatedGateButton
+              label={t('room.waiting.start')}
+              seated={seated.length}
+              minPlayers={view.room.minPlayers}
+              onClick={onStart}
+            />
+          ) : (
+            <Muted>{t('room.waiting.waitForHost')}</Muted>
+          )}
+        </StartBar>
       </Column>
 
       <Column>
+        {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
+        <Invite roomId={roomId} code={view.room.code ?? null}>
+          {(isHost || view.room.password !== undefined) && (
+            <Suspense>
+              <RoomPasswordSetting
+                password={view.room.password ?? null}
+                onSet={isHost ? onSetPassword : undefined}
+              />
+            </Suspense>
+          )}
+        </Invite>
 
-      {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
-      <Invite roomId={roomId} code={view.room.code ?? null} />
+        <GameSetup
+          room={view.room}
+          isHost={isHost}
+          onSetGame={onSetGame}
+          onSetOptions={onSetOptions}
+        />
 
-      <GameSetup
-        room={view.room}
-        isHost={isHost}
-        onSetGame={onSetGame}
-        onSetOptions={onSetOptions}
-      />
-
-      {isHost && (
-        <Actions>
-          <DissolveButton onDissolve={onDissolve} />
-        </Actions>
-      )}
-      {aside}
+        {isHost && (
+          <Actions>
+            <DissolveButton onDissolve={onDissolve} />
+          </Actions>
+        )}
+        {aside}
       </Column>
     </Layout>
   )
 }
 
 /** The room's number (four digits) to say aloud, else its id; the link and the QR code for phones */
-function Invite({ roomId, code }: { roomId: string; code: string | null }) {
+function Invite({
+  roomId,
+  code,
+  children,
+}: {
+  roomId: string
+  code: string | null
+  children?: ReactNode
+}) {
   const t = useT()
   const toast = useToast()
   const link = `${window.location.origin}/r/${roomId}`
@@ -179,6 +201,7 @@ function Invite({ roomId, code }: { roomId: string; code: string | null }) {
         </Button>
       </Actions>
       <QrCode text={link} label={t('room.waiting.qrLabel')} />
+      {children}
     </Section>
   )
 }

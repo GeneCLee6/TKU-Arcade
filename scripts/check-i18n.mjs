@@ -319,7 +319,10 @@ const screenMessages = existsSync(GAME_SCREENS) ? await load(GAME_SCREENS, 'SCRE
 const screensEn = screenMessages.en ?? {}
 checkParity(screensEn, `${GAME_SCREENS} (en)`, screenMessages['zh-TW'] ?? {}, `${GAME_SCREENS} (zh-TW)`)
 for (const key of Object.keys(screensEn)) {
-  if (!key.startsWith('games.')) problems.push(`${GAME_SCREENS}: '${key}': keys here start with games.`)
+  // `room.extra.`: the room's own strings that load later (shared/games/roomExtras.ts, I3)
+  if (!key.startsWith('games.') && !key.startsWith('room.extra.')) {
+    problems.push(`${GAME_SCREENS}: '${key}': keys here start with games. or room.extra.`)
+  }
 }
 const kartMessages = existsSync(KART) ? await load(KART, 'KART_MESSAGES') : {}
 const kartEn = kartMessages.en ?? {}
