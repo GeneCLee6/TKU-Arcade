@@ -3,6 +3,10 @@
 // en is the source, zh-TW has the same keys, and `npm run check-i18n` compares them.
 const en = {
   'kart.spike.title': 'Kart physics test',
+  'kart.spike.toOval': 'Drive the test oval',
+  'kart.spike.toArena': 'Back to the yard',
+  'kart.hud.lap': 'Lap {count}/{of}',
+  'kart.hud.minimap': 'Track map',
   'kart.spike.canvas': 'A box car in a walled test yard, seen from behind',
   'kart.spike.keys':
     '{throttle} to accelerate, {brake} to brake or reverse, {left} and {right} to steer. Hold {drift} while steering to drift: drifting fills the boost gauge, and {boost} fires a boost. Let go of a drift during a boost to chain another. {reset} puts the car back at the last safe place. F shows the numbers.',
@@ -194,6 +198,10 @@ export type KartMessageKey = keyof typeof en
 
 const zhTW: Record<KartMessageKey, string> = {
   'kart.spike.title': '卡丁車物理測試',
+  'kart.spike.toOval': '開測試橢圓賽道',
+  'kart.spike.toArena': '回測試場',
+  'kart.hud.lap': '第 {count}／{of} 圈',
+  'kart.hud.minimap': '賽道小地圖',
   'kart.spike.canvas': '圍牆圍起來的測試場裡的一台方塊車，從車後看',
   'kart.spike.keys':
     '{throttle} 加速，{brake} 煞車或倒車，{left}、{right} 轉向。轉向時按住 {drift} 甩尾：甩尾會累積加速條，按 {boost} 噴射。噴射中甩尾再放開，可以連噴。按 {reset} 回到上一個安全的地方。按 F 看數字。',

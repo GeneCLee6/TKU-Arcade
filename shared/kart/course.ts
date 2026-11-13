@@ -1,8 +1,9 @@
 // e8-t02b: one car on a course, a step at a time: the kart physics, then the walls, then the reset
 // and the safe place it goes back to. Pure, like physics.ts.
 //
-// Until tracks have checkpoints (e8-t04, J4) the safe place is wherever the car last drove clear of
-// the walls for SAFE_CONFIRM_SECONDS; a track's respawn points will take its place.
+// On a track (e8-t04, J4) the safe place is the respawn point of the last gate passed, in order. On
+// a course without gates (the test arena) it is wherever the car last drove clear of the walls for
+// SAFE_CONFIRM_SECONDS.
 import {
   DEFAULT_RULES,
   INITIAL_KART,
@@ -14,6 +15,7 @@ import {
   type KartState,
   type KartTuning,
 } from './physics.ts'
+import { gateCrossing, type Gate } from './track.ts'
 import { collideWalls, KART_RADIUS, wallClearance, type Wall } from './walls.ts'
 
 /** A place and the way to face there */
@@ -26,6 +28,12 @@ export interface Spot {
 export interface Course {
   readonly walls: readonly Wall[]
   readonly start: Spot
+  /** A track's gates in driving order (gate 0 the finish line) and where each sends a reset car */
+  readonly checkpoints?: {
+    readonly gates: readonly Gate[]
+    readonly respawns: readonly Spot[]
+    readonly laps: number
+  }
 }
 
 /** A place is safe this far from every wall: a car put there can steer before it reaches one */
@@ -50,6 +58,10 @@ export interface Run {
   readonly resetHeld: boolean
   /** How many times the car has been reset */
   readonly resets: number
+  /** On a track: the gate to cross next, in order */
+  readonly nextGate: number
+  /** On a track: how many times the finish line has been crossed going forwards, in order */
+  readonly crossings: number
 }
 
 const placed = (spot: Spot): KartState => ({ ...INITIAL_KART, ...spot })
@@ -64,6 +76,8 @@ export function startRun(course: Course): Run {
     hitSpeed: 0,
     resetHeld: false,
     resets: 0,
+    nextGate: 0,
+    crossings: 0,
   }
 }
 
@@ -82,6 +96,50 @@ export function resetRun(run: Run): Run {
     hitSpeed: 0,
     resets: run.resets + 1,
   }
+}
+
+export interface GateProgress {
+  readonly nextGate: number
+  readonly crossings: number
+  readonly safe: Spot
+}
+
+/**
+ * Gates count only in order: crossing the next one forwards moves on (and crossing gate 0 is a lap
+ * line crossing); crossing the last one passed backwards moves back, so that driving back over a
+ * gate and forwards again does not count it twice. The safe place follows: the respawn point of the
+ * last gate passed, or the start before gate 0 has ever been crossed
+ */
+export function passGates(
+  progress: GateProgress,
+  from: { x: number; z: number },
+  to: { x: number; z: number },
+  checkpoints: NonNullable<Course['checkpoints']>,
+  start: Spot,
+): GateProgress {
+  const { gates, respawns } = checkpoints
+  const count = gates.length
+  const { nextGate, crossings } = progress
+  if (gateCrossing(gates[nextGate]!, from.x, from.z, to.x, to.z) === 1) {
+    return {
+      nextGate: (nextGate + 1) % count,
+      crossings: nextGate === 0 ? crossings + 1 : crossings,
+      safe: respawns[nextGate]!,
+    }
+  }
+  const behind = (nextGate - 1 + count) % count
+  // Before the start line has been crossed there is nothing behind to undo
+  const anythingPassed = crossings > 0
+  if (anythingPassed && gateCrossing(gates[behind]!, from.x, from.z, to.x, to.z) === -1) {
+    const left = behind === 0 ? crossings - 1 : crossings
+    const before = (behind - 1 + count) % count
+    return {
+      nextGate: behind,
+      crossings: left,
+      safe: left === 0 && behind === 0 ? start : respawns[before]!,
+    }
+  }
+  return progress
 }
 
 /** Which way the car is going, as a heading (heading 0 faces -z and grows clockwise) */
@@ -107,6 +165,30 @@ export function stepRun(
   } = collideWalls(run.kart, moved, course.walls, tuning)
 
   let { safe, candidate, candidateSeconds } = run
+  const { nextGate, crossings } = run
+  const checkpoints = course.checkpoints
+  if (checkpoints && checkpoints.gates.length > 0) {
+    const passed = passGates(
+      { nextGate, crossings, safe },
+      run.kart,
+      kart,
+      checkpoints,
+      course.start,
+    )
+    return {
+      kart,
+      safe: passed.safe,
+      candidate: null,
+      candidateSeconds: 0,
+      impact,
+      hitSpeed,
+      resetHeld: input.reset ?? false,
+      resets: run.resets,
+      nextGate: passed.nextGate,
+      crossings: passed.crossings,
+    }
+  }
+
   // Forwards, not just fast: a place passed in reverse would face the wrong way
   const forward = kart.vx * Math.sin(kart.heading) - kart.vz * Math.cos(kart.heading)
   const clear =
@@ -137,5 +219,7 @@ export function stepRun(
     hitSpeed,
     resetHeld: input.reset ?? false,
     resets: run.resets,
+    nextGate,
+    crossings,
   }
 }

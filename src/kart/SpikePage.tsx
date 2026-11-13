@@ -22,7 +22,14 @@ import {
 } from './devices.ts'
 import { CalloutText, Hud } from './Hud.tsx'
 import { supportsWebGL2 } from './Scene.ts'
-import { startSpikeLoop, type SpikeHud, type SpikeStats } from './spikeLoop.ts'
+import { Minimap, type MinimapHandle } from './Minimap.tsx'
+import {
+  spikeTrack,
+  startSpikeLoop,
+  type SpikeCourse,
+  type SpikeHud,
+  type SpikeStats,
+} from './spikeLoop.ts'
 import { NARROW_PANEL_TOP, NARROW_TOP } from './layout.ts'
 import { TuningPanel } from './TuningPanel.tsx'
 
@@ -72,6 +79,12 @@ export function SpikePage() {
   useEffect(() => {
     controls.current = { bindings, rules, tuning, enabled: !controlsOpen }
   }, [bindings, rules, tuning, controlsOpen])
+  // e8-t04: the yard, or the test oval with its minimap and laps (?track=oval)
+  const [course, setCourse] = useState<SpikeCourse>(() =>
+    new URLSearchParams(window.location.search).get('track') === 'oval' ? 'oval' : 'arena',
+  )
+  const [track] = useState(spikeTrack)
+  const minimap = useRef<MinimapHandle>(null)
   const [showNumbers, setShowNumbers] = useState(() =>
     new URLSearchParams(window.location.search).has('fps'),
   )
@@ -87,12 +100,24 @@ export function SpikePage() {
         onHud: setHud,
         onCallout: (next) => setCallout((last) => ({ callout: next, id: (last?.id ?? 0) + 1 })),
         onContextLost: () => setFailure('contextLost'),
+        course,
+        onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
       })
     } catch {
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [])
+  }, [course])
+
+  const switchCourse = () => {
+    const next: SpikeCourse = course === 'oval' ? 'arena' : 'oval'
+    const url = new URL(window.location.href)
+    if (next === 'oval') url.searchParams.set('track', 'oval')
+    else url.searchParams.delete('track')
+    window.history.replaceState(null, '', url)
+    setHud(EMPTY_HUD)
+    setCourse(next)
+  }
 
   // Each callout shows for a moment; a new one replaces it and starts its own moment
   useEffect(() => {
@@ -180,6 +205,9 @@ export function SpikePage() {
           >
             {t('kart.tuning.open')}
           </Button>
+          <Button $variant="secondary" $size="sm" onClick={switchCourse} data-testid="kart-course">
+            {t(course === 'oval' ? 'kart.spike.toArena' : 'kart.spike.toOval')}
+          </Button>
           <Button $variant="secondary" $size="sm" onClick={() => setShowNumbers((shown) => !shown)}>
             {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
           </Button>
@@ -209,6 +237,16 @@ export function SpikePage() {
         <WallFlash key={hud.hits} aria-hidden="true" data-testid="kart-wall-flash" />
       )}
       {callout && <CalloutText key={callout.id} t={t} callout={callout.callout} />}
+      {course === 'oval' && (
+        <MapCorner>
+          {hud.lap && (
+            <LapText data-testid="kart-lap">
+              {t('kart.hud.lap', { count: Math.max(1, hud.lap.count), of: hud.lap.of })}
+            </LapText>
+          )}
+          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
+        </MapCorner>
+      )}
       <Bottom>
         <Hud t={t} hud={hud} maxStored={tuning.maxStoredBoosts} />
         <Hint>
@@ -311,6 +349,25 @@ const Buttons = styled.div`
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: ${space.sm}px;
+`
+
+// Under the top row, on the right: where the eye goes for the course, away from the HUD
+const MapCorner = styled.div`
+  position: absolute;
+  top: 64px;
+  right: ${space.sm}px;
+  display: grid;
+  justify-items: end;
+  gap: ${space.xs}px;
+  pointer-events: none;
+`
+
+const LapText = styled.p`
+  margin: 0;
+  padding: 2px ${space.sm}px;
+  color: ${color.text};
+  background: color-mix(in srgb, ${color.bg} 55%, transparent);
+  font-weight: 800;
 `
 
 const Bottom = styled.div`

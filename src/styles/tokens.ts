@@ -145,6 +145,11 @@ export const kartScene = {
   nose: '#F3F4F6',
   // The test arena's walls (e8-t02b)
   wall: '#3F4A5C',
+  // A track's road, its centre line on the minimap, the finish line and the next gate (e8-t04)
+  road: '#4B5563',
+  roadLine: '#E5E7EB',
+  finish: '#F9FAFB',
+  nextGate: '#FACC15',
   lightSky: '#FFFFFF',
   lightGround: '#6B7280',
 } as const
@@ -232,7 +237,8 @@ export const font = {
   kai: "'LXGW WenKai TC', 'Kaiti TC', BiauKai, 'DFKai-SB', STKaiti, KaiTi, 'Noto Serif TC', 'PMingLiU', serif",
   sans: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang TC', 'Microsoft JhengHei', sans-serif",
   // Latin headings, buttons and the wordmark: Saira, italic and heavy
-  display: "Saira, 'Noto Sans TC', 'Arial Narrow', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  display:
+    "Saira, 'Noto Sans TC', 'Arial Narrow', system-ui, -apple-system, 'Segoe UI', sans-serif",
   // Chinese headings: Noto Sans TC at 900, upright
   displayZh: "'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif",
   // Numbers, room ids and small labels

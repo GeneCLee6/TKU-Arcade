@@ -1,4 +1,6 @@
 import { TEST_ARENA } from '../../shared/kart/arena.ts'
+import { courseOf, parseTrack, type Track } from '../../shared/kart/track.ts'
+import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
 import { startRun, stepRun, type Spot } from '../../shared/kart/course.ts'
 import { actionKeys, isBoundKey, readInput, type Bindings } from '../../shared/kart/input.ts'
@@ -51,6 +53,18 @@ export interface SpikeHud {
   readonly chain: number
   /** Counts wall hits, so that the HUD can flash on each one */
   readonly hits: number
+  /** On a track: laps begun (finish line crossings) and the track's laps */
+  readonly lap?: { readonly count: number; readonly of: number }
+}
+
+/** What /kart/spike drives on: the walled yard of J3, or J4's test track */
+export type SpikeCourse = 'arena' | 'oval'
+
+/** The test oval, checked like any track file */
+export function spikeTrack(): Track {
+  const parsed = parseTrack(TEST_OVAL)
+  if ('problems' in parsed) throw new Error(`test oval: ${parsed.problems.join('; ')}`)
+  return parsed.track
 }
 
 /** What tests and a curious owner can read from the console. It stays after the loop stops. */
@@ -71,6 +85,9 @@ export interface SpikeDebug {
   resets: number
   /** The tuning the last step ran with */
   tuning: KartTuning | undefined
+  /** On a track: finish line crossings and the next gate (e8-t04) */
+  crossings: number
+  nextGate: number
 }
 
 declare global {
@@ -96,6 +113,9 @@ export interface SpikeOptions {
   /** DRIFT, BOOST or CHAIN: called once for each */
   readonly onCallout: (callout: Callout) => void
   readonly onContextLost: () => void
+  readonly course?: SpikeCourse
+  /** Every frame, where the car is: the minimap moves its marker with it, outside React */
+  readonly onPose?: (x: number, z: number, heading: number, nextGate: number) => void
 }
 
 const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
@@ -105,7 +125,8 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
   a.hits === b.hits &&
   a.storedBoosts === b.storedBoosts &&
   a.boosting === b.boosting &&
-  a.chain === b.chain
+  a.chain === b.chain &&
+  a.lap?.count === b.lap?.count
 
 /**
  * The game loop, outside React (docs/ARCHITECTURE.md §4): rendering follows the display, the physics
@@ -113,8 +134,9 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
  * Throws when WebGL is unavailable.
  */
 export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): () => void {
-  const course = TEST_ARENA
-  const scene = createKartScene(container, course.walls)
+  const track = options.course === 'oval' ? spikeTrack() : null
+  const course = track ? courseOf(track) : TEST_ARENA
+  const scene = createKartScene(container, course.walls, track ?? undefined)
   const held = new Set<string>()
   // A boost or reset key pressed and let go between two steps still counts
   let boostTapped = false
@@ -132,6 +154,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     hits: 0,
     resets: 0,
     tuning: undefined,
+    crossings: 0,
+    nextGate: 0,
   }
   window.__kartSpike = debug
   scene.snapCamera(run.kart.heading)
@@ -192,6 +216,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     debug.hits = hits
     debug.resets = run.resets
     debug.tuning = tuning
+    debug.crossings = run.crossings
+    debug.nextGate = run.nextGate
     const boosting = current.boostSeconds > 0
     scene.draw(
       poseBetween(previous, current, clock.alpha),
@@ -207,7 +233,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       boosting,
       chain: boosting ? current.chain : 0,
       hits,
+      ...(track ? { lap: { count: run.crossings, of: track.laps } } : {}),
     }
+    options.onPose?.(current.x, current.z, current.heading, run.nextGate)
     if (!sameHud(lastHud, hud)) {
       lastHud = hud
       options.onHud(hud)
