@@ -295,13 +295,13 @@ describe('the game', () => {
   it('lets the host pick only among the games the lobby lists', () => {
     renderRoom(inGame('promotion'))
     expect(select()).toHaveValue('promotion')
-    expect(choices()).toEqual(['Promotion', 'Silent Table', 'Spectrum'])
+    expect(choices()).toEqual(['Promotion', 'Silent Table', 'Spectrum', 'Bluff Reader'])
   })
 
   it('still shows an unlisted game as the selected one, and can leave it', () => {
     const { onSetGame } = renderRoom(inGame('tictactoe'))
     expect(select()).toHaveValue('tictactoe')
-    expect(choices()).toHaveLength(4)
+    expect(choices()).toHaveLength(5)
 
     fireEvent.change(select(), { target: { value: 'promotion' } })
 

@@ -7,14 +7,13 @@ export const BLUFF_READ_SECONDS = 60
 
 export const bluffInfo: GameInfo<BluffOptions> = {
   id: 'bluff',
-  // Unlisted until its screen (I2) is there; a room can be opened with POST /api/rooms. 3 to 9: a
-  // judge, the honest reader and at least one bluffer; the mole needs four
+  // Listed with its screen (I2). 3 to 9: a judge, the honest reader and at least one bluffer; the
+  // mole needs four
   meta: {
     minPlayers: 3,
     maxPlayers: 9,
     minutes: 30,
     i18nKey: 'games.bluff',
-    unlisted: true,
   },
 
   options: {

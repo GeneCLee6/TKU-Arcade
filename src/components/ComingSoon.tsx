@@ -11,10 +11,9 @@ import { Body, Heading, Monogram, Name, Summary } from './gameCardParts.ts'
 registerMessages(soonMessages)
 
 // Shown, not playable: games that are not built yet (Silent Table and Spectrum were listed on the
-// owner's request, 2026-11-12). Take a game out of here the day it is listed. Its id, then where its strings
-// are: `${keys}.name` and `${keys}.summary`
+// owner's request, 2026-11-12; Bluff Reader with its screen, I2). Take a game out of here the day it
+// is listed. Its id, then where its strings are: `${keys}.name` and `${keys}.summary`
 const SOON: readonly (readonly [id: string, keys: string])[] = [
-  ['bluff-reader', 'games.bluff-reader'],
   ['kart', 'games.kart'],
 ]
 

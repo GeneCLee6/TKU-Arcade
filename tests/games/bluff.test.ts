@@ -59,10 +59,10 @@ const pointsOf = (state: BluffState) =>
   Object.fromEntries(state.players.map((player, index) => [player.seat, state.reveal?.points[index]]))
 
 describe('the module', () => {
-  it('runs for 3 to 9, and stays out of the lobby until its screen is there', () => {
+  it('runs for 3 to 9, and is in the lobby with its screen (I2)', () => {
     expect(getGame('bluff')).toBe(bluff)
     expect([bluff.meta.minPlayers, bluff.meta.maxPlayers]).toEqual([3, 9])
-    expect(LOBBY_GAMES.some((game) => game.id === 'bluff')).toBe(false)
+    expect(LOBBY_GAMES.some((game) => game.id === 'bluff')).toBe(true)
   })
 
   it('has every key it can send translated, in both languages', () => {

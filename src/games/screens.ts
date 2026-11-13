@@ -16,6 +16,7 @@ const SCREENS: Partial<Record<string, GameScreen>> = {
   promotion: lazy(() => import('./promotion/PromotionScreen.tsx')),
   'silent-table': lazy(() => import('./silent-table/SilentTableScreen.tsx')),
   spectrum: lazy(() => import('./spectrum/SpectrumScreen.tsx')),
+  bluff: lazy(() => import('./bluff/BluffScreen.tsx')),
 }
 
 // The full edition of promotion (C7) is a screen of its own: a simple game never loads its board

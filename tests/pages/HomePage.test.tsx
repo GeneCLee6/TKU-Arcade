@@ -113,7 +113,7 @@ describe('signed in (e1-t13)', () => {
 })
 
 describe('lobby cards', () => {
-  it('lists promotion, silent table and spectrum with their facts, and not the unlisted tic-tac-toe', async () => {
+  it('lists promotion, silent table, spectrum and bluff reader with their facts, and not the unlisted tic-tac-toe', async () => {
     renderLobby()
     const card = screen.getByRole('heading', { level: 3, name: 'Promotion' }).closest('li')!
     expect(within(card).getByText('2–6 players')).toBeInTheDocument()
@@ -127,15 +127,19 @@ describe('lobby cards', () => {
     const spectrum = cardOf('Spectrum')
     expect(within(spectrum).getByText('4–11 players')).toBeInTheDocument()
     expect(within(spectrum).getByRole('button', { name: 'New room' })).toBeInTheDocument()
-    // Three open games; the two Coming soon cards arrive with their lazy chunk
+    // Listed with its screen (I2)
+    const bluff = cardOf('Bluff Reader')
+    expect(within(bluff).getByText('3–9 players')).toBeInTheDocument()
+    expect(within(bluff).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    // Four open games; the Coming soon card arrives with its lazy chunk
     await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(5))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(3)
-    expect(LOBBY_GAMES.map((game) => game.id)).toEqual(['promotion', 'silent-table', 'spectrum'])
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(4)
+    expect(LOBBY_GAMES.map((game) => game.id)).toEqual(['promotion', 'silent-table', 'spectrum', 'bluff'])
   })
 
   it('shows the games that are not open yet as Coming soon, with nothing to press', async () => {
     renderLobby()
-    const names = ['Bluff Reader', 'Kart']
+    const names = ['Kart']
     for (const name of names) {
       // The tag is part of the heading, so a screen reader hears it with the name
       const heading = await screen.findByRole('heading', { level: 3, name: `${name} Coming soon` })
@@ -157,10 +161,7 @@ describe('lobby cards', () => {
   it('translates the Coming soon cards', async () => {
     setLanguage('zh-TW')
     renderLobby()
-    expect(
-      await screen.findByRole('heading', { level: 3, name: '真假朗讀 即將推出' }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 3, name: '卡丁車 即將推出' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 3, name: '卡丁車 即將推出' })).toBeInTheDocument()
     setLanguage('en')
   })
 

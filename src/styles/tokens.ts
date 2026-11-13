@@ -125,8 +125,8 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   promotion: 'gamePromotion',
   'silent-table': 'gameSilentTable',
   spectrum: 'gameSpectrum',
-  // Its card only, for now (E3's Coming soon); the kart keeps the brand's cyan (DESIGN §1)
-  'bluff-reader': 'gameBluffReader',
+  // The kart keeps the brand's cyan (DESIGN §1)
+  bluff: 'gameBluffReader',
 }
 
 /** A game's hue, for its card and its room: what `--color-accent` becomes there */
