@@ -71,6 +71,8 @@ export function JoinRoomForm({ prominent = false }: { prominent?: boolean }) {
           inputMode={prominent ? 'numeric' : 'url'}
           enterKeyHint="go"
           placeholder={prominent ? '1234' : undefined}
+          // Big digits: without a size the box would ask for twenty of them and widen the page
+          size={prominent ? 6 : undefined}
           value={value}
           onChange={handleChange}
           aria-invalid={problem !== null}

@@ -375,6 +375,7 @@ const Grid = styled.ul`
 // The installed app's join box, above everything else on the page
 const AppJoin = styled.section`
   display: grid;
+  min-width: 0;
   gap: ${space.sm}px;
   padding: ${space.md}px;
   background: ${color.sunken};

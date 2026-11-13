@@ -63,7 +63,10 @@ test('the installed app opens with the number box first, on a number pad', async
   const box = person.getByLabel('Room number')
   await expect(box).toBeVisible()
   await expect(box).toHaveAttribute('inputmode', 'numeric')
-  await expect(box).toBeInViewport()
+  await expect(box).toBeInViewport({ ratio: 1 })
+  await expect(person.getByRole('button', { name: 'Join', exact: true })).toBeInViewport({ ratio: 1 })
+  // Big digits must not widen the page: nothing sideways on a phone
+  expect(await person.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   await expect(person.getByLabel('Got a room number or a link?')).toHaveCount(0)
   await expect(person.getByRole('heading', { name: 'Install as an app' })).toHaveCount(0)
   await person.context().close()
