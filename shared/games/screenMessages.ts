@@ -5,6 +5,7 @@ import { bluffScreenMessages } from './bluff/i18n.screen.ts'
 import { roomExtraMessages } from './roomExtras.ts'
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
 import { promotionFullMessages } from './promotion/i18n.full.ts'
+import { promotionRouteMessages } from './promotion/i18n.routes.ts'
 import { promotionScreenMessages } from './promotion/i18n.screen.ts'
 import { silentTableScreenMessages } from './silent-table/i18n.screen.ts'
 import { soonMessages } from './soon.ts'
@@ -16,6 +17,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...promotionScreenMessages.en,
     ...promotionDetailMessages.en,
     ...promotionFullMessages.en,
+    ...promotionRouteMessages.en,
     ...silentTableScreenMessages.en,
     ...spectrumScreenMessages.en,
     ...bluffScreenMessages.en,
@@ -26,6 +28,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...promotionScreenMessages['zh-TW'],
     ...promotionDetailMessages['zh-TW'],
     ...promotionFullMessages['zh-TW'],
+    ...promotionRouteMessages['zh-TW'],
     ...silentTableScreenMessages['zh-TW'],
     ...spectrumScreenMessages['zh-TW'],
     ...bluffScreenMessages['zh-TW'],

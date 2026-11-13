@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import styled, { keyframes } from 'styled-components'
 import type { FullArt } from '../../../../shared/games/promotion/boardFull.ts'
 import { promotionFullMessages } from '../../../../shared/games/promotion/i18n.full.ts'
@@ -50,6 +50,9 @@ import { useTurnPlayback } from './useTurnPlayback.ts'
 // Everything this screen says, with its cell and department names in boardFull.ts: loaded only with
 // a full edition's game, the board's data after the first paint (fullData.ts)
 registerMessages(promotionFullMessages)
+
+// Each player's way through the game, once it is over: out of the first screen
+const FullRoutes = lazy(() => import('./FullRoutes.tsx'))
 
 /** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
 const DENSE_CELL = 48
@@ -394,6 +397,17 @@ export default function FullScreen({ room, game }: GameScreenProps) {
       resultHeadline={resultHeadline}
       resultDetail={resultDetail}
       resultHeld={playing || (settling && !settled && !settleClosed)}
+      resultExtra={
+        game.over && data ? (
+          <Suspense fallback={null}>
+            <FullRoutes
+              players={players}
+              nameOf={nameOf}
+              cellName={(id) => shortCellName(id, language)}
+            />
+          </Suspense>
+        ) : undefined
+      }
       dock={immersed ? undefined : turn}
       ownCountdown
     >

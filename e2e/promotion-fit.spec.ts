@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { newPerson, startGame } from './helpers.ts'
+import { newPerson, playToResult, startGame } from './helpers.ts'
 
 // e3-t10 (C5): the whole promotion board on one screen, full screen and its fallback, the keyboard
 // on the fitted board; e3-t11: the rank watermarks. Against a real browser, at real sizes
@@ -199,3 +199,19 @@ for (const scheme of ['light', 'dark'] as const) {
     await host.context().close()
   })
 }
+
+// 2026-11-13 (擁有者): the end shows each player's way through the game, a roll at a time
+test('the result lists every career route, each roll and where it led', async ({ browser }) => {
+  const host = await newPerson(browser, { reducedMotion: 'reduce' })
+  const guest = await newPerson(browser, { reducedMotion: 'reduce' })
+  await playToResult(host, guest)
+  const routes = host.getByRole('region', { name: 'Career routes' })
+  await expect(routes).toBeVisible()
+  const seats = routes.locator('[data-route-seat]')
+  await expect(seats).toHaveCount(2)
+  await seats.first().locator('summary').click()
+  await expect(seats.first().locator('li').first()).toContainText('Round 1')
+  await routes.screenshot({ path: test.info().outputPath('career-routes-simple.png') })
+  await host.context().close()
+  await guest.context().close()
+})

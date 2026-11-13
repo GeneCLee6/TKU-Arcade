@@ -32,7 +32,12 @@ export type PromotionPlayer = {
   rolls: number
   /** How many of those rolls were zang */
   demotions: number
+  /** Since 2026-11-13: every roll, for the career route shown at the end. A game from before has none */
+  route?: SimpleRouteStep[]
 }
+
+/** One roll of a seat's career in the simple edition: the result and the cell it led to */
+export type SimpleRouteStep = { round: number; face: Face; to: string }
 
 /** The latest roll, enough to animate it: the top or dice, then the piece from one cell to another */
 export type LastRoll = {
@@ -114,7 +119,34 @@ export type FullPlayer = {
    * restoration (開復) is reckoned from
    */
   post?: string | null
+  /**
+   * Since 2026-11-13: every turn that moved this seat or asked it something, from its birth roll on,
+   * for the career route shown at the end. A game from before has none
+   */
+  route?: FullRouteStep[]
 }
+
+/** One turn of a seat's career: what the dice made, where it led, what was answered, the silver */
+export type FullRouteStep = {
+  round: number
+  /** The birth roll, which placed the seat on its origin */
+  birth?: true
+  /** Each throw that scored, in order: the move's, then an event zone's or a restoration's */
+  throws: FullRouteThrow[]
+  /** Every cell landed on, in order */
+  path: string[]
+  /** What the seat answered, when the turn asked */
+  decision?: FullDecision
+  /** The seat's silver gained (or, negative, lost) in the turn */
+  silver: number
+}
+
+/**
+ * A throw of a career route: its combination, the face of its first move (a pair's, three of a
+ * kind's, two pairs' better one), and for a throw that decided an event zone or a restoration, the
+ * zone and the face that decided it
+ */
+export type FullRouteThrow = { combo: ComboKind; face?: FullFace; zone?: string }
 
 /** How four dice read (rulesFull.ts `readThrow`) */
 export type ComboKind =
@@ -208,6 +240,11 @@ export type FullRules = {
   decisionMs: number
   buying: boolean
   endAtDahe: boolean
+  /**
+   * Since 2026-11-13 (擁有者): a throw that scores nothing is thrown again until one does, so every
+   * turn has a result. A game from before has none and throws once a turn
+   */
+  rethrow?: boolean
 }
 
 /** One seat's line in the final settlement */

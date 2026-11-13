@@ -15,6 +15,8 @@ Everyone starts as a commoner. **The first to reach Ronggui (Retired in Glory), 
 3. Your piece moves to the office your current cell names for that result.
 4. One roll a turn, then the next player. Every roll moves you, except graft on the commoner's cell, where you stay put (and the turn still passes).
 
+Once the game is over, the **career routes** under the result show every player's rolls from the first to the last.
+
 There is nothing to decide: the fun is in the swings, and in watching your friends fall.
 
 ## The four results

@@ -12,11 +12,13 @@ import { anyCell, shortCellName } from './fullText.ts'
 
 const face = (t: Translate, step: string) => t(`games.promotion.full.face.${step}`)
 
-/** What an event zone's throw (C8) or a restoration's decided, in words */
-function eventText(t: Translate, thrown: FullThrow, language: Language): string {
+/** What an event zone's throw (C8) or a restoration's decided, in words; `again` as for comboText */
+function eventText(t: Translate, thrown: FullThrow, language: Language, again: boolean): string {
   const { cell, face: decided } = thrown.event as NonNullable<FullThrow['event']>
   const zone = shortCellName(cell, language)
-  if (decided === null) return t('games.promotion.full.combo.eventWait', { zone })
+  if (decided === null) {
+    return t(again ? 'games.promotion.full.combo.eventAgain' : 'games.promotion.full.combo.eventWait', { zone })
+  }
   let outcome: string
   if (cell === DISMISSED) {
     const exiled = decided === 'zang' && (thrown.combo === 'three' || thrown.combo === 'allGraft')
@@ -44,8 +46,9 @@ function eventText(t: Translate, thrown: FullThrow, language: Language): string 
 
 /**
  * "A pair of Talent: one move", "Virtue over Graft: void, throw again". `again` is whether this turn
- * throws once more after this one: only the first board's three throws (C6) ever did; since C8 a
- * throw that scores nothing ends the turn where it stands, and must not say "throw again"
+ * throws once more after this one: the first board's three throws (C6) did, and since 2026-11-13 a
+ * turn throws until something scores; a game between the two (C8) throws once, and a throw that
+ * scores nothing ends its turn where it stands, and must not say "throw again"
  */
 export function comboText(
   t: Translate,
@@ -55,7 +58,7 @@ export function comboText(
   again = false,
 ): string {
   if (birth) return t('games.promotion.full.combo.birth')
-  if (thrown.event) return eventText(t, thrown, language)
+  if (thrown.event) return eventText(t, thrown, language, again)
   const [first, second] = thrown.steps
   switch (thrown.combo) {
     case 'none':

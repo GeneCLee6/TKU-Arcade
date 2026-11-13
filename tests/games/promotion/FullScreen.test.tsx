@@ -196,3 +196,44 @@ describe('the settlement (C7, fixed in C8)', () => {
     expect(screen.getByRole('region', { name: 'Settlement' })).toBeInTheDocument()
   })
 })
+
+describe('career routes at the end (2026-11-13)', () => {
+  it("shows every seat's turns from the birth roll on, under the result", async () => {
+    let match: Match<PromotionFullState> = startMatch(promotion, makeSeats(2), OPTIONS, 3) as Match<PromotionFullState>
+    while (!promotion.isOver(match.state)) {
+      const state = match.state
+      const seat = state.pending?.seat ?? (state.turn as number)
+      match = applyAction(promotion, match, promotion.legalActions(state, seat)[0], seat) as Match<PromotionFullState>
+    }
+    const room = parts('Al')
+    const game = projection(match.state, 0)
+    render(
+      <MemoryRouter>
+        <ToastProvider>
+          <FullScreen
+            room={{ ...room, view: { ...room.view, room: { ...room.view.room, status: 'ended' }, game } }}
+            game={game}
+          />
+        </ToastProvider>
+      </MemoryRouter>,
+    )
+    await act(async () => {})
+    while (screen.queryByRole('button', { name: 'Next step' })) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    // The routes load after the result shows (a lazy chunk)
+    await act(async () => {
+      await import('../../../src/games/promotion/full/FullRoutes.tsx')
+    })
+    const routes = await screen.findByRole('region', { name: 'Career routes' }, { timeout: 10_000 })
+    const seats = routes.querySelectorAll('[data-route-seat]')
+    expect(seats).toHaveLength(2)
+    const first = seats[0].querySelectorAll('li')
+    expect(first.length).toBeGreaterThan(1)
+    expect(first[0]).toHaveTextContent('Birth roll')
+    expect(first[0]).toHaveTextContent('Round 1')
+    // Every roll since scored: no turn says nothing came of it
+    expect(routes).not.toHaveTextContent('No combination')
+  })
+})

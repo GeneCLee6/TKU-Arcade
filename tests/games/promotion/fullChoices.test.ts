@@ -34,6 +34,7 @@ import {
   lowerPost,
   meets,
   resolveCell,
+  START_MONEY,
   stepTarget,
   THROWS_V2,
 } from '../../../shared/games/promotion/rulesFull.ts'
@@ -529,8 +530,8 @@ describe('an offered post', () => {
 
   it('each decision gets a fresh countdown', () => {
     let state = act(offered(), { type: 'decline' }, 0)
-    state = roll(state, NOTHING)
-    state = roll(state, NOTHING)
+    state = roll(state, [...NOTHING, ...PAIR.gong])
+    state = roll(state, [...NOTHING, ...PAIR.gong])
     state = roll(state, PAIR.rou)
     expect(promotion.timers?.(state)).toEqual([{ id: 'decide-2', ms: 30_000, action: { type: 'decline' } }])
   })
@@ -624,8 +625,60 @@ describe('buying office instead of a minor post', () => {
 // ── Events, commissions, dismissal, congratulations, titles ─────────────────────────────────
 
 describe('the second rules’ events and money', () => {
-  it('a turn is one throw: no combination, no move', () => {
-    const state = roll(placed(start(2), ['zhixian', 'zhixian']), NOTHING)
+  it('a turn throws until something scores, then the turn passes (擁有者 2026-11-13)', () => {
+    const state = roll(placed(start(2), ['zhixian', 'zhixian']), [...NOTHING, ...NOTHING, ...PAIR.de])
+    expect(state.rules?.rethrow).toBe(true)
+    expect(state.last?.throws.map((thrown) => thrown.combo)).toEqual(['none', 'none', 'pair'])
+    expect(state.players[0].cell).toBe(cellOf('zhixian').moves.de)
+    expect(state.turn).toBe(1)
+  })
+
+  it('throws again after virtue over graft too, which scores nothing', () => {
+    const state = roll(placed(start(2), ['zhixian', 'zhixian']), [4, 4, 1, 5, ...PAIR.cai])
+    expect(state.last?.throws.map((thrown) => thrown.combo)).toEqual(['cancel', 'pair'])
+    expect(state.players[0].cell).toBe(cellOf('zhixian').moves.cai)
+  })
+
+  it('keeps each seat’s career route: birth, each move with its combinations and silver, answers', () => {
+    let state = start(2)
+    state = roll(state, [4, 4, 4, 4])
+    const birth = state.players[0].route
+    expect(birth).toHaveLength(1)
+    expect(birth?.[0]).toMatchObject({ round: 1, birth: true, path: [state.players[0].cell] })
+    const moved = roll(placed(start(2), ['zhixian', 'zhixian'], { route: [] }), [...NOTHING, ...PAIR.de])
+    expect(moved.players[0].route).toEqual([
+      {
+        round: 1,
+        throws: [{ combo: 'pair', face: 'de' }],
+        path: [cellOf('zhixian').moves.de],
+        silver: moved.players[0].money - START_MONEY,
+      },
+    ])
+    expect(moved.players[1].route).toEqual([])
+    // An offer: the roll that asks and the answer are one step
+    const asked = roll(placed(start(3), ['shengyuan', 'zhixian', 'zhixian'], { route: [] }), PAIR.rou)
+    expect(asked.players[0].route).toEqual([{ round: 1, throws: [{ combo: 'pair', face: 'rou' }], path: [], silver: 0 }])
+    const taken = act(asked, { type: 'accept' }, 0)
+    expect(taken.players[0].route).toMatchObject([
+      {
+        round: 1,
+        throws: [{ combo: 'pair', face: 'rou' }],
+        path: ['fanglue-tenglu'],
+        decision: { kind: 'accept', cell: 'fanglue-tenglu' },
+      },
+    ])
+    // An event zone's throw keeps the zone and the face that decided it
+    const zone = roll(placed(start(2), ['zhixian', 'zhixian'], { route: [] }), [...PAIR.rou, ...NOTHING, ...PAIR.de])
+    expect(zone.players[0].route?.[0].throws).toEqual([
+      { combo: 'pair', face: 'rou' },
+      { combo: 'pair', face: 'de', zone: 'daji' },
+    ])
+  })
+
+  it('a game from before 2026-11-13 throws once: no combination, no move', () => {
+    const fresh = start(2)
+    const before = { ...placed(fresh, ['zhixian', 'zhixian']), rules: { ...fresh.rules!, rethrow: undefined } }
+    const state = roll(before, NOTHING)
     expect(THROWS_V2).toBe(1)
     expect(state.last?.throws).toHaveLength(1)
     expect(state.players[0].cell).toBe('zhixian')
@@ -639,8 +692,21 @@ describe('the second rules’ events and money', () => {
     expect(state.players[0].post).toBeNull()
   })
 
-  it('a second throw that scores nothing waits for the next turn, which decides it', () => {
-    let state = roll(placed(start(2), ['zhixian', 'zhixian']), [...PAIR.rou, ...NOTHING])
+  it('an event zone throws again until something scores', () => {
+    const state = roll(placed(start(2), ['zhixian', 'zhixian']), [...PAIR.rou, ...NOTHING, ...PAIR.de])
+    expect(state.last?.throws.map((t) => t.event ?? null)).toEqual([
+      null,
+      { cell: 'daji', face: null },
+      { cell: 'daji', face: 'de' },
+    ])
+    expect(state.players[0].cell).toBe(stepTarget(B2, state.players[0], 'cai', 'zhixian'))
+    expect(state.turn).toBe(1)
+  })
+
+  it('before 2026-11-13, a second throw that scores nothing waits for the next turn, which decides it', () => {
+    const fresh = start(2)
+    const before = { ...placed(fresh, ['zhixian', 'zhixian']), rules: { ...fresh.rules!, rethrow: undefined } }
+    let state = roll(before, [...PAIR.rou, ...NOTHING])
     expect(state.players[0]).toMatchObject({ cell: 'daji', post: 'zhixian', rank: cellOf('zhixian').rank })
     state = roll(state, NOTHING)
     state = roll(state, PAIR.zang)

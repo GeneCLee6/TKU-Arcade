@@ -1,0 +1,71 @@
+// The career routes shown once a game is over (2026-11-13), both editions: loaded with the routes
+// themselves (src/games/promotion/SimpleRoutes.tsx, full/FullRoutes.tsx), after the game's first
+// screen. check-i18n and `npm run play` find it through shared/games/screenMessages.ts. `en` is the
+// source; the type makes zh-TW keep the same keys.
+const en = {
+  'games.promotion.career.title': 'Career routes',
+  'games.promotion.career.explain': 'Every roll of every player, from the first to the last. Open a name to see it.',
+  'games.promotion.career.summary': '{start} → {end} · {count} rolls',
+  'games.promotion.career.round': 'Round {round}',
+  'games.promotion.career.stayed': 'stays',
+  'games.promotion.full.career.title': 'Career routes',
+  'games.promotion.full.career.explain':
+    'Every turn of every player, from the birth roll to the end: what the dice made, where it led, what was answered and the silver. Open a name to see it.',
+  'games.promotion.full.career.summary': '{start} → {end} · {count} turns',
+  'games.promotion.full.career.round': 'Round {round}',
+  'games.promotion.full.career.birth': 'Birth roll',
+  'games.promotion.full.career.stayed': 'stays',
+  'games.promotion.full.career.silver': '{amount} silver',
+  'games.promotion.full.career.combo.pair': 'Pair',
+  'games.promotion.full.career.combo.pairOf': 'Pair of {face}',
+  'games.promotion.full.career.combo.threeOf': 'Three {face}',
+  'games.promotion.full.career.combo.pairsOf': 'Two pairs, {face} first',
+  'games.promotion.full.career.zone': '{zone}: {face}',
+  'games.promotion.full.career.combo.three': 'Three of a kind',
+  'games.promotion.full.career.combo.pairs': 'Plain two pairs',
+  'games.promotion.full.career.combo.redPairs': 'Red two pairs',
+  'games.promotion.full.career.combo.run': 'Straight',
+  'games.promotion.full.career.combo.four': 'Four of a kind',
+  'games.promotion.full.career.combo.allGraft': 'Four Graft',
+  'games.promotion.full.career.combo.cancel': 'Virtue over Graft',
+  'games.promotion.full.career.combo.none': 'No combination',
+  'games.promotion.full.career.accept': 'accepted {cell}',
+  'games.promotion.full.career.decline': 'declined {cell}',
+  'games.promotion.full.career.skip': 'took the post of {cell}',
+  'games.promotion.full.career.buy': 'bought {cell} for {price} silver',
+}
+
+const zhTW: Record<keyof typeof en, string> = {
+  'games.promotion.career.title': '升遷路線',
+  'games.promotion.career.explain': '每個人從第一擲到最後一擲，一路怎麼升、怎麼降。點名字展開。',
+  'games.promotion.career.summary': '{start} → {end}・擲了 {count} 次',
+  'games.promotion.career.round': '第 {round} 回',
+  'games.promotion.career.stayed': '留在原地',
+  'games.promotion.full.career.title': '升遷路線',
+  'games.promotion.full.career.explain':
+    '每個人從擲出身到最後的每一回合：擲出什麼、走到哪、怎麼抉擇、銀兩進出。點名字展開。',
+  'games.promotion.full.career.summary': '{start} → {end}・{count} 回合',
+  'games.promotion.full.career.round': '第 {round} 回',
+  'games.promotion.full.career.birth': '擲出身',
+  'games.promotion.full.career.stayed': '留在原地',
+  'games.promotion.full.career.silver': '{amount} 兩',
+  'games.promotion.full.career.combo.pair': '對子',
+  'games.promotion.full.career.combo.pairOf': '{face}一對',
+  'games.promotion.full.career.combo.threeOf': '三個{face}',
+  'games.promotion.full.career.combo.pairsOf': '素二對（先{face}）',
+  'games.promotion.full.career.zone': '{zone}：{face}',
+  'games.promotion.full.career.combo.three': '三同',
+  'games.promotion.full.career.combo.pairs': '素二對',
+  'games.promotion.full.career.combo.redPairs': '紅二對',
+  'games.promotion.full.career.combo.run': '穿花',
+  'games.promotion.full.career.combo.four': '四同',
+  'games.promotion.full.career.combo.allGraft': '全贓',
+  'games.promotion.full.career.combo.cancel': '德壓贓',
+  'games.promotion.full.career.combo.none': '不成組合',
+  'games.promotion.full.career.accept': '接受{cell}',
+  'games.promotion.full.career.decline': '不接受{cell}',
+  'games.promotion.full.career.skip': '就當{cell}',
+  'games.promotion.full.career.buy': '花 {price} 兩捐了{cell}',
+}
+
+export const promotionRouteMessages = { en, 'zh-TW': zhTW }

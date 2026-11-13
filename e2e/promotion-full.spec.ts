@@ -452,3 +452,24 @@ test('the rules page has both editions', async ({ page }) => {
   await expect(page.getByText(/four six-sided dice/i).first()).toBeVisible()
   await expect(page.getByText(/謄錄/).first()).toBeVisible()
 })
+
+// 2026-11-13 (擁有者): every turn has a result, and the end shows each player's way through the game
+test('a two-player game ends with every career route, each turn with a result', async ({ browser }) => {
+  test.setTimeout(600_000)
+  const people = await fullRoom(browser, 2, { reducedMotion: 'reduce' }, { decisionSeconds: 10 })
+  const [host] = people
+  for (let step = 0; step < 900; step++) {
+    if ((await stepOnce(people)) === 'over') break
+  }
+  await expect(host.getByText('Game over').first()).toBeVisible({ timeout: 20_000 })
+  await host.getByRole('region', { name: 'Settlement' }).getByRole('button', { name: 'Close' }).click()
+  const routes = host.getByRole('region', { name: 'Career routes' })
+  await expect(routes).toBeVisible()
+  const seats = routes.locator('[data-route-seat]')
+  await expect(seats).toHaveCount(2)
+  await seats.first().locator('summary').click()
+  await expect(seats.first().locator('li').first()).toContainText('Birth roll')
+  await expect(routes).not.toContainText('No combination')
+  await routes.screenshot({ path: test.info().outputPath('career-routes-full.png') })
+  await close(people)
+})

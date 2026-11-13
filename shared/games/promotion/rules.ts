@@ -114,7 +114,13 @@ export const promotionSimple: GameModule<
   init(seats, options, rng) {
     const first = rng.pick(seats).id
     return {
-      players: seats.map((seat) => ({ seat: seat.id, cell: START_CELL, rolls: 0, demotions: 0 })),
+      players: seats.map((seat) => ({
+        seat: seat.id,
+        cell: START_CELL,
+        rolls: 0,
+        demotions: 0,
+        route: [],
+      })),
       turn: first,
       first,
       round: 1,
@@ -153,6 +159,8 @@ export const promotionSimple: GameModule<
             cell: to,
             rolls: player.rolls + 1,
             demotions: player.demotions + (face === 'zang' ? 1 : 0),
+            // A game from before the route was kept has none, and keeps none
+            ...(player.route && { route: [...player.route, { round: state.round, face, to }] }),
           }
         : player,
     )

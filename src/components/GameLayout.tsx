@@ -45,6 +45,8 @@ export interface GameLayoutProps {
   resultHeld?: boolean
   /** See `ResultPanel` */
   resultUnranked?: boolean
+  /** See `ResultPanel` */
+  resultExtra?: ReactNode
   /**
    * The screen shows the game's countdowns itself, over its board (promotion's full edition, C8): a
    * phone then shows none above the game, where one appearing would push the board down
@@ -71,6 +73,7 @@ export function GameLayout({
   resultDetail,
   resultHeld,
   resultUnranked,
+  resultExtra,
   ownCountdown,
 }: GameLayoutProps) {
   const compact = useCompact()
@@ -93,6 +96,7 @@ export function GameLayout({
       headline={resultHeadline}
       detail={resultDetail}
       unranked={resultUnranked}
+      extra={resultExtra}
       onRematch={room.onRematch}
       onReopen={room.onReopen}
       onDissolve={room.onDissolve}

@@ -692,23 +692,26 @@ describe('the simple edition', () => {
   // `edition`). Taken on main before C6 (c349616) and again after: they match
   it('plays exactly as before C6', () => {
     const hash = hasher()
+    // The career route (2026-11-13) is new: the play is what must not change
+    const json = (value: unknown) =>
+      JSON.stringify(value, (key, field: unknown) => (key === 'route' ? undefined : field))
     for (const kind of ['four-sided', 'six-sided'] as const) {
       for (let seats = 2; seats <= 6; seats++) {
         for (let seed = 1; seed <= 20; seed++) {
           const options = { dice: kind, turnLimit: 40 } as PromotionOptions
           let match = startMatch(promotion, makeSeats(seats), options, seed)
-          hash.update(JSON.stringify(match.state))
+          hash.update(json(match.state))
           while (!promotion.isOver(match.state)) {
             const next = applyAction(promotion, match, ROLL, match.state.turn as number)
             if (isGameError(next)) throw new Error(next.gameError)
             match = next
             hash.update(
-              JSON.stringify(match.state) +
-                JSON.stringify(promotion.view(match.state, 0)) +
-                JSON.stringify(promotion.view(match.state, 'spectator')),
+              json(match.state) +
+                json(promotion.view(match.state, 0)) +
+                json(promotion.view(match.state, 'spectator')),
             )
           }
-          hash.update(JSON.stringify(promotion.result(match.state)))
+          hash.update(json(promotion.result(match.state)))
         }
       }
     }
