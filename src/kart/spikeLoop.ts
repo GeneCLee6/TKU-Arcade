@@ -1,4 +1,5 @@
 import { TEST_ARENA } from '../../shared/kart/arena.ts'
+import type { Quality } from './quality.ts'
 import { courseOf, parseTrack, type Track } from '../../shared/kart/track.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
@@ -148,6 +149,8 @@ export interface SpikeOptions {
   readonly onCallout: (callout: Callout) => void
   readonly onContextLost: () => void
   readonly course?: SpikeCourse
+  /** e8-t06: how much to draw */
+  readonly quality?: Quality
   /** Every frame, where the car is: the minimap moves its marker with it, outside React */
   readonly onPose?: (x: number, z: number, heading: number, nextGate: number) => void
   /** On a track: the time trial's state, when it changes */
@@ -180,7 +183,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     : null
   let trial: Trial | null = trialCourse ? startTrial(trialCourse) : null
   let lastTrial: SpikeTrial | undefined
-  const scene = createKartScene(container, course.walls, track ?? undefined)
+  const scene = createKartScene(container, course.walls, track ?? undefined, options.quality)
   const held = new Set<string>()
   // A boost or reset key pressed and let go between two steps still counts
   let boostTapped = false

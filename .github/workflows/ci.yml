@@ -5,7 +5,6 @@ name: CI
 # production deploys run in deploy.yml after this workflow succeeds on main (DEPLOY.md §4).
 #
 # Steps still to come, each added by the batch that adds its npm script (don't call them before):
-#   - K1 (e12-t08): `npm run check-assets` — every file in public/ and R2 is listed in ASSETS.md
 on:
   push:
     branches: [main]
@@ -39,6 +38,9 @@ jobs:
 
       - name: Translations (check-i18n)
         run: npm run check-i18n
+
+      - name: Assets listed (check-assets)
+        run: npm run check-assets
 
       - name: Type check
         run: npm run typecheck

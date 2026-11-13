@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "budget": "node scripts/check-budget.mjs",
+    "check-assets": "node scripts/check-assets.mjs",
     "check-i18n": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-i18n.mjs",
     "typecheck": "tsc -b",
     "lint": "oxlint",

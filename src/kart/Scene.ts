@@ -1,14 +1,12 @@
 import {
   BoxGeometry,
-  BufferGeometry,
   Color,
-  Float32BufferAttribute,
-  DoubleSide,
   DirectionalLight,
   Fog,
   GridHelper,
   Group,
   HemisphereLight,
+  PCFSoftShadowMap,
   Mesh,
   MeshLambertMaterial,
   PerspectiveCamera,
@@ -17,7 +15,9 @@ import {
   WebGLRenderer,
 } from 'three'
 import type { Wall } from '../../shared/kart/walls.ts'
-import { roadDirection, type Track } from '../../shared/kart/track.ts'
+import type { Track } from '../../shared/kart/track.ts'
+import { buildTrackArt, type TrackArt } from './art/trackArt.ts'
+import { QUALITY, type Quality } from './quality.ts'
 import { kartScene } from '../styles/tokens.ts'
 import { fieldOfView, followCar, startRig, type Chased } from './camera.ts'
 
@@ -29,9 +29,6 @@ const CAMERA_LOOK_AHEAD = 3
 const MAX_PIXEL_RATIO = 2
 /** Walls are drawn this high and this thick; the physics sees only their centre line */
 const WALL_HEIGHT = 1.1
-/** The road sits this far above the ground, under the grid's lines it would otherwise flicker with */
-const ROAD_LIFT = 0.03
-const FINISH_WIDTH = 1.2
 const WALL_THICKNESS = 0.5
 
 export interface Pose {
@@ -62,39 +59,23 @@ export function supportsWebGL2(): boolean {
   return true
 }
 
-/** Builds the scene inside `container`, with `walls`. Throws when three.js cannot start. */
-/**
- * The road as one flat ribbon from kerb to kerb (e8-t04), just above the ground, and the finish line
- * across it. A grey box stand-in until the track's own model (e8-t05b)
- */
-function roadGeometry(track: Pick<Track, 'road'>): BufferGeometry {
-  const positions: number[] = []
-  const indices: number[] = []
-  const { road } = track
-  road.forEach((point, index) => {
-    const { dx, dz } = roadDirection(road, index)
-    const half = point.width / 2
-    positions.push(point.x + dz * half, ROAD_LIFT, point.z - dx * half)
-    positions.push(point.x - dz * half, ROAD_LIFT, point.z + dx * half)
-    const a = index * 2
-    const b = ((index + 1) % road.length) * 2
-    // Two triangles from this point's pair to the next, facing up
-    indices.push(a, b, a + 1, a + 1, b, b + 1)
-  })
-  const geometry = new BufferGeometry()
-  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-  return geometry
-}
-
+/** Builds the scene inside `container`, with `walls` and, for a track, its art. Throws when three.js cannot start. */
 export function createKartScene(
   container: HTMLElement,
   walls: readonly Wall[],
-  track?: Pick<Track, 'road' | 'gates'>,
+  track?: Track,
+  quality: Quality = 'high',
 ): KartScene {
-  const renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO))
+  const settings = QUALITY[quality]
+  const renderer = new WebGLRenderer({
+    antialias: settings.antialias,
+    powerPreference: 'high-performance',
+  })
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO, settings.pixelRatio))
+  // A track's art casts shadows near the car when the quality allows (e8-t06)
+  const shadows = track !== undefined && settings.shadowMap > 0
+  renderer.shadowMap.enabled = shadows
+  renderer.shadowMap.type = PCFSoftShadowMap
   renderer.domElement.style.display = 'block'
   container.append(renderer.domElement)
 
@@ -105,7 +86,23 @@ export function createKartScene(
   scene.add(new HemisphereLight(kartScene.lightSky, kartScene.lightGround, 2))
   const sun = new DirectionalLight(kartScene.lightSky, 1.5)
   sun.position.set(30, 60, 20)
-  scene.add(sun)
+  scene.add(sun, sun.target)
+  if (shadows) {
+    sun.castShadow = true
+    sun.shadow.mapSize.set(settings.shadowMap, settings.shadowMap)
+    // A box round the car, moved with it: sharp shadows near, none far off where nobody looks
+    const reach = 45
+    Object.assign(sun.shadow.camera, {
+      left: -reach,
+      right: reach,
+      top: reach,
+      bottom: -reach,
+      near: 1,
+      far: 200,
+    })
+    sun.shadow.bias = -0.0005
+    sun.shadow.normalBias = 0.04
+  }
 
   const groundGeometry = new PlaneGeometry(GROUND_SIZE, GROUND_SIZE)
   const groundMaterial = new MeshLambertMaterial({
@@ -123,7 +120,20 @@ export function createKartScene(
     kartScene.gridLine,
     kartScene.gridLine,
   )
-  scene.add(ground, grid)
+  // A track brings its own ground and sky; the test yard keeps the plain plane and grid
+  let art: TrackArt | null = null
+  if (track) {
+    art = buildTrackArt(track, {
+      density: settings.density,
+      shadows,
+      anisotropy: Math.min(settings.anisotropy, renderer.capabilities.getMaxAnisotropy()),
+    })
+    scene.add(art.group)
+    scene.fog = new Fog(kartScene.skyHorizon, 160, settings.fogFar)
+    scene.background = new Color(kartScene.skyHorizon)
+  } else {
+    scene.add(ground, grid)
+  }
 
   const bodyGeometry = new BoxGeometry(1.5, 0.55, 2.6)
   const bodyMaterial = new MeshLambertMaterial({ color: kartScene.body })
@@ -136,12 +146,14 @@ export function createKartScene(
   nose.position.set(0, 0.85, -0.7)
   const car = new Group()
   car.add(body, nose)
+  body.castShadow = shadows
+  nose.castShadow = shadows
   scene.add(car)
 
-  // One box per wall, along its centre line
+  // One box per wall, along its centre line: the test yard's. A track's art draws its own barriers
   const wallGeometry = new BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS)
   const wallMaterial = new MeshLambertMaterial({ color: kartScene.wall })
-  for (const wall of walls) {
+  for (const wall of track ? [] : walls) {
     const length = Math.hypot(wall.bx - wall.ax, wall.bz - wall.az)
     const mesh = new Mesh(wallGeometry, wallMaterial)
     // Long enough to close the gap at a corner
@@ -151,30 +163,7 @@ export function createKartScene(
     scene.add(mesh)
   }
 
-  const extraGeometries: BufferGeometry[] = []
-  const extraMaterials: MeshLambertMaterial[] = []
-  if (track) {
-    const ribbon = roadGeometry(track)
-    // Both sides: which way round the triangles go then never decides whether the road shows
-    const roadMaterial = new MeshLambertMaterial({ color: kartScene.road, side: DoubleSide })
-    scene.add(new Mesh(ribbon, roadMaterial))
-    extraGeometries.push(ribbon)
-    extraMaterials.push(roadMaterial)
-    const finish = track.gates[0]
-    if (finish) {
-      const lineGeometry = new BoxGeometry(1, 0.02, FINISH_WIDTH)
-      const lineMaterial = new MeshLambertMaterial({ color: kartScene.finish })
-      const line = new Mesh(lineGeometry, lineMaterial)
-      line.scale.x = Math.hypot(finish.bx - finish.ax, finish.bz - finish.az)
-      line.position.set((finish.ax + finish.bx) / 2, ROAD_LIFT + 0.01, (finish.az + finish.bz) / 2)
-      line.rotation.y = -Math.atan2(finish.bz - finish.az, finish.bx - finish.ax)
-      scene.add(line)
-      extraGeometries.push(lineGeometry)
-      extraMaterials.push(lineMaterial)
-    }
-  }
-
-  const camera = new PerspectiveCamera(60, 1, 1, 260)
+  const camera = new PerspectiveCamera(60, 1, 0.5, track ? 2000 : 260)
   let rig = startRig(0)
   let baseFov = 60
   // The boost's wider view is motion: not for a viewer who asked for less (read live, it can change)
@@ -210,6 +199,11 @@ export function createKartScene(
       const snappedZ = Math.round(z / GRID_CELL) * GRID_CELL
       ground.position.set(snappedX, 0, snappedZ)
       grid.position.set(snappedX, 0.01, snappedZ)
+      if (shadows) {
+        sun.position.set(x + 30, 60, z + 20)
+        sun.target.position.set(x, 0, z)
+      }
+      art?.update(performance.now() / 1000)
 
       rig = followCar(rig, chased, frameSeconds)
       const fov = fieldOfView(baseFov, rig, reducedMotion?.matches ?? false)
@@ -242,8 +236,7 @@ export function createKartScene(
       for (const material of [groundMaterial, bodyMaterial, noseMaterial, wallMaterial]) {
         material.dispose()
       }
-      for (const geometry of extraGeometries) geometry.dispose()
-      for (const material of extraMaterials) material.dispose()
+      art?.dispose()
       grid.material.dispose()
       renderer.dispose()
       // Browsers allow a handful of live contexts: don't wait for the collector to free this one
