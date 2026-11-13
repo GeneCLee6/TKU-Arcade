@@ -149,7 +149,7 @@ describe('a decision on the full board (C8)', () => {
     show(asked('jiansheng', [2, 2, 3, 5]), 0, 'Al', send)
     await act(async () => {})
     expect(screen.getByRole('region', { name: /Buy an office instead of Tianwensheng/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Zhixian · 30 silver' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Zhixian\s*·\s*30 silver$/ }))
     expect(send).toHaveBeenCalledExactlyOnceWith({ type: 'buy', cell: 'zhixian' })
     expect(screen.getByRole('button', { name: 'Take Tianwensheng' })).toBeInTheDocument()
   })

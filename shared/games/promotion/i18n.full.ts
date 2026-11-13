@@ -164,8 +164,8 @@ const en = {
   'games.promotion.full.buy.title': 'Buy an office instead of {cell}?',
   'games.promotion.full.buy.explain':
     'The dice make you {cell}, a minor technical post. You may pay the pot 5 silver a rank step above it for a regular office instead; a bought office is the irregular route, which some posts refuse. You have {money} silver.',
-  'games.promotion.full.buy.option': '{cell} · {price} silver',
   'games.promotion.full.buy.price': '{price} silver',
+  'games.promotion.full.buy.separator': ' · ',
   'games.promotion.full.buy.skip': 'Take {cell}',
   'games.promotion.full.default.offer': 'If time runs out: decline',
   'games.promotion.full.default.buy': 'If time runs out: take the post',
@@ -362,8 +362,8 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.full.buy.title': '要捐官，不當{cell}嗎？',
   'games.promotion.full.buy.explain':
     '骰子讓你當{cell}，這是雜職。你可以改捐一個正職：比它高一級付公注 5 兩；捐來的官算異途，有些官職不收。你有 {money} 兩。',
-  'games.promotion.full.buy.option': '{cell}・{price} 兩',
   'games.promotion.full.buy.price': '{price} 兩',
+  'games.promotion.full.buy.separator': '・',
   'games.promotion.full.buy.skip': '就當{cell}',
   'games.promotion.full.default.offer': '時間到就當作不接受',
   'games.promotion.full.default.buy': '時間到就當作不捐',
