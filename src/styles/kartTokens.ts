@@ -51,6 +51,8 @@ export const kartScene = {
   helmet: '#F8FAFC',
   visor: '#0F172A',
   smoke: '#E5E7EB',
+  // The best run's ghost (e8-t11)
+  ghost: '#9AD8FF',
   skid: '#1A1A1D',
   flame: '#FFB020',
   flameCore: '#FFF3C4',

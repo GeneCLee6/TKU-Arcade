@@ -19,6 +19,10 @@ const base: SpikeTrial = {
   lapTimes: [],
   wrongWay: false,
   total: null,
+  bestRun: null,
+  bestLap: null,
+  newBestRun: false,
+  newBestLap: false,
 }
 
 describe('the race overlay', () => {

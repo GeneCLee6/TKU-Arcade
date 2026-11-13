@@ -1,4 +1,14 @@
 import { TEST_ARENA } from '../../shared/kart/arena.ts'
+import type { KartTelemetry } from '../../shared/protocol.ts'
+import {
+  finishRecording,
+  ghostAt,
+  recordStep,
+  startRecording,
+  type Ghost,
+  type GhostRecorder,
+} from '../../shared/kart/ghost.ts'
+import { keepIfBetter, loadBestLap, loadGhost, type RecordNews } from './records.ts'
 import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
 import { courseOf, parseTrack, type Track } from '../../shared/kart/track.ts'
@@ -93,6 +103,12 @@ export interface SpikeTrial {
   readonly wrongWay: boolean
   /** Seconds from GO to the finish, once finished */
   readonly total: number | null
+  /** The records on this track in this browser, seconds (e8-t11) */
+  readonly bestRun: number | null
+  readonly bestLap: number | null
+  /** Set at the finish: whether this run set them */
+  readonly newBestRun: boolean
+  readonly newBestLap: boolean
 }
 
 const sameTrial = (a: SpikeTrial | undefined, b: SpikeTrial): boolean =>
@@ -101,7 +117,9 @@ const sameTrial = (a: SpikeTrial | undefined, b: SpikeTrial): boolean =>
   a.countdown === b.countdown &&
   a.lap === b.lap &&
   a.wrongWay === b.wrongWay &&
-  a.lapTimes.length === b.lapTimes.length
+  a.lapTimes.length === b.lapTimes.length &&
+  a.bestRun === b.bestRun &&
+  a.newBestRun === b.newBestRun
 
 /** What tests and a curious owner can read from the console. It stays after the loop stops. */
 export interface SpikeDebug {
@@ -176,7 +194,33 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
  * runs in fixed steps. Returns the function that stops everything; it may be called more than once.
  * Throws when WebGL is unavailable.
  */
+/** e12-t10: one report a visit, after this long of driving */
+export const TELEMETRY_AFTER_MS = 30_000
+let reported = false
+
+/** Sends the visit's frame rate and load time, once; never fails the game */
+function report(fps: number, loadMs: number, quality: Quality): void {
+  if (reported) return
+  reported = true
+  const body: KartTelemetry = {
+    kind: 'kart',
+    fps: Math.round(fps * 10) / 10,
+    loadMs: Math.round(loadMs),
+    quality,
+  }
+  try {
+    void fetch('/api/telemetry', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // No network: nothing to report
+  }
+}
+
 export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): () => void {
+  const loadStarted = performance.now()
   const track = spikeTrack(options.course ?? 'arena')
   const course = track ? courseOf(track) : TEST_ARENA
   const trialCourse: TrialCourse | null = track
@@ -184,6 +228,11 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     : null
   let trial: Trial | null = trialCourse ? startTrial(trialCourse) : null
   let lastTrial: SpikeTrial | undefined
+  // e8-t11: the best run to race against, and this run as it is recorded
+  let best: Ghost | null = track ? loadGhost(track.id) : null
+  let bestLap: number | null = track ? loadBestLap(track.id) : null
+  let recorder: GhostRecorder | null = null
+  let news: RecordNews | null = null
   const scene = createKartScene(container, course.walls, track ?? undefined, options.quality)
   const audio = createKartAudio()
   const held = new Set<string>()
@@ -220,8 +269,16 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let statsFrames = 0
   let slowest = 0
 
+  let firstFrameAt: number | null = null
+  let loadMs = 0
   const frame = (now: number) => {
     handle = requestAnimationFrame(frame)
+    if (firstFrameAt === null) {
+      firstFrameAt = now
+      loadMs = now - loadStarted
+    } else if (now - firstFrameAt >= TELEMETRY_AFTER_MS && !reported) {
+      report(((debug.frames + 1) * 1000) / (now - firstFrameAt), loadMs, options.quality ?? 'high')
+    }
     const frameMs = lastFrame === undefined ? 0 : now - lastFrame
     lastFrame = now
 
@@ -242,9 +299,22 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       boostTapped = false
       resetTapped = false
       const before = run
-      if (trial && trialCourse) {
+      if (trial && trialCourse && track) {
+        const was = trial.phase
         trial = stepTrial(trial, input, trialCourse, tuning, rules)
         run = trial.run
+        if (was === 'countdown' && trial.phase === 'racing') {
+          recorder = startRecording(track.id)
+          recordStep(recorder, 0, run.kart)
+        } else if (trial.phase !== 'countdown' && was === 'racing' && recorder) {
+          recordStep(recorder, trial.steps, run.kart)
+        }
+        if (was === 'racing' && trial.phase === 'finished' && recorder) {
+          const ghost = finishRecording(recorder, trial.steps, trial.laps)
+          news = keepIfBetter(ghost)
+          if (news.bestRun) best = ghost
+          bestLap = news.lapSteps
+        }
       } else {
         run = stepRun(run, input, course, tuning, rules)
       }
@@ -314,12 +384,17 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         lapTimes: trial.laps.map(seconds),
         wrongWay: trial.wrongWay,
         total: trial.phase === 'finished' ? seconds(trial.steps) : null,
+        bestRun: news ? seconds(news.runSteps) : best ? seconds(best.total) : null,
+        bestLap: bestLap === null ? null : seconds(bestLap),
+        newBestRun: news?.bestRun ?? false,
+        newBestLap: news?.bestLap ?? false,
       }
       if (!sameTrial(lastTrial, view)) {
         lastTrial = view
         options.onTrial?.(view)
       }
       options.onClock?.(seconds(trial.steps), seconds(lapSteps(trial)))
+      scene.ghost(best ? ghostAt(best, trial.steps) : null)
     }
     if (!sameHud(lastHud, hud)) {
       lastHud = hud
@@ -396,6 +471,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       if (!trialCourse) return
       trial = startTrial(trialCourse)
       run = trial.run
+      recorder = null
+      news = null
       previous = run.kart
       lastTrial = undefined
       scene.snapCamera(run.kart.heading)
