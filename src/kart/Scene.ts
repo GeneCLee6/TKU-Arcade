@@ -5,7 +5,7 @@ import {
   Fog,
   GridHelper,
   HemisphereLight,
-  PCFSoftShadowMap,
+  PCFShadowMap,
   Mesh,
   MeshLambertMaterial,
   PerspectiveCamera,
@@ -18,7 +18,7 @@ import type { Track } from '../../shared/kart/track.ts'
 import { buildTrackArt, type TrackArt } from './art/trackArt.ts'
 import { QUALITY, type Quality } from './quality.ts'
 import { createKartEffects } from './art/effects.ts'
-import { buildKartModel, type KartLook } from './art/kartModel.ts'
+import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 import { kartScene } from '../styles/kartTokens.ts'
@@ -48,6 +48,8 @@ export interface KartScene {
   draw(pose: Pose, chased: Chased, frameSeconds: number, look?: KartLook): void
   /** Puts the camera straight behind the car at once, as after a reset */
   snapCamera(heading: number): void
+  /** Where the best run's ghost is now (e8-t11), or null to hide it */
+  ghost(pose: Pose | null): void
   /** `{width}x{height}` of the drawing buffer */
   drawingBuffer(): string
   /** Frees everything on the GPU and takes the canvas out of the page */
@@ -78,7 +80,7 @@ export function createKartScene(
   // A track's art casts shadows near the car when the quality allows (e8-t06)
   const shadows = track !== undefined && settings.shadowMap > 0
   renderer.shadowMap.enabled = shadows
-  renderer.shadowMap.type = PCFSoftShadowMap
+  renderer.shadowMap.type = PCFShadowMap
   renderer.domElement.style.display = 'block'
   container.append(renderer.domElement)
 
@@ -143,6 +145,8 @@ export function createKartScene(
   const car = kart.group
   scene.add(car)
   const effects = createKartEffects(scene, kart)
+  // Made the first time there is a ghost to show
+  let ghostKart: KartModel | null = null
 
   // One box per wall, along its centre line: the test yard's. A track's art draws its own barriers
   const wallGeometry = new BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS)
@@ -218,6 +222,17 @@ export function createKartScene(
       rig = startRig(heading)
       effects.lift()
     },
+    ghost(pose) {
+      if (!pose) {
+        if (ghostKart) ghostKart.group.visible = false
+        return
+      }
+      ghostKart ??= buildKartModel(false, true)
+      if (!ghostKart.group.parent) scene.add(ghostKart.group)
+      ghostKart.group.visible = true
+      ghostKart.group.position.set(pose.x, 0, pose.z)
+      ghostKart.group.rotation.y = -pose.heading
+    },
     drawingBuffer: () => `${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`,
     dispose() {
       observer.disconnect()
@@ -229,6 +244,7 @@ export function createKartScene(
       }
       effects.dispose()
       kart.dispose()
+      ghostKart?.dispose()
       art?.dispose()
       grid.material.dispose()
       renderer.dispose()

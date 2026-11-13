@@ -1,4 +1,5 @@
 import type { HealthResponse } from '../shared/health.ts'
+import { handleTelemetry } from './telemetry.ts'
 import { handleStats } from './metrics.ts'
 import { handleVoice } from './voice.ts'
 import type { LobbyResponse } from '../shared/protocol.ts'
@@ -73,6 +74,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   if (url.pathname === '/api/lobby') return handleLobby(request, env)
   if (url.pathname === '/api/voice') return handleVoice(request, env)
   if (url.pathname === '/api/stats') return handleStats(request, env)
+  if (url.pathname === '/api/telemetry') return handleTelemetry(request, env, url)
   if (isAuthPath(url.pathname)) return handleAuth(request, env, url)
   if (url.pathname === '/api/errors') return handleClientError(request, env, url)
   if (url.pathname.startsWith('/api/')) return notFound()

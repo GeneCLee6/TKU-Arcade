@@ -804,3 +804,23 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
   await page.keyboard.up('ArrowUp')
   expect(errors).toEqual([])
 })
+
+// e8-t11: a best run kept in this browser shows as the record, and its ghost races along
+test('a kept best run shows as the record, its ghost racing along', async ({ page }) => {
+  const errors = watchConsole(page)
+  const samples: number[] = []
+  for (let step = 0; step <= 3600; step += 3) samples.push(-50, 88 - step * 0.4, 0)
+  await page.addInitScript(
+    (ghost) => {
+      localStorage.setItem('tku-arcade.kart.ghost.test-oval', JSON.stringify(ghost))
+      localStorage.setItem('tku-arcade.kart.bestLap.test-oval', '1100')
+    },
+    { track: 'test-oval', format: 1, total: 3600, laps: [1300, 1200, 1100], samples },
+  )
+  await page.goto('/kart?track=oval')
+  await expect(page.locator('canvas')).toBeVisible()
+  await expect(page.getByTestId('kart-record')).toHaveText('1:00.000')
+  // Some frames with the ghost drawn: a slow software renderer manages few
+  await expect.poll(() => framesOf(page), { timeout: 15_000 }).toBeGreaterThan(30)
+  expect(errors).toEqual([])
+})

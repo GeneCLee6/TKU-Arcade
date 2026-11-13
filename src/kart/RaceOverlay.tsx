@@ -30,6 +30,7 @@ export const RaceClock = forwardRef<RaceClockHandle, { t: KartT; trial: SpikeTri
       },
     }))
     const best = trial.lapTimes.length > 0 ? Math.min(...trial.lapTimes) : null
+    const record = trial.bestRun
     const last = trial.lapTimes.at(-1) ?? null
     return (
       <Clock data-testid="kart-race-clock">
@@ -54,6 +55,12 @@ export const RaceClock = forwardRef<RaceClockHandle, { t: KartT; trial: SpikeTri
           <Row>
             <Label>{t('kart.race.bestLap')}</Label>
             <Time>{formatTime(best)}</Time>
+          </Row>
+        )}
+        {record !== null && (
+          <Row>
+            <Label>{t('kart.race.record')}</Label>
+            <Time data-testid="kart-record">{formatTime(record)}</Time>
           </Row>
         )}
       </Clock>
@@ -83,6 +90,14 @@ export function RaceCenter({
       <Results role="dialog" aria-labelledby="kart-results-title" data-testid="kart-results">
         <Title id="kart-results-title">{t('kart.race.finished')}</Title>
         <Total>{formatTime(trial.total)}</Total>
+        {(trial.newBestRun || trial.newBestLap) && (
+          <News role="status" data-testid="kart-new-record">
+            {t(trial.newBestRun ? 'kart.race.newRecord' : 'kart.race.newBestLap')}
+          </News>
+        )}
+        {trial.bestRun !== null && !trial.newBestRun && (
+          <Record>{t('kart.race.recordIs', { time: formatTime(trial.bestRun) })}</Record>
+        )}
         <Laps>
           {trial.lapTimes.map((time, index) => (
             <li key={index}>
@@ -203,6 +218,19 @@ const Total = styled.p`
   ${monoType}
   font-size: ${fontSize.xxl}px;
   font-weight: 700;
+`
+
+const News = styled.p`
+  margin: 0;
+  color: ${color.success};
+  ${displayType}
+  font-size: ${fontSize.lg}px;
+`
+
+const Record = styled.p`
+  margin: 0;
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
 `
 
 const Laps = styled.ol`

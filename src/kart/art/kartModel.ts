@@ -43,12 +43,22 @@ const WHEEL = { front: 0.27, rear: 0.33, width: 0.26 }
 const TRACK_WIDTH = 0.66
 const AXLE = { front: -0.88, rear: 0.86 }
 
-export function buildKartModel(shadows: boolean): KartModel {
+/** `ghost`: see-through and one colour, as a ghost of the best run (e8-t11) */
+export function buildKartModel(shadows: boolean, ghost = false): KartModel {
   const geometries: BufferGeometry[] = []
   const materials: Material[] = []
   const keep = <T extends BufferGeometry>(geometry: T) => (geometries.push(geometry), geometry)
   const paint = (color: string, roughness = 0.55, metalness = 0.1) => {
-    const material = new MeshStandardMaterial({ color, roughness, metalness, flatShading: true })
+    const material = ghost
+      ? new MeshStandardMaterial({
+          color: kartScene.ghost,
+          transparent: true,
+          opacity: 0.38,
+          depthWrite: false,
+          roughness: 0.4,
+          flatShading: true,
+        })
+      : new MeshStandardMaterial({ color, roughness, metalness, flatShading: true })
     materials.push(material)
     return material
   }

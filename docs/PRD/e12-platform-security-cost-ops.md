@@ -74,7 +74,7 @@ depends_on: []
 ### M2
 
 - [x] `e12-t08` `docs/ASSETS.md` 格式、`scripts/assets/upload.ts`（R2、雜湊、Cache-Control）、`check-assets.mjs` 進 CI · AC-12.6 · M · ← e12-t02 · K1（#51）
-- [ ] `e12-t10` 卡丁車 fps 與載入時間遙測（匿名） · AC-12.3 · S · ← e8-t06
+- [x] `e12-t10` 卡丁車 fps 與載入時間遙測（匿名） · AC-12.3 · S · ← e8-t06 · K3（#53）：`/api/telemetry`，只存區間計數
 
 ### M4
 

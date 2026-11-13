@@ -375,8 +375,29 @@ export type CreateRoomRequest = {
 /** `code`: the room's short number, null when none could be given (the link still works) */
 export type CreateRoomResponse = { id: string; code: string | null }
 
-/** What the daily metrics count (e12-t07) */
-export type MetricName = 'room_created' | 'game_started' | 'game_finished'
+/** What the daily metrics count (e12-t07); the kart's frame rate and load time in bands (e12-t10) */
+export type MetricName =
+  | 'room_created'
+  | 'game_started'
+  | 'game_finished'
+  | `kart_fps_${KartFpsBand}`
+  | `kart_load_${KartLoadBand}`
+
+export type KartFpsBand = 'under30' | '30to45' | '45to55' | '55up'
+export type KartLoadBand = 'under1s' | '1to3s' | '3to6s' | '6sup'
+
+/** POST /api/telemetry (e12-t10): one kart session's frame rate and load time, nothing else */
+export type KartTelemetry = {
+  kind: 'kart'
+  fps: number
+  loadMs: number
+  quality: 'low' | 'medium' | 'high'
+}
+
+export const fpsBand = (fps: number): KartFpsBand =>
+  fps < 30 ? 'under30' : fps < 45 ? '30to45' : fps < 55 ? '45to55' : '55up'
+export const loadBand = (ms: number): KartLoadBand =>
+  ms < 1000 ? 'under1s' : ms < 3000 ? '1to3s' : ms < 6000 ? '3to6s' : '6sup'
 
 /** One day's count of one metric for one game */
 export type DailyMetricRow = { day: string; metric: MetricName; game: string; count: number }

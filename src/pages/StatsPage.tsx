@@ -68,7 +68,15 @@ export function StatsPage() {
     }
   }, [key])
 
-  const rows = loaded.status === 'ready' ? loaded.stats.rows : []
+  const all = loaded.status === 'ready' ? loaded.stats.rows : []
+  // The kart's frame rate and load time (e12-t10) are counted by quality, not by game: a table apart
+  const kart = all.filter((row) => row.metric.startsWith('kart_'))
+  const rows = all.filter((row) => !row.metric.startsWith('kart_'))
+  const kartMetrics = [...new Set(kart.map((row) => row.metric))].sort()
+  const kartCount = (metric: string, quality: string) =>
+    kart
+      .filter((row) => row.metric === metric && row.game === quality)
+      .reduce((sum, row) => sum + row.count, 0)
   const days = [...new Set(rows.map((row) => row.day))]
   const games = [...new Set(rows.map((row) => row.game))].sort()
   const byDay = METRICS.map((metric) => sums(rows, metric, (row) => row.day))
@@ -161,6 +169,35 @@ export function StatsPage() {
                   ))}
                 </tbody>
               </Table>
+            )}
+            {kartMetrics.length > 0 && (
+              <>
+                <h2>{t('room.extra.stats.kart')}</h2>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th scope="col">{t('room.extra.stats.kartBand')}</th>
+                      {(['low', 'medium', 'high'] as const).map((quality) => (
+                        <th key={quality} scope="col">
+                          {t(`room.extra.stats.quality.${quality}`)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kartMetrics.map((metric) => (
+                      <tr key={metric}>
+                        <th scope="row" translate="no">
+                          {metric.replace('kart_', '')}
+                        </th>
+                        {(['low', 'medium', 'high'] as const).map((quality) => (
+                          <td key={quality}>{kartCount(metric, quality)}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </>
             )}
             <div>
               <Button
