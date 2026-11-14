@@ -45,15 +45,10 @@ export const kartScene = {
   tyre: '#222326',
   seat: '#E4572E',
   lamp: '#FFF4C2',
-  // The first kart and its driver (e8-t07): our own colours
-  kartDark: '#25262B',
-  suit: '#1E3A8A',
-  helmet: '#F8FAFC',
-  visor: '#0F172A',
+  // The drift dust (e8-t07); the karts' own colours are kartBodies, below
   smoke: '#E5E7EB',
   // The best run's ghost (e8-t11)
   ghost: '#9AD8FF',
-  skid: '#1A1A1D',
   flame: '#FFB020',
   flameCore: '#FFF3C4',
   lightSky: '#FFFFFF',
@@ -112,6 +107,21 @@ export const kartThemes = {
     sunDisc: '#FFF1C9',
     sunGlow: '#FFC27A',
   },
+  // The campus on its hill (2026-11-14): a clear late morning, the sun high in the south-west
+  campus: {
+    skyTop: '#2F7BD6',
+    skyMiddle: '#7DB6EC',
+    skyHorizon: '#DCEEF8',
+    fog: '#D4E7F2',
+    hemisphereSky: '#FFFFFF',
+    hemisphereGround: '#6E7A6A',
+    hemisphereIntensity: 1.9,
+    sun: '#FFF3DD',
+    sunIntensity: 1.8,
+    sunDirection: [-45, 70, 35],
+    sunDisc: null,
+    sunGlow: null,
+  },
 } as const satisfies Record<string, KartTheme>
 
 /** The harbour at sunset (N1, e10-t03): our own palette */
@@ -144,4 +154,80 @@ export const harbourScene = {
   lanternLit: '#FF7A3D',
   palmTrunk: '#8A6A48',
   palmLeaf: '#3C7F3A',
+} as const
+
+/**
+ * The hover karts (owner, 2026-11-14: karts with no tyres, hugging the floor): our own three bodies
+ * and their colours. `glow` is the underglow, the thrusters and the drift sparks.
+ */
+export const kartBodies = {
+  tide: {
+    main: '#14A3A8',
+    second: '#F4F7F6',
+    accent: '#FFC53D',
+    glow: '#5CF2FF',
+    suit: '#0F4C5C',
+    helmet: '#F4F7F6',
+  },
+  comet: {
+    main: '#F2623B',
+    second: '#FFE8C7',
+    accent: '#2B2D42',
+    glow: '#FFB547',
+    suit: '#7A2E1B',
+    helmet: '#FFE8C7',
+  },
+  ray: {
+    main: '#6D4AFF',
+    second: '#1F1B3A',
+    accent: '#F5C542',
+    glow: '#C18BFF',
+    suit: '#2A1F66',
+    helmet: '#F5C542',
+  },
+} as const
+
+/** The hover parts every body shares: thruster housings, the cockpit glass, the sparks */
+export const kartHover = {
+  housing: '#2E3138',
+  glass: '#132033',
+  spark: '#FFF6D6',
+} as const
+
+/**
+ * The Tamkang campus track (2026-11-14): our own palette for a stylised 淡江大學 淡水校園, not taken
+ * from any of the university's marks. Green glazed roofs and pale walls on the lantern avenue, red
+ * columns, a pale library and towers, the river and the mountain across it hazy in the distance.
+ */
+export const tamkangScene = {
+  paving: '#D9D2C3',
+  pavingJoint: '#B9B0A0',
+  roofGreen: '#2F7A5B',
+  roofGreenDark: '#1F5A42',
+  wallWhite: '#F3EFE6',
+  column: '#A8322D',
+  lanternGlass: '#FFF2C9',
+  lanternFrame: '#2B4A3C',
+  library: '#E8E1D3',
+  libraryGlass: '#3D5A73',
+  tower: '#E4DCCB',
+  towerBand: '#9B6B4A',
+  glassTower: '#7FA6C2',
+  scroll: '#FAFAF7',
+  museumHull: '#F4F6F8',
+  museumStripe: '#2F5DA8',
+  museumFunnel: '#D9443A',
+  stone: '#B9B4AA',
+  stoneDark: '#8E897F',
+  rail: '#5B5F66',
+  lawn: '#7DBB4E',
+  river: '#6FA7BE',
+  riverBank: '#9E9A86',
+  mountain: '#6E8F86',
+  mountainFar: '#9DB4B8',
+  // The campus's other buildings and the town below: painted walls
+  walls: ['#F1E9DA', '#E6DED0', '#EFD9C6', '#D9E2E6', '#F5F1E8', '#E3D5BD'],
+  townRoofs: ['#8C4A32', '#6B6F78', '#A85B3A', '#4E5A63'],
+  window: '#33465A',
+  signText: '#2B2B2B',
 } as const

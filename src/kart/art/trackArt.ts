@@ -40,6 +40,7 @@ import {
   harbourTreeFits,
   inHarbourSea,
 } from './harbourArt.ts'
+import { buildTamkang, inTamkangRiver, tamkangGround, tamkangTreeFits } from './tamkangArt.ts'
 import {
   ASPHALT_LENGTH,
   BARRIER_LENGTH,
@@ -66,7 +67,11 @@ export interface TrackArt {
 
 /** A track's sky and light: the harbour's sunset, or the sunny afternoon of every other track */
 export const themeOf = (track: Pick<Track, 'id'>): KartTheme =>
-  track.id === 'harbour' ? kartThemes.sunset : kartThemes.day
+  track.id === 'harbour'
+    ? kartThemes.sunset
+    : track.id === 'tamkang'
+      ? kartThemes.campus
+      : kartThemes.day
 
 /** What a track's own scenery (harbourArt.ts) builds with: shared, and freed with the rest */
 export interface ArtKit {
@@ -268,6 +273,8 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   const textures = trackTextures(level.anisotropy)
   const theme = themeOf(track)
   const harbour = track.id === 'harbour'
+  // The campus on its hilltop (2026-11-14): its own ground, falling away beyond the campus
+  const tamkang = track.id === 'tamkang'
   const geometries: BufferGeometry[] = []
   const materials: Material[] = []
   const extraTextures: Texture[] = []
@@ -275,7 +282,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   const own = <T extends Material>(material: T) => (materials.push(material), material)
   const ownTexture = <T extends Texture>(texture: T) => (extraTextures.push(texture), texture)
   /** How high the ground is: flat but for the harbour's hillside */
-  const groundAt = harbour ? harbourGround : () => 0
+  const groundAt = harbour ? harbourGround : tamkang ? tamkangGround : () => 0
   const standard = (color: string, map?: Texture) =>
     own(
       new MeshStandardMaterial({
@@ -321,7 +328,8 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   textures.grass.repeat.set(groundWidth / 10, groundDepth / 10)
   ground.rotation.x = -Math.PI / 2
   ground.position.set(groundWest + groundWidth / 2, 0, groundNorth + groundDepth / 2)
-  group.add(shadowed(ground, false))
+  // The campus brings its own ground, with the hillside in it
+  if (!tamkang) group.add(shadowed(ground, false))
   const dome = sky(theme)
   keep(dome.geometry)
   own(dome.material as Material)
@@ -452,7 +460,8 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     box: reach,
     clearance: 7,
     spacing: 4.5,
-    fits: (x, z) => !inRiver(x) && (!harbour || harbourTreeFits(x, z)),
+    fits: (x, z) =>
+      !inRiver(x) && (!harbour || harbourTreeFits(x, z)) && (!tamkang || tamkangTreeFits(x, z)),
   })
   const trunks = new InstancedMesh(
     keep(new CylinderGeometry(0.22, 0.32, 2.2, 6)),
@@ -544,8 +553,13 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       if (harbour && inHarbourSea(matrix.elements[12]!, matrix.elements[14]!, 40)) {
         matrix.scale(new Vector3(0.45, 0.22, 0.45))
       }
-      // The y scale is the cone's height; its centre sits half of that up
-      matrix.elements[13] = matrix.elements[5]! / 2 - 2
+      // At the campus, none stands in the river: the mountain across it is its own (tamkangArt.ts)
+      if (tamkang && inTamkangRiver(matrix.elements[12]!, matrix.elements[14]!, 160)) {
+        matrix.scale(new Vector3(0.001, 0.001, 0.001))
+      }
+      // The y scale is the cone's height; its centre sits half of that up, on the ground
+      const base = tamkang ? tamkangGround(matrix.elements[12]!, matrix.elements[14]!) : 0
+      matrix.elements[13] = matrix.elements[5]! / 2 - 2 + base
       instances.setMatrixAt(index, matrix)
     }
     group.add(instances)
@@ -556,7 +570,8 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   const lampEvery = level.density < 0.5 ? 60 : 36
   let lastLamp = -Infinity
   track.road.forEach((point, index) => {
-    if (along[index]! - lastLamp < lampEvery) return
+    // The campus has its own palace lamps instead
+    if (tamkang || along[index]! - lastLamp < lampEvery) return
     const a = roadDirection(track.road, index)
     const b = roadDirection(track.road, (index + 3) % track.road.length)
     if (a.dx * b.dx + a.dz * b.dz < 0.995) return
@@ -620,8 +635,8 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   })
   group.add(shadowed(tyres))
 
-  // A grandstand beside the start, facing the line
-  if (finish) {
+  // A grandstand beside the start, facing the line; the campus has its classrooms there instead
+  if (finish && !tamkang) {
     const start = track.road[0]!
     const { dx, dz } = roadDirection(track.road, 0)
     const stand = new Group()
@@ -743,6 +758,22 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       })
     : null
 
+  // ── The campus: its hillside, landmarks, town, river and mountain ──
+  const tamkangScenery = tamkang
+    ? buildTamkang({
+        track,
+        level,
+        group,
+        textures,
+        keep,
+        own,
+        ownTexture,
+        standard,
+        shadowed,
+        place,
+      })
+    : null
+
   for (const instances of group.children) {
     if (instances instanceof InstancedMesh) {
       instances.instanceMatrix.setUsage(DynamicDrawUsage)
@@ -756,6 +787,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     update(seconds) {
       if (water) water.offset.set(seconds * 0.012, seconds * 0.04)
       harbourScenery?.update(seconds)
+      tamkangScenery?.update(seconds)
     },
     dispose() {
       for (const geometry of geometries) geometry.dispose()
