@@ -7,6 +7,12 @@
 // (owner, again "too slow, the skill ceiling is too low"): faster still, a longer boost, boosts that
 // stack, the flick (a tapped drift that snaps the nose round), drifts whose depth and length trade
 // gauge for speed, and the counter catch (counter-steer out of a drift to straighten up at once).
+// Then (owner: "the drift grips too well, and the gap between an expert and a novice is too
+// small"): the drift is a real slide. The rear lets go (`traction` 0), the nose swings in and the
+// car's momentum carries on the old way, coming round only slowly (`driftAlign`); sliding sideways
+// scrubs speed off (`driftScrub`), the more the deeper and the longer; let go and the grip comes
+// back over `driftRecovery`. The tapped drift no longer snaps the nose round: tapped just after a
+// release boost it earns a second one (the double), and every link of a chain goes a little faster.
 //
 // Units are metres, seconds and radians. Seen from above, heading 0 faces -z and heading grows
 // clockwise, so a positive steer turns right.
@@ -73,10 +79,19 @@ export interface KartState {
   readonly stackSeconds: number
   /** Seconds left of a counter catch: extra grip that straightens the car up out of a drift */
   readonly catchSeconds: number
-  /** Counts flicks (tapped drifts that snapped the nose round), so that the HUD can call them out */
-  readonly flicks: number
-  /** Seconds until another flick may snap: tapping the drift key over and over does not chain them */
-  readonly flickCooldown: number
+  /**
+   * How much of the tyres' grip the car has: 1 gripping, 0 for as long as a drift is held, then back
+   * to 1 over `driftRecovery` seconds once it is let go (the car is still sliding until then)
+   */
+  readonly traction: number
+  /** Seconds left, after a release boost, in which a tapped drift earns a second one (the double) */
+  readonly doubleWindow: number
+  /** Whether the current drift began inside that window: however short, letting go opens a release window */
+  readonly doubleDrift: boolean
+  /** Whether the open release window came from such a tap: the boost it fires is a double */
+  readonly doubleArmed: boolean
+  /** Counts double boosts, so that the HUD can call them out */
+  readonly doubles: number
 }
 
 export const INITIAL_KART: KartState = {
@@ -101,8 +116,11 @@ export const INITIAL_KART: KartState = {
   stallSeconds: 0,
   stackSeconds: 0,
   catchSeconds: 0,
-  flicks: 0,
-  flickCooldown: 0,
+  traction: 1,
+  doubleWindow: 0,
+  doubleDrift: false,
+  doubleArmed: false,
+  doubles: 0,
 }
 
 export const NO_INPUT: KartInput = {
@@ -122,20 +140,20 @@ export const NO_INPUT: KartInput = {
  */
 export const KART_TUNING = {
   /**
-   * Straight-line top speed (2026-11-14, owner "too slow": 30 to 40, then 40 to 50 m/s). The HUD
-   * reads it through SPEEDOMETER_SCALE: 261 km/h. 0 to top takes topSpeed / acceleration = 2.08 s
+   * Straight-line top speed (2026-11-14, owner "too slow": 30 to 40, to 50, then 56 m/s). The HUD
+   * reads it through SPEEDOMETER_SCALE: 302 km/h. 0 to top takes topSpeed / acceleration = 2.15 s
    */
-  topSpeed: 50,
+  topSpeed: 60,
   reverseSpeed: 10,
-  acceleration: 24,
-  braking: 48,
+  acceleration: 28,
+  braking: 56,
   coastDrag: 6,
   /** Below this speed the car turns proportionally less, so it cannot spin on the spot */
   fullTurnSpeed: 8,
   turnRate: 2.5,
   /**
    * How much of the turn rate is gone at top speed: grip alone turns no tighter than about
-   * 50 / (2.5 * 0.5) = 40 m flat out, so the tighter corners want a drift
+   * 56 / (2.5 * 0.5) = 45 m flat out, so the tighter corners want a drift
    */
   turnLossAtTopSpeed: 0.5,
   /** How fast the slip dies outside a drift, per second */
@@ -145,56 +163,42 @@ export const KART_TUNING = {
   driftMinSpeed: 10,
   /** A drift ends below this speed even with the key held */
   driftExitSpeed: 7,
-  /** How fast the car turns in a drift with the stick centred */
-  driftTurnRate: 2,
+  /** How fast the nose swings round in a drift with the stick centred */
+  driftTurnRate: 1.9,
   /** How much steering into or out of the drift adds to or takes from that */
   driftSteerRate: 0.9,
   /**
-   * How fast the direction of travel swings round to the nose in a drift, per second. With the turn
-   * rate it sets the steady slip angle, in radians about turn rate / align: stick centred
-   * 2.0 / 4.2 = 27°, steering in 2.9 / 4.2 = 40°, steering out 1.1 / 4.2 = 15°.
+   * The grip left in a drift: how fast the direction of travel comes round to the nose, per second.
+   * Low, so the car's momentum carries on the old way while the nose points into the corner. With
+   * the turn rate it sets the steady slip angle, in radians about turn rate / align: stick centred
+   * 1.7 / 2.2 = 44 degrees, steering out 0.9 / 2.2 = 23 degrees, steering in up to the cap.
    */
-  driftAlign: 4.2,
-  /** A safety cap a steady drift stays under (the steady angle above tops out at about 40°) */
-  driftMaxSlip: (42 * Math.PI) / 180,
-  /** A drift costs speed: above this it is pulled down at driftDrag */
-  driftTopSpeed: 44,
-  driftDrag: 12,
+  driftAlign: 2.2,
+  /** The widest the slide gets: the nose swings no further round than this from the way the car goes */
+  driftMaxSlip: (58 * Math.PI) / 180,
   /**
-   * The depth of a drift (steering into it rather than out) trades speed for gauge: steering fully
-   * in fills the gauge this much faster (and fully out this much slower) ...
+   * Sliding sideways scrubs speed off: this much a second at the top speed, sliding fully sideways;
+   * in proportion to the sine of the slip angle and to the speed. A deep drift held long loses most
+   * of its speed, a shallow one or a tap next to none
    */
-  driftDepthFill: 0.5,
-  /** ... and costs this share of the drift top speed (none steering fully out) */
-  driftDepthCost: 0.1,
-  /** A long drift tires: past this many seconds the drift top speed falls ... */
-  driftFatigueAfter: 1.2,
-  /** ... by this much a second */
-  driftFatigue: 3,
+  driftScrub: 64,
+  /** How long the grip takes to come back once the drift is let go: the car slides on until then */
+  driftRecovery: 0.4,
+  /** The slip angle at which the gauge fills at gaugeFillRate: deeper fills faster (up to 1.5 times) */
+  driftGaugeSlip: (35 * Math.PI) / 180,
 
-  /** A flick: a drift tapped for less than this long, let go, snaps the nose round */
-  flickMaxDrift: 0.18,
-  /** How far a flick turns the car and its travel, radians (about 11°) */
-  flickAngle: 0.2,
-  /** The share of the speed a flick keeps */
-  flickKeep: 0.985,
-  /** Gauge points for a flick */
-  flickGauge: 4,
-  /** After a flick, the next one waits this long */
-  flickCooldown: 0.5,
-
-  /** Counter-steering as a drift is let go grips this many times harder for a moment ... */
+  /** Counter-steering as a drift is let go brings the grip back this many times faster ... */
   catchGrip: 3,
-  /** ... this long, so the car straightens up at once */
+  /** ... for this long, so the car straightens up at once */
   catchSeconds: 0.35,
 
   /**
-   * Gauge points per second of drifting (2026-11-14, owner "fills too slowly": 40 to 65), plus a
-   * bonus for each drift let go: two or three good drifts fill it
+   * Gauge points per second of drifting at driftGaugeSlip, plus a bonus for each drift let go: two
+   * or three good drifts fill it
    */
-  gaugeFillRate: 45,
+  gaugeFillRate: 60,
   /** Gauge points for letting go of a drift that lasted at least chainMinDrift */
-  gaugeDriftBonus: 8,
+  gaugeDriftBonus: 10,
   /**
    * The share of the usual fill (and the drift bonus) the gauge gets while a full boost runs, so
    * that charges alone cannot keep a boost going for ever: the gaps are the release boosts' to fill
@@ -204,18 +208,18 @@ export const KART_TUNING = {
   maxStoredBoosts: 2,
   /** How long a boost from the gauge lasts (owner "too short": 1.2 to 2, then 3.25 s) */
   boostDuration: 3.25,
-  /** A boost raises the top speed (and the drift top speed) by this factor: 365 km/h on the HUD */
-  boostTopSpeedFactor: 1.4,
+  /** A boost raises the top speed by this factor: 438 km/h on the HUD */
+  boostTopSpeedFactor: 1.45,
   /** How hard a boost pushes, on top of the throttle, whether or not the throttle is held */
-  boostAcceleration: 48,
+  boostAcceleration: 60,
   /** Above the top speed once a boost ends, the car slows by this much per second */
   overSpeedDrag: 9,
   /**
    * A charge fired while a boost runs stacks: it adds its length (up to boostMaxSeconds) and for
-   * this long the top speed rises to boostStackFactor (405 km/h on the HUD)
+   * this long the top speed rises to boostStackFactor (484 km/h on the HUD)
    */
   boostStackSeconds: 1.2,
-  boostStackFactor: 1.55,
+  boostStackFactor: 1.6,
   /** A boost never has more than this many seconds left, however it is stacked */
   boostMaxSeconds: 6,
 
@@ -231,21 +235,30 @@ export const KART_TUNING = {
   /** After letting go of a drift, a fresh press of the throttle within this many seconds fires one */
   releaseWindow: 0.3,
   /** How long a release boost lasts */
-  chainDuration: 0.9,
+  chainDuration: 0.7,
   /** A release boost raises the top speed by this factor (less than a full boost) */
   miniTopSpeedFactor: 1.2,
-  /** How hard a release boost pushes, on top of the throttle */
-  miniAcceleration: 34,
+  /** How hard a release boost pushes, on top of the throttle: a short, sharp burst */
+  miniAcceleration: 64,
   /** How long after a boost ends the chain window stays open */
   chainGrace: 0.6,
   /** The shortest drift that earns a release boost and the gauge bonus, so a tap is not enough */
-  chainMinDrift: 0.2,
+  chainMinDrift: 0.25,
+  /** Each release boost in a chain after the first lifts the release boost's top speed this much more ... */
+  chainSpeedStep: 0.03,
+  /** ... for up to this many links */
+  chainSpeedLinks: 4,
+  /**
+   * The double: for this long after a release boost, a drift begun, however short a tap, opens the
+   * release window again when let go, and that second release boost adds its length to the first
+   */
+  doubleWindow: 0.5,
 
   // The boost slide (2026-11-14): a drift begun during a boost
   /** How fast a boost runs down during a boost slide: 0.5 makes it last twice as long */
   slideBoostDrain: 0.5,
-  /** A boost slide keeps this share of the boosted top speed (a plain drift drops to driftTopSpeed) */
-  slideSpeedKeep: 0.97,
+  /** The share of a drift's scrub a boost slide still pays: the boost carries the speed through */
+  slideScrub: 0.3,
 
   /** How long a boost pad on the road boosts, at a full boost's strength (course.ts) */
   padBoostSeconds: 1.2,
@@ -332,11 +345,15 @@ function yawRate(
 
 /** The share of the engine's pull left while stalled after a bad start */
 const STALL_SHARE = 0.15
+/** Below this slip angle (radians) there is no slide left to catch */
+const CATCH_MIN_SLIP = 0.08
+/** The gauge fills at most this many times its rate, however deep the slide */
+const GAUGE_DEPTH_MAX = 1.5
 
-/** Swings the velocity round towards the nose by `fraction` of the slip, keeping its speed */
-function align(forward: number, side: number, fraction: number, maxSlip: number) {
+/** Swings the velocity round towards the nose, leaving `fraction` of the slip, keeping its speed */
+function align(forward: number, side: number, fraction: number) {
   const speed = Math.hypot(forward, side)
-  const slip = clamp(Math.atan2(side, forward) * fraction, -maxSlip, maxSlip)
+  const slip = Math.atan2(side, forward) * fraction
   return { forward: speed * Math.cos(slip), side: speed * Math.sin(slip) }
 }
 
@@ -354,6 +371,7 @@ export function stepKart(
 
   // Boosts first, so that a boost fired now already pushes in this step
   let { gauge, storedBoosts, boostSeconds, chainWindow, chain, releaseWindow, miniSeconds } = state
+  let { doubleWindow, doubleArmed, doubles } = state
   const fire =
     (rules.autoBoost && storedBoosts > 0) || (input.boost && !state.boostHeld && storedBoosts > 0)
   let stackSeconds = state.stackSeconds
@@ -372,21 +390,32 @@ export function stepKart(
   const tapped = input.throttle && !state.throttleHeld
   if (rules.chainBoosts && tapped && releaseWindow > 0) {
     releaseWindow = 0
-    miniSeconds = tuning.chainDuration
     chain = chainWindow > 0 ? chain + 1 : 1
-    chainWindow = Math.max(chainWindow, tuning.chainDuration + tuning.chainGrace)
+    if (doubleArmed) {
+      // The double: a second release boost on top of the first, which it makes longer
+      miniSeconds += tuning.chainDuration
+      doubles++
+      doubleWindow = 0
+    } else {
+      miniSeconds = tuning.chainDuration
+      doubleWindow = tuning.doubleWindow
+    }
+    doubleArmed = false
+    chainWindow = Math.max(chainWindow, miniSeconds + tuning.chainGrace)
   }
 
   const full = boostSeconds > 0
   const stacked = full && stackSeconds > 0
   const boosting = full || miniSeconds > 0
   const push = full ? tuning.boostAcceleration : miniSeconds > 0 ? tuning.miniAcceleration : 0
+  // Every link of a chain after the first makes the release boost a little faster
+  const links = clamp(chain - 1, 0, tuning.chainSpeedLinks)
   const factor = stacked
     ? tuning.boostStackFactor
     : full
       ? tuning.boostTopSpeedFactor
       : miniSeconds > 0
-        ? tuning.miniTopSpeedFactor
+        ? tuning.miniTopSpeedFactor + tuning.chainSpeedStep * links
         : 1
 
   const forward = drive(
@@ -408,88 +437,105 @@ export function stepKart(
   // A drift begun during a boost is a boost slide for as long as the boost lasts
   const entered = drifting && state.driftDirection === 0
   const sliding = drifting && boosting && (entered || state.sliding)
+  // A drift begun just after a release boost may be the tap that earns the double
+  const doubleDrift = drifting && (entered ? doubleWindow > 0 : state.doubleDrift)
+  if (entered) doubleWindow = 0
 
   // Letting go of a long enough drift (the key, not slowing down) opens the release window and
-  // tops up the gauge
+  // tops up the gauge; so does letting go of the double's tap, however short (two steps at least:
+  // a key that flickers for one step is not a tap)
   const released = state.drifting && !input.drift
   const earned = released && state.driftSeconds >= tuning.chainMinDrift
-  if (earned) {
+  const doubled = released && !earned && state.doubleDrift && state.driftSeconds > dt * 1.5
+  if (earned || doubled) {
     releaseWindow = tuning.releaseWindow
-    if (storedBoosts < tuning.maxStoredBoosts) {
-      gauge += tuning.gaugeDriftBonus * (full ? tuning.boostGaugeShare : 1)
-    }
+    doubleArmed = doubled
   }
-  // A tapped drift let go is a flick: the nose and the travel snap round, a little gauge
-  // At least two steps of drift: a key that flickers for one step is not a tap
-  const flicked =
-    released &&
-    state.driftSeconds < tuning.flickMaxDrift &&
-    state.driftSeconds > dt * 1.5 &&
-    state.flickCooldown <= 0
-  if (flicked && storedBoosts < tuning.maxStoredBoosts) gauge += tuning.flickGauge
-  // Counter-steering as the drift is let go: a moment of extra grip straightens the car up
-  let catchSeconds = Math.max(0, state.catchSeconds - dt)
-  if (released && steer * state.driftDirection < -0.3) catchSeconds = tuning.catchSeconds
-  // How deep the drift is: 0 steering fully out of it, 1 fully into it
-  const depth = drifting ? (steer * driftDirection + 1) / 2 : 0
+  if (earned && storedBoosts < tuning.maxStoredBoosts) {
+    gauge += tuning.gaugeDriftBonus * (full ? tuning.boostGaugeShare : 1)
+  }
 
   // Back to world axes from the old nose, then read against the new nose. The car turning while the
   // velocity stays put is what opens the slip angle.
   const worldVx = forward * Math.sin(state.heading) + side * Math.cos(state.heading)
   const worldVz = -forward * Math.cos(state.heading) + side * Math.sin(state.heading)
-  const heading = wrapAngle(state.heading + yawRate(forward, steer, driftDirection, tuning) * dt)
+  let heading = wrapAngle(state.heading + yawRate(forward, steer, driftDirection, tuning) * dt)
 
   let newForward = forwardOf(worldVx, worldVz, heading)
   let newSide = sideOf(worldVx, worldVz, heading)
 
-  if (drifting) {
-    // The slip settles where the turn opens it as fast as the alignment closes it, under the cap
-    ;({ forward: newForward, side: newSide } = align(
-      newForward,
-      newSide,
-      Math.exp(-tuning.driftAlign * dt),
-      tuning.driftMaxSlip,
-    ))
-  } else if (newForward > 0) {
-    // Going forwards the grip swings the velocity onto the nose, so leaving a drift keeps its speed
-    const grip = tuning.grip * (catchSeconds > 0 ? tuning.catchGrip : 1)
-    ;({ forward: newForward, side: newSide } = align(
-      newForward,
-      newSide,
-      Math.exp(-grip * dt),
-      Math.PI / 2,
-    ))
+  // Counter-steering against the slide as the drift is let go, or while the grip is still coming
+  // back: the grip comes back faster for a moment and the car straightens up
+  const slipBefore = Math.atan2(newSide, newForward)
+  let catchSeconds = Math.max(0, state.catchSeconds - dt)
+  const sliddenOut = !drifting && state.traction < 1 && Math.abs(slipBefore) > CATCH_MIN_SLIP
+  const countered = released
+    ? steer * state.driftDirection < -0.3
+    : sliddenOut && steer * Math.sign(slipBefore) > 0.3
+  if (countered && state.catchSeconds <= 0) catchSeconds = tuning.catchSeconds
+  // The rear lets go the moment a drift begins, and grips again only some time after it is let go
+  const traction = drifting
+    ? 0
+    : Math.min(
+        1,
+        state.traction +
+          (dt / Math.max(dt, tuning.driftRecovery)) * (catchSeconds > 0 ? tuning.catchGrip : 1),
+      )
+
+  if (drifting && newForward > 0) {
+    // The nose swings no further round than the cap: past it the car would spin
+    const over = slipBefore - clamp(slipBefore, -tuning.driftMaxSlip, tuning.driftMaxSlip)
+    if (over !== 0) {
+      heading = wrapAngle(heading + over)
+      newForward = forwardOf(worldVx, worldVz, heading)
+      newSide = sideOf(worldVx, worldVz, heading)
+    }
+  }
+  if (newForward > 0) {
+    // Going forwards the grip swings the velocity onto the nose, keeping its speed: fast when the
+    // tyres grip, slowly in a drift, so that the car's momentum carries on the old way
+    const rate = tuning.driftAlign + (tuning.grip - tuning.driftAlign) * traction
+    ;({ forward: newForward, side: newSide } = align(newForward, newSide, Math.exp(-rate * dt)))
+    if (traction < 1) {
+      // Sliding sideways scrubs speed off: the deeper the slide and the faster, the more
+      const speed = Math.hypot(newForward, newSide)
+      const slide = speed > 0 ? Math.abs(newSide) / speed : 0
+      const scrub =
+        tuning.driftScrub *
+        slide *
+        (speed / tuning.topSpeed) *
+        (1 - traction) *
+        (sliding ? tuning.slideScrub : 1) *
+        dt
+      const kept = speed > 0 ? Math.max(0, speed - scrub) / speed : 1
+      newForward *= kept
+      newSide *= kept
+    }
   } else {
     // Reversing or stopped: sideways speed simply dies
     newSide *= Math.exp(-tuning.grip * dt)
   }
 
   // One limit on the whole speed, sideways included, or a slide would add to the top speed. Above
-  // it, from a boost that ended or a drift that began, the car eases down instead of stopping dead.
-  // A plain drift's top speed: lower the deeper it is, and lower still once it has gone on long
-  const driftLimit =
-    tuning.driftTopSpeed * (1 - tuning.driftDepthCost * depth) -
-    tuning.driftFatigue * Math.max(0, driftSeconds - tuning.driftFatigueAfter)
-  const limit = sliding
-    ? tuning.topSpeed * factor * tuning.slideSpeedKeep
-    : (drifting ? Math.max(tuning.driftExitSpeed, driftLimit) : tuning.topSpeed) * factor
+  // it, from a boost that ended, the car eases down instead of stopping dead.
+  const limit = tuning.topSpeed * factor
   const speed = Math.hypot(newForward, newSide)
   if (speed > limit) {
-    const easing = drifting ? tuning.driftDrag : tuning.overSpeedDrag
-    const allowed = Math.max(limit, Math.hypot(state.vx, state.vz) - easing * dt)
+    const allowed = Math.max(limit, Math.hypot(state.vx, state.vz) - tuning.overSpeedDrag * dt)
     if (speed > allowed) {
       newForward *= allowed / speed
       newSide *= allowed / speed
     }
   }
 
-  // The gauge fills only in a real drift, at speed; a full gauge becomes a stored boost
+  // The gauge fills only in a real drift, at speed, and by how far the car is sliding; a full gauge
+  // becomes a stored boost
   if (drifting && newForward >= tuning.driftMinSpeed && storedBoosts < tuning.maxStoredBoosts) {
-    gauge +=
-      tuning.gaugeFillRate *
-      (1 + tuning.driftDepthFill * (depth * 2 - 1)) *
-      (full ? tuning.boostGaugeShare : 1) *
-      dt
+    const depth = Math.min(
+      GAUGE_DEPTH_MAX,
+      Math.abs(Math.atan2(newSide, newForward)) / Math.max(1e-3, tuning.driftGaugeSlip),
+    )
+    gauge += tuning.gaugeFillRate * depth * (full ? tuning.boostGaugeShare : 1) * dt
   }
   // Only when it gained this step: a gauge left full while the store was full (fire a charge and
   // it waits) turns into a charge at the next drift, not at once
@@ -503,24 +549,22 @@ export function stepKart(
   if (boostSeconds > 0) boostSeconds = Math.max(0, boostSeconds - drain)
   stackSeconds = boostSeconds > 0 ? Math.max(0, stackSeconds - drain) : 0
   if (miniSeconds > 0) miniSeconds = Math.max(0, miniSeconds - drain)
-  if (releaseWindow > 0 && !earned) releaseWindow = Math.max(0, releaseWindow - dt)
+  if (releaseWindow > 0 && !earned && !doubled) releaseWindow = Math.max(0, releaseWindow - dt)
+  if (releaseWindow === 0) doubleArmed = false
+  // The double's window runs down from the step after the release boost that opened it
+  if (doubleWindow > 0 && doubleWindow === state.doubleWindow) {
+    doubleWindow = Math.max(0, doubleWindow - dt)
+  }
   // The chain holds through a drift; once its window closes the count starts over
   if (chainWindow > 0 && !drifting) chainWindow = Math.max(0, chainWindow - dt)
   if (chainWindow === 0) chain = 0
 
-  // The flick turns the nose and the travel together, keeping almost all the speed
-  let finalHeading = heading
-  if (flicked) {
-    finalHeading = wrapAngle(heading + state.driftDirection * tuning.flickAngle)
-    newForward *= tuning.flickKeep
-    newSide *= tuning.flickKeep
-  }
-  const vx = newForward * Math.sin(finalHeading) + newSide * Math.cos(finalHeading)
-  const vz = -newForward * Math.cos(finalHeading) + newSide * Math.sin(finalHeading)
+  const vx = newForward * Math.sin(heading) + newSide * Math.cos(heading)
+  const vz = -newForward * Math.cos(heading) + newSide * Math.sin(heading)
   return {
     x: state.x + vx * dt,
     z: state.z + vz * dt,
-    heading: finalHeading,
+    heading,
     vx,
     vz,
     drifting,
@@ -539,10 +583,16 @@ export function stepKart(
     stallSeconds: Math.max(0, state.stallSeconds - dt),
     stackSeconds,
     catchSeconds,
-    flicks: flicked ? state.flicks + 1 : state.flicks,
-    flickCooldown: flicked ? tuning.flickCooldown : Math.max(0, state.flickCooldown - dt),
+    traction,
+    doubleWindow,
+    doubleDrift,
+    doubleArmed,
+    doubles,
   }
 }
+
+/** Whether the car is sliding: in a drift, or just out of one with the grip not yet back */
+export const kartSkidding = (state: KartState): boolean => state.drifting || state.traction < 1
 
 /** Whether any boost (from the gauge, the start or a release) is running */
 export const kartBoosting = (state: KartState): boolean =>

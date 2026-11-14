@@ -88,7 +88,8 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
    | Goods / Gold / Wharf / Stalls · Shops · Trading houses / Reserve / Patron | 貨／金／碼頭／攤子・店號・商行／保留／貴客 |
    | Drift / Boost gauge / Boost | 甩尾／加速條／噴射 |
    | Start boost / Jump start / Release boost / Chain / Boost slide | 起跑加速／偷跑熄火／收尾加速／連噴／推滑 |
-   | Stacked boost / Flick / Counter catch / Boost pad / Chain broken | 疊噴／甩頭／反打回正／加速帶／連噴中斷 |
+   | Stacked boost / Counter catch / Boost pad / Chain broken | 疊噴／反打回正／加速帶／連噴中斷 |
+   | Double release / Slide (the car sliding in a drift) / Grip | 雙收尾／側滑／抓地（2026-11-14；「甩頭 Flick」已拿掉） |
    | Time trial / Item race / Ghost | 時間賽／道具賽／幽靈車 |
 
 7. **規則頁**是 markdown 兩份，不是 `t()`；由英文寫起，繁中翻譯，兩份都是「自己的話」，不轉載原作說明書。
