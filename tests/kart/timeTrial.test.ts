@@ -15,6 +15,7 @@ import {
   type TrialCourse,
 } from '../../shared/kart/timeTrial.ts'
 import { courseOf, parseTrack, type Track, type TrackJson } from '../../shared/kart/track.ts'
+import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
 
@@ -175,5 +176,71 @@ describe('the riverside graybox', () => {
     expect(wrongWarnings).toBe(0)
     // A careful autopilot: a real driver drifting the hairpin is faster
     expect(seconds(trial.steps)).toBeLessThan(240)
+  })
+})
+
+describe('the harbour track (N1, e10-t02)', () => {
+  it('is a valid track whose road never runs into itself, the grid behind the line', () => {
+    const track = load(HARBOUR)
+    const { road } = track
+    for (let i = 0; i < road.length; i++) {
+      for (let j = i + 1; j < road.length; j++) {
+        const along = Math.min(j - i, road.length - (j - i))
+        if (along * 6 < 40) continue
+        const gap = Math.hypot(road[i]!.x - road[j]!.x, road[i]!.z - road[j]!.z)
+        expect(gap, `road ${i} and ${j}`).toBeGreaterThan((road[i]!.width + road[j]!.width) / 2 + 4)
+      }
+    }
+    // The line is on the seafront straight, driven eastwards (+x); the grid is behind it
+    const line = track.road[0]!
+    expect(line.z).toBeLessThan(-100)
+    for (const place of track.grid) {
+      expect(place.x).toBeLessThan(line.x)
+      expect(Math.abs(place.heading - Math.PI / 2)).toBeLessThan(0.1)
+    }
+  })
+
+  it('is about as long as Riverside, and the tighter, more technical of the two', () => {
+    const length = (json: TrackJson) =>
+      json.road.reduce((sum, point, index) => {
+        const next = json.road[(index + 1) % json.road.length]!
+        return sum + Math.hypot(next.x - point.x, next.z - point.z)
+      }, 0)
+    expect(length(HARBOUR)).toBeGreaterThan(1200)
+    expect(length(HARBOUR)).toBeLessThan(1600)
+    // Count the hairpins: places where the road turns round by more than 150 degrees within 80 m
+    const hairpins = (json: TrackJson) => {
+      const { road } = json
+      let count = 0
+      let skip = 0
+      for (let index = 0; index < road.length; index++) {
+        if (skip > 0) {
+          skip--
+          continue
+        }
+        const a = road[index]!
+        const b = road[(index + 1) % road.length]!
+        const c = road[(index + 13) % road.length]!
+        const d = road[(index + 14) % road.length]!
+        const before = Math.atan2(b.x - a.x, b.z - a.z)
+        const after = Math.atan2(d.x - c.x, d.z - c.z)
+        let turn = Math.abs(after - before)
+        if (turn > Math.PI) turn = 2 * Math.PI - turn
+        if (turn > (150 * Math.PI) / 180) {
+          count++
+          skip = 14
+        }
+      }
+      return count
+    }
+    expect(hairpins(HARBOUR)).toBeGreaterThanOrEqual(2)
+    expect(hairpins(HARBOUR)).toBeGreaterThan(hairpins(RIVERSIDE))
+  })
+
+  it('can be driven round three times, never the wrong way', () => {
+    const { trial, wrongWarnings } = race(HARBOUR, 320)
+    expect(trial.phase).toBe('finished')
+    expect(wrongWarnings).toBe(0)
+    expect(seconds(trial.steps)).toBeLessThan(270)
   })
 })

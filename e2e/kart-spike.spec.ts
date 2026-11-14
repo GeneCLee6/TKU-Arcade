@@ -772,6 +772,22 @@ test('the riverside graybox opens from the course picker, with its own minimap',
   expect(errors).toEqual([])
 })
 
+// N1 (e10-t02, e10-t03): the second track, picked on the kart page, with its own minimap and trial
+test('the harbour track opens from the kart page picker and races', async ({ page }) => {
+  // Its scenery is the heaviest yet: a software renderer under parallel tests needs the time
+  test.setTimeout(60_000)
+  const errors = watchConsole(page)
+  await page.goto('/kart')
+  await expect(page.locator('canvas')).toBeVisible()
+  await page.getByTestId('kart-course').selectOption('harbour')
+  await expect(page).toHaveURL(/track=harbour/)
+  await expect(page.getByRole('img', { name: 'Track map' })).toBeVisible()
+  // The countdown may be over before a slow renderer shows it: the race clock is there either way
+  await expect(page.getByTestId('kart-race-clock')).toBeVisible({ timeout: 15_000 })
+  await expect.poll(() => framesOf(page), { timeout: 30_000 }).toBeGreaterThan(10)
+  expect(errors).toEqual([])
+})
+
 // e8-t14: the kart page itself, a time trial without the spike's tools; e8-t07 its kart and effects
 test('the kart page races on Riverside without the tuning tools, and the sound switches', async ({
   page,
@@ -784,6 +800,7 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
   await expect(page.getByTestId('kart-course').locator('option')).toHaveText([
     'Test oval',
     'Riverside (graybox)',
+    'Harbour Hairpins',
   ])
   await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
   await expect(page.getByText('Time trial')).toBeVisible()

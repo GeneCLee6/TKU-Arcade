@@ -59,3 +59,89 @@ export const kartScene = {
   lightSky: '#FFFFFF',
   lightGround: '#6B7280',
 } as const
+
+/**
+ * A track's light and sky (N1, e10-t03): Riverside and the test tracks keep the sunny afternoon of
+ * K1 (the same values as above, so they look as they did); the harbour is a sunset of our own. The
+ * sun's direction points from the ground towards it.
+ */
+export interface KartTheme {
+  readonly skyTop: string
+  /** Between the horizon and the top; the sky blends horizon → middle → top */
+  readonly skyMiddle: string
+  readonly skyHorizon: string
+  /** The fog and the background behind everything: the horizon's colour */
+  readonly fog: string
+  readonly hemisphereSky: string
+  readonly hemisphereGround: string
+  readonly hemisphereIntensity: number
+  readonly sun: string
+  readonly sunIntensity: number
+  readonly sunDirection: readonly [number, number, number]
+  /** A disc and a glow on the sky where the sun is; null draws none */
+  readonly sunDisc: string | null
+  readonly sunGlow: string | null
+}
+
+export const kartThemes = {
+  day: {
+    skyTop: kartScene.skyTop,
+    skyMiddle: '#8DBBE6',
+    skyHorizon: kartScene.skyHorizon,
+    fog: kartScene.skyHorizon,
+    hemisphereSky: kartScene.lightSky,
+    hemisphereGround: kartScene.lightGround,
+    hemisphereIntensity: 2,
+    sun: kartScene.lightSky,
+    sunIntensity: 1.5,
+    sunDirection: [30, 60, 20],
+    sunDisc: null,
+    sunGlow: null,
+  },
+  sunset: {
+    skyTop: '#2E3A86',
+    skyMiddle: '#C46C9A',
+    skyHorizon: '#FFB27A',
+    fog: '#F4A47E',
+    hemisphereSky: '#FFD6BA',
+    hemisphereGround: '#4E4466',
+    hemisphereIntensity: 1.55,
+    sun: '#FFB878',
+    sunIntensity: 2.6,
+    sunDirection: [-62, 22, -80],
+    sunDisc: '#FFF1C9',
+    sunGlow: '#FFC27A',
+  },
+} as const satisfies Record<string, KartTheme>
+
+/** The harbour at sunset (N1, e10-t03): our own palette */
+export const harbourScene = {
+  // The sea, tinting the shared water texture warm
+  sea: '#E7A08C',
+  concrete: '#B9B2A6',
+  concreteDark: '#8D877E',
+  quayEdge: '#F2C230',
+  lighthouseRed: '#C8323C',
+  lighthouseWhite: '#F6F1E7',
+  lanternGlass: '#FFE7A3',
+  harbourGreen: '#2E9E62',
+  tetrapod: '#A7A39A',
+  // Boats: hulls in four colours, white cabins, dark trim
+  hulls: ['#D9443A', '#1F8A9E', '#2F5DA8', '#E8B330'],
+  cabin: '#F4F1EA',
+  boatTrim: '#2B2D33',
+  flag: '#F24B3C',
+  // Containers, sheds and the crane
+  containers: ['#C0392B', '#1F6FB2', '#2E8B57', '#E67E22', '#7D3C98', '#D4AC0D'],
+  shedWalls: ['#D8CFC0', '#9FB8AD', '#C9A27E'],
+  roofs: ['#8C4A32', '#2F6F73', '#6B6F78'],
+  crane: '#E2A72E',
+  // The hillside town: painted walls, warm lit windows
+  walls: ['#F3E3C3', '#F2C6B4', '#CFE3D0', '#C9DBEA', '#F6F0E6'],
+  window: '#2C2F3A',
+  windowLit: '#FFC66B',
+  lantern: '#E5322D',
+  lanternLit: '#FF7A3D',
+  palmTrunk: '#8A6A48',
+  palmLeaf: '#3C7F3A',
+} as const
