@@ -16,13 +16,14 @@ describe('the topic bank', () => {
     expect(SPECTRUM_TOPICS.map((row) => [...row])).toEqual(rows)
   })
 
-  // Rewritten 2026-11-14 (擁有者: too dull, too subjective): fewer, each with a scene
-  it('holds at least 220 topics, every field filled, no topic twice', () => {
-    expect(SPECTRUM_TOPICS.length).toBeGreaterThanOrEqual(220)
+  // Rewritten 2026-11-14 (擁有者: too dull, too subjective), each with a scene; then grown to about
+  // a thousand, with bridge and Hong Kong film and drama added (擁有者, the same day)
+  it('holds at least a thousand topics, every field filled, no topic twice', () => {
+    expect(SPECTRUM_TOPICS.length).toBeGreaterThanOrEqual(1000)
     expect(
       SPECTRUM_TOPICS.every((row) => row.length === 5 && row.every((field) => field !== '')),
     ).toBe(true)
-    const names = SPECTRUM_TOPICS.map(([category, topic]) => `${category}/${topic}`)
+    const names = SPECTRUM_TOPICS.map(([, topic]) => topic)
     expect(new Set(names).size).toBe(names.length)
   })
 
@@ -34,7 +35,7 @@ describe('the topic bank', () => {
     }
   })
 
-  it('uses twelve categories', () => {
+  it('uses fourteen categories', () => {
     expect(new Set(SPECTRUM_TOPICS.map(([category]) => category))).toEqual(
       new Set([
         '生活',
@@ -49,6 +50,8 @@ describe('the topic bank', () => {
         '人際',
         '運動',
         '奇想',
+        '橋牌',
+        '港片港劇',
       ]),
     )
   })
