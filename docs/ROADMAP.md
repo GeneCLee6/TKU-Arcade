@@ -160,6 +160,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 ## 路線圖外的遊戲
 
 - [ ] **誰的詞不一樣**（暫名 Odd Word Out，擁有者 2026-11-14 要求，`feat/odd-word-out`）：`e13-t01`–`e13-t03` 完成（規則、267 組題庫、畫面、規則頁、上大廳）；`e13-t04` 擁有者審題庫與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e13-odd-word-out.md`。
+- [ ] **慘度排排站**（暫名 Misery Line，擁有者 2026-11-14 要求，`feat/misery-line`）：`e14-t01`–`e14-t03` 完成（規則、396 張卡庫、畫面、規則頁、上大廳）；`e14-t04` 擁有者看卡庫與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e14-misery-line.md`。
 
 ## 不在批次裡的事（擁有者自己做）
 

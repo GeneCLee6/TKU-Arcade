@@ -80,6 +80,16 @@ const ART: Record<string, ReactElement> = {
       />
     </>
   ),
+  // A rising meter of four bars, the last one a question: how bad is this one?
+  misery: (
+    <>
+      <path {...stroke} d="M4 28h24" />
+      <rect fill="currentColor" x="5" y="22" width="4" height="4" />
+      <rect fill="currentColor" x="11" y="17" width="4" height="9" />
+      <rect fill="currentColor" x="17" y="11" width="4" height="15" />
+      <path {...stroke} d="M23 8.5a2.6 2.6 0 1 1 3.4 2.5c-.9.4-1.4 1-1.4 2v1.5M25 19v.4" />
+    </>
+  ),
 }
 
 /** The drawing for `gameId`; `fallback` for a game without one */
