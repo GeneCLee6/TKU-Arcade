@@ -304,6 +304,8 @@ describe('the game', () => {
       'Lantern Lane',
       'Clubroom Tiles',
       'Kite Day',
+      'Secret Scroll',
+      'Wasabi Dumplings',
     ])
   })
 

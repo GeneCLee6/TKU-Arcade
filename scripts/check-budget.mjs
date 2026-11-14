@@ -61,9 +61,16 @@ const mainKeys = collectAll(entries)
 const room = manifest[ROOM_PAGE] ? [ROOM_PAGE] : []
 
 // A lazy chunk a game's screen loads after its first paint (the full board's layout, C9) is that
-// screen's, not a game of its own
+// screen's, not a game of its own. The dynamic import may sit in a chunk the screen imports
+// statically (promotion's fullData.ts once the board's cards came with it, 2026-11-14), so every
+// chunk of the screen's own is asked, not the site's or the room page's
 const gameChunks = lazyEntriesUnder('src/games/')
-const loadedByGame = new Set(gameChunks.flatMap((key) => manifest[key].dynamicImports ?? []))
+const shellKeys = collectAll([...entries, ...room])
+const laterOf = (game) => {
+  const own = [...collectAll([game])].filter((key) => !shellKeys.has(key))
+  return own.flatMap((key) => manifest[key].dynamicImports ?? [])
+}
+const loadedByGame = new Set(gameChunks.flatMap(laterOf))
 const games = gameChunks.filter((key) => !loadedByGame.has(key))
 
 const budgets = [
@@ -92,8 +99,7 @@ if (kartEntries.length > 0) {
  * not limited: the first screen is what the budget is for
  */
 function afterPaint(game, firstKeys) {
-  const later = manifest[game]?.dynamicImports ?? []
-  const keys = collectAll(later)
+  const keys = collectAll(laterOf(game))
   for (const key of firstKeys) keys.delete(key)
   return keys
 }

@@ -146,6 +146,13 @@ describe('lobby cards', () => {
     const kiteCard = cardOf('Kite Day')
     expect(within(kiteCard).getByText('2–5 players')).toBeInTheDocument()
     expect(within(kiteCard).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    // The owner's brief, 2026-11-14
+    const scroll = cardOf('Secret Scroll')
+    expect(within(scroll).getByText('2–6 players')).toBeInTheDocument()
+    expect(within(scroll).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    const dumplings = cardOf('Wasabi Dumplings')
+    expect(within(dumplings).getByText('3–6 players')).toBeInTheDocument()
+    expect(within(dumplings).getByRole('button', { name: 'New room' })).toBeInTheDocument()
     // Eight open games; the Coming soon card arrives with its lazy chunk
     await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(9))
     expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(8)
@@ -158,6 +165,8 @@ describe('lobby cards', () => {
       'lantern',
       'tiles',
       'kite',
+      'secret-scroll',
+      'wasabi',
     ])
   })
 

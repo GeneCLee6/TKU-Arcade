@@ -5,16 +5,30 @@ import { bluff } from './bluff/rules.ts'
 import { lantern } from './lantern/rules.ts'
 import { kite } from './kite/rules.ts'
 import { oddWord } from './odd-word/rules.ts'
+import { secretScroll } from './secret-scroll/rules.ts'
 import { promotion } from './promotion/rules.ts'
 import { silentTable } from './silent-table/rules.ts'
 import { spectrum } from './spectrum/rules.ts'
 import { tiles } from './tiles/rules.ts'
 import { ticTacToe } from './tictactoe/rules.ts'
+import { wasabi } from './wasabi/rules.ts'
 import type { AnyGameModule } from './types.ts'
 
 export { GAME_MESSAGES, LOBBY_GAMES } from './catalog.ts'
 
-const MODULES: readonly AnyGameModule[] = [ticTacToe, promotion, silentTable, spectrum, bluff, oddWord, lantern, tiles, kite]
+const MODULES: readonly AnyGameModule[] = [
+  ticTacToe,
+  promotion,
+  silentTable,
+  spectrum,
+  bluff,
+  oddWord,
+  lantern,
+  tiles,
+  kite,
+  secretScroll,
+  wasabi,
+]
 
 const BY_ID: ReadonlyMap<string, AnyGameModule> = new Map(MODULES.map((game) => [game.id, game]))
 

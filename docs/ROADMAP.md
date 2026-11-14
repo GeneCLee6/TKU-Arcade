@@ -164,6 +164,8 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 - [ ] **社辦牌陣**（暫名 Clubroom Tiles，擁有者 2026-11-14 要求，`feat/game-tiles`）：`e23-t01`–`e23-t02` 完成（規則、即時草稿、畫面、規則頁、上大廳）；`e23-t03` 擁有者試玩、定名稱與 IP 簽核。不屬於任何 Phase。細節在 `PRD/e23-clubroom-tiles.md`。
 
 - [ ] **宮燈點點**（暫名 Lantern Lane，擁有者 2026-11-14 要求，`feat/game-mind`）：`e15-t01`–`e15-t02` 完成（即時合作規則、畫面、規則頁、上大廳）；`e15-t03` 擁有者試玩與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e15-lantern-lane.md`。
+- [ ] **奪祕笈**（暫名 Secret Scroll，擁有者 2026-11-14 要求，`feat/game-letter-skull`）：`e18-t01`–`e18-t02` 完成（規則、畫面、規則頁、上大廳）；`e18-t03` 擁有者 IP 簽核。細節在 `PRD/e18-secret-scroll.md`。
+- [ ] **芥末餃子**（暫名 Wasabi Dumplings，擁有者 2026-11-14 要求，`feat/game-letter-skull`）：`e19-t01`–`e19-t02` 完成（規則、餐桌與喊價階梯、規則頁、上大廳）；`e19-t03` 擁有者 IP 簽核。細節在 `PRD/e19-wasabi-dumplings.md`。
 
 - [ ] **放風箏**（暫名 Kite Day，擁有者 2026-11-14 要求，`feat/game-hanabi`）：`e16-t01`–`e16-t02` 完成（規則、畫面、規則頁、上大廳）；`e16-t03` 擁有者定名、試玩與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e16-kite-day.md`。
 

@@ -36,6 +36,8 @@ const light = {
   gameLantern: '#A8246A',
   gameTiles: '#3F6212',
   gameKite: '#3D52C2',
+  gameSecretScroll: '#86532A',
+  gameWasabi: '#0E6B5A',
   success: '#13703A',
   danger: '#B91C1C',
   warning: '#9C4A06',
@@ -96,6 +98,8 @@ const dark: Record<ColorName, string> = {
   gameLantern: '#FF9ECF',
   gameTiles: '#C6F35B',
   gameKite: '#A3B8FF',
+  gameSecretScroll: '#E0B084',
+  gameWasabi: '#45D6B8',
   success: '#5CFFA8',
   danger: '#FF5A6E',
   warning: '#FFC23D',
@@ -154,6 +158,8 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   lantern: 'gameLantern',
   tiles: 'gameTiles',
   kite: 'gameKite',
+  'secret-scroll': 'gameSecretScroll',
+  wasabi: 'gameWasabi',
 }
 
 /** A game's hue, for its card and its room: what `--color-accent` becomes there */
