@@ -11,6 +11,8 @@ import { oddWordMessages } from './odd-word/i18n.ts'
 import { oddWordInfo } from './odd-word/info.ts'
 import { secretScrollMessages } from './secret-scroll/i18n.ts'
 import { secretScrollInfo } from './secret-scroll/info.ts'
+import { miseryMessages } from './misery/i18n.ts'
+import { miseryInfo } from './misery/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
 import { promotionInfo } from './promotion/info.ts'
 import { silentTableMessages } from './silent-table/i18n.ts'
@@ -40,6 +42,7 @@ export const GAME_INFOS = [
   tradersInfo,
   secretScrollInfo,
   wasabiInfo,
+  miseryInfo,
 ] as unknown as readonly AnyGameInfo[]
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
@@ -67,6 +70,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...tradersMessages.en,
     ...secretScrollMessages.en,
     ...wasabiMessages.en,
+    ...miseryMessages.en,
   },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
@@ -81,5 +85,6 @@ export const GAME_MESSAGES: GameMessages = {
     ...tradersMessages['zh-TW'],
     ...secretScrollMessages['zh-TW'],
     ...wasabiMessages['zh-TW'],
+    ...miseryMessages['zh-TW'],
   },
 }

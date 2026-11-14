@@ -54,6 +54,7 @@ const readablePairs: [ColorName, ColorName][] = [
   ['onAccent', 'gameTraders'],
   ['onAccent', 'gameSecretScroll'],
   ['onAccent', 'gameWasabi'],
+  ['onAccent', 'gameMisery'],
   // ...and as text themselves: a public room's game, a link
   ['brand', 'bg'],
   ['gamePromotion', 'bg'],
@@ -67,6 +68,7 @@ const readablePairs: [ColorName, ColorName][] = [
   ['gameTraders', 'bg'],
   ['gameSecretScroll', 'bg'],
   ['gameWasabi', 'bg'],
+  ['gameMisery', 'bg'],
   ['danger', 'surface'],
   ['danger', 'bg'],
   ['danger', 'surface'],
@@ -92,6 +94,8 @@ const readablePairs: [ColorName, ColorName][] = [
   ['tileClub', 'tileFace'],
   ['tileJoker', 'tileFace'],
   ['chipInk', 'chipFace'],
+  // 慘度排排站's misery meter borrows five game hues and danger, under onAccent
+  ['onAccent', 'danger'],
 ]
 
 describe('tokens', () => {
@@ -126,6 +130,7 @@ describe('tokens', () => {
       'gameTraders',
       'gameSecretScroll',
       'gameWasabi',
+      'gameMisery',
     ] as const
     for (const hue of hues) {
       expect(contrast(p[hue], panel), `${hue} on panel`).toBeGreaterThanOrEqual(4.5)

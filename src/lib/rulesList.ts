@@ -19,6 +19,7 @@ const WITH_RULES: Record<RulesEdition, readonly string[]> = {
     'traders',
     'secret-scroll',
     'wasabi',
+    'misery',
   ],
   // A game with a second edition (promotion's full one, C7) has a second pair, `rulesFull.*.md`
   full: ['promotion'],
