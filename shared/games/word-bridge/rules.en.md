@@ -13,10 +13,7 @@ The team game plays like the board game Codenames (Vlaada Chvátil, Czech Games 
 ## A turn
 
 1. **The call**: your caller types one word and a number, for example "sailing 2". The number says how many words the clue is meant for; "any" is allowed too.
-2. **The picks**: tap a word, then turn it. You can pick up to the number plus one.
-   - Your own word: it turns your colour and you may go on.
-   - A bystander or the other side's word: it turns, and your turn ends.
-   - The trap: your side loses at once.
+2. **The picks**: tap a word, then turn it, up to the number plus one. Your own word turns your colour and you may go on; a bystander or the other side's word ends your turn; the trap loses the game for your side at once.
 3. After at least one pick you may end your turn yourselves.
 
 The first side to turn all its words wins, even if the other side turned the last of them.
