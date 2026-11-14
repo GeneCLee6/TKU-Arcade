@@ -33,6 +33,12 @@ const light = {
   gameSpectrum: '#1D5FC4',
   gameBluffReader: '#6B3FD1',
   gameOddWord: '#B03A12',
+  gameLantern: '#A8246A',
+  gameTiles: '#3F6212',
+  gameKite: '#3D52C2',
+  gameTraders: '#85471C',
+  gameSecretScroll: '#4A5570',
+  gameWasabi: '#0E6B5A',
   gamePalace: '#A3182B',
   success: '#13703A',
   danger: '#B91C1C',
@@ -59,6 +65,14 @@ const light = {
   cardRed: '#B91C1C',
   chipFace: '#FDE68A',
   chipInk: '#111827',
+  // Clubroom Tiles: the same in both themes, as a set of tiles is. Four suit inks on ivory
+  tileFace: '#FBF7EC',
+  tileEdge: '#C9BD9E',
+  tileSpade: '#1F2A44',
+  tileHeart: '#B91C1C',
+  tileDiamond: '#7E22CE',
+  tileClub: '#15803D',
+  tileJoker: '#BE185D',
 }
 
 export type ColorName = keyof typeof light
@@ -83,6 +97,12 @@ const dark: Record<ColorName, string> = {
   gameSpectrum: '#4DA3FF',
   gameBluffReader: '#B48CFF',
   gameOddWord: '#FF8F66',
+  gameLantern: '#FF9ECF',
+  gameTiles: '#C6F35B',
+  gameKite: '#A3B8FF',
+  gameTraders: '#E3B98A',
+  gameSecretScroll: '#C3CCDD',
+  gameWasabi: '#45D6B8',
   gamePalace: '#FF6F7F',
   success: '#5CFFA8',
   danger: '#FF5A6E',
@@ -106,6 +126,13 @@ const dark: Record<ColorName, string> = {
   cardRed: '#B91C1C',
   chipFace: '#FDE68A',
   chipInk: '#111827',
+  tileFace: '#FBF7EC',
+  tileEdge: '#C9BD9E',
+  tileSpade: '#1F2A44',
+  tileHeart: '#B91C1C',
+  tileDiamond: '#7E22CE',
+  tileClub: '#15803D',
+  tileJoker: '#BE185D',
 }
 
 // Raw values: only GlobalStyle (to define the variables) and the contrast tests should read these
@@ -132,6 +159,12 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   // The kart keeps the brand's cyan (DESIGN §1)
   bluff: 'gameBluffReader',
   'odd-word': 'gameOddWord',
+  lantern: 'gameLantern',
+  tiles: 'gameTiles',
+  kite: 'gameKite',
+  traders: 'gameTraders',
+  'secret-scroll': 'gameSecretScroll',
+  wasabi: 'gameWasabi',
   palace: 'gamePalace',
 }
 
@@ -204,6 +237,8 @@ export const promotionBoard = {
     engravedGold: '#B8892E',
   },
 } as const
+
+// Tamsui Traders' pieces are in tradersTokens.ts: only that game's chunk loads them
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const
 

@@ -95,7 +95,9 @@ export const HARBOUR: TrackJson = {
   // corners (owner: eight karts side by side); old records are set aside
   // 2026-11-14 again (owner: much faster karts): straights 4 m wider, boost pads; old records
   // are set aside, the physics having changed too
-  revision: 4,
+  // 2026-11-14 once more (owner: the drift as a real slide, faster still): the road is the same,
+  // the physics is not, so old records are set aside
+  revision: 5,
   laps: 3,
   road: fromLine,
   gates,

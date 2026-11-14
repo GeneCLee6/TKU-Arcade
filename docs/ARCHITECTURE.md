@@ -41,7 +41,13 @@ shared/                 前後端共用、純 TS、可在 Node 測
     screenMessages.ts     隨畫面載入的字串總表：只給 check-i18n 與 npm run play，網站不能 import
     spectrum/             光譜猜題（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；topics.ts 是題庫（由 scripts/spectrum-topics.mjs 從 CSV 產生，只在 Worker，F3 搬到 D1）
     bluff/                真假朗讀（暫名）
+    lantern/              宮燈點點（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；即時合作，同時的動作照 RoomDO 收件順序
+    kite/                 放風箏（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；沒有題庫
     odd-word/             誰的詞不一樣（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；bank.ts 是詞組（由 scripts/odd-word-bank.mjs 從 CSV 產生，只在 Worker）
+    tiles/                社辦牌陣（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；tiles.ts 是牌組與桌面的判斷（前後端共用）
+    traders/              滬尾商行（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；bank.ts 是牌與貴客（由 scripts/traders-cards.mjs 從 CSV 產生，只在 Worker）；貨的顏色在 src/styles/tradersTokens.ts
+    secret-scroll/        奪祕笈（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；deck.ts 是牌堆組成（規則與畫面的參考表共用，不在首屏）
+    wasabi/               芥末餃子（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts
     palace/               朝堂暗鬥（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；沒有題庫
   poker/hand.ts         牌型引擎
   kart/                 physics.ts、clock.ts、i18n.ts（J1 已有）；track.ts、input.ts、ghost.ts、net.ts、karts.ts、unlocks.ts
@@ -323,6 +329,34 @@ src/kart/
 - **技巧上限的證明**（`tests/kart/drivers.ts`、`expert.test.ts`）：三個腳本駕駛各跑三圈。**新手**：不甩尾、彎前放油煞車、倒數一開始就按油門（偷跑熄火）。**一般**：純追蹤（pure pursuit），彎需要的轉向超過抓地就甩、甩尾裡用方向調深淺、直線發噴射，但沒有起跑加速與收尾加速。**高手**：同上，再加起跑加速、每次甩尾後放油門一步再按（收尾加速，接著的甩尾就是推滑）。結果：河畔 132.5／116.8／**112.8** 秒、漁港 147.4／135.7／**130.8**、淡江 170.4／150.1／**144.6**（新手／一般／高手）；高手比新手快 11–15%，比一般快 3–4%。測試擋：高手至少比新手快 10%、比一般快、零逆向。
 - **場景**（`festival.ts`，三張圖共用，全部程式產生）：起終點後面一座彩色條紋的**拱門**；路兩側每 22 m（低畫質 44 m）一支**旗桿與長條旗**（7 色）；最急的彎外側 2–4 座**看台**，坐滿小觀眾（圓柱身體＋球頭，8 色，每座 5 排 × 8–16 人）；護欄外的**花圃**（最多 260 叢）；遠處一座會轉的**摩天輪**（16 個車廂保持水平）、3–7 個會飄的**熱氣球**、一圈遠方的**天際線**（最多 70 棟，避開海與河）。顏色在 `kartTokens.ts` 的 `kartFestival`。淡江另外把坡下的淡水鎮從 200 加到 320 棟，校園外不再空。數量跟畫質（density）走；每一種是一個 instanced draw call。
 - **數字**：卡丁車 chunk 196.1 → **200.5 kB** gzip；主站與各遊戲首屏不變。只在 Playwright 的軟體繪圖（SwiftShader）看過畫面，沒有實機 fps。
+
+### 4.12 路線圖外：甩尾變成真的滑、收尾加速當主角、技巧差距（2026-11-14，`feat/kart-drift-feel`）
+
+擁有者開過 #65：「還是不夠快；甩尾的時候抓地力不該這麼好，要再按一次前進才會有一小段加速，這樣才有接兩次、一路接下去的技巧；手感要像那款經典卡丁車，高手跟新手的圈速要差很多。」仍是單機（規則 10）。只學玩法與物理手感，**名稱、文字、美術、賽道都是自己的**（`IP-CHECKLIST.md` 卡丁車一節補記）。
+
+- **甩尾是真的側滑**（`physics.ts`，取代 #65 的「速度上限型」甩尾）：
+  - 新狀態 `KartState.traction`（0–1）。甩尾一開始就歸 0（後輪放掉）；放開甩尾鍵後用 `driftRecovery` 0.4 秒線性回到 1，這段時間車還在滑（`kartSkidding()`：甩尾中或 `traction < 1`，胎痕、火花、甩尾聲、攝影機都看它）。
+  - 車頭照舊用 `driftTurnRate` 1.9 ± `driftSteerRate` 0.9 rad/s 轉（往彎內打更深、往外打收淺）；**行進方向**只用 `driftAlign` 2.2／秒慢慢跟上車頭（抓地時是 `grip` 10／秒，中間依 `traction` 線性混合）。所以進甩尾的頭 0.25 秒：車頭已經轉了約 40°，行進方向才轉 11°，車身照原來的方向衝出去，之後才被帶進彎。穩定側滑角（實測）：往內 50°、置中 38°、往外 21°（#65 是 33°／23°／13°）；上限 `driftMaxSlip` 58°，超過時限制的是**車頭**（不再把速度方向硬拉回來）。
+  - **側滑磨速** `driftScrub` 64 m/s²：每秒掉 `driftScrub × sin(側滑角) × 速度/極速 ×（1 − traction）`，引擎推力照常沿車頭推。結果：往外打的淺甩與點甩幾乎不掉速（60 → 59 以上）；置中一秒 60 → 53 m/s；往內深甩一秒 60 → 44、兩秒 → 29。拿掉的參數：`driftTopSpeed`、`driftDrag`、`driftDepthFill`、`driftDepthCost`、`driftFatigueAfter`、`driftFatigue`（深淺與長短的代價現在由側滑本身決定）。
+  - **加速條**照側滑角累積：`gaugeFillRate` 60 點／秒 ×（側滑角 ÷ `driftGaugeSlip` 35°，最多 1.5 倍），放開一次夠長的甩尾另加 10 點；噴射中仍只有 25%。
+  - **反打回正**：放開的那一步或回復途中往側滑的反方向打，`catchSeconds` 0.35 秒內抓地回復快 `catchGrip` 3 倍。
+- **收尾加速**（玩法不變：放開 ≥ `chainMinDrift` 0.25 秒的甩尾後，0.3 秒內**重新按下**油門）：改成短而猛的一下：0.7 秒、推力 `miniAcceleration` 64 m/s²、極速 ×1.2（72 m/s）。甩尾掉的速度靠它補回來，補不補差很多：0.8 秒深甩後的兩秒內多跑約 16 m。
+- **連噴每一環更快**：連噴第 2 環起每環極速再 +`chainSpeedStep` 3%，最多 `chainSpeedLinks` 4 環（×1.32，79 m/s）。直線上也能連：短甩（一開始往一邊點、馬上往外打收淺，撐過 0.25 秒）→ 放開 → 重按油門，幾乎不掉速，所以高手直線也在甩。
+- **雙收尾（Double release）**：收尾加速發出後 `doubleWindow` 0.5 秒內再開始一次甩尾，不管多短（至少兩步），放開就再開一次收尾加速的窗；這第二發把時間**加在**第一發剩下的上面（0.7 + 0.7），連噴 +1，提示「雙收尾！」。一次正式甩尾只能換一次雙收尾（第二發不再開 `doubleWindow`）；點按若拖到 0.25 秒以上就是一次普通的甩尾。`KartState` 多 `doubleWindow`、`doubleDrift`、`doubleArmed`、`doubles`。**甩頭（Flick）拿掉了**：點甩不再瞬間轉車頭（那是假的），點甩現在的用途是雙收尾、微調路線、集一點氣。
+- **推滑**：噴射中開始的甩尾只付 `slideScrub` 30% 的磨速（原本是另一個速度上限 `slideSpeedKeep`），噴射推力把速度帶過彎；噴射仍以 0.5 倍消耗。
+- **速度**：真實極速 50 → **60 m/s**（加速 28，0 到極速 2.14 秒；煞車 56），錶面倍率不變 ×1.45：極速 **313 km/h**、收尾加速 376（連噴最高 413）、噴射 ×1.45 = 87 m/s **454**、疊噴 ×1.6 = 96 m/s **501**。抓地在極速時最小迴轉半徑約 48 m。碰牆仍是每 0.6 m 檢查一次（`walls.ts`），96 m/s 一步 1.6 m、檢查 3 次，不會穿牆。賽道佈局不動；物理變了，三張圖 `revision` 再加一（`riverside@5`、`harbour@5`、`tamkang@4`），舊紀錄不比。調參存檔的 key 改成 `tku-arcade.kart.tuning.2`（舊數字對不上新物理）。
+- **畫面**（`effects.ts`、`camera.ts`、`spikeLoop.ts`，顏色在 `kartTokens.ts` 的 `kartHover.sparkEarned`／`sparkReady`）：甩尾撐過 0.25 秒（已經賺到收尾加速）火花變**金色**且更密；放開後收尾加速的窗開著時，兩個後角噴**淺藍**火花（現在按油門）；任何噴射發出的那一刻，車尾炸出一扇火花、尾焰拉長加粗 0.35 秒；放開後車還在滑時胎痕、火花、煙照出。攝影機在側滑時往車頭方向擺 30%（`SLIDE_SWING`）、跟隨變慢（`SLIDE_FOLLOW` 3.2，平常 5），看得出車被甩出去再拉回來；噴射視角 +8° → +10°。
+- **調參面板**：甩尾組多 `driftScrub`、`driftRecovery`、`driftGaugeSlip`；技巧組多 `slideScrub`、`chainSpeedStep`、`chainSpeedLinks`、`doubleWindow`；少了上面拿掉的與甩頭的 5 個。`planted`（甩尾留較多抓地、角度小、磨速少）與 `loose`（更滑、更久、磨更多）跟著重訂。
+- **技巧差距**（`tests/kart/drivers.ts`、`expert.test.ts`，三圈秒數，測試釘住 ±2.5 秒）：
+
+  | 賽道 | 新手 | 一般 | 高手 | 高手比新手 | 高手比一般 |
+  | --- | --- | --- | --- | --- | --- |
+  | 河畔 | 115.7 | 94.8 | **80.0** | 少 31% | 少 16% |
+  | 漁港 | 127.4 | 110.8 | **88.0** | 少 31% | 少 21% |
+  | 淡江 | 148.3 | 124.4 | **98.7** | 少 33% | 少 21% |
+
+  **新手**：不甩尾、彎前放油煞車、偷跑熄火。**一般**：純追蹤，彎需要的轉向超過抓地就甩，把側滑角維持在「彎要的轉速 ÷ `driftAlign`」，車頭指向出彎方向就放，直線發噴射；沒有起跑加速、沒有收尾加速。**高手**：同上，再加起跑加速、每次甩尾後放油門一步再按（收尾加速）、緊接一個 3 步的點甩再按一次（雙收尾）、直線沒噴射時連續短甩收尾（連噴，最長 40–116 環）、噴射中再發一格（疊噴）。高手三圈 95–104 次收尾加速、53–60 次雙收尾、零撞牆。#65 的差距是高手比新手少 11–15%、比一般少 3–4%。測試擋：高手至少比新手少 25%、比一般少 12%，一般比新手少 8%，秒數不能偏離上表超過 2.5 秒，高手不能撞牆。
+- **數字**：卡丁車 chunk 200.5 → **201.1 kB** gzip；主站與各遊戲首屏不變。只在 Playwright 的軟體繪圖看過畫面，沒有實機 fps；**手感沒有人開過**，腳本駕駛只能證明「技巧值多少」，不能證明「像不像」。
 
 ## 5. i18n
 

@@ -2,7 +2,10 @@
 // back corners in a drift, a little dust, glowing trails on the road in the kart's own colour that
 // fade out behind it, and a flame from each thruster during a boost. Pooled and reused: nothing is
 // made or freed while driving. 2026-11-14 (owner): dark skid marks too, left on the road by every
-// drift and fading over several seconds, in a pool of their own with a cap.
+// drift and fading over several seconds, in a pool of their own with a cap. Then (the drift as a
+// real slide): the sparks turn gold once the drift has earned its release boost and spray pale blue
+// from both corners while the release window is open, and every boost fired bursts: a fan of sparks
+// out of the back and the flames stretched long for a moment.
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -25,8 +28,12 @@ import type { KartLook, KartModel } from './kartModel.ts'
 const PUFFS = 40
 const PUFF_LIFE = 0.8
 /** Sparks alive at once, at most */
-const SPARKS = 90
+const SPARKS = 150
 const SPARK_LIFE = 0.45
+/** A boost fired throws this many sparks out of the back at once ... */
+const BURST_SPARKS = 36
+/** ... and stretches the flames for this long */
+const BURST_SECONDS = 0.35
 /** Trail pieces kept: about two seconds of a drift, both corners; the oldest are laid over again */
 const MARKS = 260
 const MARK_WIDTH = 0.18
@@ -95,7 +102,12 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   let puffDue = 0
 
   // ── Sparks: small bright dots thrown out sideways and back, falling ──
-  const sparkMaterials = [kart.glow, kartHover.spark].map(
+  const sparkMaterials = [
+    kart.glow,
+    kartHover.spark,
+    kartHover.sparkEarned,
+    kartHover.sparkReady,
+  ].map(
     (color) =>
       new SpriteMaterial({
         map: texture,
@@ -221,6 +233,8 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     return { group, outer, inner }
   })
   let flicker = 0
+  let bursts = 0
+  let burstAge = BURST_SECONDS
 
   const toWorld = (pose: { x: number; z: number; heading: number }, lx: number, lz: number) => {
     const cos = Math.cos(pose.heading)
@@ -363,26 +377,55 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         if (share >= 1) puff.sprite.visible = false
       }
 
-      // Sparks: thrown out of the drift's outside corner and back along the kart
-      sparkDue += (sliding ? 70 : 0) * seconds
+      // Sparks: thrown out of the drift's outside corner and back along the kart. Gold once the
+      // drift has earned its release boost; pale blue from both corners while its window is open
+      const charge = look.charge ?? 0
+      const ready = charge === 2
+      sparkDue += (ready ? 140 : sliding ? (charge === 1 ? 110 : 70) : 0) * seconds
       const cos = Math.cos(pose.heading)
       const sin = Math.sin(pose.heading)
-      while (sparkDue >= 1) {
-        sparkDue -= 1
-        // The outside of a drift to the right is the left corner
-        const corner = corners[look.drift > 0 ? 0 : corners.length - 1]!
+      const throwSpark = (
+        corner: { x: number; z: number },
+        outward: number,
+        back: number,
+        material: SpriteMaterial,
+      ) => {
         const spark = sparks[nextSpark]!
         spark.age = 0
-        const outward = -Math.sign(look.drift) * (2 + Math.random() * 3)
-        const back = 3 + Math.random() * 4
         // From the kart's frame (outward along x, back along +z) into the world's
         spark.vx = outward * cos - back * sin
         spark.vz = outward * sin + back * cos
         spark.vy = 1.5 + Math.random() * 2.5
+        spark.sprite.material = material
         spark.sprite.position.set(corner.x, 0.25, corner.z)
         spark.sprite.visible = true
         nextSpark = (nextSpark + 1) % SPARKS
       }
+      while (sparkDue >= 1) {
+        sparkDue -= 1
+        if (ready) {
+          const side = nextSpark % 2 === 0 ? 0 : corners.length - 1
+          const outward = (side === 0 ? -1 : 1) * (1 + Math.random() * 3)
+          throwSpark(corners[side]!, outward, 4 + Math.random() * 5, sparkMaterials[3]!)
+          continue
+        }
+        // The outside of a drift to the right is the left corner
+        const corner = corners[look.drift > 0 ? 0 : corners.length - 1]!
+        const outward = -Math.sign(look.drift) * (2 + Math.random() * 3)
+        const material = charge === 1 ? sparkMaterials[2]! : sparkMaterials[nextSpark % 2]!
+        throwSpark(corner, outward, 3 + Math.random() * 4, material)
+      }
+      // A boost fired: a fan of sparks out of the back, and the flames stretch
+      if ((look.bursts ?? 0) > bursts) {
+        burstAge = 0
+        for (let index = 0; index < BURST_SPARKS; index++) {
+          const corner = corners[index % corners.length]!
+          const fan = (Math.random() - 0.5) * 9
+          throwSpark(corner, fan, 8 + Math.random() * 9, sparkMaterials[index % 2 === 0 ? 1 : 3]!)
+        }
+      }
+      bursts = look.bursts ?? 0
+      burstAge = Math.min(BURST_SECONDS, burstAge + seconds)
       for (const spark of sparks) {
         if (spark.age >= SPARK_LIFE) continue
         spark.age += seconds
@@ -400,9 +443,12 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
       if (look.boosting) {
         flicker += seconds * 40
         for (const flame of flames) {
-          const stretch = 0.85 + Math.sin(flicker) * 0.15 + Math.random() * 0.1
-          flame.outer.scale.set(1, stretch, 1)
-          flame.inner.scale.set(1, 0.8 + Math.random() * 0.3, 1)
+          // Long and fat just after a boost fires, settling back
+          const burst = 1 + 1.6 * (1 - burstAge / BURST_SECONDS)
+          const stretch = (0.85 + Math.sin(flicker) * 0.15 + Math.random() * 0.1) * burst
+          const fat = 1 + (burst - 1) * 0.35
+          flame.outer.scale.set(fat, stretch, fat)
+          flame.inner.scale.set(fat, (0.8 + Math.random() * 0.3) * burst, fat)
         }
       }
     },

@@ -63,6 +63,28 @@ const ART: Record<string, ReactElement> = {
       <path {...stroke} d="M7 10h7M18 18h7" />
     </>
   ),
+  // Three palace lanterns rising along a line, the highest one lit
+  lantern: (
+    <>
+      <path {...stroke} d="M2 29L30 13" />
+      <ellipse {...stroke} cx="6" cy="21" rx="3.2" ry="4" />
+      <path {...stroke} d="M4.5 16.5h3M4.5 25.5h3" />
+      <ellipse {...stroke} cx="15" cy="15.5" rx="3.6" ry="4.5" />
+      <path {...stroke} d="M13.3 10.5h3.4M13.3 20.5h3.4" />
+      <ellipse fill="currentColor" cx="25" cy="9" rx="4" ry="5" />
+      <path {...stroke} d="M23 3h4M23 15h4" />
+    </>
+  ),
+  // Three tiles in a run and a fourth on its way: a set being built
+  tiles: (
+    <>
+      <rect {...stroke} x="2.5" y="9" width="8" height="11" rx="1.5" />
+      <rect {...stroke} x="12" y="9" width="8" height="11" rx="1.5" />
+      <rect {...stroke} x="21.5" y="9" width="8" height="11" rx="1.5" />
+      <rect fill="currentColor" x="12" y="22.5" width="8" height="7" rx="1.5" />
+      <path {...stroke} d="M5 14.5h3M14.5 14.5h3M24 14.5h3" />
+    </>
+  ),
   // Two face-down cards behind a seal stamped with a crown: claims at court
   palace: (
     <>
@@ -86,6 +108,42 @@ const ART: Record<string, ReactElement> = {
         rx="1.5"
         transform="rotate(14 23.5 22.5)"
       />
+    </>
+  ),
+  // Two diamond kites on one line, the higher one filled: a kite train
+  kite: (
+    <>
+      <path {...stroke} d="M3 29q6-4 9-10t9-10" />
+      <path fill="currentColor" d="M23 2l6 6-6 9-6-9z" />
+      <path {...stroke} d="M12 11l5 5-5 7-5-7z" />
+    </>
+  ),
+  // A stack of goods tokens beside a card with a sail on it: trading from the harbour
+  traders: (
+    <>
+      <ellipse {...stroke} cx="9" cy="24" rx="6" ry="2.5" />
+      <path {...stroke} d="M3 24v-3M15 24v-3" />
+      <ellipse {...stroke} cx="9" cy="21" rx="6" ry="2.5" />
+      <path {...stroke} d="M3 21v-3M15 21v-3" />
+      <ellipse fill="currentColor" cx="9" cy="18" rx="6" ry="2.5" />
+      <rect {...stroke} x="18" y="4" width="11" height="15" rx="1.5" />
+      <path fill="currentColor" d="M23.5 7v8h-3.5zM24.5 8.5l3 6.5h-3z" />
+    </>
+  ),
+  // A rolled scroll with its cord: the prize of the round
+  'secret-scroll': (
+    <>
+      <rect {...stroke} x="8" y="6" width="16" height="20" />
+      <path {...stroke} d="M5 6h22M5 26h22M12 12h8M12 16h8M12 20h5" />
+      <circle fill="currentColor" cx="24" cy="20" r="3" />
+    </>
+  ),
+  // A dumpling over a steamer's rim
+  wasabi: (
+    <>
+      <path {...stroke} d="M4 20 Q16 2 28 20 Z" />
+      <path {...stroke} d="M11 13l1.5 3M16 10v4M21 13l-1.5 3" />
+      <path {...stroke} d="M3 24h26M6 28h20" />
     </>
   ),
 }
