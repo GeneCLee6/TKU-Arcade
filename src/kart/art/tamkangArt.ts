@@ -152,6 +152,10 @@ export function tamkangGround(x: number, z: number): number {
 export const inTamkangRiver = (x: number, z: number, margin = 0): boolean =>
   acrossRiver(x, z) > -margin
 
+/** Where the race-day dressing (festival.ts) may stand: on land, off the landmarks */
+export const tamkangFestivalFits = (x: number, z: number): boolean =>
+  !inTamkangRiver(x, z, 20) && !TAMKANG_LANDMARKS.some((box) => inside(box, x, z, 2))
+
 /** Where the shared trees may grow: on land, off the landmarks, the stairway and the plazas */
 export const tamkangTreeFits = (x: number, z: number): boolean =>
   !inTamkangRiver(x, z, 30) &&
@@ -992,7 +996,8 @@ export function buildTamkang(kit: ArtKit): { update(seconds: number): void } {
   // In the town: smaller houses on the slope and the low ground, clear of the river
   for (const spot of scatter(track.road, {
     seed: 80,
-    count: count(200, 50),
+    // 2026-11-14: more of the town, so the slopes round the campus are not bare
+    count: count(320, 70),
     box: { minX: metres(-820), maxX: metres(700), minZ: metres(-520), maxZ: metres(900) },
     clearance: 40,
     spacing: 14,

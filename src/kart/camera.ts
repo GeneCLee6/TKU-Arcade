@@ -12,12 +12,23 @@ export const CAMERA_FOLLOW = 5
 const BOOST_EASE = 6
 /** How much wider the view gets at full boost, in degrees */
 export const BOOST_FOV_KICK = 8
+/**
+ * 2026-11-14 (owner: "still too slow"): the view also widens with speed itself, up to this many
+ * degrees at REFERENCE_SPEED and beyond, so that going fast reads as fast even without a boost
+ */
+export const SPEED_FOV_KICK = 10
+/** The plain top speed, m/s: `pace` is the speed over this */
+export const REFERENCE_SPEED = 50
+/** How fast the pace follows the speed, per second */
+const PACE_EASE = 4
 
 export interface CameraRig {
   /** Which way the camera looks, as a heading (0 faces -z, growing clockwise) */
   readonly heading: number
   /** 0 to 1: how far into the boost kick the view is */
   readonly boost: number
+  /** The speed over REFERENCE_SPEED, eased: 1 flat out, about 1.4 in a boost */
+  readonly pace: number
 }
 
 export interface Chased {
@@ -29,7 +40,7 @@ export interface Chased {
 
 const wrap = (angle: number): number => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI))
 
-export const startRig = (heading: number): CameraRig => ({ heading, boost: 0 })
+export const startRig = (heading: number): CameraRig => ({ heading, boost: 0, pace: 0 })
 
 /** Where the camera wants to look: along the travel when going forwards, else along the nose */
 export function aimOf({ heading, vx, vz }: Chased): number {
@@ -44,12 +55,22 @@ export function aimOf({ heading, vx, vz }: Chased): number {
 export function followCar(rig: CameraRig, car: Chased, seconds: number): CameraRig {
   const follow = 1 - Math.exp(-CAMERA_FOLLOW * seconds)
   const ease = 1 - Math.exp(-BOOST_EASE * seconds)
+  const paceEase = 1 - Math.exp(-PACE_EASE * seconds)
+  const pace = Math.hypot(car.vx, car.vz) / REFERENCE_SPEED
   return {
     heading: wrap(rig.heading + wrap(aimOf(car) - rig.heading) * follow),
     boost: rig.boost + ((car.boosting ? 1 : 0) - rig.boost) * ease,
+    pace: rig.pace + (pace - rig.pace) * paceEase,
   }
 }
 
-/** The vertical field of view: wider in a boost, unless the viewer asked for less motion */
+/**
+ * The vertical field of view: wider with speed (from 30% of the top speed to all of it) and wider
+ * still in a boost, unless the viewer asked for less motion
+ */
 export const fieldOfView = (base: number, rig: CameraRig, reducedMotion: boolean): number =>
-  reducedMotion ? base : base + BOOST_FOV_KICK * rig.boost
+  reducedMotion
+    ? base
+    : base +
+      SPEED_FOV_KICK * Math.max(0, Math.min(1, (rig.pace - 0.3) / 0.7)) +
+      BOOST_FOV_KICK * rig.boost

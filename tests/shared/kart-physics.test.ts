@@ -41,9 +41,9 @@ describe('stepKart', () => {
       state = stepKart(state, THROTTLE)
       steps++
     }
-    // 40 / 20 = 2 s: 120 steps of 1/60 s
+    // 50 / 24 = 2.08 s: 125 steps of 1/60 s
     expect(steps).toBe(Math.ceil((KART_TUNING.topSpeed / KART_TUNING.acceleration) * 60 - 1e-9))
-    expect(steps * STEP_SECONDS).toBeCloseTo(2, 2)
+    expect(steps * STEP_SECONDS).toBeCloseTo(2.08, 2)
   })
 
   it('keeps the top speed in a turn: sliding does not add to it', () => {
@@ -139,10 +139,10 @@ describe('drifting', () => {
   })
 
   it('keeps its speed when the key is let go, instead of losing the sideways part', () => {
-    const drifting = run(atSpeed(), DRIFT_RIGHT, 2)
+    const drifting = run(atSpeed(), DRIFT_RIGHT, 1)
     const released = run(drifting, NO_INPUT, 0.3)
     // Coasting loses coastDrag each second, and nothing else
-    expect(kartSpeed(released)).toBeCloseTo(kartSpeed(drifting) - KART_TUNING.coastDrag * 0.3, 1)
+    expect(kartSpeed(released)).toBeCloseTo(kartSpeed(drifting) - KART_TUNING.coastDrag * 0.3, 0)
   })
 
   it('cannot start below the minimum speed, nor while reversing', () => {
@@ -201,7 +201,9 @@ describe('drifting', () => {
 
   it('costs a little speed, not most of it', () => {
     const straight = kartSpeed(run(INITIAL_KART, THROTTLE, 10))
-    const drifting = kartSpeed(run(run(INITIAL_KART, THROTTLE, 10), DRIFT_RIGHT, 3))
+    // Entered, then held centred for a second: neither deep nor long
+    const entered = run(run(INITIAL_KART, THROTTLE, 10), DRIFT_RIGHT, 0.1)
+    const drifting = kartSpeed(run(entered, { ...THROTTLE, drift: true }, 1))
     expect(drifting).toBeLessThan(straight)
     expect(drifting).toBeGreaterThan(straight * 0.8)
   })

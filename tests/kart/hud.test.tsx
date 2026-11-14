@@ -3,7 +3,15 @@ import { describe, expect, it } from 'vitest'
 import { KART_MESSAGES } from '../../shared/kart/i18n.ts'
 import { INITIAL_KART, type KartState } from '../../shared/kart/physics.ts'
 import { registerMessages, translate } from '../../src/i18n/t.ts'
-import { aimOf, BOOST_FOV_KICK, fieldOfView, followCar, startRig } from '../../src/kart/camera.ts'
+import {
+  aimOf,
+  BOOST_FOV_KICK,
+  fieldOfView,
+  followCar,
+  REFERENCE_SPEED,
+  SPEED_FOV_KICK,
+  startRig,
+} from '../../src/kart/camera.ts'
 import { calloutAtStart, calloutBetween, louder } from '../../src/kart/callouts.ts'
 import { CalloutText, GAUGE_SEGMENTS, Hud } from '../../src/kart/Hud.tsx'
 import type { SpikeHud } from '../../src/kart/spikeLoop.ts'
@@ -125,9 +133,20 @@ describe('the chase camera', () => {
   })
 
   it('widens the view in a boost, unless motion is reduced', () => {
-    const rig = { heading: 0, boost: 1 }
+    const rig = { heading: 0, boost: 1, pace: 0 }
     expect(fieldOfView(60, rig, false)).toBe(60 + BOOST_FOV_KICK)
     expect(fieldOfView(60, rig, true)).toBe(60)
     expect(fieldOfView(60, startRig(0), false)).toBe(60)
+  })
+
+  it('widens the view with speed too, fully at the top speed', () => {
+    expect(fieldOfView(60, { heading: 0, boost: 0, pace: 1 }, false)).toBe(60 + SPEED_FOV_KICK)
+    expect(fieldOfView(60, { heading: 0, boost: 0, pace: 0.65 }, false)).toBeCloseTo(65, 9)
+    expect(fieldOfView(60, { heading: 0, boost: 1, pace: 1.4 }, true)).toBe(60)
+    // The pace follows the speed
+    let rig = startRig(0)
+    const car = { heading: 0, vx: 0, vz: -REFERENCE_SPEED, boosting: false }
+    for (let frame = 0; frame < 120; frame++) rig = followCar(rig, car, 1 / 60)
+    expect(rig.pace).toBeCloseTo(1, 2)
   })
 })

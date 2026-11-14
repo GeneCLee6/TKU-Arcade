@@ -373,8 +373,8 @@ test.describe('the boost gauge', () => {
     await page.keyboard.down('ArrowUp')
     await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
     await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'release')
-    // Boosting raises the top speed past the plain 40 m/s
-    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(40.5)
+    // Boosting raises the top speed past the plain 50 m/s
+    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(50.5)
     await page.keyboard.up('ArrowUp')
     expect(errors).toEqual([])
   })
@@ -674,8 +674,8 @@ test.describe('the tuning panel', () => {
     const topSpeed = page.getByRole('slider', { name: 'Top speed', exact: true })
     await topSpeed.focus()
     await page.keyboard.press('ArrowRight')
-    await expect(topSpeed).toHaveValue('40.5')
-    await expect.poll(async () => (await reading(page)).tuning?.topSpeed).toBe(40.5)
+    await expect(topSpeed).toHaveValue('50.5')
+    await expect.poll(async () => (await reading(page)).tuning?.topSpeed).toBe(50.5)
     expect((await reading(page)).state.z).toBe(0)
     await expect(preset).toHaveValue('custom')
 
@@ -700,7 +700,7 @@ test.describe('the tuning panel', () => {
     // Kept across a reload
     await page.reload()
     await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
-    expect((await reading(page)).tuning).toMatchObject({ grip: 7.5, topSpeed: 40.5 })
+    expect((await reading(page)).tuning).toMatchObject({ grip: 7.5, topSpeed: 50.5 })
 
     await page.getByRole('button', { name: 'Tuning' }).click()
     await page.getByRole('button', { name: 'Back to Standard' }).click()

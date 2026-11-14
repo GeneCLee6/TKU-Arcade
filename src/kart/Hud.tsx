@@ -86,6 +86,11 @@ const CALLOUT_KEYS = {
   drift: 'kart.callout.drift',
   slide: 'kart.callout.slide',
   release: 'kart.callout.release',
+  flick: 'kart.callout.flick',
+  catch: 'kart.callout.catch',
+  pad: 'kart.callout.pad',
+  stack: 'kart.callout.stack',
+  broken: 'kart.callout.broken',
   boost: 'kart.callout.boost',
   start: 'kart.callout.start',
   stall: 'kart.callout.stall',
@@ -263,9 +268,21 @@ const calloutFill: Record<Callout['kind'], string> = {
   chain: color.magenta,
   start: color.success,
   stall: color.danger,
+  flick: color.warning,
+  catch: color.success,
+  pad: color.accent,
+  stack: color.magenta,
+  broken: color.danger,
 }
 /** The small callouts: the ones that come often in a lap */
-const SMALL: ReadonlySet<Callout['kind']> = new Set(['drift', 'slide', 'release'])
+const SMALL: ReadonlySet<Callout['kind']> = new Set([
+  'drift',
+  'slide',
+  'release',
+  'flick',
+  'catch',
+  'pad',
+])
 const calloutClip = 'polygon(18px 0, 100% 0, calc(100% - 18px) 100%, 0 100%)'
 
 const CalloutTag = styled.span<{ $kind: Callout['kind'] }>`

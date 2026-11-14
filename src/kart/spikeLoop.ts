@@ -48,10 +48,17 @@ import { createKartScene } from './Scene.ts'
 const STATS_EVERY_MS = 500
 
 /**
- * The HUD's speed: metres per second times 3.6, the real conversion, since the world is in metres.
- * The standard top speed of 40 m/s reads 144 km/h, and 187 km/h in a boost (2026-11-14).
+ * How much faster the speedometer reads than the real speed (2026-11-14, owner: kart racers' dials
+ * read 300 to 400). The world stays in true metres, so the tracks keep sensible sizes; only the dial
+ * is scaled, the way arcade racers scale theirs.
  */
-export const KMH_PER_MPS = 3.6
+export const SPEEDOMETER_SCALE = 1.45
+
+/**
+ * The HUD's speed: metres per second times 3.6 (the real conversion) times SPEEDOMETER_SCALE. The
+ * standard top speed of 50 m/s reads 261 km/h, a boost 365 and a stacked boost 405.
+ */
+export const KMH_PER_MPS = 3.6 * SPEEDOMETER_SCALE
 
 /** A hit at least this fast into the wall (m/s) counts as one for the debug count and the HUD flash */
 const HIT_SPEED = 4
