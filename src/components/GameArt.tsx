@@ -110,6 +110,18 @@ const ART: Record<string, ReactElement> = {
       <path {...stroke} d="M12 11l5 5-5 7-5-7z" />
     </>
   ),
+  // A stack of goods tokens beside a card with a sail on it: trading from the harbour
+  traders: (
+    <>
+      <ellipse {...stroke} cx="9" cy="24" rx="6" ry="2.5" />
+      <path {...stroke} d="M3 24v-3M15 24v-3" />
+      <ellipse {...stroke} cx="9" cy="21" rx="6" ry="2.5" />
+      <path {...stroke} d="M3 21v-3M15 21v-3" />
+      <ellipse fill="currentColor" cx="9" cy="18" rx="6" ry="2.5" />
+      <rect {...stroke} x="18" y="4" width="11" height="15" rx="1.5" />
+      <path fill="currentColor" d="M23.5 7v8h-3.5zM24.5 8.5l3 6.5h-3z" />
+    </>
+  ),
 }
 
 /** The drawing for `gameId`; `fallback` for a game without one */

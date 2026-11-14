@@ -20,6 +20,7 @@
     "test:visual": "playwright test --config playwright.visual.config.ts",
     "play": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/play.ts",
     "sim:promotion": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/promotion-sim.ts",
+    "sim:traders": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/traders-sim.ts",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy"
   },

@@ -304,13 +304,14 @@ describe('the game', () => {
       'Lantern Lane',
       'Clubroom Tiles',
       'Kite Day',
+      'Tamsui Traders',
     ])
   })
 
   it('still shows an unlisted game as the selected one, and can leave it', () => {
     const { onSetGame } = renderRoom(inGame('tictactoe'))
     expect(select()).toHaveValue('tictactoe')
-    expect(choices()).toHaveLength(9)
+    expect(choices()).toHaveLength(10)
 
     fireEvent.change(select(), { target: { value: 'promotion' } })
 

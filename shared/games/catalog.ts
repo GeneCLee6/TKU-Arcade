@@ -17,6 +17,8 @@ import { spectrumMessages } from './spectrum/i18n.ts'
 import { spectrumInfo } from './spectrum/info.ts'
 import { tilesMessages } from './tiles/i18n.ts'
 import { tilesInfo } from './tiles/info.ts'
+import { tradersMessages } from './traders/i18n.ts'
+import { tradersInfo } from './traders/info.ts'
 import { ticTacToeMessages } from './tictactoe/i18n.ts'
 import { ticTacToeInfo } from './tictactoe/info.ts'
 import type { AnyGameInfo, GameMessages } from './types.ts'
@@ -31,6 +33,7 @@ export const GAME_INFOS = [
   lanternInfo,
   tilesInfo,
   kiteInfo,
+  tradersInfo,
 ] as unknown as readonly AnyGameInfo[]
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
@@ -55,6 +58,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...lanternMessages.en,
     ...tilesMessages.en,
     ...kiteMessages.en,
+    ...tradersMessages.en,
   },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
@@ -66,5 +70,6 @@ export const GAME_MESSAGES: GameMessages = {
     ...lanternMessages['zh-TW'],
     ...tilesMessages['zh-TW'],
     ...kiteMessages['zh-TW'],
+    ...tradersMessages['zh-TW'],
   },
 }
