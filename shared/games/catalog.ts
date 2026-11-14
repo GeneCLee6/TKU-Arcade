@@ -3,6 +3,8 @@
 // registry with the rules is shared/games/index.ts; a new game adds itself to both.
 import { bluffMessages } from './bluff/i18n.ts'
 import { bluffInfo } from './bluff/info.ts'
+import { lanternMessages } from './lantern/i18n.ts'
+import { lanternInfo } from './lantern/info.ts'
 import { oddWordMessages } from './odd-word/i18n.ts'
 import { oddWordInfo } from './odd-word/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
@@ -22,6 +24,7 @@ export const GAME_INFOS = [
   spectrumInfo,
   bluffInfo,
   oddWordInfo,
+  lanternInfo,
 ] as unknown as readonly AnyGameInfo[]
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
@@ -43,6 +46,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...spectrumMessages.en,
     ...bluffMessages.en,
     ...oddWordMessages.en,
+    ...lanternMessages.en,
   },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
@@ -51,5 +55,6 @@ export const GAME_MESSAGES: GameMessages = {
     ...spectrumMessages['zh-TW'],
     ...bluffMessages['zh-TW'],
     ...oddWordMessages['zh-TW'],
+    ...lanternMessages['zh-TW'],
   },
 }
