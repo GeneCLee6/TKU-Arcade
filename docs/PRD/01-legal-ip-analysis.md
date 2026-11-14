@@ -165,6 +165,22 @@ owner: GeneCLee6
 - 做法：暫名「慘度排排站／Misery Line」；卡庫 396 張全部自寫，沒有看原作的卡片清單；慘度是本專案自己的判斷；畫面自己畫；規則頁兩語各用一句話描述它像原作。
 - **風險：低。**
 
+### 2.14 搭橋（Codenames 玩法，2026-11-14 加）
+
+- 原作：Codenames（Vlaada Chvátil 設計，Czech Games Edition 出版）；合作模式的靈感來自它的雙人版 Codenames Duet。
+- 不受保護：5×5 詞格、只有給提示的人看得到答案、「一個詞＋一個數字」的提示、最多翻數字＋1、翻到中立或對方就換人、翻到禁忌詞直接輸、兩面答案輪流給提示的合作玩法與分布。
+- 不能做：原作名稱、「間諜／特務／代號／刺客」等角色與用語、卡面與答案卡的圖像、原作的詞卡清單、規則書的寫法。
+- 做法：暫名「搭橋／Word Bridge」，主題是橋牌社：南北對東西、叫牌人、路人、地雷；詞庫全部自寫（沒有參考原作或網路上的詞表）；畫面用 CSS 畫；規則頁用一句話描述它像 Codenames。
+- **風險：很低。**
+
+### 2.15 撞詞（Just One 玩法，2026-11-14 加）
+
+- 原作：Just One（Ludovic Roudy、Bruno Sautter 設計，Repos Production 出版）。
+- 不受保護：一人猜、其他人各寫一個提示、一樣的提示互相抵銷、猜一次或跳過、猜錯多丟一張、13 張卡的計分。
+- 不能做：原作名稱、題卡內容、評分表的文字、畫架與卡片的圖像、規則書的寫法。
+- 做法：暫名「撞詞／Clue Clash」，題目全部自寫（不放真人姓名與片名）；評語、畫面自寫；規則頁用一句話描述它像 Just One。
+- **風險：很低。**
+
 ## 3. 資產來源政策
 
 | 來源 | 可不可以 | 條件 |
@@ -189,7 +205,7 @@ CI 會擋沒有登記的資產檔（E12 AC-12.6）。
 5. **不對外宣傳、不上平台**；連結只給朋友。
 6. **接到通知就下架**，不爭辯；功能旗標要能分遊戲關閉。
 7. 上線任何一款新遊戲前跑一次 **IP 檢查清單**（E12 AC-12.8）。
-8. **不抄表達的原作**（CLAUDE.md 規則 1 列的五款之外，之後新遊戲學了誰就加在這裡）：The Mind（Wolfgang Warsch，NSV；宮燈點點，2026-11-14）；Hanabi（Antoine Bauza；放風箏，2026-11-14）；Splendor（璀璨寶石，Marc André，Space Cowboys；滬尾商行，2026-11-14，見 §2.9）；Love Letter（Seiji Kanai，Z-Man／AEG；奪祕笈，2026-11-14）；Skull（Hervé Marly；芥末餃子，2026-11-14）。
+8. **不抄表達的原作**（CLAUDE.md 規則 1 列的五款之外，之後新遊戲學了誰就加在這裡）：The Mind（Wolfgang Warsch，NSV；宮燈點點，2026-11-14）；Hanabi（Antoine Bauza；放風箏，2026-11-14）；Splendor（璀璨寶石，Marc André，Space Cowboys；滬尾商行，2026-11-14，見 §2.9）；Love Letter（Seiji Kanai，Z-Man／AEG；奪祕笈，2026-11-14）；Skull（Hervé Marly；芥末餃子，2026-11-14）；Codenames 與 Codenames Duet（Vlaada Chvátil，Czech Games Edition；搭橋，2026-11-14，見 §2.14）；Just One（Ludovic Roudy、Bruno Sautter，Repos Production；撞詞，2026-11-14，見 §2.15）。
 
 ## 5. 回答擁有者的三個問題
 

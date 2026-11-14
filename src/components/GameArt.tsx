@@ -112,6 +112,26 @@ const ART: Record<string, ReactElement> = {
       <path {...stroke} d="M23 8.5a2.6 2.6 0 1 1 3.4 2.5c-.9.4-1.4 1-1.4 2v1.5M25 19v.4" />
     </>
   ),
+  // A row of word tiles with an arch over it: a clue bridging two words
+  'word-bridge': (
+    <>
+      <path {...stroke} d="M5 17c3-9 19-9 22 0" />
+      <path {...stroke} d="M10 13.5v3.5M16 11v6M22 13.5v3.5" />
+      <rect fill="currentColor" x="3" y="20" width="7" height="7" rx="1.2" />
+      <rect {...stroke} x="12.5" y="20" width="7" height="7" rx="1.2" />
+      <rect fill="currentColor" x="22" y="20" width="7" height="7" rx="1.2" />
+    </>
+  ),
+  // Two clue cards tilted into each other, a burst where they clash, and a question mark below
+  'clue-clash': (
+    <>
+      <rect {...stroke} x="2.5" y="5" width="10" height="13" rx="1.5" transform="rotate(-14 7.5 11.5)" />
+      <rect {...stroke} x="19.5" y="5" width="10" height="13" rx="1.5" transform="rotate(14 24.5 11.5)" />
+      <path {...stroke} d="M16 3v3M12.5 4.5l1.5 2.2M19.5 4.5L18 6.7" />
+      <path {...stroke} d="M13 23a3 3 0 1 1 4.2 2.7c-.8.4-1.2 1-1.2 1.8" />
+      <circle fill="currentColor" cx="16" cy="30" r="1.2" />
+    </>
+  ),
   // Two diamond kites on one line, the higher one filled: a kite train
   kite: (
     <>
