@@ -22,6 +22,8 @@ const SCREENS: Partial<Record<string, GameScreen>> = {
   tiles: lazy(() => import('./tiles/TilesScreen.tsx')),
   kite: lazy(() => import('./kite/KiteScreen.tsx')),
   traders: lazy(() => import('./traders/TradersScreen.tsx')),
+  'secret-scroll': lazy(() => import('./secret-scroll/SecretScrollScreen.tsx')),
+  wasabi: lazy(() => import('./wasabi/WasabiScreen.tsx')),
 }
 
 // The full edition of promotion (C7) is a screen of its own: a simple game never loads its board
