@@ -1,7 +1,8 @@
 // e8-t05b: a track's art, built in code from its JSON: the road and its kerbs, crash barriers on the
 // physics walls, grass, a sky, the finish gantry, and scenery placed where the track leaves room
-// (shared/kart/scenery.ts). Riverside gets its river, bridge, town and hills. All of it original:
-// a low-poly, sunny look of our own (the PRD's Q4), no model or image files.
+// (shared/kart/scenery.ts). Riverside gets its river, bridge, town and hills; the harbour (N1) its
+// sea, breakwaters, boats and hillside town at sunset (harbourArt.ts). All of it original: a
+// low-poly look of our own (the PRD's Q4), no model or image files.
 import {
   BackSide,
   DoubleSide,
@@ -24,13 +25,29 @@ import {
   PlaneGeometry,
   SphereGeometry,
   TorusGeometry,
+  Vector3,
   type Material,
   type Texture,
 } from 'three'
 import { roadClearance, roadDistances, scatter } from '../../../shared/kart/scenery.ts'
 import { roadDirection, trackBounds, type Track } from '../../../shared/kart/track.ts'
-import { kartScene } from '../../styles/kartTokens.ts'
-import { ASPHALT_LENGTH, BARRIER_LENGTH, KERB_LENGTH, trackTextures } from './textures.ts'
+import { kartScene, kartThemes, type KartTheme } from '../../styles/kartTokens.ts'
+import {
+  buildHarbour,
+  HARBOUR_COAST,
+  HARBOUR_SHORE,
+  harbourGround,
+  harbourTreeFits,
+  inHarbourSea,
+} from './harbourArt.ts'
+import {
+  ASPHALT_LENGTH,
+  BARRIER_LENGTH,
+  KERB_LENGTH,
+  painted,
+  trackTextures,
+  type TrackTextures,
+} from './textures.ts'
 
 /** How much the art does: set by the quality option (quality.ts) */
 export interface ArtLevel {
@@ -45,6 +62,33 @@ export interface TrackArt {
   /** Every frame: the water flows */
   update(seconds: number): void
   dispose(): void
+}
+
+/** A track's sky and light: the harbour's sunset, or the sunny afternoon of every other track */
+export const themeOf = (track: Pick<Track, 'id'>): KartTheme =>
+  track.id === 'harbour' ? kartThemes.sunset : kartThemes.day
+
+/** What a track's own scenery (harbourArt.ts) builds with: shared, and freed with the rest */
+export interface ArtKit {
+  readonly track: Track
+  readonly level: ArtLevel
+  readonly group: Group
+  readonly textures: TrackTextures
+  keep<T extends BufferGeometry>(geometry: T): T
+  own<T extends Material>(material: T): T
+  /** A texture freed with the art */
+  ownTexture<T extends Texture>(texture: T): T
+  standard(color: string, map?: Texture): MeshStandardMaterial
+  shadowed<T extends Mesh | InstancedMesh>(object: T, cast?: boolean): T
+  place(
+    instances: InstancedMesh,
+    index: number,
+    x: number,
+    y: number,
+    z: number,
+    scale: [number, number, number],
+    turn?: number,
+  ): void
 }
 
 const BARRIER_HEIGHT = 0.95
@@ -149,16 +193,24 @@ function barrier(
   return mesh(positions, uvs, indices)
 }
 
-/** A dome from the horizon's haze to the deep blue overhead */
-function sky(): Mesh {
+/** A dome from the horizon's haze to the deep colour overhead */
+function sky(theme: KartTheme): Mesh {
   const geometry = new SphereGeometry(1400, 24, 12)
-  const top = new Color(kartScene.skyTop)
-  const horizon = new Color(kartScene.skyHorizon)
+  const top = new Color(theme.skyTop)
+  const middle = new Color(theme.skyMiddle)
+  const horizon = new Color(theme.skyHorizon)
+  const day = theme === kartThemes.day
   const colours: number[] = []
   const position = geometry.getAttribute('position')
   for (let index = 0; index < position.count; index++) {
     const height = Math.max(0, position.getY(index) / 1400)
-    const colour = horizon.clone().lerp(top, Math.pow(height, 0.6))
+    // The day sky is K1's two-colour blend, as it was; others go through the middle colour
+    const t = Math.pow(height, 0.6)
+    const colour = day
+      ? horizon.clone().lerp(top, t)
+      : t < 0.45
+        ? horizon.clone().lerp(middle, t / 0.45)
+        : middle.clone().lerp(top, (t - 0.45) / 0.55)
     colours.push(colour.r, colour.g, colour.b)
   }
   geometry.setAttribute('color', new Float32BufferAttribute(colours, 3))
@@ -173,13 +225,57 @@ function sky(): Mesh {
   return dome
 }
 
+/** The sun low on the sky: a bright disc in a soft glow, one plane facing the middle of the dome */
+function sunDisc(
+  theme: KartTheme,
+  keep: <T extends BufferGeometry>(geometry: T) => T,
+  own: <T extends Material>(material: T) => T,
+  ownTexture: <T extends Texture>(texture: T) => T,
+): Mesh {
+  const disc = theme.sunDisc ?? '#ffffff'
+  const glowColour = theme.sunGlow ?? disc
+  const glow = ownTexture(
+    painted(
+      256,
+      31,
+      (context, size) => {
+        const middle = size / 2
+        const gradient = context.createRadialGradient(middle, middle, 0, middle, middle, middle)
+        gradient.addColorStop(0, disc)
+        gradient.addColorStop(0.15, disc)
+        gradient.addColorStop(0.19, glowColour)
+        gradient.addColorStop(0.45, `${glowColour}55`)
+        gradient.addColorStop(1, `${glowColour}00`)
+        context.fillStyle = gradient
+        context.fillRect(0, 0, size, size)
+      },
+      1,
+    ),
+  )
+  const mesh = new Mesh(
+    keep(new PlaneGeometry(520, 520)),
+    own(new MeshBasicMaterial({ map: glow, transparent: true, fog: false, depthWrite: false })),
+  )
+  const [x, y, z] = theme.sunDirection
+  const length = Math.hypot(x, y, z)
+  mesh.position.set((x / length) * 1300, (y / length) * 1300, (z / length) * 1300)
+  mesh.lookAt(0, 0, 0)
+  return mesh
+}
+
 export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   const group = new Group()
   const textures = trackTextures(level.anisotropy)
+  const theme = themeOf(track)
+  const harbour = track.id === 'harbour'
   const geometries: BufferGeometry[] = []
   const materials: Material[] = []
+  const extraTextures: Texture[] = []
   const keep = <T extends BufferGeometry>(geometry: T) => (geometries.push(geometry), geometry)
   const own = <T extends Material>(material: T) => (materials.push(material), material)
+  const ownTexture = <T extends Texture>(texture: T) => (extraTextures.push(texture), texture)
+  /** How high the ground is: flat but for the harbour's hillside */
+  const groundAt = harbour ? harbourGround : () => 0
   const standard = (color: string, map?: Texture) =>
     own(
       new MeshStandardMaterial({
@@ -205,8 +301,13 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   const centreX = (box.minX + box.maxX) / 2
   const centreZ = (box.minZ + box.maxZ) / 2
   const groundSize = 2400
+  // At the harbour the land ends at the quay and the beach; the sea lies lower, beyond them
+  const groundNorth = harbour ? HARBOUR_COAST : centreZ - groundSize / 2
+  const groundDepth = centreZ + groundSize / 2 - groundNorth
+  const groundWest = harbour ? HARBOUR_SHORE : centreX - groundSize / 2
+  const groundWidth = centreX + groundSize / 2 - groundWest
   const ground = new Mesh(
-    keep(new PlaneGeometry(groundSize, groundSize)),
+    keep(new PlaneGeometry(groundWidth, groundDepth)),
     own(
       new MeshLambertMaterial({
         map: textures.grass,
@@ -217,14 +318,15 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       }),
     ),
   )
-  textures.grass.repeat.set(groundSize / 10, groundSize / 10)
+  textures.grass.repeat.set(groundWidth / 10, groundDepth / 10)
   ground.rotation.x = -Math.PI / 2
-  ground.position.set(centreX, 0, centreZ)
+  ground.position.set(groundWest + groundWidth / 2, 0, groundNorth + groundDepth / 2)
   group.add(shadowed(ground, false))
-  const dome = sky()
+  const dome = sky(theme)
   keep(dome.geometry)
   own(dome.material as Material)
   group.add(dome)
+  if (theme.sunDisc && theme.sunGlow) group.add(sunDisc(theme, keep, own, ownTexture))
 
   // ── The road, kerbs and barriers ──
   const roadGeometry = keep(
@@ -350,7 +452,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     box: reach,
     clearance: 7,
     spacing: 4.5,
-    fits: (x) => !inRiver(x),
+    fits: (x, z) => !inRiver(x) && (!harbour || harbourTreeFits(x, z)),
   })
   const trunks = new InstancedMesh(
     keep(new CylinderGeometry(0.22, 0.32, 2.2, 6)),
@@ -371,15 +473,31 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   )
   trees.forEach((tree, index) => {
     const size = 0.8 + tree.b * 0.9
-    place(trunks, index, tree.x, 1.1 * size, tree.z, [size, size, size])
+    place(trunks, index, tree.x, groundAt(tree.x, tree.z) + 1.1 * size, tree.z, [size, size, size])
   })
   round.forEach((tree, index) => {
     const size = 0.8 + tree.b * 0.9
-    place(crowns, index, tree.x, 3.2 * size, tree.z, [size, size * 1.1, size], tree.a * 6)
+    place(
+      crowns,
+      index,
+      tree.x,
+      groundAt(tree.x, tree.z) + 3.2 * size,
+      tree.z,
+      [size, size * 1.1, size],
+      tree.a * 6,
+    )
   })
   pointed.forEach((tree, index) => {
     const size = 0.8 + tree.b * 0.9
-    place(pines, index, tree.x, 4 * size, tree.z, [size, size, size], tree.a * 6)
+    place(
+      pines,
+      index,
+      tree.x,
+      groundAt(tree.x, tree.z) + 4 * size,
+      tree.z,
+      [size, size, size],
+      tree.a * 6,
+    )
   })
   for (const instances of [trunks, crowns, pines]) group.add(shadowed(instances))
 
@@ -422,6 +540,10 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     const matrix = new Matrix4()
     for (let index = 0; index < instances.count; index++) {
       instances.getMatrixAt(index, matrix)
+      // At the harbour, the hills out in the sea are low islands, so that the horizon stays open
+      if (harbour && inHarbourSea(matrix.elements[12]!, matrix.elements[14]!, 40)) {
+        matrix.scale(new Vector3(0.45, 0.22, 0.45))
+      }
       // The y scale is the cone's height; its centre sits half of that up
       matrix.elements[13] = matrix.elements[5]! / 2 - 2
       instances.setMatrixAt(index, matrix)
@@ -605,6 +727,22 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     group.add(shadowed(bodies), shadowed(roofs))
   }
 
+  // ── The harbour: its sea, quay, breakwaters, lighthouse, boats and hillside town ──
+  const harbourScenery = harbour
+    ? buildHarbour({
+        track,
+        level,
+        group,
+        textures,
+        keep,
+        own,
+        ownTexture,
+        standard,
+        shadowed,
+        place,
+      })
+    : null
+
   for (const instances of group.children) {
     if (instances instanceof InstancedMesh) {
       instances.instanceMatrix.setUsage(DynamicDrawUsage)
@@ -617,10 +755,12 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     group,
     update(seconds) {
       if (water) water.offset.set(seconds * 0.012, seconds * 0.04)
+      harbourScenery?.update(seconds)
     },
     dispose() {
       for (const geometry of geometries) geometry.dispose()
       for (const material of materials) material.dispose()
+      for (const texture of extraTextures) texture.dispose()
       textures.dispose()
     },
   }

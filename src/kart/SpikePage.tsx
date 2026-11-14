@@ -88,7 +88,7 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
   useEffect(() => {
     controls.current = { bindings, rules, tuning, enabled: !controlsOpen }
   }, [bindings, rules, tuning, controlsOpen])
-  // e8-t04, e8-t05a: the yard, or a track with its minimap and a time trial (?track=oval|riverside)
+  // e8-t04, e8-t05a: the yard, or a track with its minimap and a time trial (?track=oval|riverside|harbour)
   const courses = play ? SPIKE_COURSES.filter((one) => one !== 'arena') : SPIKE_COURSES
   const soundOn = useSoundOn()
   const [course, setCourse] = useState<SpikeCourse>(() => {
