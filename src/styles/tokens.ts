@@ -35,6 +35,7 @@ const light = {
   gameOddWord: '#B03A12',
   gameLantern: '#A8246A',
   gameTiles: '#3F6212',
+  gameKite: '#3D52C2',
   gameTraders: '#85471C',
   success: '#13703A',
   danger: '#B91C1C',
@@ -95,6 +96,7 @@ const dark: Record<ColorName, string> = {
   gameOddWord: '#FF8F66',
   gameLantern: '#FF9ECF',
   gameTiles: '#C6F35B',
+  gameKite: '#A3B8FF',
   gameTraders: '#E3B98A',
   success: '#5CFFA8',
   danger: '#FF5A6E',
@@ -153,6 +155,7 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   'odd-word': 'gameOddWord',
   lantern: 'gameLantern',
   tiles: 'gameTiles',
+  kite: 'gameKite',
   traders: 'gameTraders',
 }
 

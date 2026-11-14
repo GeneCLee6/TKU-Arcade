@@ -20,6 +20,7 @@ const SCREENS: Partial<Record<string, GameScreen>> = {
   'odd-word': lazy(() => import('./odd-word/OddWordScreen.tsx')),
   lantern: lazy(() => import('./lantern/LanternScreen.tsx')),
   tiles: lazy(() => import('./tiles/TilesScreen.tsx')),
+  kite: lazy(() => import('./kite/KiteScreen.tsx')),
   traders: lazy(() => import('./traders/TradersScreen.tsx')),
 }
 

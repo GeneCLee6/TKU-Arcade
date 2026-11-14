@@ -5,6 +5,8 @@ import { bluffMessages } from './bluff/i18n.ts'
 import { bluffInfo } from './bluff/info.ts'
 import { lanternMessages } from './lantern/i18n.ts'
 import { lanternInfo } from './lantern/info.ts'
+import { kiteMessages } from './kite/i18n.ts'
+import { kiteInfo } from './kite/info.ts'
 import { oddWordMessages } from './odd-word/i18n.ts'
 import { oddWordInfo } from './odd-word/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
@@ -30,6 +32,7 @@ export const GAME_INFOS = [
   oddWordInfo,
   lanternInfo,
   tilesInfo,
+  kiteInfo,
   tradersInfo,
 ] as unknown as readonly AnyGameInfo[]
 
@@ -54,6 +57,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...oddWordMessages.en,
     ...lanternMessages.en,
     ...tilesMessages.en,
+    ...kiteMessages.en,
     ...tradersMessages.en,
   },
   'zh-TW': {
@@ -65,6 +69,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...oddWordMessages['zh-TW'],
     ...lanternMessages['zh-TW'],
     ...tilesMessages['zh-TW'],
+    ...kiteMessages['zh-TW'],
     ...tradersMessages['zh-TW'],
   },
 }
