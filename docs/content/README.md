@@ -4,7 +4,7 @@
 
 ## `traders-cards.csv`、`traders-patrons.csv`
 
-滬尾商行（暫名 Tamsui Traders，規則見 [`../PRD/e22-tamsui-traders.md`](../PRD/e22-tamsui-traders.md)）的牌與貴客，全部為本專案自己設計，沒有參考原作卡表（`../PRD/01-legal-ip-analysis.md` §2.8）。
+滬尾商行（暫名 Tamsui Traders，規則見 [`../PRD/e22-tamsui-traders.md`](../PRD/e22-tamsui-traders.md)）的牌與貴客，全部為本專案自己設計，沒有參考原作卡表（`../PRD/01-legal-ip-analysis.md` §2.9）。
 
 | 檔案 | 欄位 |
 | --- | --- |

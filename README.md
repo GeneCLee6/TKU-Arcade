@@ -21,6 +21,7 @@ A browser game lobby for friends of the Tamkang University Bridge Club: open one
 | Bluff Reader (working title) | One honest reader, everyone else bluffs, the judge picks | M1 |
 | Odd Word Out (working title) | Most players get one word, a few get a similar one; describe yours on your voice call and spot the odd ones out | Off-roadmap |
 | Lantern Lane (working title) | Real-time co-op: light numbered lanterns 1–100 in rising order without saying a word | Off-roadmap |
+| Clubroom Tiles (working title) | Number-tile rummy for 2–4: lay runs and groups, rework the whole table, empty your rack first | Off-roadmap |
 | Tamsui Traders (working title) | Engine building on the old Tamsui harbour: take goods, buy shops that discount the next, win over patrons; 2–4 players | Off-roadmap |
 | Kart (working title) | Arcade kart racing: drift, fill the gauge, boost | M2–M3 |
 

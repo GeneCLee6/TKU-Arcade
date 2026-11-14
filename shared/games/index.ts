@@ -7,6 +7,7 @@ import { oddWord } from './odd-word/rules.ts'
 import { promotion } from './promotion/rules.ts'
 import { silentTable } from './silent-table/rules.ts'
 import { spectrum } from './spectrum/rules.ts'
+import { tiles } from './tiles/rules.ts'
 import { traders } from './traders/rules.ts'
 import { ticTacToe } from './tictactoe/rules.ts'
 import type { AnyGameModule } from './types.ts'
@@ -21,6 +22,7 @@ const MODULES: readonly AnyGameModule[] = [
   bluff,
   oddWord,
   lantern,
+  tiles,
   traders,
 ]
 

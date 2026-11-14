@@ -7,7 +7,6 @@ import { GameLayout, RoomChatPanel, type RoomParts } from '../components/GameLay
 import { HowToPlay } from '../components/HowToPlay.tsx'
 import { NicknameForm } from '../components/NicknameForm.tsx'
 import { TopBar } from '../components/TopBar.tsx'
-import { WaitingRoom } from '../components/WaitingRoom.tsx'
 import { gameScreen } from '../games/screens.ts'
 import type { RulesEdition } from '../lib/rulesDoc.ts'
 import { useT } from '../i18n/useT.ts'
@@ -26,6 +25,12 @@ import { color, fontSize, space } from '../styles/tokens.ts'
 
 // e7-t11: its own chunk, with its strings
 const Reactions = lazy(() => import('../components/Reactions.tsx'))
+
+// Only a room that has not started shows it: a game's first screen does not wait for the seats and
+// the options form (every new game's lobby strings come out of the same 150 kB)
+const WaitingRoom = lazy(() =>
+  import('../components/WaitingRoom.tsx').then(({ WaitingRoom }) => ({ default: WaitingRoom })),
+)
 
 // e1-t16: only a room with a password, and only for someone new, ever needs it
 const PasswordForm = lazy(() => import('../components/PasswordForm.tsx'))
@@ -216,7 +221,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         }
       />
       {view.room.status === 'waiting' ? (
-        <>
+        <Suspense fallback={<p role="status">{t('common.loading')}</p>}>
           <WaitingRoom
             roomId={id}
             view={view}
@@ -234,7 +239,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
           />
           {/* On a phone the chat is a drawer, its bar stuck to the bottom of the whole page */}
           {compact && <RoomChatPanel room={parts} />}
-        </>
+        </Suspense>
       ) : view.game && Screen ? (
         // While its code loads the room is already all there, chat included
         <Suspense
