@@ -17,8 +17,9 @@ describe('the term bank', () => {
   })
 
   // Rewritten 2026-11-14 (擁有者): rarer, longer terms, each with three categories, one of them true
-  it('holds at least 200 terms, none twice', () => {
-    expect(BLUFF_TERMS.length).toBeGreaterThanOrEqual(200)
+  // Then grown to about a thousand whose names point to another category (擁有者, the same day)
+  it('holds at least 900 terms, none twice', () => {
+    expect(BLUFF_TERMS.length).toBeGreaterThanOrEqual(900)
     const terms = BLUFF_TERMS.map(([term]) => term)
     expect(new Set(terms).size).toBe(terms.length)
   })
