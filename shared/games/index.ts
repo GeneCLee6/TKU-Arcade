@@ -5,6 +5,7 @@ import { bluff } from './bluff/rules.ts'
 import { lantern } from './lantern/rules.ts'
 import { clueClash } from './clue-clash/rules.ts'
 import { kite } from './kite/rules.ts'
+import { misery } from './misery/rules.ts'
 import { oddWord } from './odd-word/rules.ts'
 import { secretScroll } from './secret-scroll/rules.ts'
 import { promotion } from './promotion/rules.ts'
@@ -32,6 +33,7 @@ const MODULES: readonly AnyGameModule[] = [
   traders,
   secretScroll,
   wasabi,
+  misery,
   wordBridge,
   clueClash,
 ]

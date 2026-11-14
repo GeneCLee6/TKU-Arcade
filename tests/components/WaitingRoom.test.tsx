@@ -307,6 +307,7 @@ describe('the game', () => {
       'Tamsui Traders',
       'Secret Scroll',
       'Wasabi Dumplings',
+      'Misery Line',
       'Word Bridge',
       'Clue Clash',
     ])
@@ -315,7 +316,7 @@ describe('the game', () => {
   it('still shows an unlisted game as the selected one, and can leave it', () => {
     const { onSetGame } = renderRoom(inGame('tictactoe'))
     expect(select()).toHaveValue('tictactoe')
-    expect(choices()).toHaveLength(14)
+    expect(choices()).toHaveLength(15)
 
     fireEvent.change(select(), { target: { value: 'promotion' } })
 

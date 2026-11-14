@@ -26,6 +26,7 @@ A browser game lobby for friends of the Tamkang University Bridge Club: open one
 | Tamsui Traders (working title) | Engine building on the old Tamsui harbour: take goods, buy shops that discount the next, win over patrons; 2–4 players | Off-roadmap |
 | Secret Scroll (working title) | A sixteen-card deduction game in a martial-arts world: hold one card, draw one, play one | Off-roadmap |
 | Wasabi Dumplings (working title) | Hide a wasabi dumpling among plain ones, bid how many you can eat, then eat | Off-roadmap |
+| Misery Line (working title) | Every card is a disaster with a hidden misery index from 1 to 100; slot it into your own line, and steal the ones others misplace | Off-roadmap |
 | Word Bridge (working title) | One-word clues link your partners to your words on a 5×5 grid; two partnerships, or 2–3 players co-op | Off-roadmap |
 | Clue Clash (working title) | Everyone writes one clue for the guesser; clues that clash cancel out | Off-roadmap |
 | Kart (working title) | Arcade kart racing: drift, fill the gauge, boost | M2–M3 |
