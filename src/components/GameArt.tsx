@@ -63,6 +63,23 @@ const ART: Record<string, ReactElement> = {
       <path {...stroke} d="M7 10h7M18 18h7" />
     </>
   ),
+  // Four word cards, one turned a different way: the odd one out
+  'odd-word': (
+    <>
+      <rect {...stroke} x="3" y="5" width="11" height="9" rx="1.5" />
+      <rect {...stroke} x="18" y="5" width="11" height="9" rx="1.5" />
+      <rect {...stroke} x="3" y="18" width="11" height="9" rx="1.5" />
+      <rect
+        fill="currentColor"
+        x="18"
+        y="18"
+        width="11"
+        height="9"
+        rx="1.5"
+        transform="rotate(14 23.5 22.5)"
+      />
+    </>
+  ),
 }
 
 /** The drawing for `gameId`; `fallback` for a game without one */

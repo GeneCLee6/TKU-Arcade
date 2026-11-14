@@ -32,6 +32,7 @@ const light = {
   gameSilentTable: '#0B7A47',
   gameSpectrum: '#1D5FC4',
   gameBluffReader: '#6B3FD1',
+  gameOddWord: '#B03A12',
   success: '#13703A',
   danger: '#B91C1C',
   warning: '#9C4A06',
@@ -80,6 +81,7 @@ const dark: Record<ColorName, string> = {
   gameSilentTable: '#5CFFA8',
   gameSpectrum: '#4DA3FF',
   gameBluffReader: '#B48CFF',
+  gameOddWord: '#FF8F66',
   success: '#5CFFA8',
   danger: '#FF5A6E',
   warning: '#FFC23D',
@@ -127,6 +129,7 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   spectrum: 'gameSpectrum',
   // The kart keeps the brand's cyan (DESIGN §1)
   bluff: 'gameBluffReader',
+  'odd-word': 'gameOddWord',
 }
 
 /** A game's hue, for its card and its room: what `--color-accent` becomes there */
