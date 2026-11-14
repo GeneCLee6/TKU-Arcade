@@ -43,7 +43,7 @@ import {
   transferText,
   turnSentence,
 } from './fullWords.ts'
-import { SETTLE_STEPS, Settlement } from './Settlement.tsx'
+import { SETTLE_STEPS } from './settleSteps.ts'
 import { useTurnPlayback } from './useTurnPlayback.ts'
 
 // Everything this screen says, with its cell and department names in boardFull.ts: loaded only with
@@ -55,6 +55,9 @@ const FullRoutes = lazy(() => import('./FullRoutes.tsx'))
 // A cell's details, only when someone taps one: out of the first screen too (2026-11-14, to make room
 // in the 150 kB budget for new games)
 const FullCellDetail = lazy(() => import('./FullCellDetail.tsx').then((module) => ({ default: module.FullCellDetail })))
+// The settlement, only at the end of a game: out of the first screen (2026-11-14, Word Bridge and
+// Clue Clash)
+const Settlement = lazy(() => import('./Settlement.tsx').then((module) => ({ default: module.Settlement })))
 
 /** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
 const DENSE_CELL = 48
@@ -465,14 +468,16 @@ export default function FullScreen({ room, game }: GameScreenProps) {
               </Payments>
             )}
             {showSettlement && state.settlement && (
-              <Settlement
-                settlement={state.settlement}
-                nameOf={nameOf}
-                step={settleStep}
-                onStep={setSettleStep}
-                onClose={() => setSettleClosed(true)}
-                reducedMotion={reducedMotion}
-              />
+              <Suspense fallback={null}>
+                <Settlement
+                  settlement={state.settlement}
+                  nameOf={nameOf}
+                  step={settleStep}
+                  onStep={setSettleStep}
+                  onClose={() => setSettleClosed(true)}
+                  reducedMotion={reducedMotion}
+                />
+              </Suspense>
             )}
             {deciding && data && !showSettlement && (
               <DecisionPrompt

@@ -34,6 +34,8 @@ const PAGES = [
   { name: 'rules-silent-table', path: '/games/silent-table/rules' },
   { name: 'rules-spectrum', path: '/games/spectrum/rules' },
   { name: 'rules-bluff', path: '/games/bluff/rules' },
+  { name: 'rules-word-bridge', path: '/games/word-bridge/rules' },
+  { name: 'rules-clue-clash', path: '/games/clue-clash/rules' },
   { name: 'not-found', path: '/no/such/page' },
 ] as const
 

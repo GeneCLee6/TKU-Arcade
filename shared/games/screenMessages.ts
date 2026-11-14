@@ -3,6 +3,7 @@
 // would put them all in everyone's first load. A screen adds its own (`registerMessages`).
 import { bluffScreenMessages } from './bluff/i18n.screen.ts'
 import { lanternScreenMessages } from './lantern/i18n.screen.ts'
+import { clueClashScreenMessages } from './clue-clash/i18n.screen.ts'
 import { oddWordScreenMessages } from './odd-word/i18n.screen.ts'
 import { roomExtraMessages } from './roomExtras.ts'
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
@@ -13,6 +14,7 @@ import { silentTableScreenMessages } from './silent-table/i18n.screen.ts'
 import { soonMessages } from './soon.ts'
 import { spectrumScreenMessages } from './spectrum/i18n.screen.ts'
 import type { GameMessages } from './types.ts'
+import { wordBridgeScreenMessages } from './word-bridge/i18n.screen.ts'
 
 export const SCREEN_MESSAGES: GameMessages = {
   en: {
@@ -25,6 +27,8 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...bluffScreenMessages.en,
     ...oddWordScreenMessages.en,
     ...lanternScreenMessages.en,
+    ...wordBridgeScreenMessages.en,
+    ...clueClashScreenMessages.en,
     ...soonMessages.en,
     ...roomExtraMessages.en,
   },
@@ -38,6 +42,8 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...bluffScreenMessages['zh-TW'],
     ...oddWordScreenMessages['zh-TW'],
     ...lanternScreenMessages['zh-TW'],
+    ...wordBridgeScreenMessages['zh-TW'],
+    ...clueClashScreenMessages['zh-TW'],
     ...soonMessages['zh-TW'],
     ...roomExtraMessages['zh-TW'],
   },

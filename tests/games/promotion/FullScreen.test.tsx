@@ -186,6 +186,11 @@ describe('the settlement (C7, fixed in C8)', () => {
     }
     const { rerender } = render(at(match.state))
     await act(async () => {})
+    // The settlement is a lazy chunk (2026-11-14)
+    await act(async () => {
+      await import('../../../src/games/promotion/full/Settlement.tsx')
+    })
+    await screen.findByRole('region', { name: 'Settlement' }, { timeout: 10_000 })
     while (screen.queryByRole('button', { name: 'Next step' })) {
       fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
     }
@@ -193,7 +198,7 @@ describe('the settlement (C7, fixed in C8)', () => {
     expect(screen.queryByRole('region', { name: 'Settlement' })).toBeNull()
     rerender(at(fresh))
     rerender(at(match.state))
-    expect(screen.getByRole('region', { name: 'Settlement' })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Settlement' })).toBeInTheDocument()
   })
 })
 
@@ -218,6 +223,11 @@ describe('career routes at the end (2026-11-13)', () => {
       </MemoryRouter>,
     )
     await act(async () => {})
+    // The settlement is a lazy chunk (2026-11-14)
+    await act(async () => {
+      await import('../../../src/games/promotion/full/Settlement.tsx')
+    })
+    await screen.findByRole('region', { name: 'Settlement' }, { timeout: 10_000 })
     while (screen.queryByRole('button', { name: 'Next step' })) {
       fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
     }
