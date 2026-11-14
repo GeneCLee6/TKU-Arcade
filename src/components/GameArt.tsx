@@ -102,6 +102,14 @@ const ART: Record<string, ReactElement> = {
       />
     </>
   ),
+  // Two diamond kites on one line, the higher one filled: a kite train
+  kite: (
+    <>
+      <path {...stroke} d="M3 29q6-4 9-10t9-10" />
+      <path fill="currentColor" d="M23 2l6 6-6 9-6-9z" />
+      <path {...stroke} d="M12 11l5 5-5 7-5-7z" />
+    </>
+  ),
 }
 
 /** The drawing for `gameId`; `fallback` for a game without one */

@@ -3,6 +3,7 @@
 // would put them all in everyone's first load. A screen adds its own (`registerMessages`).
 import { bluffScreenMessages } from './bluff/i18n.screen.ts'
 import { lanternScreenMessages } from './lantern/i18n.screen.ts'
+import { kiteScreenMessages } from './kite/i18n.screen.ts'
 import { oddWordScreenMessages } from './odd-word/i18n.screen.ts'
 import { roomExtraMessages } from './roomExtras.ts'
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
@@ -27,6 +28,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...oddWordScreenMessages.en,
     ...lanternScreenMessages.en,
     ...tilesScreenMessages.en,
+    ...kiteScreenMessages.en,
     ...soonMessages.en,
     ...roomExtraMessages.en,
   },
@@ -41,6 +43,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...oddWordScreenMessages['zh-TW'],
     ...lanternScreenMessages['zh-TW'],
     ...tilesScreenMessages['zh-TW'],
+    ...kiteScreenMessages['zh-TW'],
     ...soonMessages['zh-TW'],
     ...roomExtraMessages['zh-TW'],
   },
