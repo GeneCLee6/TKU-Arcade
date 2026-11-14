@@ -3,6 +3,7 @@ import { advanceClock, MAX_FRAME_SECONDS } from '../../shared/kart/clock.ts'
 import {
   INITIAL_KART,
   KART_TUNING,
+  kartSkidding,
   kartSlip,
   kartSpeed,
   NO_INPUT,
@@ -41,9 +42,9 @@ describe('stepKart', () => {
       state = stepKart(state, THROTTLE)
       steps++
     }
-    // 40 / 20 = 2 s: 120 steps of 1/60 s
+    // 60 / 28 = 2.14 s: 129 steps of 1/60 s
     expect(steps).toBe(Math.ceil((KART_TUNING.topSpeed / KART_TUNING.acceleration) * 60 - 1e-9))
-    expect(steps * STEP_SECONDS).toBeCloseTo(2, 2)
+    expect(steps * STEP_SECONDS).toBeCloseTo(2.15, 2)
   })
 
   it('keeps the top speed in a turn: sliding does not add to it', () => {
@@ -128,21 +129,66 @@ describe('drifting', () => {
     const tight = settled(1)
     const centred = settled(0)
     const wide = settled(-1)
-    // J1's drift sat on its cap the whole time: now the cap is only a safety net
+    // J1's drift sat on its cap the whole time: now the cap is only a safety net. 2026-11-14: a
+    // real slide, at wider angles (about 50, 38 and 21 degrees)
     expect(degrees(KART_TUNING.driftMaxSlip) - degrees(tight)).toBeGreaterThan(4)
-    expect(degrees(tight)).toBeGreaterThan(28)
-    expect(degrees(centred)).toBeGreaterThan(18)
-    expect(degrees(centred)).toBeLessThan(28)
-    expect(degrees(wide)).toBeGreaterThan(8)
+    expect(degrees(tight)).toBeGreaterThan(42)
+    expect(degrees(centred)).toBeGreaterThan(30)
+    expect(degrees(centred)).toBeLessThan(45)
+    expect(degrees(wide)).toBeGreaterThan(12)
+    expect(degrees(wide)).toBeLessThan(28)
     expect(wide).toBeLessThan(centred)
     expect(centred).toBeLessThan(tight)
   })
 
-  it('keeps its speed when the key is let go, instead of losing the sideways part', () => {
-    const drifting = run(atSpeed(), DRIFT_RIGHT, 2)
+  it('slides on when the key is let go, losing a little more speed but not the sideways part', () => {
+    const drifting = run(atSpeed(), DRIFT_RIGHT, 1)
     const released = run(drifting, NO_INPUT, 0.3)
-    // Coasting loses coastDrag each second, and nothing else
-    expect(kartSpeed(released)).toBeCloseTo(kartSpeed(drifting) - KART_TUNING.coastDrag * 0.3, 1)
+    // Coasting loses coastDrag each second; the slide, dying away, scrubs off a few m/s more
+    const coasted = kartSpeed(drifting) - KART_TUNING.coastDrag * 0.3
+    expect(kartSpeed(released)).toBeLessThan(coasted)
+    expect(kartSpeed(released)).toBeGreaterThan(coasted - 5)
+  })
+
+  it('lets the back go: the nose swings in while the car carries on the old way', () => {
+    const travel = (state: KartState) => Math.atan2(state.vx, -state.vz)
+    const early = run(atSpeed(), DRIFT_RIGHT, 0.25)
+    expect(early.traction).toBe(0)
+    // A quarter of a second in, the nose is some 40 degrees round and the travel barely a quarter of that
+    expect(early.heading).toBeGreaterThan((30 * Math.PI) / 180)
+    expect(travel(early)).toBeLessThan(early.heading * 0.35)
+    expect(kartSpeed(early)).toBeGreaterThan(KART_TUNING.topSpeed * 0.98)
+    // Gripping, the same steering brings the travel round with the nose
+    const gripping = run(atSpeed(), { ...THROTTLE, steer: 1 }, 0.25)
+    expect(travel(gripping)).toBeGreaterThan(gripping.heading * 0.6)
+  })
+
+  it('scrubs speed off by how deep and how long the slide is', () => {
+    const entered = run(atSpeed(), DRIFT_RIGHT, 0.1)
+    const after = (steer: number, seconds: number) =>
+      kartSpeed(run(entered, { ...THROTTLE, steer, drift: true }, seconds))
+    const top = KART_TUNING.topSpeed
+    // Steered out of, a shallow slide costs nothing to speak of; a tap of any kind neither
+    expect(after(-1, 1)).toBeGreaterThan(top * 0.98)
+    expect(after(1, 0.15)).toBeGreaterThan(top * 0.98)
+    // Deep and held, it loses a quarter of its speed in a second and half in two
+    expect(after(1, 1)).toBeLessThan(top * 0.78)
+    expect(after(1, 2)).toBeLessThan(top * 0.52)
+    expect(after(0, 1)).toBeLessThan(top * 0.93)
+    expect(after(0, 1)).toBeGreaterThan(after(1, 1) + 5)
+  })
+
+  it('gets its grip back over driftRecovery once let go, sliding until then', () => {
+    const drifting = run(atSpeed(), DRIFT_RIGHT, 0.6)
+    expect(kartSkidding(drifting)).toBe(true)
+    const half = run(drifting, THROTTLE, KART_TUNING.driftRecovery / 2)
+    expect(half.drifting).toBe(false)
+    expect(half.traction).toBeCloseTo(0.5, 1)
+    expect(kartSkidding(half)).toBe(true)
+    expect(Math.abs(kartSlip(half))).toBeGreaterThan((15 * Math.PI) / 180)
+    const back = run(drifting, THROTTLE, KART_TUNING.driftRecovery + 0.05)
+    expect(back.traction).toBe(1)
+    expect(kartSkidding(back)).toBe(false)
   })
 
   it('cannot start below the minimum speed, nor while reversing', () => {
@@ -201,8 +247,10 @@ describe('drifting', () => {
 
   it('costs a little speed, not most of it', () => {
     const straight = kartSpeed(run(INITIAL_KART, THROTTLE, 10))
-    const drifting = kartSpeed(run(run(INITIAL_KART, THROTTLE, 10), DRIFT_RIGHT, 3))
-    expect(drifting).toBeLessThan(straight)
+    // Entered, then held centred for a second: neither deep nor long
+    const entered = run(run(INITIAL_KART, THROTTLE, 10), DRIFT_RIGHT, 0.1)
+    const drifting = kartSpeed(run(entered, { ...THROTTLE, drift: true }, 1))
+    expect(drifting).toBeLessThan(straight * 0.95)
     expect(drifting).toBeGreaterThan(straight * 0.8)
   })
 

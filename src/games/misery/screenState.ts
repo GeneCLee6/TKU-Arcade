@@ -61,7 +61,7 @@ export const miseryBand = (index: number): 0 | 1 | 2 | 3 | 4 =>
 
 // The meter borrows hues the site already has, green to red, so that it costs the first load nothing;
 // onAccent reads on each of them in both themes (tests/styles/tokens.test.ts)
-const BANDS: readonly ColorName[] = ['gameSilentTable', 'gameMisery', 'gamePromotion', 'gameOddWord', 'danger']
+const BANDS: readonly ColorName[] = ['gameSilentTable', 'gameTiles', 'gamePromotion', 'gameOddWord', 'danger']
 
 /** The misery meter's colour for an index, from the tokens; its ink is onAccent */
 export const miseryFill = (index: number): string => color[BANDS[miseryBand(index)]]

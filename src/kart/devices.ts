@@ -16,7 +16,9 @@ type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
 const BINDINGS_KEY = 'tku-arcade.kart.bindings'
 const RULES_KEY = 'tku-arcade.kart.rules'
-const TUNING_KEY = 'tku-arcade.kart.tuning'
+// `.2` since the drift became a real slide (2026-11-14): numbers saved for the old physics, with
+// names it no longer has, would leave the new ones half applied
+const TUNING_KEY = 'tku-arcade.kart.tuning.2'
 
 // localStorage can be missing, blocked or full: the page then keeps everything in memory
 function read(key: string): string | null {

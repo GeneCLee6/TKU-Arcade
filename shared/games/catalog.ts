@@ -3,8 +3,14 @@
 // registry with the rules is shared/games/index.ts; a new game adds itself to both.
 import { bluffMessages } from './bluff/i18n.ts'
 import { bluffInfo } from './bluff/info.ts'
+import { lanternMessages } from './lantern/i18n.ts'
+import { lanternInfo } from './lantern/info.ts'
+import { kiteMessages } from './kite/i18n.ts'
+import { kiteInfo } from './kite/info.ts'
 import { oddWordMessages } from './odd-word/i18n.ts'
 import { oddWordInfo } from './odd-word/info.ts'
+import { secretScrollMessages } from './secret-scroll/i18n.ts'
+import { secretScrollInfo } from './secret-scroll/info.ts'
 import { miseryMessages } from './misery/i18n.ts'
 import { miseryInfo } from './misery/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
@@ -13,8 +19,14 @@ import { silentTableMessages } from './silent-table/i18n.ts'
 import { silentTableInfo } from './silent-table/info.ts'
 import { spectrumMessages } from './spectrum/i18n.ts'
 import { spectrumInfo } from './spectrum/info.ts'
+import { tilesMessages } from './tiles/i18n.ts'
+import { tilesInfo } from './tiles/info.ts'
+import { tradersMessages } from './traders/i18n.ts'
+import { tradersInfo } from './traders/info.ts'
 import { ticTacToeMessages } from './tictactoe/i18n.ts'
 import { ticTacToeInfo } from './tictactoe/info.ts'
+import { wasabiMessages } from './wasabi/i18n.ts'
+import { wasabiInfo } from './wasabi/info.ts'
 import type { AnyGameInfo, GameMessages } from './types.ts'
 
 export const GAME_INFOS = [
@@ -24,6 +36,12 @@ export const GAME_INFOS = [
   spectrumInfo,
   bluffInfo,
   oddWordInfo,
+  lanternInfo,
+  tilesInfo,
+  kiteInfo,
+  tradersInfo,
+  secretScrollInfo,
+  wasabiInfo,
   miseryInfo,
 ] as unknown as readonly AnyGameInfo[]
 
@@ -46,6 +64,12 @@ export const GAME_MESSAGES: GameMessages = {
     ...spectrumMessages.en,
     ...bluffMessages.en,
     ...oddWordMessages.en,
+    ...lanternMessages.en,
+    ...tilesMessages.en,
+    ...kiteMessages.en,
+    ...tradersMessages.en,
+    ...secretScrollMessages.en,
+    ...wasabiMessages.en,
     ...miseryMessages.en,
   },
   'zh-TW': {
@@ -55,6 +79,12 @@ export const GAME_MESSAGES: GameMessages = {
     ...spectrumMessages['zh-TW'],
     ...bluffMessages['zh-TW'],
     ...oddWordMessages['zh-TW'],
+    ...lanternMessages['zh-TW'],
+    ...tilesMessages['zh-TW'],
+    ...kiteMessages['zh-TW'],
+    ...tradersMessages['zh-TW'],
+    ...secretScrollMessages['zh-TW'],
+    ...wasabiMessages['zh-TW'],
     ...miseryMessages['zh-TW'],
   },
 }

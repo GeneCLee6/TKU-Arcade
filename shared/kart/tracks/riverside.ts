@@ -8,7 +8,7 @@
 // last right onto the straight. Written in code as control points smoothed by a closed Catmull-Rom
 // spline, then sampled about every SAMPLE metres; build-track.ts will make the same JSON from the
 // Blender scene.
-import { gatesAlong, headingOf, TRACK_FORMAT, type TrackJson } from '../track.ts'
+import { gatesAlong, padsAlong, headingOf, TRACK_FORMAT, type TrackJson } from '../track.ts'
 import { splineRoad, type ControlPoint } from './spline.ts'
 
 /** Metres between road points */
@@ -17,9 +17,9 @@ const SAMPLE = 6
 /** [x, z, width]: the line through the middle of the road, in driving order */
 const CONTROL: readonly ControlPoint[] = [
   // The main straight, up to the line and beyond (towards -z)
-  [0, 250, 34],
-  [0, 60, 34],
-  [0, -120, 34],
+  [0, 250, 38],
+  [0, 60, 38],
+  [0, -120, 38],
   // A tight right
   [4, -165, 32],
   [28, -192, 30],
@@ -58,11 +58,11 @@ const CONTROL: readonly ControlPoint[] = [
   // A right onto the run home, and the last right onto the straight
   [160, 265, 32],
   [130, 285, 32],
-  [100, 292, 34],
-  [60, 300, 34],
-  [24, 300, 34],
-  [4, 282, 34],
-  [0, 262, 34],
+  [100, 292, 38],
+  [60, 300, 38],
+  [24, 300, 38],
+  [4, 282, 38],
+  [0, 262, 38],
 ]
 
 const road = splineRoad(CONTROL, SAMPLE)
@@ -81,7 +81,11 @@ export const RIVERSIDE: TrackJson = {
   name: { en: 'Riverside (graybox)', 'zh-TW': '河畔（灰盒）' },
   // 2026-11-14: widened (owner: "make them wide"), then redrawn wider still with hairpins (owner:
   // eight karts side by side, more sharp corners); old records are set aside
-  revision: 3,
+  // 2026-11-14 again (owner: much faster karts): straights 4 m wider, boost pads; old records
+  // are set aside, the physics having changed too
+  // 2026-11-14 once more (owner: the drift as a real slide, faster still): the road is the same,
+  // the physics is not, so old records are set aside
+  revision: 5,
   laps: 3,
   road: fromLine,
   gates,
@@ -93,7 +97,13 @@ export const RIVERSIDE: TrackJson = {
     heading: headingOf(up),
   })),
   walls: [],
-  boostPads: [],
+  // Off the middle of the straights: taking one is a choice of line
+  boostPads: padsAlong(fromLine, [
+    [14, 8],
+    [132, -8],
+    [180, 8],
+    [325, -8],
+  ]),
   itemBoxes: [],
   decor: [],
 }

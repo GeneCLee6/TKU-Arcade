@@ -49,6 +49,8 @@ export const kartScene = {
   smoke: '#E5E7EB',
   // The dark skid marks a drift leaves on the road (2026-11-14), under the glowing trails
   skid: '#17171A',
+  // The streaks rushing past the view at speed (2026-11-14)
+  speedLine: '#F2FBFF',
   // The best run's ghost (e8-t11)
   ghost: '#9AD8FF',
   flame: '#FFB020',
@@ -190,10 +192,36 @@ export const kartBodies = {
 } as const
 
 /** The hover parts every body shares: thruster housings, the cockpit glass, the sparks */
+/**
+ * The race-day dressing every track shares (2026-11-14, festival.ts): our own bright, saturated
+ * party palette for the arch, the flags, the crowds, the flowers, the Ferris wheel, the balloons and
+ * the far skyline
+ */
+export const kartFestival = {
+  arch: ['#FF3B6B', '#FFD23F', '#2EC4F1', '#7CE36B', '#B26BFF'],
+  flags: ['#FF3B6B', '#FFD23F', '#2EC4F1', '#7CE36B', '#FF8A3D', '#B26BFF', '#FFFFFF'],
+  pole: '#E9EEF5',
+  standSeat: '#3C6FD8',
+  standRoof: '#F4F7FB',
+  crowd: ['#FF4D5E', '#FFC93C', '#2EC4F1', '#5BD16C', '#FF8A3D', '#9B6BFF', '#FFFFFF', '#1F2A44'],
+  skin: '#F2C7A0',
+  flowers: ['#FF4F8B', '#FFD23F', '#FFFFFF', '#FF8A3D', '#B26BFF'],
+  flowerLeaf: '#3F9E3A',
+  wheel: '#FFFFFF',
+  cabins: ['#FF3B6B', '#FFD23F', '#2EC4F1', '#7CE36B'],
+  balloons: ['#FF3B6B', '#FFD23F', '#2EC4F1', '#7CE36B', '#FF8A3D', '#B26BFF'],
+  basket: '#8B5A2B',
+  skyline: ['#9FB4CC', '#B7C6D8', '#8AA3BF', '#C9D4E2', '#A7B9CF'],
+} as const
+
 export const kartHover = {
   housing: '#2E3138',
   glass: '#132033',
   spark: '#FFF6D6',
+  // 2026-11-14: the sparks of a drift long enough to have earned its release boost, and the sparks
+  // while the release boost's window is open
+  sparkEarned: '#FFC21A',
+  sparkReady: '#7CF3FF',
 } as const
 
 /**

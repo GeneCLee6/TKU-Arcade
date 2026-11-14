@@ -24,11 +24,9 @@ import type { GameScreenProps } from '../../screens.ts'
 import { useBoardFit } from '../useBoardFit.ts'
 import { MAX_ZOOM, MIN_ZOOM, useBoardZoom } from '../useBoardZoom.ts'
 import { useImmersive } from '../useImmersive.ts'
-import { DecisionPrompt } from './DecisionPrompt.tsx'
 import { fullArtHref, fullKnob } from './fullArt.ts'
 import { FullBoard, type FullFlight, type FullPiece } from './FullBoard.tsx'
 import { loadFullBoardFont } from './fullFont.ts'
-import { FullCellDetail } from './FullCellDetail.tsx'
 import { FullDice } from './FullDice.tsx'
 import { useFullData } from './fullData.ts'
 import type { SquareLayout } from './fullSquare.ts'
@@ -44,7 +42,7 @@ import {
   transferText,
   turnSentence,
 } from './fullWords.ts'
-import { SETTLE_STEPS, Settlement } from './Settlement.tsx'
+import { SETTLE_STEPS } from './settleSteps.ts'
 import { useTurnPlayback } from './useTurnPlayback.ts'
 
 // Everything this screen says, with its cell and department names in boardFull.ts: loaded only with
@@ -53,6 +51,16 @@ registerMessages(promotionFullMessages)
 
 // Each player's way through the game, once it is over: out of the first screen
 const FullRoutes = lazy(() => import('./FullRoutes.tsx'))
+// Only once a game ends, or once someone has a choice to make: off the first screen too (budget)
+const Settlement = lazy(() =>
+  import('./Settlement.tsx').then((module) => ({ default: module.Settlement })),
+)
+const DecisionPrompt = lazy(() =>
+  import('./DecisionPrompt.tsx').then((module) => ({ default: module.DecisionPrompt })),
+)
+// A cell's details, only when someone taps one: out of the first screen too (2026-11-14, to make room
+// in the 150 kB budget for new games)
+const FullCellDetail = lazy(() => import('./FullCellDetail.tsx').then((module) => ({ default: module.FullCellDetail })))
 
 /** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
 const DENSE_CELL = 48
@@ -463,30 +471,36 @@ export default function FullScreen({ room, game }: GameScreenProps) {
               </Payments>
             )}
             {showSettlement && state.settlement && (
-              <Settlement
-                settlement={state.settlement}
-                nameOf={nameOf}
-                step={settleStep}
-                onStep={setSettleStep}
-                onClose={() => setSettleClosed(true)}
-                reducedMotion={reducedMotion}
-              />
+              <Suspense fallback={null}>
+                <Settlement
+                  settlement={state.settlement}
+                  nameOf={nameOf}
+                  step={settleStep}
+                  onStep={setSettleStep}
+                  onClose={() => setSettleClosed(true)}
+                  reducedMotion={reducedMotion}
+                />
+              </Suspense>
             )}
             {deciding && data && !showSettlement && (
-              <DecisionPrompt
-                pending={pending}
-                mine={myDecision}
-                name={nameOf(pending.seat)}
-                money={moneyOf(players[pending.seat])}
-                timer={decisionTimer}
-                waiting={asked}
-                onAnswer={answer}
-                top={promptOnTop}
-                area={promptArea}
-              />
+              <Suspense fallback={null}>
+                <DecisionPrompt
+                  pending={pending}
+                  mine={myDecision}
+                  name={nameOf(pending.seat)}
+                  money={moneyOf(players[pending.seat])}
+                  timer={decisionTimer}
+                  waiting={asked}
+                  onAnswer={answer}
+                  top={promptOnTop}
+                  area={promptArea}
+                />
+              </Suspense>
             )}
             {board && (
-              <FullCellDetail board={board} id={selected} here={here} onClose={() => setSelected(null)} />
+              <Suspense fallback={null}>
+                <FullCellDetail board={board} id={selected} here={here} onClose={() => setSelected(null)} />
+              </Suspense>
             )}
           </BoardArea>
 

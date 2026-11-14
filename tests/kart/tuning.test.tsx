@@ -46,11 +46,11 @@ describe('the tuning panel', () => {
     expect(screen.getByRole('combobox', { name: 'Preset' })).toHaveValue('standard')
     expect(screen.getAllByRole('slider')).toHaveLength(Object.keys(KART_TUNING).length)
     const top = screen.getByRole('slider', { name: 'Top speed' })
-    expect(top).toHaveValue('40')
-    expect(top).toHaveAttribute('aria-valuetext', '40.0 m/s')
-    expect(screen.getByRole('slider', { name: 'Drift angle cap' })).toHaveValue('42')
+    expect(top).toHaveValue('60')
+    expect(top).toHaveAttribute('aria-valuetext', '60.0 m/s')
+    expect(screen.getByRole('slider', { name: 'Drift angle cap' })).toHaveValue('58')
     expect(screen.getByTestId('kart-slips')).toHaveTextContent(
-      'A drift settles at 33° steering into it, 23° centred and 13° steering out.',
+      'A drift settles at 50° steering into it, 38° centred and 21° steering out.',
     )
   })
 
@@ -72,7 +72,7 @@ describe('the tuning panel', () => {
     })
     expect(current).toBe(PRESETS.loose)
     expect(status()).toHaveTextContent('Preset: Loose.')
-    expect(screen.getByTestId('kart-slips')).toHaveTextContent('46° steering into it')
+    expect(screen.getByTestId('kart-slips')).toHaveTextContent('57° steering into it')
     fireEvent.click(screen.getByRole('button', { name: 'Back to Standard' }))
     expect(current).toBe(PRESETS.standard)
   })
@@ -97,7 +97,7 @@ describe('the tuning panel', () => {
 
     fireEvent.change(jsonBox(), { target: { value: '{"topSpeed": 500}' } })
     fireEvent.click(screen.getByRole('button', { name: 'Import' }))
-    expect(status()).toHaveTextContent('Top speed has to be a number from 15 to 50.')
+    expect(status()).toHaveTextContent('Top speed has to be a number from 15 to 80.')
     expect(current).toBe(KART_TUNING)
 
     fireEvent.change(jsonBox(), { target: { value: '[1, 2]' } })
@@ -135,7 +135,7 @@ describe('storing the tuning', () => {
   })
 
   it('falls back to the standard preset when what is stored is broken', () => {
-    localStorage.setItem('tku-arcade.kart.tuning', '{"grip": "lots"}')
+    localStorage.setItem('tku-arcade.kart.tuning.2', '{"grip": "lots"}')
     expect(loadTuning()).toEqual({ tuning: KART_TUNING, preset: 'standard' })
   })
 

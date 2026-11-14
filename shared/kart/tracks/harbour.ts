@@ -10,7 +10,14 @@
 // scenery is placed in the same drawn units, harbourArt.ts), the road 28 to 32 m, the sweeper at the
 // end of the quay squared off into a tight right and the kink on the west side made a sharp
 // left-right flick.
-import { gatesAlong, headingOf, roadDirection, TRACK_FORMAT, type TrackJson } from '../track.ts'
+import {
+  gatesAlong,
+  padsAlong,
+  headingOf,
+  roadDirection,
+  TRACK_FORMAT,
+  type TrackJson,
+} from '../track.ts'
 import { splineRoad, type ControlPoint } from './spline.ts'
 
 /** Metres between road points */
@@ -22,9 +29,9 @@ export const HARBOUR_SCALE = 1.6
 /** [x, z, width]: x and z in drawn units (times HARBOUR_SCALE for metres), the width in metres */
 const DRAWN: readonly ControlPoint[] = [
   // The seafront straight, eastwards (+x), the sea on the left
-  [-130, -112, 32],
-  [-40, -112, 32],
-  [60, -112, 32],
+  [-130, -112, 36],
+  [-40, -112, 36],
+  [60, -112, 36],
   // A tight right at the end of the quay
   [140, -112, 31],
   [178, -106, 31],
@@ -58,7 +65,7 @@ const DRAWN: readonly ControlPoint[] = [
   [-183, 25, 31],
   [-162, -10, 29],
   [-190, -54, 31],
-  [-176, -98, 32],
+  [-176, -98, 36],
 ]
 
 const CONTROL: readonly ControlPoint[] = DRAWN.map(([x, z, width]) => [
@@ -86,7 +93,11 @@ export const HARBOUR: TrackJson = {
   name: { en: 'Harbour Hairpins', 'zh-TW': '漁港髮夾彎' },
   // 2026-11-14: widened (owner: "make them wide"), then drawn bigger and wider still with sharper
   // corners (owner: eight karts side by side); old records are set aside
-  revision: 3,
+  // 2026-11-14 again (owner: much faster karts): straights 4 m wider, boost pads; old records
+  // are set aside, the physics having changed too
+  // 2026-11-14 once more (owner: the drift as a real slide, faster still): the road is the same,
+  // the physics is not, so old records are set aside
+  revision: 5,
   laps: 3,
   road: fromLine,
   gates,
@@ -102,7 +113,13 @@ export const HARBOUR: TrackJson = {
     }
   }),
   walls: [],
-  boostPads: [],
+  // Off the middle of the straights: taking one is a choice of line
+  boostPads: padsAlong(fromLine, [
+    [20, -8],
+    [45, 8],
+    [88, 8],
+    [130, -8],
+  ]),
   itemBoxes: [],
   decor: [],
 }

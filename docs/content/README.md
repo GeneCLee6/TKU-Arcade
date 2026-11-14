@@ -2,6 +2,18 @@
 
 這裡放還沒上線的題庫草稿，**全部要擁有者逐題審過才會上線**。
 
+## `traders-cards.csv`、`traders-patrons.csv`
+
+滬尾商行（暫名 Tamsui Traders，規則見 [`../PRD/e22-tamsui-traders.md`](../PRD/e22-tamsui-traders.md)）的牌與貴客，全部為本專案自己設計，沒有參考原作卡表（`../PRD/01-legal-ip-analysis.md` §2.9）。
+
+| 檔案 | 欄位 |
+| --- | --- |
+| `traders-cards.csv`（90 張） | `id`（`t1-01` 起，層數加編號）、`tier`（1–3）、`bonus`（這張牌給的折扣：`tea`、`camphor`、`indigo`、`sugar`、`pepper`）、`points`、五種貨各要幾個 |
+| `traders-patrons.csv`（10 位） | `id`、`zh`、`en`（貴客名稱，畫面依語言顯示）、五種貨的牌各要幾張 |
+
+- 欄位裡不能有半形逗號。改完跑 `node scripts/traders-cards.mjs` 重新產生 `shared/games/traders/bank.ts`，再跑 `npm run sim:traders` 看局長與先手優勢有沒有變。`tests/games/traders/bank.test.ts` 擋不同步，並檢查每種貨每層張數與總分相同、被要求的量差不多、價錢曲線、每張都買得到。
+- **狀態：草稿，等擁有者看。**
+
 ## `misery-cards.zh-TW.csv`
 
 慘度排排站（暫名 Misery Line，規則見 [`../PRD/e14-misery-line.md`](../PRD/e14-misery-line.md)）的卡庫，396 張、12 類，全部為本專案自寫（寫了 469 張，刪掉太像、太弱或擠在 20–50 之間的 73 張）。**沒有看、也沒有改寫原作的任何卡片或慘度。**

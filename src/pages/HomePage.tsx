@@ -23,10 +23,11 @@ import { color, font, fontSize, space } from '../styles/tokens.ts'
 // The games that are not open yet (E3): their own chunk, strings included, so they cost the first load
 // only this line
 const ComingSoon = lazy(() => import('../components/ComingSoon.tsx'))
-// The public rooms wait on the network anyway, so their list is a chunk of its own: a room's first
-// screen (and its budget, scripts/check-budget.mjs) never pays for the lobby's list
+
+// The public rooms come from the network anyway: their code arrives with them, after the first paint,
+// which keeps it out of every game's first screen too (2026-11-14, with e16)
 const PublicRooms = lazy(() =>
-  import('../components/PublicRooms.tsx').then((module) => ({ default: module.PublicRooms })),
+  import('../components/PublicRooms.tsx').then(({ PublicRooms }) => ({ default: PublicRooms })),
 )
 
 /** The lobby: the games, a link box and the public rooms (e1-t02, e1-t09) */
