@@ -64,6 +64,18 @@ export const DEFAULT_BINDINGS: Bindings = {
   },
 }
 
+/**
+ * Shift drifts and Ctrl boosts too, whatever the bindings say (owner, 2026-11-14: the layout the
+ * friends' hands already know), unless the player has given that key to another action. They are
+ * not in the defaults' two places: those keep Z and X for the arrows, Space and E for WASD. Shift
+ * pressed five times may open Windows' Sticky Keys prompt (turn it off in Windows' settings), and
+ * Ctrl with W closes a tab, so the page asks before leaving during a race (spikeLoop.ts)
+ */
+export const ALWAYS_KEYS: Readonly<Partial<Record<KartAction, readonly string[]>>> = {
+  drift: ['ShiftLeft', 'ShiftRight'],
+  boost: ['ControlLeft', 'ControlRight'],
+}
+
 /** Keys the page needs for itself: moving focus, pressing buttons, leaving a capture, the numbers */
 export const RESERVED_KEYS: ReadonlySet<string> = new Set([
   'Tab',
@@ -114,7 +126,7 @@ export function readInput(
 ): KartInput {
   const amount = (action: KartAction): number => {
     let value = 0
-    for (const code of bindings.keys[action]) if (code && held.has(code)) value = 1
+    for (const code of actionKeys(bindings, action)) if (held.has(code)) value = 1
     if (pad) {
       for (const control of bindings.pad[action]) {
         if (control) value = Math.max(value, padValue(control, pad))
@@ -134,12 +146,16 @@ export function readInput(
   }
 }
 
-export const isBoundKey = (bindings: Bindings, code: string): boolean =>
-  KART_ACTIONS.some((action) => bindings.keys[action].includes(code))
+/** The keys an action listens to: its two places, and Shift or Ctrl where nothing else took them */
+export const actionKeys = (bindings: Bindings, action: KartAction): readonly string[] => {
+  const own = bindings.keys[action].filter((code): code is string => code !== null)
+  const taken = (code: string) => KART_ACTIONS.some((other) => other !== action && bindings.keys[other].includes(code))
+  const always = (ALWAYS_KEYS[action] ?? []).filter((code) => !own.includes(code) && !taken(code))
+  return [...own, ...always]
+}
 
-/** The keys of an action that fires once per press, so that a tap between two steps still counts */
-export const actionKeys = (bindings: Bindings, action: KartAction): readonly string[] =>
-  bindings.keys[action].filter((code): code is string => code !== null)
+export const isBoundKey = (bindings: Bindings, code: string): boolean =>
+  KART_ACTIONS.some((action) => actionKeys(bindings, action).includes(code))
 
 export const boostKeys = (bindings: Bindings): readonly string[] => actionKeys(bindings, 'boost')
 

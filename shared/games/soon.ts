@@ -7,12 +7,15 @@ const en = {
   'games.kart.name': 'Kart',
   'games.kart.summary':
     'Drift through the corners to fill your boost gauge, then race your friends.',
+  // The time trial is open for trying the feel (owner, 2026-11-14); racing friends comes later
+  'games.kart.tryNow': 'Try it alone',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
   'games.soon': '即將推出',
   'games.kart.name': '卡丁車',
   'games.kart.summary': '過彎甩尾集滿加速條，再和朋友一起比賽。',
+  'games.kart.tryNow': '單人試跑',
 }
 
 export const soonMessages = { en, 'zh-TW': zhTW }

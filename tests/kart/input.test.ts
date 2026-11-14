@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  actionKeys,
   activeControls,
   AXIS_DEAD_ZONE,
   bindKey,
   bindPad,
   DEFAULT_BINDINGS,
+  isBoundKey,
   KART_ACTIONS,
   newPress,
   padValue,
@@ -49,6 +51,19 @@ describe('the default keys', () => {
       drift: true,
       boost: true,
     })
+  })
+
+  it('drifts with Shift and boosts with Ctrl too (2026-11-14)', () => {
+    expect(readInput(DEFAULT_BINDINGS, keys('ShiftLeft', 'ControlLeft'))).toMatchObject({ drift: true, boost: true })
+    expect(readInput(DEFAULT_BINDINGS, keys('ShiftRight', 'ControlRight'))).toMatchObject({ drift: true, boost: true })
+    expect(isBoundKey(DEFAULT_BINDINGS, 'ControlLeft')).toBe(true)
+    expect(actionKeys(DEFAULT_BINDINGS, 'boost')).toEqual(['KeyX', 'KeyE', 'ControlLeft', 'ControlRight'])
+  })
+
+  it('lets Shift go when the player gives it to another action', () => {
+    const { bindings } = bindKey(DEFAULT_BINDINGS, 'brake', 1, 'ShiftLeft')
+    expect(readInput(bindings, keys('ShiftLeft'))).toMatchObject({ brake: true, drift: false })
+    expect(readInput(bindings, keys('ShiftRight')).drift).toBe(true)
   })
 
   it('cancel left against right', () => {

@@ -147,16 +147,14 @@ describe('lobby cards', () => {
     ])
   })
 
-  it('shows the games that are not open yet as Coming soon, with nothing to press', async () => {
+  it('shows the games that are not open yet as Coming soon, the kart with a link to try it alone', async () => {
     renderLobby()
-    const names = ['Kart']
-    for (const name of names) {
-      // The tag is part of the heading, so a screen reader hears it with the name
-      const heading = await screen.findByRole('heading', { level: 3, name: `${name} Coming soon` })
-      const card = heading.closest('li')!
-      expect(within(card).queryByRole('button')).not.toBeInTheDocument()
-      expect(within(card).queryByRole('link')).not.toBeInTheDocument()
-    }
+    // The tag is part of the heading, so a screen reader hears it with the name
+    const heading = await screen.findByRole('heading', { level: 3, name: 'Kart Coming soon' })
+    const card = heading.closest('li')!
+    expect(within(card).queryByRole('button')).not.toBeInTheDocument()
+    // The time trial is open for trying the feel (owner, 2026-11-14): one link, to it
+    expect(within(card).getByRole('link', { name: 'Try it alone' })).toHaveAttribute('href', '/kart')
     // A Coming soon card never doubles a listed game: take it out of ComingSoon.tsx when it opens
     for (const game of LOBBY_GAMES) {
       const name = translate('en', `${game.meta.i18nKey}.name`)
@@ -165,7 +163,7 @@ describe('lobby cards', () => {
       ).toHaveLength(1)
     }
     // Nothing on the page leads to the kart's hidden spike
-    expect(document.querySelector('a[href^="/kart"]')).toBeNull()
+    expect(document.querySelector('a[href^="/kart/spike"]')).toBeNull()
   })
 
   it('translates the Coming soon cards', async () => {
