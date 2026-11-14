@@ -235,7 +235,7 @@ async function expectNoSeriousProblems(page: Page, step: string) {
   // measures against the dock: let it sit in the page's flow while axe looks (2026-11-14)
   const unstick = await page.addStyleTag({ content: '[data-dock] { position: static !important; }' })
   const { violations } = await new AxeBuilder({ page }).analyze()
-  await unstick.evaluate((tag) => tag.remove())
+  await unstick.evaluate((tag) => (tag as Element).remove())
   await page.setViewportSize(size)
   const blocking = violations
     .filter((violation) => BLOCKING.has(violation.impact ?? ''))
