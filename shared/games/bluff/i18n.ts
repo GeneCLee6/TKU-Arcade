@@ -7,7 +7,7 @@ const en = {
   'games.bluff.option.twoRounds': 'Everyone judges twice',
   'games.bluff.option.readSeconds': 'Seconds to read',
   'games.bluff.option.mole': 'A mole with secret words (4 players or more)',
-  'games.bluff.option.hints': 'Bluffers get a hint',
+  'games.bluff.option.hints': 'Show three categories, one of them true',
   'games.bluff.option.clock': 'Countdowns',
 }
 
@@ -17,7 +17,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.bluff.option.twoRounds': '每人當兩次裁判',
   'games.bluff.option.readSeconds': '每人朗讀秒數',
   'games.bluff.option.mole': '有暗樁（4 人以上）',
-  'games.bluff.option.hints': '瞎掰的人看得到提示',
+  'games.bluff.option.hints': '顯示三個類別提示（其中一個是真的）',
   'games.bluff.option.clock': '倒數計時',
 }
 

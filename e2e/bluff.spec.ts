@@ -70,6 +70,9 @@ test('four players play every round to the result, on phones', async ({ browser 
       if (person !== mole) await expect(person.getByTestId('words')).toHaveCount(0)
     }
     await expect(mole.getByTestId('words').getByRole('listitem')).toHaveCount(3)
+    // Everyone sees the same three categories (2026-11-14), the judge too
+    await expect(judge.getByTestId('choices').getByRole('listitem')).toHaveCount(3)
+    if (round === 1) await honest.getByTestId('role-card').screenshot({ path: test.info().outputPath('bluff-card.png') })
     // On a phone the chat is in a drawer: the stage says it is closed
     await expect(judge.getByText(/Chat is closed until the reveal/)).toBeVisible()
     await expect(judge.getByRole('timer')).toBeVisible()
