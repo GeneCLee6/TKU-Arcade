@@ -13,8 +13,10 @@ import {
 } from '../../shared/kart/physics.ts'
 import { padsAlong } from '../../shared/kart/track.ts'
 
-// 2026-11-14 (owner: much faster, longer boosts, a higher skill ceiling): stacked charges, the flick,
-// the depth and length of a drift, the counter catch, walls that break the chain, boost pads
+// 2026-11-14 (owner: much faster, longer boosts, a higher skill ceiling): stacked charges, the
+// counter catch, walls that break the chain, boost pads. The flick is gone (a tapped drift now
+// earns the double, kart-boost.test.ts), and the depth and length of a drift cost speed by the
+// slide itself (kart-physics.test.ts)
 
 const THROTTLE: KartInput = { ...NO_INPUT, throttle: true }
 const DRIFT_RIGHT: KartInput = { ...THROTTLE, steer: 1, drift: true }
@@ -31,11 +33,12 @@ const T = KART_TUNING
 
 describe('the new numbers', () => {
   it('is much faster, with longer boosts', () => {
-    expect(T.topSpeed).toBe(50)
-    expect(T.topSpeed * T.boostTopSpeedFactor).toBe(70)
-    expect(T.topSpeed * T.boostStackFactor).toBeCloseTo(77.5, 9)
+    expect(T.topSpeed).toBe(60)
+    expect(T.topSpeed * T.boostTopSpeedFactor).toBeCloseTo(87, 9)
+    expect(T.topSpeed * T.boostStackFactor).toBeCloseTo(96, 9)
+    expect(T.topSpeed * T.miniTopSpeedFactor).toBeCloseTo(72, 9)
     expect(T.boostDuration).toBe(3.25)
-    expect(T.chainDuration).toBe(0.9)
+    expect(T.chainDuration).toBe(0.7)
     expect(T.startBoostDuration).toBe(1.8)
     expect(T.maxStoredBoosts).toBe(2)
   })
@@ -73,54 +76,25 @@ describe('stacked charges', () => {
   })
 })
 
-describe('the flick', () => {
-  it('snaps the nose and the travel round on a tapped drift, keeping almost all the speed', () => {
-    const before = atSpeed()
-    const tapped = run(before, DRIFT_RIGHT, 0.1)
-    const flicked = stepKart(tapped, THROTTLE)
-    expect(flicked.flicks).toBe(1)
-    expect(flicked.heading - tapped.heading).toBeGreaterThan(T.flickAngle * 0.9)
-    // The travel turned with the nose, all at once
-    const travel = (state: KartState) => Math.atan2(state.vx, -state.vz)
-    expect(travel(flicked) - travel(tapped)).toBeGreaterThan(T.flickAngle * 0.9)
-    expect(kartSpeed(flicked)).toBeGreaterThan(kartSpeed(before) * 0.95)
-    expect(flicked.gauge - tapped.gauge).toBeCloseTo(T.flickGauge, 6)
-  })
-
-  it('is not a held drift, and waits between flicks', () => {
-    const held = stepKart(run(atSpeed(), DRIFT_RIGHT, 0.5), THROTTLE)
-    expect(held.flicks).toBe(0)
-    const once = stepKart(run(atSpeed(), DRIFT_RIGHT, 0.1), THROTTLE)
-    const again = stepKart(run(once, DRIFT_RIGHT, 0.1), THROTTLE)
-    expect(again.flicks).toBe(1)
-  })
-})
-
-describe('the depth and length of a drift', () => {
-  const entered = () => run(atSpeed(), DRIFT_RIGHT, 0.1)
-
-  it('costs more speed steering into it than out of it', () => {
-    const deep = run(entered(), DRIFT_RIGHT, 1)
-    const shallow = run(entered(), { ...DRIFT_RIGHT, steer: -1 }, 1)
-    expect(kartSpeed(deep)).toBeCloseTo(T.driftTopSpeed * (1 - T.driftDepthCost), 6)
-    expect(kartSpeed(shallow)).toBeGreaterThan(kartSpeed(deep) + 3)
-  })
-
-  it('tires: a drift held long slows down', () => {
-    const centred = { ...DRIFT_RIGHT, steer: 0 }
-    const short = run(entered(), centred, 1)
-    const long = run(entered(), centred, 3)
-    expect(kartSpeed(long)).toBeLessThan(kartSpeed(short) - T.driftFatigue)
-  })
-})
-
 describe('the counter catch', () => {
   it('straightens the car up faster when the drift is let go steering against it', () => {
     const drifting = run(atSpeed(), DRIFT_RIGHT, 1)
     const caught = run(drifting, { ...THROTTLE, steer: -1 }, 0.1)
     const plain = run(drifting, THROTTLE, 0.1)
     expect(caught.catchSeconds).toBeGreaterThan(0)
-    expect(Math.abs(kartSlip(caught))).toBeLessThan(Math.abs(kartSlip(plain)) * 0.6)
+    expect(Math.abs(kartSlip(caught))).toBeLessThan(Math.abs(kartSlip(plain)) * 0.7)
+    // The grip is back catchGrip times sooner
+    expect(caught.traction).toBeCloseTo(plain.traction * T.catchGrip, 6)
+  })
+
+  it('catches the slide a moment after letting go too, while the grip is still coming back', () => {
+    const drifting = run(atSpeed(), DRIFT_RIGHT, 1)
+    const late = run(drifting, THROTTLE, 0.1)
+    expect(late.catchSeconds).toBe(0)
+    const caught = stepKart(late, { ...THROTTLE, steer: -1 })
+    expect(caught.catchSeconds).toBeGreaterThan(0)
+    // Steering the slide's way is not a catch
+    expect(stepKart(late, { ...THROTTLE, steer: 1 }).catchSeconds).toBe(0)
   })
 })
 

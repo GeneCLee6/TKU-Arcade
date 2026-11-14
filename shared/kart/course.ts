@@ -61,6 +61,8 @@ function afterWalls(kart: KartState, hitSpeed: number, course: Course, tuning: K
       releaseWindow: 0,
       sliding: false,
       stackSeconds: 0,
+      doubleWindow: 0,
+      doubleArmed: false,
     }
   }
   const pads = course.boostPads

@@ -9,6 +9,7 @@ import {
   fieldOfView,
   followCar,
   REFERENCE_SPEED,
+  SLIDE_SWING,
   SPEED_FOV_KICK,
   startRig,
 } from '../../src/kart/camera.ts'
@@ -93,6 +94,16 @@ describe('callouts', () => {
     expect(calloutAtStart('none')).toBeUndefined()
   })
 
+  it('calls out the double by name, not as one more link of the chain', () => {
+    const first = { ...INITIAL_KART, chain: 1, miniSeconds: 0.5 }
+    expect(calloutBetween(first, { ...first, chain: 2, miniSeconds: 1.2, doubles: 1 })).toEqual({
+      kind: 'double',
+      count: 0,
+    })
+    expect(en('kart.callout.double')).toBe('Double release!')
+    expect(zh('kart.callout.double')).toBe('雙收尾！')
+  })
+
   it('has words for every callout in both languages', () => {
     for (const kind of ['start', 'stall', 'release', 'slide'] as const) {
       const { unmount } = render(<CalloutText t={en} callout={{ kind, count: 0 }} />)
@@ -118,6 +129,17 @@ describe('the chase camera', () => {
     expect(aimOf({ ...sliding, boosting: false })).toBeCloseTo(0.5 - slip, 9)
     expect(aimOf({ heading: 0.5, vx: 0.5, vz: 0, boosting: false })).toBe(0.5)
     expect(aimOf({ heading: 0, vx: 0, vz: 5, boosting: false })).toBe(0)
+  })
+
+  it('swings part of the way round with the nose while the car slides, and lags', () => {
+    const slip = 40 * DEGREE
+    const car = { heading: 0.5, vx: 40 * Math.sin(0.5 - slip), vz: -40 * Math.cos(0.5 - slip) }
+    const sliding = { ...car, boosting: false, skidding: true }
+    expect(aimOf(sliding)).toBeCloseTo(0.5 - slip + slip * SLIDE_SWING, 9)
+    // Slower to follow than when the car grips
+    const gripping = followCar(startRig(0), { ...car, boosting: false }, 0.1)
+    const slid = followCar(startRig(0), { ...sliding, heading: 0.5 - slip }, 0.1)
+    expect(Math.abs(slid.heading)).toBeLessThan(Math.abs(gripping.heading))
   })
 
   it('swings round the same way whatever the frame rate', () => {

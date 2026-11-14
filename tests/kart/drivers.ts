@@ -1,7 +1,8 @@
 // Scripted drivers for the track tests (2026-11-14): a careful novice who never drifts, an average
-// driver who drifts and fires charges, and an expert who also takes the start boost and a release
-// boost after every drift. Not a racing AI: a fixed recipe, enough to show what the techniques are
-// worth on a lap.
+// driver who drifts through the corners and fires charges, and an expert who also takes the start
+// boost, a release boost after every drift, the double after that, and chains tapped drifts and
+// release boosts down the straights. Not a racing AI: a fixed recipe on the middle of the road,
+// enough to show what the techniques are worth on a lap.
 import { KART_TUNING, NO_INPUT, type KartInput, type KartState } from '../../shared/kart/physics.ts'
 import type { Trial } from '../../shared/kart/timeTrial.ts'
 
@@ -64,28 +65,60 @@ function pointAhead(road: Road, from: number, metres: number): { x: number; z: n
 }
 
 /**
- * The turn rate (rad/s, signed) that brings the car's travel onto a point `metres` ahead on the road,
- * by pure pursuit: curvature 2 sin(angle) / distance, times the speed
+ * The turn rate (rad/s, signed) that brings a car pointing along `along` onto a point `metres` ahead
+ * on the road, by pure pursuit: curvature 2 sin(angle) / distance, times the speed
  */
-function pursuit(road: Road, kart: KartState, nearest: number, metres: number, speed: number) {
+function pursuit(
+  road: Road,
+  kart: KartState,
+  nearest: number,
+  metres: number,
+  speed: number,
+  along: number,
+) {
   const target = pointAhead(road, nearest, metres)
-  const travel = speed > 3 ? Math.atan2(kart.vx, -kart.vz) : kart.heading
-  const angle = wrap(Math.atan2(target.x - kart.x, -(target.z - kart.z)) - travel)
+  const angle = wrap(Math.atan2(target.x - kart.x, -(target.z - kart.z)) - along)
   const distance = Math.max(1, Math.hypot(target.x - kart.x, target.z - kart.z))
   return (2 * Math.sin(angle) * Math.max(speed, 5)) / distance
 }
 
+/** What the expert's hands are in the middle of: nothing, or one of the timed moves */
+type Move =
+  | { readonly kind: 'none' }
+  /** A tapped drift down a straight: begun one way, steered back out at once, held just long enough */
+  | { readonly kind: 'tap'; readonly direction: -1 | 1; readonly steps: number }
+  /** The throttle let go for a step, to press it afresh for the release boost */
+  | { readonly kind: 'lift'; readonly steps: number; readonly double: boolean }
+  /** The double's tap: a drift of a few steps right after the release boost */
+  | { readonly kind: 'double'; readonly direction: -1 | 1; readonly steps: number }
+
+const NONE: Move = { kind: 'none' }
+/** Seconds of travel the drivers look ahead for their line, on top of 14 m: the slide answers late */
+const REACH = 0.5
+/** The share of the tightest turn a drift can make past which the corner needs the brake too */
+const BRAKE_AT = 0.8
+
+/** How many steps a tapped drift is held: just past chainMinDrift, so that it earns a release boost */
+const TAP_STEPS = Math.ceil(KART_TUNING.chainMinDrift * 60) + 2
+/** How many steps the double's tap is held */
+const DOUBLE_STEPS = 3
+/** A tap begins when the release boost before it has this long left, so that the chain never gaps */
+const TAP_BEFORE_END = 0.1
+
 /**
- * The expert: pure pursuit, drifting whenever the corner wants more turn than grip gives, steering
- * the drift deeper or shallower to hold the line, braking only when even a drift is not enough. With
- * `techniques` it also gets the start boost and a release boost after every drift (and so slides
- * through the next corner under it); without, it is an average driver who drifts and fires charges.
+ * The drifting drivers. Pure pursuit of the middle of the road; a drift whenever the corner wants
+ * more turn than the grip gives, the nose held as far round as the corner needs (the slide then
+ * brings the car round), let go once the nose points down the road. Without `techniques` that is
+ * the average driver, who also fires charges on the straights. With them, the expert: the start
+ * boost, a release boost out of every drift and the double after it, charges stacked, and on the
+ * straights a chain of tapped drifts, each for its release boost.
  */
 export function createExpert(techniques = true): (trial: Trial, road: Road) => KartInput {
   const t = KART_TUNING
-  let lift = 0
+  let move: Move = NONE
   let wasDrifting = false
   let boostPressed = false
+  let lastTap: -1 | 1 = 1
   return (trial, road) => {
     const { kart } = trial.run
     if (trial.phase === 'countdown') {
@@ -94,34 +127,109 @@ export function createExpert(techniques = true): (trial: Trial, road: Road) => K
     }
     const nearest = nearestIndex(road, kart)
     const speed = Math.hypot(kart.vx, kart.vz)
-    const want = pursuit(road, kart, nearest, 14 + speed * 0.3, speed)
+    const travel = speed > 3 ? Math.atan2(kart.vx, -kart.vz) : kart.heading
+    const reach = 14 + speed * REACH
+    // The turn the car's travel needs, and the turn its nose needs, to reach the road ahead
+    const want = pursuit(road, kart, nearest, reach, speed, travel)
+    const noseWant = pursuit(road, kart, nearest, reach, speed, kart.heading)
     // Far ahead: is a corner coming?
-    const later = pursuit(road, kart, nearest, 30 + speed * 0.9, speed)
+    const later = pursuit(road, kart, nearest, 30 + speed * 0.9, speed, travel)
     const gripTurn = t.turnRate * (1 - t.turnLossAtTopSpeed * Math.min(1, speed / t.topSpeed))
-    const driftMax = t.driftTurnRate + t.driftSteerRate
-    if (techniques && wasDrifting && !kart.drifting) lift = 2
+    const slip = Math.abs(wrap(kart.heading - travel))
+
+    // A drift just let go: the expert lifts off the throttle for a step, then presses for the boost
+    const letGo = wasDrifting && !kart.drifting && kart.releaseWindow > 0
+    if (techniques && letGo && move.kind === 'none') {
+      move = { kind: 'lift', steps: 1, double: !kart.doubleArmed }
+    }
     wasDrifting = kart.drifting
 
-    let drift: boolean
-    let steer: number
+    const straight = Math.abs(later) < gripTurn * 0.4 && Math.abs(want) < gripTurn * 0.4
+    // A charge only where the road stays straight a good way ahead; the expert stacks the second
+    const fire =
+      !boostPressed &&
+      kart.storedBoosts > 0 &&
+      straight &&
+      !kart.drifting &&
+      (kart.boostSeconds === 0 || (techniques && kart.stackSeconds === 0))
+    boostPressed = fire
+
+    const gripSteer = clampSteer(noseWant / gripTurn)
+    const base = { ...NO_INPUT, throttle: true, boost: fire }
+
+    if (move.kind === 'lift') {
+      const { steps, double } = move
+      if (steps > 0) {
+        move = { kind: 'lift', steps: steps - 1, double }
+        return { ...base, throttle: false, steer: gripSteer }
+      }
+      // Pressed again: the release boost. Then, the double: a tap of drift the way the road goes
+      const direction: -1 | 1 = Math.abs(noseWant) > 0.05 ? (noseWant > 0 ? 1 : -1) : lastTap
+      move = double ? { kind: 'double', direction, steps: DOUBLE_STEPS } : NONE
+      return { ...base, steer: gripSteer }
+    }
+    if (move.kind === 'double') {
+      const { direction, steps } = move
+      if (steps > 0) {
+        move = { kind: 'double', direction, steps: steps - 1 }
+        return { ...base, drift: true, steer: steps === DOUBLE_STEPS ? direction : -direction }
+      }
+      move = NONE
+      return { ...base, steer: gripSteer }
+    }
+    if (move.kind === 'tap') {
+      const { direction, steps } = move
+      if (steps > 0 && kart.drifting) {
+        move = { kind: 'tap', direction, steps: steps - 1 }
+        // Into it for the one step that starts the drift, then out of it: a shallow slide
+        return { ...base, drift: true, steer: -direction }
+      }
+      move = NONE
+      return { ...base, steer: gripSteer }
+    }
+
+    let drift = false
+    let steer = gripSteer
     if (kart.drifting) {
       const dir = kart.driftDirection
-      steer = clampSteer((want - dir * t.driftTurnRate) / t.driftSteerRate)
-      drift = kart.driftSeconds < 0.25 || Math.abs(want) > gripTurn * 0.75
-      if (Math.sign(want) !== dir && kart.driftSeconds >= 0.25) drift = false
-    } else {
-      drift = speed > t.driftMinSpeed + 4 && Math.abs(want) > gripTurn * 0.95
-      steer = drift ? Math.sign(want) : clampSteer(want / gripTurn)
+      // The slide turns the car's travel at driftAlign times the slip: hold the slip the corner needs
+      const slipWanted = Math.min(
+        t.driftMaxSlip,
+        Math.max(0.15, (Math.abs(want) / t.driftAlign) * 1.1),
+      )
+      const yaw = want + dir * (slipWanted - slip) * 4
+      steer = clampSteer((yaw - dir * t.driftTurnRate) / t.driftSteerRate)
+      // Held until the nose points down the road, or the corner has eased; the expert at least
+      // long enough to earn the release boost
+      const least = techniques ? t.chainMinDrift + 0.02 : 0.1
+      const done = Math.sign(noseWant) !== dir || Math.abs(want) < gripTurn * 0.5
+      drift = kart.driftSeconds < least || !done
+    } else if (
+      speed > t.driftMinSpeed + 4 &&
+      Math.abs(want) > gripTurn * 0.9 &&
+      kart.traction >= 1
+    ) {
+      drift = true
+      steer = Math.sign(want)
+    } else if (
+      techniques &&
+      straight &&
+      Math.abs(noseWant) < gripTurn * 0.25 &&
+      kart.traction >= 1 &&
+      kart.boostSeconds === 0 &&
+      kart.miniSeconds < TAP_BEFORE_END &&
+      speed > t.topSpeed * 0.6
+    ) {
+      // A straight, and no boost running: a tapped drift for its release boost, towards the middle
+      const towards: -1 | 1 = noseWant > 0 ? 1 : -1
+      const direction: -1 | 1 = Math.abs(noseWant) > 0.02 ? towards : lastTap === 1 ? -1 : 1
+      lastTap = direction
+      move = { kind: 'tap', direction, steps: TAP_STEPS - 1 }
+      return { ...base, drift: true, steer: direction }
     }
-    const brake = Math.abs(want) > driftMax * 1.05 && speed > 25
-    // A charge only where the road stays straight a good way ahead
-    const straight = Math.abs(later) < gripTurn * 0.4 && Math.abs(want) < gripTurn * 0.4
-    const fire = !boostPressed && kart.storedBoosts > 0 && straight && !kart.drifting
-    boostPressed = fire
-    if (lift > 0) {
-      lift--
-      return { ...NO_INPUT, throttle: lift === 0, steer, boost: fire }
-    }
-    return { ...NO_INPUT, throttle: !brake, brake, steer, drift: drift && !brake, boost: fire }
+    // Even a drift is not enough: slow down, drifting on. The average driver keeps the throttle
+    // down under the brake, and so never presses it afresh for a release boost by accident
+    const brake = Math.abs(want) > t.driftAlign * t.driftMaxSlip * BRAKE_AT && speed > 30
+    return { ...base, throttle: !brake || !techniques, brake, steer, drift }
   }
 }
