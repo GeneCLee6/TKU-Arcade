@@ -15,6 +15,8 @@ export type NumberLineMark = {
   pick: GuessPick
   /** Null when the guess said nothing of this answer, or there was no guess */
   correct: boolean | null
+  /** A full order put it one place off: half the points (2026-11-14) */
+  close: boolean
 }
 
 /** How many numbers apart two marks must be to share a lane: a mark is this many steps wide */
@@ -65,6 +67,7 @@ export function revealMarks(
         number: answerer.number as number,
         pick,
         correct: pick === null ? null : reveal.correct.includes(answerer.seat),
+        close: (reveal.close ?? []).includes(answerer.seat),
       }
     })
 }

@@ -14,7 +14,8 @@ export type SpectrumOptions = {
 }
 
 /** One line of the topic bank: category, topic, the 1 end, the 10 end (shared/games/spectrum/topics.ts) */
-export type SpectrumTopicRow = readonly [string, string, string, string]
+/** category, topic, scene, the 1 end, the 10 end (scripts/spectrum-topics.mjs) */
+export type SpectrumTopicRow = readonly [string, string, string, string, string]
 
 export type SpectrumTopic = {
   /** Stable within the bank: its line in the reviewed CSV, from 1 */
@@ -25,6 +26,8 @@ export type SpectrumTopic = {
   low: string
   /** What 10 means */
   high: string
+  /** Since 2026-11-14: a sentence setting the scene, what kind of answer to give; older topics have none */
+  scene?: string
 }
 
 export type SpectrumAnswerer = {
@@ -55,8 +58,13 @@ export type SpectrumReveal = {
   /** Null when nobody guessed: `missed` says why */
   guess: SpectrumGuess | null
   missed: SpectrumMiss | null
-  /** The answerers the guess got right */
+  /** The answerers the guess got right: in their very place, or picked as the largest or smallest */
   correct: SeatId[]
+  /**
+   * Since 2026-11-14 (擁有者: the standings made no sense): the answerers a full order put one place
+   * off, worth half. A round from before has none
+   */
+  close?: SeatId[]
   /** What each seat gained this round, by seat */
   points: number[]
 }

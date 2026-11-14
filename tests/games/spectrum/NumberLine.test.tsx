@@ -28,6 +28,7 @@ const mark = (
   number,
   pick: null,
   correct: null,
+  close: false,
   ...extra,
 })
 

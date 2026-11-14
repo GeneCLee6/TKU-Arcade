@@ -75,12 +75,12 @@ export function NumberLine({ low, high, marks, animate = true }: NumberLineProps
                   animationDelay: animate ? `${index * STAGGER_MS}ms` : undefined,
                 }}
               >
-                <Bubble $correct={mark.correct}>
+                <Bubble $correct={mark.correct} $close={mark.close}>
                   <Answer $out={mark.text === null}>{mark.text ?? '—'}</Answer>
                   <Name>{mark.name}</Name>
                   {label !== null && (
-                    <Verdict $correct={mark.correct}>
-                      {mark.correct === null ? '' : mark.correct ? '✓ ' : '✕ '}
+                    <Verdict $correct={mark.correct} $close={mark.close}>
+                      {mark.correct === null ? '' : mark.correct ? '✓ ' : mark.close ? '≈ ' : '✕ '}
                       {label}
                     </Verdict>
                   )}
@@ -100,7 +100,13 @@ export function NumberLine({ low, high, marks, animate = true }: NumberLineProps
           const verdict =
             mark.correct === null
               ? ''
-              : t(mark.correct ? 'games.spectrum.ui.right' : 'games.spectrum.ui.wrong')
+              : t(
+                  mark.correct
+                    ? 'games.spectrum.ui.right'
+                    : mark.close
+                      ? 'games.spectrum.ui.close'
+                      : 'games.spectrum.ui.wrong',
+                )
           return (
             <li key={mark.seat}>
               {mark.text === null
@@ -214,7 +220,10 @@ const Mark = styled.div<{ $animate: boolean }>`
 `
 
 // A wrong pick is told by the cross and the word as well as by its outline
-const Bubble = styled.div<{ $correct: boolean | null }>`
+const verdictColor = (correct: boolean | null, close: boolean) =>
+  correct === null ? color.muted : correct ? color.success : close ? color.warning : color.danger
+
+const Bubble = styled.div<{ $correct: boolean | null; $close: boolean }>`
   position: relative;
   z-index: 1;
   box-sizing: border-box;
@@ -225,7 +234,7 @@ const Bubble = styled.div<{ $correct: boolean | null }>`
   border: ${(p) =>
     p.$correct === null
       ? `1px solid ${color.border}`
-      : `2px solid ${p.$correct ? color.success : color.danger}`};
+      : `2px solid ${verdictColor(p.$correct, p.$close)}`};
 `
 
 const Answer = styled.div<{ $out: boolean }>`
@@ -248,8 +257,8 @@ const Name = styled.div`
   line-height: 1.3;
 `
 
-const Verdict = styled.div<{ $correct: boolean | null }>`
-  color: ${(p) => (p.$correct === null ? color.muted : p.$correct ? color.success : color.danger)};
+const Verdict = styled.div<{ $correct: boolean | null; $close: boolean }>`
+  color: ${(p) => verdictColor(p.$correct, p.$close)};
   font-size: ${fontSize.sm}px;
   font-weight: 700;
   line-height: 1.3;

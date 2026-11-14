@@ -15,13 +15,13 @@ import {
 } from 'three'
 import type { Wall } from '../../shared/kart/walls.ts'
 import type { Track } from '../../shared/kart/track.ts'
-import { buildTrackArt, type TrackArt } from './art/trackArt.ts'
+import { buildTrackArt, themeOf, type TrackArt } from './art/trackArt.ts'
 import { QUALITY, type Quality } from './quality.ts'
 import { createKartEffects } from './art/effects.ts'
 import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
-import { kartScene } from '../styles/kartTokens.ts'
+import { kartScene, kartThemes } from '../styles/kartTokens.ts'
 import { fieldOfView, followCar, startRig, type Chased } from './camera.ts'
 
 const GROUND_SIZE = 400
@@ -88,9 +88,14 @@ export function createKartScene(
   scene.background = new Color(kartScene.sky)
   scene.fog = new Fog(kartScene.sky, 70, 190)
 
-  scene.add(new HemisphereLight(kartScene.lightSky, kartScene.lightGround, 2))
-  const sun = new DirectionalLight(kartScene.lightSky, 1.5)
-  sun.position.set(30, 60, 20)
+  // A track's own light (N1): the harbour's low sunset sun, or the afternoon everywhere else
+  const theme = track ? themeOf(track) : kartThemes.day
+  scene.add(
+    new HemisphereLight(theme.hemisphereSky, theme.hemisphereGround, theme.hemisphereIntensity),
+  )
+  const sun = new DirectionalLight(theme.sun, theme.sunIntensity)
+  const [sunX, sunY, sunZ] = theme.sunDirection
+  sun.position.set(sunX, sunY, sunZ)
   scene.add(sun, sun.target)
   if (shadows) {
     sun.castShadow = true
@@ -134,8 +139,8 @@ export function createKartScene(
       anisotropy: Math.min(settings.anisotropy, renderer.capabilities.getMaxAnisotropy()),
     })
     scene.add(art.group)
-    scene.fog = new Fog(kartScene.skyHorizon, 160, settings.fogFar)
-    scene.background = new Color(kartScene.skyHorizon)
+    scene.fog = new Fog(theme.fog, 160, settings.fogFar)
+    scene.background = new Color(theme.fog)
   } else {
     scene.add(ground, grid)
   }
@@ -200,7 +205,7 @@ export function createKartScene(
       ground.position.set(snappedX, 0, snappedZ)
       grid.position.set(snappedX, 0.01, snappedZ)
       if (shadows) {
-        sun.position.set(x + 30, 60, z + 20)
+        sun.position.set(x + sunX, sunY, z + sunZ)
         sun.target.position.set(x, 0, z)
       }
       art?.update(performance.now() / 1000)
