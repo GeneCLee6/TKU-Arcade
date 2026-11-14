@@ -11,9 +11,9 @@ import {
 import { createRng } from '../../../shared/games/rng.ts'
 import { kartScene } from '../../styles/kartTokens.ts'
 
-type Paint = (context: CanvasRenderingContext2D, size: number, random: () => number) => void
+export type Paint = (context: CanvasRenderingContext2D, size: number, random: () => number) => void
 
-function painted(size: number, seed: number, paint: Paint, anisotropy: number): Texture {
+export function painted(size: number, seed: number, paint: Paint, anisotropy: number): Texture {
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
@@ -30,7 +30,7 @@ function painted(size: number, seed: number, paint: Paint, anisotropy: number): 
 }
 
 /** Fine grain over a base colour: `spots` dots of up to `spread` lighter or darker */
-function grain(
+export function grain(
   context: CanvasRenderingContext2D,
   size: number,
   random: () => number,

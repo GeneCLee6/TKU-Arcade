@@ -12,6 +12,7 @@ import { keepIfBetter, loadBestLap, loadGhost, type RecordNews } from './records
 import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
 import { courseOf, parseTrack, type Track } from '../../shared/kart/track.ts'
+import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
 import {
@@ -78,15 +79,17 @@ export interface SpikeHud {
   readonly hits: number
 }
 
-/** What /kart/spike drives on: the walled yard of J3, J4's test oval, or J5's first track */
-export type SpikeCourse = 'arena' | 'oval' | 'riverside'
+/** What /kart/spike drives on: the walled yard of J3, J4's test oval, J5's first track or N1's second */
+export type SpikeCourse = 'arena' | 'oval' | 'riverside' | 'harbour'
 
-export const SPIKE_COURSES: readonly SpikeCourse[] = ['arena', 'oval', 'riverside']
+export const SPIKE_COURSES: readonly SpikeCourse[] = ['arena', 'oval', 'riverside', 'harbour']
+
+const TRACKS = { oval: TEST_OVAL, riverside: RIVERSIDE, harbour: HARBOUR } as const
 
 /** A course's track, checked like any track file; null for the yard, which is not a track */
 export function spikeTrack(course: SpikeCourse): Track | null {
   if (course === 'arena') return null
-  const parsed = parseTrack(course === 'oval' ? TEST_OVAL : RIVERSIDE)
+  const parsed = parseTrack(TRACKS[course])
   if ('problems' in parsed) throw new Error(`${course}: ${parsed.problems.join('; ')}`)
   return parsed.track
 }
