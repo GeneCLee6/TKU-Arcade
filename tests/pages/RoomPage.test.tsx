@@ -207,14 +207,15 @@ describe('joining', () => {
 
     serverSays(welcome({ name: 'Al (2)', seat: 1 }, { token: TOKEN_B }))
 
-    expect(screen.getByText('Al (2)')).toBeInTheDocument()
+    // The waiting room is a chunk of its own (lazy)
+    expect(await screen.findByText('Al (2)')).toBeInTheDocument()
     expect(localStorage.getItem(SEAT_KEY)).toBe(TOKEN_B)
     expect(localStorage.getItem(NICKNAME_KEY)).toBe('Al')
   })
 
   it('shows the waiting room, the seat counted from one', async () => {
     await joined({ seat: 2 })
-    const row = screen.getByText('Al').closest('li') as HTMLElement
+    const row = (await screen.findByText('Al')).closest('li') as HTMLElement
     expect(within(row).getByText('Seat 3')).toBeInTheDocument()
     expect(startButton()).toBeInTheDocument()
     expect(backLink()).toBeInTheDocument()

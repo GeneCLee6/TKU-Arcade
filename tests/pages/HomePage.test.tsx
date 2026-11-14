@@ -139,12 +139,15 @@ describe('lobby cards', () => {
     const lantern = cardOf('Lantern Lane')
     expect(within(lantern).getByText('2–6 players')).toBeInTheDocument()
     expect(within(lantern).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    const tiles = cardOf('Clubroom Tiles')
+    expect(within(tiles).getByText('2–4 players')).toBeInTheDocument()
+    expect(within(tiles).getByRole('button', { name: 'New room' })).toBeInTheDocument()
     // Word Bridge and Clue Clash (owner's request, 2026-11-14)
     expect(within(cardOf('Word Bridge')).getByText('2–10 players')).toBeInTheDocument()
     expect(within(cardOf('Clue Clash')).getByText('3–7 players')).toBeInTheDocument()
-    // Eight open games; the Coming soon card arrives with its lazy chunk
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(9))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(8)
+    // Nine open games; the Coming soon card arrives with its lazy chunk
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(10))
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(9)
     expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
       'promotion',
       'silent-table',
@@ -152,6 +155,7 @@ describe('lobby cards', () => {
       'bluff',
       'odd-word',
       'lantern',
+      'tiles',
       'word-bridge',
       'clue-clash',
     ])

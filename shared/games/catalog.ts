@@ -15,6 +15,8 @@ import { silentTableMessages } from './silent-table/i18n.ts'
 import { silentTableInfo } from './silent-table/info.ts'
 import { spectrumMessages } from './spectrum/i18n.ts'
 import { spectrumInfo } from './spectrum/info.ts'
+import { tilesMessages } from './tiles/i18n.ts'
+import { tilesInfo } from './tiles/info.ts'
 import { ticTacToeMessages } from './tictactoe/i18n.ts'
 import { ticTacToeInfo } from './tictactoe/info.ts'
 import { wordBridgeMessages } from './word-bridge/i18n.ts'
@@ -29,6 +31,7 @@ export const GAME_INFOS = [
   bluffInfo,
   oddWordInfo,
   lanternInfo,
+  tilesInfo,
   wordBridgeInfo,
   clueClashInfo,
 ] as unknown as readonly AnyGameInfo[]
@@ -53,6 +56,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...bluffMessages.en,
     ...oddWordMessages.en,
     ...lanternMessages.en,
+    ...tilesMessages.en,
     ...wordBridgeMessages.en,
     ...clueClashMessages.en,
   },
@@ -64,6 +68,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...bluffMessages['zh-TW'],
     ...oddWordMessages['zh-TW'],
     ...lanternMessages['zh-TW'],
+    ...tilesMessages['zh-TW'],
     ...wordBridgeMessages['zh-TW'],
     ...clueClashMessages['zh-TW'],
   },

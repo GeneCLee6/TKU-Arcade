@@ -75,6 +75,16 @@ const ART: Record<string, ReactElement> = {
       <path {...stroke} d="M23 3h4M23 15h4" />
     </>
   ),
+  // Three tiles in a run and a fourth on its way: a set being built
+  tiles: (
+    <>
+      <rect {...stroke} x="2.5" y="9" width="8" height="11" rx="1.5" />
+      <rect {...stroke} x="12" y="9" width="8" height="11" rx="1.5" />
+      <rect {...stroke} x="21.5" y="9" width="8" height="11" rx="1.5" />
+      <rect fill="currentColor" x="12" y="22.5" width="8" height="7" rx="1.5" />
+      <path {...stroke} d="M5 14.5h3M14.5 14.5h3M24 14.5h3" />
+    </>
+  ),
   // Four word cards, one turned a different way: the odd one out
   'odd-word': (
     <>

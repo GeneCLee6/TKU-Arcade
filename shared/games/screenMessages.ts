@@ -13,6 +13,7 @@ import { promotionScreenMessages } from './promotion/i18n.screen.ts'
 import { silentTableScreenMessages } from './silent-table/i18n.screen.ts'
 import { soonMessages } from './soon.ts'
 import { spectrumScreenMessages } from './spectrum/i18n.screen.ts'
+import { tilesScreenMessages } from './tiles/i18n.screen.ts'
 import type { GameMessages } from './types.ts'
 import { wordBridgeScreenMessages } from './word-bridge/i18n.screen.ts'
 
@@ -27,6 +28,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...bluffScreenMessages.en,
     ...oddWordScreenMessages.en,
     ...lanternScreenMessages.en,
+    ...tilesScreenMessages.en,
     ...wordBridgeScreenMessages.en,
     ...clueClashScreenMessages.en,
     ...soonMessages.en,
@@ -42,6 +44,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...bluffScreenMessages['zh-TW'],
     ...oddWordScreenMessages['zh-TW'],
     ...lanternScreenMessages['zh-TW'],
+    ...tilesScreenMessages['zh-TW'],
     ...wordBridgeScreenMessages['zh-TW'],
     ...clueClashScreenMessages['zh-TW'],
     ...soonMessages['zh-TW'],

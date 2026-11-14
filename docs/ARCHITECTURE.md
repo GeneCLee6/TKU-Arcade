@@ -46,6 +46,7 @@ shared/                 前後端共用、純 TS、可在 Node 測
     clue-clash/           撞詞（暫名）：同上，clue.ts 是提示、猜題與撞詞的比較；bank.ts 由 scripts/clue-clash-bank.mjs 產生，只在 Worker
     wordFold.ts           文字遊戲共用的比較（NFKC、小寫、去標點、互相包含）
     odd-word/             誰的詞不一樣（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；bank.ts 是詞組（由 scripts/odd-word-bank.mjs 從 CSV 產生，只在 Worker）
+    tiles/                社辦牌陣（暫名）：rules.ts、types.ts、info.ts、i18n.ts、i18n.screen.ts；tiles.ts 是牌組與桌面的判斷（前後端共用）
   poker/hand.ts         牌型引擎
   kart/                 physics.ts、clock.ts、i18n.ts（J1 已有）；track.ts、input.ts、ghost.ts、net.ts、karts.ts、unlocks.ts
 worker/
