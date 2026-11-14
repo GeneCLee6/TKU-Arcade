@@ -10,7 +10,6 @@ import { InstallApp } from '../components/InstallApp.tsx'
 import { JoinRoomForm } from '../components/JoinRoomForm.tsx'
 import { isStandalone } from '../lib/installApp.ts'
 import { NicknameForm } from '../components/NicknameForm.tsx'
-import { PublicRooms } from '../components/PublicRooms.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { useToast } from '../components/useToast.ts'
 import { useT } from '../i18n/useT.ts'
@@ -24,6 +23,12 @@ import { color, font, fontSize, space } from '../styles/tokens.ts'
 // The games that are not open yet (E3): their own chunk, strings included, so they cost the first load
 // only this line
 const ComingSoon = lazy(() => import('../components/ComingSoon.tsx'))
+
+// The public rooms come from the network anyway: their code arrives with them, after the first paint,
+// which keeps it out of every game's first screen too (2026-11-14, with e16)
+const PublicRooms = lazy(() =>
+  import('../components/PublicRooms.tsx').then(({ PublicRooms }) => ({ default: PublicRooms })),
+)
 
 /** The lobby: the games, a link box and the public rooms (e1-t02, e1-t09) */
 export function HomePage() {
@@ -135,7 +140,9 @@ export function HomePage() {
             </Suspense>
           </Grid>
         </section>
-        <PublicRooms />
+        <Suspense>
+          <PublicRooms />
+        </Suspense>
         {/* Signing in (e1-t13) is optional, so it comes last: not in the top bar, which stays one
             row on a 360 px phone, and not above the games, which must start on a phone's first
             screen. Nothing at all while sign-in is not configured */}

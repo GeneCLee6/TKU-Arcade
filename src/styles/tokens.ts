@@ -34,6 +34,7 @@ const light = {
   gameBluffReader: '#6B3FD1',
   gameOddWord: '#B03A12',
   gameLantern: '#A8246A',
+  gameKite: '#466F00',
   success: '#13703A',
   danger: '#B91C1C',
   warning: '#9C4A06',
@@ -84,6 +85,7 @@ const dark: Record<ColorName, string> = {
   gameBluffReader: '#B48CFF',
   gameOddWord: '#FF8F66',
   gameLantern: '#FF9ECF',
+  gameKite: '#C6F35A',
   success: '#5CFFA8',
   danger: '#FF5A6E',
   warning: '#FFC23D',
@@ -133,6 +135,7 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   bluff: 'gameBluffReader',
   'odd-word': 'gameOddWord',
   lantern: 'gameLantern',
+  kite: 'gameKite',
 }
 
 /** A game's hue, for its card and its room: what `--color-accent` becomes there */

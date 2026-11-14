@@ -4,7 +4,7 @@
 
 - 淡江系列的第三個站，但這個是「玩」的地方。**2026-11-09 擁有者同意改成電競風、2026-11-11 核准（批次 E1，`e7-t14`）**：夜色深底、青色（`brand`）與洋紅（`magenta`）點綴、斜切的分頁與按鈕、切角的玻璃面板、背景一片淡淡的透視格線地板。參考是擁有者看過的可點原型（純 HTML，不在 repo 裡）；照它的樣子做，程式是自己寫的。原本「乾淨、沒有霓虹」的方向作廢。
 - **深色是預設**（沒有選過的人看到深色）；淺色是同一套設計的白天版（淺灰藍底、白色玻璃、深青與深洋紅），對比測試一樣要過。主題切換仍是「跟隨系統／淺色／深色」三個，選了就記在 localStorage（`tku-arcade.theme`；選回深色就刪掉這筆）。
-- 每款遊戲一個主題色（`e7-t12` 的主題色部分）：陞官圖金色（深色 `#FFC23D`、淺色 `#9A5800`）、默契牌局綠（`#5CFFA8`／`#0B7A47`）、光譜猜題藍（`#4DA3FF`／`#1D5FC4`，H2）、真假朗讀紫（`#B48CFF`／`#6B3FD1`，批次 E3 的即將推出卡片先加）、誰的詞不一樣橘紅（`#FF8F66`／`#B03A12`，2026-11-14）、宮燈點點宮燈粉（`#FF9ECF`／`#A8246A`，2026-11-14）；其他遊戲沒有主題色時用 `brand`。卡丁車用 `brand` 的青（批次 E3 決定，不另加 token；要和品牌分開再加進 `gameHues`）。用法：
+- 每款遊戲一個主題色（`e7-t12` 的主題色部分）：陞官圖金色（深色 `#FFC23D`、淺色 `#9A5800`）、默契牌局綠（`#5CFFA8`／`#0B7A47`）、光譜猜題藍（`#4DA3FF`／`#1D5FC4`，H2）、真假朗讀紫（`#B48CFF`／`#6B3FD1`，批次 E3 的即將推出卡片先加）、誰的詞不一樣橘紅（`#FF8F66`／`#B03A12`，2026-11-14）、宮燈點點宮燈粉（`#FF9ECF`／`#A8246A`，2026-11-14）、放風箏草綠（`#C6F35A`／`#466F00`，2026-11-14；風箏本身的顏色沿用 `promotionBoard` 的宮廷色，深淺色相同）；其他遊戲沒有主題色時用 `brand`。卡丁車用 `brand` 的青（批次 E3 決定，不另加 token；要和品牌分開再加進 `gameHues`）。用法：
   - 大廳卡片與公開房列表的那一列，在自己的子樹把 `--color-accent` 換成那款遊戲的顏色（`gameHue(id)`）；
   - 房間頁與規則頁，`data-game="<id>"` 一出現在頁面上，`GlobalStyle` 用 `:root:has([data-game=…])` 把整頁的 `--color-accent` 換掉：頂欄的按下狀態、背景的光暈與格線、主按鈕、標題前的斜槓都跟著變。元件不必知道是哪款遊戲。
 - 陞官圖圖版（`promotionBoard`）、默契牌局的牌桌與牌（`felt*`、`card*`、`chip*`）、座位顏色（`seat0`–`seat5`）都**不跟著改**，深淺色相同。
@@ -15,7 +15,7 @@
   - 底與面：`bg`（頁面）、`surface`（不透明：對話框、toast、dock、有列的地方）、`panel`（玻璃，半透明）、`sunken`（陷進面板：聊天紀錄、輸入框、列）、`raised`／`raisedHover`（面板上控制項自己的底色：次要按鈕、沒按下的分段）。
   - 字：`text`、`muted`；線：`border`（輸入框、次要按鈕的框）、`line`（面板的髮絲邊）。
   - 品牌：`brand`（青）、`magenta`；`accent`＝目前的主題色（大廳是 `brand`，遊戲裡是那款遊戲的顏色），`onAccent` 在每個主題色與兩個品牌色上都讀得到（深色是近黑、淺色是白）。
-  - 每款遊戲：`gamePromotion`、`gameSilentTable`、`gameSpectrum`、`gameBluffReader`、`gameOddWord`、`gameLantern`。
+  - 每款遊戲：`gamePromotion`、`gameSilentTable`、`gameSpectrum`、`gameBluffReader`、`gameOddWord`、`gameLantern`、`gameKite`。
   - 狀態：`success`、`danger`、`warning`；`overlay`。
   - 不跟主題變的：`qr*`、`seat*`、`felt*`、`card*`、`chip*`，`promotionBoard`、`kartScene`（純值）。
   - `tests/styles/tokens.test.ts` 擋：文字配色 4.5:1；玻璃與 `sunken`、`raised` 是半透明的，測試先把它疊在 `bg` 上再算。
@@ -83,6 +83,7 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
    | Judge / Honest reader / Bluffer | 裁判／老實人／瞎掰人 |
    | Odd one out / Blank / Runs the round | 詞不一樣的人／白板／主持這回合 |
    | Lantern / Match / Moonlight / The avenue / Hand up / Too early | 宮燈（燈）／火柴／月光／大道／舉手／點太早 |
+   | Kite / Kite train / Note / Snapped / Fly it / Set aside | 風箏／串風箏／紙條／斷線／放上去／收起來 |
    | Drift / Boost gauge / Boost | 甩尾／加速條／噴射 |
    | Start boost / Jump start / Release boost / Chain / Boost slide | 起跑加速／偷跑熄火／收尾加速／連噴／推滑 |
    | Stacked boost / Flick / Counter catch / Boost pad / Chain broken | 疊噴／甩頭／反打回正／加速帶／連噴中斷 |
