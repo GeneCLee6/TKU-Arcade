@@ -71,6 +71,9 @@ export function RoundReveal({
       {view.explanation !== null && (
         <Part $animate={animate} $step={3}>
           <Label>{t('games.bluff.ui.explanation')}</Label>
+          {view.term.category !== null && view.term.choices.length > 1 && (
+            <Body>{t('games.bluff.ui.trueCategory', { category: view.term.category })}</Body>
+          )}
           <Explanation lang="zh-TW">
             <Lead>{view.term.term}</Lead>
             {view.explanation}

@@ -457,7 +457,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     // Sound may start only after a gesture: the first key is one
     audio.unlock()
     const { bindings, enabled } = options.controls()
-    if (!enabled || event.altKey || event.ctrlKey || event.metaKey) return
+    // Ctrl itself boosts (ALWAYS_KEYS), and an arrow pressed while Ctrl is held still steers
+    const ctrlChord = event.ctrlKey && !event.code.startsWith('Control') && !event.code.startsWith('Arrow')
+    if (!enabled || event.altKey || ctrlChord || event.metaKey) return
     // A slider, a list or a text box keeps its keys: the tuning panel is used while the car waits
     if (isField(event.target)) return
     if (!ownsKey(event.code, bindings)) return
@@ -474,6 +476,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   }
   // The key-up of a key let go in another window never arrives
   const onBlur = () => held.clear()
+  // Ctrl boosts, and Ctrl with W closes the tab before any page can stop it: during a race, the
+  // browser asks first (2026-11-14)
+  const onBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (trial?.phase !== 'racing') return
+    event.preventDefault()
+    event.returnValue = ''
+  }
 
   let stopped = false
   const stop = () => {
@@ -483,6 +492,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     cancelAnimationFrame(handle)
     window.removeEventListener('keydown', onKeyDown)
     window.removeEventListener('keyup', onKeyUp)
+    window.removeEventListener('beforeunload', onBeforeUnload)
     window.removeEventListener('blur', onBlur)
     scene.canvas.removeEventListener('webglcontextlost', onContextLost)
     scene.dispose()
@@ -507,6 +517,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   })
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
+  window.addEventListener('beforeunload', onBeforeUnload)
   window.addEventListener('blur', onBlur)
   scene.canvas.addEventListener('webglcontextlost', onContextLost)
   handle = requestAnimationFrame(frame)

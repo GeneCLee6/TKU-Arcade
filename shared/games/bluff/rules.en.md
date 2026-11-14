@@ -9,7 +9,9 @@ The idea of one player reading the real meaning while the rest bluff and a judge
 - **Judge**: taken in seat order, once each a game (the host can make it twice). Everyone knows who the judge is. The judge sees the term only.
 - **Honest reader**: drawn in secret from the others, gets the **real meaning** and reads it out as it is.
 - **Mole**: with 4 players or more, one more is drawn in secret. The mole bluffs too, and also gets **3 secret words** to work into their reading. The site does not check whether they did; everyone listens.
-- **Bluffers**: everyone else. They see the term and a small hint, and make up a meaning that sounds true.
+- **Bluffers**: everyone else. They see the term and its three categories, and make up a meaning that sounds true.
+
+Every term comes with **three categories** (say, "an old official post / a kind of bird / a traditional pastry"). Everyone sees them, the judge too. The real meaning belongs to one of them, but only the honest reader knows which. Bluffers may pick any of the three; the reveal shows the true one.
 
 Each player knows only their own role.
 
@@ -42,7 +44,7 @@ Set by the host in the waiting room.
 - **Everyone judges twice**: twice as many rounds as players.
 - **Seconds to read**: 20 to 180 seconds, 60 by default.
 - **A mole with secret words (4 players or more)**: off, there is no mole and no secret words.
-- **Bluffers get a hint**: off, bluffers and the mole see the term only.
+- **Show three categories, one of them true**: on by default. Off, everyone sees the term only.
 - **Countdowns**: off, there is no countdown for cards, reading or the vote; the buttons move the game on.
 
 ## When someone is away

@@ -76,8 +76,8 @@ function parseAction(action: unknown): BluffAction | null {
 }
 
 const termAt = (id: number): BluffTerm => {
-  const [category, term, hint, explanation] = BLUFF_TERMS[id - 1]
-  return { id, category, term, hint, explanation }
+  const [term, category, decoy1, decoy2, explanation] = BLUFF_TERMS[id - 1]
+  return { id, category, term, choices: [category, decoy1, decoy2], explanation }
 }
 
 /** A term this room has not had; once all have come up, the bank starts over */
@@ -119,7 +119,10 @@ function dealRound(
   const honest = rng.pick(order)
   const withMole = state.moleOn && state.players.length >= MOLE_MIN_PLAYERS
   const mole = withMole ? rng.pick(order.filter((seat) => seat !== honest)) : null
-  const { term, used } = drawTerm(state.usedTerms, rng)
+  const drawn = drawTerm(state.usedTerms, rng)
+  const used = drawn.used
+  // The three categories in a fresh order each time, so that the true one has no place of its own
+  const term = { ...drawn.term, choices: rng.shuffle(drawn.term.choices ?? [drawn.term.category]) }
   return {
     phase: 'prepare',
     round,
@@ -336,15 +339,19 @@ export const bluff: GameModule<BluffState, BluffAction, BluffView, BluffOptions>
       ...(vote !== null ? [state.judge] : []),
       ...state.order.filter((reader) => String(reader) in stickers),
     ]
-    const bluffing = role === 'bluffer' || role === 'mole'
     const own = seat === null ? undefined : stickers[String(seat)]
     return {
       ...open,
       you: seat,
       role,
-      term: { id: term.id, category: term.category, term: term.term },
+      term: {
+        id: term.id,
+        term: term.term,
+        // A round dealt before 2026-11-14 had one category, shown to all, and a hint for bluffers
+        choices: state.hints ? (term.choices ?? [term.category]) : [],
+        category: shown || term.choices === undefined ? term.category : null,
+      },
       explanation: shown || role === 'honest' ? term.explanation : null,
-      hint: shown || (bluffing && state.hints) ? term.hint : null,
       words: shown || role === 'mole' ? words : [],
       honest: shown ? honest : null,
       mole: shown ? mole : null,

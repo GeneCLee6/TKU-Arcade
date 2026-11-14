@@ -39,7 +39,7 @@ const en = {
   'kart.hud.minimap': 'Track map',
   'kart.spike.canvas': 'A box car in a walled test yard, seen from behind',
   'kart.spike.keys':
-    '{throttle} to accelerate, {brake} to brake or reverse, {left} and {right} to steer. Hold {drift} while steering to drift: drifting fills the boost gauge, and {boost} fires a boost. Let go of a drift during a boost to chain another. {reset} puts the car back at the last safe place. F shows the numbers.',
+    '{throttle} to accelerate, {brake} to brake or reverse, {left} and {right} to steer. Hold {drift} while steering to drift: drifting fills the boost gauge, and {boost} fires a boost. Let go of a drift during a boost to chain another. {reset} puts the car back at the last safe place. F shows the numbers. Shift drifts and Ctrl boosts too.',
   'kart.spike.noTouch':
     'No touch controls in this test: driving needs a keyboard or a gamepad. The numbers still work.',
   'kart.spike.noWebgl': "This browser can't run WebGL 2, so the test can't start.",
@@ -263,7 +263,7 @@ const zhTW: Record<KartMessageKey, string> = {
   'kart.hud.minimap': '賽道小地圖',
   'kart.spike.canvas': '圍牆圍起來的測試場裡的一台方塊車，從車後看',
   'kart.spike.keys':
-    '{throttle} 加速，{brake} 煞車或倒車，{left}、{right} 轉向。轉向時按住 {drift} 甩尾：甩尾會累積加速條，按 {boost} 噴射。噴射中甩尾再放開，可以連噴。按 {reset} 回到上一個安全的地方。按 F 看數字。',
+    '{throttle} 加速，{brake} 煞車或倒車，{left}、{right} 轉向。轉向時按住 {drift} 甩尾：甩尾會累積加速條，按 {boost} 噴射。噴射中甩尾再放開，可以連噴。按 {reset} 回到上一個安全的地方。按 F 看數字。Shift 也能甩尾、Ctrl 也能噴射。',
   'kart.spike.noTouch': '這個測試沒有觸控操作，要鍵盤或手把才能開。數字還是看得到。',
   'kart.spike.noWebgl': '這個瀏覽器無法執行 WebGL 2，所以測試無法開始。',
   'kart.spike.contextLost': '瀏覽器收回了繪圖資源。請重新整理頁面再開始。',

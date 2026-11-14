@@ -120,13 +120,12 @@ describe('the cards', () => {
     expect(within(card).queryByTestId('words')).toBeNull()
   })
 
-  it('gives the mole the hint and three secret words, and never the meaning', () => {
+  it('gives the mole three secret words, and never the meaning', () => {
     const state = start()
     expect(state.mole).not.toBeNull()
     show(state, state.mole)
     const card = screen.getByTestId('role-card')
     expect(within(card).getByTestId('role')).toHaveTextContent('You are the mole')
-    expect(within(card).getByTestId('hint')).toHaveTextContent(state.term.hint)
     for (const word of state.words) expect(within(card).getByTestId('words')).toHaveTextContent(word)
     expect(screen.queryByText(state.term.explanation)).toBeNull()
   })
