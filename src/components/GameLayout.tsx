@@ -110,7 +110,7 @@ export function GameLayout({
           <GameColumn>
             {resultPanel}
             {children}
-            <Dock $stuck>{dock}</Dock>
+            <Dock $stuck data-dock="">{dock}</Dock>
           </GameColumn>
         )}
         <SideColumn>
@@ -185,7 +185,7 @@ export function PhoneDock({ room, dock, players }: PhoneDockProps) {
 
   return (
     <>
-      <Dock $stuck>
+      <Dock $stuck data-dock="">
         {dock}
         <DockButtons>
           {players !== null && (

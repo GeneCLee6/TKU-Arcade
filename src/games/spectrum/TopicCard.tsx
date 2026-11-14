@@ -19,6 +19,7 @@ export function TopicCard({ topic }: { topic: SpectrumTopic }) {
         <span>{topic.category}</span>
       </Category>
       <Topic lang="zh-TW">{topic.topic}</Topic>
+      {topic.scene && <Scene lang="zh-TW">{topic.scene}</Scene>}
       <Scale>
         <End $high={false}>
           <EndNumber>1</EndNumber>
@@ -85,6 +86,16 @@ const Topic = styled.h2`
   letter-spacing: 0.1em;
   overflow-wrap: anywhere;
   text-shadow: 0 0 32px color-mix(in srgb, ${color.accent} 45%, transparent);
+`
+
+// What kind of answer the topic asks for, in a sentence (2026-11-14)
+const Scene = styled.p`
+  margin: 0;
+  max-width: 640px;
+  color: ${color.text};
+  font-size: ${fontSize.lg}px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 `
 
 const Scale = styled.div`

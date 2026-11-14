@@ -213,8 +213,8 @@ describe('topics', () => {
       expect(card).toHaveLength(CARD_SIZE)
       expect(CARD_SIZE).toBe(4)
       for (const topic of card) {
-        const [category, text, low, high] = SPECTRUM_TOPICS[topic.id - 1]
-        expect(topic).toEqual({ id: topic.id, category, topic: text, low, high })
+        const [category, text, scene, low, high] = SPECTRUM_TOPICS[topic.id - 1]
+        expect(topic).toEqual({ id: topic.id, category, topic: text, scene, low, high })
       }
       expect(new Set(card.map((topic) => topic.category)).size).toBe(CARD_SIZE)
     }
@@ -358,6 +358,7 @@ describe('guessing the largest and the smallest', () => {
       guess: { kind: 'extremes', max: 3, min: 2 },
       missed: null,
       correct: [3, 2],
+      close: [],
       points: [2, 0, 1, 1],
     })
     expect(both.players.map((player) => player.score)).toEqual([2, 0, 1, 1])
@@ -412,15 +413,25 @@ describe('guessing the largest and the smallest', () => {
 describe('guessing the whole order', () => {
   const NUMBERS = { 1: 7, 2: 2, 3: 9, 4: 4 }
 
-  it('scores one for the guesser and one for each answerer in the right place', () => {
+  it('scores two each for an answer in its place and one each for one place off (2026-11-14)', () => {
     const right = act(guessing(5, NUMBERS, { mode: 'order' }), order([2, 4, 1, 3]), 0)
     expect(right.reveal?.correct).toEqual([2, 4, 1, 3])
-    expect(right.reveal?.points).toEqual([4, 1, 1, 1, 1])
+    expect(right.reveal?.close).toEqual([])
+    expect(right.reveal?.points).toEqual([8, 2, 2, 2, 2])
 
-    // 4 and 1 swapped: the two ends are still right
+    // 4 and 1 swapped: the two ends are right, the middle two one place off
     const swapped = act(guessing(5, NUMBERS, { mode: 'order' }), order([2, 1, 4, 3]), 0)
     expect(swapped.reveal?.correct).toEqual([2, 3])
-    expect(swapped.reveal?.points).toEqual([2, 0, 1, 1, 0])
+    expect(swapped.reveal?.close).toEqual([1, 4])
+    expect(swapped.reveal?.points).toEqual([6, 1, 2, 2, 1])
+  })
+
+  it('does not zero out a whole line for one early slip', () => {
+    // Truly 2, 4, 7, 9; the smallest put last: the other three are each one place off
+    const slipped = act(guessing(5, NUMBERS, { mode: 'order' }), order([4, 1, 3, 2]), 0)
+    expect(slipped.reveal?.correct).toEqual([])
+    expect(slipped.reveal?.close).toEqual([4, 1, 3])
+    expect(slipped.reveal?.points).toEqual([3, 1, 0, 1, 1])
   })
 
   it('lets tied numbers sit in either order', () => {
@@ -600,6 +611,7 @@ describe('the clock', () => {
       guess: null,
       missed: 'tooFew',
       correct: [],
+      close: [],
       points: [0, 0, 0, 0],
     })
     expect(act(start(4), TIME_UP, 'system').reveal?.missed).toBe('tooFew')
@@ -607,7 +619,7 @@ describe('the clock', () => {
 
   it('when guessing runs out, the guess counts as none', () => {
     const after = act(guessing(4, { 1: 7, 2: 2, 3: 9 }), TIME_UP, 'system')
-    expect(after.reveal).toEqual({ guess: null, missed: 'time', correct: [], points: [0, 0, 0, 0] })
+    expect(after.reveal).toEqual({ guess: null, missed: 'time', correct: [], close: [], points: [0, 0, 0, 0] })
   })
 
   it('only the room can call time, and a late call at a reveal does nothing', () => {
@@ -649,6 +661,7 @@ describe('covering for an absent seat', () => {
       guess: null,
       missed: 'skipped',
       correct: [],
+      close: [],
       points: [0, 0, 0, 0],
     })
     expect(spectrum.skipAction?.(shown, 0)).toEqual(skip(0))

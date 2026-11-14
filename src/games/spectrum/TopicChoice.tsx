@@ -33,6 +33,7 @@ export function TopicChoice({
                 <span>{topic.category}</span>
               </Category>
               <Topic lang="zh-TW">{topic.topic}</Topic>
+              {topic.scene && <Scene lang="zh-TW">{topic.scene}</Scene>}
               <Ends>
                 <End $high={false}>
                   <EndNumber>1</EndNumber> <span lang="zh-TW">{topic.low}</span>
@@ -151,6 +152,13 @@ const Topic = styled.span`
   font-size: ${fontSize.xl}px;
   font-weight: 800;
   line-height: 1.2;
+  overflow-wrap: anywhere;
+`
+
+const Scene = styled.span`
+  color: ${color.text};
+  font-size: ${fontSize.sm}px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 `
 

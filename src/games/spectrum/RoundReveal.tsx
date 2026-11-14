@@ -52,8 +52,9 @@ export function RoundReveal({ view, nameOf, animate }: RoundRevealProps) {
           })}
         {guess?.kind === 'order' && (
           <Verdict $right={reveal.correct.length === guess.seats.length}>
-            {t('games.spectrum.ui.orderScore', {
+            {t('games.spectrum.ui.orderScoreClose', {
               right: reveal.correct.length,
+              close: (reveal.close ?? []).length,
               total: guess.seats.length,
             })}
           </Verdict>
