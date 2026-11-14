@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState } from 'react'
 import { useT } from '../i18n/useT.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
-import { hasRules, type RulesEdition } from '../lib/rulesDoc.ts'
+import { hasRules, type RulesEdition } from '../lib/rulesList.ts'
 import { Button } from './Button.tsx'
 import { Dialog } from './Dialog.tsx'
 

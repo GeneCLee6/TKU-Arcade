@@ -1,8 +1,12 @@
 // Each game's rules, two markdown files beside its module (docs/DESIGN.md §5). Each is a chunk of its
 // own, fetched when someone asks to read it. The page and the room's "how to play" both read them here.
+// Only the rules' own lazy chunks import this file: the first screens ask rulesList.ts instead.
 import { useEffect, useState } from 'react'
 import type { Language } from '../i18n/t.ts'
 import { useLanguage } from '../i18n/useT.ts'
+import { hasRules, type RulesEdition } from './rulesList.ts'
+
+export { hasRules, type RulesEdition }
 
 // A game with a second edition (promotion's full one, C7) has a second pair, `rulesFull.*.md`
 const DOCS = {
@@ -13,15 +17,8 @@ const DOCS = {
   }),
 }
 
-/** Which of a game's rules: its own, or its full edition's */
-export type RulesEdition = 'simple' | 'full'
-
 const docPath = (gameId: string, language: Language, edition: RulesEdition = 'simple') =>
   `../../shared/games/${gameId}/${edition === 'full' ? 'rulesFull' : 'rules'}.${language}.md`
-
-/** English is where a game's rules start, so that one decides whether it has any */
-export const hasRules = (gameId: string, edition: RulesEdition = 'simple'): boolean =>
-  docPath(gameId, 'en', edition) in DOCS
 
 export type RulesDoc =
   | { status: 'loading' }

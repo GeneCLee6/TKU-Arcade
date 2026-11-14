@@ -19,6 +19,7 @@ A browser game lobby for friends of the Tamkang University Bridge Club: open one
 | Silent Table | Cooperative poker without talking: rank chips are the only hints | M1 |
 | Spectrum (working title) | Everyone but the guesser gets a secret 1–10 and answers a two-ended topic; the guesser picks the highest and lowest | M1 |
 | Bluff Reader (working title) | One honest reader, everyone else bluffs, the judge picks | M1 |
+| Odd Word Out (working title) | Most players get one word, a few get a similar one; describe yours on your voice call and spot the odd ones out | Off-roadmap |
 | Kart (working title) | Arcade kart racing: drift, fill the gauge, boost | M2–M3 |
 
 Game mechanics are not protected by copyright; names, art, characters, tracks, music and prompt decks are. Everything of the second kind here is original or CC0/CC BY licensed; asset files will be registered in `docs/ASSETS.md` once the first one lands (none yet). Games that borrow a modern game's mechanics name it only on their own rules page, in one descriptive sentence. The reasoning is in [`docs/PRD/01-legal-ip-analysis.md`](docs/PRD/01-legal-ip-analysis.md).
