@@ -19,6 +19,8 @@ const CATEGORIES = [
   '科技網路',
   '穿搭',
   '日常',
+  // The owner's request, 2026-11-14: the friends are TVB drama and Stephen Chow fans
+  '港劇港片',
 ]
 
 describe('the word bank', () => {
