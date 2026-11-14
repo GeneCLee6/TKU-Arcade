@@ -108,17 +108,6 @@ const en = {
   'games.promotion.full.civilianShort': 'Civilian',
 
   'games.promotion.full.settlement': 'Settlement',
-  'games.promotion.full.settle.before': 'Before',
-  'games.promotion.full.settle.grade': 'Grade',
-  'games.promotion.full.settle.duipin': 'Ranks compared',
-  'games.promotion.full.settle.share': 'Pot shared',
-  'games.promotion.full.settle.after': 'Final',
-  'games.promotion.full.settle.player': 'Player',
-  'games.promotion.full.settle.explain':
-    'Every two players compare grades: the lower pays the higher 5 silver a grade. Then the pot is split evenly.',
-  'games.promotion.full.settle.remainder': '{name}, the poorest, takes the odd {amount} silver.',
-  'games.promotion.full.settle.next': 'Next step',
-  'games.promotion.full.settle.close': 'Close',
 
   'games.promotion.full.req.zhengtu': 'Needs the regular route (a tribute degree or better)',
   'games.promotion.full.req.juren': 'Needs the juren degree',
@@ -132,18 +121,6 @@ const en = {
   'games.promotion.full.tag.jinshi': 'Jin',
   'games.promotion.full.tag.banner': 'Bnr',
   'games.promotion.full.tag.guard': 'Grd',
-  'games.promotion.full.detail.reward': 'On landing: the pot pays {amount} silver',
-  'games.promotion.full.detail.fee': 'On landing: pay the pot {amount} silver',
-  'games.promotion.full.detail.retire': 'Retire here: everyone still in office pays {amount} silver',
-  'games.promotion.full.detail.keepRank': 'Keeps the rank held before for the final comparison',
-  'games.promotion.full.detail.out': 'Out of the game: compared at nothing',
-  'games.promotion.full.detail.degree': 'Gives the degree: {degree}',
-  'games.promotion.full.detail.wu': 'Makes a military jinshi',
-  'games.promotion.full.detail.fengjue': 'Four of a kind: {cell}',
-  'games.promotion.full.detail.banner': 'Banner household, {face}: {cell}',
-  'games.promotion.full.detail.here': 'Here: {names}',
-  'games.promotion.full.detail.note':
-    'Real Qing offices arranged for this game after the traditional one; the moves and silver are reconstructions.',
   // C8: the players' choices, events, restoration, and the money changes
   'games.promotion.full.result.dahe':
     'Grand congratulations after {rounds} rounds ends the game: ranks are compared and the pot is shared.',
@@ -200,15 +177,6 @@ const en = {
   'games.promotion.full.tag.event': 'Evt',
   'games.promotion.full.titlesShort': '{count} title(s)',
   'games.promotion.full.boughtShort': 'Bought',
-  'games.promotion.full.detail.offer':
-    'An offered post: whoever the dice send here may decline and stay where they were',
-  'games.promotion.full.detail.minor':
-    'A minor technical post: anyone with the standing (a licentiate or better) may buy a regular office instead, 5 silver a rank step',
-  'games.promotion.full.detail.fine': 'A commission: rolling Graft while holding it costs a {amount}-silver fine to the pot',
-  'games.promotion.full.detail.title': 'Comes with an honorary title (兼銜): a grade more in the final comparison',
-  'games.promotion.full.detail.event': 'An event: a second throw decides by its face, reckoned from the post held',
-  'games.promotion.full.detail.restore':
-    'Dismissed: on later turns Virtue restores the post, Talent the one below, three Graft exile; anything else waits',
   'games.promotion.full.gradeTitle': 'Grade {grade} in the final comparison: {name}',
 }
 
@@ -313,16 +281,6 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.full.civilianShort': '民',
 
   'games.promotion.full.settlement': '結算',
-  'games.promotion.full.settle.before': '結算前',
-  'games.promotion.full.settle.grade': '級數',
-  'games.promotion.full.settle.duipin': '對品',
-  'games.promotion.full.settle.share': '分注',
-  'games.promotion.full.settle.after': '最後',
-  'games.promotion.full.settle.player': '玩家',
-  'games.promotion.full.settle.explain': '每兩個人比級數，每差一級，低的付高的 5 兩；之後公注平分給所有人。',
-  'games.promotion.full.settle.remainder': '{name} 最窮，拿走除不盡的 {amount} 兩。',
-  'games.promotion.full.settle.next': '下一步',
-  'games.promotion.full.settle.close': '關閉',
 
   'games.promotion.full.req.zhengtu': '要正途（貢生以上的功名）',
   'games.promotion.full.req.juren': '要舉人',
@@ -336,17 +294,6 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.full.tag.jinshi': '進',
   'games.promotion.full.tag.banner': '旗',
   'games.promotion.full.tag.guard': '侍',
-  'games.promotion.full.detail.reward': '落在這裡：公注付 {amount} 兩',
-  'games.promotion.full.detail.fee': '落在這裡：付公注 {amount} 兩',
-  'games.promotion.full.detail.retire': '在這裡退休：每個還在任的人付 {amount} 兩賀儀',
-  'games.promotion.full.detail.keepRank': '結算時保留原來的品級',
-  'games.promotion.full.detail.out': '出局：結算時級數算 0',
-  'games.promotion.full.detail.degree': '取得功名：{degree}',
-  'games.promotion.full.detail.wu': '成為武進士',
-  'games.promotion.full.detail.fengjue': '四同：到{cell}',
-  'games.promotion.full.detail.banner': '旗籍擲到{face}：到{cell}',
-  'games.promotion.full.detail.here': '在這裡：{names}',
-  'games.promotion.full.detail.note': '依清代真實官制、照傳統玩法自行整理；去向與銀兩是重建的。',
   'games.promotion.full.result.dahe': '第 {rounds} 回合有人大賀，遊戲結束：對品、分注後結算。',
   'games.promotion.full.loading': '正在畫圖版…',
   'games.promotion.full.yourChoice': '輪到你決定：在圖版上回答',
@@ -399,12 +346,6 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.full.tag.event': '考',
   'games.promotion.full.titlesShort': '銜{count}',
   'games.promotion.full.boughtShort': '捐',
-  'games.promotion.full.detail.offer': '授職：骰子送到這裡的人可以不接受，留在原地',
-  'games.promotion.full.detail.minor': '雜職：有功名（生員、監生以上）的人可以改捐一個正職，高一級付 5 兩',
-  'games.promotion.full.detail.fine': '差事：在任上擲到贓，罰 {amount} 兩給公注',
-  'games.promotion.full.detail.title': '附帶兼銜：結算對品時多算一級',
-  'games.promotion.full.detail.event': '考績：再擲一次，照擲出的那一面、從原來的官職算結果',
-  'games.promotion.full.detail.restore': '革職：之後每回合擲德開復原職、擲才降一級開復、擲三個以上的贓發往長戍，其他等下一回合',
   'games.promotion.full.gradeTitle': '對品第 {grade} 級：{name}',
 }
 

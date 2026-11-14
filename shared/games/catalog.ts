@@ -13,6 +13,8 @@ import { oddWordMessages } from './odd-word/i18n.ts'
 import { oddWordInfo } from './odd-word/info.ts'
 import { secretScrollMessages } from './secret-scroll/i18n.ts'
 import { secretScrollInfo } from './secret-scroll/info.ts'
+import { palaceMessages } from './palace/i18n.ts'
+import { palaceInfo } from './palace/info.ts'
 import { miseryMessages } from './misery/i18n.ts'
 import { miseryInfo } from './misery/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
@@ -46,6 +48,7 @@ export const GAME_INFOS = [
   tradersInfo,
   secretScrollInfo,
   wasabiInfo,
+  palaceInfo,
   miseryInfo,
   wordBridgeInfo,
   clueClashInfo,
@@ -78,6 +81,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...tradersMessages.en,
     ...secretScrollMessages.en,
     ...wasabiMessages.en,
+    ...palaceMessages.en,
     ...miseryMessages.en,
   },
   'zh-TW': {
@@ -95,6 +99,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...tradersMessages['zh-TW'],
     ...secretScrollMessages['zh-TW'],
     ...wasabiMessages['zh-TW'],
+    ...palaceMessages['zh-TW'],
     ...miseryMessages['zh-TW'],
   },
 }

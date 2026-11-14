@@ -181,6 +181,12 @@ owner: GeneCLee6
 - 做法：暫名「撞詞／Clue Clash」，題目全部自寫（不放真人姓名與片名）；評語、畫面自寫；規則頁用一句話描述它像 Just One。
 - **風險：很低。**
 
+### 2.16 朝堂暗鬥（Coup 玩法，2026-11-14 加）
+
+- 原作：Coup（Rikki Tahta 設計，Indie Boards & Cards 出版）。
+- 不受保護：自稱角色、可以唬人、任何人可質疑、輸的一方失去一張牌、阻擋與質疑阻擋、兩張牌都失去就出局的玩法。
+- 不能做：原作的名稱、角色名稱（公爵、刺客、隊長、大使、女伯爵）、反烏托邦宮廷主題、卡牌美術、說明書文字與圖示。
+- 做法：暫名「朝堂暗鬥／Palace Bluff」，主題改成中國古代朝堂，五個官職（戶部尚書、錦衣衛、大太監、軍師、太后）與行動名稱（領俸、請賞、逼宮、徵稅、緝拿、勒索、籌謀）都自己取，卡牌是 CSS 畫的字印；規則頁用一句話說玩法來自 Coup。
 ## 3. 資產來源政策
 
 | 來源 | 可不可以 | 條件 |
@@ -205,7 +211,7 @@ CI 會擋沒有登記的資產檔（E12 AC-12.6）。
 5. **不對外宣傳、不上平台**；連結只給朋友。
 6. **接到通知就下架**，不爭辯；功能旗標要能分遊戲關閉。
 7. 上線任何一款新遊戲前跑一次 **IP 檢查清單**（E12 AC-12.8）。
-8. **不抄表達的原作**（CLAUDE.md 規則 1 列的五款之外，之後新遊戲學了誰就加在這裡）：The Mind（Wolfgang Warsch，NSV；宮燈點點，2026-11-14）；Hanabi（Antoine Bauza；放風箏，2026-11-14）；Splendor（璀璨寶石，Marc André，Space Cowboys；滬尾商行，2026-11-14，見 §2.9）；Love Letter（Seiji Kanai，Z-Man／AEG；奪祕笈，2026-11-14）；Skull（Hervé Marly；芥末餃子，2026-11-14）；Codenames 與 Codenames Duet（Vlaada Chvátil，Czech Games Edition；搭橋，2026-11-14，見 §2.14）；Just One（Ludovic Roudy、Bruno Sautter，Repos Production；撞詞，2026-11-14，見 §2.15）。
+8. **不抄表達的原作**（CLAUDE.md 規則 1 列的五款之外，之後新遊戲學了誰就加在這裡）：The Mind（Wolfgang Warsch，NSV；宮燈點點，2026-11-14）；Hanabi（Antoine Bauza；放風箏，2026-11-14）；Splendor（璀璨寶石，Marc André，Space Cowboys；滬尾商行，2026-11-14，見 §2.9）；Love Letter（Seiji Kanai，Z-Man／AEG；奪祕笈，2026-11-14）；Skull（Hervé Marly；芥末餃子，2026-11-14）；Codenames 與 Codenames Duet（Vlaada Chvátil，Czech Games Edition；搭橋，2026-11-14，見 §2.14）；Just One（Ludovic Roudy、Bruno Sautter，Repos Production；撞詞，2026-11-14，見 §2.15）；Coup（Rikki Tahta，Indie Boards & Cards；朝堂暗鬥，2026-11-14，見 §2.16）。
 
 ## 5. 回答擁有者的三個問題
 

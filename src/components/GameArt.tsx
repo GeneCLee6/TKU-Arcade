@@ -85,6 +85,14 @@ const ART: Record<string, ReactElement> = {
       <path {...stroke} d="M5 14.5h3M14.5 14.5h3M24 14.5h3" />
     </>
   ),
+  // Two face-down cards behind a seal stamped with a crown: claims at court
+  palace: (
+    <>
+      <rect {...stroke} x="3" y="6" width="12" height="17" rx="1.5" transform="rotate(-10 9 14.5)" />
+      <rect {...stroke} x="10" y="5" width="12" height="17" rx="1.5" />
+      <path fill="currentColor" d="M18 27v-6l3 2.5 3-4 3 4 3-2.5v6z" />
+    </>
+  ),
   // Four word cards, one turned a different way: the odd one out
   'odd-word': (
     <>
