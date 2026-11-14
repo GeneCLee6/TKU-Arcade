@@ -11,9 +11,11 @@ import {
 import { keepIfBetter, loadBestLap, loadGhost, type RecordNews } from './records.ts'
 import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
-import { courseOf, parseTrack, type Track } from '../../shared/kart/track.ts'
+import type { KartBody } from './bodies.ts'
+import { courseOf, parseTrack, recordKey, type Track } from '../../shared/kart/track.ts'
 import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
+import { TAMKANG } from '../../shared/kart/tracks/tamkang.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
 import {
   currentLap,
@@ -79,12 +81,26 @@ export interface SpikeHud {
   readonly hits: number
 }
 
-/** What /kart/spike drives on: the walled yard of J3, J4's test oval, J5's first track or N1's second */
-export type SpikeCourse = 'arena' | 'oval' | 'riverside' | 'harbour'
+/**
+ * What /kart/spike drives on: the walled yard of J3, J4's test oval, J5's first track, N1's second or
+ * the Tamkang campus (2026-11-14)
+ */
+export type SpikeCourse = 'arena' | 'oval' | 'riverside' | 'harbour' | 'tamkang'
 
-export const SPIKE_COURSES: readonly SpikeCourse[] = ['arena', 'oval', 'riverside', 'harbour']
+export const SPIKE_COURSES: readonly SpikeCourse[] = [
+  'arena',
+  'oval',
+  'riverside',
+  'harbour',
+  'tamkang',
+]
 
-const TRACKS = { oval: TEST_OVAL, riverside: RIVERSIDE, harbour: HARBOUR } as const
+const TRACKS = {
+  oval: TEST_OVAL,
+  riverside: RIVERSIDE,
+  harbour: HARBOUR,
+  tamkang: TAMKANG,
+} as const
 
 /** A course's track, checked like any track file; null for the yard, which is not a track */
 export function spikeTrack(course: SpikeCourse): Track | null {
@@ -173,6 +189,8 @@ export interface SpikeOptions {
   readonly course?: SpikeCourse
   /** e8-t06: how much to draw */
   readonly quality?: Quality
+  /** Which hover kart to draw (2026-11-14): cosmetic, every body drives the same */
+  readonly body?: KartBody
   /** Every frame, where the car is: the minimap moves its marker with it, outside React */
   readonly onPose?: (x: number, z: number, heading: number, nextGate: number) => void
   /** On a track: the time trial's state, when it changes */
@@ -232,11 +250,17 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let trial: Trial | null = trialCourse ? startTrial(trialCourse) : null
   let lastTrial: SpikeTrial | undefined
   // e8-t11: the best run to race against, and this run as it is recorded
-  let best: Ghost | null = track ? loadGhost(track.id) : null
-  let bestLap: number | null = track ? loadBestLap(track.id) : null
+  let best: Ghost | null = track ? loadGhost(recordKey(track)) : null
+  let bestLap: number | null = track ? loadBestLap(recordKey(track)) : null
   let recorder: GhostRecorder | null = null
   let news: RecordNews | null = null
-  const scene = createKartScene(container, course.walls, track ?? undefined, options.quality)
+  const scene = createKartScene(
+    container,
+    course.walls,
+    track ?? undefined,
+    options.quality,
+    options.body,
+  )
   const audio = createKartAudio()
   const held = new Set<string>()
   // A boost or reset key pressed and let go between two steps still counts
@@ -307,7 +331,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         trial = stepTrial(trial, input, trialCourse, tuning, rules)
         run = trial.run
         if (was === 'countdown' && trial.phase === 'racing') {
-          recorder = startRecording(track.id)
+          recorder = startRecording(recordKey(track))
           recordStep(recorder, 0, run.kart)
         } else if (trial.phase !== 'countdown' && was === 'racing' && recorder) {
           recordStep(recorder, trial.steps, run.kart)

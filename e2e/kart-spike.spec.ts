@@ -788,6 +788,30 @@ test('the harbour track opens from the kart page picker and races', async ({ pag
   expect(errors).toEqual([])
 })
 
+// 2026-11-14: the Tamkang campus track, picked on the kart page, raced in another hover kart that
+// the page remembers
+test('the Tamkang campus opens from the picker and races in the kart picked', async ({ page }) => {
+  // The campus is heavy scenery too: a software renderer under parallel tests needs the time
+  test.setTimeout(60_000)
+  const errors = watchConsole(page)
+  await page.goto('/kart')
+  await expect(page.locator('canvas')).toBeVisible()
+  await expect(page.getByTestId('kart-body').locator('option')).toHaveText([
+    'Tide Runner',
+    'Comet',
+    'Stingray',
+  ])
+  await page.getByTestId('kart-body').selectOption('ray')
+  await page.getByTestId('kart-course').selectOption('tamkang')
+  await expect(page).toHaveURL(/track=tamkang/)
+  await expect(page.getByRole('img', { name: 'Track map' })).toBeVisible()
+  await expect(page.getByTestId('kart-race-clock')).toBeVisible({ timeout: 15_000 })
+  await expect.poll(() => framesOf(page), { timeout: 30_000 }).toBeGreaterThan(10)
+  await page.reload()
+  await expect(page.getByTestId('kart-body')).toHaveValue('ray')
+  expect(errors).toEqual([])
+})
+
 // e8-t14: the kart page itself, a time trial without the spike's tools; e8-t07 its kart and effects
 test('the kart page races on Riverside without the tuning tools, and the sound switches', async ({
   page,
@@ -801,6 +825,7 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
     'Test oval',
     'Riverside (graybox)',
     'Harbour Hairpins',
+    'Tamkang Campus',
   ])
   await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
   await expect(page.getByText('Time trial')).toBeVisible()

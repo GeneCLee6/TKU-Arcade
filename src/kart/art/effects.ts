@@ -1,11 +1,13 @@
-// e8-t07: what a kart leaves behind: smoke puffing from the back wheels in a drift, dark tyre marks
-// laid on the road while it slides, and a flame from the exhaust during a boost. Pooled and reused:
-// nothing is made or freed while driving.
+// e8-t07: what a kart leaves behind. Since the hover karts (2026-11-14): sparks spraying from the
+// back corners in a drift, a little dust, glowing trails on the road in the kart's own colour that
+// fade out behind it, and a flame from each thruster during a boost. Pooled and reused: nothing is
+// made or freed while driving.
 import {
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
+  Color,
   ConeGeometry,
   DynamicDrawUsage,
   Group,
@@ -15,26 +17,31 @@ import {
   SpriteMaterial,
   type Object3D,
 } from 'three'
-import { kartScene } from '../../styles/kartTokens.ts'
+import { kartHover, kartScene } from '../../styles/kartTokens.ts'
 import type { KartLook, KartModel } from './kartModel.ts'
 
-/** Smoke puffs alive at once, at most */
-const PUFFS = 70
-const PUFF_LIFE = 0.9
-/** Tyre mark pieces kept; the oldest are laid over again */
-const MARKS = 900
-const MARK_WIDTH = 0.24
-/** Just above the road and kerbs (trackArt.ts LIFT), under the car */
+/** Dust puffs alive at once, at most */
+const PUFFS = 40
+const PUFF_LIFE = 0.8
+/** Sparks alive at once, at most */
+const SPARKS = 90
+const SPARK_LIFE = 0.45
+/** Trail pieces kept: about two seconds of a drift, both corners; the oldest are laid over again */
+const MARKS = 260
+const MARK_WIDTH = 0.3
+/** Just above the road and kerbs (trackArt.ts LIFT), under the kart's glow */
 const MARK_HEIGHT = 0.085
+/** A trail fades out over this many seconds */
+const MARK_FADE = 1.6
 
 export interface KartEffects {
   update(pose: { x: number; z: number; heading: number }, look: KartLook, seconds: number): void
-  /** Forgets the marks, as after a reset: the next drift does not join up with the last */
+  /** Forgets the trails, as after a reset: the next drift does not join up with the last */
   lift(): void
   dispose(): void
 }
 
-function puffTexture(): CanvasTexture {
+function softTexture(): CanvasTexture {
   const canvas = document.createElement('canvas')
   canvas.width = 64
   canvas.height = 64
@@ -51,8 +58,10 @@ function puffTexture(): CanvasTexture {
 }
 
 export function createKartEffects(world: Object3D, kart: KartModel): KartEffects {
-  // ── Smoke ──
-  const texture = puffTexture()
+  const texture = softTexture()
+  let clock = 0
+
+  // ── Dust: a light stream from under the back while drifting ──
   const puffs: { sprite: Sprite; material: SpriteMaterial; age: number; vy: number }[] = []
   for (let index = 0; index < PUFFS; index++) {
     const material = new SpriteMaterial({
@@ -70,8 +79,31 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   let nextPuff = 0
   let puffDue = 0
 
-  // ── Tyre marks: one ribbon piece per wheel per step while sliding ──
+  // ── Sparks: small bright dots thrown out sideways and back, falling ──
+  const sparkMaterials = [kart.glow, kartHover.spark].map(
+    (color) =>
+      new SpriteMaterial({
+        map: texture,
+        color,
+        transparent: true,
+        depthWrite: false,
+        blending: AdditiveBlending,
+      }),
+  )
+  const sparks: { sprite: Sprite; age: number; vx: number; vy: number; vz: number }[] = []
+  for (let index = 0; index < SPARKS; index++) {
+    const sprite = new Sprite(sparkMaterials[index % 2]!)
+    sprite.visible = false
+    world.add(sprite)
+    sparks.push({ sprite, age: SPARK_LIFE, vx: 0, vy: 0, vz: 0 })
+  }
+  let nextSpark = 0
+  let sparkDue = 0
+
+  // ── Trails: one ribbon piece per corner per frame while drifting, fading with age ──
   const positions = new Float32Array(MARKS * 4 * 3)
+  const colours = new Float32Array(MARKS * 4 * 3)
+  const born = new Float32Array(MARKS).fill(-Infinity)
   const indices = new Uint32Array(MARKS * 6)
   for (let piece = 0; piece < MARKS; piece++) {
     const a = piece * 4
@@ -79,12 +111,15 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   }
   const markGeometry = new BufferGeometry()
   const positionAttribute = new BufferAttribute(positions, 3).setUsage(DynamicDrawUsage)
+  const colourAttribute = new BufferAttribute(colours, 3).setUsage(DynamicDrawUsage)
   markGeometry.setAttribute('position', positionAttribute)
+  markGeometry.setAttribute('color', colourAttribute)
   markGeometry.setIndex(new BufferAttribute(indices, 1))
+  // Added light: black adds nothing, so a trail fades out by darkening
   const markMaterial = new MeshBasicMaterial({
-    color: kartScene.skid,
+    vertexColors: true,
     transparent: true,
-    opacity: 0.5,
+    blending: AdditiveBlending,
     depthWrite: false,
     polygonOffset: true,
     polygonOffsetFactor: -2,
@@ -94,11 +129,12 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   // Its bounds change all the time; never culled
   marks.frustumCulled = false
   world.add(marks)
+  const trailColour = new Color(kart.glow)
   let nextMark = 0
-  let lastWheels: { x: number; z: number }[] | null = null
+  let lastCorners: { x: number; z: number }[] | null = null
+  let fading = false
 
-  // ── The boost flame, on the kart, at its exhaust ──
-  const flame = new Group()
+  // ── The boost flames, on the kart, one at each thruster ──
   const outerMaterial = new MeshBasicMaterial({
     color: kartScene.flame,
     transparent: true,
@@ -113,18 +149,24 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     blending: AdditiveBlending,
     depthWrite: false,
   })
-  const outerGeometry = new ConeGeometry(0.16, 0.9, 10)
-  const innerGeometry = new ConeGeometry(0.08, 0.55, 8)
-  const outer = new Mesh(outerGeometry, outerMaterial)
-  const inner = new Mesh(innerGeometry, innerMaterial)
-  // Cones point up: laid back along +z, out of the exhaust
-  for (const cone of [outer, inner]) cone.rotation.x = Math.PI / 2
-  outer.position.z = 0.45
-  inner.position.z = 0.3
-  flame.add(outer, inner)
-  flame.position.set(...kart.exhaust)
-  flame.visible = false
-  kart.group.add(flame)
+  // One big thruster gets a bigger flame than each of two small ones
+  const flameSize = kart.thrusters.length > 1 ? 0.8 : 1.25
+  const outerGeometry = new ConeGeometry(0.16 * flameSize, 0.95 * flameSize, 10)
+  const innerGeometry = new ConeGeometry(0.08 * flameSize, 0.6 * flameSize, 8)
+  const flames = kart.thrusters.map((thruster) => {
+    const group = new Group()
+    const outer = new Mesh(outerGeometry, outerMaterial)
+    const inner = new Mesh(innerGeometry, innerMaterial)
+    // Cones point up: laid back along +z, out of the thruster
+    for (const cone of [outer, inner]) cone.rotation.x = Math.PI / 2
+    outer.position.z = 0.48 * flameSize
+    inner.position.z = 0.32 * flameSize
+    group.add(outer, inner)
+    group.position.set(...thruster)
+    group.visible = false
+    kart.group.add(group)
+    return { group, outer, inner }
+  })
   let flicker = 0
 
   const toWorld = (pose: { x: number; z: number; heading: number }, lx: number, lz: number) => {
@@ -138,10 +180,9 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     const dz = to.z - from.z
     const length = Math.hypot(dx, dz)
     if (length < 0.02 || length > 3) return
-    // Across the direction of travel, half the mark's width either side
+    // Across the direction of travel, half the trail's width either side
     const nx = (-dz / length) * (MARK_WIDTH / 2)
     const nz = (dx / length) * (MARK_WIDTH / 2)
-    const at = nextMark * 12
     positions.set(
       [
         from.x + nx,
@@ -157,34 +198,55 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         MARK_HEIGHT,
         to.z - nz,
       ],
-      at,
+      nextMark * 12,
     )
+    born[nextMark] = clock
     nextMark = (nextMark + 1) % MARKS
     positionAttribute.needsUpdate = true
   }
 
+  /** Each trail piece's brightness by its age; says whether any piece still shows */
+  const fadeMarks = () => {
+    let showing = false
+    for (let piece = 0; piece < MARKS; piece++) {
+      const share = Math.max(0, 1 - (clock - born[piece]!) / MARK_FADE)
+      if (share > 0) showing = true
+      const strength = share * share * 0.75
+      for (let corner = 0; corner < 4; corner++) {
+        const at = (piece * 4 + corner) * 3
+        colours[at] = trailColour.r * strength
+        colours[at + 1] = trailColour.g * strength
+        colours[at + 2] = trailColour.b * strength
+      }
+    }
+    colourAttribute.needsUpdate = true
+    return showing
+  }
+
   return {
     update(pose, look, seconds) {
+      clock += seconds
       const sliding = look.drift !== 0 && Math.abs(look.speed) > 6
-      const wheels = kart.rearWheels.map(([lx, lz]) => toWorld(pose, lx, lz))
+      const corners = kart.rearContacts.map(([lx, lz]) => toWorld(pose, lx, lz))
 
-      if (sliding && lastWheels)
-        wheels.forEach((wheel, index) => layMark(lastWheels![index]!, wheel))
-      lastWheels = sliding ? wheels : null
+      if (sliding && lastCorners)
+        corners.forEach((corner, index) => layMark(lastCorners![index]!, corner))
+      lastCorners = sliding ? corners : null
+      // Faded every frame while a trail still shows, then left alone
+      if (sliding || fading) fading = fadeMarks()
 
-      // Puffs: a steady stream from each back wheel while sliding, a faint one under boost
-      const rate = sliding ? 28 : look.boosting ? 6 : 0
-      puffDue += rate * seconds
+      // Dust: a light stream while drifting, a faint one under boost
+      puffDue += (sliding ? 12 : look.boosting ? 4 : 0) * seconds
       while (puffDue >= 1) {
         puffDue -= 1
-        const wheel = wheels[nextPuff % wheels.length]!
+        const corner = corners[nextPuff % corners.length]!
         const puff = puffs[nextPuff]!
         puff.age = 0
-        puff.vy = 0.6 + Math.random() * 0.6
+        puff.vy = 0.5 + Math.random() * 0.5
         puff.sprite.position.set(
-          wheel.x + (Math.random() - 0.5) * 0.3,
-          0.25,
-          wheel.z + (Math.random() - 0.5) * 0.3,
+          corner.x + (Math.random() - 0.5) * 0.4,
+          0.2,
+          corner.z + (Math.random() - 0.5) * 0.4,
         )
         puff.sprite.visible = true
         nextPuff = (nextPuff + 1) % PUFFS
@@ -194,28 +256,65 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         puff.age += seconds
         const share = Math.min(1, puff.age / PUFF_LIFE)
         puff.sprite.position.y += puff.vy * seconds
-        const size = 0.8 + share * 2.8
+        const size = 0.6 + share * 2.2
         puff.sprite.scale.set(size, size, 1)
-        puff.material.opacity = 0.8 * (1 - share)
+        puff.material.opacity = 0.45 * (1 - share)
         if (share >= 1) puff.sprite.visible = false
       }
 
-      flame.visible = look.boosting
+      // Sparks: thrown out of the drift's outside corner and back along the kart
+      sparkDue += (sliding ? 70 : 0) * seconds
+      const cos = Math.cos(pose.heading)
+      const sin = Math.sin(pose.heading)
+      while (sparkDue >= 1) {
+        sparkDue -= 1
+        // The outside of a drift to the right is the left corner
+        const corner = corners[look.drift > 0 ? 0 : corners.length - 1]!
+        const spark = sparks[nextSpark]!
+        spark.age = 0
+        const outward = -Math.sign(look.drift) * (2 + Math.random() * 3)
+        const back = 3 + Math.random() * 4
+        // From the kart's frame (outward along x, back along +z) into the world's
+        spark.vx = outward * cos - back * sin
+        spark.vz = outward * sin + back * cos
+        spark.vy = 1.5 + Math.random() * 2.5
+        spark.sprite.position.set(corner.x, 0.25, corner.z)
+        spark.sprite.visible = true
+        nextSpark = (nextSpark + 1) % SPARKS
+      }
+      for (const spark of sparks) {
+        if (spark.age >= SPARK_LIFE) continue
+        spark.age += seconds
+        spark.vy -= 14 * seconds
+        const { position } = spark.sprite
+        position.x += spark.vx * seconds
+        position.z += spark.vz * seconds
+        position.y = Math.max(0.12, position.y + spark.vy * seconds)
+        const size = 0.3 * (1 - Math.min(1, spark.age / SPARK_LIFE)) + 0.05
+        spark.sprite.scale.set(size, size, 1)
+        if (spark.age >= SPARK_LIFE) spark.sprite.visible = false
+      }
+
+      for (const flame of flames) flame.group.visible = look.boosting
       if (look.boosting) {
         flicker += seconds * 40
-        const stretch = 0.85 + Math.sin(flicker) * 0.15 + Math.random() * 0.1
-        outer.scale.set(1, stretch, 1)
-        inner.scale.set(1, 0.8 + Math.random() * 0.3, 1)
+        for (const flame of flames) {
+          const stretch = 0.85 + Math.sin(flicker) * 0.15 + Math.random() * 0.1
+          flame.outer.scale.set(1, stretch, 1)
+          flame.inner.scale.set(1, 0.8 + Math.random() * 0.3, 1)
+        }
       }
     },
     lift() {
-      lastWheels = null
+      lastCorners = null
     },
     dispose() {
       for (const puff of puffs) {
         puff.material.dispose()
         world.remove(puff.sprite)
       }
+      for (const spark of sparks) world.remove(spark.sprite)
+      for (const material of sparkMaterials) material.dispose()
       texture.dispose()
       markGeometry.dispose()
       markMaterial.dispose()

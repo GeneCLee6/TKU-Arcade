@@ -48,6 +48,12 @@ export interface TrackJson {
   /** Lower-case letters, digits and dashes: its file names and records go by it */
   readonly id: string
   readonly name: { readonly en: string; readonly 'zh-TW': string }
+  /**
+   * The layout's revision, 1 when left out. Raised whenever the road changes enough that old times
+   * no longer compare (2026-11-14: Riverside and the harbour were widened), so that records and
+   * ghosts kept for the old layout are set aside (`recordKey`)
+   */
+  readonly revision?: number
   readonly laps: number
   /** The centre line as a closed loop, in driving order; the last point joins the first */
   readonly road: readonly RoadPoint[]
@@ -147,6 +153,14 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
   ) {
     problems.push('name: an en and a zh-TW name')
   }
+  if (
+    json.revision !== undefined &&
+    (!Number.isInteger(json.revision) ||
+      (json.revision as number) < 1 ||
+      (json.revision as number) > 999)
+  ) {
+    problems.push('revision: a whole number from 1 to 999')
+  }
   if (!Number.isInteger(json.laps) || (json.laps as number) < 1 || (json.laps as number) > 20) {
     problems.push('laps: a whole number from 1 to 20')
   }
@@ -206,6 +220,9 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     format: TRACK_FORMAT,
     id: json.id as string,
     name: { en: (name as { en: string }).en, 'zh-TW': (name as { 'zh-TW': string })['zh-TW'] },
+    ...(json.revision !== undefined && json.revision !== 1
+      ? { revision: json.revision as number }
+      : {}),
     laps: json.laps as number,
     road,
     gates,
@@ -218,6 +235,13 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
   }
   return { track: { ...base, allWalls: [...kerbs(road), ...walls] } }
 }
+
+/**
+ * What a track's records and ghost are kept under: its id, and its revision after the first, so
+ * that a widened or redrawn layout starts with no records rather than times from another road
+ */
+export const recordKey = (track: Pick<TrackJson, 'id' | 'revision'>): string =>
+  (track.revision ?? 1) > 1 ? `${track.id}@${track.revision}` : track.id
 
 // ── Geometry ───────────────────────────────────────────────────────────────────────────────────
 

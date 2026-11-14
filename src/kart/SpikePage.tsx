@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { setSoundOn, useSoundOn } from '../lib/sound.ts'
 import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
+import { KART_BODIES, loadBody, saveBody, type KartBody } from './bodies.ts'
 import styled, { keyframes } from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
 import { KART_ACTIONS, type Bindings, type KartAction } from '../../shared/kart/input.ts'
@@ -101,6 +102,7 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
   const race = useRef<{ restart: () => void } | null>(null)
   const [trial, setTrial] = useState<SpikeTrial>()
   const [quality, setQuality] = useState<Quality>(loadQuality)
+  const [body, setBody] = useState<KartBody>(loadBody)
   const [showNumbers, setShowNumbers] = useState(() =>
     new URLSearchParams(window.location.search).has('fps'),
   )
@@ -118,6 +120,7 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
         onContextLost: () => setFailure('contextLost'),
         course,
         quality,
+        body,
         onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
         onTrial: setTrial,
         onClock: (total, lap) => clock.current?.set(total, lap),
@@ -129,7 +132,7 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, quality])
+  }, [course, quality, body])
 
   const switchCourse = (next: SpikeCourse) => {
     const url = new URL(window.location.href)
@@ -253,6 +256,25 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
               {QUALITIES.map((one) => (
                 <option key={one} value={one}>
                   {t(`kart.quality.${one}`)}
+                </option>
+              ))}
+            </select>
+          </CourseLabel>
+          <CourseLabel>
+            <span>{t('kart.spike.body')}</span>
+            <select
+              value={body}
+              onChange={(event) => {
+                const next = event.target.value as KartBody
+                saveBody(next)
+                setTrial(undefined)
+                setBody(next)
+              }}
+              data-testid="kart-body"
+            >
+              {KART_BODIES.map((one) => (
+                <option key={one} value={one}>
+                  {t(`kart.body.${one}`)}
                 </option>
               ))}
             </select>

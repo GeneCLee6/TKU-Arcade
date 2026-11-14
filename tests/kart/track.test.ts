@@ -7,6 +7,7 @@ import {
   gatesAlong,
   kerbs,
   parseTrack,
+  recordKey,
   trackBounds,
   type Track,
 } from '../../shared/kart/track.ts'
@@ -60,6 +61,17 @@ describe('parseTrack', () => {
     expect('problems' in parseTrack({ ...TEST_OVAL, road: 'round' })).toBe(true)
     const narrow = { ...TEST_OVAL, road: TEST_OVAL.road.map((point) => ({ ...point, width: 2 })) }
     expect('problems' in parseTrack(narrow)).toBe(true)
+  })
+
+  it('takes a layout revision, keeping its records apart from the earlier layout’s', () => {
+    const parsed = parseTrack({ ...TEST_OVAL, revision: 3 })
+    if ('problems' in parsed) throw new Error(parsed.problems.join('; '))
+    expect(parsed.track.revision).toBe(3)
+    expect(recordKey(parsed.track)).toBe('test-oval@3')
+    expect(recordKey({ id: 'oval' })).toBe('oval')
+    expect(recordKey({ id: 'oval', revision: 1 })).toBe('oval')
+    for (const revision of [0, 1.5, 'two', 1000])
+      expect('problems' in parseTrack({ ...TEST_OVAL, revision })).toBe(true)
   })
 })
 

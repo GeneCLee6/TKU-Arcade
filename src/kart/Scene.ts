@@ -19,6 +19,7 @@ import { buildTrackArt, themeOf, type TrackArt } from './art/trackArt.ts'
 import { QUALITY, type Quality } from './quality.ts'
 import { createKartEffects } from './art/effects.ts'
 import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
+import type { KartBody } from './bodies.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 import { kartScene, kartThemes } from '../styles/kartTokens.ts'
@@ -70,6 +71,7 @@ export function createKartScene(
   walls: readonly Wall[],
   track?: Track,
   quality: Quality = 'high',
+  body: KartBody = 'tide',
 ): KartScene {
   const settings = QUALITY[quality]
   const renderer = new WebGLRenderer({
@@ -145,8 +147,8 @@ export function createKartScene(
     scene.add(ground, grid)
   }
 
-  // The first kart and its driver (e8-t07), with its smoke, tyre marks and boost flame
-  const kart = buildKartModel(shadows)
+  // The hover kart and its driver (e8-t07, 2026-11-14), with its sparks, trails and boost flames
+  const kart = buildKartModel(shadows, false, body)
   const car = kart.group
   scene.add(car)
   const effects = createKartEffects(scene, kart)
@@ -232,7 +234,7 @@ export function createKartScene(
         if (ghostKart) ghostKart.group.visible = false
         return
       }
-      ghostKart ??= buildKartModel(false, true)
+      ghostKart ??= buildKartModel(false, true, body)
       if (!ghostKart.group.parent) scene.add(ghostKart.group)
       ghostKart.group.visible = true
       ghostKart.group.position.set(pose.x, 0, pose.z)

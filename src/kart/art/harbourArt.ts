@@ -76,7 +76,7 @@ export const inHarbourSea = (x: number, z: number, margin = 0): boolean =>
 
 /** Where the shared trees may grow: not on the quay, not among the sheds or the houses */
 export const harbourTreeFits = (x: number, z: number): boolean =>
-  z > -102 && x > HARBOUR_SHORE + 34 && !inside(TOWN, x, z) && !inside(TERRACES, x, z)
+  z > -98 && x > HARBOUR_SHORE + 34 && !inside(TOWN, x, z) && !inside(TERRACES, x, z)
 
 /** A gable roof one unit each way: ridge along x at the top, eaves at y = 0 */
 function gable(): BufferGeometry {
@@ -299,7 +299,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
 
   // ── The quay: concrete to the edge, a sea wall down to the water, bollards ──
   const quay = { minX: -215, maxX: 262 }
-  const quayDepth = -119.4 - HARBOUR_COAST
+  const quayDepth = -121.4 - HARBOUR_COAST
   const apron = new Mesh(
     keep(new PlaneGeometry(quay.maxX - quay.minX, quayDepth)),
     own(new MeshLambertMaterial({ map: concrete })),
