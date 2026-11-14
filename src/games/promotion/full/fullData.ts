@@ -6,20 +6,9 @@
 // and the columns, fullSquare.ts) comes with it: nothing is laid out before there is a board.
 import { useEffect, useSyncExternalStore } from 'react'
 import type * as BoardData from '../../../../shared/games/promotion/boardFull.ts'
-import type { DecisionPrompt } from './DecisionPrompt.tsx'
-import type { FullCellDetail } from './FullCellDetail.tsx'
 import type * as Layouts from './fullSquare.ts'
-import type { Settlement } from './Settlement.tsx'
 
-/**
- * The board, its layouts, and the cards that come up over it now and then (a decision, the
- * settlement, a cell's detail): they show only once there is a board, so they come with it (2026-11-14, to keep the
- * first screen within the budget as new games join the lobby)
- */
-export type FullData = typeof BoardData & {
-  layouts: typeof Layouts
-  parts: { DecisionPrompt: typeof DecisionPrompt; Settlement: typeof Settlement; FullCellDetail: typeof FullCellDetail }
-}
+export type FullData = typeof BoardData & { layouts: typeof Layouts }
 
 let loaded: FullData | null = null
 let loading: Promise<FullData> | null = null
@@ -30,16 +19,8 @@ export function loadFullData(): Promise<FullData> {
   loading ??= Promise.all([
     import('../../../../shared/games/promotion/boardFull.ts'),
     import('./fullSquare.ts'),
-    import('./DecisionPrompt.tsx'),
-    import('./Settlement.tsx'),
-    import('./FullCellDetail.tsx'),
-  ]).then(([board, layouts, decision, settlement, detail]) => {
-    const parts = {
-      DecisionPrompt: decision.DecisionPrompt,
-      Settlement: settlement.Settlement,
-      FullCellDetail: detail.FullCellDetail,
-    }
-    const data: FullData = { ...board, layouts, parts }
+  ]).then(([board, layouts]) => {
+    const data: FullData = { ...board, layouts }
     loaded = data
     for (const listener of listeners) listener()
     return data
