@@ -6,6 +6,8 @@ import { useT } from '../../../i18n/useT.ts'
 import { color, fontSize, promotionBoard, space } from '../../../styles/tokens.ts'
 import { SETTLE_STEPS } from './settleSteps.ts'
 
+/** The settlement's steps: silver before, ranks compared (對品), the pot shared (分注), final */
+export { SETTLE_STEPS }
 const STEP_MS = 1400
 
 const signed = (amount: number) => (amount > 0 ? `+${amount}` : amount < 0 ? `−${-amount}` : '0')

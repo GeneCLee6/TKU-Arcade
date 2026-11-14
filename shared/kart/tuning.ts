@@ -45,11 +45,12 @@ const DEGREE = Math.PI / 180
 /**
  * Every number the panel shows, in the order it shows them, with the range it allows. The ranges are
  * wide enough to feel the difference and narrow enough that the physics stays sane: at the highest
- * top speed and boost the car still moves under 2 m a step, which the walls handle (walls.ts).
- * `driftMaxSlip` is stored in radians and shown in degrees: its min and max here are degrees.
+ * top speed and boost the car still moves under 3 m a step, which the walls handle (walls.ts checks
+ * every 0.6 m of travel). Angles are stored in radians and shown in degrees: their min and max here
+ * are degrees.
  */
 export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
-  topSpeed: { group: 'speed', min: 15, max: 70, step: 0.5, unit: 'metresPerSecond' },
+  topSpeed: { group: 'speed', min: 15, max: 80, step: 0.5, unit: 'metresPerSecond' },
   acceleration: { group: 'speed', min: 4, max: 50, step: 0.5, unit: 'metresPerSecondSquared' },
   braking: { group: 'speed', min: 5, max: 80, step: 1, unit: 'metresPerSecondSquared' },
   coastDrag: { group: 'speed', min: 0, max: 15, step: 0.5, unit: 'metresPerSecondSquared' },
@@ -64,14 +65,11 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
   driftSteerRate: { group: 'drift', min: 0, max: 2, step: 0.05, unit: 'radiansPerSecond' },
   driftAlign: { group: 'drift', min: 0.5, max: 10, step: 0.1, unit: 'perSecond' },
   driftMaxSlip: { group: 'drift', min: 10, max: 70, step: 1, unit: 'degrees' },
-  driftTopSpeed: { group: 'drift', min: 10, max: 70, step: 0.5, unit: 'metresPerSecond' },
-  driftDrag: { group: 'drift', min: 0, max: 30, step: 0.5, unit: 'metresPerSecondSquared' },
+  driftScrub: { group: 'drift', min: 0, max: 120, step: 1, unit: 'metresPerSecondSquared' },
+  driftRecovery: { group: 'drift', min: 0.05, max: 1.5, step: 0.05, unit: 'seconds' },
+  driftGaugeSlip: { group: 'drift', min: 10, max: 70, step: 1, unit: 'degrees' },
   driftMinSpeed: { group: 'drift', min: 2, max: 20, step: 0.5, unit: 'metresPerSecond' },
   driftExitSpeed: { group: 'drift', min: 1, max: 15, step: 0.5, unit: 'metresPerSecond' },
-  driftDepthFill: { group: 'drift', min: 0, max: 1, step: 0.05, unit: 'share' },
-  driftDepthCost: { group: 'drift', min: 0, max: 0.4, step: 0.01, unit: 'share' },
-  driftFatigueAfter: { group: 'drift', min: 0, max: 5, step: 0.1, unit: 'seconds' },
-  driftFatigue: { group: 'drift', min: 0, max: 15, step: 0.5, unit: 'metresPerSecondSquared' },
 
   gaugeFillRate: { group: 'boost', min: 5, max: 150, step: 1, unit: 'pointsPerSecond' },
   gaugeDriftBonus: { group: 'boost', min: 0, max: 50, step: 1, unit: 'points' },
@@ -79,7 +77,7 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
   maxStoredBoosts: { group: 'boost', min: 1, max: 3, step: 1, unit: 'count' },
   boostDuration: { group: 'boost', min: 0.2, max: 6, step: 0.05, unit: 'seconds' },
   boostTopSpeedFactor: { group: 'boost', min: 1, max: 2, step: 0.01, unit: 'factor' },
-  boostAcceleration: { group: 'boost', min: 0, max: 100, step: 1, unit: 'metresPerSecondSquared' },
+  boostAcceleration: { group: 'boost', min: 0, max: 120, step: 1, unit: 'metresPerSecondSquared' },
   overSpeedDrag: { group: 'boost', min: 0, max: 30, step: 0.5, unit: 'metresPerSecondSquared' },
   boostStackSeconds: { group: 'boost', min: 0, max: 4, step: 0.05, unit: 'seconds' },
   boostStackFactor: { group: 'boost', min: 1, max: 2.2, step: 0.01, unit: 'factor' },
@@ -95,19 +93,17 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
   miniAcceleration: {
     group: 'technique',
     min: 0,
-    max: 80,
+    max: 120,
     step: 1,
     unit: 'metresPerSecondSquared',
   },
   chainGrace: { group: 'technique', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
   chainMinDrift: { group: 'technique', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
   slideBoostDrain: { group: 'technique', min: 0.1, max: 1, step: 0.05, unit: 'factor' },
-  slideSpeedKeep: { group: 'technique', min: 0.5, max: 1, step: 0.01, unit: 'share' },
-  flickMaxDrift: { group: 'technique', min: 0, max: 0.5, step: 0.01, unit: 'seconds' },
-  flickAngle: { group: 'technique', min: 0, max: 30, step: 1, unit: 'degrees' },
-  flickKeep: { group: 'technique', min: 0.8, max: 1, step: 0.005, unit: 'share' },
-  flickGauge: { group: 'technique', min: 0, max: 30, step: 1, unit: 'points' },
-  flickCooldown: { group: 'technique', min: 0, max: 3, step: 0.05, unit: 'seconds' },
+  slideScrub: { group: 'technique', min: 0, max: 1, step: 0.05, unit: 'share' },
+  chainSpeedStep: { group: 'technique', min: 0, max: 0.1, step: 0.01, unit: 'share' },
+  chainSpeedLinks: { group: 'technique', min: 0, max: 10, step: 1, unit: 'count' },
+  doubleWindow: { group: 'technique', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
   catchGrip: { group: 'technique', min: 1, max: 6, step: 0.1, unit: 'factor' },
   catchSeconds: { group: 'technique', min: 0, max: 1, step: 0.05, unit: 'seconds' },
 
@@ -119,9 +115,9 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
 
 export const TUNING_KEYS = Object.keys(TUNING_SPECS) as TuningKey[]
 
-/** A stored value as the panel shows it (degrees for the slip cap) */
+/** A stored value as the panel shows it: degrees for an angle, without the rounding error of radians */
 export const shownValue = (key: TuningKey, value: number): number =>
-  TUNING_SPECS[key].unit === 'degrees' ? value / DEGREE : value
+  TUNING_SPECS[key].unit === 'degrees' ? Math.round((value / DEGREE) * 1e9) / 1e9 : value
 
 /** A value from the panel as the physics stores it, rounded to the slider's step */
 export function storedValue(key: TuningKey, shown: number): number {
@@ -145,10 +141,11 @@ export const PRESET_IDS = ['standard', 'planted', 'loose'] as const
 export type PresetId = (typeof PRESET_IDS)[number]
 
 /**
- * Three starting points, all original. `standard` is J2's numbers (plus J3's walls), retuned 2026-11-14 (faster, longer boosts, the techniques). `planted` grips
- * harder and drifts at a narrower angle, losing less speed but filling the gauge more slowly, so it
- * is easier and pays less. `loose` slides wider and grips less, fills the gauge faster and gives a
- * longer chain window, so it is harder and pays more. None is a signed-off feel (AC-8.8).
+ * Three starting points, all original. `standard` is J2's numbers (plus J3's walls), retuned
+ * 2026-11-14 (faster, longer boosts, the techniques, then the drift as a real slide). `planted`
+ * keeps more grip in a drift and slides at a narrower angle, scrubbing off less speed, so it is
+ * easier. `loose` slides wider and longer and scrubs off more, with a shorter release window, so it
+ * is harder. None is a signed-off feel (AC-8.8).
  */
 export const PRESETS: { readonly [P in PresetId]: KartTuning } = {
   standard: KART_TUNING,
@@ -156,12 +153,12 @@ export const PRESETS: { readonly [P in PresetId]: KartTuning } = {
     ...KART_TUNING,
     turnRate: 2.7,
     grip: 16,
-    driftTurnRate: 2.1,
+    driftTurnRate: 1.8,
     driftSteerRate: 0.8,
-    driftAlign: 6,
-    driftMaxSlip: 30 * DEGREE,
-    driftTopSpeed: 46,
-    driftDrag: 14,
+    driftAlign: 3.6,
+    driftMaxSlip: 42 * DEGREE,
+    driftScrub: 30,
+    driftRecovery: 0.25,
     gaugeFillRate: 55,
     chainGrace: 0.4,
     releaseWindow: 0.35,
@@ -171,17 +168,17 @@ export const PRESETS: { readonly [P in PresetId]: KartTuning } = {
     ...KART_TUNING,
     turnRate: 2.3,
     grip: 6,
-    driftTurnRate: 1.9,
-    driftSteerRate: 1.1,
-    driftAlign: 3.1,
-    driftMaxSlip: 50 * DEGREE,
-    driftTopSpeed: 42,
-    driftDrag: 9,
-    gaugeFillRate: 78,
+    driftTurnRate: 1.6,
+    driftSteerRate: 0.9,
+    driftAlign: 1.6,
+    driftMaxSlip: 66 * DEGREE,
+    driftScrub: 52,
+    driftRecovery: 0.55,
+    gaugeFillRate: 60,
     boostDuration: 2.8,
     chainGrace: 0.65,
     releaseWindow: 0.25,
-    chainDuration: 0.7,
+    chainDuration: 0.6,
     wallImpactLoss: 0.6,
   },
 }

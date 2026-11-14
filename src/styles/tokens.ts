@@ -37,6 +37,10 @@ const light = {
   gameTiles: '#3F6212',
   gameWordBridge: '#3B48B8',
   gameClueClash: '#0A6A60',
+  gameKite: '#3D52C2',
+  gameTraders: '#85471C',
+  gameSecretScroll: '#4A5570',
+  gameWasabi: '#0E6B5A',
   success: '#13703A',
   danger: '#B91C1C',
   warning: '#9C4A06',
@@ -98,6 +102,10 @@ const dark: Record<ColorName, string> = {
   gameTiles: '#C6F35B',
   gameWordBridge: '#8F9BFF',
   gameClueClash: '#4FE3D0',
+  gameKite: '#A3B8FF',
+  gameTraders: '#E3B98A',
+  gameSecretScroll: '#C3CCDD',
+  gameWasabi: '#45D6B8',
   success: '#5CFFA8',
   danger: '#FF5A6E',
   warning: '#FFC23D',
@@ -157,6 +165,10 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   tiles: 'gameTiles',
   'word-bridge': 'gameWordBridge',
   'clue-clash': 'gameClueClash',
+  kite: 'gameKite',
+  traders: 'gameTraders',
+  'secret-scroll': 'gameSecretScroll',
+  wasabi: 'gameWasabi',
 }
 
 /** A game's hue, for its card and its room: what `--color-accent` becomes there */
@@ -228,6 +240,8 @@ export const promotionBoard = {
     engravedGold: '#B8892E',
   },
 } as const
+
+// Tamsui Traders' pieces are in tradersTokens.ts: only that game's chunk loads them
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const
 

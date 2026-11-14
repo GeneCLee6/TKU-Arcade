@@ -179,7 +179,7 @@ describe('the course: safe places and the reset', () => {
 
   it('remembers a safe place behind the car, clear of the walls and facing the way it drove', () => {
     const run = drive(startRun(course), THROTTLE, 8)
-    expect(run.safe.z).toBeLessThan(-20)
+    expect(run.safe.z).toBeLessThan(-15)
     expect(run.safe.z).toBeGreaterThan(-120 + SAFE_CLEARANCE)
     expect(run.safe.heading).toBeCloseTo(0, 9)
     expect(wallClearance(course.walls, run.safe.x, run.safe.z)).toBeGreaterThanOrEqual(

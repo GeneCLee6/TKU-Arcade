@@ -7,8 +7,12 @@ import { lanternMessages } from './lantern/i18n.ts'
 import { lanternInfo } from './lantern/info.ts'
 import { clueClashMessages } from './clue-clash/i18n.ts'
 import { clueClashInfo } from './clue-clash/info.ts'
+import { kiteMessages } from './kite/i18n.ts'
+import { kiteInfo } from './kite/info.ts'
 import { oddWordMessages } from './odd-word/i18n.ts'
 import { oddWordInfo } from './odd-word/info.ts'
+import { secretScrollMessages } from './secret-scroll/i18n.ts'
+import { secretScrollInfo } from './secret-scroll/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
 import { promotionInfo } from './promotion/info.ts'
 import { silentTableMessages } from './silent-table/i18n.ts'
@@ -17,10 +21,14 @@ import { spectrumMessages } from './spectrum/i18n.ts'
 import { spectrumInfo } from './spectrum/info.ts'
 import { tilesMessages } from './tiles/i18n.ts'
 import { tilesInfo } from './tiles/info.ts'
+import { tradersMessages } from './traders/i18n.ts'
+import { tradersInfo } from './traders/info.ts'
 import { ticTacToeMessages } from './tictactoe/i18n.ts'
 import { ticTacToeInfo } from './tictactoe/info.ts'
 import { wordBridgeMessages } from './word-bridge/i18n.ts'
 import { wordBridgeInfo } from './word-bridge/info.ts'
+import { wasabiMessages } from './wasabi/i18n.ts'
+import { wasabiInfo } from './wasabi/info.ts'
 import type { AnyGameInfo, GameMessages } from './types.ts'
 
 export const GAME_INFOS = [
@@ -32,6 +40,10 @@ export const GAME_INFOS = [
   oddWordInfo,
   lanternInfo,
   tilesInfo,
+  kiteInfo,
+  tradersInfo,
+  secretScrollInfo,
+  wasabiInfo,
   wordBridgeInfo,
   clueClashInfo,
 ] as unknown as readonly AnyGameInfo[]
@@ -59,6 +71,10 @@ export const GAME_MESSAGES: GameMessages = {
     ...tilesMessages.en,
     ...wordBridgeMessages.en,
     ...clueClashMessages.en,
+    ...kiteMessages.en,
+    ...tradersMessages.en,
+    ...secretScrollMessages.en,
+    ...wasabiMessages.en,
   },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
@@ -71,5 +87,9 @@ export const GAME_MESSAGES: GameMessages = {
     ...tilesMessages['zh-TW'],
     ...wordBridgeMessages['zh-TW'],
     ...clueClashMessages['zh-TW'],
+    ...kiteMessages['zh-TW'],
+    ...tradersMessages['zh-TW'],
+    ...secretScrollMessages['zh-TW'],
+    ...wasabiMessages['zh-TW'],
   },
 }

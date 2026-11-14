@@ -122,6 +122,42 @@ const ART: Record<string, ReactElement> = {
       <circle fill="currentColor" cx="16" cy="30" r="1.2" />
     </>
   ),
+  // Two diamond kites on one line, the higher one filled: a kite train
+  kite: (
+    <>
+      <path {...stroke} d="M3 29q6-4 9-10t9-10" />
+      <path fill="currentColor" d="M23 2l6 6-6 9-6-9z" />
+      <path {...stroke} d="M12 11l5 5-5 7-5-7z" />
+    </>
+  ),
+  // A stack of goods tokens beside a card with a sail on it: trading from the harbour
+  traders: (
+    <>
+      <ellipse {...stroke} cx="9" cy="24" rx="6" ry="2.5" />
+      <path {...stroke} d="M3 24v-3M15 24v-3" />
+      <ellipse {...stroke} cx="9" cy="21" rx="6" ry="2.5" />
+      <path {...stroke} d="M3 21v-3M15 21v-3" />
+      <ellipse fill="currentColor" cx="9" cy="18" rx="6" ry="2.5" />
+      <rect {...stroke} x="18" y="4" width="11" height="15" rx="1.5" />
+      <path fill="currentColor" d="M23.5 7v8h-3.5zM24.5 8.5l3 6.5h-3z" />
+    </>
+  ),
+  // A rolled scroll with its cord: the prize of the round
+  'secret-scroll': (
+    <>
+      <rect {...stroke} x="8" y="6" width="16" height="20" />
+      <path {...stroke} d="M5 6h22M5 26h22M12 12h8M12 16h8M12 20h5" />
+      <circle fill="currentColor" cx="24" cy="20" r="3" />
+    </>
+  ),
+  // A dumpling over a steamer's rim
+  wasabi: (
+    <>
+      <path {...stroke} d="M4 20 Q16 2 28 20 Z" />
+      <path {...stroke} d="M11 13l1.5 3M16 10v4M21 13l-1.5 3" />
+      <path {...stroke} d="M3 24h26M6 28h20" />
+    </>
+  ),
 }
 
 /** The drawing for `gameId`; `fallback` for a game without one */
