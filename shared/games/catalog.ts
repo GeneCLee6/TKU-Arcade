@@ -5,6 +5,8 @@ import { bluffMessages } from './bluff/i18n.ts'
 import { bluffInfo } from './bluff/info.ts'
 import { oddWordMessages } from './odd-word/i18n.ts'
 import { oddWordInfo } from './odd-word/info.ts'
+import { palaceMessages } from './palace/i18n.ts'
+import { palaceInfo } from './palace/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
 import { promotionInfo } from './promotion/info.ts'
 import { silentTableMessages } from './silent-table/i18n.ts'
@@ -22,6 +24,7 @@ export const GAME_INFOS = [
   spectrumInfo,
   bluffInfo,
   oddWordInfo,
+  palaceInfo,
 ] as unknown as readonly AnyGameInfo[]
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
@@ -43,6 +46,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...spectrumMessages.en,
     ...bluffMessages.en,
     ...oddWordMessages.en,
+    ...palaceMessages.en,
   },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
@@ -51,5 +55,6 @@ export const GAME_MESSAGES: GameMessages = {
     ...spectrumMessages['zh-TW'],
     ...bluffMessages['zh-TW'],
     ...oddWordMessages['zh-TW'],
+    ...palaceMessages['zh-TW'],
   },
 }

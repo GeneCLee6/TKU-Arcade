@@ -28,7 +28,6 @@ import { DecisionPrompt } from './DecisionPrompt.tsx'
 import { fullArtHref, fullKnob } from './fullArt.ts'
 import { FullBoard, type FullFlight, type FullPiece } from './FullBoard.tsx'
 import { loadFullBoardFont } from './fullFont.ts'
-import { FullCellDetail } from './FullCellDetail.tsx'
 import { FullDice } from './FullDice.tsx'
 import { useFullData } from './fullData.ts'
 import type { SquareLayout } from './fullSquare.ts'
@@ -53,6 +52,9 @@ registerMessages(promotionFullMessages)
 
 // Each player's way through the game, once it is over: out of the first screen
 const FullRoutes = lazy(() => import('./FullRoutes.tsx'))
+
+// A cell's sheet, once someone first taps a cell: out of the first screen too
+const FullCellDetail = lazy(() => import('./FullCellDetail.tsx').then((m) => ({ default: m.FullCellDetail })))
 
 /** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
 const DENSE_CELL = 48
@@ -105,6 +107,9 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   const dense = box !== null && fit !== null && layouts !== null && layouts.CELL_W * fit.scale * zoomLevel < DENSE_CELL
 
   const [selected, setSelected] = useState<string | null>(null)
+  // Mounted from the first tap on, so that the sheet can animate shut and open again at once
+  const [detailLoaded, setDetailLoaded] = useState(false)
+  if (selected !== null && !detailLoaded) setDetailLoaded(true)
   const toggleCell = useCallback(
     (cell: string) => setSelected((current) => (current === cell ? null : cell)),
     [setSelected],
@@ -485,8 +490,10 @@ export default function FullScreen({ room, game }: GameScreenProps) {
                 area={promptArea}
               />
             )}
-            {board && (
-              <FullCellDetail board={board} id={selected} here={here} onClose={() => setSelected(null)} />
+            {board && detailLoaded && (
+              <Suspense fallback={null}>
+                <FullCellDetail board={board} id={selected} here={here} onClose={() => setSelected(null)} />
+              </Suspense>
             )}
           </BoardArea>
 

@@ -3,6 +3,7 @@
 // lazy screens have src/games/screens.ts. A new game adds its module here and its info in catalog.ts.
 import { bluff } from './bluff/rules.ts'
 import { oddWord } from './odd-word/rules.ts'
+import { palace } from './palace/rules.ts'
 import { promotion } from './promotion/rules.ts'
 import { silentTable } from './silent-table/rules.ts'
 import { spectrum } from './spectrum/rules.ts'
@@ -11,7 +12,7 @@ import type { AnyGameModule } from './types.ts'
 
 export { GAME_MESSAGES, LOBBY_GAMES } from './catalog.ts'
 
-const MODULES: readonly AnyGameModule[] = [ticTacToe, promotion, silentTable, spectrum, bluff, oddWord]
+const MODULES: readonly AnyGameModule[] = [ticTacToe, promotion, silentTable, spectrum, bluff, oddWord, palace]
 
 const BY_ID: ReadonlyMap<string, AnyGameModule> = new Map(MODULES.map((game) => [game.id, game]))
 
