@@ -114,6 +114,10 @@ function show(state: PromotionFullState, viewer: number | 'spectator', you: stri
 beforeAll(async () => {
   stubDialog()
   await loadFullData()
+  // Lazy chunks of the screen (the decision card, the settlement): loaded once, so that a render
+  // followed by one act() shows them
+  await import('../../../src/games/promotion/full/DecisionPrompt.tsx')
+  await import('../../../src/games/promotion/full/Settlement.tsx')
 })
 
 beforeEach(() => {
@@ -125,7 +129,9 @@ describe('a decision on the full board (C8)', () => {
   it('asks the deciding seat over the board, with what each answer does and a countdown', async () => {
     const send = vi.fn()
     const { container } = show(asked('shengyuan', [2, 2, 3, 5]), 0, 'Al', send)
-    await act(async () => {})
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
     expect(container.querySelectorAll('[data-cell]').length).toBe(236)
     expect(container.querySelector('[data-pending-cell="fanglue-tenglu"]')).not.toBeNull()
     expect(container.querySelector('[data-choice="offer"]')).not.toBeNull()
@@ -147,7 +153,9 @@ describe('a decision on the full board (C8)', () => {
   it('offers each office with its price, and taking the minor post', async () => {
     const send = vi.fn()
     show(asked('jiansheng', [2, 2, 3, 5]), 0, 'Al', send)
-    await act(async () => {})
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
     expect(screen.getByRole('region', { name: /Buy an office instead of Tianwensheng/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Zhixian\s*·\s*30 silver$/ }))
     expect(send).toHaveBeenCalledExactlyOnceWith({ type: 'buy', cell: 'zhixian' })
@@ -156,7 +164,9 @@ describe('a decision on the full board (C8)', () => {
 
   it('shows everyone else who is deciding what, with nothing to press', async () => {
     show(asked('shengyuan', [2, 2, 3, 5]), 'spectator', 'Cy')
-    await act(async () => {})
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
     expect(screen.getAllByText('Al is deciding whether to accept Fanglueguan Tenglu')).toHaveLength(2)
     expect(screen.getByText('Al is deciding…')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
@@ -185,7 +195,9 @@ describe('the settlement (C7, fixed in C8)', () => {
       )
     }
     const { rerender } = render(at(match.state))
-    await act(async () => {})
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
     while (screen.queryByRole('button', { name: 'Next step' })) {
       fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
     }
@@ -217,7 +229,9 @@ describe('career routes at the end (2026-11-13)', () => {
         </ToastProvider>
       </MemoryRouter>,
     )
-    await act(async () => {})
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
     while (screen.queryByRole('button', { name: 'Next step' })) {
       fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
     }
