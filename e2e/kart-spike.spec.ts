@@ -774,14 +774,17 @@ test('the riverside graybox opens from the course picker, with its own minimap',
 
 // N1 (e10-t02, e10-t03): the second track, picked on the kart page, with its own minimap and trial
 test('the harbour track opens from the kart page picker and races', async ({ page }) => {
+  // Its scenery is the heaviest yet: a software renderer under parallel tests needs the time
+  test.setTimeout(60_000)
   const errors = watchConsole(page)
   await page.goto('/kart')
   await expect(page.locator('canvas')).toBeVisible()
   await page.getByTestId('kart-course').selectOption('harbour')
   await expect(page).toHaveURL(/track=harbour/)
   await expect(page.getByRole('img', { name: 'Track map' })).toBeVisible()
-  await expect(page.getByTestId('kart-countdown')).toBeVisible()
-  await expect.poll(() => framesOf(page), { timeout: 15_000 }).toBeGreaterThan(10)
+  // The countdown may be over before a slow renderer shows it: the race clock is there either way
+  await expect(page.getByTestId('kart-race-clock')).toBeVisible({ timeout: 15_000 })
+  await expect.poll(() => framesOf(page), { timeout: 30_000 }).toBeGreaterThan(10)
   expect(errors).toEqual([])
 })
 

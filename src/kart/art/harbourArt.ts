@@ -333,6 +333,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   group.add(shadowed(bollards))
 
   // ── Breakwaters, tetrapods and the harbour lights ──
+  // Far from the road, these cast no shadows: the shadow map covers only ±45 m round the car
   const coast = HARBOUR_COAST
   const arms: [number, number, number, number][] = [
     [-95, coast, -95, coast - 120],
@@ -349,7 +350,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
     const block = new Mesh(keep(new BoxGeometry(8, armHeight, span + 8)), armMaterial)
     block.position.set((ax + bx) / 2, armTop - armHeight / 2, (az + bz) / 2)
     block.rotation.y = Math.atan2(bx - ax, bz - az)
-    group.add(shadowed(block))
+    group.add(shadowed(block, false))
     const along = { x: (bx - ax) / span, z: (bz - az) / span }
     const step = level.density < 0.5 ? 4 : 2.4
     for (let at = 2; at < span; at += step) {
@@ -378,7 +379,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
       [random() * 6, random() * 6, random() * 6],
     ),
   )
-  group.add(shadowed(tetrapods))
+  group.add(shadowed(tetrapods, false))
 
   // The lighthouse, at the end of the western arm: red and white bands, a lit lantern, turning beams
   const lighthouse = new Group()
@@ -386,7 +387,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   const white = standard(harbourScene.lighthouseWhite)
   const plinth = new Mesh(keep(new CylinderGeometry(3.4, 3.8, 1.2, 12)), armMaterial)
   plinth.position.y = armTop + 0.6
-  lighthouse.add(shadowed(plinth))
+  lighthouse.add(shadowed(plinth, false))
   const bands = 4
   const bandHeight = 3.3
   for (let band = 0; band < bands; band++) {
@@ -396,7 +397,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
       band % 2 === 0 ? red : white,
     )
     piece.position.y = armTop + 1.2 + bandHeight * (band + 0.5)
-    lighthouse.add(shadowed(piece))
+    lighthouse.add(shadowed(piece, false))
   }
   const towerTop = armTop + 1.2 + bandHeight * bands
   const gallery = new Mesh(
@@ -411,7 +412,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   lantern.position.y = towerTop + 1.35
   const cap = new Mesh(keep(new ConeGeometry(1.7, 1.6, 10)), red)
   cap.position.y = towerTop + 3.15
-  lighthouse.add(shadowed(gallery), lantern, shadowed(cap))
+  lighthouse.add(shadowed(gallery, false), lantern, shadowed(cap, false))
   const beamLength = 80
   const beamGeometry = keep(new ConeGeometry(3.5, beamLength, 16, 4, true))
   beamGeometry.translate(0, -beamLength / 2, 0)
@@ -457,7 +458,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   band.position.y = armTop + 3.4
   const greenLamp = new Mesh(keep(new SphereGeometry(0.7, 10, 8)), basic('#9CFFB8'))
   greenLamp.position.y = armTop + 6.6
-  beacon.add(shadowed(green), shadowed(band), greenLamp)
+  beacon.add(shadowed(green, false), shadowed(band, false), greenLamp)
   beacon.position.set(78, 0, coast - 82)
   group.add(beacon)
 
@@ -483,7 +484,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   }))
   const part = (geometry: BufferGeometry, material: Material) => {
     const instances = new InstancedMesh(keep(geometry), material, boats.length)
-    group.add(shadowed(instances))
+    group.add(shadowed(instances, false))
     return instances
   }
   const hulls = part(hull(), standard('#ffffff'))
@@ -540,7 +541,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   ] as const) {
     const leg = new Mesh(keep(new BoxGeometry(1.2, 26, 1.2)), craneMaterial)
     leg.position.set(x, 13, z)
-    crane.add(shadowed(leg))
+    crane.add(shadowed(leg, false))
   }
   const girder = new Mesh(keep(new BoxGeometry(14, 2, 12)), craneMaterial)
   girder.position.y = 26
@@ -548,7 +549,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   boom.position.set(0, 28, -24)
   const crab = new Mesh(keep(new BoxGeometry(3, 2.4, 3.4)), standard(harbourScene.cabin))
   crab.position.set(0, 25.6, -30)
-  crane.add(shadowed(girder), shadowed(boom), shadowed(crab))
+  crane.add(shadowed(girder, false), shadowed(boom, false), shadowed(crab, false))
   crane.position.set(236, 0, coast + 6)
   group.add(crane)
 
@@ -562,7 +563,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   bridgeHouse.position.set(0, SEA_LEVEL + 3.9 + 4.5, -32)
   const funnel = new Mesh(keep(new CylinderGeometry(1.6, 1.8, 5, 10)), red)
   funnel.position.set(0, SEA_LEVEL + 3.9 + 11, -35)
-  ship.add(shadowed(shipHull), shadowed(bridgeHouse), shadowed(funnel))
+  ship.add(shadowed(shipHull, false), shadowed(bridgeHouse, false), shadowed(funnel, false))
   // Lying east-west beyond the crane, bow to the east
   ship.position.set(244, 0, coast - 22)
   ship.rotation.y = Math.PI / 2
@@ -860,7 +861,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
       [1, 1, 1],
     )
   })
-  group.add(shadowed(houseBodies), shadowed(tankMeshes))
+  group.add(shadowed(houseBodies, false), shadowed(tankMeshes, false))
 
   // Pines on the upper slope beyond the houses, and trees between them
   const pineSpots = [
@@ -903,7 +904,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
       spot.b * 6,
     )
   })
-  group.add(shadowed(pines))
+  group.add(shadowed(pines, false))
 
   return {
     update(seconds) {
