@@ -302,6 +302,7 @@ describe('the game', () => {
       'Bluff Reader',
       'Odd Word Out',
       'Lantern Lane',
+      'Clubroom Tiles',
       'Kite Day',
     ])
   })
@@ -309,7 +310,7 @@ describe('the game', () => {
   it('still shows an unlisted game as the selected one, and can leave it', () => {
     const { onSetGame } = renderRoom(inGame('tictactoe'))
     expect(select()).toHaveValue('tictactoe')
-    expect(choices()).toHaveLength(8)
+    expect(choices()).toHaveLength(9)
 
     fireEvent.change(select(), { target: { value: 'promotion' } })
 

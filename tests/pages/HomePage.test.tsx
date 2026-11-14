@@ -113,7 +113,7 @@ describe('signed in (e1-t13)', () => {
 })
 
 describe('lobby cards', () => {
-  it('lists promotion, silent table, spectrum, bluff reader, odd word out, lantern lane and kite day with their facts, and not the unlisted tic-tac-toe', async () => {
+  it('lists promotion, silent table, spectrum, bluff reader, odd word out, lantern lane, clubroom tiles and kite day with their facts, and not the unlisted tic-tac-toe', async () => {
     renderLobby()
     const card = screen.getByRole('heading', { level: 3, name: 'Promotion' }).closest('li')!
     expect(within(card).getByText('2–6 players')).toBeInTheDocument()
@@ -139,13 +139,16 @@ describe('lobby cards', () => {
     const lantern = cardOf('Lantern Lane')
     expect(within(lantern).getByText('2–6 players')).toBeInTheDocument()
     expect(within(lantern).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    const tiles = cardOf('Clubroom Tiles')
+    expect(within(tiles).getByText('2–4 players')).toBeInTheDocument()
+    expect(within(tiles).getByRole('button', { name: 'New room' })).toBeInTheDocument()
     // Listed on the owner's request, 2026-11-14
     const kiteCard = cardOf('Kite Day')
     expect(within(kiteCard).getByText('2–5 players')).toBeInTheDocument()
     expect(within(kiteCard).getByRole('button', { name: 'New room' })).toBeInTheDocument()
-    // Seven open games; the Coming soon card arrives with its lazy chunk
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(8))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(7)
+    // Eight open games; the Coming soon card arrives with its lazy chunk
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(9))
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(8)
     expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
       'promotion',
       'silent-table',
@@ -153,6 +156,7 @@ describe('lobby cards', () => {
       'bluff',
       'odd-word',
       'lantern',
+      'tiles',
       'kite',
     ])
   })

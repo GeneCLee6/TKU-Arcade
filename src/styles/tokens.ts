@@ -34,7 +34,8 @@ const light = {
   gameBluffReader: '#6B3FD1',
   gameOddWord: '#B03A12',
   gameLantern: '#A8246A',
-  gameKite: '#466F00',
+  gameTiles: '#3F6212',
+  gameKite: '#3D52C2',
   success: '#13703A',
   danger: '#B91C1C',
   warning: '#9C4A06',
@@ -60,6 +61,14 @@ const light = {
   cardRed: '#B91C1C',
   chipFace: '#FDE68A',
   chipInk: '#111827',
+  // Clubroom Tiles: the same in both themes, as a set of tiles is. Four suit inks on ivory
+  tileFace: '#FBF7EC',
+  tileEdge: '#C9BD9E',
+  tileSpade: '#1F2A44',
+  tileHeart: '#B91C1C',
+  tileDiamond: '#7E22CE',
+  tileClub: '#15803D',
+  tileJoker: '#BE185D',
 }
 
 export type ColorName = keyof typeof light
@@ -85,7 +94,8 @@ const dark: Record<ColorName, string> = {
   gameBluffReader: '#B48CFF',
   gameOddWord: '#FF8F66',
   gameLantern: '#FF9ECF',
-  gameKite: '#C6F35A',
+  gameTiles: '#C6F35B',
+  gameKite: '#A3B8FF',
   success: '#5CFFA8',
   danger: '#FF5A6E',
   warning: '#FFC23D',
@@ -108,6 +118,13 @@ const dark: Record<ColorName, string> = {
   cardRed: '#B91C1C',
   chipFace: '#FDE68A',
   chipInk: '#111827',
+  tileFace: '#FBF7EC',
+  tileEdge: '#C9BD9E',
+  tileSpade: '#1F2A44',
+  tileHeart: '#B91C1C',
+  tileDiamond: '#7E22CE',
+  tileClub: '#15803D',
+  tileJoker: '#BE185D',
 }
 
 // Raw values: only GlobalStyle (to define the variables) and the contrast tests should read these
@@ -135,6 +152,7 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   bluff: 'gameBluffReader',
   'odd-word': 'gameOddWord',
   lantern: 'gameLantern',
+  tiles: 'gameTiles',
   kite: 'gameKite',
 }
 
