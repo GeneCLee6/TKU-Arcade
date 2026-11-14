@@ -309,13 +309,15 @@ describe('the game', () => {
       'Wasabi Dumplings',
       'Palace Bluff',
       'Misery Line',
+      'Word Bridge',
+      'Clue Clash',
     ])
   })
 
   it('still shows an unlisted game as the selected one, and can leave it', () => {
     const { onSetGame } = renderRoom(inGame('tictactoe'))
     expect(select()).toHaveValue('tictactoe')
-    expect(choices()).toHaveLength(14)
+    expect(choices()).toHaveLength(16)
 
     fireEvent.change(select(), { target: { value: 'promotion' } })
 

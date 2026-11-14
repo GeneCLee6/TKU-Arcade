@@ -5,6 +5,7 @@ import { Button } from '../../../components/Button.tsx'
 import { useT } from '../../../i18n/useT.ts'
 import { color, fontSize, promotionBoard, space } from '../../../styles/tokens.ts'
 import { SETTLE_STEPS } from './settleSteps.ts'
+import './sheetMessages.ts'
 
 /** The settlement's steps: silver before, ranks compared (對品), the pot shared (分注), final */
 export { SETTLE_STEPS }

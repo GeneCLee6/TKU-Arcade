@@ -172,6 +172,9 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 - [ ] **放風箏**（暫名 Kite Day，擁有者 2026-11-14 要求，`feat/game-hanabi`）：`e16-t01`–`e16-t02` 完成（規則、畫面、規則頁、上大廳）；`e16-t03` 擁有者定名、試玩與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e16-kite-day.md`。
 - [ ] **慘度排排站**（暫名 Misery Line，擁有者 2026-11-14 要求，`feat/misery-line`）：`e14-t01`–`e14-t03` 完成（規則、396 張卡庫、畫面、規則頁、上大廳）；`e14-t04` 擁有者看卡庫與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e14-misery-line.md`。
 
+- [ ] **搭橋**（暫名 Word Bridge，擁有者 2026-11-14 要求，`feat/game-words`）：`e20-t01`–`e20-t03` 完成（分隊與合作規則、606 個詞、畫面、規則頁、上大廳）；`e20-t04` 擁有者試玩、審詞庫與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e20-word-bridge.md`。
+
+- [ ] **撞詞**（暫名 Clue Clash，擁有者 2026-11-14 要求，`feat/game-words`）：`e21-t01`–`e21-t03` 完成（合作猜詞規則、626 個題目、畫面、規則頁、上大廳）；`e21-t04` 擁有者試玩、審題庫與 IP 簽核。細節在 `PRD/e21-clue-clash.md`。
 - [ ] **朝堂暗鬥**（暫名 Palace Bluff，擁有者 2026-11-14 要求，`feat/game-coup`）：`e17-t01`–`e17-t02` 完成（規則、計時、畫面、規則頁、上大廳）；`e17-t03` 擁有者定名稱與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e17-palace-bluff.md`。
 
 ## 不在批次裡的事（擁有者自己做）

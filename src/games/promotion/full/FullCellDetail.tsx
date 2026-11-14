@@ -7,6 +7,7 @@ import { useLanguage, useT } from '../../../i18n/useT.ts'
 import { color, font, promotionBoard, space } from '../../../styles/tokens.ts'
 import { fullKnob } from './fullArt.ts'
 import { deptName, fullCellName, shortCellName } from './fullText.ts'
+import './sheetMessages.ts'
 
 /**
  * One cell of the full board in words, in a sheet over the board when asked for: its whole name,

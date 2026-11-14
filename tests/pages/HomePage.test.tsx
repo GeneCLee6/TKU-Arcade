@@ -142,6 +142,9 @@ describe('lobby cards', () => {
     const tiles = cardOf('Clubroom Tiles')
     expect(within(tiles).getByText('2–4 players')).toBeInTheDocument()
     expect(within(tiles).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    // Word Bridge and Clue Clash (owner's request, 2026-11-14)
+    expect(within(cardOf('Word Bridge')).getByText('2–10 players')).toBeInTheDocument()
+    expect(within(cardOf('Clue Clash')).getByText('3–7 players')).toBeInTheDocument()
     // Listed on the owner's request, 2026-11-14
     const kiteCard = cardOf('Kite Day')
     expect(within(kiteCard).getByText('2–5 players')).toBeInTheDocument()
@@ -162,9 +165,9 @@ describe('lobby cards', () => {
     const misery = cardOf('Misery Line')
     expect(within(misery).getByText('2–10 players')).toBeInTheDocument()
     expect(within(misery).getByRole('button', { name: 'New room' })).toBeInTheDocument()
-    // Thirteen open games; the Coming soon card arrives with its lazy chunk
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(14))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(13)
+    // Fifteen open games; the Coming soon card arrives with its lazy chunk
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(16))
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(15)
     expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
       'promotion',
       'silent-table',
@@ -179,6 +182,8 @@ describe('lobby cards', () => {
       'wasabi',
       'palace',
       'misery',
+      'word-bridge',
+      'clue-clash',
     ])
   })
 
