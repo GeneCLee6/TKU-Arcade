@@ -7,6 +7,7 @@ import {
   space,
   type ColorName,
 } from '../../src/styles/tokens.ts'
+import { tradersPieces } from '../../src/styles/tradersTokens.ts'
 
 function luminance(hex: string): number {
   const channels = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16) / 255)
@@ -47,6 +48,7 @@ const readablePairs: [ColorName, ColorName][] = [
   ['onAccent', 'gameSpectrum'],
   ['onAccent', 'gameBluffReader'],
   ['onAccent', 'gameOddWord'],
+  ['onAccent', 'gameTraders'],
   // ...and as text themselves: a public room's game, a link
   ['brand', 'bg'],
   ['gamePromotion', 'bg'],
@@ -54,6 +56,7 @@ const readablePairs: [ColorName, ColorName][] = [
   ['gameSpectrum', 'bg'],
   ['gameBluffReader', 'bg'],
   ['gameOddWord', 'bg'],
+  ['gameTraders', 'bg'],
   ['danger', 'surface'],
   ['danger', 'bg'],
   ['danger', 'surface'],
@@ -102,6 +105,7 @@ describe('tokens', () => {
       'gameSpectrum',
       'gameBluffReader',
       'gameOddWord',
+      'gameTraders',
     ] as const
     for (const hue of hues) {
       expect(contrast(p[hue], panel), `${hue} on panel`).toBeGreaterThanOrEqual(4.5)
@@ -119,6 +123,23 @@ describe('tokens', () => {
       ...Object.entries(board.face).map(
         ([face, fill]): [string, string, string] => [face, board.onFace, fill],
       ),
+    ]
+    for (const [name, foreground, background] of pairs) {
+      expect(contrast(foreground, background), name).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('the Tamsui Traders pieces have their text pairs at WCAG AA', () => {
+    const pieces = tradersPieces
+    const pairs: [string, string, string][] = [
+      ['tea', pieces.onTea, pieces.tea],
+      ['camphor', pieces.onCamphor, pieces.camphor],
+      ['indigo', pieces.onIndigo, pieces.indigo],
+      ['sugar', pieces.onSugar, pieces.sugar],
+      ['pepper', pieces.onPepper, pieces.pepper],
+      ['gold', pieces.onGold, pieces.gold],
+      ['ink on paper', pieces.ink, pieces.paper],
+      ['muted ink on paper', pieces.inkMuted, pieces.paper],
     ]
     for (const [name, foreground, background] of pairs) {
       expect(contrast(foreground, background), name).toBeGreaterThanOrEqual(4.5)

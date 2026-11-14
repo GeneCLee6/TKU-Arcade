@@ -135,15 +135,19 @@ describe('lobby cards', () => {
     const odd = cardOf('Odd Word Out')
     expect(within(odd).getByText('3–12 players')).toBeInTheDocument()
     expect(within(odd).getByRole('button', { name: 'New room' })).toBeInTheDocument()
-    // Five open games; the Coming soon card arrives with its lazy chunk
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(6))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(5)
+    const traders = cardOf('Tamsui Traders')
+    expect(within(traders).getByText('2–4 players')).toBeInTheDocument()
+    expect(within(traders).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    // Six open games; the Coming soon card arrives with its lazy chunk
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(7))
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(6)
     expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
       'promotion',
       'silent-table',
       'spectrum',
       'bluff',
       'odd-word',
+      'traders',
     ])
   })
 

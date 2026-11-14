@@ -11,6 +11,8 @@ import { silentTableMessages } from './silent-table/i18n.ts'
 import { silentTableInfo } from './silent-table/info.ts'
 import { spectrumMessages } from './spectrum/i18n.ts'
 import { spectrumInfo } from './spectrum/info.ts'
+import { tradersMessages } from './traders/i18n.ts'
+import { tradersInfo } from './traders/info.ts'
 import { ticTacToeMessages } from './tictactoe/i18n.ts'
 import { ticTacToeInfo } from './tictactoe/info.ts'
 import type { AnyGameInfo, GameMessages } from './types.ts'
@@ -22,6 +24,7 @@ export const GAME_INFOS = [
   spectrumInfo,
   bluffInfo,
   oddWordInfo,
+  tradersInfo,
 ] as unknown as readonly AnyGameInfo[]
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
@@ -43,6 +46,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...spectrumMessages.en,
     ...bluffMessages.en,
     ...oddWordMessages.en,
+    ...tradersMessages.en,
   },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
@@ -51,5 +55,6 @@ export const GAME_MESSAGES: GameMessages = {
     ...spectrumMessages['zh-TW'],
     ...bluffMessages['zh-TW'],
     ...oddWordMessages['zh-TW'],
+    ...tradersMessages['zh-TW'],
   },
 }

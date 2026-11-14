@@ -33,6 +33,7 @@ const light = {
   gameSpectrum: '#1D5FC4',
   gameBluffReader: '#6B3FD1',
   gameOddWord: '#B03A12',
+  gameTraders: '#4E6A00',
   success: '#13703A',
   danger: '#B91C1C',
   warning: '#9C4A06',
@@ -82,6 +83,7 @@ const dark: Record<ColorName, string> = {
   gameSpectrum: '#4DA3FF',
   gameBluffReader: '#B48CFF',
   gameOddWord: '#FF8F66',
+  gameTraders: '#C3E35A',
   success: '#5CFFA8',
   danger: '#FF5A6E',
   warning: '#FFC23D',
@@ -130,6 +132,7 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   // The kart keeps the brand's cyan (DESIGN §1)
   bluff: 'gameBluffReader',
   'odd-word': 'gameOddWord',
+  traders: 'gameTraders',
 }
 
 /** A game's hue, for its card and its room: what `--color-accent` becomes there */
@@ -201,6 +204,8 @@ export const promotionBoard = {
     engravedGold: '#B8892E',
   },
 } as const
+
+// Tamsui Traders' pieces are in tradersTokens.ts: only that game's chunk loads them
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const
 

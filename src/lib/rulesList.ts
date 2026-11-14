@@ -7,7 +7,7 @@
 export type RulesEdition = 'simple' | 'full'
 
 const WITH_RULES: Record<RulesEdition, readonly string[]> = {
-  simple: ['promotion', 'silent-table', 'spectrum', 'bluff', 'odd-word'],
+  simple: ['promotion', 'silent-table', 'spectrum', 'bluff', 'odd-word', 'traders'],
   // A game with a second edition (promotion's full one, C7) has a second pair, `rulesFull.*.md`
   full: ['promotion'],
 }
