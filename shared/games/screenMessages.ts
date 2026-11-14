@@ -16,6 +16,7 @@ import { silentTableScreenMessages } from './silent-table/i18n.screen.ts'
 import { soonMessages } from './soon.ts'
 import { spectrumScreenMessages } from './spectrum/i18n.screen.ts'
 import { tilesScreenMessages } from './tiles/i18n.screen.ts'
+import { tradersScreenMessages } from './traders/i18n.screen.ts'
 import type { GameMessages } from './types.ts'
 
 export const SCREEN_MESSAGES: GameMessages = {
@@ -31,6 +32,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...lanternScreenMessages.en,
     ...tilesScreenMessages.en,
     ...kiteScreenMessages.en,
+    ...tradersScreenMessages.en,
     ...secretScrollScreenMessages.en,
     ...wasabiScreenMessages.en,
     ...soonMessages.en,
@@ -48,6 +50,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...lanternScreenMessages['zh-TW'],
     ...tilesScreenMessages['zh-TW'],
     ...kiteScreenMessages['zh-TW'],
+    ...tradersScreenMessages['zh-TW'],
     ...secretScrollScreenMessages['zh-TW'],
     ...wasabiScreenMessages['zh-TW'],
     ...soonMessages['zh-TW'],

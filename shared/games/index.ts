@@ -10,6 +10,7 @@ import { promotion } from './promotion/rules.ts'
 import { silentTable } from './silent-table/rules.ts'
 import { spectrum } from './spectrum/rules.ts'
 import { tiles } from './tiles/rules.ts'
+import { traders } from './traders/rules.ts'
 import { ticTacToe } from './tictactoe/rules.ts'
 import { wasabi } from './wasabi/rules.ts'
 import type { AnyGameModule } from './types.ts'
@@ -26,6 +27,7 @@ const MODULES: readonly AnyGameModule[] = [
   lantern,
   tiles,
   kite,
+  traders,
   secretScroll,
   wasabi,
 ]

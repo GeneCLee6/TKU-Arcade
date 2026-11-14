@@ -16,6 +16,7 @@ const WITH_RULES: Record<RulesEdition, readonly string[]> = {
     'lantern',
     'tiles',
     'kite',
+    'traders',
     'secret-scroll',
     'wasabi',
   ],

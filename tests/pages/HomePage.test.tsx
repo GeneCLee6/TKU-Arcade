@@ -113,7 +113,7 @@ describe('signed in (e1-t13)', () => {
 })
 
 describe('lobby cards', () => {
-  it('lists promotion, silent table, spectrum, bluff reader, odd word out, lantern lane, clubroom tiles, kite day, secret scroll and wasabi dumplings with their facts, and not the unlisted tic-tac-toe', async () => {
+  it('lists promotion, silent table, spectrum, bluff reader, odd word out, lantern lane, clubroom tiles, kite day, tamsui traders, secret scroll and wasabi dumplings with their facts, and not the unlisted tic-tac-toe', async () => {
     renderLobby()
     const card = screen.getByRole('heading', { level: 3, name: 'Promotion' }).closest('li')!
     expect(within(card).getByText('2–6 players')).toBeInTheDocument()
@@ -146,6 +146,9 @@ describe('lobby cards', () => {
     const kiteCard = cardOf('Kite Day')
     expect(within(kiteCard).getByText('2–5 players')).toBeInTheDocument()
     expect(within(kiteCard).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    const traders = cardOf('Tamsui Traders')
+    expect(within(traders).getByText('2–4 players')).toBeInTheDocument()
+    expect(within(traders).getByRole('button', { name: 'New room' })).toBeInTheDocument()
     // The owner's brief, 2026-11-14
     const scroll = cardOf('Secret Scroll')
     expect(within(scroll).getByText('2–6 players')).toBeInTheDocument()
@@ -153,9 +156,9 @@ describe('lobby cards', () => {
     const dumplings = cardOf('Wasabi Dumplings')
     expect(within(dumplings).getByText('3–6 players')).toBeInTheDocument()
     expect(within(dumplings).getByRole('button', { name: 'New room' })).toBeInTheDocument()
-    // Ten open games; the Coming soon card arrives with its lazy chunk
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(11))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(10)
+    // Eleven open games; the Coming soon card arrives with its lazy chunk
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(12))
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(11)
     expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
       'promotion',
       'silent-table',
@@ -165,6 +168,7 @@ describe('lobby cards', () => {
       'lantern',
       'tiles',
       'kite',
+      'traders',
       'secret-scroll',
       'wasabi',
     ])

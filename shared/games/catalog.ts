@@ -19,6 +19,8 @@ import { spectrumMessages } from './spectrum/i18n.ts'
 import { spectrumInfo } from './spectrum/info.ts'
 import { tilesMessages } from './tiles/i18n.ts'
 import { tilesInfo } from './tiles/info.ts'
+import { tradersMessages } from './traders/i18n.ts'
+import { tradersInfo } from './traders/info.ts'
 import { ticTacToeMessages } from './tictactoe/i18n.ts'
 import { ticTacToeInfo } from './tictactoe/info.ts'
 import { wasabiMessages } from './wasabi/i18n.ts'
@@ -35,6 +37,7 @@ export const GAME_INFOS = [
   lanternInfo,
   tilesInfo,
   kiteInfo,
+  tradersInfo,
   secretScrollInfo,
   wasabiInfo,
 ] as unknown as readonly AnyGameInfo[]
@@ -61,6 +64,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...lanternMessages.en,
     ...tilesMessages.en,
     ...kiteMessages.en,
+    ...tradersMessages.en,
     ...secretScrollMessages.en,
     ...wasabiMessages.en,
   },
@@ -74,6 +78,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...lanternMessages['zh-TW'],
     ...tilesMessages['zh-TW'],
     ...kiteMessages['zh-TW'],
+    ...tradersMessages['zh-TW'],
     ...secretScrollMessages['zh-TW'],
     ...wasabiMessages['zh-TW'],
   },
