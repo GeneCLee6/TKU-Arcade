@@ -4,6 +4,7 @@
 import { bluff } from './bluff/rules.ts'
 import { lantern } from './lantern/rules.ts'
 import { kite } from './kite/rules.ts'
+import { misery } from './misery/rules.ts'
 import { oddWord } from './odd-word/rules.ts'
 import { secretScroll } from './secret-scroll/rules.ts'
 import { palace } from './palace/rules.ts'
@@ -32,6 +33,7 @@ const MODULES: readonly AnyGameModule[] = [
   secretScroll,
   wasabi,
   palace,
+  misery,
 ]
 
 const BY_ID: ReadonlyMap<string, AnyGameModule> = new Map(MODULES.map((game) => [game.id, game]))

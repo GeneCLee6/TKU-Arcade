@@ -113,7 +113,7 @@ describe('signed in (e1-t13)', () => {
 })
 
 describe('lobby cards', () => {
-  it('lists promotion, silent table, spectrum, bluff reader, odd word out, lantern lane, clubroom tiles, kite day, tamsui traders, secret scroll and wasabi dumplings with their facts, and not the unlisted tic-tac-toe', async () => {
+  it('lists promotion, silent table, spectrum, bluff reader, odd word out, lantern lane, clubroom tiles, kite day, tamsui traders, secret scroll, wasabi dumplings and misery line with their facts, and not the unlisted tic-tac-toe', async () => {
     renderLobby()
     const card = screen.getByRole('heading', { level: 3, name: 'Promotion' }).closest('li')!
     expect(within(card).getByText('2–6 players')).toBeInTheDocument()
@@ -159,9 +159,12 @@ describe('lobby cards', () => {
     const palace = cardOf('Palace Bluff')
     expect(within(palace).getByText('2–6 players')).toBeInTheDocument()
     expect(within(palace).getByRole('button', { name: 'New room' })).toBeInTheDocument()
-    // Twelve open games; the Coming soon card arrives with its lazy chunk
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(13))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(12)
+    const misery = cardOf('Misery Line')
+    expect(within(misery).getByText('2–10 players')).toBeInTheDocument()
+    expect(within(misery).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    // Thirteen open games; the Coming soon card arrives with its lazy chunk
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(14))
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(13)
     expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
       'promotion',
       'silent-table',
@@ -175,6 +178,7 @@ describe('lobby cards', () => {
       'secret-scroll',
       'wasabi',
       'palace',
+      'misery',
     ])
   })
 

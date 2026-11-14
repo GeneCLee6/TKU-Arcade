@@ -27,6 +27,7 @@ A browser game lobby for friends of the Tamkang University Bridge Club: open one
 | Secret Scroll (working title) | A sixteen-card deduction game in a martial-arts world: hold one card, draw one, play one | Off-roadmap |
 | Wasabi Dumplings (working title) | Hide a wasabi dumpling among plain ones, bid how many you can eat, then eat | Off-roadmap |
 | Palace Bluff (working title) | Claim any role at an imperial court, challenge the liars, last one with a backer wins | Off-roadmap |
+| Misery Line (working title) | Every card is a disaster with a hidden misery index from 1 to 100; slot it into your own line, and steal the ones others misplace | Off-roadmap |
 | Kart (working title) | Arcade kart racing: drift, fill the gauge, boost | M2–M3 |
 
 Game mechanics are not protected by copyright; names, art, characters, tracks, music and prompt decks are. Everything of the second kind here is original or CC0/CC BY licensed; asset files will be registered in `docs/ASSETS.md` once the first one lands (none yet). Games that borrow a modern game's mechanics name it only on their own rules page, in one descriptive sentence. The reasoning is in [`docs/PRD/01-legal-ip-analysis.md`](docs/PRD/01-legal-ip-analysis.md).

@@ -170,6 +170,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 - [ ] **芥末餃子**（暫名 Wasabi Dumplings，擁有者 2026-11-14 要求，`feat/game-letter-skull`）：`e19-t01`–`e19-t02` 完成（規則、餐桌與喊價階梯、規則頁、上大廳）；`e19-t03` 擁有者 IP 簽核。細節在 `PRD/e19-wasabi-dumplings.md`。
 
 - [ ] **放風箏**（暫名 Kite Day，擁有者 2026-11-14 要求，`feat/game-hanabi`）：`e16-t01`–`e16-t02` 完成（規則、畫面、規則頁、上大廳）；`e16-t03` 擁有者定名、試玩與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e16-kite-day.md`。
+- [ ] **慘度排排站**（暫名 Misery Line，擁有者 2026-11-14 要求，`feat/misery-line`）：`e14-t01`–`e14-t03` 完成（規則、396 張卡庫、畫面、規則頁、上大廳）；`e14-t04` 擁有者看卡庫與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e14-misery-line.md`。
 
 - [ ] **朝堂暗鬥**（暫名 Palace Bluff，擁有者 2026-11-14 要求，`feat/game-coup`）：`e17-t01`–`e17-t02` 完成（規則、計時、畫面、規則頁、上大廳）；`e17-t03` 擁有者定名稱與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e17-palace-bluff.md`。
 
