@@ -60,7 +60,7 @@ Chat is closed while the cards are read, during the reading and the vote (one "I
 
 ## The terms
 
-Every term is real but little known, and every explanation is in our own words. The terms are in Chinese only for now.
+Every term is real but little known, and its name often misleads: it looks like one category and turns out to be another. Every explanation is in our own words. The terms are in Chinese only for now.
 
 ## Players
 
