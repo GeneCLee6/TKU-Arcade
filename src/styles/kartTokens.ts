@@ -218,6 +218,10 @@ export const kartHover = {
   housing: '#2E3138',
   glass: '#132033',
   spark: '#FFF6D6',
+  // 2026-11-14: the sparks of a drift long enough to have earned its release boost, and the sparks
+  // while the release boost's window is open
+  sparkEarned: '#FFC21A',
+  sparkReady: '#7CF3FF',
 } as const
 
 /**

@@ -45,6 +45,13 @@ export interface KartLook {
   /** -1 left, 1 right, 0 not drifting */
   readonly drift: number
   readonly boosting: boolean
+  /**
+   * The release boost's state, for the sparks: 1 when the drift has gone on long enough to earn
+   * one, 2 while its window is open (press the throttle now), 0 or left out otherwise
+   */
+  readonly charge?: 0 | 1 | 2
+  /** Counts boosts fired, of any kind: when it goes up the thrusters burst */
+  readonly bursts?: number
 }
 
 export interface KartModel {

@@ -32,6 +32,7 @@ import { startRun, stepRun, type Spot } from '../../shared/kart/course.ts'
 import { actionKeys, isBoundKey, readInput, type Bindings } from '../../shared/kart/input.ts'
 import {
   kartBoosting,
+  kartSkidding,
   kartSlip,
   kartSpeed,
   NO_INPUT,
@@ -44,6 +45,7 @@ import {
 import { calloutAtStart, calloutBetween, louder, type Callout } from './callouts.ts'
 import { readGamepad } from './devices.ts'
 import { createKartScene } from './Scene.ts'
+import type { KartLook } from './art/kartModel.ts'
 
 const STATS_EVERY_MS = 500
 
@@ -56,7 +58,8 @@ export const SPEEDOMETER_SCALE = 1.45
 
 /**
  * The HUD's speed: metres per second times 3.6 (the real conversion) times SPEEDOMETER_SCALE. The
- * standard top speed of 50 m/s reads 261 km/h, a boost 365 and a stacked boost 405.
+ * standard top speed of 60 m/s reads 313 km/h, a release boost 376 (up to 413 in a chain), a boost
+ * 454 and a stacked boost 501.
  */
 export const KMH_PER_MPS = 3.6 * SPEEDOMETER_SCALE
 
@@ -299,6 +302,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let lastFrame: number | undefined
   let handle = 0
   let lastHud: SpikeHud | undefined
+  let bursts = 0
 
   let statsFrom: number | undefined
   let statsFrames = 0
@@ -361,6 +365,10 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       } else {
         previous = before.kart
         callout = louder(callout, calloutBetween(before.kart, run.kart))
+        // Any boost fired (a charge, a release boost, a pad, the start): the thrusters burst
+        const { kart } = run
+        const was = before.kart
+        if (kart.miniSeconds > was.miniSeconds || kart.boostSeconds > was.boostSeconds) bursts++
       }
       // One hit per crash, not one per step of pushing against the wall after it
       if (run.hitSpeed >= HIT_SPEED && before.hitSpeed < HIT_SPEED) {
@@ -382,22 +390,33 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     debug.crossings = run.crossings
     debug.nextGate = run.nextGate
     const boosting = kartBoosting(current)
-    const look = {
+    const skidding = kartSkidding(current)
+    // Let go, the car slides on until the grip is back: the nose is still turned the drift's way
+    const slideWay = current.driftDirection || (skidding ? -Math.sign(kartSlip(current)) : 0)
+    const look: KartLook = {
       speed: current.vx * Math.sin(current.heading) - current.vz * Math.cos(current.heading),
       steer: debug.input.steer,
-      drift: current.driftDirection,
+      drift: slideWay,
       boosting,
+      // The sparks say when a release boost is there for the taking
+      charge:
+        current.releaseWindow > 0
+          ? 2
+          : current.drifting && current.driftSeconds >= tuning.chainMinDrift
+            ? 1
+            : 0,
+      bursts,
     }
     scene.draw(
       poseBetween(previous, current, clock.alpha),
-      { heading: current.heading, vx: current.vx, vz: current.vz, boosting },
+      { heading: current.heading, vx: current.vx, vz: current.vz, boosting, skidding },
       frameMs / 1000,
       look,
     )
     audio.update({
       speed: look.speed,
       throttle: debug.input.throttle,
-      drifting: current.drifting,
+      drifting: skidding,
       boosting,
     })
     if (callout) options.onCallout(callout)
