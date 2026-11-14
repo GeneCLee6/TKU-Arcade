@@ -2,8 +2,10 @@
 // number from 1 to 10. The guesser is dealt a card of four topics with two ends each and picks one
 // to ask (owner, 2026-11-13; "late-night snacks": 1 = least wanted, 10 = most wanted), and each answerer sends one answer that says where their number sits between
 // the two ends, without saying the number. Once every answer is in they are shown, and the guesser
-// puts every answer in order (or, as a rule option, picks only the largest and the smallest). Every
-// right pick scores one for the guesser and one for that answerer. The guesser moves one seat on
+// puts every answer in order (or, as a rule option, picks only the largest and the smallest). In a
+// full order an answer in its very place scores two for the guesser and two for that answerer, one
+// place off scores one each (2026-11-14: scoring only the very place let one early slip zero out
+// the whole line); a right largest or smallest scores one each. The guesser moves one seat on
 // each round; everyone guesses once (or twice), and the highest total wins.
 //
 // The decisions the epic left open are recorded in docs/PRD/e5-spectrum-guess.md, "H1 定案的規則細節".
@@ -78,8 +80,8 @@ function parseAction(action: unknown): SpectrumAction | null {
 }
 
 const topicAt = (id: number): SpectrumTopic => {
-  const [category, topic, low, high] = SPECTRUM_TOPICS[id - 1]
-  return { id, category, topic, low, high }
+  const [category, topic, scene, low, high] = SPECTRUM_TOPICS[id - 1]
+  return { id, category, topic, scene, low, high }
 }
 
 /**
@@ -157,6 +159,30 @@ function dealRound(
 const inPlay = (answerers: readonly SpectrumAnswerer[]): SpectrumAnswerer[] =>
   answerers.filter((answerer) => !answerer.out && answerer.text !== null)
 
+/** What an answer in its very place of a full order scores, for the guesser and for its answerer */
+export const EXACT_POINTS = 2
+/** What an answer one place off scores, each */
+export const CLOSE_POINTS = 1
+
+/**
+ * How many places off a full order put each answerer: 0 in its place, where equal numbers share the
+ * places they could take between them
+ */
+export function placeErrors(answerers: readonly SpectrumAnswerer[], seats: readonly SeatId[]): Map<SeatId, number> {
+  const playing = inPlay(answerers)
+  const numberOf = new Map(playing.map((answerer) => [answerer.seat, answerer.number]))
+  const numbers = playing.map((answerer) => answerer.number).sort((a, b) => a - b)
+  const errors = new Map<SeatId, number>()
+  seats.forEach((seat, index) => {
+    const number = numberOf.get(seat)
+    if (number === undefined) return
+    const first = numbers.indexOf(number)
+    const last = numbers.lastIndexOf(number)
+    errors.set(seat, index < first ? first - index : index > last ? index - last : 0)
+  })
+  return errors
+}
+
 /** Which answerers this guess got right. Equal numbers are interchangeable, so a tie counts either way */
 export function rightPicks(answerers: readonly SpectrumAnswerer[], guess: SpectrumGuess): SeatId[] {
   const playing = inPlay(answerers)
@@ -171,6 +197,13 @@ export function rightPicks(answerers: readonly SpectrumAnswerer[], guess: Spectr
   return guess.seats.filter((seat, index) => numberOf.get(seat) === numbers[index])
 }
 
+/** The answerers a full order put one place off; none for the largest and smallest */
+export function closePicks(answerers: readonly SpectrumAnswerer[], guess: SpectrumGuess): SeatId[] {
+  if (guess.kind !== 'order') return []
+  const errors = placeErrors(answerers, guess.seats)
+  return guess.seats.filter((seat) => errors.get(seat) === 1)
+}
+
 /** The numbers are shown and this round is scored; after the last round, the game ends here */
 function reveal(
   state: SpectrumState,
@@ -178,11 +211,16 @@ function reveal(
   missed: SpectrumMiss | null,
 ): SpectrumState {
   const correct = guess === null ? [] : rightPicks(state.answerers, guess)
+  const close = guess === null ? [] : closePicks(state.answerers, guess)
+  const order = guess?.kind === 'order'
+  const pointsOf = (seat: SeatId): number =>
+    correct.includes(seat) ? (order ? EXACT_POINTS : 1) : close.includes(seat) ? CLOSE_POINTS : 0
+  const answerPoints = state.answerers.map((answerer) => pointsOf(answerer.seat))
   const points = state.players.map((player) => {
-    if (player.seat === state.guesser) return correct.length
-    return correct.includes(player.seat) ? 1 : 0
+    if (player.seat === state.guesser) return answerPoints.reduce((sum, value) => sum + value, 0)
+    return pointsOf(player.seat)
   })
-  const result: SpectrumReveal = { guess, missed, correct, points }
+  const result: SpectrumReveal = { guess, missed, correct, close, points }
   return {
     ...state,
     phase: state.round >= state.totalRounds ? 'over' : 'reveal',

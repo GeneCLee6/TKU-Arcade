@@ -178,6 +178,8 @@ test('the guesser puts every answer in order in the full-order mode', async ({ b
   const [host, guest] = people
   await setSelectOption(host, guest, 'The guesser picks', 'order', 'Everyone in order')
   await host.getByRole('button', { name: 'Start game' }).click()
+  await expect(host.getByTestId('topic-choice')).toBeVisible()
+  await host.getByTestId('topic-choice').screenshot({ path: test.info().outputPath('spectrum-card.png') })
 
   const { guesser, answerers } = await rolesOf(people)
   await sendAnswer(answerers[0], ANSWERS[0])
@@ -193,7 +195,9 @@ test('the guesser puts every answer in order in the full-order mode', async ({ b
   await expect(order.getByRole('listitem').nth(1)).toContainText(moved)
   await expect(answerers[0].getByText(/is putting the answers in order\.$/)).toBeVisible()
   await guesser.getByRole('button', { name: 'Confirm guess' }).click()
-  await expect(host.getByText(/^\d of 3 in the right place\.$/)).toBeVisible()
+  // 2026-11-14: an answer in its place scores two, one place off scores one
+  await expect(host.getByText(/^Of 3: \d in the right place \(2 points each\), \d one place off \(1 point each\)\.$/)).toBeVisible()
+  await host.getByTestId('round-reveal').screenshot({ path: test.info().outputPath('spectrum-reveal.png') })
   await close(people)
 })
 
@@ -227,7 +231,11 @@ async function expectNoSeriousProblems(page: Page, step: string) {
   const size = page.viewportSize() ?? { width: 1280, height: 720 }
   const height = await page.evaluate(() => document.documentElement.scrollHeight)
   await page.setViewportSize({ width: size.width, height: Math.max(height, size.height) })
+  // The dock sticks to the bottom of the window and covers whatever scrolls under it, which axe then
+  // measures against the dock: let it sit in the page's flow while axe looks (2026-11-14)
+  const unstick = await page.addStyleTag({ content: '[data-dock] { position: static !important; }' })
   const { violations } = await new AxeBuilder({ page }).analyze()
+  await unstick.evaluate((tag) => (tag as Element).remove())
   await page.setViewportSize(size)
   const blocking = violations
     .filter((violation) => BLOCKING.has(violation.impact ?? ''))

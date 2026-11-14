@@ -1,5 +1,5 @@
 // `node scripts/spectrum-topics.mjs`: writes shared/games/spectrum/topics.ts from the reviewed draft
-// docs/content/spectrum-topics.zh-TW.csv (category, topic, low, high; no quoting). The topics live on
+// docs/content/spectrum-topics.zh-TW.csv (category, topic, scene, low, high; no quoting). The topics live on
 // the server only until F3 moves them to the D1 `prompts` table; tests/games/spectrum-topics.test.ts
 // fails if the two files drift apart. Paths are relative to the current directory.
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -8,11 +8,11 @@ const CSV = 'docs/content/spectrum-topics.zh-TW.csv'
 const OUT = 'shared/games/spectrum/topics.ts'
 
 const [header, ...lines] = readFileSync(CSV, 'utf8').replace(/\r/g, '').trim().split('\n')
-if (header !== 'category,topic,low,high') throw new Error(`${CSV}: unexpected header ${header}`)
+if (header !== 'category,topic,scene,low,high') throw new Error(`${CSV}: unexpected header ${header}`)
 const rows = lines.map((line, index) => {
   const fields = line.split(',').map((field) => field.trim())
-  if (fields.length !== 4 || fields.some((field) => field === '')) {
-    throw new Error(`${CSV}:${index + 2}: expected four non-empty fields`)
+  if (fields.length !== 5 || fields.some((field) => field === '')) {
+    throw new Error(`${CSV}:${index + 2}: expected five non-empty fields`)
   }
   return fields
 })
@@ -26,7 +26,7 @@ writeFileSync(
 // (tests/games/catalog.test.ts). F3 moves the topics to the D1 \`prompts\` table.
 import type { SpectrumTopicRow } from './types.ts'
 
-/** category, topic, the 1 end, the 10 end; a topic's id is its index here plus one */
+/** category, topic, scene, the 1 end, the 10 end; a topic's id is its index here plus one */
 export const SPECTRUM_TOPICS: readonly SpectrumTopicRow[] = [
 ${body}
 ]
