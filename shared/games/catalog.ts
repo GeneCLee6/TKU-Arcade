@@ -7,6 +7,8 @@ import { lanternMessages } from './lantern/i18n.ts'
 import { lanternInfo } from './lantern/info.ts'
 import { oddWordMessages } from './odd-word/i18n.ts'
 import { oddWordInfo } from './odd-word/info.ts'
+import { secretScrollMessages } from './secret-scroll/i18n.ts'
+import { secretScrollInfo } from './secret-scroll/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
 import { promotionInfo } from './promotion/info.ts'
 import { silentTableMessages } from './silent-table/i18n.ts'
@@ -15,6 +17,8 @@ import { spectrumMessages } from './spectrum/i18n.ts'
 import { spectrumInfo } from './spectrum/info.ts'
 import { ticTacToeMessages } from './tictactoe/i18n.ts'
 import { ticTacToeInfo } from './tictactoe/info.ts'
+import { wasabiMessages } from './wasabi/i18n.ts'
+import { wasabiInfo } from './wasabi/info.ts'
 import type { AnyGameInfo, GameMessages } from './types.ts'
 
 export const GAME_INFOS = [
@@ -25,6 +29,8 @@ export const GAME_INFOS = [
   bluffInfo,
   oddWordInfo,
   lanternInfo,
+  secretScrollInfo,
+  wasabiInfo,
 ] as unknown as readonly AnyGameInfo[]
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
@@ -47,6 +53,8 @@ export const GAME_MESSAGES: GameMessages = {
     ...bluffMessages.en,
     ...oddWordMessages.en,
     ...lanternMessages.en,
+    ...secretScrollMessages.en,
+    ...wasabiMessages.en,
   },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
@@ -56,5 +64,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...bluffMessages['zh-TW'],
     ...oddWordMessages['zh-TW'],
     ...lanternMessages['zh-TW'],
+    ...secretScrollMessages['zh-TW'],
+    ...wasabiMessages['zh-TW'],
   },
 }

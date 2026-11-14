@@ -163,6 +163,8 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 - [ ] **誰的詞不一樣**（暫名 Odd Word Out，擁有者 2026-11-14 要求，`feat/odd-word-out`）：`e13-t01`–`e13-t03` 完成（規則、267 組題庫、畫面、規則頁、上大廳）；`e13-t04` 擁有者審題庫與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e13-odd-word-out.md`。
 
 - [ ] **宮燈點點**（暫名 Lantern Lane，擁有者 2026-11-14 要求，`feat/game-mind`）：`e15-t01`–`e15-t02` 完成（即時合作規則、畫面、規則頁、上大廳）；`e15-t03` 擁有者試玩與 IP 簽核。不屬於任何 Phase，也不擋後面的批次。細節在 `PRD/e15-lantern-lane.md`。
+- [ ] **奪祕笈**（暫名 Secret Scroll，擁有者 2026-11-14 要求，`feat/game-letter-skull`）：`e18-t01`–`e18-t02` 完成（規則、畫面、規則頁、上大廳）；`e18-t03` 擁有者 IP 簽核。細節在 `PRD/e18-secret-scroll.md`。
+- [ ] **芥末餃子**（暫名 Wasabi Dumplings，擁有者 2026-11-14 要求，`feat/game-letter-skull`）：`e19-t01`–`e19-t02` 完成（規則、餐桌與喊價階梯、規則頁、上大廳）；`e19-t03` 擁有者 IP 簽核。細節在 `PRD/e19-wasabi-dumplings.md`。
 
 ## 不在批次裡的事（擁有者自己做）
 

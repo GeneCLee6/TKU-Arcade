@@ -139,9 +139,16 @@ describe('lobby cards', () => {
     const lantern = cardOf('Lantern Lane')
     expect(within(lantern).getByText('2–6 players')).toBeInTheDocument()
     expect(within(lantern).getByRole('button', { name: 'New room' })).toBeInTheDocument()
-    // Six open games; the Coming soon card arrives with its lazy chunk
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(7))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(6)
+    // The owner's brief, 2026-11-14
+    const scroll = cardOf('Secret Scroll')
+    expect(within(scroll).getByText('2–6 players')).toBeInTheDocument()
+    expect(within(scroll).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    const dumplings = cardOf('Wasabi Dumplings')
+    expect(within(dumplings).getByText('3–6 players')).toBeInTheDocument()
+    expect(within(dumplings).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    // Eight open games; the Coming soon card arrives with its lazy chunk
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(9))
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(8)
     expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
       'promotion',
       'silent-table',
@@ -149,6 +156,8 @@ describe('lobby cards', () => {
       'bluff',
       'odd-word',
       'lantern',
+      'secret-scroll',
+      'wasabi',
     ])
   })
 

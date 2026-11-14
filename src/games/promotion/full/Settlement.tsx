@@ -4,9 +4,8 @@ import type { FullSettlement } from '../../../../shared/games/promotion/types.ts
 import { Button } from '../../../components/Button.tsx'
 import { useT } from '../../../i18n/useT.ts'
 import { color, fontSize, promotionBoard, space } from '../../../styles/tokens.ts'
+import { SETTLE_STEPS } from './settleSteps.ts'
 
-/** The settlement's steps: silver before, ranks compared (對品), the pot shared (分注), final */
-export const SETTLE_STEPS = 3
 const STEP_MS = 1400
 
 const signed = (amount: number) => (amount > 0 ? `+${amount}` : amount < 0 ? `−${-amount}` : '0')

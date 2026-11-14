@@ -92,6 +92,22 @@ const ART: Record<string, ReactElement> = {
       />
     </>
   ),
+  // A rolled scroll with its cord: the prize of the round
+  'secret-scroll': (
+    <>
+      <rect {...stroke} x="8" y="6" width="16" height="20" />
+      <path {...stroke} d="M5 6h22M5 26h22M12 12h8M12 16h8M12 20h5" />
+      <circle fill="currentColor" cx="24" cy="20" r="3" />
+    </>
+  ),
+  // A dumpling over a steamer's rim
+  wasabi: (
+    <>
+      <path {...stroke} d="M4 20 Q16 2 28 20 Z" />
+      <path {...stroke} d="M11 13l1.5 3M16 10v4M21 13l-1.5 3" />
+      <path {...stroke} d="M3 24h26M6 28h20" />
+    </>
+  ),
 }
 
 /** The drawing for `gameId`; `fallback` for a game without one */

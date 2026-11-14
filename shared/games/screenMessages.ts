@@ -4,6 +4,8 @@
 import { bluffScreenMessages } from './bluff/i18n.screen.ts'
 import { lanternScreenMessages } from './lantern/i18n.screen.ts'
 import { oddWordScreenMessages } from './odd-word/i18n.screen.ts'
+import { secretScrollScreenMessages } from './secret-scroll/i18n.screen.ts'
+import { wasabiScreenMessages } from './wasabi/i18n.screen.ts'
 import { roomExtraMessages } from './roomExtras.ts'
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
 import { promotionFullMessages } from './promotion/i18n.full.ts'
@@ -25,6 +27,8 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...bluffScreenMessages.en,
     ...oddWordScreenMessages.en,
     ...lanternScreenMessages.en,
+    ...secretScrollScreenMessages.en,
+    ...wasabiScreenMessages.en,
     ...soonMessages.en,
     ...roomExtraMessages.en,
   },
@@ -38,6 +42,8 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...bluffScreenMessages['zh-TW'],
     ...oddWordScreenMessages['zh-TW'],
     ...lanternScreenMessages['zh-TW'],
+    ...secretScrollScreenMessages['zh-TW'],
+    ...wasabiScreenMessages['zh-TW'],
     ...soonMessages['zh-TW'],
     ...roomExtraMessages['zh-TW'],
   },
