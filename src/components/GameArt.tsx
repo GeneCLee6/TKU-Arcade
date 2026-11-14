@@ -63,6 +63,18 @@ const ART: Record<string, ReactElement> = {
       <path {...stroke} d="M7 10h7M18 18h7" />
     </>
   ),
+  // Three palace lanterns rising along a line, the highest one lit
+  lantern: (
+    <>
+      <path {...stroke} d="M2 29L30 13" />
+      <ellipse {...stroke} cx="6" cy="21" rx="3.2" ry="4" />
+      <path {...stroke} d="M4.5 16.5h3M4.5 25.5h3" />
+      <ellipse {...stroke} cx="15" cy="15.5" rx="3.6" ry="4.5" />
+      <path {...stroke} d="M13.3 10.5h3.4M13.3 20.5h3.4" />
+      <ellipse fill="currentColor" cx="25" cy="9" rx="4" ry="5" />
+      <path {...stroke} d="M23 3h4M23 15h4" />
+    </>
+  ),
   // Four word cards, one turned a different way: the odd one out
   'odd-word': (
     <>

@@ -28,7 +28,6 @@ import { DecisionPrompt } from './DecisionPrompt.tsx'
 import { fullArtHref, fullKnob } from './fullArt.ts'
 import { FullBoard, type FullFlight, type FullPiece } from './FullBoard.tsx'
 import { loadFullBoardFont } from './fullFont.ts'
-import { FullCellDetail } from './FullCellDetail.tsx'
 import { FullDice } from './FullDice.tsx'
 import { useFullData } from './fullData.ts'
 import type { SquareLayout } from './fullSquare.ts'
@@ -53,6 +52,9 @@ registerMessages(promotionFullMessages)
 
 // Each player's way through the game, once it is over: out of the first screen
 const FullRoutes = lazy(() => import('./FullRoutes.tsx'))
+// A cell's details, only when someone taps one: out of the first screen too (2026-11-14, to make room
+// in the 150 kB budget for new games)
+const FullCellDetail = lazy(() => import('./FullCellDetail.tsx').then((module) => ({ default: module.FullCellDetail })))
 
 /** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
 const DENSE_CELL = 48
@@ -486,7 +488,9 @@ export default function FullScreen({ room, game }: GameScreenProps) {
               />
             )}
             {board && (
-              <FullCellDetail board={board} id={selected} here={here} onClose={() => setSelected(null)} />
+              <Suspense fallback={null}>
+                <FullCellDetail board={board} id={selected} here={here} onClose={() => setSelected(null)} />
+              </Suspense>
             )}
           </BoardArea>
 
