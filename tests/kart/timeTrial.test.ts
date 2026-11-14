@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { STEP_SECONDS, type KartInput } from '../../shared/kart/physics.ts'
+import { KART_TUNING, kartSpeed, STEP_SECONDS, type KartInput } from '../../shared/kart/physics.ts'
 import {
   COUNTDOWN_SECONDS,
   bestLap,
@@ -9,6 +9,7 @@ import {
   lapSteps,
   resetTrial,
   seconds,
+  startFrom,
   startTrial,
   stepTrial,
   type Trial,
@@ -18,6 +19,7 @@ import { courseOf, parseTrack, type Track, type TrackJson } from '../../shared/k
 import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
+import { alongRoad, sharpCorners } from './trackShape.ts'
 
 // e8-t05a, e8-t10 (AC-8.4): the first track and the time trial on it
 
@@ -92,6 +94,63 @@ describe('the time trial', () => {
     expect(trial.steps).toBe(1)
   })
 
+  describe('the start boost', () => {
+    const track = load(TEST_OVAL)
+    const course = trialCourse(track)
+    const idle: KartInput = { throttle: false, brake: false, steer: 0, drift: false, boost: false }
+    const gas: KartInput = { ...idle, throttle: true }
+    /** Counts down, pressing the throttle once `pressAt` seconds are left (null: never) */
+    const countdownWith = (pressAt: number | null) => {
+      let trial = startTrial(course)
+      while (trial.phase === 'countdown') {
+        const pressing = pressAt !== null && trial.countdown <= pressAt + 1e-9
+        trial = stepTrial(trial, pressing ? gas : idle, course)
+      }
+      return trial
+    }
+
+    it('boosts off the line when the throttle goes down just before GO', () => {
+      const trial = countdownWith(KART_TUNING.startWindow - 0.1)
+      expect(trial.start).toBe('boost')
+      expect(trial.run.kart.boostSeconds).toBeCloseTo(KART_TUNING.startBoostDuration, 9)
+      // A second in, well ahead of a plain start
+      let boosted = trial
+      let plain = countdownWith(null)
+      expect(plain.start).toBe('none')
+      for (let step = 0; step < 60; step++) {
+        boosted = stepTrial(boosted, gas, course)
+        plain = stepTrial(plain, gas, course)
+      }
+      expect(kartSpeed(boosted.run.kart)).toBeGreaterThan(kartSpeed(plain.run.kart) + 10)
+    })
+
+    it('stalls instead when the throttle is held from too early', () => {
+      const trial = countdownWith(KART_TUNING.startWindow + 0.3)
+      expect(trial.start).toBe('stall')
+      expect(trial.run.kart.boostSeconds).toBe(0)
+      let stalled = trial
+      let plain = countdownWith(null)
+      for (let step = 0; step < 30; step++) {
+        stalled = stepTrial(stalled, gas, course)
+        plain = stepTrial(plain, gas, course)
+      }
+      expect(kartSpeed(stalled.run.kart)).toBeLessThan(kartSpeed(plain.run.kart) / 2)
+    })
+
+    it('forgives an early press let go, if pressed again inside the window', () => {
+      let trial = startTrial(course)
+      while (trial.phase === 'countdown') {
+        const left = trial.countdown
+        const pressing = left > 2 || left <= KART_TUNING.startWindow - 0.05
+        trial = stepTrial(trial, pressing ? gas : idle, course)
+      }
+      expect(trial.start).toBe('boost')
+      expect(startFrom(null, KART_TUNING)).toBe('none')
+      expect(startFrom(KART_TUNING.startWindow, KART_TUNING)).toBe('boost')
+      expect(startFrom(KART_TUNING.startWindow + 0.05, KART_TUNING)).toBe('stall')
+    })
+  })
+
   it('times three laps on the test oval, from GO, adding up to the total', () => {
     const { trial } = race(TEST_OVAL, 240)
     expect(trial.phase).toBe('finished')
@@ -155,9 +214,9 @@ describe('the riverside graybox', () => {
     const { road } = track
     for (let i = 0; i < road.length; i++) {
       for (let j = i + 1; j < road.length; j++) {
-        const along = Math.min(j - i, road.length - (j - i))
-        // Neighbours along the road are close by nature; any other part keeps clear of the kerbs
-        if (along * 6 < 40) continue
+        // Neighbours along the road (a hairpin's two legs included) are close by nature; any other
+        // part keeps clear of the kerbs
+        if (alongRoad(road, i, j) < 90) continue
         const gap = Math.hypot(road[i]!.x - road[j]!.x, road[i]!.z - road[j]!.z)
         expect(gap, `road ${i} and ${j}`).toBeGreaterThan((road[i]!.width + road[j]!.width) / 2 + 4)
       }
@@ -171,11 +230,11 @@ describe('the riverside graybox', () => {
   })
 
   it('can be driven round three times, never the wrong way', () => {
-    const { trial, wrongWarnings } = race(RIVERSIDE, 300)
+    const { trial, wrongWarnings } = race(RIVERSIDE, 400)
     expect(trial.phase).toBe('finished')
     expect(wrongWarnings).toBe(0)
-    // A careful autopilot: a real driver drifting the hairpin is faster
-    expect(seconds(trial.steps)).toBeLessThan(240)
+    // A careful autopilot: a real driver drifting the hairpins is faster
+    expect(seconds(trial.steps)).toBeLessThan(330)
   })
 })
 
@@ -185,8 +244,9 @@ describe('the harbour track (N1, e10-t02)', () => {
     const { road } = track
     for (let i = 0; i < road.length; i++) {
       for (let j = i + 1; j < road.length; j++) {
-        const along = Math.min(j - i, road.length - (j - i))
-        if (along * 6 < 40) continue
+        // Neighbours along the road (a hairpin's two legs included) are close by nature; any other
+        // part keeps clear of the kerbs
+        if (alongRoad(road, i, j) < 90) continue
         const gap = Math.hypot(road[i]!.x - road[j]!.x, road[i]!.z - road[j]!.z)
         expect(gap, `road ${i} and ${j}`).toBeGreaterThan((road[i]!.width + road[j]!.width) / 2 + 4)
       }
@@ -200,47 +260,23 @@ describe('the harbour track (N1, e10-t02)', () => {
     }
   })
 
-  it('is about as long as Riverside, and the tighter, more technical of the two', () => {
+  it('is about as long as Riverside, with two hairpins one after the other', () => {
     const length = (json: TrackJson) =>
       json.road.reduce((sum, point, index) => {
         const next = json.road[(index + 1) % json.road.length]!
         return sum + Math.hypot(next.x - point.x, next.z - point.z)
       }, 0)
-    expect(length(HARBOUR)).toBeGreaterThan(1200)
-    expect(length(HARBOUR)).toBeLessThan(1600)
-    // Count the hairpins: places where the road turns round by more than 150 degrees within 80 m
-    const hairpins = (json: TrackJson) => {
-      const { road } = json
-      let count = 0
-      let skip = 0
-      for (let index = 0; index < road.length; index++) {
-        if (skip > 0) {
-          skip--
-          continue
-        }
-        const a = road[index]!
-        const b = road[(index + 1) % road.length]!
-        const c = road[(index + 13) % road.length]!
-        const d = road[(index + 14) % road.length]!
-        const before = Math.atan2(b.x - a.x, b.z - a.z)
-        const after = Math.atan2(d.x - c.x, d.z - c.z)
-        let turn = Math.abs(after - before)
-        if (turn > Math.PI) turn = 2 * Math.PI - turn
-        if (turn > (150 * Math.PI) / 180) {
-          count++
-          skip = 14
-        }
-      }
-      return count
-    }
-    expect(hairpins(HARBOUR)).toBeGreaterThanOrEqual(2)
-    expect(hairpins(HARBOUR)).toBeGreaterThan(hairpins(RIVERSIDE))
+    expect(length(HARBOUR)).toBeGreaterThan(2000)
+    expect(length(HARBOUR)).toBeLessThan(2600)
+    // A hairpin: the road turned round by more than 150 degrees within 110 m
+    expect(sharpCorners(HARBOUR.road, 110, 150)).toBeGreaterThanOrEqual(2)
+    expect(sharpCorners(RIVERSIDE.road, 110, 150)).toBeGreaterThanOrEqual(2)
   })
 
   it('can be driven round three times, never the wrong way', () => {
-    const { trial, wrongWarnings } = race(HARBOUR, 320)
+    const { trial, wrongWarnings } = race(HARBOUR, 420)
     expect(trial.phase).toBe('finished')
     expect(wrongWarnings).toBe(0)
-    expect(seconds(trial.steps)).toBeLessThan(270)
+    expect(seconds(trial.steps)).toBeLessThan(360)
   })
 })

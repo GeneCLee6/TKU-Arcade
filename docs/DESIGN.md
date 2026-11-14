@@ -83,6 +83,7 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
    | Judge / Honest reader / Bluffer | 裁判／老實人／瞎掰人 |
    | Odd one out / Blank / Runs the round | 詞不一樣的人／白板／主持這回合 |
    | Drift / Boost gauge / Boost | 甩尾／加速條／噴射 |
+   | Start boost / Jump start / Release boost / Chain / Boost slide | 起跑加速／偷跑熄火／收尾加速／連噴／推滑 |
    | Time trial / Item race / Ghost | 時間賽／道具賽／幽靈車 |
 
 7. **規則頁**是 markdown 兩份，不是 `t()`；由英文寫起，繁中翻譯，兩份都是「自己的話」，不轉載原作說明書。

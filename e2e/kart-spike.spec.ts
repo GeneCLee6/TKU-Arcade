@@ -23,6 +23,9 @@ interface KartReading {
     storedBoosts: number
     boostSeconds: number
     chain: number
+    miniSeconds: number
+    releaseWindow: number
+    throttleHeld: boolean
   }
   input: { throttle: boolean; brake: boolean; steer: number; drift: boolean; boost: boolean }
   gamepad: string | undefined
@@ -39,6 +42,20 @@ const reading = (page: Page): Promise<KartReading> =>
 /** 0 until the lazy chunk has loaded and started the loop, as just after a reload */
 const framesOf = (page: Page): Promise<number> =>
   page.evaluate(() => (window as unknown as { __kartSpike?: KartReading }).__kartSpike?.frames ?? 0)
+
+/**
+ * Waits, frame by frame, for the window after a drift in which a fresh press of the throttle fires a
+ * release boost, with the throttle seen up: a press now lands inside it
+ */
+const releaseWindowOpen = (page: Page) =>
+  page.waitForFunction(
+    () => {
+      const state = (window as unknown as { __kartSpike: KartReading }).__kartSpike.state
+      return state.releaseWindow > 0 && !state.throttleHeld
+    },
+    undefined,
+    { polling: 'raf', timeout: 5000 },
+  )
 
 /** Fails the test on anything red in the console or any uncaught error */
 function watchConsole(page: Page): string[] {
@@ -318,7 +335,7 @@ test.describe('the lobby', () => {
 test.describe('the boost gauge', () => {
   test.use({ locale: 'en-US', viewport: { width: 1280, height: 720 } })
 
-  test('fills while drifting, fires a boost on X, and chains one when the drift is let go', async ({
+  test('fills while drifting, fires a boost on X, and a release boost after the drift', async ({
     page,
   }) => {
     const errors = watchConsole(page)
@@ -334,7 +351,7 @@ test.describe('the boost gauge', () => {
     await expect.poll(async () => (await reading(page)).state.gauge, LONG).toBeGreaterThan(20)
     await expect(page.getByTestId('kart-gauge')).not.toHaveAttribute('aria-valuenow', '0')
 
-    // 2.5 s of drifting fills the gauge into a stored boost
+    // 1.5 s of drifting fills the gauge into a stored boost
     await expect.poll(async () => (await reading(page)).state.storedBoosts, LONG).toBe(1)
     await expect(stored).toHaveAttribute('aria-label', 'Boosts ready: 1 of 2')
 
@@ -347,14 +364,17 @@ test.describe('the boost gauge', () => {
 
     await expect(page.getByTestId('kart-boosting')).toBeVisible()
 
-    // Let go of the drift while the boost runs: a chained boost, which the HUD and a callout say
+    // Let go of the drift and the throttle, then press the throttle again in time: a release boost,
+    // the first link of a chain, which a callout says
+    await page.keyboard.up('ArrowUp')
     await page.keyboard.up('z')
-    await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
-    await expect(page.getByTestId('kart-boosting')).toHaveText('Chain ×1')
-    await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'chain')
     await page.keyboard.up('ArrowRight')
-    // Boosting raises the top speed past the plain 30 m/s
-    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(30.5)
+    await releaseWindowOpen(page)
+    await page.keyboard.down('ArrowUp')
+    await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
+    await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'release')
+    // Boosting raises the top speed past the plain 40 m/s
+    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(40.5)
     await page.keyboard.up('ArrowUp')
     expect(errors).toEqual([])
   })
@@ -427,7 +447,11 @@ test.describe('a gamepad (simulated: a real pad cannot be tested headless)', () 
     await padPress(page, 2, true) // X
     await expect.poll(async () => (await reading(page)).state.boostSeconds, LONG).toBeGreaterThan(0)
     await padPress(page, 2, false)
+    // Drift and throttle let go, the throttle pressed again in time: a release boost
     await padPress(page, 5, false)
+    await padPress(page, 0, false)
+    await releaseWindowOpen(page)
+    await padPress(page, 0, true)
     await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
     await padAxis(page, 0, 0)
     await padPress(page, 0, false)
@@ -650,8 +674,8 @@ test.describe('the tuning panel', () => {
     const topSpeed = page.getByRole('slider', { name: 'Top speed', exact: true })
     await topSpeed.focus()
     await page.keyboard.press('ArrowRight')
-    await expect(topSpeed).toHaveValue('30.5')
-    await expect.poll(async () => (await reading(page)).tuning?.topSpeed).toBe(30.5)
+    await expect(topSpeed).toHaveValue('40.5')
+    await expect.poll(async () => (await reading(page)).tuning?.topSpeed).toBe(40.5)
     expect((await reading(page)).state.z).toBe(0)
     await expect(preset).toHaveValue('custom')
 
@@ -676,7 +700,7 @@ test.describe('the tuning panel', () => {
     // Kept across a reload
     await page.reload()
     await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
-    expect((await reading(page)).tuning).toMatchObject({ grip: 7.5, topSpeed: 30.5 })
+    expect((await reading(page)).tuning).toMatchObject({ grip: 7.5, topSpeed: 40.5 })
 
     await page.getByRole('button', { name: 'Tuning' }).click()
     await page.getByRole('button', { name: 'Back to Standard' }).click()

@@ -47,6 +47,8 @@ export const kartScene = {
   lamp: '#FFF4C2',
   // The drift dust (e8-t07); the karts' own colours are kartBodies, below
   smoke: '#E5E7EB',
+  // The dark skid marks a drift leaves on the road (2026-11-14), under the glowing trails
+  skid: '#17171A',
   // The best run's ghost (e8-t11)
   ghost: '#9AD8FF',
   flame: '#FFB020',

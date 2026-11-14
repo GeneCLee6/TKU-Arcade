@@ -4,7 +4,7 @@ import { KART_MESSAGES } from '../../shared/kart/i18n.ts'
 import { INITIAL_KART, type KartState } from '../../shared/kart/physics.ts'
 import { registerMessages, translate } from '../../src/i18n/t.ts'
 import { aimOf, BOOST_FOV_KICK, fieldOfView, followCar, startRig } from '../../src/kart/camera.ts'
-import { calloutBetween, louder } from '../../src/kart/callouts.ts'
+import { calloutAtStart, calloutBetween, louder } from '../../src/kart/callouts.ts'
 import { CalloutText, GAUGE_SEGMENTS, Hud } from '../../src/kart/Hud.tsx'
 import type { SpikeHud } from '../../src/kart/spikeLoop.ts'
 
@@ -65,10 +65,33 @@ describe('callouts', () => {
     ).toEqual({ kind: 'boost', count: 0 })
     expect(
       calloutBetween(
-        { ...INITIAL_KART, chain: 1 },
-        { ...INITIAL_KART, chain: 2, boostSeconds: 0.8 },
+        { ...INITIAL_KART, chain: 1, miniSeconds: 0.1 },
+        { ...INITIAL_KART, chain: 2, miniSeconds: 0.6 },
       ),
     ).toEqual({ kind: 'chain', count: 2 })
+  })
+
+  it('calls out the techniques: a release boost, a boost slide, the start', () => {
+    expect(calloutBetween(INITIAL_KART, { ...INITIAL_KART, chain: 1, miniSeconds: 0.6 })).toEqual({
+      kind: 'release',
+      count: 0,
+    })
+    const boosting = { ...INITIAL_KART, boostSeconds: 1 }
+    expect(
+      calloutBetween(boosting, { ...boosting, drifting: true, driftDirection: 1, sliding: true }),
+    ).toEqual({ kind: 'slide', count: 0 })
+    expect(calloutAtStart('boost')).toEqual({ kind: 'start', count: 0 })
+    expect(calloutAtStart('stall')).toEqual({ kind: 'stall', count: 0 })
+    expect(calloutAtStart('none')).toBeUndefined()
+  })
+
+  it('has words for every callout in both languages', () => {
+    for (const kind of ['start', 'stall', 'release', 'slide'] as const) {
+      const { unmount } = render(<CalloutText t={en} callout={{ kind, count: 0 }} />)
+      expect(screen.getByTestId('kart-callout').textContent).toBe(en(`kart.callout.${kind}`))
+      unmount()
+    }
+    expect(zh('kart.callout.slide')).toBe('推滑')
   })
 
   it('keeps the louder of two in one frame', () => {

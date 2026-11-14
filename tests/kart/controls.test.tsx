@@ -133,7 +133,7 @@ describe('the controls panel', () => {
     fireEvent.click(
       screen.getByRole('checkbox', { name: 'Fire a boost by itself when the gauge fills' }),
     )
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Chained boosts' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Release boosts and chains' }))
     expect(screen.getByTestId('rules')).toHaveTextContent('{"autoBoost":true,"chainBoosts":false}')
   })
 

@@ -4,6 +4,9 @@
 // cargo ship, sheds and container stacks in the infield, palms along the quay, red lanterns along the
 // switchbacks, and a hillside town of flat-roofed houses with water tanks and lit windows. All of it
 // our own low-poly shapes and canvas-painted textures: no model or image files (docs/ASSETS.md).
+// 2026-11-14: the track was drawn 1.6 times as big (HARBOUR_SCALE); the scenery is placed in the
+// same drawn units, `at(n)` metres, so that it stands where it did round the road, its things keeping
+// their own sizes.
 import {
   AdditiveBlending,
   BoxGeometry,
@@ -29,18 +32,24 @@ import {
 import { createRng } from '../../../shared/games/rng.ts'
 import { roadClearance, scatter } from '../../../shared/kart/scenery.ts'
 import { roadDirection } from '../../../shared/kart/track.ts'
+import { HARBOUR_SCALE } from '../../../shared/kart/tracks/harbour.ts'
 import { harbourScene, kartScene, kartThemes } from '../../styles/kartTokens.ts'
 import { grain, painted } from './textures.ts'
 import type { ArtKit } from './trackArt.ts'
 
+/** Metres, from the drawn units the layout and the scenery are placed in */
+const at = (drawn: number): number => drawn * HARBOUR_SCALE
+
 /** Where the land ends and the quay drops to the sea, z (the seafront straight runs at about -112) */
-export const HARBOUR_COAST = -146
+export const HARBOUR_COAST = at(-146)
 /** Where the land ends to the west, x: a beach down to the same sea, the sun setting beyond it */
-export const HARBOUR_SHORE = -228
+export const HARBOUR_SHORE = at(-228)
 /** The sea lies this far below the quay */
 const SEA_LEVEL = -1.6
 /** Where the hillside south of the switchbacks starts to rise, z */
-const HILL_FOOT = 184
+const HILL_FOOT = at(184)
+/** Over how many metres the hillside rises to its first shoulder */
+const HILL_RISE = at(150)
 
 interface Box {
   readonly minX: number
@@ -50,17 +59,28 @@ interface Box {
 }
 const inside = (box: Box, x: number, z: number) =>
   x > box.minX && x < box.maxX && z > box.minZ && z < box.maxZ
+const drawnBox = (minX: number, maxX: number, minZ: number, maxZ: number): Box => ({
+  minX: at(minX),
+  maxX: at(maxX),
+  minZ: at(minZ),
+  maxZ: at(maxZ),
+})
 
 /** The sheds and container stacks in the infield, between the straight and the switchbacks */
-const TOWN: Box = { minX: -60, maxX: 176, minZ: -98, maxZ: 42 }
+const TOWN = drawnBox(-60, 176, -98, 42)
 /** The terraces of houses on the hillside */
-const TERRACES: Box = { minX: -205, maxX: 270, minZ: 194, maxZ: 336 }
+const TERRACES = drawnBox(-205, 270, 194, 336)
 /** The switchbacks, where the lanterns hang */
-const SWITCHBACKS: Box = { minX: -22, maxX: 152, minZ: 44, maxZ: 174 }
+const SWITCHBACKS = drawnBox(-22, 152, 44, 174)
+/** The container crane on the quay's east end, and the cargo ship moored beyond it */
+const CRANE_X = at(236)
+const SHIP = { x: at(244), z: HARBOUR_COAST - at(22) }
+/** The infield container yard: its first stack */
+const YARD = { x: at(92), z: at(-88) }
 
 /** The ground's height at (x, z): flat, but for the hillside rising south of the track */
 export function harbourGround(x: number, z: number): number {
-  const rise = (z - HILL_FOOT) / 150
+  const rise = (z - HILL_FOOT) / HILL_RISE
   if (rise <= 0) return 0
   const steep = Math.pow(Math.min(rise, 1), 1.5) * 40 + Math.max(0, Math.min(rise, 2) - 1) * 30
   const ripple = Math.min(1, rise * 3) * 2.5 * Math.sin(x / 19 + z / 27)
@@ -76,7 +96,7 @@ export const inHarbourSea = (x: number, z: number, margin = 0): boolean =>
 
 /** Where the shared trees may grow: not on the quay, not among the sheds or the houses */
 export const harbourTreeFits = (x: number, z: number): boolean =>
-  z > -98 && x > HARBOUR_SHORE + 34 && !inside(TOWN, x, z) && !inside(TERRACES, x, z)
+  z > at(-98) && x > HARBOUR_SHORE + 34 && !inside(TOWN, x, z) && !inside(TERRACES, x, z)
 
 /** A gable roof one unit each way: ridge along x at the top, eaves at y = 0 */
 function gable(): BufferGeometry {
@@ -241,7 +261,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   )
 
   // ── The sea, north and west, under the land too (the land hides it), and the sun's path on it ──
-  const seaBox = { minX: -1900, maxX: 1500, minZ: HARBOUR_COAST - 1700, maxZ: 1250 }
+  const seaBox = { minX: at(-1900), maxX: at(1500), minZ: HARBOUR_COAST - at(1700), maxZ: at(1250) }
   const seaWidth = seaBox.maxX - seaBox.minX
   const seaDepth = seaBox.maxZ - seaBox.minZ
   const water = textures.water
@@ -281,7 +301,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   // The beach along the western shore, sloping into the water
   const beachTop = HARBOUR_SHORE + 16
   const beachFoot = HARBOUR_SHORE - 22
-  const beachLength = 1250 - HARBOUR_COAST
+  const beachLength = at(1250) - HARBOUR_COAST
   const beachDrop = 0.03 - (SEA_LEVEL - 1)
   const beachRun = beachTop - beachFoot
   const beachGeometry = keep(
@@ -298,8 +318,9 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   group.add(shadowed(beach, false))
 
   // ── The quay: concrete to the edge, a sea wall down to the water, bollards ──
-  const quay = { minX: -215, maxX: 262 }
-  const quayDepth = -121.4 - HARBOUR_COAST
+  const quay = { minX: at(-215), maxX: at(262) }
+  // Up to the straight's kerb (its centre at -112, half of its 32 m out), less a little
+  const quayDepth = at(-112) - 16.4 - HARBOUR_COAST
   const apron = new Mesh(
     keep(new PlaneGeometry(quay.maxX - quay.minX, quayDepth)),
     own(new MeshLambertMaterial({ map: concrete })),
@@ -336,10 +357,10 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   // Far from the road, these cast no shadows: the shadow map covers only ±45 m round the car
   const coast = HARBOUR_COAST
   const arms: [number, number, number, number][] = [
-    [-95, coast, -95, coast - 120],
-    [-95, coast - 120, -25, coast - 120],
-    [165, coast, 165, coast - 82],
-    [165, coast - 82, 78, coast - 82],
+    [at(-95), coast, at(-95), coast - at(120)],
+    [at(-95), coast - at(120), at(-25), coast - at(120)],
+    [at(165), coast, at(165), coast - at(82)],
+    [at(165), coast - at(82), at(78), coast - at(82)],
   ]
   const armTop = 1.0
   const armHeight = armTop - (SEA_LEVEL - 0.6)
@@ -444,7 +465,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   }
   beams.position.y = towerTop + 1.35
   lighthouse.add(beams)
-  lighthouse.position.set(-25, 0, coast - 120)
+  lighthouse.position.set(at(-25), 0, coast - at(120))
   group.add(lighthouse)
 
   // A small green light on the eastern arm, opposite
@@ -459,14 +480,14 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   const greenLamp = new Mesh(keep(new SphereGeometry(0.7, 10, 8)), basic('#9CFFB8'))
   greenLamp.position.y = armTop + 6.6
   beacon.add(shadowed(green, false), shadowed(band, false), greenLamp)
-  beacon.position.set(78, 0, coast - 82)
+  beacon.position.set(at(78), 0, coast - at(82))
   group.add(beacon)
 
   // ── Fishing boats at their moorings, bobbing ──
   const boatSpots = scatter(track.road, {
     seed: 41,
     count: count(14, 4),
-    box: { minX: -82, maxX: 152, minZ: coast - 72, maxZ: coast - 7 },
+    box: { minX: at(-82), maxX: at(152), minZ: coast - at(72), maxZ: coast - 7 },
     clearance: 0,
     spacing: 13,
   })
@@ -550,7 +571,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   const crab = new Mesh(keep(new BoxGeometry(3, 2.4, 3.4)), standard(harbourScene.cabin))
   crab.position.set(0, 25.6, -30)
   crane.add(shadowed(girder, false), shadowed(boom, false), shadowed(crab, false))
-  crane.position.set(236, 0, coast + 6)
+  crane.position.set(CRANE_X, 0, coast + 6)
   group.add(crane)
 
   const ship = new Group()
@@ -565,7 +586,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   funnel.position.set(0, SEA_LEVEL + 3.9 + 11, -35)
   ship.add(shadowed(shipHull, false), shadowed(bridgeHouse, false), shadowed(funnel, false))
   // Lying east-west beyond the crane, bow to the east
-  ship.position.set(244, 0, coast - 22)
+  ship.position.set(SHIP.x, 0, SHIP.z)
   ship.rotation.y = Math.PI / 2
   group.add(ship)
 
@@ -587,13 +608,13 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   for (let row = 0; row < 3; row++) {
     for (let column = 0; column < 5; column++) {
       if (random() > keepShare) continue
-      stack(212 + column * 6.6, coast + 13 + row * 2.7, 1 + Math.floor(random() * 3), 0)
+      stack(CRANE_X - 24 + column * 6.6, coast + 13 + row * 2.7, 1 + Math.floor(random() * 3), 0)
     }
   }
   for (let row = 0; row < 3; row++) {
     for (let column = 0; column < 5; column++) {
-      const x = 92 + column * 6.6
-      const z = -88 + row * 2.7
+      const x = YARD.x + column * 6.6
+      const z = YARD.z + row * 2.7
       if (random() > keepShare || !clearOfRoad(x, z, 6)) continue
       stack(x, z, 1 + Math.floor(random() * 2), 0)
     }
@@ -603,8 +624,8 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
       if (random() > keepShare) continue
       // Along the ship's deck, between its bridge and its bow
       stack(
-        220 + column * 6.4,
-        coast - 22 - 7.5 + row * 5,
+        SHIP.x - 24 + column * 6.4,
+        SHIP.z - 7.5 + row * 5,
         1 + Math.floor(random() * 2),
         0,
         SEA_LEVEL + 3.9,
@@ -630,7 +651,9 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
     clearance: 12,
     spacing: 26,
     // Clear of the container yard and the grandstand by the line
-    fits: (x, z) => !(x > 84 && x < 128 && z > -92 && z < -78) && !(x < -36 && z < -78),
+    fits: (x, z) =>
+      !(x > YARD.x - 8 && x < YARD.x + 36 && z > YARD.z - 4 && z < YARD.z + 10) &&
+      !(x < at(-36) && z < at(-78)),
   })
   const sheds = new InstancedMesh(
     keep(new BoxGeometry(1, 1, 1)),
@@ -652,7 +675,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
 
   // ── Palms along the quay and among the sheds ──
   const palmSpots: { x: number; z: number; lean: number; turn: number }[] = []
-  for (let x = quay.minX + 8; x < 200; x += 15) {
+  for (let x = quay.minX + 8; x < at(200); x += 15) {
     palmSpots.push({
       x: x + random() * 3,
       z: coast + 5 + random() * 2,
@@ -667,11 +690,12 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
     clearance: 5,
     spacing: 9,
     fits: (x, z) =>
-      !(x < -36 && z < -80) && shedSpots.every((shed) => Math.hypot(shed.x - x, shed.z - z) > 16),
+      !(x < at(-36) && z < at(-80)) &&
+      shedSpots.every((shed) => Math.hypot(shed.x - x, shed.z - z) > 16),
   })) {
     palmSpots.push({ x: spot.x, z: spot.z, lean: spot.a * 0.15, turn: spot.b * 6 })
   }
-  for (let z = HARBOUR_COAST + 14; z < 175; z += 17) {
+  for (let z = HARBOUR_COAST + 14; z < at(175); z += 17) {
     palmSpots.push({
       x: HARBOUR_SHORE + 9 + random() * 4,
       z: z + random() * 5,
@@ -750,9 +774,9 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   group.add(shadowed(lanternPosts), lanterns, shadowed(lanternCaps))
 
   // ── The hillside: the ground rising south of the track, terraced houses, pines higher up ──
-  const hillEast = 1000
+  const hillEast = at(1000)
   const hillWidth = hillEast - HARBOUR_SHORE
-  const hillDepth = 520
+  const hillDepth = at(520)
   const hillGeometry = keep(new PlaneGeometry(hillWidth, hillDepth, 60, 26))
   hillGeometry.rotateX(-Math.PI / 2)
   hillGeometry.translate((HARBOUR_SHORE + hillEast) / 2, 0, HILL_FOOT + hillDepth / 2)
@@ -799,9 +823,10 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
     tank: boolean
   }[] = []
   const housesShare = 0.2 + level.density * 0.32
-  for (let row = 0; row * 15 + TERRACES.minZ < TERRACES.maxZ; row++) {
-    for (let x = TERRACES.minX; x < TERRACES.maxX; x += 13) {
-      const z = TERRACES.minZ + row * 15 + random() * 3
+  // Rows and houses spaced in drawn units too, so that the hillside keeps about as many houses
+  for (let row = 0; row * at(15) + TERRACES.minZ < TERRACES.maxZ; row++) {
+    for (let x = TERRACES.minX; x < TERRACES.maxX; x += at(13)) {
+      const z = TERRACES.minZ + row * at(15) + random() * 3
       const hx = x + random() * 3
       if (random() > housesShare || !clearOfRoad(hx, z, 16)) continue
       const w = 7 + random() * 3.5
@@ -870,7 +895,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
       count: count(220, 30),
       box: {
         minX: HARBOUR_SHORE + 20,
-        maxX: 700,
+        maxX: at(700),
         minZ: TERRACES.maxZ + 4,
         maxZ: HILL_FOOT + hillDepth - 20,
       },

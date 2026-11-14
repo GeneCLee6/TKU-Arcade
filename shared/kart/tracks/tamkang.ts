@@ -5,60 +5,76 @@
 // the library and the scroll plaza, esses along the campus's western edge (the old stairway down to
 // the town below on the right, the river and the mountain across it beyond), a right hairpin by the
 // ship-shaped museum, a run back up through the lawn, a left hairpin at the top, a run down past the
-// business tower and a last left hairpin onto the avenue. Wide like the others (18 to 22 m), flat
-// (the physics is on a plane; the hill only falls away beyond the edge of the campus).
+// business tower and a last left hairpin onto the avenue. Flat (the physics is on a plane; the hill
+// only falls away beyond the edge of the campus). 2026-11-14 again, owner: "room for at least eight
+// karts side by side, and more sharp corners" (revision 2): drawn 1.5 times as big (TAMKANG_SCALE:
+// the campus is placed in the same drawn units, tamkangArt.ts), the road 28 to 34 m (it was 18 to
+// 22), the fast left at the top tightened round the tower and the western esses made three sharp
+// flicks.
 import { gatesAlong, headingOf, roadDirection, TRACK_FORMAT, type TrackJson } from '../track.ts'
 import { splineRoad, type ControlPoint } from './spline.ts'
 
 /** Metres between road points */
 const SAMPLE = 6
 
-const CONTROL: readonly ControlPoint[] = [
+/** The layout below, and the campus placed round it, are drawn this many times smaller than real */
+export const TAMKANG_SCALE = 1.5
+
+/** [x, z, width]: x and z in drawn units (times TAMKANG_SCALE for metres), the width in metres */
+const DRAWN: readonly ControlPoint[] = [
   // The lantern avenue, northwards (-z), up to the line and beyond
-  [0, 150, 22],
-  [0, 40, 22],
-  [0, -90, 22],
-  // A fast left at the top, round the memorial tower, westwards past the library
-  [-15, -160, 21],
-  [-60, -200, 20],
-  [-120, -205, 20],
+  [0, 150, 34],
+  [0, 40, 34],
+  [0, -90, 34],
+  // A tight left at the top, round the memorial tower, westwards past the library
+  [0, -165, 33],
+  [-7, -191, 31],
+  [-30, -201, 31],
+  [-120, -203, 31],
   // A kink round the scroll plaza
-  [-160, -195, 19],
-  [-185, -215, 19],
-  [-215, -205, 19],
-  // Left, onto the western edge, and its esses southwards
-  [-248, -165, 20],
-  [-255, -110, 20],
-  [-240, -55, 19],
-  [-250, 0, 19],
-  [-238, 55, 19],
+  [-160, -195, 29],
+  [-185, -215, 29],
+  [-215, -205, 29],
+  // Left, onto the western edge, and its three sharp flicks southwards
+  [-248, -165, 31],
+  [-258, -110, 31],
+  [-232, -70, 29],
+  [-262, -25, 29],
+  [-232, 20, 29],
+  [-252, 60, 29],
   // The museum hairpin: right, round to the north
-  [-232, 110, 18],
-  [-210, 150, 18],
-  [-175, 155, 18],
-  [-155, 120, 18],
+  [-232, 110, 28],
+  [-210, 150, 28],
+  [-175, 155, 28],
+  [-155, 120, 28],
   // Up through the lawn
-  [-152, 50, 19],
-  [-150, -30, 19],
+  [-152, 50, 29],
+  [-150, -30, 29],
   // The top hairpin: left, round to the south
-  [-140, -85, 18],
-  [-112, -112, 18],
-  [-84, -88, 18],
+  [-140, -85, 28],
+  [-112, -112, 28],
+  [-84, -88, 28],
   // Down past the business tower
-  [-82, -20, 19],
-  [-86, 60, 20],
-  [-84, 140, 20],
+  [-82, -20, 29],
+  [-86, 60, 31],
+  [-84, 140, 31],
   // The last hairpin, left, onto the avenue
-  [-74, 200, 21],
-  [-44, 230, 22],
-  [-10, 222, 22],
-  [2, 190, 22],
+  [-74, 200, 33],
+  [-44, 230, 34],
+  [-10, 222, 34],
+  [2, 190, 34],
 ]
+
+const CONTROL: readonly ControlPoint[] = DRAWN.map(([x, z, width]) => [
+  x * TAMKANG_SCALE,
+  z * TAMKANG_SCALE,
+  width,
+])
 
 const road = splineRoad(CONTROL, SAMPLE)
 
-/** The start and finish line: on the avenue, the road point at z = 40 */
-const FINISH = road.findIndex((point) => point.x === 0 && point.z <= 40)
+/** The start and finish line: on the avenue, the road point at z = 40 (drawn) */
+const FINISH = road.findIndex((point) => point.x === 0 && point.z <= 40 * TAMKANG_SCALE)
 
 // The road starts at the line, so that gate 0 is the finish
 const fromLine = [...road.slice(FINISH), ...road.slice(0, FINISH)]
@@ -70,6 +86,9 @@ export const TAMKANG: TrackJson = {
   format: TRACK_FORMAT,
   id: 'tamkang',
   name: { en: 'Tamkang Campus', 'zh-TW': '淡江校園' },
+  // 2026-11-14: drawn bigger and wider with sharper corners (owner: eight karts side by side); the
+  // first layout's records are set aside
+  revision: 2,
   laps: 3,
   road: fromLine,
   gates,

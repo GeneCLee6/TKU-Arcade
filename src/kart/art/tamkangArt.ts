@@ -9,6 +9,10 @@
 // mountain across it (觀音山). No logos, no real people, no model or image files: shapes in
 // three.js and textures painted on canvases (docs/ASSETS.md). The only words are the plain name on
 // a stone by the avenue.
+//
+// 2026-11-14 again: the track was drawn 1.5 times as big (TAMKANG_SCALE) with a 28 to 34 m road;
+// the campus is placed in the same drawn units, `metres(n)`, so that every landmark stands where it
+// did round the road, keeping its own size.
 import {
   BoxGeometry,
   BufferGeometry,
@@ -32,14 +36,18 @@ import {
 } from 'three'
 import { createRng } from '../../../shared/games/rng.ts'
 import { scatter } from '../../../shared/kart/scenery.ts'
+import { TAMKANG_SCALE } from '../../../shared/kart/tracks/tamkang.ts'
 import { kartScene, kartThemes, tamkangScene } from '../../styles/kartTokens.ts'
 import { grain, painted } from './textures.ts'
 import type { ArtKit } from './trackArt.ts'
 
+/** Metres, from the drawn units the layout and the campus are placed in */
+const metres = (drawn: number): number => drawn * TAMKANG_SCALE
+
 /** The campus is a flat hilltop: past this x to the west, the ground falls away to the town */
-export const CAMPUS_WEST = -300
+export const CAMPUS_WEST = metres(-300)
 /** ... and past this z to the south */
-export const CAMPUS_SOUTH = 280
+export const CAMPUS_SOUTH = metres(280)
 /**
  * How far below the campus the town and the river bank lie, metres: shallow enough that the river
  * shows over the campus's edge from a kart (from 3.4 m up, 50 m from the edge, the line of sight
@@ -52,10 +60,10 @@ const SLOPE = 170
 const WATER_LEVEL = -26.5
 
 /** The river's north bank: a point on it and the unit normal pointing across the river */
-const BANK = { x: -300, z: 400 }
+const BANK = { x: metres(-300), z: metres(400) }
 const ACROSS = { x: -0.41, z: 0.912 }
 /** Bank to bank, metres */
-const RIVER_WIDTH = 640
+const RIVER_WIDTH = metres(640)
 
 interface Box {
   readonly minX: number
@@ -65,6 +73,7 @@ interface Box {
 }
 const inside = (box: Box, x: number, z: number, margin = 0) =>
   x > box.minX - margin && x < box.maxX + margin && z > box.minZ - margin && z < box.maxZ + margin
+/** A box `w` by `d` metres round the drawn point (x, z) */
 const boxAround = (x: number, z: number, w: number, d: number): Box => ({
   minX: x - w / 2,
   maxX: x + w / 2,
@@ -74,25 +83,28 @@ const boxAround = (x: number, z: number, w: number, d: number): Box => ({
 
 // ── Where the landmarks stand: clear of the road (tests/kart/tamkangArt.test.ts checks) ──
 
+// Positions in metres (drawn units times TAMKANG_SCALE), sizes in metres as they were
 /** The classroom rows either side of the lantern avenue (x = 0): blocks along z */
-const CLASSROOM_BLOCKS = [-62, -12, 80, 125] as const
-const CLASSROOM = { offset: 33, depth: 14, length: 36, height: 10 }
+const CLASSROOM_BLOCKS = [-62, -12, 80, 125].map(metres)
+const CLASSROOM = { offset: metres(33), depth: 14, length: 36, height: 10 }
+/** The palace lamps either side of the avenue, this far from its middle: 4 m off its 34 m road */
+const LAMP_OFFSET = 21
 /** The memorial tower on its plaza, inside the top corner */
-const TOWER = { x: -42, z: -128, size: 18, height: 74 }
+const TOWER = { x: metres(-42), z: metres(-128), size: 18, height: 74 }
 /** The library, north of the road past the top corner */
-const LIBRARY = { x: -108, z: -270, w: 100, d: 40, height: 30 }
+const LIBRARY = { x: metres(-108), z: metres(-270), w: 100, d: 40, height: 30 }
 /** The scroll plaza, inside the kink */
-const SCROLLS = { x: -192, z: -163, radius: 18 }
+const SCROLLS = { x: metres(-192), z: metres(-163), radius: 18 }
 /** The lawn, between the western esses and the run up through the middle */
-const LAWN: Box = { minX: -220, maxX: -164, minZ: -100, maxZ: 68 }
+const LAWN: Box = { minX: metres(-212), maxX: metres(-170), minZ: metres(-100), maxZ: metres(68) }
 /** The business tower, between the runs up and down the middle */
-const BUSINESS = { x: -117, z: 28, size: 22, podium: 32, height: 88 }
+const BUSINESS = { x: metres(-117), z: metres(28), size: 22, podium: 32, height: 88 }
 /** The ship-shaped museum, south of the museum hairpin */
-const MUSEUM = { x: -196, z: 224, length: 64, beam: 16 }
+const MUSEUM = { x: metres(-196), z: metres(224), length: 64, beam: 16 }
 /** The stairway down the hill, westwards from the campus's edge */
-const STAIRS = { z: -40, width: 7, length: 190 }
+const STAIRS = { z: metres(-40), width: 7, length: 190 }
 /** The name stone, by the bottom of the avenue */
-const SIGN = { x: 27, z: 176 }
+const SIGN = { x: metres(27), z: metres(176) }
 
 /** Every building's ground, for keeping trees and other buildings off it */
 export const TAMKANG_LANDMARKS: readonly Box[] = [
@@ -127,7 +139,7 @@ export function tamkangGround(x: number, z: number): number {
   let height = past > 0 ? -LOW * smooth(past / SLOPE) : 0
   // A gentle roll on the hillside and the town, none on the campus
   if (past > 0) height += Math.min(1, past / 60) * 1.8 * Math.sin(x / 37 + z / 53)
-  const far = (-640 - z) / 420
+  const far = (metres(-640) - z) / 420
   if (far > 0) height += Math.pow(Math.min(far, 1.4), 1.5) * 60 * (0.75 + 0.25 * Math.sin(x / 95))
   const across = acrossRiver(x, z)
   // Down the bank into the water, and the riverbed under it
@@ -146,7 +158,7 @@ export const tamkangTreeFits = (x: number, z: number): boolean =>
   !TAMKANG_LANDMARKS.some((box) => inside(box, x, z, 3)) &&
   !(x < CAMPUS_WEST + 6 && Math.abs(z - STAIRS.z) < STAIRS.width + 4) &&
   // The campus's western edge stays open: the view down to the river from the esses
-  !(x > CAMPUS_WEST - 80 && x < CAMPUS_WEST + 40 && z > -200 && z < 160)
+  !(x > CAMPUS_WEST - 80 && x < CAMPUS_WEST + 40 && z > metres(-200) && z < metres(160))
 
 /** A hip roof one unit each way: eaves at y = 0, a ridge along x at y = 1 */
 function hipRoof(): BufferGeometry {
@@ -375,12 +387,12 @@ export function buildTamkang(kit: ArtKit): { update(seconds: number): void } {
     own(new MeshLambertMaterial({ map: water, color: tamkangScene.river })),
   )
   river.rotation.x = -Math.PI / 2
-  river.position.set(-300, WATER_LEVEL, 900)
+  river.position.set(metres(-300), WATER_LEVEL, metres(900))
   add(river, false)
 
   // ── The mountain across the river: a long ridge of peaks, hazy with distance ──
   const along = { x: -ACROSS.z, z: -ACROSS.x }
-  const ridgeAt = { x: BANK.x + ACROSS.x * 1000, z: BANK.z + ACROSS.z * 1000 }
+  const ridgeAt = { x: BANK.x + ACROSS.x * metres(1000), z: BANK.z + ACROSS.z * metres(1000) }
   const ridgeLength = 2000
   const ridgeDepth = 720
   const mountainGeometry = keep(new PlaneGeometry(ridgeLength, ridgeDepth, 60, 22))
@@ -430,10 +442,10 @@ export function buildTamkang(kit: ArtKit): { update(seconds: number): void } {
 
   // ── The lantern avenue: palace lamps down both sides of the straight ──
   const lampSpots: { x: number; z: number }[] = []
-  for (let z = -78; z <= 150; z += 15) {
+  for (let z = metres(-78); z <= metres(150); z += metres(15)) {
     // Clear of the finish gantry's legs
     if (Math.abs(z - track.road[0]!.z) < 6) continue
-    for (const side of [-1, 1]) lampSpots.push({ x: side * 14, z })
+    for (const side of [-1, 1]) lampSpots.push({ x: side * LAMP_OFFSET, z })
   }
   const lampPosts = new InstancedMesh(
     keep(new CylinderGeometry(0.13, 0.18, 5.2, 8)),
@@ -535,11 +547,12 @@ export function buildTamkang(kit: ArtKit): { update(seconds: number): void } {
   // A paved terrace along the front of each row, under the colonnade
   for (const side of [-1, 1]) {
     const terrace = new Mesh(
-      keep(new PlaneGeometry(8, 230)),
+      keep(new PlaneGeometry(8, metres(230))),
       own(new MeshLambertMaterial({ map: paving })),
     )
     terrace.rotation.x = -Math.PI / 2
-    terrace.position.set(side * 21.5, 0.03, 35)
+    // Just in front of the colonnade
+    terrace.position.set(side * (CLASSROOM.offset - CLASSROOM.depth / 2 - 4), 0.03, metres(35))
     add(terrace, false)
   }
   paving.repeat.set(2, 2)
@@ -961,7 +974,7 @@ export function buildTamkang(kit: ArtKit): { update(seconds: number): void } {
   for (const spot of scatter(track.road, {
     seed: 79,
     count: count(34, 12),
-    box: { minX: CAMPUS_WEST + 20, maxX: 360, minZ: -460, maxZ: CAMPUS_SOUTH - 20 },
+    box: { minX: CAMPUS_WEST + 20, maxX: metres(360), minZ: metres(-460), maxZ: CAMPUS_SOUTH - 20 },
     clearance: 22,
     spacing: 44,
     fits: (x, z) => !keepOut(x, z, 22) && !(x < CAMPUS_WEST + 40 && Math.abs(z - STAIRS.z) < 30),
@@ -980,7 +993,7 @@ export function buildTamkang(kit: ArtKit): { update(seconds: number): void } {
   for (const spot of scatter(track.road, {
     seed: 80,
     count: count(200, 50),
-    box: { minX: -820, maxX: 700, minZ: -520, maxZ: 900 },
+    box: { minX: metres(-820), maxX: metres(700), minZ: metres(-520), maxZ: metres(900) },
     clearance: 40,
     spacing: 14,
     fits: (x, z) =>
