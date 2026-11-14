@@ -5,57 +5,74 @@
 // degree flick into two switchback hairpins up the hillside, a chicane, and a long fast arc home
 // that kinks once before the line. Flat, like every track so far: the physics is on a plane.
 // Drawn the same way as Riverside (spline.ts). 2026-11-14, owner: "make them wide": the same layout,
-// the road 15 to 18 m (it was 10 to 13), revision 2.
+// the road 15 to 18 m (it was 10 to 13), revision 2. Then "room for at least eight karts side by
+// side, and more sharp corners" (revision 3): the layout drawn 1.6 times as big (HARBOUR_SCALE: the
+// scenery is placed in the same drawn units, harbourArt.ts), the road 28 to 32 m, the sweeper at the
+// end of the quay squared off into a tight right and the kink on the west side made a sharp
+// left-right flick.
 import { gatesAlong, headingOf, roadDirection, TRACK_FORMAT, type TrackJson } from '../track.ts'
 import { splineRoad, type ControlPoint } from './spline.ts'
 
 /** Metres between road points */
 const SAMPLE = 6
 
-const CONTROL: readonly ControlPoint[] = [
+/** The layout below, and the scenery placed round it, are drawn this many times smaller than real */
+export const HARBOUR_SCALE = 1.6
+
+/** [x, z, width]: x and z in drawn units (times HARBOUR_SCALE for metres), the width in metres */
+const DRAWN: readonly ControlPoint[] = [
   // The seafront straight, eastwards (+x), the sea on the left
-  [-130, -112, 18],
-  [-40, -112, 18],
-  [60, -112, 18],
-  // A fast right sweeper round the end of the quay
-  [135, -100, 17],
-  [180, -62, 17],
-  [195, -8, 16],
+  [-130, -112, 32],
+  [-40, -112, 32],
+  [60, -112, 32],
+  // A tight right at the end of the quay
+  [140, -112, 31],
+  [178, -106, 31],
+  [193, -80, 31],
+  [195, -8, 29],
   // A short, tight right onto the first switchback leg, westwards
-  [192, 44, 16],
-  [174, 62, 16],
-  [140, 64, 16],
-  [95, 62, 16],
-  [42, 60, 16],
+  [192, 44, 29],
+  [174, 62, 29],
+  [140, 64, 29],
+  [95, 62, 29],
+  [42, 60, 29],
   // Hairpin 1: left, round to the east
-  [10, 66, 16],
-  [-2, 87, 16],
-  [12, 106, 16],
-  [52, 110, 16],
-  [95, 108, 16],
+  [10, 66, 29],
+  [-2, 87, 29],
+  [12, 106, 29],
+  [52, 110, 29],
+  [95, 108, 29],
   // Hairpin 2: right, round to the west
-  [127, 114, 16],
-  [139, 134, 16],
-  [125, 154, 16],
+  [127, 114, 29],
+  [139, 134, 29],
+  [125, 154, 29],
   // The chicane on the top leg
-  [86, 158, 15],
-  [56, 145, 15],
-  [24, 167, 15],
-  [-14, 158, 16],
-  // A long fast right, down the west side, a kink, and the right onto the straight
-  [-100, 151, 17],
-  [-150, 128, 17],
-  [-178, 80, 17],
-  [-183, 25, 17],
-  [-168, -22, 16],
-  [-184, -62, 17],
-  [-176, -98, 18],
+  [86, 158, 28],
+  [56, 145, 28],
+  [24, 167, 28],
+  [-14, 158, 29],
+  // A long fast right, down the west side, a sharp left-right flick, and the right onto the straight
+  [-100, 151, 31],
+  [-150, 128, 31],
+  [-178, 80, 31],
+  [-183, 25, 31],
+  [-162, -10, 29],
+  [-190, -54, 31],
+  [-176, -98, 32],
 ]
+
+const CONTROL: readonly ControlPoint[] = DRAWN.map(([x, z, width]) => [
+  x * HARBOUR_SCALE,
+  z * HARBOUR_SCALE,
+  width,
+])
 
 const road = splineRoad(CONTROL, SAMPLE)
 
-/** The start and finish line: the first road point on the straight past x = -70 */
-const FINISH = road.findIndex((point) => point.z < -100 && point.x >= -70)
+/** The start and finish line: the first road point on the straight past x = -70 (drawn) */
+const FINISH = road.findIndex(
+  (point) => point.z < -100 * HARBOUR_SCALE && point.x >= -70 * HARBOUR_SCALE,
+)
 
 // The road starts at the line, so that gate 0 is the finish
 const fromLine = [...road.slice(FINISH), ...road.slice(0, FINISH)]
@@ -67,8 +84,9 @@ export const HARBOUR: TrackJson = {
   format: TRACK_FORMAT,
   id: 'harbour',
   name: { en: 'Harbour Hairpins', 'zh-TW': '漁港髮夾彎' },
-  // 2026-11-14: widened (owner: "make them wide"); old records are set aside
-  revision: 2,
+  // 2026-11-14: widened (owner: "make them wide"), then drawn bigger and wider still with sharper
+  // corners (owner: eight karts side by side); old records are set aside
+  revision: 3,
   laps: 3,
   road: fromLine,
   gates,
@@ -76,7 +94,7 @@ export const HARBOUR: TrackJson = {
   // Two by two behind the line, 7 m apart, staggered, facing along the straight
   grid: [0, 1, 2, 3, 4, 5].map((slot) => {
     const back = 10 + Math.floor(slot / 2) * 7 + (slot % 2) * 3.5
-    const across = slot % 2 === 0 ? -3.5 : 3.5
+    const across = slot % 2 === 0 ? -4 : 4
     return {
       x: Math.round((fromLine[0]!.x - along.dx * back + side.dx * across) * 100) / 100,
       z: Math.round((fromLine[0]!.z - along.dz * back + side.dz * across) * 100) / 100,

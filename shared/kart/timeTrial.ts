@@ -5,6 +5,10 @@
 // nothing). The car starts behind the line and lap 1 is timed from GO, its run-up included, so the
 // laps add up to the total; crossing the line for the (laps + 1)th time finishes. Driving the wrong way is warned about, not punished: the gates
 // already refuse to count it.
+//
+// The start boost (2026-11-14, owner): press the throttle in the last `startWindow` seconds before
+// GO and hold it, and the car leaves the grid with a boost; hold it from earlier than that and the
+// engine bogs down for a moment instead. Letting go and pressing again inside the window still counts.
 import { resetRun, startRun, stepRun, type Course, type Run } from './course.ts'
 import {
   DEFAULT_RULES,
@@ -26,6 +30,9 @@ const WRONG_WAY_DOT = -0.35
 
 export type TrialPhase = 'countdown' | 'racing' | 'finished'
 
+/** How the car left the grid: nothing special, a start boost, or a stall from a jump start */
+export type TrialStart = 'none' | 'boost' | 'stall'
+
 export interface Trial {
   readonly phase: TrialPhase
   readonly run: Run
@@ -40,6 +47,10 @@ export interface Trial {
   /** Seconds spent going the wrong way, and whether that is long enough to say so */
   readonly wrongSeconds: number
   readonly wrongWay: boolean
+  /** While counting down with the throttle held: the countdown left when it was pressed */
+  readonly startPress: number | null
+  /** Settled at GO */
+  readonly start: TrialStart
 }
 
 export interface TrialCourse extends Course {
@@ -60,7 +71,15 @@ export function startTrial(course: TrialCourse): Trial {
     lapStartedAt: 0,
     wrongSeconds: 0,
     wrongWay: false,
+    startPress: null,
+    start: 'none',
   }
+}
+
+/** How a throttle pressed with `pressedAt` seconds of countdown left, and held to GO, starts */
+export function startFrom(pressedAt: number | null, tuning: KartTuning): TrialStart {
+  if (pressedAt === null) return 'none'
+  return pressedAt <= tuning.startWindow + 1e-9 ? 'boost' : 'stall'
 }
 
 /** Seconds, from steps */
@@ -107,10 +126,32 @@ export function stepTrial(
     return { ...trial, run: stepRun(trial.run, { ...IDLE, brake: true }, course, tuning, rules) }
   }
   if (trial.phase === 'countdown') {
+    // Held on the grid; only the throttle counts, for the start boost. When it was pressed is the
+    // countdown left at that step, before it runs down
+    const startPress = input.throttle ? (trial.startPress ?? trial.countdown) : null
     const countdown = trial.countdown - STEP_SECONDS
-    // Held on the grid: what is pressed now does nothing until GO
-    if (countdown > 1e-9) return { ...trial, countdown }
-    return { ...trial, phase: 'racing', countdown: 0 }
+    if (countdown > 1e-9) return { ...trial, countdown, startPress }
+    const start = startFrom(startPress, tuning)
+    const kart = trial.run.kart
+    const launched =
+      start === 'boost'
+        ? {
+            ...kart,
+            boostSeconds: tuning.startBoostDuration,
+            chainWindow: tuning.startBoostDuration + tuning.chainGrace,
+            throttleHeld: true,
+          }
+        : start === 'stall'
+          ? { ...kart, stallSeconds: tuning.startStallSeconds, throttleHeld: true }
+          : kart
+    return {
+      ...trial,
+      phase: 'racing',
+      countdown: 0,
+      startPress: null,
+      start,
+      run: { ...trial.run, kart: launched },
+    }
   }
 
   const run = stepRun(trial.run, input, course, tuning, rules)
@@ -133,6 +174,8 @@ export function stepTrial(
     lapStartedAt,
     wrongSeconds,
     wrongWay: wrongSeconds >= WRONG_WAY_SECONDS - 1e-9,
+    startPress: null,
+    start: trial.start,
   }
 }
 

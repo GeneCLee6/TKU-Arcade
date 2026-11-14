@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { STEP_SECONDS, type KartInput } from '../../shared/kart/physics.ts'
+import { KART_RADIUS } from '../../shared/kart/walls.ts'
 import { roadClearance } from '../../shared/kart/scenery.ts'
 import {
   seconds,
@@ -18,6 +19,7 @@ import {
 import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TAMKANG } from '../../shared/kart/tracks/tamkang.ts'
+import { alongRoad, sharpCorners } from './trackShape.ts'
 import {
   CAMPUS_SOUTH,
   CAMPUS_WEST,
@@ -28,7 +30,8 @@ import {
 } from '../../src/kart/art/tamkangArt.ts'
 
 // 2026-11-14 (owner: wide tracks, and a Tamkang University map): the widened tracks, and the
-// campus track, its ground and its landmarks
+// campus track, its ground and its landmarks. Then (owner: room for eight karts side by side, more
+// sharp corners): every road 28 m or more, and corners that want a drift
 
 const load = (json: TrackJson): Track => {
   const parsed = parseTrack(json)
@@ -70,17 +73,28 @@ function autopilot(trial: Trial, road: readonly { x: number; z: number }[]): Kar
 }
 
 describe('the wide tracks', () => {
-  it('makes Riverside and the harbour wide: at least 15 m everywhere, about ten kart widths', () => {
+  it('leaves room for eight karts side by side everywhere: 28 m or more', () => {
+    // Eight karts' collision circles (walls.ts KART_RADIUS, 1.2 m) side by side take 19.2 m
+    const eightKarts = 8 * 2 * KART_RADIUS
     for (const json of [RIVERSIDE, HARBOUR, TAMKANG]) {
-      expect(Math.min(...json.road.map((point) => point.width)), json.id).toBeGreaterThanOrEqual(15)
+      const narrowest = Math.min(...json.road.map((point) => point.width))
+      expect(narrowest, json.id).toBeGreaterThanOrEqual(28)
+      expect(narrowest - 2 * KART_RADIUS, json.id).toBeGreaterThan(eightKarts + 4)
     }
-    expect(Math.min(...RIVERSIDE.road.map((point) => point.width))).toBeGreaterThanOrEqual(18)
   })
 
-  it('keeps the widened layouts’ records apart from the old ones', () => {
-    expect(recordKey(load(RIVERSIDE))).toBe('riverside@2')
-    expect(recordKey(load(HARBOUR))).toBe('harbour@2')
-    expect(recordKey(load(TAMKANG))).toBe('tamkang')
+  it('has corners sharp enough to want a drift at the new speed', () => {
+    // At 40 m/s the grip alone turns no tighter than about 30 m: these swing round by more than
+    // 75 degrees within 60 m
+    for (const json of [RIVERSIDE, HARBOUR, TAMKANG]) {
+      expect(sharpCorners(json.road, 60, 75), json.id).toBeGreaterThanOrEqual(5)
+    }
+  })
+
+  it('keeps the new layouts’ records apart from the old ones', () => {
+    expect(recordKey(load(RIVERSIDE))).toBe('riverside@3')
+    expect(recordKey(load(HARBOUR))).toBe('harbour@3')
+    expect(recordKey(load(TAMKANG))).toBe('tamkang@2')
   })
 })
 
@@ -90,20 +104,21 @@ describe('the Tamkang campus track', () => {
     const { road } = track
     for (let i = 0; i < road.length; i++) {
       for (let j = i + 1; j < road.length; j++) {
-        const along = Math.min(j - i, road.length - (j - i))
-        if (along * 6 < 40) continue
+        // Neighbours along the road (a hairpin's two legs included) are close by nature; any other
+        // part keeps clear of the kerbs
+        if (alongRoad(road, i, j) < 90) continue
         const gap = Math.hypot(road[i]!.x - road[j]!.x, road[i]!.z - road[j]!.z)
         expect(gap, `road ${i} and ${j}`).toBeGreaterThan((road[i]!.width + road[j]!.width) / 2 + 4)
       }
     }
     // The line is on the lantern avenue, driven northwards (-z); the grid is behind it
-    expect(track.road[0]).toMatchObject({ x: 0, z: 40 })
+    expect(track.road[0]).toMatchObject({ x: 0, z: 60 })
     for (const place of track.grid) {
       expect(place.z).toBeGreaterThan(track.road[0]!.z)
       expect(place.heading).toBeCloseTo(0)
     }
-    expect(length(TAMKANG)).toBeGreaterThan(1500)
-    expect(length(TAMKANG)).toBeLessThan(1900)
+    expect(length(TAMKANG)).toBeGreaterThan(2400)
+    expect(length(TAMKANG)).toBeLessThan(2900)
   })
 
   it('can be driven round three times, never the wrong way', () => {
@@ -116,7 +131,7 @@ describe('the Tamkang campus track', () => {
     let trial = startTrial(course)
     let steps = 0
     let wrongWarnings = 0
-    while (trial.phase !== 'finished' && steps < 360 / STEP_SECONDS) {
+    while (trial.phase !== 'finished' && steps < 480 / STEP_SECONDS) {
       const before = trial
       trial = stepTrial(trial, autopilot(trial, track.road), course)
       if (trial.wrongWay && !before.wrongWay) wrongWarnings++
@@ -124,7 +139,7 @@ describe('the Tamkang campus track', () => {
     }
     expect(trial.phase).toBe('finished')
     expect(wrongWarnings).toBe(0)
-    expect(seconds(trial.steps)).toBeLessThan(300)
+    expect(seconds(trial.steps)).toBeLessThan(420)
   })
 })
 

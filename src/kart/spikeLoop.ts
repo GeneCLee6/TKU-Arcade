@@ -31,6 +31,7 @@ import { advanceClock } from '../../shared/kart/clock.ts'
 import { startRun, stepRun, type Spot } from '../../shared/kart/course.ts'
 import { actionKeys, isBoundKey, readInput, type Bindings } from '../../shared/kart/input.ts'
 import {
+  kartBoosting,
   kartSlip,
   kartSpeed,
   NO_INPUT,
@@ -40,7 +41,7 @@ import {
   type KartState,
   type KartTuning,
 } from '../../shared/kart/physics.ts'
-import { calloutBetween, louder, type Callout } from './callouts.ts'
+import { calloutAtStart, calloutBetween, louder, type Callout } from './callouts.ts'
 import { readGamepad } from './devices.ts'
 import { createKartScene } from './Scene.ts'
 
@@ -48,7 +49,7 @@ const STATS_EVERY_MS = 500
 
 /**
  * The HUD's speed: metres per second times 3.6, the real conversion, since the world is in metres.
- * The standard top speed of 30 m/s reads 108 km/h, and 140 km/h in a boost.
+ * The standard top speed of 40 m/s reads 144 km/h, and 187 km/h in a boost (2026-11-14).
  */
 export const KMH_PER_MPS = 3.6
 
@@ -75,7 +76,7 @@ export interface SpikeHud {
   readonly gauge: number
   readonly storedBoosts: number
   readonly boosting: boolean
-  /** The chain count while a chained boost runs, else 0 */
+  /** The chain count while a boost runs (shown from 2), else 0 */
   readonly chain: number
   /** Counts wall hits, so that the HUD can flash on each one */
   readonly hits: number
@@ -183,7 +184,7 @@ export interface SpikeOptions {
   readonly controls: () => SpikeControls
   readonly onStats: (stats: SpikeStats) => void
   readonly onHud: (hud: SpikeHud) => void
-  /** DRIFT, BOOST or CHAIN: called once for each */
+  /** DRIFT, BOOST, CHAIN and the techniques' callouts: called once for each */
   readonly onCallout: (callout: Callout) => void
   readonly onContextLost: () => void
   readonly course?: SpikeCourse
@@ -331,6 +332,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         trial = stepTrial(trial, input, trialCourse, tuning, rules)
         run = trial.run
         if (was === 'countdown' && trial.phase === 'racing') {
+          callout = louder(callout, calloutAtStart(trial.start))
           recorder = startRecording(recordKey(track))
           recordStep(recorder, 0, run.kart)
         } else if (trial.phase !== 'countdown' && was === 'racing' && recorder) {
@@ -372,7 +374,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     debug.tuning = tuning
     debug.crossings = run.crossings
     debug.nextGate = run.nextGate
-    const boosting = current.boostSeconds > 0
+    const boosting = kartBoosting(current)
     const look = {
       speed: current.vx * Math.sin(current.heading) - current.vz * Math.cos(current.heading),
       steer: debug.input.steer,
@@ -458,7 +460,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     audio.unlock()
     const { bindings, enabled } = options.controls()
     // Ctrl itself boosts (ALWAYS_KEYS), and an arrow pressed while Ctrl is held still steers
-    const ctrlChord = event.ctrlKey && !event.code.startsWith('Control') && !event.code.startsWith('Arrow')
+    const ctrlChord =
+      event.ctrlKey && !event.code.startsWith('Control') && !event.code.startsWith('Arrow')
     if (!enabled || event.altKey || ctrlChord || event.metaKey) return
     // A slider, a list or a text box keeps its keys: the tuning panel is used while the car waits
     if (isField(event.target)) return

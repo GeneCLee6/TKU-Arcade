@@ -46,11 +46,11 @@ describe('the tuning panel', () => {
     expect(screen.getByRole('combobox', { name: 'Preset' })).toHaveValue('standard')
     expect(screen.getAllByRole('slider')).toHaveLength(Object.keys(KART_TUNING).length)
     const top = screen.getByRole('slider', { name: 'Top speed' })
-    expect(top).toHaveValue('30')
-    expect(top).toHaveAttribute('aria-valuetext', '30.0 m/s')
-    expect(screen.getByRole('slider', { name: 'Drift angle cap' })).toHaveValue('40')
+    expect(top).toHaveValue('40')
+    expect(top).toHaveAttribute('aria-valuetext', '40.0 m/s')
+    expect(screen.getByRole('slider', { name: 'Drift angle cap' })).toHaveValue('42')
     expect(screen.getByTestId('kart-slips')).toHaveTextContent(
-      'A drift settles at 32° steering into it, 22° centred and 13° steering out.',
+      'A drift settles at 33° steering into it, 23° centred and 13° steering out.',
     )
   })
 
@@ -72,7 +72,7 @@ describe('the tuning panel', () => {
     })
     expect(current).toBe(PRESETS.loose)
     expect(status()).toHaveTextContent('Preset: Loose.')
-    expect(screen.getByTestId('kart-slips')).toHaveTextContent('44° steering into it')
+    expect(screen.getByTestId('kart-slips')).toHaveTextContent('46° steering into it')
     fireEvent.click(screen.getByRole('button', { name: 'Back to Standard' }))
     expect(current).toBe(PRESETS.standard)
   })

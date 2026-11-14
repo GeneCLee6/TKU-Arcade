@@ -67,8 +67,8 @@ export const Hud = memo(function Hud({ t, hud, maxStored }: HudProps) {
             ))}
           </Charges>
           {hud.boosting && (
-            <Tag $chain={hud.chain > 0} data-testid="kart-boosting">
-              {hud.chain > 0 ? t('kart.hud.chain', { count: hud.chain }) : t('kart.hud.boosting')}
+            <Tag $chain={hud.chain >= 2} data-testid="kart-boosting">
+              {hud.chain >= 2 ? t('kart.hud.chain', { count: hud.chain }) : t('kart.hud.boosting')}
             </Tag>
           )}
         </LabelRow>
@@ -82,12 +82,24 @@ interface CalloutProps {
   readonly callout: Callout
 }
 
-/** DRIFT, BOOST, CHAIN ×n: big, brief, and only for the eyes (the HUD says the same in words) */
+const CALLOUT_KEYS = {
+  drift: 'kart.callout.drift',
+  slide: 'kart.callout.slide',
+  release: 'kart.callout.release',
+  boost: 'kart.callout.boost',
+  start: 'kart.callout.start',
+  stall: 'kart.callout.stall',
+} as const satisfies Record<Exclude<Callout['kind'], 'chain'>, KartMessageKey>
+
+/**
+ * DRIFT, BOOST, CHAIN ×n, and the techniques' words: big, brief, and only for the eyes (the HUD says
+ * the boost and the chain in words)
+ */
 export const CalloutText = memo(function CalloutText({ t, callout }: CalloutProps) {
   const text =
     callout.kind === 'chain'
       ? t('kart.callout.chain', { count: callout.count })
-      : t(callout.kind === 'boost' ? 'kart.callout.boost' : 'kart.callout.drift')
+      : t(CALLOUT_KEYS[callout.kind])
   return (
     <CalloutBox aria-hidden="true" data-testid="kart-callout" data-kind={callout.kind}>
       <CalloutTag $kind={callout.kind}>{text}</CalloutTag>
@@ -243,7 +255,17 @@ const CalloutBox = styled.div`
   }
 `
 
-const calloutFill = { drift: color.warning, boost: color.accent, chain: color.magenta } as const
+const calloutFill: Record<Callout['kind'], string> = {
+  drift: color.warning,
+  slide: color.gameSpectrum,
+  release: color.accent,
+  boost: color.accent,
+  chain: color.magenta,
+  start: color.success,
+  stall: color.danger,
+}
+/** The small callouts: the ones that come often in a lap */
+const SMALL: ReadonlySet<Callout['kind']> = new Set(['drift', 'slide', 'release'])
 const calloutClip = 'polygon(18px 0, 100% 0, calc(100% - 18px) 100%, 0 100%)'
 
 const CalloutTag = styled.span<{ $kind: Callout['kind'] }>`
@@ -253,5 +275,5 @@ const CalloutTag = styled.span<{ $kind: Callout['kind'] }>`
   color: ${color.onAccent};
   text-transform: uppercase;
   white-space: nowrap;
-  font-size: ${({ $kind }) => ($kind === 'drift' ? 'clamp(28px, 4vw, 44px)' : 'clamp(36px, 6.5vw, 72px)')};
+  font-size: ${({ $kind }) => (SMALL.has($kind) ? 'clamp(28px, 4vw, 44px)' : 'clamp(36px, 6.5vw, 72px)')};
 `

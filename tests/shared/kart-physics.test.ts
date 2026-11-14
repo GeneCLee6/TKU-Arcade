@@ -41,9 +41,9 @@ describe('stepKart', () => {
       state = stepKart(state, THROTTLE)
       steps++
     }
-    // 30 / 14 = 2.14 s: 129 steps of 1/60 s
-    expect(steps).toBe(Math.ceil((KART_TUNING.topSpeed / KART_TUNING.acceleration) * 60))
-    expect(steps * STEP_SECONDS).toBeCloseTo(2.15, 2)
+    // 40 / 20 = 2 s: 120 steps of 1/60 s
+    expect(steps).toBe(Math.ceil((KART_TUNING.topSpeed / KART_TUNING.acceleration) * 60 - 1e-9))
+    expect(steps * STEP_SECONDS).toBeCloseTo(2, 2)
   })
 
   it('keeps the top speed in a turn: sliding does not add to it', () => {
@@ -239,7 +239,9 @@ describe('frame rate independence', () => {
     { seconds: 3, input: { ...THROTTLE, steer: -1, drift: true } },
     { seconds: 1 / 6, input: { ...THROTTLE, steer: -1, drift: true, boost: true } },
     { seconds: 1 / 2, input: { ...THROTTLE, steer: -1, drift: true } },
-    { seconds: 1 / 3, input: THROTTLE },
+    // Let go of everything, then the throttle again: a release boost
+    { seconds: 1 / 6, input: NO_INPUT },
+    { seconds: 1 / 6, input: THROTTLE },
   ]
 
   /** Plays the script as the render loop would, with frames of the durations `frameLength` gives */
@@ -271,7 +273,7 @@ describe('frame rate independence', () => {
     expect(at144.steps).toBe(stepsInScript)
     expect(at144.state).toEqual(at30.state)
     expect(at30.state.x).not.toBe(0)
-    // The script really did fill the gauge, boost and chain
+    // The script really did fill the gauge, boost and fire a release boost
     expect(at30.state.chain).toBe(1)
   })
 

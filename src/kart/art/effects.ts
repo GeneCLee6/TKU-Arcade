@@ -1,7 +1,8 @@
 // e8-t07: what a kart leaves behind. Since the hover karts (2026-11-14): sparks spraying from the
 // back corners in a drift, a little dust, glowing trails on the road in the kart's own colour that
 // fade out behind it, and a flame from each thruster during a boost. Pooled and reused: nothing is
-// made or freed while driving.
+// made or freed while driving. 2026-11-14 (owner): dark skid marks too, left on the road by every
+// drift and fading over several seconds, in a pool of their own with a cap.
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -28,11 +29,25 @@ const SPARKS = 90
 const SPARK_LIFE = 0.45
 /** Trail pieces kept: about two seconds of a drift, both corners; the oldest are laid over again */
 const MARKS = 260
-const MARK_WIDTH = 0.3
+const MARK_WIDTH = 0.18
 /** Just above the road and kerbs (trackArt.ts LIFT), under the kart's glow */
 const MARK_HEIGHT = 0.085
+/**
+ * The longest piece laid in one frame, metres: a slow frame at boost speed still joins up (a reset,
+ * which jumps further, lifts the trail first)
+ */
+const MAX_PIECE = 8
 /** A trail fades out over this many seconds */
 const MARK_FADE = 1.6
+/** Skid mark pieces kept: about 7 s of drifting, both corners; the oldest are laid over again */
+const SKIDS = 840
+const SKID_WIDTH = 0.42
+/** A skid mark fades out over this many seconds */
+const SKID_FADE = 6
+/** How dark a fresh skid mark is: its opacity */
+const SKID_OPACITY = 0.55
+/** The skid marks lie a hair under the trails, so that the glow draws over them */
+const SKID_HEIGHT = MARK_HEIGHT - 0.004
 
 export interface KartEffects {
   update(pose: { x: number; z: number; heading: number }, look: KartLook, seconds: number): void
@@ -107,7 +122,8 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   const indices = new Uint32Array(MARKS * 6)
   for (let piece = 0; piece < MARKS; piece++) {
     const a = piece * 4
-    indices.set([a, a + 1, a + 2, a + 2, a + 1, a + 3], piece * 6)
+    // Wound to face up (2026-11-14: they faced the ground before, and so never showed)
+    indices.set([a, a + 2, a + 1, a + 2, a + 3, a + 1], piece * 6)
   }
   const markGeometry = new BufferGeometry()
   const positionAttribute = new BufferAttribute(positions, 3).setUsage(DynamicDrawUsage)
@@ -133,6 +149,43 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   let nextMark = 0
   let lastCorners: { x: number; z: number }[] | null = null
   let fading = false
+
+  // ── Skid marks: dark, see-through, long-lasting; their opacity fades with age ──
+  const skidPositions = new Float32Array(SKIDS * 4 * 3)
+  const skidColours = new Float32Array(SKIDS * 4 * 4)
+  const skidBorn = new Float32Array(SKIDS).fill(-Infinity)
+  const skidIndices = new Uint32Array(SKIDS * 6)
+  for (let piece = 0; piece < SKIDS; piece++) {
+    const a = piece * 4
+    skidIndices.set([a, a + 2, a + 1, a + 2, a + 3, a + 1], piece * 6)
+  }
+  const skidTint = new Color(kartScene.skid)
+  for (let vertex = 0; vertex < SKIDS * 4; vertex++) {
+    skidColours.set([skidTint.r, skidTint.g, skidTint.b, 0], vertex * 4)
+  }
+  const skidGeometry = new BufferGeometry()
+  const skidPositionAttribute = new BufferAttribute(skidPositions, 3).setUsage(DynamicDrawUsage)
+  // Four numbers a vertex: the alpha fades each piece out on its own
+  const skidColourAttribute = new BufferAttribute(skidColours, 4).setUsage(DynamicDrawUsage)
+  skidGeometry.setAttribute('position', skidPositionAttribute)
+  skidGeometry.setAttribute('color', skidColourAttribute)
+  skidGeometry.setIndex(new BufferAttribute(skidIndices, 1))
+  const skidMaterial = new MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  })
+  const skids = new Mesh(skidGeometry, skidMaterial)
+  skids.frustumCulled = false
+  // Before the glowing trails, so that they add their light over the dark marks
+  skids.renderOrder = 1
+  marks.renderOrder = 2
+  world.add(skids)
+  let nextSkid = 0
+  let skidsShowing = false
 
   // ── The boost flames, on the kart, one at each thruster ──
   const outerMaterial = new MeshBasicMaterial({
@@ -179,7 +232,7 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     const dx = to.x - from.x
     const dz = to.z - from.z
     const length = Math.hypot(dx, dz)
-    if (length < 0.02 || length > 3) return
+    if (length < 0.02 || length > MAX_PIECE) return
     // Across the direction of travel, half the trail's width either side
     const nx = (-dz / length) * (MARK_WIDTH / 2)
     const nz = (dx / length) * (MARK_WIDTH / 2)
@@ -205,13 +258,57 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     positionAttribute.needsUpdate = true
   }
 
+  const laySkid = (from: { x: number; z: number }, to: { x: number; z: number }) => {
+    const dx = to.x - from.x
+    const dz = to.z - from.z
+    const length = Math.hypot(dx, dz)
+    if (length < 0.02 || length > MAX_PIECE) return
+    const nx = (-dz / length) * (SKID_WIDTH / 2)
+    const nz = (dx / length) * (SKID_WIDTH / 2)
+    const y = SKID_HEIGHT
+    skidPositions.set(
+      [
+        from.x + nx,
+        y,
+        from.z + nz,
+        from.x - nx,
+        y,
+        from.z - nz,
+        to.x + nx,
+        y,
+        to.z + nz,
+        to.x - nx,
+        y,
+        to.z - nz,
+      ],
+      nextSkid * 12,
+    )
+    skidBorn[nextSkid] = clock
+    nextSkid = (nextSkid + 1) % SKIDS
+    skidPositionAttribute.needsUpdate = true
+  }
+
+  /** Each skid piece's opacity by its age; says whether any piece still shows */
+  const fadeSkids = () => {
+    let showing = false
+    for (let piece = 0; piece < SKIDS; piece++) {
+      const share = Math.max(0, 1 - (clock - skidBorn[piece]!) / SKID_FADE)
+      if (share > 0) showing = true
+      // Holds dark for a while, then fades
+      const alpha = Math.min(1, share * 1.6) * SKID_OPACITY
+      for (let corner = 0; corner < 4; corner++) skidColours[(piece * 4 + corner) * 4 + 3] = alpha
+    }
+    skidColourAttribute.needsUpdate = true
+    return showing
+  }
+
   /** Each trail piece's brightness by its age; says whether any piece still shows */
   const fadeMarks = () => {
     let showing = false
     for (let piece = 0; piece < MARKS; piece++) {
       const share = Math.max(0, 1 - (clock - born[piece]!) / MARK_FADE)
       if (share > 0) showing = true
-      const strength = share * share * 0.75
+      const strength = share * share * 0.6
       for (let corner = 0; corner < 4; corner++) {
         const at = (piece * 4 + corner) * 3
         colours[at] = trailColour.r * strength
@@ -230,10 +327,14 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
       const corners = kart.rearContacts.map(([lx, lz]) => toWorld(pose, lx, lz))
 
       if (sliding && lastCorners)
-        corners.forEach((corner, index) => layMark(lastCorners![index]!, corner))
+        corners.forEach((corner, index) => {
+          layMark(lastCorners![index]!, corner)
+          laySkid(lastCorners![index]!, corner)
+        })
       lastCorners = sliding ? corners : null
-      // Faded every frame while a trail still shows, then left alone
+      // Faded every frame while a trail or a skid mark still shows, then left alone
       if (sliding || fading) fading = fadeMarks()
+      if (sliding || skidsShowing) skidsShowing = fadeSkids()
 
       // Dust: a light stream while drifting, a faint one under boost
       puffDue += (sliding ? 12 : look.boosting ? 4 : 0) * seconds
@@ -319,6 +420,9 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
       markGeometry.dispose()
       markMaterial.dispose()
       world.remove(marks)
+      skidGeometry.dispose()
+      skidMaterial.dispose()
+      world.remove(skids)
       outerGeometry.dispose()
       innerGeometry.dispose()
       outerMaterial.dispose()

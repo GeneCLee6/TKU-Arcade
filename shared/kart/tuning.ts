@@ -14,7 +14,7 @@ import {
 
 export type TuningKey = keyof typeof KART_TUNING
 
-export const TUNING_GROUPS = ['speed', 'steering', 'drift', 'boost', 'walls'] as const
+export const TUNING_GROUPS = ['speed', 'steering', 'drift', 'boost', 'technique', 'walls'] as const
 export type TuningGroup = (typeof TUNING_GROUPS)[number]
 
 /** How a number reads on the panel: its unit decides the words around it */
@@ -26,6 +26,7 @@ export type TuningUnit =
   | 'degrees'
   | 'seconds'
   | 'pointsPerSecond'
+  | 'points'
   | 'factor'
   | 'share'
   | 'count'
@@ -69,14 +70,30 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
   driftExitSpeed: { group: 'drift', min: 1, max: 15, step: 0.5, unit: 'metresPerSecond' },
 
   gaugeFillRate: { group: 'boost', min: 5, max: 150, step: 1, unit: 'pointsPerSecond' },
+  gaugeDriftBonus: { group: 'boost', min: 0, max: 50, step: 1, unit: 'points' },
   maxStoredBoosts: { group: 'boost', min: 1, max: 3, step: 1, unit: 'count' },
   boostDuration: { group: 'boost', min: 0.2, max: 4, step: 0.05, unit: 'seconds' },
   boostTopSpeedFactor: { group: 'boost', min: 1, max: 2, step: 0.01, unit: 'factor' },
   boostAcceleration: { group: 'boost', min: 0, max: 80, step: 1, unit: 'metresPerSecondSquared' },
   overSpeedDrag: { group: 'boost', min: 0, max: 30, step: 0.5, unit: 'metresPerSecondSquared' },
-  chainDuration: { group: 'boost', min: 0, max: 3, step: 0.05, unit: 'seconds' },
-  chainGrace: { group: 'boost', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
-  chainMinDrift: { group: 'boost', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
+
+  startWindow: { group: 'technique', min: 0.05, max: 1, step: 0.05, unit: 'seconds' },
+  startBoostDuration: { group: 'technique', min: 0, max: 3, step: 0.05, unit: 'seconds' },
+  startStallSeconds: { group: 'technique', min: 0, max: 2, step: 0.05, unit: 'seconds' },
+  releaseWindow: { group: 'technique', min: 0.05, max: 1, step: 0.05, unit: 'seconds' },
+  chainDuration: { group: 'technique', min: 0, max: 3, step: 0.05, unit: 'seconds' },
+  miniTopSpeedFactor: { group: 'technique', min: 1, max: 2, step: 0.01, unit: 'factor' },
+  miniAcceleration: {
+    group: 'technique',
+    min: 0,
+    max: 80,
+    step: 1,
+    unit: 'metresPerSecondSquared',
+  },
+  chainGrace: { group: 'technique', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
+  chainMinDrift: { group: 'technique', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
+  slideBoostDrain: { group: 'technique', min: 0.1, max: 1, step: 0.05, unit: 'factor' },
+  slideSpeedKeep: { group: 'technique', min: 0.5, max: 1, step: 0.01, unit: 'share' },
 
   wallBounce: { group: 'walls', min: 0, max: 1, step: 0.05, unit: 'share' },
   wallImpactLoss: { group: 'walls', min: 0, max: 1, step: 0.05, unit: 'share' },
@@ -111,7 +128,7 @@ export const PRESET_IDS = ['standard', 'planted', 'loose'] as const
 export type PresetId = (typeof PRESET_IDS)[number]
 
 /**
- * Three starting points, all original. `standard` is J2's numbers (plus J3's walls). `planted` grips
+ * Three starting points, all original. `standard` is J2's numbers (plus J3's walls), retuned 2026-11-14 (faster, longer boosts, the techniques). `planted` grips
  * harder and drifts at a narrower angle, losing less speed but filling the gauge more slowly, so it
  * is easier and pays less. `loose` slides wider and grips less, fills the gauge faster and gives a
  * longer chain window, so it is harder and pays more. None is a signed-off feel (AC-8.8).
@@ -120,31 +137,34 @@ export const PRESETS: { readonly [P in PresetId]: KartTuning } = {
   standard: KART_TUNING,
   planted: {
     ...KART_TUNING,
-    turnRate: 2.4,
+    turnRate: 2.6,
     grip: 16,
-    driftTurnRate: 1.7,
-    driftSteerRate: 0.6,
-    driftAlign: 5,
+    driftTurnRate: 1.9,
+    driftSteerRate: 0.7,
+    driftAlign: 5.4,
     driftMaxSlip: 30 * DEGREE,
-    driftTopSpeed: 27.5,
-    driftDrag: 10,
-    gaugeFillRate: 34,
-    chainGrace: 0.25,
+    driftTopSpeed: 36.5,
+    driftDrag: 11,
+    gaugeFillRate: 55,
+    chainGrace: 0.4,
+    releaseWindow: 0.35,
     wallImpactLoss: 0.4,
   },
   loose: {
     ...KART_TUNING,
-    turnRate: 2,
+    turnRate: 2.2,
     grip: 6,
-    driftTurnRate: 1.5,
-    driftSteerRate: 0.9,
-    driftAlign: 2.6,
+    driftTurnRate: 1.7,
+    driftSteerRate: 1,
+    driftAlign: 2.8,
     driftMaxSlip: 50 * DEGREE,
-    driftTopSpeed: 25.5,
-    driftDrag: 6,
-    gaugeFillRate: 48,
-    boostDuration: 1,
-    chainGrace: 0.4,
+    driftTopSpeed: 33.5,
+    driftDrag: 7,
+    gaugeFillRate: 78,
+    boostDuration: 1.7,
+    chainGrace: 0.65,
+    releaseWindow: 0.25,
+    chainDuration: 0.7,
     wallImpactLoss: 0.6,
   },
 }

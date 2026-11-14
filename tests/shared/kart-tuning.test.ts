@@ -36,7 +36,7 @@ describe('the tuning specs', () => {
     expect(storedValue('boostTopSpeedFactor', 1.3)).toBe(1.3)
     expect(storedValue('chainGrace', 0.30000000000000004)).toBe(0.3)
     expect(storedValue('driftMaxSlip', 40)).toBeCloseTo((40 * Math.PI) / 180, 12)
-    expect(shownValue('driftMaxSlip', KART_TUNING.driftMaxSlip)).toBeCloseTo(40, 9)
+    expect(shownValue('driftMaxSlip', KART_TUNING.driftMaxSlip)).toBeCloseTo(42, 9)
   })
 })
 
@@ -60,8 +60,8 @@ describe('the presets', () => {
     const standard = steadySlips(PRESETS.standard)
     const planted = steadySlips(PRESETS.planted)
     const loose = steadySlips(PRESETS.loose)
-    // J2's measured angles, rounded: 32°, 22°, 12.5°
-    expect(standard).toEqual({ into: 32, centred: 22, out: 13 })
+    // The measured angles, rounded (2026-11-14 retune; J2's were 32°, 22° and 13°)
+    expect(standard).toEqual({ into: 33, centred: 23, out: 13 })
     expect(planted.into).toBeLessThan(standard.into)
     expect(planted.centred).toBeLessThan(standard.centred)
     expect(loose.into).toBeGreaterThan(standard.into)
