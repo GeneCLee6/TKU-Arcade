@@ -1,5 +1,6 @@
 // `node scripts/bluff-bank.mjs`: writes shared/games/bluff/bank.ts from the reviewed drafts
-// docs/content/bluff-terms.zh-TW.csv (category, term, hint, explanation) and
+// docs/content/bluff-terms.zh-TW.csv (term, category, decoy1, decoy2, explanation: the true category
+// and two decoys, shown to everyone in a shuffled order) and
 // docs/content/bluff-words.zh-TW.csv (word: the mole's mission words). No quoting in either file, so
 // no ASCII comma inside a field. The bank lives on the server only (tests/games/catalog.test.ts);
 // tests/games/bluff/bank.test.ts fails if the CSVs and bank.ts drift apart. Run from the repo root.
@@ -21,7 +22,7 @@ function rows(file, header, width) {
   })
 }
 
-const terms = rows(TERMS, 'category,term,hint,explanation', 4)
+const terms = rows(TERMS, 'term,category,decoy1,decoy2,explanation', 5)
 const words = rows(WORDS, 'word', 1).map(([word]) => word)
 const quote = (field) => `'${field.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 writeFileSync(
@@ -30,7 +31,7 @@ writeFileSync(
 // Server only: shared/games/bluff/rules.ts imports it, and the browser imports no rules.
 import type { BluffTermRow } from './types.ts'
 
-/** category, term, the bluffers' hint, the true explanation; a term's id is its index here plus one */
+/** term, true category, two decoy categories, the true explanation; a term's id is its index here plus one */
 export const BLUFF_TERMS: readonly BluffTermRow[] = [
 ${terms.map((row) => `  [${row.map(quote).join(', ')}],`).join('\n')}
 ]

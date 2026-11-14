@@ -10,8 +10,8 @@ import './messages.ts'
 import { roleOf } from './screenState.ts'
 
 /**
- * The term, big, and what only you hold this round: your role, and the real meaning (the honest
- * reader), the hint (bluffers and the mole) or the secret words (the mole). It is all in your own
+ * The term, big, with its three categories (one of them true, 2026-11-14), and what only you hold
+ * this round: your role, and the real meaning (the honest reader) or the secret words (the mole). It is all in your own
  * view, cut by the server. Face to face, a neighbour can glance at a phone: the card can be covered.
  * The bank's text is Chinese only.
  */
@@ -22,20 +22,34 @@ export function RoleCard({ view }: { view: BluffView }) {
   // Covered for this round only: a new term comes face up
   const [coveredRound, setCoveredRound] = useState<number | null>(null)
   const covered = coveredRound === view.round
-  const secret = view.explanation !== null || view.hint !== null || view.words.length > 0
+  const secret = view.explanation !== null || view.words.length > 0
 
   return (
     <Card aria-labelledby="bluff-term" data-testid="role-card" $role={role}>
       <Head>
-        <Tag>
-          <span lang="zh-TW">{view.term.category}</span>
-        </Tag>
         <RoleLine data-testid="role">{t(`games.bluff.ui.role.${role}`)}</RoleLine>
       </Head>
       <TermLabel>{t('games.bluff.ui.term')}</TermLabel>
       <Term id="bluff-term" lang="zh-TW">
         {view.term.term}
       </Term>
+      {view.term.choices.length > 1 && (
+        <Choices aria-label={t('games.bluff.ui.choices')} data-testid="choices">
+          {view.term.choices.map((choice) => (
+            <li key={choice}>
+              <Tag $tone={view.term.category === choice ? 'success' : 'plain'}>
+                <span lang="zh-TW">{choice}</span>
+              </Tag>
+            </li>
+          ))}
+        </Choices>
+      )}
+      {view.term.choices.length === 1 && (
+        <Tag>
+          <span lang="zh-TW">{view.term.choices[0]}</span>
+        </Tag>
+      )}
+      {view.term.choices.length > 1 && <Body>{t('games.bluff.ui.choicesHelp')}</Body>}
       <Body>{t(`games.bluff.ui.roleHelp.${role}`)}</Body>
 
       {secret && covered && <Covered>{t('games.bluff.ui.covered')}</Covered>}
@@ -45,12 +59,6 @@ export function RoleCard({ view }: { view: BluffView }) {
             <Secret aria-labelledby="bluff-explanation" data-testid="explanation">
               <SecretLabel id="bluff-explanation">{t('games.bluff.ui.explanation')}</SecretLabel>
               <Explanation lang="zh-TW">{view.explanation}</Explanation>
-            </Secret>
-          )}
-          {view.hint !== null && (
-            <Secret aria-labelledby="bluff-hint" data-testid="hint">
-              <SecretLabel id="bluff-hint">{t('games.bluff.ui.hint')}</SecretLabel>
-              <HintText lang="zh-TW">{view.hint}</HintText>
             </Secret>
           )}
           {view.words.length > 0 && (
@@ -144,10 +152,19 @@ const Explanation = styled.p`
   overflow-wrap: anywhere;
 `
 
-const HintText = styled.p`
+// The three categories, side by side; at the reveal the true one turns green
+const Choices = styled.ul`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${space.sm}px;
   margin: 0;
-  font-size: ${fontSize.lg}px;
-  font-weight: 700;
+  padding: 0;
+  list-style: none;
+
+  & ${Tag} {
+    font-size: ${fontSize.md}px;
+    padding: ${space.xs}px ${space.md}px;
+  }
 `
 
 const Words = styled.ul`

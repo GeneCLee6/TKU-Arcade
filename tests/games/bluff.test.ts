@@ -107,10 +107,11 @@ describe('the deal', () => {
     expect(start(6, { mole: false }).mole).toBeNull()
   })
 
-  it('draws a term from the bank with its hint and explanation, never twice in a room', () => {
+  it('draws a term from the bank with its three categories in some order and its explanation, never twice in a room', () => {
     let state = start(9, { twoRounds: true }, 3)
-    const [category, term, hint, explanation] = BLUFF_TERMS[state.term.id - 1]
-    expect(state.term).toEqual({ id: state.term.id, category, term, hint, explanation })
+    const [term, category, decoy1, decoy2, explanation] = BLUFF_TERMS[state.term.id - 1]
+    expect(state.term).toMatchObject({ id: state.term.id, category, term, explanation })
+    expect([...(state.term.choices ?? [])].sort()).toEqual([category, decoy1, decoy2].sort())
     const seen = [state.term.id]
     while (state.phase !== 'over') {
       state = voting(state)
@@ -280,12 +281,18 @@ describe('view trimming', () => {
     expect(view('spectator').explanation).toBeNull()
   })
 
-  it('gives bluffers and the mole the hint (if on), the mole alone the words, and hides who is who', () => {
+  it('shows everyone the three categories (if on) but not which is true, the mole alone the words', () => {
     const bluffer = state.order.find((s) => s !== state.honest && s !== state.mole) as number
-    expect(view(bluffer)).toMatchObject({ role: 'bluffer', hint: state.term.hint, words: [] })
+    const choices = state.term.choices as string[]
+    expect(choices).toHaveLength(3)
+    expect(choices).toContain(state.term.category)
+    for (const viewer of [bluffer, state.judge, state.honest, 'spectator'] as const) {
+      expect(view(viewer).term).toEqual({ id: state.term.id, term: state.term.term, choices, category: null })
+    }
+    expect(view(bluffer)).toMatchObject({ role: 'bluffer', words: [] })
     expect(view(state.mole as number)).toMatchObject({ role: 'mole', words: state.words })
-    expect(view(state.judge)).toMatchObject({ role: 'judge', hint: null, words: [] })
-    expect(view(bluffer, { ...state, hints: false }).hint).toBeNull()
+    expect(view(state.judge)).toMatchObject({ role: 'judge', words: [] })
+    expect(view(bluffer, { ...state, hints: false }).term.choices).toEqual([])
     for (const viewer of [state.judge, bluffer, state.honest, 'spectator'] as const) {
       expect(view(viewer)).toMatchObject({ honest: null, mole: null })
     }

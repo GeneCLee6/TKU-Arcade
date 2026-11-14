@@ -12,21 +12,27 @@ export type BluffOptions = {
   readSeconds: number
   /** A mole among the bluffers, where there are enough players */
   mole: boolean
-  /** Bluffers see the term's hint */
+  /** Everyone sees the term's three categories, one of them the true one (2026-11-14; before, a hint for bluffers) */
   hints: boolean
   /** Countdowns for preparing, reading and voting */
   clock: boolean
 }
 
-/** One line of the term bank: category, term, the bluffers' hint, the true explanation */
-export type BluffTermRow = readonly [string, string, string, string]
+/** One line of the term bank: term, its true category, two decoy categories, the true explanation */
+export type BluffTermRow = readonly [string, string, string, string, string]
 
 export type BluffTerm = {
   /** Its line in the reviewed CSV, from 1 */
   id: number
+  /** The true category: one of `choices` */
   category: string
   term: string
-  hint: string
+  /**
+   * Since 2026-11-14 (擁有者): the three categories everyone sees, in this round's order; the true
+   * one among them. A round from before has none, and a `hint` for the bluffers instead
+   */
+  choices?: string[]
+  hint?: string
   explanation: string
 }
 
@@ -131,11 +137,13 @@ export type BluffView = Omit<
   you: SeatId | null
   /** Your own role this round; null for a spectator */
   role: BluffRole | null
-  term: { id: number; category: string; term: string }
+  /**
+   * The term and its three categories (none when the room turned them off). Which one is true stays
+   * hidden until the reveal: `category` is null before it
+   */
+  term: { id: number; term: string; choices: string[]; category: string | null }
   /** The honest reader's, and everyone's at the reveal */
   explanation: string | null
-  /** The bluffers' and the mole's, when hints are on; everyone's at the reveal */
-  hint: string | null
   /** The mole's own, and everyone's at the reveal */
   words: string[]
   /** Shown at the reveal */
