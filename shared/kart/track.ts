@@ -308,6 +308,30 @@ export function gatesAlong(
   return { gates, respawns }
 }
 
+/**
+ * Boost pads on the road (2026-11-14): one at each road point index given, moved `across` metres to
+ * the right of the centre line (negative: to the left), facing along the road. Off the middle, so
+ * that taking one is a choice of line
+ */
+export function padsAlong(
+  road: readonly RoadPoint[],
+  spots: readonly (readonly [index: number, across: number])[],
+  size: { length: number; width: number } = { length: 14, width: 7 },
+): BoostPad[] {
+  return spots.map(([index, across]) => {
+    const point = road[index % road.length]!
+    const direction = roadDirection(road, index % road.length)
+    // The road's right, facing along it, is (-dz, dx)
+    return {
+      x: Math.round((point.x - direction.dz * across) * 100) / 100,
+      z: Math.round((point.z + direction.dx * across) * 100) / 100,
+      heading: headingOf(direction),
+      length: size.length,
+      width: size.width,
+    }
+  })
+}
+
 /** Which side of the gate's line P is: > 0 the side a driver comes from, < 0 the side they go to */
 const side = (gate: Gate, x: number, z: number): number =>
   (gate.bx - gate.ax) * (z - gate.az) - (gate.bz - gate.az) * (x - gate.ax)
@@ -342,6 +366,7 @@ export const courseOf = (track: Track): Course => ({
   walls: track.allWalls,
   start: track.grid[0]!,
   checkpoints: { gates: track.gates, respawns: track.respawns, laps: track.laps },
+  boostPads: track.boostPads,
 })
 
 /** The smallest box holding the road and its kerbs, for the minimap */

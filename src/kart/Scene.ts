@@ -18,12 +18,13 @@ import type { Track } from '../../shared/kart/track.ts'
 import { buildTrackArt, themeOf, type TrackArt } from './art/trackArt.ts'
 import { QUALITY, type Quality } from './quality.ts'
 import { createKartEffects } from './art/effects.ts'
+import { createSpeedLines } from './art/speedLines.ts'
 import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
 import type { KartBody } from './bodies.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 import { kartScene, kartThemes } from '../styles/kartTokens.ts'
-import { fieldOfView, followCar, startRig, type Chased } from './camera.ts'
+import { fieldOfView, followCar, REFERENCE_SPEED, startRig, type Chased } from './camera.ts'
 
 const GROUND_SIZE = 400
 const GRID_CELL = 5
@@ -168,7 +169,10 @@ export function createKartScene(
     scene.add(mesh)
   }
 
-  const camera = new PerspectiveCamera(60, 1, 0.5, track ? 2000 : 260)
+  const camera = new PerspectiveCamera(60, 1, 0.5, track ? 2600 : 260)
+  // In the scene, so that the speed lines riding on it are drawn
+  scene.add(camera)
+  const speedLines = createSpeedLines(camera)
   let rig = startRig(0)
   let baseFov = 60
   // The boost's wider view is motion: not for a viewer who asked for less (read live, it can change)
@@ -218,9 +222,13 @@ export function createKartScene(
         camera.fov = fov
         camera.updateProjectionMatrix()
       }
+      const motion = !(reducedMotion?.matches ?? false)
+      speedLines.update(rig.pace, rig.pace * REFERENCE_SPEED, frameSeconds, !motion)
+      // A little further back at speed, so the road rushes up from under the camera
+      const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * 1.2 : 0)
       const sin = Math.sin(rig.heading)
       const cos = Math.cos(rig.heading)
-      camera.position.set(x - sin * CAMERA_BACK, CAMERA_UP, z + cos * CAMERA_BACK)
+      camera.position.set(x - sin * back, CAMERA_UP, z + cos * back)
       camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6, z - cos * CAMERA_LOOK_AHEAD)
 
       renderer.render(scene, camera)
@@ -250,6 +258,7 @@ export function createKartScene(
         material.dispose()
       }
       effects.dispose()
+      speedLines.dispose()
       kart.dispose()
       ghostKart?.dispose()
       art?.dispose()

@@ -4,6 +4,9 @@
 // On a track (e8-t04, J4) the safe place is the respawn point of the last gate passed, in order. On
 // a course without gates (the test arena) it is wherever the car last drove clear of the walls for
 // SAFE_CONFIRM_SECONDS.
+//
+// 2026-11-14: a hard wall hit breaks the chain (release boosts and the boost slide), and boost pads
+// on the road boost whoever drives over them.
 import {
   DEFAULT_RULES,
   INITIAL_KART,
@@ -15,7 +18,7 @@ import {
   type KartState,
   type KartTuning,
 } from './physics.ts'
-import { gateCrossing, type Gate } from './track.ts'
+import { gateCrossing, type BoostPad, type Gate } from './track.ts'
 import { collideWalls, KART_RADIUS, wallClearance, type Wall } from './walls.ts'
 
 /** A place and the way to face there */
@@ -34,6 +37,39 @@ export interface Course {
     readonly respawns: readonly Spot[]
     readonly laps: number
   }
+  /** Strips on the road that boost whoever drives over them */
+  readonly boostPads?: readonly BoostPad[]
+}
+
+/** Whether (x, z) is on `pad`: within half its length along its heading and half its width across */
+export function onPad(pad: BoostPad, x: number, z: number): boolean {
+  const dx = x - pad.x
+  const dz = z - pad.z
+  const along = dx * Math.sin(pad.heading) - dz * Math.cos(pad.heading)
+  const across = dx * Math.cos(pad.heading) + dz * Math.sin(pad.heading)
+  return Math.abs(along) <= pad.length / 2 && Math.abs(across) <= pad.width / 2
+}
+
+/** After the walls: a hard hit breaks the chain, and a boost pad boosts */
+function afterWalls(kart: KartState, hitSpeed: number, course: Course, tuning: KartTuning) {
+  let next = kart
+  if (hitSpeed >= tuning.wallBreakSpeed) {
+    next = {
+      ...next,
+      chain: 0,
+      chainWindow: 0,
+      releaseWindow: 0,
+      sliding: false,
+      stackSeconds: 0,
+    }
+  }
+  const pads = course.boostPads
+  if (pads && pads.length > 0 && next.boostSeconds < tuning.padBoostSeconds) {
+    if (pads.some((pad) => onPad(pad, next.x, next.z))) {
+      next = { ...next, boostSeconds: tuning.padBoostSeconds }
+    }
+  }
+  return next
 }
 
 /** A place is safe this far from every wall: a car put there can steer before it reaches one */
@@ -158,11 +194,12 @@ export function stepRun(
 
   const moved = stepKart(run.kart, input, tuning, rules)
   const {
-    state: kart,
+    state: walled,
     impact,
     hitSpeed,
     touching,
   } = collideWalls(run.kart, moved, course.walls, tuning)
+  const kart = afterWalls(walled, hitSpeed, course, tuning)
 
   let { safe, candidate, candidateSeconds } = run
   const { nextGate, crossings } = run

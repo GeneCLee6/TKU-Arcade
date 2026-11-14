@@ -40,7 +40,14 @@ import {
   harbourTreeFits,
   inHarbourSea,
 } from './harbourArt.ts'
-import { buildTamkang, inTamkangRiver, tamkangGround, tamkangTreeFits } from './tamkangArt.ts'
+import {
+  buildTamkang,
+  inTamkangRiver,
+  tamkangFestivalFits,
+  tamkangGround,
+  tamkangTreeFits,
+} from './tamkangArt.ts'
+import { buildFestival } from './festival.ts'
 import {
   ASPHALT_LENGTH,
   BARRIER_LENGTH,
@@ -664,6 +671,17 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     if (roadClearance(track.road, stand.position.x, stand.position.z) > 4) group.add(stand)
   }
 
+  // ── Race-day dressing on every track: arch, flags, grandstands and crowds, flowers, a Ferris
+  // wheel, balloons, a skyline (festival.ts) ──
+  const festival = buildFestival(
+    { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
+    {
+      groundAt,
+      fits: (x, z) =>
+        harbour ? !inHarbourSea(x, z, 8) : tamkang ? tamkangFestivalFits(x, z) : !inRiver(x),
+    },
+  )
+
   // ── Riverside: the river, its banks, a bridge, and a brick town beyond ──
   let water: Texture | null = null
   if (river) {
@@ -787,6 +805,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     update(seconds) {
       if (water) water.offset.set(seconds * 0.012, seconds * 0.04)
       harbourScenery?.update(seconds)
+      festival.update(seconds)
       tamkangScenery?.update(seconds)
     },
     dispose() {

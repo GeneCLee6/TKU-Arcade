@@ -11,7 +11,14 @@
 // the campus is placed in the same drawn units, tamkangArt.ts), the road 28 to 34 m (it was 18 to
 // 22), the fast left at the top tightened round the tower and the western esses made three sharp
 // flicks.
-import { gatesAlong, headingOf, roadDirection, TRACK_FORMAT, type TrackJson } from '../track.ts'
+import {
+  gatesAlong,
+  padsAlong,
+  headingOf,
+  roadDirection,
+  TRACK_FORMAT,
+  type TrackJson,
+} from '../track.ts'
 import { splineRoad, type ControlPoint } from './spline.ts'
 
 /** Metres between road points */
@@ -23,9 +30,9 @@ export const TAMKANG_SCALE = 1.5
 /** [x, z, width]: x and z in drawn units (times TAMKANG_SCALE for metres), the width in metres */
 const DRAWN: readonly ControlPoint[] = [
   // The lantern avenue, northwards (-z), up to the line and beyond
-  [0, 150, 34],
-  [0, 40, 34],
-  [0, -90, 34],
+  [0, 150, 38],
+  [0, 40, 38],
+  [0, -90, 38],
   // A tight left at the top, round the memorial tower, westwards past the library
   [0, -165, 33],
   [-7, -191, 31],
@@ -60,9 +67,9 @@ const DRAWN: readonly ControlPoint[] = [
   [-84, 140, 31],
   // The last hairpin, left, onto the avenue
   [-74, 200, 33],
-  [-44, 230, 34],
-  [-10, 222, 34],
-  [2, 190, 34],
+  [-44, 230, 38],
+  [-10, 222, 38],
+  [2, 190, 38],
 ]
 
 const CONTROL: readonly ControlPoint[] = DRAWN.map(([x, z, width]) => [
@@ -88,7 +95,9 @@ export const TAMKANG: TrackJson = {
   name: { en: 'Tamkang Campus', 'zh-TW': '淡江校園' },
   // 2026-11-14: drawn bigger and wider with sharper corners (owner: eight karts side by side); the
   // first layout's records are set aside
-  revision: 2,
+  // 2026-11-14 again (owner: much faster karts): straights 4 m wider, boost pads; old records
+  // are set aside, the physics having changed too
+  revision: 3,
   laps: 3,
   road: fromLine,
   gates,
@@ -104,7 +113,14 @@ export const TAMKANG: TrackJson = {
     }
   }),
   walls: [],
-  boostPads: [],
+  // Off the middle of the straights: taking one is a choice of line
+  boostPads: padsAlong(fromLine, [
+    [20, 8],
+    [75, -8],
+    [255, -8],
+    [340, 8],
+    [430, -8],
+  ]),
   itemBoxes: [],
   decor: [],
 }
