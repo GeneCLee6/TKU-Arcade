@@ -126,10 +126,46 @@ const logged = (state: HoldemState, ...lines: HoldemLog[]): HoldemState => ({
 export const potOf = (state: HoldemState): number =>
   state.players.reduce((sum, player) => sum + player.committed, 0)
 
-/** The big blind on hand `hand`: doubling every `blindUp` hands */
+/** The big blind of the first hand, whatever the stacks: the small blind is half of it */
+export const START_BB = 20
+/** Starting chips: the option is in big blinds (before 2026-11-15 it was the chips themselves) */
+export const startingChips = (options: HoldemOptions): number =>
+  options.stack >= 1000 ? options.stack : options.stack * START_BB
+
+/** One decade of the blind ladder: 10/20, 15/30, 25/50, 40/80, 60/120, then the same ×10 and on */
+const LADDER = [20, 30, 50, 80, 120] as const
+
+/** The big blind of level `level` (0 at the start): about ×1.5 a level, in round numbers */
+export const bigBlindAt = (level: number): number => LADDER[level % LADDER.length] * 10 ** Math.floor(level / LADDER.length)
+
+/** A game begun before 2026-11-15 kept `blinds` in its options and doubled them: it still does */
+const legacyBlinds = (options: HoldemOptions): number | null => {
+  const blinds = (options as { blinds?: unknown }).blinds
+  return typeof blinds === 'number' && blinds > 0 ? blinds : null
+}
+
+/** The blind level of hand `hand`, 0 for the first: one up every `blindUp` hands */
+export function blindLevel(options: HoldemOptions, hand: number): number {
+  return options.blindUp > 0 ? Math.floor((Math.max(1, hand) - 1) / options.blindUp) : 0
+}
+
+/** The big blind of level `level` in this game */
+function bigBlindOfLevel(options: HoldemOptions, level: number): number {
+  const legacy = legacyBlinds(options)
+  return legacy === null ? bigBlindAt(level) : legacy * 2 ** level
+}
+
+/** The big blind on hand `hand` */
 export function bigBlindFor(options: HoldemOptions, hand: number): number {
-  const level = options.blindUp > 0 ? Math.floor((hand - 1) / options.blindUp) : 0
-  return options.blinds * 2 ** level
+  return bigBlindOfLevel(options, blindLevel(options, hand))
+}
+
+/** When the blinds next go up after hand `hand`, and to what; null when they never do */
+export function nextBlindsAfter(options: HoldemOptions, hand: number): { hand: number; sb: number; bb: number } | null {
+  if (options.blindUp <= 0) return null
+  const level = blindLevel(options, hand) + 1
+  const bb = bigBlindOfLevel(options, level)
+  return { hand: level * options.blindUp + 1, sb: bb / 2, bb }
 }
 
 /** A straight flush to the ace is named apart; it is still the same category to the evaluator */
@@ -167,12 +203,18 @@ export function raiseBounds(state: HoldemState, player: HoldemPlayer): { min: nu
   return { min: Math.min(state.currentBet + state.minRaise, max), max }
 }
 
-/** The quick sizes: the smallest, half the pot, the pot, all in; within the bounds, no repeats */
+/** The quick sizes: the smallest, half, two thirds and the whole pot, all in; within the bounds, no repeats */
 export function raiseChoices(state: HoldemState, player: HoldemPlayer): number[] {
   const { min, max } = raiseBounds(state, player)
   const toCall = state.currentBet - player.bet
   const pot = potOf(state) + toCall
-  const sizes = [min, state.currentBet + Math.floor(pot / 2), state.currentBet + pot, max]
+  const sizes = [
+    min,
+    state.currentBet + Math.floor(pot / 2),
+    state.currentBet + Math.floor((pot * 2) / 3),
+    state.currentBet + pot,
+    max,
+  ]
   return [...new Set(sizes.map((to) => Math.min(max, Math.max(min, to))))].sort((a, b) => a - b)
 }
 
@@ -534,8 +576,8 @@ export const holdem: GameModule<HoldemState, HoldemAction, HoldemView, HoldemOpt
   init(seats, options, rng) {
     const players: HoldemPlayer[] = seats.map((seat) => ({
       seat: seat.id,
-      stack: options.stack,
-      start: options.stack,
+      stack: startingChips(options),
+      start: startingChips(options),
       hole: [],
       bet: 0,
       committed: 0,
@@ -556,11 +598,11 @@ export const holdem: GameModule<HoldemState, HoldemAction, HoldemView, HoldemOpt
       button,
       sbSeat: button,
       bbSeat: button,
-      sb: options.blinds / 2,
-      bb: options.blinds,
+      sb: bigBlindFor(options, 1) / 2,
+      bb: bigBlindFor(options, 1),
       street: 'preflop',
       currentBet: 0,
-      minRaise: options.blinds,
+      minRaise: bigBlindFor(options, 1),
       aggressor: null,
       step: 0,
       phase: { kind: 'handEnd' },
@@ -633,7 +675,6 @@ export const holdem: GameModule<HoldemState, HoldemAction, HoldemView, HoldemOpt
     const you = viewer !== 'spectator' && playerOf(state, viewer) !== undefined ? viewer : null
     const mine = you === null ? undefined : playerOf(state, you)
     const shown = state.last?.hand === state.hand ? state.last.shown : []
-    const { blindUp } = state.options
     return {
       you,
       options: state.options,
@@ -657,7 +698,8 @@ export const holdem: GameModule<HoldemState, HoldemAction, HoldemView, HoldemOpt
       bbSeat: state.bbSeat,
       sb: state.sb,
       bb: state.bb,
-      nextBlindsUp: blindUp > 0 ? (Math.floor((state.hand - 1) / blindUp) + 1) * blindUp + 1 : null,
+      level: blindLevel(state.options, state.hand) + 1,
+      nextBlinds: nextBlindsAfter(state.options, state.hand),
       street: state.street,
       currentBet: state.currentBet,
       minRaise: state.minRaise,
