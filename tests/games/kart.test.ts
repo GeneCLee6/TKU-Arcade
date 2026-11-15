@@ -47,10 +47,11 @@ describe('the race room in the lobby (e9-t07)', () => {
     expect(track.kind).toBe('select')
     expect(track.choices.map((choice) => choice.value)).toEqual([...RACE_TRACK_IDS])
     for (const id of RACE_TRACK_IDS) {
-      expect(GAME_MESSAGES.en[`games.kart.track.${id}`]).toBeTruthy()
-      expect(GAME_MESSAGES['zh-TW'][`games.kart.track.${id}`]).toBeTruthy()
+      expect(SCREEN_MESSAGES.en[`games.kart.track.${id}`]).toBeTruthy()
+      expect(SCREEN_MESSAGES['zh-TW'][`games.kart.track.${id}`]).toBeTruthy()
     }
     expect(getGame('kart')).toBe(kart)
+    expect(GAME_MESSAGES.en['games.kart.name']).toBe('Kart')
   })
 
   it('has its screen strings in both languages', () => {
@@ -85,7 +86,9 @@ describe('the race (e9-t07, e9-t08)', () => {
     expect(state.phase).toBe('countdown')
     expect(kart.timers?.(state)).toEqual([{ id: 'go', ms: COUNTDOWN_MS, action: { t: 'go' } }])
     // The clock sets GO, once
-    expect(kart.realtime?.clock?.(state, 5000)).toEqual([{ t: 'schedule', goAt: 5000 + COUNTDOWN_MS }])
+    expect(kart.realtime?.clock?.(state, 5000)).toEqual([
+      { t: 'schedule', goAt: 5000 + COUNTDOWN_MS },
+    ])
     state = act(state, { t: 'schedule', goAt: 9000 })
     expect(kart.realtime?.clock?.(state, 5000)).toEqual([])
     expect(refused(state, { t: 'schedule', goAt: 1 })).toBe(true)
@@ -100,7 +103,12 @@ describe('the race (e9-t07, e9-t08)', () => {
 
   it('takes only its own actions from a player', () => {
     const state = start(2)
-    for (const action of [{ t: 'start' }, { t: 'go' }, { t: 'lap', seat: 0, ms: 1 }, { t: 'close' }]) {
+    for (const action of [
+      { t: 'start' },
+      { t: 'go' },
+      { t: 'lap', seat: 0, ms: 1 },
+      { t: 'close' },
+    ]) {
       expect(refused(state, action, 0)).toBe(true)
     }
     expect(refused(state, { t: 'loaded' }, 'system')).toBe(true)
@@ -129,7 +137,10 @@ describe('the race (e9-t07, e9-t08)', () => {
       [1, 2],
       [2, 3],
     ])
-    expect(result.standings[0]!.note).toEqual({ key: 'games.kart.note.time', params: { time: '1:20.000' } })
+    expect(result.standings[0]!.note).toEqual({
+      key: 'games.kart.note.time',
+      params: { time: '1:20.000' },
+    })
     expect(result.standings[2]!.note).toEqual({ key: 'games.kart.note.out', params: { laps: 0 } })
   })
 

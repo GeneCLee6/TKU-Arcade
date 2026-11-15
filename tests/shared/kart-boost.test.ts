@@ -15,13 +15,17 @@ import {
 } from '../../shared/kart/physics.ts'
 
 // e8-t02a: the gauge, boosts and chained boosts (AC-8.3; walls and respawn are e8-t02b). 2026-11-14:
-// a quicker gauge, a longer boost, release boosts and their chains, and the boost slide
+// a quicker gauge, a longer boost, release boosts and their chains, and the boost slide. Then the
+// slide-out and the counter-steer: a release boost needs the slide caught first, and the gauge
+// fills by how deep, how fast and how long the car slides, the slide-out included
 
 const THROTTLE: KartInput = { ...NO_INPUT, throttle: true }
 const DRIFT_RIGHT: KartInput = { ...THROTTLE, steer: 1, drift: true }
 /** Held centred once a drift has begun: neither deep nor shallow */
 const DRIFT_CENTRED: KartInput = { ...THROTTLE, steer: 0, drift: true }
 const BOOST: KartInput = { ...THROTTLE, boost: true }
+/** Off the throttle, steering against a right-hand drift: the counter-steer that catches its slide-out */
+const COUNTER: KartInput = { ...NO_INPUT, steer: -1 }
 
 function run(
   state: KartState,
@@ -55,7 +59,10 @@ describe('the boost gauge', () => {
     const depth = Math.abs(kartSlip(next)) / driftGaugeSlip
     expect(depth).toBeGreaterThan(0.8)
     expect(depth).toBeLessThan(1.5)
-    expect(next.gauge - settled.gauge).toBeCloseTo(gaugeFillRate * depth * STEP_SECONDS, 9)
+    // ... and its speed over the top speed: it is the road covered sideways that counts
+    const pace = kartSpeed(next) / KART_TUNING.topSpeed
+    expect(pace).toBeLessThan(1)
+    expect(next.gauge - settled.gauge).toBeCloseTo(gaugeFillRate * depth * pace * STEP_SECONDS, 9)
   })
 
   it('fills faster steering into the drift and slower steering out of it, up to 1.5 times', () => {
@@ -67,7 +74,17 @@ describe('the boost gauge', () => {
     // However deep, no faster than one and a half times the rate
     const deep = run(entered, DRIFT_RIGHT, 1)
     const deeper = stepKart(deep, DRIFT_RIGHT)
-    expect(deeper.gauge - deep.gauge).toBeCloseTo(KART_TUNING.gaugeFillRate * 1.5 * STEP_SECONDS, 9)
+    const pace = kartSpeed(deeper) / KART_TUNING.topSpeed
+    expect(deeper.gauge - deep.gauge).toBeCloseTo(
+      KART_TUNING.gaugeFillRate * 1.5 * pace * STEP_SECONDS,
+      9,
+    )
+  })
+
+  it('fills the more the longer the drift', () => {
+    const gained = (seconds: number) => run(atSpeed(), DRIFT_RIGHT, seconds).gauge
+    expect(gained(0.6)).toBeGreaterThan(gained(0.3) * 2)
+    expect(gained(0.9)).toBeGreaterThan(gained(0.6) + 15)
   })
 
   it('turns into a stored boost when full, about two seconds into a centred drift, and starts over', () => {
@@ -82,11 +99,17 @@ describe('the boost gauge', () => {
     expect(state.gauge).toBeLessThan(KART_TUNING.gaugeFillRate * 1.5 * STEP_SECONDS)
   })
 
-  it('does not fill outside a drift, and keeps what it has', () => {
+  it('goes on filling through the slide-out, then keeps what it has; never without a slide', () => {
     const part = run(atSpeed(), DRIFT_RIGHT, 0.5)
-    const after = run(part, { ...THROTTLE, steer: 1 }, 3)
-    // Only the bonus for letting go of the drift
-    expect(after.gauge).toBeCloseTo(part.gauge + KART_TUNING.gaugeDriftBonus, 9)
+    const slidOut = run(part, THROTTLE, KART_TUNING.driftRecovery + 0.1)
+    // The bonus for letting go of the drift, and what the slide-out added
+    const added = slidOut.gauge - part.gauge - KART_TUNING.gaugeDriftBonus
+    expect(added).toBeGreaterThan(5)
+    expect(added).toBeLessThan(30)
+    // Caught at once, the slide-out is short and adds less
+    const caught = run(part, { ...THROTTLE, steer: -1 }, KART_TUNING.driftRecovery + 0.1)
+    expect(caught.gauge).toBeLessThan(slidOut.gauge - 3)
+    expect(run(slidOut, { ...THROTTLE, steer: 1 }, 3).gauge).toBe(slidOut.gauge)
     expect(run(INITIAL_KART, { ...THROTTLE, steer: 1 }, 5).gauge).toBe(0)
   })
 
@@ -164,7 +187,7 @@ describe('boosting', () => {
     expect(kartSpeed(boosted)).toBeLessThanOrEqual(BOOSTED_TOP + 1e-9)
   })
 
-  it('lasts 3.25 seconds, and the gauge fills in three or four drifts', () => {
+  it('lasts 3.25 seconds, and the gauge fills in two or three drifts', () => {
     expect(KART_TUNING.boostDuration).toBe(3.25)
     expect(KART_TUNING.topSpeed).toBe(60)
     // Drifts of about two thirds of a second, each let go
@@ -176,17 +199,20 @@ describe('boosting', () => {
       drifts++
     }
     expect(state.storedBoosts).toBe(1)
-    expect(drifts).toBeGreaterThanOrEqual(3)
-    expect(drifts).toBeLessThanOrEqual(4)
+    expect(drifts).toBeGreaterThanOrEqual(2)
+    expect(drifts).toBeLessThanOrEqual(3)
   })
 
   it('adds the drift bonus to the gauge on letting go of a drift, not on a tap', () => {
     const drifting = run(atSpeed(), DRIFT_RIGHT, 0.5)
     const released = stepKart(drifting, THROTTLE)
-    expect(released.gauge - drifting.gauge).toBeCloseTo(KART_TUNING.gaugeDriftBonus, 6)
-    // A tap gets nothing for being let go
+    // The bonus, and one step of the slide-out
+    const gained = released.gauge - drifting.gauge
+    expect(gained).toBeGreaterThan(KART_TUNING.gaugeDriftBonus)
+    expect(gained).toBeLessThan(KART_TUNING.gaugeDriftBonus + 2)
+    // A tap gets no bonus for being let go
     const tap = run(atSpeed(), DRIFT_RIGHT, KART_TUNING.chainMinDrift / 2)
-    expect(stepKart(tap, THROTTLE).gauge).toBe(tap.gauge)
+    expect(stepKart(tap, THROTTLE).gauge - tap.gauge).toBeLessThan(1)
   })
 
   it('fires the moment the gauge fills when the rules say so, and waits otherwise', () => {
@@ -201,11 +227,58 @@ describe('boosting', () => {
 })
 
 describe('release boosts and chains', () => {
-  /** Drifts for `seconds`, then lets go of the drift and the throttle together */
+  /**
+   * Drifts for `seconds`, then lets go of the drift and the throttle together, steering against
+   * the slide: the counter-steer
+   */
   const driftThenLift = (state: KartState, seconds: number) =>
-    stepKart(run(state, DRIFT_RIGHT, seconds), NO_INPUT)
+    stepKart(run(state, DRIFT_RIGHT, seconds), COUNTER)
 
-  it('fires on a fresh press of the throttle inside the window after a drift', () => {
+  it('slides out when the drift is let go, waiting for the counter-steer', () => {
+    const letGo = stepKart(run(atSpeed(), DRIFT_RIGHT, 0.5), NO_INPUT)
+    expect(letGo.drifting).toBe(false)
+    expect(letGo.slideDirection).toBe(1)
+    expect(letGo.burstReady).toBe(true)
+    expect(letGo.releaseWindow).toBe(0)
+    // No counter-steer, no release boost, however the throttle is pressed
+    const pressed = stepKart(letGo, THROTTLE)
+    expect(pressed.miniSeconds).toBe(0)
+    expect(pressed.burstReady).toBe(true)
+    // Steering the drift's way is no counter-steer either
+    expect(stepKart(letGo, { ...NO_INPUT, steer: 1 }).releaseWindow).toBe(0)
+    // Steering against it catches the slide and opens the window
+    const caught = stepKart(letGo, COUNTER)
+    expect(caught.burstReady).toBe(false)
+    expect(caught.catchSeconds).toBeCloseTo(KART_TUNING.catchSeconds, 9)
+    expect(caught.releaseWindow).toBeCloseTo(KART_TUNING.releaseWindow, 9)
+    expect(stepKart(caught, THROTTLE).miniSeconds).toBeGreaterThan(0)
+  })
+
+  it('takes the counter-steer and the press in the same step, but not the press first', () => {
+    const letGo = stepKart(run(atSpeed(), DRIFT_RIGHT, 0.5), NO_INPUT)
+    expect(stepKart(letGo, { ...THROTTLE, steer: -1 }).miniSeconds).toBeGreaterThan(0)
+    // Pressed before the counter-steer and held through it: nothing
+    const early = stepKart(stepKart(letGo, THROTTLE), { ...THROTTLE, steer: -1 })
+    expect(early.releaseWindow).toBeGreaterThan(0)
+    expect(early.miniSeconds).toBe(0)
+    // Let go and pressed again inside the window: the release boost
+    expect(stepKart(stepKart(early, COUNTER), THROTTLE).miniSeconds).toBeGreaterThan(0)
+  })
+
+  it('gives the whole slide-out to counter-steer in, and loses the release boost after it', () => {
+    const letGo = stepKart(run(atSpeed(), DRIFT_RIGHT, 0.5), NO_INPUT)
+    const waited = run(letGo, NO_INPUT, KART_TUNING.driftRecovery * 0.8)
+    expect(waited.burstReady).toBe(true)
+    expect(stepKart(waited, COUNTER).releaseWindow).toBeGreaterThan(0)
+    const gone = run(letGo, NO_INPUT, KART_TUNING.driftRecovery + 0.05)
+    expect(gone.burstReady).toBe(false)
+    expect(gone.slideDirection).toBe(0)
+    expect(stepKart(stepKart(gone, COUNTER), THROTTLE).miniSeconds).toBe(0)
+    // A new drift before the catch gives the old one's release boost up
+    expect(stepKart(letGo, DRIFT_RIGHT).burstReady).toBe(false)
+  })
+
+  it('fires on a fresh press of the throttle inside the window after the counter-steer', () => {
     const lifted = driftThenLift(atSpeed(), 0.5)
     expect(lifted.releaseWindow).toBeGreaterThan(0)
     expect(lifted.miniSeconds).toBe(0)
@@ -291,10 +364,10 @@ describe('release boosts and chains', () => {
 
 describe('the double', () => {
   const TAP: KartInput = { ...THROTTLE, steer: 1, drift: true }
-  /** A drift, let go with the throttle up, then the throttle pressed: a release boost */
-  const released = () => stepKart(stepKart(run(atSpeed(), DRIFT_RIGHT, 0.4), NO_INPUT), THROTTLE)
-  /** A tapped drift of three steps, let go with the throttle up */
-  const tapThenLift = (state: KartState) => stepKart(run(state, TAP, 3 / 60), NO_INPUT)
+  /** A drift, let go counter-steering with the throttle up, then the throttle pressed: a release boost */
+  const released = () => stepKart(stepKart(run(atSpeed(), DRIFT_RIGHT, 0.4), COUNTER), THROTTLE)
+  /** A tapped drift of three steps, let go counter-steering with the throttle up */
+  const tapThenLift = (state: KartState) => stepKart(run(state, TAP, 3 / 60), COUNTER)
 
   it('opens the release window again on a tapped drift just after a release boost', () => {
     const first = released()
@@ -326,7 +399,7 @@ describe('the double', () => {
   })
 
   it('is a plain release boost when the second drift is a long one', () => {
-    const long = stepKart(stepKart(run(released(), TAP, 0.4), NO_INPUT), THROTTLE)
+    const long = stepKart(stepKart(run(released(), TAP, 0.4), COUNTER), THROTTLE)
     expect(long.doubles).toBe(0)
     expect(long.chain).toBe(2)
     expect(long.miniSeconds).toBeCloseTo(KART_TUNING.chainDuration - STEP_SECONDS, 9)
@@ -363,7 +436,7 @@ describe('the boost slide', () => {
   })
 
   it('works from a release boost too, so that chains can slide', () => {
-    const fired = stepKart(stepKart(run(atSpeed(), DRIFT_RIGHT, 0.5), NO_INPUT), THROTTLE)
+    const fired = stepKart(stepKart(run(atSpeed(), DRIFT_RIGHT, 0.5), COUNTER), THROTTLE)
     expect(fired.miniSeconds).toBeGreaterThan(0)
     expect(run(fired, DRIFT_RIGHT, 0.2).sliding).toBe(true)
   })
@@ -376,7 +449,7 @@ describe('tuning', () => {
     for (let step = 0; step < 4 * 60; step++) state = stepKart(state, THROTTLE, faster)
     expect(kartSpeed(state)).toBeCloseTo(40, 6)
 
-    const quickGauge = { ...KART_TUNING, gaugeFillRate: 100 }
+    const quickGauge = { ...KART_TUNING, gaugeFillRate: 120 }
     let drift = atSpeed()
     for (let step = 0; step < 61; step++) drift = stepKart(drift, DRIFT_RIGHT, quickGauge)
     expect(drift.storedBoosts).toBe(1)

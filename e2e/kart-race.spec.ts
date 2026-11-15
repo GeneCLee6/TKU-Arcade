@@ -15,6 +15,7 @@ interface RaceReading {
   received: number
   others: number
   countdown: number | null
+  counted: boolean
   crossings: number
 }
 
@@ -24,9 +25,13 @@ const race = (page: Page): Promise<RaceReading | null> =>
 test('two people race each other in one room, from the countdown to the results', async ({
   browser,
 }) => {
-  const viewport = { width: 640, height: 400 }
+  const viewport = { width: 480, height: 320 }
   const ann = await newPerson(browser, { viewport })
   const bob = await newPerson(browser, { viewport })
+  // The least to draw: two software-rendered races share one machine
+  for (const page of [ann, bob]) {
+    await page.addInitScript(() => localStorage.setItem('tku-arcade.kart.quality', 'low'))
+  }
   const response = await ann.request.post('/api/rooms', {
     data: { gameId: 'kart', options: { track: 'riverside', laps: 1 } },
   })
@@ -37,9 +42,11 @@ test('two people race each other in one room, from the countdown to the results'
 
   for (const page of [ann, bob]) await expect(page.getByTestId('kart-race')).toBeVisible()
   // Both on the grid: the room's clock counts down for both
-  await Promise.all(
-    [ann, bob].map((page) => expect(page.getByTestId('kart-countdown')).toBeVisible({ timeout: 60_000 })),
-  )
+  for (const page of [ann, bob]) {
+    await expect
+      .poll(async () => (await race(page))?.counted ?? false, { timeout: 60_000 })
+      .toBe(true)
+  }
   // Each sees the other's kart, from its frames
   for (const page of [ann, bob]) {
     await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 30_000 }).toBe(1)
@@ -47,7 +54,9 @@ test('two people race each other in one room, from the countdown to the results'
   }
   // Off the line: the first crossing starts lap 1
   for (const page of [ann, bob]) {
-    await expect.poll(async () => (await race(page))?.crossings ?? 0, { timeout: 60_000 }).toBeGreaterThan(0)
+    await expect
+      .poll(async () => (await race(page))?.crossings ?? 0, { timeout: 60_000 })
+      .toBeGreaterThan(0)
   }
   const reading = await race(ann)
   expect(reading?.sent).toBeGreaterThan(20)
@@ -55,9 +64,8 @@ test('two people race each other in one room, from the countdown to the results'
   for (const page of [ann, bob]) await expect(page.getByTestId('kart-lap')).toHaveText('Lap 1/1')
   // One lap, then the room's results with both names and a time
   for (const page of [ann, bob]) {
-    await expect(page.getByTestId('kart-finish').or(page.getByText('Race over'))).toBeVisible({ timeout: 180_000 })
     await expect(page.getByText('Race over')).toBeVisible({ timeout: 180_000 })
   }
   await expect(ann.getByText(/Finished in \d:\d\d\.\d{3}/).first()).toBeVisible()
-  await expect(ann.getByRole('button', { name: /rematch|play again/i })).toBeVisible()
+  await expect(ann.getByRole('button', { name: 'Rematch' })).toBeVisible()
 })

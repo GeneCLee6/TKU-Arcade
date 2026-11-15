@@ -93,6 +93,16 @@ const ART: Record<string, ReactElement> = {
       <path fill="currentColor" d="M18 27v-6l3 2.5 3-4 3 4 3-2.5v6z" />
     </>
   ),
+  // Two cards held up beside a stack of chips: a hand of hold'em
+  holdem: (
+    <>
+      <rect {...stroke} x="3" y="7" width="11" height="16" rx="1.5" transform="rotate(-12 8.5 15)" />
+      <rect {...stroke} x="9" y="5" width="11" height="16" rx="1.5" />
+      <ellipse {...stroke} cx="24" cy="25" rx="5" ry="2" />
+      <path {...stroke} d="M19 25v-3.5M29 25v-3.5" />
+      <ellipse {...stroke} cx="24" cy="21.5" rx="5" ry="2" />
+    </>
+  ),
   // Four word cards, one turned a different way: the odd one out
   'odd-word': (
     <>

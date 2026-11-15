@@ -66,7 +66,8 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
   driftAlign: { group: 'drift', min: 0.5, max: 10, step: 0.1, unit: 'perSecond' },
   driftMaxSlip: { group: 'drift', min: 10, max: 70, step: 1, unit: 'degrees' },
   driftScrub: { group: 'drift', min: 0, max: 120, step: 1, unit: 'metresPerSecondSquared' },
-  driftRecovery: { group: 'drift', min: 0.05, max: 1.5, step: 0.05, unit: 'seconds' },
+  driftRecovery: { group: 'drift', min: 0.05, max: 2, step: 0.05, unit: 'seconds' },
+  slideCarry: { group: 'drift', min: 0, max: 1, step: 0.05, unit: 'share' },
   driftGaugeSlip: { group: 'drift', min: 10, max: 70, step: 1, unit: 'degrees' },
   driftMinSpeed: { group: 'drift', min: 2, max: 20, step: 0.5, unit: 'metresPerSecond' },
   driftExitSpeed: { group: 'drift', min: 1, max: 15, step: 0.5, unit: 'metresPerSecond' },
@@ -104,7 +105,7 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
   chainSpeedStep: { group: 'technique', min: 0, max: 0.1, step: 0.01, unit: 'share' },
   chainSpeedLinks: { group: 'technique', min: 0, max: 10, step: 1, unit: 'count' },
   doubleWindow: { group: 'technique', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
-  catchGrip: { group: 'technique', min: 1, max: 6, step: 0.1, unit: 'factor' },
+  catchGrip: { group: 'technique', min: 1, max: 8, step: 0.1, unit: 'factor' },
   catchSeconds: { group: 'technique', min: 0, max: 1, step: 0.05, unit: 'seconds' },
 
   wallBounce: { group: 'walls', min: 0, max: 1, step: 0.05, unit: 'share' },
@@ -142,10 +143,11 @@ export type PresetId = (typeof PRESET_IDS)[number]
 
 /**
  * Three starting points, all original. `standard` is J2's numbers (plus J3's walls), retuned
- * 2026-11-14 (faster, longer boosts, the techniques, then the drift as a real slide). `planted`
- * keeps more grip in a drift and slides at a narrower angle, scrubbing off less speed, so it is
- * easier. `loose` slides wider and longer and scrubs off more, with a shorter release window, so it
- * is harder. None is a signed-off feel (AC-8.8).
+ * 2026-11-14 (faster, longer boosts, the techniques, then the drift as a real slide, then the
+ * slide-out and the counter-steer). `planted` keeps more grip in a drift and slides at a narrower
+ * angle, scrubbing off less speed, slides out for less long and gives longer to press the throttle,
+ * so it is easier. `loose` slides wider and longer and scrubs off more, with a shorter release
+ * window, so it is harder. None is a signed-off feel (AC-8.8).
  */
 export const PRESETS: { readonly [P in PresetId]: KartTuning } = {
   standard: KART_TUNING,
@@ -158,10 +160,11 @@ export const PRESETS: { readonly [P in PresetId]: KartTuning } = {
     driftAlign: 3.6,
     driftMaxSlip: 42 * DEGREE,
     driftScrub: 30,
-    driftRecovery: 0.25,
+    driftRecovery: 0.6,
+    slideCarry: 0.25,
     gaugeFillRate: 55,
     chainGrace: 0.4,
-    releaseWindow: 0.35,
+    releaseWindow: 0.5,
     wallImpactLoss: 0.4,
   },
   loose: {
@@ -173,11 +176,12 @@ export const PRESETS: { readonly [P in PresetId]: KartTuning } = {
     driftAlign: 1.6,
     driftMaxSlip: 66 * DEGREE,
     driftScrub: 52,
-    driftRecovery: 0.55,
+    driftRecovery: 1.2,
+    slideCarry: 0.6,
     gaugeFillRate: 60,
     boostDuration: 2.8,
     chainGrace: 0.65,
-    releaseWindow: 0.25,
+    releaseWindow: 0.3,
     chainDuration: 0.6,
     wallImpactLoss: 0.6,
   },

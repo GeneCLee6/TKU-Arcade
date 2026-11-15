@@ -39,7 +39,13 @@ describe('kart frames on the wire (e9-t01)', () => {
   })
 
   it('keep every flag and the drift either way', () => {
-    const other = { ...FRAME, reset: true, drifting: false, finished: true, driftDirection: 1 as const }
+    const other = {
+      ...FRAME,
+      reset: true,
+      drifting: false,
+      finished: true,
+      driftDirection: 1 as const,
+    }
     expect(decodeFrame(encodeFrame(other))).toEqual({ ...other, boosting: true, skidding: true })
   })
 

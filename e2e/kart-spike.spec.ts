@@ -25,6 +25,7 @@ interface KartReading {
     chain: number
     miniSeconds: number
     releaseWindow: number
+    slideDirection: number
     throttleHeld: boolean
   }
   input: { throttle: boolean; brake: boolean; steer: number; drift: boolean; boost: boolean }
@@ -44,8 +45,9 @@ const framesOf = (page: Page): Promise<number> =>
   page.evaluate(() => (window as unknown as { __kartSpike?: KartReading }).__kartSpike?.frames ?? 0)
 
 /**
- * Waits, frame by frame, for the window after a drift in which a fresh press of the throttle fires a
- * release boost, with the throttle seen up: a press now lands inside it
+ * Waits, frame by frame, for the window after a drift's slide-out is caught by a counter-steer, in
+ * which a fresh press of the throttle fires a release boost, with the throttle seen up: a press now
+ * lands inside it
  */
 const releaseWindowOpen = (page: Page) =>
   page.waitForFunction(
@@ -364,13 +366,17 @@ test.describe('the boost gauge', () => {
 
     await expect(page.getByTestId('kart-boosting')).toBeVisible()
 
-    // Let go of the drift and the throttle, then press the throttle again in time: a release boost,
-    // the first link of a chain, which a callout says
+    // Let go of the drift and the throttle: the car slides out. Steer the other way to catch it,
+    // then press the throttle again in time: a release boost, the first link of a chain, which a
+    // callout says
     await page.keyboard.up('ArrowUp')
     await page.keyboard.up('z')
     await page.keyboard.up('ArrowRight')
+    await expect.poll(async () => (await reading(page)).state.slideDirection, LONG).toBe(1)
+    await page.keyboard.down('ArrowLeft')
     await releaseWindowOpen(page)
     await page.keyboard.down('ArrowUp')
+    await page.keyboard.up('ArrowLeft')
     await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
     await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'release')
     // Boosting raises the top speed past the plain 60 m/s
@@ -447,9 +453,11 @@ test.describe('a gamepad (simulated: a real pad cannot be tested headless)', () 
     await padPress(page, 2, true) // X
     await expect.poll(async () => (await reading(page)).state.boostSeconds, LONG).toBeGreaterThan(0)
     await padPress(page, 2, false)
-    // Drift and throttle let go, the throttle pressed again in time: a release boost
+    // Drift and throttle let go, the stick the other way to catch the slide-out, the throttle
+    // pressed again in time: a release boost
     await padPress(page, 5, false)
     await padPress(page, 0, false)
+    await padAxis(page, 0, -0.8)
     await releaseWindowOpen(page)
     await padPress(page, 0, true)
     await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)

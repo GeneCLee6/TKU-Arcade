@@ -87,14 +87,31 @@ describe('the wide tracks', () => {
     // At 40 m/s the grip alone turns no tighter than about 30 m: these swing round by more than
     // 75 degrees within 60 m
     for (const json of [RIVERSIDE, HARBOUR, TAMKANG]) {
-      expect(sharpCorners(json.road, 60, 75), json.id).toBeGreaterThanOrEqual(5)
+      expect(sharpCorners(json.road, 60, 75), json.id).toBeGreaterThanOrEqual(7)
+    }
+  })
+
+  it('packs the corners in without a road running into itself (the technical layouts)', () => {
+    for (const json of [RIVERSIDE, HARBOUR, TAMKANG]) {
+      const { road } = load(json)
+      // Corners that turn 60 degrees within 40 m: esses, flicks and hairpins, a dozen or so a lap
+      expect(sharpCorners(road, 40, 60), json.id).toBeGreaterThanOrEqual(9)
+      for (let i = 0; i < road.length; i++) {
+        for (let j = i + 1; j < road.length; j++) {
+          if (alongRoad(road, i, j) < 90) continue
+          const gap = Math.hypot(road[i]!.x - road[j]!.x, road[i]!.z - road[j]!.z)
+          if (gap <= (road[i]!.width + road[j]!.width) / 2 + 4) {
+            throw new Error(`${json.id}: road ${i} and ${j} are ${gap.toFixed(1)} m apart`)
+          }
+        }
+      }
     }
   })
 
   it('keeps the new layouts’ records apart from the old ones', () => {
-    expect(recordKey(load(RIVERSIDE))).toBe('riverside@5')
-    expect(recordKey(load(HARBOUR))).toBe('harbour@5')
-    expect(recordKey(load(TAMKANG))).toBe('tamkang@4')
+    expect(recordKey(load(RIVERSIDE))).toBe('riverside@6')
+    expect(recordKey(load(HARBOUR))).toBe('harbour@6')
+    expect(recordKey(load(TAMKANG))).toBe('tamkang@5')
   })
 })
 

@@ -19,7 +19,8 @@ const en = {
   'games.kart.race.standings': 'Standings',
   'games.kart.race.racing': 'racing',
   'games.kart.race.out': 'out',
-  'games.kart.race.spectating': 'A race is on. Watching it live comes later: the results show here when it ends.',
+  'games.kart.race.spectating':
+    'A race is on. Watching it live comes later: the results show here when it ends.',
   'games.kart.race.noWebgl': 'This browser cannot draw the race (WebGL 2 is needed).',
   'games.kart.race.canvas': 'The race, seen from behind your kart',
   'games.kart.race.you': 'you',

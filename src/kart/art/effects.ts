@@ -46,13 +46,13 @@ const MARK_HEIGHT = 0.085
 const MAX_PIECE = 8
 /** A trail fades out over this many seconds */
 const MARK_FADE = 1.6
-/** Skid mark pieces kept: about 7 s of drifting, both corners; the oldest are laid over again */
-const SKIDS = 840
+/** Skid mark pieces kept: about 20 s of sliding, both corners; the oldest are laid over again */
+const SKIDS = 2400
 const SKID_WIDTH = 0.42
 /** A skid mark fades out over this many seconds */
-const SKID_FADE = 6
+const SKID_FADE = 14
 /** How dark a fresh skid mark is: its opacity */
-const SKID_OPACITY = 0.55
+const SKID_OPACITY = 0.7
 /** The skid marks lie a hair under the trails, so that the glow draws over them */
 const SKID_HEIGHT = MARK_HEIGHT - 0.004
 

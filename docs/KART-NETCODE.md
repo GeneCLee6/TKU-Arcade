@@ -1,6 +1,6 @@
 # KART-NETCODE — 卡丁車多人同步（初版，2026-11-14）
 
-L1–L3（`e2-t11` `e9-t01` `e9-t02` `e9-t03` `e9-t04` `e9-t07` `e9-t08` `e9-t09`）。架構在 [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.13；這份寫線上的格式、數字與實測。道具、觀戰、重播（L4、L5）還沒做。
+L1–L3（`e2-t11` `e9-t01` `e9-t02` `e9-t03` `e9-t04` `e9-t07` `e9-t08` `e9-t09`）。架構在 [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.14；這份寫線上的格式、數字與實測。道具、觀戰、重播（L4、L5）還沒做。
 
 ## 1. 模型一句話
 
@@ -12,10 +12,10 @@ L1–L3（`e2-t11` `e9-t01` `e9-t02` `e9-t03` `e9-t04` `e9-t07` `e9-t08` `e9-t09
 | --- | --- | --- |
 | 瀏覽器 → 房間 | 二進位 32 bytes（`shared/kart/net.ts`） | kind、旗標（重置、甩尾、噴射、側滑、自己算完賽、甩尾方向）、車身、方向盤、**賽道 tick**（GO 起算的 1/60 秒步數，GO 前是負的）、x、z、朝向、vx、vz、穿過起終點線次數、下一個 gate、序號 |
 | 房間 → 其他人 | 二進位 33 bytes | 前面加一個 byte 的座位，後面原封不動 |
-| 瀏覽器 ↔ 房間 | JSON `{t:'clock', c}` → `{t:'clock', c, s}` | 對時：`c` 是瀏覽器的 `performance.now()`，`s` 是伺服器的 `Date.now()` |
+| 瀏覽器 ↔ 房間 | 二進位 9 bytes → 17 bytes（`CLOCK_FRAME` 255 開頭，`shared/protocol.ts`） | 對時：float64 的瀏覽器 `performance.now()`，回來時後面多一個 float64 的伺服器 `Date.now()`。用二進位是因為 JSON 的解析程式會進每個人的首屏 |
 | 其他（裝好了、倒數、每一圈、完賽、退賽、結果） | 照舊的 JSON patch | `kart` 這款 GameModule 的 state，存在 DO，走 `reduce`，可以重播 |
 
-二進位 frame 不進 storage、不改 `rev`、不走 `change()`：每秒 20 次 × 8 人寫 storage 太貴。協定版本不變（新增的訊息舊頁面不會送）。
+二進位 frame 不進 storage、不改 `rev`、不走 `change()`：每秒 20 次 × 8 人寫 storage 太貴。協定版本不變（回合制的房間收到二進位照舊關閉連線；對時的 frame 任何房間都回）。
 
 ## 3. 時間
 

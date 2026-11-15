@@ -12,6 +12,9 @@ import type {
 } from '../shared/games/types.ts'
 import { diff, type JsonValue } from '../shared/patch.ts'
 import {
+  CLOCK_ANSWER_BYTES,
+  CLOCK_FRAME,
+  CLOCK_PING_BYTES,
   CloseCode,
   JOIN_TIMEOUT_MS,
   KICK_BAN_MS,
@@ -382,9 +385,6 @@ export class RoomHost {
       return
     }
     switch (message.t) {
-      case 'clock':
-        this.deps.sockets.send(conn, { t: 'clock', c: message.c, s: this.deps.now() })
-        return
       case 'resync':
         // It also clears a countdown whose ending was the message that went missing
         this.deps.sockets.send(conn, { t: 'timer', timers: this.timers() })
@@ -452,6 +452,16 @@ export class RoomHost {
     const connection = this.conns.get(conn)
     const room = this.room
     if (!connection || !room) return
+    // A clock ping, from anyone who has joined: answered with the server's time
+    const bytes = new Uint8Array(data)
+    if (bytes.byteLength === CLOCK_PING_BYTES && bytes[0] === CLOCK_FRAME) {
+      if (connection.member === null || !this.deps.sockets.sendBinary) return
+      const answer = new Uint8Array(CLOCK_ANSWER_BYTES)
+      answer.set(bytes)
+      new DataView(answer.buffer).setFloat64(CLOCK_PING_BYTES, this.deps.now(), true)
+      this.deps.sockets.sendBinary(conn, answer)
+      return
+    }
     const game = this.game
     const module = game ? this.deps.games(game.gameId) : null
     if (!game || !module?.realtime) return this.badFrame(conn)
@@ -468,7 +478,7 @@ export class RoomHost {
         game.match.state,
         this.memoryFor(game),
         seat,
-        new Uint8Array(data),
+        bytes,
         now,
       )
     } catch (error) {

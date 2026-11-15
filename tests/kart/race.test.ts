@@ -97,8 +97,8 @@ describe('how far round', () => {
 
 describe('judging frames on the server (e9-t02)', () => {
   it('counts laps from the gates passed in order', () => {
-    // A lap is about 2.1 km; at 50 m/s three laps and the run-up fit in 3 000 frames
-    const { tracked, laps } = drive(3000)
+    // A lap is about 2.5 km; at 50 m/s three laps and the run-up fit in 4 000 frames
+    const { tracked, laps } = drive(4000)
     expect(laps.length).toBeGreaterThanOrEqual(3)
     expect(lapsDone(tracked.crossings)).toBe(laps.length)
     for (let i = 1; i < laps.length; i++) expect(laps[i]).toBeGreaterThan(laps[i - 1]!)
@@ -107,13 +107,21 @@ describe('judging frames on the server (e9-t02)', () => {
 
   it('refuses a kart faster than any boost', () => {
     const frame = driveFrames(track, 0).next().value as KartFrame
-    const verdict = judgeFrame(startTracking(track, 0), { ...frame, vx: SPEED_CAP + 1, vz: 0 }, context())
+    const verdict = judgeFrame(
+      startTracking(track, 0),
+      { ...frame, vx: SPEED_CAP + 1, vz: 0 },
+      context(),
+    )
     expect(verdict).toMatchObject({ kind: 'refused', why: 'speed' })
   })
 
   it('refuses a tick ahead of the clock', () => {
     const frame = driveFrames(track, 0).next().value as KartFrame
-    const ahead = judgeFrame(startTracking(track, 0), { ...frame, tick: 600 }, context(0, GO + 1000))
+    const ahead = judgeFrame(
+      startTracking(track, 0),
+      { ...frame, tick: 600 },
+      context(0, GO + 1000),
+    )
     expect(ahead).toMatchObject({ kind: 'refused', why: 'tick' })
     // Before GO is set, nothing past zero
     const early = judgeFrame(
@@ -129,9 +137,15 @@ describe('judging frames on the server (e9-t02)', () => {
     const last = tracked.last!
     const now = GO + ((last.tick + 3) / 60) * 1000
     const jump = { ...last, tick: last.tick + 3, x: last.x + 500 }
-    expect(judgeFrame(tracked, jump, context(0, now))).toMatchObject({ kind: 'refused', why: 'jump' })
+    expect(judgeFrame(tracked, jump, context(0, now))).toMatchObject({
+      kind: 'refused',
+      why: 'jump',
+    })
     const nowhere = { ...jump, reset: true }
-    expect(judgeFrame(tracked, nowhere, context(0, now))).toMatchObject({ kind: 'refused', why: 'reset' })
+    expect(judgeFrame(tracked, nowhere, context(0, now))).toMatchObject({
+      kind: 'refused',
+      why: 'reset',
+    })
     const respawn = track.respawns[1]!
     const reset = { ...jump, reset: true, x: respawn.x, z: respawn.z }
     expect(judgeFrame(tracked, reset, context(0, now)).kind).toBe('taken')
@@ -163,7 +177,12 @@ describe('judging frames on the server (e9-t02)', () => {
     const at = middle(track.gates[next]!)
     const here = { ...tracked.last!, x: at.x, z: at.z }
     const missed: Tracked = { ...tracked, last: here }
-    const claim = { ...here, tick: here.tick + 3, crossings: tracked.crossings, nextGate: (next + 1) % count }
+    const claim = {
+      ...here,
+      tick: here.tick + 3,
+      crossings: tracked.crossings,
+      nextGate: (next + 1) % count,
+    }
     expect(judgeFrame(missed, claim, context()).tracked.nextGate).toBe((next + 1) % count)
     const twoAhead = { ...claim, nextGate: (next + 2) % count }
     expect(judgeFrame(missed, twoAhead, context()).tracked.nextGate).toBe(next)

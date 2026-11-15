@@ -4,6 +4,7 @@
 import { bluffScreenMessages } from './bluff/i18n.screen.ts'
 import { lanternScreenMessages } from './lantern/i18n.screen.ts'
 import { clueClashScreenMessages } from './clue-clash/i18n.screen.ts'
+import { kartOptionMessages } from './kart/i18n.options.ts'
 import { kartScreenMessages } from './kart/i18n.screen.ts'
 import { kiteScreenMessages } from './kite/i18n.screen.ts'
 import { miseryScreenMessages } from './misery/i18n.screen.ts'
@@ -11,6 +12,7 @@ import { oddWordScreenMessages } from './odd-word/i18n.screen.ts'
 import { secretScrollScreenMessages } from './secret-scroll/i18n.screen.ts'
 import { wasabiScreenMessages } from './wasabi/i18n.screen.ts'
 import { palaceScreenMessages } from './palace/i18n.screen.ts'
+import { holdemScreenMessages } from './holdem/i18n.screen.ts'
 import { roomExtraMessages } from './roomExtras.ts'
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
 import { promotionFullMessages } from './promotion/i18n.full.ts'
@@ -18,7 +20,6 @@ import { promotionSheetMessages } from './promotion/i18n.sheets.ts'
 import { promotionRouteMessages } from './promotion/i18n.routes.ts'
 import { promotionScreenMessages } from './promotion/i18n.screen.ts'
 import { silentTableScreenMessages } from './silent-table/i18n.screen.ts'
-import { soonMessages } from './soon.ts'
 import { spectrumScreenMessages } from './spectrum/i18n.screen.ts'
 import { tilesScreenMessages } from './tiles/i18n.screen.ts'
 import { tradersScreenMessages } from './traders/i18n.screen.ts'
@@ -45,9 +46,10 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...secretScrollScreenMessages.en,
     ...wasabiScreenMessages.en,
     ...palaceScreenMessages.en,
+    ...holdemScreenMessages.en,
     ...miseryScreenMessages.en,
     ...kartScreenMessages.en,
-    ...soonMessages.en,
+    ...kartOptionMessages.en,
     ...roomExtraMessages.en,
   },
   'zh-TW': {
@@ -69,9 +71,10 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...secretScrollScreenMessages['zh-TW'],
     ...wasabiScreenMessages['zh-TW'],
     ...palaceScreenMessages['zh-TW'],
+    ...holdemScreenMessages['zh-TW'],
     ...miseryScreenMessages['zh-TW'],
     ...kartScreenMessages['zh-TW'],
-    ...soonMessages['zh-TW'],
+    ...kartOptionMessages['zh-TW'],
     ...roomExtraMessages['zh-TW'],
   },
 }

@@ -317,7 +317,7 @@ export interface GameModule<
 }
 
 /**
- * The real-time half of a game (e2-t11, docs/ARCHITECTURE.md §4.13). Each browser simulates its own
+ * The real-time half of a game (e2-t11, docs/ARCHITECTURE.md §4.14). Each browser simulates its own
  * kart and sends its state many times a second as a small binary frame. Those frames never go
  * through `reduce`: storing and diffing twenty a second per player would cost far too much. The room
  * passes each one on to everyone else at once, and hands it here first, so that the module can judge

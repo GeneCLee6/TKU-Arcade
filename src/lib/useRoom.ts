@@ -8,7 +8,6 @@ import { useToast } from '../components/useToast.ts'
 import { en } from '../i18n/en.ts'
 import { t, type TextKey } from '../i18n/t.ts'
 import { ChatSends, mergeChat, type ChatSendResult } from './chatState.ts'
-import type { ClockSample } from '../../shared/kart/net.ts'
 import { connectRoom, type RoomConnection, type RoomEnd, type RoomTimer } from './roomConnection.ts'
 
 export type RoomSession =
@@ -50,20 +49,15 @@ export type RoomHandle = {
   realtime: RoomRealtime
 }
 
-/** What listens to a real-time game's channel: the kart's race loop */
-export type RealtimeListener = {
-  /** A relayed frame: the sender's seat in the first byte, then its frame */
-  frame?(data: Uint8Array): void
-  clock?(sample: ClockSample): void
-}
-
+/**
+ * A real-time game's channel (e2-t11): binary frames both ways, the race loop's own, outside React.
+ * What comes in is a relayed frame (the sender's seat first) or a clock answer (CLOCK_FRAME first)
+ */
 export type RoomRealtime = {
   /** False when it could not go out (reconnecting) */
-  send(frame: Uint8Array): boolean
-  /** Asks the server's time; the answer goes to every listener's `clock` */
-  pingClock(): boolean
+  send(data: Uint8Array): boolean
   /** Returns the way to stop listening */
-  listen(listener: RealtimeListener): () => void
+  listen(listener: (data: Uint8Array) => void): () => void
 }
 
 /** More than this many on screen and the oldest go first */
@@ -89,11 +83,9 @@ export function useRoom(roomId: string, name: string): RoomHandle {
   const chatSends = useRef(new ChatSends())
   const you = useRef<string | null>(null)
   // One channel for the life of the page: the race loop holds on to it across reconnects
-  const listeners = useRef(new Set<RealtimeListener>())
+  const listeners = useRef(new Set<(data: Uint8Array) => void>())
   const [realtime] = useState<RoomRealtime>(() => ({
-    send: (frame) => connection.current?.sendQuiet(frame) ?? false,
-    pingClock: () =>
-      connection.current?.sendQuiet({ t: 'clock', c: performance.now() }) ?? false,
+    send: (data) => connection.current?.sendQuiet(data) ?? false,
     listen: (listener) => {
       listeners.current.add(listener)
       return () => listeners.current.delete(listener)
@@ -135,10 +127,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
       },
       onTimers: setTimers,
       onBinary: (data) => {
-        for (const listener of listeners.current) listener.frame?.(data)
-      },
-      onClock: (sample) => {
-        for (const listener of listeners.current) listener.clock?.(sample)
+        for (const listener of listeners.current) listener(data)
       },
       onReaction: (member, reaction) => {
         const id = ++reactionId.current

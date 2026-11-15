@@ -16,7 +16,6 @@ import {
   type RoomView,
 } from '../../shared/protocol.ts'
 import { applyPatch, type JsonValue, type PatchOp } from '../../shared/patch.ts'
-import type { ClockSample } from '../../shared/kart/net.ts'
 import { readStored, writeStored } from './storage.ts'
 
 export type RoomEnd =
@@ -54,10 +53,8 @@ export type RoomHandlers = {
   onChat: (messages: ChatMessage[], reset: boolean) => void
   /** Someone's reaction (e7-t11), to float up and be gone */
   onReaction?: (member: string, reaction: number) => void
-  /** A real-time game's binary frame (e2-t11): the sender's seat, then the game's own bytes */
+  /** A binary frame (e2-t11): a real-time game's, or the answer to a clock ping */
   onBinary?: (data: Uint8Array) => void
-  /** The answer to a clock ping (e9-t01), with this browser's `performance.now()` when it came */
-  onClock?: (sample: ClockSample) => void
   onEnd: (end: RoomEnd) => void
 }
 
@@ -68,7 +65,7 @@ export type RoomConnection = {
    * Out without waiting for an answer, as a real-time game's frames and clock pings go: twenty a
    * second must not each count as a tap the socket owes a reply to. False when it could not go out
    */
-  sendQuiet: (message: ClientMessage | Uint8Array) => boolean
+  sendQuiet: (data: Uint8Array) => boolean
   /** After it, nothing from this socket counts any more */
   leave: () => void
 }
@@ -304,11 +301,6 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
       case 'reaction':
         if (joined) handlers.onReaction?.(message.member, message.reaction)
         return
-      case 'clock':
-        if (joined) {
-          handlers.onClock?.({ sent: message.c, received: performance.now(), server: message.s })
-        }
-        return
     }
   }
 
@@ -340,10 +332,10 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
       }
       return true
     },
-    sendQuiet: (message) => {
+    sendQuiet: (data) => {
       if (!current || !joined || socket.readyState !== WebSocket.OPEN) return false
       try {
-        socket.send(message instanceof Uint8Array ? (message as Uint8Array<ArrayBuffer>) : JSON.stringify(message))
+        socket.send(data as Uint8Array<ArrayBuffer>)
       } catch {
         return false
       }
@@ -462,7 +454,7 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
 
   return {
     send: (message) => socket?.send(message) ?? false,
-    sendQuiet: (message) => socket?.sendQuiet(message) ?? false,
+    sendQuiet: (data) => socket?.sendQuiet(data) ?? false,
     leave: () => {
       stopReconnecting()
       unwatch()

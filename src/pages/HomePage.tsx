@@ -22,7 +22,6 @@ import { color, font, fontSize, space } from '../styles/tokens.ts'
 
 // The games that are not open yet (E3): their own chunk, strings included, so they cost the first load
 // only this line
-const ComingSoon = lazy(() => import('../components/ComingSoon.tsx'))
 
 // The public rooms come from the network anyway: their code arrives with them, after the first paint,
 // which keeps it out of every game's first screen too (2026-11-14, with e16)
@@ -135,9 +134,6 @@ export function HomePage() {
                 />
               </li>
             ))}
-            <Suspense>
-              <ComingSoon />
-            </Suspense>
           </Grid>
         </section>
         <Suspense>

@@ -1,7 +1,7 @@
 // Scripted drivers for the track tests (2026-11-14): a careful novice who never drifts, an average
 // driver who drifts through the corners and fires charges, and an expert who also takes the start
-// boost, a release boost after every drift, the double after that, and chains tapped drifts and
-// release boosts down the straights. Not a racing AI: a fixed recipe on the middle of the road,
+// boost, a counter-steer and a release boost after every drift, the double after that, and chains
+// tapped drifts and release boosts down the straights. Not a racing AI: a fixed recipe on the middle of the road,
 // enough to show what the techniques are worth on a lap.
 import { KART_TUNING, NO_INPUT, type KartInput, type KartState } from '../../shared/kart/physics.ts'
 import type { Trial } from '../../shared/kart/timeTrial.ts'
@@ -102,6 +102,8 @@ const BRAKE_AT = 0.8
 const TAP_STEPS = Math.ceil(KART_TUNING.chainMinDrift * 60) + 2
 /** How many steps the double's tap is held */
 const DOUBLE_STEPS = 3
+/** How many steps the expert counter-steers, off the throttle, before pressing it for the boost */
+const LIFT_STEPS = 2
 /** A tap begins when the release boost before it has this long left, so that the chain never gaps */
 const TAP_BEFORE_END = 0.1
 
@@ -137,10 +139,11 @@ export function createExpert(techniques = true): (trial: Trial, road: Road) => K
     const gripTurn = t.turnRate * (1 - t.turnLossAtTopSpeed * Math.min(1, speed / t.topSpeed))
     const slip = Math.abs(wrap(kart.heading - travel))
 
-    // A drift just let go: the expert lifts off the throttle for a step, then presses for the boost
-    const letGo = wasDrifting && !kart.drifting && kart.releaseWindow > 0
+    // A drift just let go, the car sliding out: the expert counter-steers and lifts off the
+    // throttle for a moment, then presses it again for the boost
+    const letGo = wasDrifting && !kart.drifting && (kart.burstReady || kart.releaseWindow > 0)
     if (techniques && letGo && move.kind === 'none') {
-      move = { kind: 'lift', steps: 1, double: !kart.doubleArmed }
+      move = { kind: 'lift', steps: LIFT_STEPS, double: !kart.doubleArmed }
     }
     wasDrifting = kart.drifting
 
@@ -159,9 +162,11 @@ export function createExpert(techniques = true): (trial: Trial, road: Road) => K
 
     if (move.kind === 'lift') {
       const { steps, double } = move
+      // Against the slide: the counter-steer that catches it and opens the release window
+      const counter = kart.slideDirection !== 0 ? -kart.slideDirection : gripSteer
       if (steps > 0) {
         move = { kind: 'lift', steps: steps - 1, double }
-        return { ...base, throttle: false, steer: gripSteer }
+        return { ...base, throttle: false, steer: counter }
       }
       // Pressed again: the release boost. Then, the double: a tap of drift the way the road goes
       const direction: -1 | 1 = Math.abs(noseWant) > 0.05 ? (noseWant > 0 ? 1 : -1) : lastTap

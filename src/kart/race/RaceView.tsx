@@ -67,7 +67,10 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
   const raceNet = useRef<RaceNet | null>(null)
   const track = useMemo(() => raceTrack(view.track), [view.track])
   const seat = view.you as number
-  const slot = Math.max(0, view.racers.findIndex((racer) => racer.seat === seat))
+  const slot = Math.max(
+    0,
+    view.racers.findIndex((racer) => racer.seat === seat),
+  )
   // Read by the loop, every step
   const latest = useRef(view)
   const actRef = useRef(act)
@@ -203,9 +206,7 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
       )}
       {finished && (
         <Finish role="status" data-testid="kart-finish">
-          <FinishTitle>
-            {t('games.kart.race.finishedPlace', { place: place || 1 })}
-          </FinishTitle>
+          <FinishTitle>{t('games.kart.race.finishedPlace', { place: place || 1 })}</FinishTitle>
           <Standings view={view} order={order} nameOf={nameOf} />
           <Muted>{t('games.kart.race.waitingOthers')}</Muted>
         </Finish>

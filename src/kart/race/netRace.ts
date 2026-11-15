@@ -10,11 +10,17 @@ import {
   type ClockSample,
   type KartFrame,
 } from '../../../shared/kart/net.ts'
-import { kartBoosting, kartSkidding, kartSlip, type KartInput } from '../../../shared/kart/physics.ts'
+import {
+  kartBoosting,
+  kartSkidding,
+  kartSlip,
+  type KartInput,
+} from '../../../shared/kart/physics.ts'
 import { gridSpot, raceProgress } from '../../../shared/kart/race.ts'
 import type { Trial } from '../../../shared/kart/timeTrial.ts'
 import type { Track } from '../../../shared/kart/track.ts'
 import type { KartRacer } from '../../../shared/games/kart/types.ts'
+import { CLOCK_ANSWER_BYTES, CLOCK_FRAME, CLOCK_PING_BYTES } from '../../../shared/protocol.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
 import { KART_BODIES, type KartBody } from '../bodies.ts'
 import type { OtherKart, ScreenPoint } from '../Scene.ts'
@@ -83,6 +89,8 @@ export interface RaceDebug {
   /** Other karts with a recent frame */
   others: number
   countdown: number | null
+  /** Whether this browser has counted down to the room's GO (a countdown was seen above zero) */
+  counted: boolean
   /** This kart's own count: finish line crossings and the next gate */
   crossings: number
   nextGate: number
@@ -116,19 +124,26 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     received: 0,
     others: 0,
     countdown: null,
+    counted: false,
     crossings: 0,
     nextGate: 0,
   }
   window.__kartRace = debug
 
-  const stopListening = realtime.listen({
-    frame(data) {
-      const relayed = readRelayed(data)
-      if (!relayed || relayed.seat === seat) return
-      debug.received++
-      remotes.add(relayed.seat, relayed.frame, performance.now() / 1000)
-    },
-    clock(sample) {
+  const pingClock = () => {
+    const ping = new Uint8Array(CLOCK_PING_BYTES)
+    ping[0] = CLOCK_FRAME
+    new DataView(ping.buffer).setFloat64(1, performance.now(), true)
+    realtime.send(ping)
+  }
+  const stopListening = realtime.listen((data) => {
+    if (data.byteLength === CLOCK_ANSWER_BYTES && data[0] === CLOCK_FRAME) {
+      const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
+      const sample: ClockSample = {
+        sent: view.getFloat64(1, true),
+        received: performance.now(),
+        server: view.getFloat64(CLOCK_PING_BYTES, true),
+      }
       lastAnswerAt = sample.received
       lastRtt = sample.received - sample.sent
       debug.rtt = lastRtt
@@ -136,13 +151,18 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       if (samples.length > KEEP_SAMPLES) samples.shift()
       offset = clockOffset(samples)
       debug.offset = offset
-    },
+      return
+    }
+    const relayed = readRelayed(data)
+    if (!relayed || relayed.seat === seat) return
+    debug.received++
+    remotes.add(relayed.seat, relayed.frame, performance.now() / 1000)
   })
   const timers: ReturnType<typeof setTimeout>[] = []
   for (let i = 0; i < FIRST_PINGS; i++) {
-    timers.push(setTimeout(() => realtime.pingClock(), i * FIRST_PING_GAP_MS))
+    timers.push(setTimeout(() => pingClock(), i * FIRST_PING_GAP_MS))
   }
-  const pinger = setInterval(() => realtime.pingClock(), PING_EVERY_MS)
+  const pinger = setInterval(() => pingClock(), PING_EVERY_MS)
 
   const serverNow = () => (offset === null ? null : performance.now() + offset)
 
@@ -161,7 +181,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       skidding: kartSkidding(kart),
       finished: trial.phase === 'finished',
       driftDirection:
-        kart.driftDirection || (kartSkidding(kart) ? (-Math.sign(kartSlip(kart)) as -1 | 0 | 1) : 0),
+        kart.driftDirection ||
+        (kartSkidding(kart) ? (-Math.sign(kartSlip(kart)) as -1 | 0 | 1) : 0),
       steer: input.steer,
       body,
       crossings: trial.run.crossings,
@@ -179,6 +200,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       const now = serverNow()
       const left = goAt === null || now === null ? null : (goAt - now) / 1000
       debug.countdown = left
+      if (left !== null && left > 0) debug.counted = true
       return left
     },
     afterStep(trial, input, reset) {
@@ -197,21 +219,19 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     others() {
       poses = remotes.poses(performance.now() / 1000)
       debug.others = poses.filter((pose) => !pose.stale).length
-      return poses.map(
-        (pose): OtherKart => ({
-          id: pose.seat,
-          x: pose.x,
-          z: pose.z,
-          heading: pose.heading,
-          body: KART_BODIES[pose.frame.body] ?? 'tide',
-          look: {
-            speed: pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading),
-            steer: pose.frame.steer,
-            drift: pose.frame.driftDirection,
-            boosting: pose.frame.boosting,
-          },
-        }),
-      )
+      return poses.map((pose): OtherKart => ({
+        id: pose.seat,
+        x: pose.x,
+        z: pose.z,
+        heading: pose.heading,
+        body: KART_BODIES[pose.frame.body] ?? 'tide',
+        look: {
+          speed: pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading),
+          steer: pose.frame.steer,
+          drift: pose.frame.driftDirection,
+          boosting: pose.frame.boosting,
+        },
+      }))
     },
     drawn(scene) {
       if (!tagListener) return
@@ -239,7 +259,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       const count = track.gates.length
       const latest = remotes.latest()
       const progress = (racer: KartRacer): number => {
-        if (racer.seat === seat) return raceProgress(track, own.crossings, own.nextGate, own.x, own.z)
+        if (racer.seat === seat)
+          return raceProgress(track, own.crossings, own.nextGate, own.x, own.z)
         const frame = latest.get(racer.seat)
         if (!frame || frame.nextGate >= count) return racer.lapMs.length * count
         return raceProgress(track, frame.crossings, frame.nextGate, frame.x, frame.z)

@@ -262,7 +262,12 @@ export const BUMP_MIN_PUSH = 2
  */
 export function bumpKart(
   kart: KartState,
-  others: readonly { readonly x: number; readonly z: number; readonly vx: number; readonly vz: number }[],
+  others: readonly {
+    readonly x: number
+    readonly z: number
+    readonly vx: number
+    readonly vz: number
+  }[],
 ): { kart: KartState; hit: number } {
   let { x, z, vx, vz } = kart
   let hit = 0

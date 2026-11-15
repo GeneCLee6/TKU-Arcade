@@ -27,6 +27,7 @@ const SCREENS: Partial<Record<string, GameScreen>> = {
   'secret-scroll': lazy(() => import('./secret-scroll/SecretScrollScreen.tsx')),
   wasabi: lazy(() => import('./wasabi/WasabiScreen.tsx')),
   palace: lazy(() => import('./palace/PalaceScreen.tsx')),
+  holdem: lazy(() => import('./holdem/HoldemScreen.tsx')),
   misery: lazy(() => import('./misery/MiseryScreen.tsx')),
   kart: lazy(() => import('./kart/KartScreen.tsx')),
 }

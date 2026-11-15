@@ -1,4 +1,4 @@
-// The kart race room (e9-t02, e9-t07, e9-t08; docs/ARCHITECTURE.md §4.13, docs/KART-NETCODE.md).
+// The kart race room (e9-t02, e9-t07, e9-t08; docs/ARCHITECTURE.md §4.14, docs/KART-NETCODE.md).
 // Worker only: it judges laps on the tracks themselves.
 //
 // loading → countdown → racing → finished. Everyone's browser loads the track and says so; when all
@@ -71,7 +71,10 @@ function standings(state: KartState): Standing[] {
         ? finished.findIndex((other) => other.finishMs === racer.finishMs) + 1
         : index + 1,
     score: null,
-    note: { key: 'games.kart.note.time', params: { time: formatTime((racer.finishMs as number) / 1000) } },
+    note: {
+      key: 'games.kart.note.time',
+      params: { time: formatTime((racer.finishMs as number) / 1000) },
+    },
   }))
   // Those who did not finish share a place by laps done
   rest.forEach((racer, index) => {
@@ -141,7 +144,9 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         if (ms < sofar) return gameError(BAD)
         const lapMs = [...racer.lapMs, Math.round(ms - sofar)]
         const finishMs = lapMs.length >= state.laps ? Math.round(ms) : null
-        const racers = state.racers.map((one) => (one === racer ? { ...one, lapMs, finishMs } : one))
+        const racers = state.racers.map((one) =>
+          one === racer ? { ...one, lapMs, finishMs } : one,
+        )
         return settle({ ...state, racers })
       }
       case 'retire': {

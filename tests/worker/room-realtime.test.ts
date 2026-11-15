@@ -9,7 +9,15 @@ import { readRelayed, type KartFrame } from '../../shared/kart/net.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { applyPatch, type JsonValue } from '../../shared/patch.ts'
 import { ticTacToe } from '../../shared/games/tictactoe/rules.ts'
-import { CloseCode, PROTOCOL_VERSION, type RoomView, type ServerMessage } from '../../shared/protocol.ts'
+import {
+  CLOCK_ANSWER_BYTES,
+  CLOCK_FRAME,
+  CLOCK_PING_BYTES,
+  CloseCode,
+  PROTOCOL_VERSION,
+  type RoomView,
+  type ServerMessage,
+} from '../../shared/protocol.ts'
 import { RoomHost } from '../../worker/room-host.ts'
 import { bytes, driveFrames } from '../kart/raceDriver.ts'
 
@@ -27,14 +35,18 @@ class Client {
   receive(message: ServerMessage) {
     this.received.push(message)
     if (message.t === 'welcome' || message.t === 'snapshot') this.view = message.state
-    else if (message.t === 'patch') this.view = applyPatch(this.view as JsonValue, message.ops) as RoomView
+    else if (message.t === 'patch')
+      this.view = applyPatch(this.view as JsonValue, message.ops) as RoomView
   }
   send(message: unknown) {
     this.world.host.message(this.conn, JSON.stringify(message))
   }
   frame(frame: KartFrame) {
     const data = bytes(frame)
-    this.world.host.binary(this.conn, data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)
+    this.world.host.binary(
+      this.conn,
+      data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
+    )
   }
   get race(): KartView {
     return (this.view!.game as GameProjection).view as unknown as KartView
@@ -49,7 +61,8 @@ class World {
   constructor(modules: Record<string, AnyGameModule>) {
     this.host = new RoomHost({
       sockets: {
-        send: (conn, message) => this.clients.get(conn)?.receive(JSON.parse(JSON.stringify(message))),
+        send: (conn, message) =>
+          this.clients.get(conn)?.receive(JSON.parse(JSON.stringify(message))),
         sendBinary: (conn, data) => this.clients.get(conn)?.frames.push(data),
         close: (conn, code) => {
           const client = this.clients.get(conn)
@@ -111,8 +124,18 @@ describe('a real-time game in a room (e2-t11)', () => {
 
   it('answers a clock ping with the server time', () => {
     const { world, ann } = kartRoom()
-    ann.send({ t: 'clock', c: 123.5 })
-    expect(ann.received.at(-1)).toEqual({ t: 'clock', c: 123.5, s: world.clock })
+    const ping = new Uint8Array(CLOCK_PING_BYTES)
+    ping[0] = CLOCK_FRAME
+    new DataView(ping.buffer).setFloat64(1, 123.5, true)
+    world.host.binary(ann.conn, ping.buffer)
+    const answer = ann.frames.at(-1)!
+    expect(answer.byteLength).toBe(CLOCK_ANSWER_BYTES)
+    const view = new DataView(answer.buffer)
+    expect([answer[0], view.getFloat64(1, true), view.getFloat64(9, true)]).toEqual([
+      CLOCK_FRAME,
+      123.5,
+      world.clock,
+    ])
   })
 
   it('passes each frame on to everyone else with the seat in front, and judges laps', () => {
