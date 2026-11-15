@@ -135,7 +135,11 @@ function YourHand({
         </Controls>
       )}
       {votes > 0 && !over && <Muted>{t('games.holdem.ui.stopVotes', { votes, players: live.length })}</Muted>}
-      {view.nextBlindsUp !== null && !over && <Muted>{t('games.holdem.ui.blindsUp', { hand: view.nextBlindsUp })}</Muted>}
+      {view.nextBlinds !== null && !over && (
+        <Muted data-testid="blinds-up">
+          {t('games.holdem.ui.blindsUp', { level: view.level, hand: view.nextBlinds.hand, sb: view.nextBlinds.sb, bb: view.nextBlinds.bb })}
+        </Muted>
+      )}
     </Panel>
   )
 }

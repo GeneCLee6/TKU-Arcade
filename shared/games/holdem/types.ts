@@ -5,18 +5,15 @@ import type { SeatId } from '../types.ts'
 // game, played for chips that only exist inside one game: no money, no buy-in, and the chips reset
 // every game. docs/PRD/e24-holdem.md has the rules and every decision.
 
-/** Starting chips per player */
-export type HoldemStack = 1000 | 2000 | 5000
-/** The big blind at the start; the small blind is half of it */
-export type HoldemBlind = 10 | 20 | 50
-/** The blinds double every this many hands; 0 is never */
-export type HoldemBlindUp = 0 | 10 | 20
+/** Starting chips per player, in big blinds: the blinds always start at 10 / 20 */
+export type HoldemStack = 100 | 200 | 300
+/** The blinds go up a level (about ×1.5) every this many hands; 0 is never */
+export type HoldemBlindUp = 0 | 15 | 20
 /** Seconds a player has to act; 0 is no clock */
 export type HoldemTimer = 0 | 20 | 30 | 60
 
 export type HoldemOptions = {
   stack: HoldemStack
-  blinds: HoldemBlind
   blindUp: HoldemBlindUp
   timer: HoldemTimer
 }
@@ -197,8 +194,10 @@ export type HoldemView = {
   bbSeat: SeatId
   sb: number
   bb: number
-  /** The hand the blinds next go up, null when they never do */
-  nextBlindsUp: number | null
+  /** The blind level of this hand: 1 at the start */
+  level: number
+  /** When and to what the blinds next go up; null when they never do */
+  nextBlinds: { hand: number; sb: number; bb: number } | null
   street: HoldemStreet
   currentBet: number
   minRaise: number

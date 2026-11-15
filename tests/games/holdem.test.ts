@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { GAME_MESSAGES } from '../../shared/games/catalog.ts'
 import { getGame, LOBBY_GAMES } from '../../shared/games/index.ts'
 import { makeSeats } from '../../shared/games/match.ts'
-import { defaultOptions } from '../../shared/games/options.ts'
+import { defaultOptions, parseOptions } from '../../shared/games/options.ts'
 import { createRng } from '../../shared/games/rng.ts'
 import { SCREEN_MESSAGES } from '../../shared/games/screenMessages.ts'
 import {
+  bigBlindAt,
   bigBlindFor,
   categoryOf,
   FOLD_PAUSE_MS,
@@ -14,6 +15,8 @@ import {
   sidePots,
   splitPot,
   startHand,
+  startingChips,
+  nextBlindsAfter,
 } from '../../shared/games/holdem/rules.ts'
 import type { HoldemAction, HoldemOptions, HoldemState } from '../../shared/games/holdem/types.ts'
 import { isGameError, type Actor, type GameError, type Rng, type Viewer } from '../../shared/games/types.ts'
@@ -25,7 +28,8 @@ import { playRandom } from './harness.ts'
 
 vi.setConfig({ testTimeout: 120_000 })
 
-const OPTIONS: HoldemOptions = { stack: 1000, blinds: 20, blindUp: 10, timer: 30 }
+// 50 BB (1,000 chips) and the blinds up every 15 hands: most of the hands below are dealt with their own stacks
+const OPTIONS = { stack: 50, blindUp: 15, timer: 30 } as unknown as HoldemOptions
 
 const cards = (text: string) => (text === '' ? [] : (text.split(' ') as Card[]))
 
@@ -115,7 +119,7 @@ describe('the catalog', () => {
   it('is listed, with defaults, and strings in both languages', () => {
     expect(getGame('holdem')).toBe(holdem)
     expect(LOBBY_GAMES.map((game) => game.id)).toContain('holdem')
-    expect(defaultOptions(holdem.options)).toEqual(OPTIONS)
+    expect(defaultOptions(holdem.options)).toEqual({ stack: 200, blindUp: 0, timer: 30 })
     expect(holdem.meta).toMatchObject({ minPlayers: 2, maxPlayers: 9 })
     for (const language of ['en', 'zh-TW'] as const) {
       expect(GAME_MESSAGES[language]['games.holdem.name']).toBeTruthy()
@@ -123,6 +127,28 @@ describe('the catalog', () => {
         expect(SCREEN_MESSAGES[language][`games.holdem.hand.${category}`]).toBeTruthy()
       }
     }
+  })
+
+  it('starts 100, 200 or 300 big blinds deep at 10 / 20, labelled with both', () => {
+    for (const [stack, chips] of [[100, 2000], [200, 4000], [300, 6000]] as const) {
+      const state = holdem.init(makeSeats(2), { stack, blindUp: 0, timer: 30 }, createRng(1))
+      expect(state.players.map((player) => player.start)).toEqual([chips, chips])
+      expect(state).toMatchObject({ sb: 10, bb: 20 })
+      const chipsText = chips.toLocaleString('en')
+      expect(GAME_MESSAGES.en[`games.holdem.option.bb.${stack}`]).toBe(`${stack} BB · ${chipsText} chips`)
+      expect(GAME_MESSAGES['zh-TW'][`games.holdem.option.bb.${stack}`]).toBe(`${stack} BB・${chipsText} 籌碼`)
+    }
+    expect(Object.keys(holdem.options)).toEqual(['stack', 'blindUp', 'timer'])
+  })
+
+  it('a room made with the old options gets the new defaults for what changed, and keeps the rest', () => {
+    expect(parseOptions(holdem.options, { stack: 1000, blinds: 20, blindUp: 10, timer: 60 })).toEqual({
+      stack: 200,
+      blindUp: 0,
+      timer: 60,
+    })
+    expect(parseOptions(holdem.options, { stack: 300, blindUp: 20, timer: 0 })).toEqual({ stack: 300, blindUp: 20, timer: 0 })
+    expect(parseOptions(holdem.options, { stack: 5000, blindUp: 15 })).toEqual({ stack: 200, blindUp: 15, timer: 30 })
   })
 })
 
@@ -211,16 +237,31 @@ describe('the blinds and who acts first', () => {
   it('the big blind may still raise when everyone just called', () => {
     const state = play(table({ stacks: [1000, 1000, 1000], holes: ['2c 3c', '2d 3d', '2h 3h'] }), [0, CALL], [1, CALL])
     expect(toAct(state)).toBe(2)
-    expect(holdem.legalActions(state, 2).map((action) => action.type)).toEqual(['check', 'raise', 'raise', 'raise', 'raise'])
+    expect(holdem.legalActions(state, 2).map((action) => action.type)).toEqual(['check', 'raise', 'raise', 'raise', 'raise', 'raise'])
   })
 
-  it('double every N hands when the host asks', () => {
-    expect([1, 10, 11, 20, 21, 31].map((hand) => bigBlindFor(OPTIONS, hand))).toEqual([20, 20, 40, 40, 80, 160])
+  it('go up a gentle level (about ×1.5) every N hands when the host asks', () => {
+    expect(Array.from({ length: 13 }, (_, level) => bigBlindAt(level))).toEqual([
+      20, 30, 50, 80, 120, 200, 300, 500, 800, 1200, 2000, 3000, 5000,
+    ])
+    expect([1, 15, 16, 30, 31, 46].map((hand) => bigBlindFor(OPTIONS, hand))).toEqual([20, 20, 30, 30, 50, 80])
+    expect([1, 20, 21, 41].map((hand) => bigBlindFor({ ...OPTIONS, blindUp: 20 }, hand))).toEqual([20, 20, 30, 50])
     expect(bigBlindFor({ ...OPTIONS, blindUp: 0 }, 99)).toBe(20)
-    const state = table({ stacks: [1000, 1000], holes: ['2c 3c', '2d 3d'], hand: 10 })
-    expect(state).toMatchObject({ hand: 11, sb: 20, bb: 40 })
-    expect(state.log).toContainEqual({ k: 'blindsUp', sb: 20, bb: 40 })
-    expect(holdem.view(state, 0).nextBlindsUp).toBe(21)
+    const state = table({ stacks: [1000, 1000], holes: ['2c 3c', '2d 3d'], hand: 15 })
+    expect(state).toMatchObject({ hand: 16, sb: 15, bb: 30 })
+    expect(state.log).toContainEqual({ k: 'blindsUp', sb: 15, bb: 30 })
+    expect(holdem.view(state, 0)).toMatchObject({ level: 2, nextBlinds: { hand: 31, sb: 25, bb: 50 } })
+    expect(nextBlindsAfter(OPTIONS, 1)).toEqual({ hand: 16, sb: 15, bb: 30 })
+    const flat = table({ stacks: [1000, 1000], holes: ['2c 3c', '2d 3d'], hand: 40, options: { blindUp: 0 } })
+    expect(flat).toMatchObject({ sb: 10, bb: 20 })
+    expect(holdem.view(flat, 0)).toMatchObject({ level: 1, nextBlinds: null })
+  })
+
+  it('a game begun with the old options (blinds and doubling) still doubles them', () => {
+    const legacy = { stack: 1000, blinds: 50, blindUp: 10, timer: 30 } as unknown as HoldemOptions
+    expect([1, 11, 21].map((hand) => bigBlindFor(legacy, hand))).toEqual([50, 100, 200])
+    expect(nextBlindsAfter(legacy, 1)).toEqual({ hand: 11, sb: 50, bb: 100 })
+    expect(startingChips(legacy)).toBe(1000)
   })
 
   it('a big blind short of chips is all in and only has to be matched that far', () => {
@@ -264,13 +305,25 @@ describe('bets and raises', () => {
     expect(refusal(option, CALL, 2)).toBe(error('nothingToCall'))
   })
 
-  it('offers the smallest raise, half the pot, the pot and all in', () => {
+  it('offers the smallest raise, half, two thirds and the whole pot, and all in', () => {
     const state = play(three(), [0, CALL], [1, CALL], [2, CHECK])
-    // Pot 60: min 20, half 30, pot 60, all in 980
-    expect(holdem.legalActions(state, 1)).toEqual([CHECK, raise(20), raise(30), raise(60), raise(980)])
+    // Pot 60: min 20, half 30, two thirds 40, pot 60, all in 980
+    expect(holdem.legalActions(state, 1)).toEqual([CHECK, raise(20), raise(30), raise(40), raise(60), raise(980)])
     const facing = play(state, [1, raise(60)])
-    // Facing 60 into 120: to call 60 makes 180; half is 60 + 90, the pot 60 + 180
-    expect(holdem.legalActions(facing, 2)).toEqual([FOLD, CALL, raise(120), raise(150), raise(240), raise(980)])
+    // Facing 60 into 120: to call 60 makes 180; half is 60 + 90, two thirds 60 + 120, the pot 60 + 180
+    expect(holdem.legalActions(facing, 2)).toEqual([FOLD, CALL, raise(120), raise(150), raise(180), raise(240), raise(980)])
+    for (const action of holdem.legalActions(facing, 2)) expect(isGameError(holdem.reduce(facing, action, 2, createRng(1)))).toBe(false)
+  })
+
+  it('two thirds of the pot rounds down, and stays within the smallest raise and all in', () => {
+    // Before the flop, facing 20 with 30 in the middle: calling makes 50, two thirds of it 33
+    expect(holdem.legalActions(three(), 0)).toEqual([FOLD, CALL, raise(40), raise(45), raise(53), raise(70), raise(1000)])
+    expect(act(three(), raise(53), 0).currentBet).toBe(53)
+    // A short stack: 30 behind after the flop, so half, two thirds and the pot are all just all in
+    const short = play(table({ stacks: [1000, 50, 1000], holes: ['2c 3c', '2d 3d', '2h 3h'] }), [0, CALL], [1, CALL], [2, CHECK])
+    expect(toAct(short)).toBe(1)
+    expect(holdem.legalActions(short, 1)).toEqual([CHECK, raise(20), raise(30)])
+    expect(refusal(short, raise(40), 1)).toBe(error('tooBig'))
   })
 
   it('an all-in short of a full raise does not reopen the betting to whoever has acted', () => {
@@ -391,7 +444,8 @@ describe('the end of a hand', () => {
       stacks: [1000, 1000, 1000],
       holes: ['2c 3d', '4c 5d', '2d 3c'],
       board: 'Th Js Qd Kh Ac',
-      options: { blinds: 10 },
+      // A game begun before 2026-11-15, with the old options: blinds 5/10
+      options: { blinds: 10 } as Partial<HoldemOptions>,
     })
     state = play(state, [0, CALL], [1, FOLD], [2, CHECK], [2, CHECK], [0, CHECK], [2, CHECK], [0, CHECK], [2, CHECK], [0, CHECK])
     // Seat 2 is left of the button (seat 0) before seat 0 comes round again
@@ -497,6 +551,7 @@ describe('busting and the button', () => {
     }
   })
 
+
   it('stops after a hand everyone still playing agrees to, ranked by chips', () => {
     let state = table({ stacks: [1000, 1000, 1000], holes: ['2c 3c', '2d 3d', '2h 3h'] })
     state = act(state, { type: 'endVote', on: true }, 1)
@@ -582,25 +637,28 @@ describe('what each viewer sees', () => {
     }
   })
 
+
   it.each([2, 3, 4, 5, 6, 7, 8, 9])('random games with %i players play to the end and leak no card', (seats) => {
     for (let seed = 1; seed <= 4; seed++) {
       const played = playRandom(holdem, { seed, seats, options: OPTIONS, secrets, maxSteps: 5000 })
       const final = played.final.state
       const total = final.players.reduce((sum, player) => sum + player.stack, 0)
-      expect(total).toBe(seats * OPTIONS.stack)
+      expect(total).toBe(seats * startingChips(OPTIONS))
       expect(final.players.filter((player) => !player.out)).toHaveLength(1)
       expect(final.outOrder).toHaveLength(seats - 1)
     }
   })
 
+
   it('play to the end with deep stacks and blinds that never go up', () => {
-    for (const options of [OPTIONS, { ...OPTIONS, blinds: 50, stack: 5000, blindUp: 0 } as HoldemOptions]) {
+    for (const options of [OPTIONS, { stack: 300, blindUp: 0, timer: 0 } as HoldemOptions, { stack: 200, blindUp: 20, timer: 0 } as HoldemOptions]) {
       for (let seed = 1; seed <= 6; seed++) {
         const played = playRandom(holdem, { seed, seats: 2 + (seed % 8), options, maxSteps: 5000 })
         expect(played.result.standings[0].rank).toBe(1)
       }
     }
   })
+
 })
 
 describe('junk', () => {

@@ -10,7 +10,7 @@ import { playerOf, raiseSizes, toCallOf } from './screenState.ts'
 
 /**
  * Your turn, in the dock under your thumb: fold, check or call (with the amount), and bet or raise,
- * which opens a slider with the quick sizes (the smallest, half the pot, the pot, all in).
+ * which opens a slider with the quick sizes (the smallest, half, two thirds and the whole pot, all in).
  */
 export function BetBar({
   view,
@@ -71,6 +71,9 @@ export function BetBar({
           </Button>
           <Button $variant="secondary" $size="sm" onClick={() => setAmount(sizes.halfPot)}>
             {t('games.holdem.ui.halfPot')}
+          </Button>
+          <Button $variant="secondary" $size="sm" onClick={() => setAmount(sizes.twoThirdsPot)}>
+            {t('games.holdem.ui.twoThirdsPot')}
           </Button>
           <Button $variant="secondary" $size="sm" onClick={() => setAmount(sizes.pot)}>
             {t('games.holdem.ui.fullPot')}
@@ -159,6 +162,13 @@ const Amount = styled.output`
 
 const Quick = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: ${space.xs}px;
+
+  /* Five across a 360 px phone: the labels need the room more than the padding does */
+  & > button {
+    min-width: 0;
+    padding: 0 ${space.xs}px;
+    white-space: nowrap;
+  }
 `
