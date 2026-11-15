@@ -9,6 +9,7 @@ import { misery } from './misery/rules.ts'
 import { oddWord } from './odd-word/rules.ts'
 import { secretScroll } from './secret-scroll/rules.ts'
 import { palace } from './palace/rules.ts'
+import { holdem } from './holdem/rules.ts'
 import { promotion } from './promotion/rules.ts'
 import { silentTable } from './silent-table/rules.ts'
 import { spectrum } from './spectrum/rules.ts'
@@ -35,6 +36,7 @@ const MODULES: readonly AnyGameModule[] = [
   secretScroll,
   wasabi,
   palace,
+  holdem,
   misery,
   wordBridge,
   clueClash,

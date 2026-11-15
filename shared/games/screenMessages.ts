@@ -10,6 +10,7 @@ import { oddWordScreenMessages } from './odd-word/i18n.screen.ts'
 import { secretScrollScreenMessages } from './secret-scroll/i18n.screen.ts'
 import { wasabiScreenMessages } from './wasabi/i18n.screen.ts'
 import { palaceScreenMessages } from './palace/i18n.screen.ts'
+import { holdemScreenMessages } from './holdem/i18n.screen.ts'
 import { roomExtraMessages } from './roomExtras.ts'
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
 import { promotionFullMessages } from './promotion/i18n.full.ts'
@@ -44,6 +45,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...secretScrollScreenMessages.en,
     ...wasabiScreenMessages.en,
     ...palaceScreenMessages.en,
+    ...holdemScreenMessages.en,
     ...miseryScreenMessages.en,
     ...soonMessages.en,
     ...roomExtraMessages.en,
@@ -67,6 +69,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...secretScrollScreenMessages['zh-TW'],
     ...wasabiScreenMessages['zh-TW'],
     ...palaceScreenMessages['zh-TW'],
+    ...holdemScreenMessages['zh-TW'],
     ...miseryScreenMessages['zh-TW'],
     ...soonMessages['zh-TW'],
     ...roomExtraMessages['zh-TW'],
