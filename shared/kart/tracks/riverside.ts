@@ -5,7 +5,10 @@
 // corners so that drifting matters" (revision 3): redrawn with a 28 to 34 m road (eight karts' 2.4 m
 // collision circles take 19.2 m) round a long straight to the line, a tight right, two hairpins in
 // a row (right, then left), a fast run onto the far side, a third hairpin, two quick lefts and a
-// last right onto the straight. Written in code as control points smoothed by a closed Catmull-Rom
+// last right onto the straight. Then "the maps are still too simple" (revision 6): redrawn again
+// as a technical circuit, 2.5 km of short straights between corners that chain: a tight right,
+// esses, a right-left pair of hairpins, a flick down the far side, a third hairpin, two more
+// switchbacks through the middle and a long last right onto the straight. Written in code as control points smoothed by a closed Catmull-Rom
 // spline, then sampled about every SAMPLE metres; build-track.ts will make the same JSON from the
 // Blender scene.
 import { gatesAlong, padsAlong, headingOf, TRACK_FORMAT, type TrackJson } from '../track.ts'
@@ -17,51 +20,71 @@ const SAMPLE = 6
 /** [x, z, width]: the line through the middle of the road, in driving order */
 const CONTROL: readonly ControlPoint[] = [
   // The main straight, up to the line and beyond (towards -z)
-  [0, 250, 38],
+  [0, 230, 38],
   [0, 60, 38],
-  [0, -120, 38],
-  // A tight right
-  [4, -165, 32],
-  [28, -192, 30],
-  [70, -200, 30],
-  [150, -200, 30],
+  [0, -70, 38],
+  // Turn 1: a tight right, eastwards
+  [5, -105, 32],
+  [28, -128, 30],
+  [62, -134, 30],
+  // The first esses: left, then right
+  [100, -134, 30],
+  [135, -150, 29],
+  [165, -185, 29],
+  [200, -200, 29],
+  [245, -196, 30],
   // Hairpin 1, right, back westwards
-  [200, -196, 28],
-  [228, -172, 28],
-  [222, -140, 28],
-  [190, -128, 28],
-  [130, -126, 30],
-  // Hairpin 2, left, eastwards again
-  [90, -120, 28],
-  [70, -96, 28],
-  [80, -66, 28],
-  [115, -58, 28],
-  // A long run east and a fast right onto the far side
-  [220, -60, 32],
-  [300, -50, 32],
-  [340, -10, 32],
-  [345, 70, 32],
-  [345, 180, 30],
+  [290, -196, 28],
+  [318, -172, 28],
+  [312, -140, 28],
+  [282, -126, 28],
+  // Hairpin 2, left, eastwards again: a switchback
+  [240, -122, 28],
+  [212, -108, 28],
+  [204, -80, 28],
+  [222, -56, 28],
+  [255, -50, 30],
+  // A short run east and a right onto the far side, southwards
+  [330, -48, 32],
+  [365, -36, 30],
+  [380, -5, 30],
+  // The far side: a left-right-left flick
+  [380, 40, 30],
+  [360, 85, 29],
+  [385, 130, 29],
+  [380, 175, 30],
   // Hairpin 3, right, back northwards
-  [340, 225, 28],
-  [310, 245, 28],
-  [280, 225, 28],
-  [275, 180, 28],
-  [275, 120, 30],
-  // Two quick lefts: westwards, then south
-  [265, 95, 30],
-  [240, 88, 30],
-  [200, 90, 30],
-  [175, 100, 30],
-  [168, 130, 30],
-  [168, 220, 32],
-  // A right onto the run home, and the last right onto the straight
-  [160, 265, 32],
-  [130, 285, 32],
-  [100, 292, 38],
-  [60, 300, 38],
-  [24, 300, 38],
-  [4, 282, 38],
+  [378, 215, 28],
+  [358, 245, 28],
+  [325, 248, 28],
+  [305, 222, 28],
+  [305, 180, 30],
+  // North, and a left westwards
+  [305, 120, 32],
+  [300, 75, 30],
+  [280, 50, 30],
+  [245, 45, 30],
+  [170, 45, 32],
+  // Hairpin 4, left, eastwards: the first of two switchbacks in the middle
+  [95, 45, 28],
+  [68, 58, 28],
+  [60, 85, 28],
+  [75, 110, 28],
+  [105, 115, 30],
+  [215, 115, 32],
+  // Hairpin 5, right, westwards
+  [240, 120, 28],
+  [262, 142, 28],
+  [256, 172, 28],
+  [228, 185, 28],
+  [135, 185, 32],
+  // A left southwards, then the long last right onto the straight
+  [100, 191, 30],
+  [78, 212, 30],
+  [72, 245, 30],
+  [62, 282, 32],
+  [36, 300, 36],
+  [10, 288, 38],
   [0, 262, 38],
 ]
 
@@ -85,7 +108,9 @@ export const RIVERSIDE: TrackJson = {
   // are set aside, the physics having changed too
   // 2026-11-14 once more (owner: the drift as a real slide, faster still): the road is the same,
   // the physics is not, so old records are set aside
-  revision: 5,
+  // 2026-11-14, last (owner: "the maps are still too simple"; the slide-out and the counter-steer):
+  // redrawn with esses, five hairpins and short straights; old records are set aside
+  revision: 6,
   laps: 3,
   road: fromLine,
   gates,
@@ -100,9 +125,9 @@ export const RIVERSIDE: TrackJson = {
   // Off the middle of the straights: taking one is a choice of line
   boostPads: padsAlong(fromLine, [
     [14, 8],
-    [132, -8],
-    [180, 8],
-    [325, -8],
+    [255, -8],
+    [298, 8],
+    [400, -8],
   ]),
   itemBoxes: [],
   decor: [],

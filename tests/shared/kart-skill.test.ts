@@ -68,15 +68,16 @@ describe('stacked charges', () => {
   })
 
   it('does not hand back a charge for nothing when the store was full', () => {
-    // A full store parks the gauge full; firing one does not refill it until the next drift
+    // A full store parks the gauge full; firing one does not refill it until the next slide
     const full = run(atSpeed(), DRIFT_RIGHT, 6)
     expect(full.storedBoosts).toBe(2)
-    const fired = run(stepKart(stepKart(full, THROTTLE), BOOST), THROTTLE, 1)
+    const gripping = run(full, THROTTLE, T.driftRecovery + 0.1)
+    const fired = run(stepKart(gripping, BOOST), THROTTLE, 1)
     expect(fired.storedBoosts).toBe(1)
   })
 })
 
-describe('the counter catch', () => {
+describe('the counter-steer', () => {
   it('straightens the car up faster when the drift is let go steering against it', () => {
     const drifting = run(atSpeed(), DRIFT_RIGHT, 1)
     const caught = run(drifting, { ...THROTTLE, steer: -1 }, 0.1)

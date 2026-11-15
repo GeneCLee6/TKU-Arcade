@@ -88,6 +88,7 @@ const CALLOUT_KEYS = {
   release: 'kart.callout.release',
   double: 'kart.callout.double',
   catch: 'kart.callout.catch',
+  counter: 'kart.callout.counter',
   pad: 'kart.callout.pad',
   stack: 'kart.callout.stack',
   broken: 'kart.callout.broken',
@@ -270,6 +271,7 @@ const calloutFill: Record<Callout['kind'], string> = {
   stall: color.danger,
   double: color.magenta,
   catch: color.success,
+  counter: color.warning,
   pad: color.accent,
   stack: color.magenta,
   broken: color.danger,
@@ -280,6 +282,7 @@ const SMALL: ReadonlySet<Callout['kind']> = new Set([
   'slide',
   'release',
   'catch',
+  'counter',
   'pad',
 ])
 const calloutClip = 'polygon(18px 0, 100% 0, calc(100% - 18px) 100%, 0 100%)'

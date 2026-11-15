@@ -10,7 +10,8 @@
 // karts side by side, and more sharp corners" (revision 2): drawn 1.5 times as big (TAMKANG_SCALE:
 // the campus is placed in the same drawn units, tamkangArt.ts), the road 28 to 34 m (it was 18 to
 // 22), the fast left at the top tightened round the tower and the western esses made three sharp
-// flicks.
+// flicks. Then "the maps are still too simple" (revision 5): a right-left flick on the run up
+// beside the lawn, and the run down past the business tower made four esses.
 import {
   gatesAlong,
   padsAlong,
@@ -54,17 +55,22 @@ const DRAWN: readonly ControlPoint[] = [
   [-210, 150, 28],
   [-175, 155, 28],
   [-155, 120, 28],
-  // Up through the lawn
-  [-152, 50, 29],
-  [-150, -30, 29],
+  // Up beside the lawn, past the business tower, and a right-left flick (revision 5)
+  [-152, 60, 29],
+  [-150, 12, 29],
+  [-128, -22, 28],
+  [-150, -56, 28],
   // The top hairpin: left, round to the south
-  [-140, -85, 28],
+  [-140, -88, 28],
   [-112, -112, 28],
-  [-84, -88, 28],
-  // Down past the business tower
-  [-82, -20, 29],
-  [-86, 60, 31],
-  [-84, 140, 31],
+  [-86, -90, 28],
+  // Down past the business tower: esses, left-right-left-right (revision 5)
+  [-84, -52, 28],
+  [-62, -16, 28],
+  [-84, 24, 28],
+  [-62, 64, 28],
+  [-84, 104, 29],
+  [-84, 145, 31],
   // The last hairpin, left, onto the avenue
   [-74, 200, 33],
   [-44, 230, 38],
@@ -99,7 +105,9 @@ export const TAMKANG: TrackJson = {
   // are set aside, the physics having changed too
   // 2026-11-14 once more (owner: the drift as a real slide, faster still): the road is the same,
   // the physics is not, so old records are set aside
-  revision: 4,
+  // 2026-11-14, last (owner: "the maps are still too simple"; the slide-out and the counter-steer):
+  // a flick on the run up beside the lawn and esses down past the business tower; old records are set aside
+  revision: 5,
   laps: 3,
   road: fromLine,
   gates,
@@ -118,10 +126,9 @@ export const TAMKANG: TrackJson = {
   // Off the middle of the straights: taking one is a choice of line
   boostPads: padsAlong(fromLine, [
     [20, 8],
-    [75, -8],
-    [255, -8],
-    [340, 8],
-    [430, -8],
+    [77, -8],
+    [249, -8],
+    [440, 8],
   ]),
   itemBoxes: [],
   decor: [],
