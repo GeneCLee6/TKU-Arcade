@@ -13,6 +13,7 @@
 import { WB_WORDS } from './bank.ts'
 import { clueProblem, tidyClue } from './clue.ts'
 import { WB_TEAMS_FROM, wordBridgeInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import { overlaps } from '../wordFold.ts'
 import type {
@@ -336,6 +337,7 @@ export const modeFor = (players: number, choice: WbOptions['mode']): 'teams' | '
 
 export const wordBridge: GameModule<WbState, WbAction, WbView, WbOptions> = {
   ...wordBridgeInfo,
+  meta: GAME_META['word-bridge'],
 
   init(seats, options, rng) {
     const players = seats.map((seat) => seat.id)

@@ -12,6 +12,11 @@ const en = {
   'games.promotion.dept.exam': 'Civil Exams',
   'games.promotion.end.motto': 'Retire home · first one there wins',
   'games.promotion.ui.boardLabel': 'Promotion board of {count} offices in eight departments',
+  // The character on the top, Chinese in both languages: it is the game's own look
+  'games.promotion.glyph.de': '德',
+  'games.promotion.glyph.cai': '才',
+  'games.promotion.glyph.gong': '功',
+  'games.promotion.glyph.zang': '贓',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -25,6 +30,10 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.dept.exam': '科舉',
   'games.promotion.end.motto': '致仕還鄉・先到者勝',
   'games.promotion.ui.boardLabel': '陞官圖圖版，八個部門共 {count} 個官職',
+  'games.promotion.glyph.de': '德',
+  'games.promotion.glyph.cai': '才',
+  'games.promotion.glyph.gong': '功',
+  'games.promotion.glyph.zang': '贓',
 }
 
 const GRADES = '九八七六五四三二一'

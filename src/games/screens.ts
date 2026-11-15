@@ -3,6 +3,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import type { GameProjection } from '../../shared/games/types.ts'
 import type { RoomParts } from '../components/GameLayout.tsx'
+import { loadFullStrings } from './promotion/full/fullStrings.ts'
 
 export interface GameScreenProps {
   /** The room around the game: a screen puts its board inside `GameLayout` and hands this on */
@@ -32,8 +33,12 @@ const SCREENS: Partial<Record<string, GameScreen>> = {
   kart: lazy(() => import('./kart/KartScreen.tsx')),
 }
 
-// The full edition of promotion (C7) is a screen of its own: a simple game never loads its board
-const PROMOTION_FULL: GameScreen = lazy(() => import('./promotion/full/FullScreen.tsx'))
+// The full edition of promotion (C7) is a screen of its own: a simple game never loads its board.
+// Its words, in the page's language, load alongside it (fullStrings.ts)
+const PROMOTION_FULL: GameScreen = lazy(() => {
+  const strings = loadFullStrings()
+  return import('./promotion/full/FullScreen.tsx').then((module) => strings.then(() => module))
+})
 
 /** The screen for a game, by its view where a game has more than one (promotion's `edition`) */
 export const gameScreen = (gameId: string, view?: unknown): GameScreen | null =>

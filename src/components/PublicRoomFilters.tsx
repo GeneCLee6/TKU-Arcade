@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import { LOBBY_GAMES } from '../../shared/games/catalog.ts'
+import { LOBBY_GAMES } from '../../shared/games/lobby.ts'
 import '../i18n/roomExtras.ts'
 import { useT } from '../i18n/useT.ts'
 import { gameTitle } from '../lib/gameTitle.ts'

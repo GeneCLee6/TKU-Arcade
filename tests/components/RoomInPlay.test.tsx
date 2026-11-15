@@ -3,9 +3,9 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CoverableSeat, RoomMember, RoomStatus, RoomView } from '../../shared/protocol.ts'
 import { RoomInPlay } from '../../src/components/RoomInPlay.tsx'
 import { ToastProvider } from '../../src/components/Toast.tsx'
-import { en } from '../../src/i18n/en.ts'
+import { en } from '../strings.ts'
 import { setLanguage } from '../../src/i18n/t.ts'
-import { zhTW } from '../../src/i18n/zh-TW.ts'
+import { zhTW } from '../strings.ts'
 import { stubDialog } from '../lib/stubDialog.ts'
 
 const member = (id: string, over: Partial<RoomMember> = {}): RoomMember => ({

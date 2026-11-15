@@ -7,6 +7,7 @@
 // docs/PRD/e13-odd-word-out.md has the rules and every detail decided here.
 import { ODD_PAIRS } from './bank.ts'
 import { oddWordInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   OddDirection,
@@ -128,6 +129,7 @@ export function wordOf(state: Pick<OddWordState, 'pair' | 'undercover' | 'blank'
 
 export const oddWord: GameModule<OddWordState, OddWordAction, OddWordView, OddWordOptions> = {
   ...oddWordInfo,
+  meta: GAME_META['odd-word'],
 
   init(seats, options, rng) {
     const base = {

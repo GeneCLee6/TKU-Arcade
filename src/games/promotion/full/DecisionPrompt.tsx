@@ -6,7 +6,8 @@ import { Countdown } from '../../../components/Countdown.tsx'
 import { VisuallyHidden } from '../../../components/VisuallyHidden.ts'
 import { useLanguage, useT } from '../../../i18n/useT.ts'
 import type { RoomTimer } from '../../../lib/roomConnection.ts'
-import { color, fontSize, promotionBoard, radius, space } from '../../../styles/tokens.ts'
+import { promotionBoard } from '../../../styles/promotionTokens.ts'
+import { color, fontSize, radius, space } from '../../../styles/tokens.ts'
 import { anyCell, shortCellName } from './fullText.ts'
 
 /** Where an offered post leads, in a few words: the copyists, the banner school, the summons */

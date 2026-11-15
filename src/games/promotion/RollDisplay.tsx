@@ -2,10 +2,17 @@ import { useEffect, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { FACES, type Face } from '../../../shared/games/promotion/board.ts'
 import type { DiceKind, LastRoll } from '../../../shared/games/promotion/types.ts'
+import { promotionScreenMessages } from '../../../shared/games/promotion/i18n.screen.ts'
+import { registerMessages } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
-import { font, promotionBoard as paint } from '../../styles/tokens.ts'
+import { promotionBoard as paint } from '../../styles/promotionTokens.ts'
+import { font } from '../../styles/tokens.ts'
 import { spunTo, turn } from './topSpin.ts'
 import { ROLL_MS } from './useRollPlayback.ts'
+
+// The four results' characters are the board's (i18n.screen.ts), registered here too: the top can
+// show without the board
+registerMessages(promotionScreenMessages)
 
 const FLICKER_MS = 90
 const DICE = [0, 1, 2, 3]

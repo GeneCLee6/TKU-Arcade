@@ -17,7 +17,7 @@ import {
   normalizeChatText,
   type ChatMessage,
 } from '../../shared/chat.ts'
-import type { MessageKey } from '../i18n/en.ts'
+import type { RoomMessageKey as MessageKey } from '../i18n/room.en.ts'
 import { useLanguage, useT } from '../i18n/useT.ts'
 import type { ChatDraft, ChatSendResult } from '../lib/chatState.ts'
 import {

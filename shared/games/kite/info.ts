@@ -1,23 +1,14 @@
-// What the browser needs to know of this game before anyone plays it: no rules, so that they stay
-// out of the first load (shared/games/catalog.ts). `rules.ts` spreads this into the module.
+// The room's options for this game: no rules, and not in the first load either. The room loads this
+// file when it opens a room of this game (src/i18n/gameDetails.ts). The lobby card's players and
+// minutes are the module's `meta`, from shared/games/lobby.ts. `rules.ts` spreads this into the module.
 import type { GameInfo } from '../types.ts'
+import { MAX_TURN_SECONDS } from './limits.ts'
 import type { KiteOptions } from './types.ts'
 
-export const MAX_NOTES = 8
-export const MAX_BURNS = 3
-export const MAX_TURN_SECONDS = 300
-/** Cards in hand: 5 with 2–3 players, 4 with 4–5 */
-export const handSize = (players: number): number => (players <= 3 ? 5 : 4)
+export { handSize, MAX_BURNS, MAX_NOTES, MAX_TURN_SECONDS } from './limits.ts'
 
 export const kiteInfo: GameInfo<KiteOptions> = {
   id: 'kite',
-  // No `proxyTurns`: every turn is a decision, and a random one could snap a line
-  meta: {
-    minPlayers: 2,
-    maxPlayers: 5,
-    minutes: 30,
-    i18nKey: 'games.kite',
-  },
 
   options: {
     rainbow: { kind: 'boolean', labelKey: 'games.kite.option.rainbow', default: false },

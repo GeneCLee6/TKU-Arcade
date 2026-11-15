@@ -7,6 +7,7 @@
 //
 // docs/PRD/e19-wasabi-dumplings.md has the rules and every detail decided here.
 import { wasabiInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   WasabiAction,
@@ -293,6 +294,7 @@ function act(state: WasabiState, action: WasabiAction, seat: SeatId, rng: Rng): 
 
 export const wasabi: GameModule<WasabiState, WasabiAction, WasabiView, WasabiOptions> = {
   ...wasabiInfo,
+  meta: GAME_META.wasabi,
 
   init(seats, options, rng) {
     const players: WasabiPlayer[] = seats.map((seat) => ({

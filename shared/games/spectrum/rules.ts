@@ -12,6 +12,7 @@
 import { answerProblem, MAX_ANSWER_LENGTH, normaliseAnswer } from './answer.ts'
 import { spectrumInfo } from './info.ts'
 import { SPECTRUM_TOPICS } from './topics.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   SpectrumAction,
@@ -315,6 +316,7 @@ function skip(state: SpectrumState, seat: SeatId, rng: Rng): SpectrumState | nul
 
 export const spectrum: GameModule<SpectrumState, SpectrumAction, SpectrumView, SpectrumOptions> = {
   ...spectrumInfo,
+  meta: GAME_META.spectrum,
 
   init(seats, options, rng) {
     const players = seats.map((seat) => ({ seat: seat.id, score: 0, guessed: 0, read: 0 }))

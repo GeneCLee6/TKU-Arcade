@@ -1,10 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { en } from '../../src/i18n/en.ts'
+import { en } from '../strings.ts'
 import { LanguageSwitch } from '../../src/i18n/LanguageSwitch.tsx'
 import { getLanguage, initLanguage, setLanguage, t } from '../../src/i18n/t.ts'
 import { useT } from '../../src/i18n/useT.ts'
-import { zhTW } from '../../src/i18n/zh-TW.ts'
+import { zhTW } from '../strings.ts'
 
 const STORAGE_KEY = 'tku-arcade.language'
 

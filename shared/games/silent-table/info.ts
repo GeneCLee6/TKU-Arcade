@@ -1,22 +1,13 @@
-// What the browser needs to know of this game before anyone plays it: no rules, so that they stay
-// out of the first load (shared/games/catalog.ts). `rules.ts` spreads this into the module.
+// The room's options for this game: no rules, and not in the first load either. The room loads this
+// file when it opens a room of this game (src/i18n/gameDetails.ts). The lobby card's players and
+// minutes are the module's `meta`, from shared/games/lobby.ts. `rules.ts` spreads this into the module.
 import type { GameInfo } from '../types.ts'
 import type { SilentTableOptions } from './types.ts'
 
-/** How many shared cards are showing in round 1, 2 and 3 */
-export const COMMUNITY_BY_ROUND: readonly number[] = [3, 4, 5]
-export const ROUNDS = COMMUNITY_BY_ROUND.length
+export { COMMUNITY_BY_ROUND, ROUNDS } from './limits.ts'
 
 export const silentTableInfo: GameInfo<SilentTableOptions> = {
   id: 'silent-table',
-  // Listed on the owner's request, 2026-11-12 (the IP-CHECKLIST.md signature lines are still the owner's).
-  // No `proxyTurns`: a chip is a decision, and a random one could lose the level
-  meta: {
-    minPlayers: 3,
-    maxPlayers: 6,
-    minutes: 20,
-    i18nKey: 'games.silent-table',
-  },
 
   options: {
     levelsToWin: {

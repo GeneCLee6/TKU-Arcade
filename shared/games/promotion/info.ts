@@ -1,5 +1,6 @@
-// What the browser needs to know of this game before anyone plays it: no rules, so that they stay
-// out of the first load (shared/games/catalog.ts). `rules.ts` spreads this into the module.
+// The room's options for this game: no rules, and not in the first load either. The room loads this
+// file when it opens a room of this game (src/i18n/gameDetails.ts). The lobby card's players and
+// minutes are the module's `meta`, from shared/games/lobby.ts. `rules.ts` spreads this into the module.
 import type { GameInfo } from '../types.ts'
 import type { PromotionOptions } from './types.ts'
 
@@ -12,9 +13,6 @@ const fullOnly = { field: 'edition', value: 'full' }
 
 export const promotionInfo: GameInfo<PromotionOptions> = {
   id: 'promotion',
-  // Every turn is one roll, so playing it for someone is fair. The full edition's decisions (C8) are
-  // never picked at random: covering a seat then takes the default answer (`proxyActions`, rules.ts)
-  meta: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.promotion', proxyTurns: true },
 
   options: {
     edition: {

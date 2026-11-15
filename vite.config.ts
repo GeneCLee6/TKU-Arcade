@@ -16,10 +16,33 @@ const appVersion = (): Plugin => ({
   ],
 })
 
+// Fills in index.html's language chunks (src/i18n/messages.*.ts), so that the page's language is
+// fetched alongside the entry rather than after it has run (docs/ARCHITECTURE.md §5)
+const LANGUAGE_CHUNKS = '/* language chunks */ {}'
+const languageChunks = (): Plugin => ({
+  name: 'language-chunks',
+  transformIndexHtml: {
+    order: 'post',
+    handler(html, { bundle }) {
+      if (bundle === undefined) return html // vite dev: the entry asks for it
+      const chunks: Record<string, string> = {}
+      for (const output of Object.values(bundle)) {
+        const source = output.type === 'chunk' ? output.facadeModuleId?.replaceAll('\\', '/') : null
+        const language = source && /\/src\/i18n\/messages\.(en|zh-TW)\.ts$/.exec(source)?.[1]
+        if (language) chunks[language] = `/${output.fileName}`
+      }
+      if (!chunks.en || !chunks['zh-TW'] || !html.includes(LANGUAGE_CHUNKS)) {
+        throw new Error('language-chunks: index.html or the language chunks have moved')
+      }
+      return html.replace(LANGUAGE_CHUNKS, JSON.stringify(chunks))
+    },
+  },
+})
+
 // The Cloudflare plugin runs the Worker (API, Durable Objects) inside `vite dev` and builds it
 // next to the client; it is left out of Vitest, which tests the Worker's logic directly.
 export default defineConfig({
-  plugins: [react(), appVersion(), ...(process.env.VITEST ? [] : [cloudflare()])],
+  plugins: [react(), appVersion(), languageChunks(), ...(process.env.VITEST ? [] : [cloudflare()])],
   // Port 5175: TKU-BridgeTable uses 5173, BridgeHall 5174
   server: { port: 5175, strictPort: true },
   // The JS budget script (e12-t03) reads the manifest to know which chunks each page loads

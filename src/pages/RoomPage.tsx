@@ -9,6 +9,7 @@ import { NicknameForm } from '../components/NicknameForm.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { gameScreen } from '../games/screens.ts'
 import type { RulesEdition } from '../lib/rulesDoc.ts'
+import { loadGameDetails, useGameDetails } from '../i18n/gameDetails.ts'
 import { useT } from '../i18n/useT.ts'
 import { ChatDraft } from '../lib/chatState.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
@@ -73,6 +74,8 @@ function RoomEntry({ id }: { id: string }) {
   useEffect(() => {
     const controller = new AbortController()
     void fetchRoomSummary(id, controller.signal).then((result) => {
+      // The game's options and room strings start loading now, while the room is joined
+      if (result.status === 'found') void loadGameDetails(result.summary.gameId)
       if (!controller.signal.aborted) setLookup(result)
     })
     return () => controller.abort()
@@ -122,6 +125,11 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
   // Here, not in the panel: what someone was writing outlives a connection problem and the retry
   const [chatDraft] = useState(() => new ChatDraft())
   const compact = useCompact()
+  // The room waits for its game's room strings (results, errors, the options form) the first time;
+  // a host's later pick of another game shows the room as it is while the new one's arrive
+  const details = useGameDetails(session.phase === 'joined' ? session.view.room.gameId : null)
+  const [detailsShown, setDetailsShown] = useState(false)
+  if (details !== undefined && !detailsShown) setDetailsShown(true)
 
   if (session.phase === 'ended') {
     switch (session.end) {
@@ -168,7 +176,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
     )
   }
 
-  if (session.phase === 'joining') {
+  if (session.phase === 'joining' || (details === undefined && !detailsShown)) {
     return (
       <>
         <RoomHeading title={title} members={members} />

@@ -1,8 +1,9 @@
 // The full board's brush face: the same LXGW WenKai TC (SIL OFL 1.1) from Google Fonts as the simple
 // board (boardFont.ts, docs/ASSETS.md), asked for only the characters the full board draws: the names
 // of both boards' cells, the plaques, seals, grades and the six results. A request of its own, as the
-// simple board's does not have these characters. Asked for once the board's data is there (fullData.ts).
-import { promotionFullMessages } from '../../../../shared/games/promotion/i18n.full.ts'
+// simple board's does not have these characters. Asked for once the board's data is there (fullData.ts),
+// so this file loads after the first paint, the Chinese table with it whatever the page's language.
+import { promotionFullZhTW } from '../../../../shared/games/promotion/i18n.full.zh-TW.ts'
 import { fullData } from './fullData.ts'
 
 const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ·.+−×'
@@ -14,7 +15,7 @@ export const fullBoardCharacters = (): string =>
     ...new Set(
       LATIN +
         [...fullData().BOARD_FULL, ...fullData().BOARD_FULL_V2].map((cell) => cell.name['zh-TW']).join('') +
-        Object.entries(promotionFullMessages['zh-TW'])
+        Object.entries(promotionFullZhTW)
           .filter(([key]) => DRAWN.test(key))
           .map(([, text]) => text)
           .join(''),

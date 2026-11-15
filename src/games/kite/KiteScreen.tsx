@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import styled, { css } from 'styled-components'
-import { MAX_BURNS, MAX_NOTES } from '../../../shared/games/kite/info.ts'
+import { MAX_BURNS, MAX_NOTES } from '../../../shared/games/kite/limits.ts'
 import type {
   KiteAction,
   KiteRank,

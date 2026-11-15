@@ -8,6 +8,7 @@
 // docs/PRD/e14-misery-line.md has the rules and every detail decided here.
 import { MISERY_CARDS } from './bank.ts'
 import { miseryInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   MiseryAction,
@@ -146,6 +147,7 @@ const pass = (state: MiseryState): MiseryState =>
 
 export const misery: GameModule<MiseryState, MiseryAction, MiseryView, MiseryOptions> = {
   ...miseryInfo,
+  meta: GAME_META.misery,
 
   init(seats, options, rng: Rng) {
     const players = seats.map((seat) => seat.id)

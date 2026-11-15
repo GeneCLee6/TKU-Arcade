@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import styled, { keyframes } from 'styled-components'
 import type { FullArt } from '../../../../shared/games/promotion/boardFull.ts'
-import { promotionFullMessages } from '../../../../shared/games/promotion/i18n.full.ts'
 import type {
   FullPlayer,
   PromotionAction,
@@ -14,19 +13,18 @@ import { Button } from '../../../components/Button.tsx'
 import { Drawer } from '../../../components/Drawer.tsx'
 import { GameLayout } from '../../../components/GameLayout.tsx'
 import { Muted } from '../../../components/roomParts.ts'
-import { registerMessages } from '../../../i18n/t.ts'
 import { useLanguage, useT } from '../../../i18n/useT.ts'
 import { initialOf } from '../../../lib/avatar.ts'
 import { playCue, setSoundOn, useSoundOn, useSoundUnlock } from '../../../lib/sound.ts'
 import { useReducedMotion } from '../../../lib/useMediaQuery.ts'
-import { color, fontSize, promotionBoard, radius, seatColor, space } from '../../../styles/tokens.ts'
+import { promotionBoard } from '../../../styles/promotionTokens.ts'
+import { color, fontSize, radius, seatColor, space } from '../../../styles/tokens.ts'
 import type { GameScreenProps } from '../../screens.ts'
 import { useBoardFit } from '../useBoardFit.ts'
 import { MAX_ZOOM, MIN_ZOOM, useBoardZoom } from '../useBoardZoom.ts'
 import { useImmersive } from '../useImmersive.ts'
 import { fullArtHref, fullKnob } from './fullArt.ts'
 import { FullBoard, type FullFlight, type FullPiece } from './FullBoard.tsx'
-import { loadFullBoardFont } from './fullFont.ts'
 import { FullDice } from './FullDice.tsx'
 import { useFullData } from './fullData.ts'
 import type { SquareLayout } from './fullSquare.ts'
@@ -45,9 +43,9 @@ import {
 import { SETTLE_STEPS } from './settleSteps.ts'
 import { useTurnPlayback } from './useTurnPlayback.ts'
 
-// Everything this screen says, with its cell and department names in boardFull.ts: loaded only with
-// a full edition's game, the board's data after the first paint (fullData.ts)
-registerMessages(promotionFullMessages)
+// Everything this screen says comes in the page's language before it shows (fullStrings.ts, through
+// screens.ts), its cell and department names in boardFull.ts with the board's data after the first
+// paint (fullData.ts)
 
 // Each player's way through the game, once it is over: out of the first screen
 const FullRoutes = lazy(() => import('./FullRoutes.tsx'))
@@ -90,8 +88,9 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   const reducedMotion = useReducedMotion()
   const data = useFullData()
   const board = data ? data.fullBoard(state.rulesVersion) : null
+  // After the first paint, with the Chinese it asks the font for (fullFont.ts)
   useEffect(() => {
-    if (data) loadFullBoardFont()
+    if (data) void import('./fullFont.ts').then((module) => module.loadFullBoardFont())
   }, [data])
   const zoom = useBoardZoom()
   const { viewport, show, zoom: zoomLevel } = zoom

@@ -1,9 +1,8 @@
-// What the lobby and the waiting room say of this game: in everyone's first load, through
-// GAME_MESSAGES (shared/games/catalog.ts), so keep them few. `en` is the source.
+// What the room says of this game before its screen has loaded: the options form, errors and results.
+// Not in the first load: the room loads this file when it opens a room of this game
+// (src/i18n/gameDetails.ts). The name and summary are the lobby's (shared/games/lobby.en.ts).
+// `en` is the source; the type makes zh-TW keep the same keys.
 const en = {
-  // The traditional game's own generic name (owner's request 2026-11-14)
-  'games.holdem.name': "Texas Hold'em",
-  'games.holdem.summary': 'No-limit poker for play chips: two cards each, five shared.',
   'games.holdem.option.stack': 'Starting chips',
   'games.holdem.option.bb.100': '100 BB · 2,000 chips',
   'games.holdem.option.bb.200': '200 BB · 4,000 chips',
@@ -18,8 +17,6 @@ const en = {
 }
 
 const zhTW: Record<keyof typeof en, string> = {
-  'games.holdem.name': '德州撲克',
-  'games.holdem.summary': '無限注撲克，只用遊戲籌碼：每人兩張、桌上五張。',
   'games.holdem.option.stack': '起始籌碼',
   'games.holdem.option.bb.100': '100 BB・2,000 籌碼',
   'games.holdem.option.bb.200': '200 BB・4,000 籌碼',

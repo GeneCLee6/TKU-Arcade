@@ -1,22 +1,25 @@
 import { lazy, Suspense } from 'react'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { ToastProvider } from './components/Toast.tsx'
+import { loadRoomStrings } from './i18n/roomStrings.ts'
 import { useT } from './i18n/useT.ts'
 import { BrowserRouter, Route, Routes } from './lib/router.tsx'
 import { useLocation } from './lib/useRouter.ts'
 import { HomePage } from './pages/HomePage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
 
+// The room's chunk with the room's words in the page's language (roomStrings.ts), side by side
+const roomChunk = () => {
+  const strings = loadRoomStrings()
+  return import('./pages/RoomPage.tsx').then((module) => strings.then(() => module))
+}
+
 // The lobby is what most people see first, so the room's code stays out of its bundle
-const RoomPage = lazy(() =>
-  import('./pages/RoomPage.tsx').then(({ RoomPage }) => ({ default: RoomPage })),
-)
+const RoomPage = lazy(() => roomChunk().then(({ RoomPage }) => ({ default: RoomPage })))
 
 // e2-t09: a finished game played back. Through the room's chunk, whose code it shares (the game
 // screens, the layout): imported straight from here, it would split that chunk in two
-const ReplayPage = lazy(() =>
-  import('./pages/RoomPage.tsx').then(({ ReplayEntry }) => ({ default: ReplayEntry })),
-)
+const ReplayPage = lazy(() => roomChunk().then(({ ReplayEntry }) => ({ default: ReplayEntry })))
 
 // e12-t07: the owner's daily counts. Nothing links here
 const StatsPage = lazy(() =>

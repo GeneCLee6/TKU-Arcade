@@ -20,6 +20,24 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="TKU Arcade" />
     <title>TKU Arcade</title>
+    <!-- The page's language is a chunk of its own (src/i18n/t.ts, which decides the same way): fetch it
+         alongside the entry, not after it. The build fills in the chunks' addresses (vite.config.ts) -->
+    <script>
+      ;(function (chunks) {
+        try {
+          var stored = localStorage.getItem('tku-arcade.language')
+          var preferred = (navigator.languages && navigator.languages[0]) || navigator.language || ''
+          var language = stored === 'en' || stored === 'zh-TW' ? stored : /^zh(-|$)/i.test(preferred) ? 'zh-TW' : 'en'
+          if (!chunks[language]) return
+          var link = document.createElement('link')
+          link.rel = 'modulepreload'
+          link.href = chunks[language]
+          document.head.appendChild(link)
+        } catch (error) {
+          // Blocked storage: the entry fetches it a moment later instead
+        }
+      })(/* language chunks */ {})
+    </script>
   </head>
   <body>
     <div id="root"></div>

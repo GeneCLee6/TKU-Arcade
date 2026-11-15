@@ -8,6 +8,7 @@ import { BEGGARS, DECK_COUNTS } from './deck.ts'
 import { secretScrollInfo } from './info.ts'
 
 export { BEGGARS, DECK_COUNTS }
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   ScrollAction,
@@ -345,6 +346,7 @@ function nextRound(state: ScrollState, rng: Rng): ScrollState {
 
 export const secretScroll: GameModule<ScrollState, ScrollAction, ScrollView, ScrollOptions> = {
   ...secretScrollInfo,
+  meta: GAME_META['secret-scroll'],
 
   init(seats, options, rng) {
     const players: ScrollPlayer[] = seats.map((seat) => ({

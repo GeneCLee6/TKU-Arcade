@@ -3,6 +3,26 @@ import { cleanup, configure } from '@testing-library/react'
 import { afterEach, beforeEach } from 'vitest'
 import { resetAccountForTests } from '../src/lib/account.ts'
 
+// What the site loads as chunks before it shows a page (src/i18n/t.ts, gameDetails.ts): here once
+// up front, so that a test renders any page or screen at once and in either language. Only with a
+// DOM: the Worker's and the scripts' tests run in node
+if (typeof document !== 'undefined') {
+  const [{ GAME_CARDS }, { loadFullStrings }, { loadGameDetails }, { loadRoomStrings }, { preloadLanguage }] =
+    await Promise.all([
+      import('../shared/games/lobby.ts'),
+      import('../src/games/promotion/full/fullStrings.ts'),
+      import('../src/i18n/gameDetails.ts'),
+      import('../src/i18n/roomStrings.ts'),
+      import('../src/i18n/t.ts'),
+    ])
+  await Promise.all([loadRoomStrings(), loadFullStrings()])
+  await Promise.all([
+    preloadLanguage('en'),
+    preloadLanguage('zh-TW'),
+    ...GAME_CARDS.map((game) => loadGameDetails(game.id)),
+  ])
+}
+
 // The default 1 s is too short for a lazy page's first import on a busy machine; below the 5 s of a
 // test, so that a real miss still reports what it was looking for
 configure({ asyncUtilTimeout: 4_000 })

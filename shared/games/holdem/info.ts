@@ -1,17 +1,11 @@
-// What the browser needs to know of this game before anyone plays it: no rules, so that they stay
-// out of the first load (shared/games/catalog.ts). `rules.ts` spreads this into the module.
+// The room's options for this game: no rules, and not in the first load either. The room loads this
+// file when it opens a room of this game (src/i18n/gameDetails.ts). The lobby card's players and
+// minutes are the module's `meta`, from shared/games/lobby.ts. `rules.ts` spreads this into the module.
 import type { GameInfo } from '../types.ts'
 import type { HoldemOptions } from './types.ts'
 
 export const holdemInfo: GameInfo<HoldemOptions> = {
   id: 'holdem',
-  // 2 to 9: the owner's numbers (2026-11-14), one full table
-  meta: {
-    minPlayers: 2,
-    maxPlayers: 9,
-    minutes: 45,
-    i18nKey: 'games.holdem',
-  },
 
   options: {
     // In big blinds: the blinds always start at 10 / 20, so 100 / 200 / 300 BB is 2,000 / 4,000 /

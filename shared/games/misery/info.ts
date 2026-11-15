@@ -1,5 +1,6 @@
-// What the browser needs to know of this game before anyone plays it: no rules, so that they stay
-// out of the first load (shared/games/catalog.ts). `rules.ts` spreads this into the module.
+// The room's options for this game: no rules, and not in the first load either. The room loads this
+// file when it opens a room of this game (src/i18n/gameDetails.ts). The lobby card's players and
+// minutes are the module's `meta`, from shared/games/lobby.ts. `rules.ts` spreads this into the module.
 import type { GameInfo } from '../types.ts'
 import type { MiseryOptions } from './types.ts'
 
@@ -9,14 +10,6 @@ export const MISERY_MAX_START = 5
 
 export const miseryInfo: GameInfo<MiseryOptions> = {
   id: 'misery',
-  // 2 to 10 (owner's request 2026-11-14). The talking is on the friends' own voice call; no
-  // `proxyTurns`: where a card goes is a decision
-  meta: {
-    minPlayers: 2,
-    maxPlayers: 10,
-    minutes: 25,
-    i18nKey: 'games.misery',
-  },
 
   options: {
     target: {

@@ -2,7 +2,8 @@ import type { ReactElement } from 'react'
 import styled, { css } from 'styled-components'
 import type { ScrollCard } from '../../../shared/games/secret-scroll/types.ts'
 import { useT } from '../../i18n/useT.ts'
-import { color, fontSize, promotionBoard, space } from '../../styles/tokens.ts'
+import { promotionBoard } from '../../styles/promotionTokens.ts'
+import { color, fontSize, space } from '../../styles/tokens.ts'
 
 // The cards borrow Silent Table's card stock and the promotion board's lacquer and gold: the same in
 // both themes, as a real deck is, and no new colours in everyone's first load

@@ -3,7 +3,7 @@ import { act, fireEvent, render, renderHook, screen } from '@testing-library/rea
 import { StrictMode, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '../../src/components/Toast.tsx'
-import { en } from '../../src/i18n/en.ts'
+import { en } from '../strings.ts'
 import { setLanguage } from '../../src/i18n/t.ts'
 import { CHAT_ACK_TIMEOUT_MS } from '../../src/lib/chatState.ts'
 import { useRoom, type RoomHandle } from '../../src/lib/useRoom.ts'

@@ -12,6 +12,7 @@ import {
   type Face,
 } from '../../shared/games/promotion/board.ts'
 import { promotionDetailMessages } from '../../shared/games/promotion/i18n.detail.ts'
+import { lobbyEn } from '../../shared/games/lobby.en.ts'
 import { promotionMessages } from '../../shared/games/promotion/i18n.ts'
 import {
   DEFAULT_TURN_LIMIT,
@@ -564,6 +565,7 @@ describe('promotion strings', () => {
 
   it('has every key the module refers to', () => {
     const keys = new Set([
+      ...Object.keys(lobbyEn),
       ...Object.keys(promotionMessages.en),
       ...Object.keys(promotionDetailMessages.en),
     ])

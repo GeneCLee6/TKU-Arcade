@@ -1,18 +1,11 @@
-// What the browser needs to know of this game before anyone plays it: no rules, so that they stay
-// out of the first load (shared/games/catalog.ts). `rules.ts` spreads this into the module.
+// The room's options for this game: no rules, and not in the first load either. The room loads this
+// file when it opens a room of this game (src/i18n/gameDetails.ts). The lobby card's players and
+// minutes are the module's `meta`, from shared/games/lobby.ts. `rules.ts` spreads this into the module.
 import type { GameInfo } from '../types.ts'
 import type { LanternOptions } from './types.ts'
 
 export const lanternInfo: GameInfo<LanternOptions> = {
   id: 'lantern',
-  // 2 to 4 as the game is meant; 5 and 6 play a shorter table (owner's request 2026-11-14). No
-  // `proxyTurns`: when to light a lantern is the whole game
-  meta: {
-    minPlayers: 2,
-    maxPlayers: 6,
-    minutes: 20,
-    i18nKey: 'games.lantern',
-  },
 
   options: {
     // 0 is one per player (at most 5), the usual difficulty; fewer is harder

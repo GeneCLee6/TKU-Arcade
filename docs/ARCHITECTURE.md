@@ -33,7 +33,9 @@ shared/                 前後端共用、純 TS、可在 Node 測
   chat.ts               聊天限制（移植 LongTalk）
   games/
     types.ts            GameModule / RealtimeModule / OptionsSchema / Rng
-    catalog.ts          瀏覽器用的遊戲清單（id、meta、options、首屏字串），不含規則
+    lobby.ts            大廳的遊戲清單（id 與 meta：人數、分鐘、字串前綴），瀏覽器首屏只有這個（2026-11-15）
+    lobby.en.ts         每款遊戲的名稱與簡介（英文，來源）；lobby.zh-TW.ts 是繁中，各自跟著該語言的 chunk
+    catalog.ts          全部遊戲的 info（選項）與字串（兩語），給 Worker、腳本、check-i18n 與測試；瀏覽器不得 import
     index.ts            Worker 與腳本用的登記表（含規則），瀏覽器不得 import
     tictactoe/          範本（測試用）
     promotion/          陞官圖：board.ts、rules.ts、i18n.ts（大廳、等待室、錯誤與結算的字串）、i18n.screen.ts 與 i18n.detail.ts（隨畫面載入，含格名與官階名）、rules.en.md、rules.zh-TW.md
@@ -85,7 +87,7 @@ docs/                   本資料夾
 - 純函式：`init / reduce / view / legalActions / isOver / result / timers? / chatLocked?`；`rng` seedable；全部不碰 DOM。
 - RoomDO 是唯一執行者：收 `action` → 驗座位與合法性 → `reduce` → 存 state → 對每個連線算 `view(seat)` 的 diff → 推送。隱藏資訊只能透過 `view` 裁切（牌桌 `views.ts` 的做法）。
 - 重播＝動作序列＋種子，用同一個 `reduce` 重放。
-- 新遊戲＝`shared/games/<id>/` ＋ `src/games/<id>/` ＋ 登記表一行 ＋ harness 測試一局 ＋ 規則頁兩份 md ＋ i18n 兩份。
+- 新遊戲＝`shared/games/<id>/` ＋ `src/games/<id>/` ＋ 登記表一行 ＋ `lobby.ts` 一行 meta 與 `lobby.en.ts`／`lobby.zh-TW.ts` 各兩行（名稱、簡介）＋ harness 測試一局 ＋ 規則頁兩份 md ＋ i18n 兩份。首屏只多 `lobby.ts` 那一行與一種語言的名稱，選項（`info.ts`）與房間要的字串（`i18n.ts`）由房間載入（§5）。
 
 ### 怎麼寫一款新遊戲（A3 起已實作）
 
@@ -415,9 +417,45 @@ src/kart/
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
-- 遊戲模組的字串在 `shared/games/<id>/i18n.ts`（同樣兩語），由登記表合併。卡丁車的字串在 `shared/kart/i18n.ts`，由它的 lazy chunk 用 `registerMessages` 註冊，不進首屏（§4.1）。
 - 規則頁是 markdown 兩份（`rules.en.md`、`rules.zh-TW.md`）。
 - 預設 `en`；第一次進站依瀏覽器第一順位語言偵測（`zh`、`zh-*` → `zh-TW`），之後以 localStorage 的使用者選擇為準；`<html lang>` 跟著改。
+
+### 5.1 首屏只帶一種語言（2026-11-15，`feat/first-screen-diet`）
+
+原本兩種語言的全部字串、每款遊戲的選項與字串都在入口 chunk，每加一款遊戲首屏就多一份（兩語）。現在入口**沒有任何字串表**，各自是 lazy chunk：
+
+| 字串 | 檔案 | 什麼時候載入 |
+| --- | --- | --- |
+| 網站與大廳（首頁、帳號、錯誤頁、規則頁標題、主題、語言…） | `src/i18n/en.ts`、`zh-TW.ts`，加上每款遊戲的名稱與簡介 `shared/games/lobby.en.ts`、`lobby.zh-TW.ts`，合成 `src/i18n/messages.<語言>.ts` | 第一次 render 之前，只載目前語言那份（`src/main.tsx` 等 `loadStartLanguage()`） |
+| 房間（等待室、房主、聊天、結算、房間錯誤、倒數） | `src/i18n/room.en.ts`、`room.zh-TW.ts` | 和房間的 chunk 一起（`src/App.tsx` 的 `roomChunk`，`roomStrings.ts`），只載目前語言 |
+| 一款遊戲的選項與房間要的字串（選項標籤、錯誤、結算） | `shared/games/<id>/info.ts`、`i18n.ts`（仍是兩語一檔，很小） | 進那款遊戲的房間時（`src/i18n/gameDetails.ts` 用 `import.meta.glob` 每款各一個 chunk；`RoomPage` 一拿到房間摘要就開始載，第一次顯示房間前等它；房主換遊戲時選單一變就開始載） |
+| 陞官圖完整版的畫面字串（最大的一張表） | `shared/games/promotion/i18n.full.en.ts`、`i18n.full.zh-TW.ts` | 和完整版畫面一起（`screens.ts` 的 lazy、`full/fullStrings.ts`），只載目前語言；字型要的中文字在畫面之後才載（`fullFont.ts`） |
+| 其他遊戲畫面的字串、卡丁車 | `i18n.screen.ts` 等，`registerMessages` | 照舊隨畫面 chunk，兩語 |
+
+- **不閃英文**：`index.html` 有一段 inline script，用和 `t.ts` 一樣的規則（localStorage，否則 `navigator.languages`）決定語言，對那份字串 chunk 發 `modulepreload`，所以它和入口一起下載、不是入口跑完才開始；檔名由 `vite.config.ts` 的 `languageChunks` 在 build 時填進去（找不到就 build 失敗）。`src/main.tsx` 等那份到了才 render。載入失敗就改用英文，再失敗也照樣 render（看到的是 key）。
+- **切換語言**：`setLanguage` 先記住選擇（localStorage），等那個語言的網站字串與已註冊的語言分片（`registerLanguageParts`：房間、陞官圖完整版）都到了才換；載過一次之後是立即的。連點兩下以最後一次為準。
+- **API**：`loadLanguage`、`loadStartLanguage`、`registerLanguageParts(name, { en, 'zh-TW' })`（回傳目前語言那份的 promise，lazy 畫面在 factory 裡和畫面 chunk 一起等）、`registerMessages`（兩語一起，照舊）、`hasMessage`（網路來的 key 是否已有字串，`useRoom` 的錯誤碼用）、`preloadLanguage`（測試用，`tests/setup.ts` 一開始就把兩語、房間、完整版與每款遊戲的 details 都載好）。
+- **check-i18n**：多比對 `room.*.ts` 與 `lobby.*.ts` 兩語一致；`lobby.en.ts` 只准 `games.<id>.name`／`.summary`／`.tryAlone`；全部遊戲的字串仍從 `shared/games/index.ts` 的 `GAME_MESSAGES`（含大廳那兩張表）比對。
+- **擋回頭路**：`tests/games/catalog.test.ts` 從 `src/main.tsx` 沿靜態 import 走一遍，入口不得碰到任何字串表、`catalog.ts`、任何遊戲的 `info.ts`／`i18n.ts`；`src/` 任何地方都不得靜態 import `catalog.ts`。`check-budget` 的主站另有較低的上限（下面）。
+- 卡丁車的字串在 `shared/kart/i18n.ts`，由它的 lazy chunk 用 `registerMessages` 註冊，不進首屏（§4.1）。卡丁車的選項標籤與賽道名稱原本由等待室 chunk 註冊（`waitingExtras.ts`），現在就是卡丁車的 `i18n.ts`，和其他遊戲一樣隨房間載入。
+- 陞官圖的四個結果字（`games.promotion.glyph.*`）只有簡化版畫面用，移到 `i18n.screen.ts`；默契牌局與放風箏的常數移到各自的 `limits.ts`，畫面不再 import `info.ts`（同一個模組既被畫面靜態 import、又被 `gameDetails` 動態載入，打包器會多切一個 runtime chunk）。
+
+### 5.2 首屏預算的量法（2026-11-15 起）
+
+`npm run budget` 每條線都算「畫面出來之前要下載的」：入口與它的靜態 import、**較重的那個語言**的網站字串，遊戲的線再加房間 chunk、房間字串、那款遊戲的 `info.ts`／`i18n.ts` 與畫面 chunk（陞官圖完整版再加它的語言分片）。所以 2026-11-15 之前與之後的數字量法不同：之前沒有語言 chunk 與遊戲 details 要另算，全部都在入口裡。
+
+- 主站（大廳）上限 **103 kB**（原本和遊戲一樣 150）：加一款遊戲應該只多一行 meta 與一個名稱，超過就是有東西跑錯地方。
+- 遊戲首屏上限照舊 150 kB；離上限不到 10 kB 印 `warn`。
+- `SCREEN_LANGUAGE_PARTS`：畫面自己的語言分片要列在這裡才算進那條線；沒列的 `*.en.ts`／`*.zh-TW.ts` 動態 chunk 會讓腳本失敗。
+
+| 線（gzip） | 之前（main 005d496） | 之後（zh-TW，較重的語言） |
+| --- | --- | --- |
+| 主站 | 109.3 | **97.6** |
+| 陞官圖完整版（最緊） | 149.8 | **139.7** |
+| 陞官圖簡化版 | 144.6 | **137.9** |
+| 光譜 | 138.3 | **129.8** |
+| 德州撲克 | 136.2 | **127.7** |
+| 卡丁車房間（畫面） | 127.6 | **119.0** |
 
 ## 6. 帳號（M1，F1 起已實作）
 

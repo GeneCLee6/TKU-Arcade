@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { useLayoutEffect, useRef } from 'react'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { Drawer } from '../../src/components/Drawer.tsx'
-import { en } from '../../src/i18n/en.ts'
+import { en } from '../strings.ts'
 import { stubDialog } from '../lib/stubDialog.ts'
 
 beforeAll(() => stubDialog())

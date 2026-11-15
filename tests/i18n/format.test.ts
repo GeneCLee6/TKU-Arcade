@@ -1,20 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MessageKey } from '../../src/i18n/en.ts'
-import { translate } from '../../src/i18n/t.ts'
+import { registerMessages, translate } from '../../src/i18n/t.ts'
 
 // A catalog pair with a key zh-TW lacks and keys with placeholders. The compile-time check makes
-// this impossible in the real catalogs, so the fallback can only be reached with a mock.
-vi.mock('../../src/i18n/en.ts', () => ({
+// this impossible in the real catalogs, so the fallback can only be reached with made-up keys.
+registerMessages({
   en: {
     'only.english': 'Only in English',
     'with.name': 'Hello {name}',
     'with.count': '{count} players',
     'with.price': 'Costs {amount}',
   },
-}))
-vi.mock('../../src/i18n/zh-TW.ts', () => ({
-  zhTW: { 'with.name': '哈囉 {name}', 'with.count': '{count} 位玩家' },
-}))
+  'zh-TW': { 'with.name': '哈囉 {name}', 'with.count': '{count} 位玩家' },
+})
 
 const key = (name: string) => name as MessageKey
 

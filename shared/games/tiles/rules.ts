@@ -20,6 +20,7 @@ import {
   TILE_COUNT,
   withoutEmpty,
 } from './tiles.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId, type TextRef } from '../types.ts'
 import type {
   TilesAction,
@@ -189,6 +190,7 @@ function play(state: TilesState, draft: TileTable, added: readonly number[]): Ti
 
 export const tiles: GameModule<TilesState, TilesAction, TilesView, TilesOptions> = {
   ...tilesInfo,
+  meta: GAME_META.tiles,
 
   init(seats, options, rng) {
     const players = seats.map((seat) => seat.id)

@@ -9,6 +9,7 @@
 // docs/PRD/e24-holdem.md has the rules and every detail decided here.
 import { bestHand, fullDeck, type Hand } from '../../poker/hand.ts'
 import { holdemInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   HoldemAction,
@@ -572,6 +573,7 @@ function sitOutNow(state: HoldemState, seat: SeatId): HoldemState {
 
 export const holdem: GameModule<HoldemState, HoldemAction, HoldemView, HoldemOptions> = {
   ...holdemInfo,
+  meta: GAME_META.holdem,
 
   init(seats, options, rng) {
     const players: HoldemPlayer[] = seats.map((seat) => ({

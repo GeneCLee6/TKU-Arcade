@@ -1,9 +1,8 @@
-// What the lobby and the waiting room say of this game: in everyone's first load, through
-// GAME_MESSAGES (shared/games/catalog.ts), so keep them few. `en` is the source.
+// What the room says of this game before its screen has loaded: the options form, errors and results.
+// Not in the first load: the room loads this file when it opens a room of this game
+// (src/i18n/gameDetails.ts). The name and summary are the lobby's (shared/games/lobby.en.ts).
+// `en` is the source; the type makes zh-TW keep the same keys.
 const en = {
-  // Working title (owner's request 2026-11-14)
-  'games.misery.name': 'Misery Line',
-  'games.misery.summary': 'How bad is it, 1 to 100? Slot each disaster into your line.',
   'games.misery.option.target': 'Cards to win',
   'games.misery.option.target8': '8',
   'games.misery.option.target10': '10',
@@ -17,8 +16,6 @@ const en = {
 }
 
 const zhTW: Record<keyof typeof en, string> = {
-  'games.misery.name': '慘度排排站',
-  'games.misery.summary': '這件衰事有多慘？排進你的慘度線。',
   'games.misery.option.target': '幾張獲勝',
   'games.misery.option.target8': '8',
   'games.misery.option.target10': '10',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyAction, makeSeats, projectGame, replayMatch } from '../../shared/games/match.ts'
+import { lobbyEn } from '../../shared/games/lobby.en.ts'
 import { ticTacToeMessages } from '../../shared/games/tictactoe/i18n.ts'
 import { ticTacToe } from '../../shared/games/tictactoe/rules.ts'
 import type { TicTacToeOptions } from '../../shared/games/tictactoe/types.ts'
@@ -108,7 +109,7 @@ describe('tic-tac-toe strings', () => {
   })
 
   it('has every key the module refers to', () => {
-    const keys = new Set(Object.keys(ticTacToeMessages.en))
+    const keys = new Set([...Object.keys(lobbyEn), ...Object.keys(ticTacToeMessages.en)])
     const { firstMove } = ticTacToe.options
     const referred = [
       `${ticTacToe.meta.i18nKey}.name`,

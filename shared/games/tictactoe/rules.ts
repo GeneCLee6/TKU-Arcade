@@ -3,6 +3,7 @@
 // where a game with secrets cuts them, and TimerSpec (shared/games/types.ts) for a game with a
 // clock.
 import { ticTacToeInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type SeatId } from '../types.ts'
 import type { TicTacToeAction, TicTacToeOptions, TicTacToeState, TicTacToeView } from './types.ts'
 
@@ -40,6 +41,7 @@ export const ticTacToe: GameModule<
   TicTacToeOptions
 > = {
   ...ticTacToeInfo,
+  meta: GAME_META.tictactoe,
 
   init(seats, options, rng) {
     return {
