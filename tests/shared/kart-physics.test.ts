@@ -141,13 +141,33 @@ describe('drifting', () => {
     expect(centred).toBeLessThan(tight)
   })
 
-  it('slides on when the key is let go, losing a little more speed but not the sideways part', () => {
+  it('slides out when the key is let go: still sideways, the nose carried on round, speed going', () => {
     const drifting = run(atSpeed(), DRIFT_RIGHT, 1)
     const released = run(drifting, NO_INPUT, 0.3)
-    // Coasting loses coastDrag each second; the slide, dying away, scrubs off a few m/s more
+    // Coasting loses coastDrag each second; the slide-out scrubs off a good deal more
     const coasted = kartSpeed(drifting) - KART_TUNING.coastDrag * 0.3
-    expect(kartSpeed(released)).toBeLessThan(coasted)
-    expect(kartSpeed(released)).toBeGreaterThan(coasted - 5)
+    expect(kartSpeed(released)).toBeLessThan(coasted - 2)
+    expect(kartSpeed(released)).toBeGreaterThan(coasted - 9)
+    // It has not snapped back: a third of a second on, the car is still well sideways ...
+    expect(Math.abs(kartSlip(released))).toBeGreaterThan((25 * Math.PI) / 180)
+    expect(kartSkidding(released)).toBe(true)
+    // ... and the nose has gone on round the drift's way
+    expect(released.heading - drifting.heading).toBeGreaterThan(0.12)
+  })
+
+  it('is pulled straight by steering the other way, much sooner than left alone', () => {
+    const drifting = run(atSpeed(), DRIFT_RIGHT, 0.6)
+    const alone = run(drifting, THROTTLE, 0.3)
+    const countered = run(drifting, { ...THROTTLE, steer: -1 }, 0.3)
+    expect(Math.abs(kartSlip(alone))).toBeGreaterThan((20 * Math.PI) / 180)
+    expect(Math.abs(kartSlip(countered))).toBeLessThan((4 * Math.PI) / 180)
+    expect(countered.traction).toBe(1)
+    // The nose comes back instead of going on round
+    expect(countered.heading).toBeLessThan(drifting.heading)
+    expect(alone.heading).toBeGreaterThan(drifting.heading)
+    // Left alone the tyres spin: a second on, the car that was caught is well ahead on speed
+    const later = (state: KartState) => kartSpeed(run(state, THROTTLE, 0.4))
+    expect(later(countered)).toBeGreaterThan(later(alone) + 4)
   })
 
   it('lets the back go: the nose swings in while the car carries on the old way', () => {
@@ -184,6 +204,7 @@ describe('drifting', () => {
     const half = run(drifting, THROTTLE, KART_TUNING.driftRecovery / 2)
     expect(half.drifting).toBe(false)
     expect(half.traction).toBeCloseTo(0.5, 1)
+    expect(half.slideDirection).toBe(1)
     expect(kartSkidding(half)).toBe(true)
     expect(Math.abs(kartSlip(half))).toBeGreaterThan((15 * Math.PI) / 180)
     const back = run(drifting, THROTTLE, KART_TUNING.driftRecovery + 0.05)
@@ -287,8 +308,8 @@ describe('frame rate independence', () => {
     { seconds: 3, input: { ...THROTTLE, steer: -1, drift: true } },
     { seconds: 1 / 6, input: { ...THROTTLE, steer: -1, drift: true, boost: true } },
     { seconds: 1 / 2, input: { ...THROTTLE, steer: -1, drift: true } },
-    // Let go of everything, then the throttle again: a release boost
-    { seconds: 1 / 6, input: NO_INPUT },
+    // Let go of everything and counter-steer, then the throttle again: a release boost
+    { seconds: 1 / 6, input: { ...NO_INPUT, steer: 1 } },
     { seconds: 1 / 6, input: THROTTLE },
   ]
 
