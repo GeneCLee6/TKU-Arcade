@@ -57,6 +57,7 @@ const readablePairs: [ColorName, ColorName][] = [
   ['onAccent', 'gameSecretScroll'],
   ['onAccent', 'gameWasabi'],
   ['onAccent', 'gamePalace'],
+  ['onAccent', 'gameHoldem'],
   ['onAccent', 'gameMisery'],
   // ...and as text themselves: a public room's game, a link
   ['brand', 'bg'],
@@ -74,6 +75,7 @@ const readablePairs: [ColorName, ColorName][] = [
   ['gameSecretScroll', 'bg'],
   ['gameWasabi', 'bg'],
   ['gamePalace', 'bg'],
+  ['gameHoldem', 'bg'],
   ['gameMisery', 'bg'],
   ['danger', 'surface'],
   ['danger', 'bg'],
@@ -139,6 +141,7 @@ describe('tokens', () => {
       'gameSecretScroll',
       'gameWasabi',
       'gamePalace',
+      'gameHoldem',
       'gameMisery',
     ] as const
     for (const hue of hues) {

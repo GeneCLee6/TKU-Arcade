@@ -42,6 +42,7 @@ const light = {
   gameSecretScroll: '#4A5570',
   gameWasabi: '#0E6B5A',
   gamePalace: '#A3182B',
+  gameHoldem: '#8E2A9A',
   gameMisery: '#7A6400',
   success: '#13703A',
   danger: '#B91C1C',
@@ -109,6 +110,7 @@ const dark: Record<ColorName, string> = {
   gameSecretScroll: '#C3CCDD',
   gameWasabi: '#45D6B8',
   gamePalace: '#FF6F7F',
+  gameHoldem: '#E68AF5',
   gameMisery: '#E6CF45',
   success: '#5CFFA8',
   danger: '#FF5A6E',
@@ -174,6 +176,7 @@ export const gameHues: Readonly<Partial<Record<string, ColorName>>> = {
   'secret-scroll': 'gameSecretScroll',
   wasabi: 'gameWasabi',
   palace: 'gamePalace',
+  holdem: 'gameHoldem',
   misery: 'gameMisery',
 }
 

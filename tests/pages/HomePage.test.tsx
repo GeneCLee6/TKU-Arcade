@@ -159,15 +159,18 @@ describe('lobby cards', () => {
     const dumplings = cardOf('Wasabi Dumplings')
     expect(within(dumplings).getByText('3–6 players')).toBeInTheDocument()
     expect(within(dumplings).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    const holdemCard = cardOf("Texas Hold'em")
+    expect(within(holdemCard).getByText('2–9 players')).toBeInTheDocument()
+    expect(within(holdemCard).getByRole('button', { name: 'New room' })).toBeInTheDocument()
     const palace = cardOf('Palace Bluff')
     expect(within(palace).getByText('2–6 players')).toBeInTheDocument()
     expect(within(palace).getByRole('button', { name: 'New room' })).toBeInTheDocument()
     const misery = cardOf('Misery Line')
     expect(within(misery).getByText('2–10 players')).toBeInTheDocument()
     expect(within(misery).getByRole('button', { name: 'New room' })).toBeInTheDocument()
-    // Fifteen open games; the Coming soon card arrives with its lazy chunk
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(16))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(15)
+    // Sixteen open games; the Coming soon card arrives with its lazy chunk
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(17))
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(16)
     expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
       'promotion',
       'silent-table',
@@ -181,6 +184,7 @@ describe('lobby cards', () => {
       'secret-scroll',
       'wasabi',
       'palace',
+      'holdem',
       'misery',
       'word-bridge',
       'clue-clash',

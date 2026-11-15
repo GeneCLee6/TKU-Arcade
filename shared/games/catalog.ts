@@ -15,6 +15,8 @@ import { secretScrollMessages } from './secret-scroll/i18n.ts'
 import { secretScrollInfo } from './secret-scroll/info.ts'
 import { palaceMessages } from './palace/i18n.ts'
 import { palaceInfo } from './palace/info.ts'
+import { holdemMessages } from './holdem/i18n.ts'
+import { holdemInfo } from './holdem/info.ts'
 import { miseryMessages } from './misery/i18n.ts'
 import { miseryInfo } from './misery/info.ts'
 import { promotionMessages } from './promotion/i18n.ts'
@@ -49,6 +51,7 @@ export const GAME_INFOS = [
   secretScrollInfo,
   wasabiInfo,
   palaceInfo,
+  holdemInfo,
   miseryInfo,
   wordBridgeInfo,
   clueClashInfo,
@@ -82,6 +85,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...secretScrollMessages.en,
     ...wasabiMessages.en,
     ...palaceMessages.en,
+    ...holdemMessages.en,
     ...miseryMessages.en,
   },
   'zh-TW': {
@@ -100,6 +104,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...secretScrollMessages['zh-TW'],
     ...wasabiMessages['zh-TW'],
     ...palaceMessages['zh-TW'],
+    ...holdemMessages['zh-TW'],
     ...miseryMessages['zh-TW'],
   },
 }
