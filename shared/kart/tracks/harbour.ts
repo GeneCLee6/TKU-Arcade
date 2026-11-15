@@ -9,7 +9,9 @@
 // side, and more sharp corners" (revision 3): the layout drawn 1.6 times as big (HARBOUR_SCALE: the
 // scenery is placed in the same drawn units, harbourArt.ts), the road 28 to 32 m, the sweeper at the
 // end of the quay squared off into a tight right and the kink on the west side made a sharp
-// left-right flick.
+// left-right flick. Then "the maps are still too simple" (revision 6): the long fast arc home is
+// gone; the top leg runs on westwards into two more switchbacks down towards the sea, and the flick
+// along the shore stays.
 import {
   gatesAlong,
   padsAlong,
@@ -58,13 +60,26 @@ const DRAWN: readonly ControlPoint[] = [
   [56, 145, 28],
   [24, 167, 28],
   [-14, 158, 29],
-  // A long fast right, down the west side, a sharp left-right flick, and the right onto the straight
-  [-100, 151, 31],
-  [-150, 128, 31],
-  [-178, 80, 31],
-  [-183, 25, 31],
-  [-162, -10, 29],
-  [-190, -54, 31],
+  // The west side (revision 6): on westwards, then two more switchbacks down towards the sea
+  [-80, 160, 30],
+  [-150, 160, 29],
+  // Hairpin 3: right, round to the east
+  [-183, 151, 28],
+  [-196, 129, 28],
+  [-184, 107, 28],
+  [-150, 100, 29],
+  [-98, 100, 29],
+  // Hairpin 4: left, round to the west
+  [-76, 92, 28],
+  [-66, 70, 28],
+  [-78, 50, 28],
+  [-104, 44, 29],
+  [-160, 42, 29],
+  // A right down the shore, a sharp right-left flick, and the right onto the straight
+  [-186, 26, 29],
+  [-194, -4, 29],
+  [-178, -34, 29],
+  [-194, -66, 30],
   [-176, -98, 36],
 ]
 
@@ -97,7 +112,9 @@ export const HARBOUR: TrackJson = {
   // are set aside, the physics having changed too
   // 2026-11-14 once more (owner: the drift as a real slide, faster still): the road is the same,
   // the physics is not, so old records are set aside
-  revision: 5,
+  // 2026-11-14, last (owner: "the maps are still too simple"; the slide-out and the counter-steer):
+  // two more switchbacks down the west side, where the long fast arc was; old records are set aside
+  revision: 6,
   laps: 3,
   road: fromLine,
   gates,
@@ -117,8 +134,9 @@ export const HARBOUR: TrackJson = {
   boostPads: padsAlong(fromLine, [
     [20, -8],
     [45, 8],
-    [88, 8],
-    [130, -8],
+    [89, 8],
+    [131, -8],
+    [271, 8],
   ]),
   itemBoxes: [],
   decor: [],

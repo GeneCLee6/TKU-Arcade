@@ -398,11 +398,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       steer: debug.input.steer,
       drift: slideWay,
       boosting,
-      // The sparks say when a release boost is there for the taking
+      // The sparks say where the release boost stands: gold once the drift has earned one and all
+      // through the slide-out (counter-steer now), blue once it is caught (the throttle now)
       charge:
         current.releaseWindow > 0
           ? 2
-          : current.drifting && current.driftSeconds >= tuning.chainMinDrift
+          : current.burstReady ||
+              (current.drifting && current.driftSeconds >= tuning.chainMinDrift)
             ? 1
             : 0,
       bursts,

@@ -4,12 +4,14 @@ import type { TrialStart } from '../../shared/kart/timeTrial.ts'
 // e8-t08: the big words over the race (DRIFT, BOOST, CHAIN ×n), told from two states in a row.
 // 2026-11-14: and the techniques: a start boost or a jump start, a release boost, a boost slide;
 // then a stacked boost, a counter catch, a boost pad and a chain broken on a wall; then the double
-// (a second release boost from a tapped drift right after the first)
+// (a second release boost from a tapped drift right after the first); then the slide-out's prompts:
+// counter-steer now, and, once caught, the throttle now
 
 export type CalloutKind =
   | 'drift'
   | 'double'
   | 'catch'
+  | 'counter'
   | 'slide'
   | 'release'
   | 'pad'
@@ -42,7 +44,10 @@ export function calloutBetween(before: KartState, after: KartState): Callout | u
   }
   // A boost from nowhere: the road's boost pad
   if (after.boostSeconds > before.boostSeconds + 1e-9) return { kind: 'pad', count: 0 }
-  if (after.catchSeconds > before.catchSeconds) return { kind: 'catch', count: 0 }
+  // The slide-out caught with a release boost waiting: press the throttle now
+  if (after.releaseWindow > before.releaseWindow) return { kind: 'catch', count: 0 }
+  // A drift let go that earned a release boost: the car is sliding out, counter-steer now
+  if (!before.burstReady && after.burstReady) return { kind: 'counter', count: 0 }
   if (!before.sliding && after.sliding) return { kind: 'slide', count: 0 }
   if (before.driftDirection === 0 && after.driftDirection !== 0) return { kind: 'drift', count: 0 }
   return undefined
@@ -54,7 +59,8 @@ export const calloutAtStart = (start: TrialStart): Callout | undefined =>
 
 const RANK: Record<CalloutKind, number> = {
   drift: 0,
-  catch: 1,
+  catch: 2,
+  counter: 1,
   slide: 2,
   release: 3,
   pad: 3,

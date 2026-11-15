@@ -260,14 +260,16 @@ describe('the harbour track (N1, e10-t02)', () => {
     }
   })
 
-  it('is about as long as Riverside, with two hairpins one after the other', () => {
+  it('is about as long as Riverside, with hairpins one after the other', () => {
     const length = (json: TrackJson) =>
       json.road.reduce((sum, point, index) => {
         const next = json.road[(index + 1) % json.road.length]!
         return sum + Math.hypot(next.x - point.x, next.z - point.z)
       }, 0)
     expect(length(HARBOUR)).toBeGreaterThan(2000)
-    expect(length(HARBOUR)).toBeLessThan(2600)
+    expect(length(HARBOUR)).toBeLessThan(3000)
+    expect(length(RIVERSIDE)).toBeGreaterThan(2200)
+    expect(length(RIVERSIDE)).toBeLessThan(2800)
     // A hairpin: the road turned round by more than 150 degrees within 110 m
     expect(sharpCorners(HARBOUR.road, 110, 150)).toBeGreaterThanOrEqual(2)
     expect(sharpCorners(RIVERSIDE.road, 110, 150)).toBeGreaterThanOrEqual(2)
