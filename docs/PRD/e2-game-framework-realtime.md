@@ -84,7 +84,7 @@ depends_on: [E12]
 
 - [x] `e2-t09` 動作序列與種子保存、`/replay` 端點、前端重放器 · AC-2.5 · M · ← e2-t03 · I3（#46）：只在一局結束後
 - [ ] `e2-t10` 戰績寫入 D1（結果→`results` 表；登入者才寫） · AC-2.4 · S · ← e1-t12, e12-t05
-- [ ] `e2-t11` `RealtimeModule` 介面骨架與文件（E9 用） · — · S
+- [x] `e2-t11` `RealtimeModule` 介面骨架與文件（E9 用） · — · S · L1（2026-11-14）：`GameModule.realtime`，ARCHITECTURE §4.13
 - [x] `e2-t12` 遊戲畫面動態載入與 JS 預算分 chunk · — · S · ← e12-t03 · #17
 
 ## 風險與對策

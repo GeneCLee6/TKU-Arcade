@@ -397,6 +397,21 @@ src/kart/
 - **測試**：`tests/shared/kart-boost.test.ts`（放開後等反打、不反打不噴、先按油門不算、同一步算、整段滑出都能反打、過了就沒、新甩尾放棄舊的一發；加速條照深度 × 速度、越久越多、滑出也算）、`kart-physics.test.ts`（放開後 0.3 秒還側著 25° 以上、車頭繼續轉、掉速；反打 0.3 秒內回正、車頭拉回、之後快 4 m/s 以上；30 與 144 fps 結果一樣）、`tests/kart/tamkang.test.ts`（三張圖都不自交、「40 m 內轉 60°」的彎至少 9 個、新的 `recordKey`）、e2e 的收尾加速改成「放開 → 按反方向 → 等窗開 → 按前進」（鍵盤與手把）。
 - **數字**：卡丁車 chunk 201.1 → **201.6 kB** gzip；主站與各遊戲首屏不變。畫面在 Playwright 的軟體繪圖看過（滑出時的胎痕與金色火花、「反打」提示、收尾加速、胎痕 10 秒後還在、三張圖的小地圖）；漁港與淡江新加的那幾段沒有逐彎開過看景物；**手感沒有人開過**，時機窗（滑出 0.9 秒、反打後 0.4 秒）是起始值。
 
+### 4.14 L1–L3：多人競速房（`e2-t11` `e9-t01` `e9-t02` `e9-t03` `e9-t04` `e9-t07` `e9-t08` `e9-t09`，2026-11-14）
+
+擁有者 2026-11-14：「能不能趕快放開多人同時玩開房了嗎」——**不等手感簽核（規則 10 由擁有者豁免），多人與手感並行**。線上格式、門檻與實測在 [`KART-NETCODE.md`](KART-NETCODE.md)。
+
+- **`RealtimeModule`**（`shared/games/types.ts`，`GameModule.realtime?`）：回合制的 GameModule 多一半即時的部分。`frame(state, memory, seat, bytes, now)` 收一個座位的二進位 frame，回「要轉給其他人的 bytes（或 null 丟掉）」與「以 `system` 身分套用的動作」；`clock(state, now)` 在每次變更後回需要伺服器時間的動作（kart 的 `goAt`）；`memory()` 是這一局只在記憶體的暫存（被趕出記憶體就重來，模組要能從下一批 frame 與 state 接回）。動作照樣進動作紀錄，所以重播仍然是「種子＋動作」。
+- **RoomHost**（`worker/room-host.ts`）：`binary(conn, data)` 取代 realtime 遊戲的 `badFrame`（回合制遊戲收到二進位照舊關閉連線）：只收已入座、在這局裡的座位，丟給模組，`relay` 前面加座位 byte 用 `sockets.sendBinary` 送給其他已 join 的連線，動作走 `systemAction`→`accept`。`accept` 與開局之後跑 `runClock`（同一個 `now`，最多 4 輪，有防重入旗標）。對時是二進位（`CLOCK_FRAME` 255 開頭，9 bytes 進、17 bytes 出），任何已 join 的連線都回伺服器時間，不進 view、不動 `rev`；用二進位是為了不讓 JSON 解析進首屏。`worker/room.ts` 把 `ArrayBuffer` 交給 `binary`。
+- **`kart` GameModule**（`shared/games/kart/`，Worker 才有 `rules.ts`）：state 是 `track`、`laps`、`phase`（loading → countdown → racing → finished）、`goAt`、每人 `loaded`／`lapMs`／`finishMs`／`out`。座位只能送 `loaded`；`start`（載入等 25 秒）、`schedule`、`go`（4 秒倒數計時器）、`lap`、`retire`、`close` 都是 `system`。沒有隱藏資訊，view 是 state 加 `you`。結果依完賽時間，未完賽依圈數，note 是時間字串。房間選項：賽道（`select`，選項由 `shared/kart/tracks/list.ts` 的 id 產生，`registry.ts` 對應賽道，型別保證兩邊一致）、圈數 1–9。1–8 人。
+- **裁定**（`shared/kart/race.ts`）：`judgeFrame` 做合理性檢查（速度、tick、跳躍、重置落點、舊 frame、1 秒後重新同步）與 gate 計數（`passGates` 沿兩個 frame 間的線段，最多 3 個；車自己的計數只在多一個 gate 且人在那個 gate 後面 60 m 內才採信）。`gridSpot` 把賽道的起跑格（目前每張 6 格）照同樣的間隔往後延伸到 8 格。`raceProgress` 給名次用。`bumpKart` 是車對車推開。
+- **瀏覽器**：`useRoom` 多一個 `realtime` 頻道（`send`、`pingClock`、`listen`；不經 React），`roomConnection` 的 `sendQuiet` 送 frame 與對時（不算「等回覆」的點按）、`binaryType = 'arraybuffer'`。**首屏**：大廳只多卡丁車的名稱、簡介與「單人試跑」；選項與賽道名稱（`i18n.options.ts`）由等待室的 lazy chunk 註冊（`src/i18n/waitingExtras.ts`），「即將推出」卡片拿掉了（沒有遊戲在裡面）。陞官圖完整版首屏 149.9 kB（上限 150）。`src/games/kart/KartScreen.tsx`（遊戲畫面 chunk，127.4 kB 首屏）：有車的人全螢幕 `src/kart/race/RaceView.tsx`（卡丁車 chunk，lazy），比賽結束後是房間的結果面板與房主的「再來一局」；沒車的人看伺服器的名次表（觀戰是 L5）。
+- **賽道迴圈的掛勾**（`spikeLoop.ts` 的 `SpikeNet`，只加不改）：起跑格、房間圈數、倒數改用房間的 `goAt`（沒有 `goAt` 前停在格子上）、每步之後送 frame、其他車的推開、每幀畫其他車與名牌；多人賽不存紀錄與幽靈車。`Scene.ts` 多 `others()`（其他車的模型，依座位建立與移除）與 `project()`（名牌的螢幕座標）。
+- **其他車**（`src/kart/race/remotes.ts`）：100 ms 插值、每台車自己學時鐘差、最多外推 200 ms、重置直接跳。`netRace.ts` 管對時、送出、名次（完賽的依伺服器時間，其他依 gate 進度）與「連線不穩」。
+- **大廳**：卡丁車從「即將推出」變成正式卡片（建立房間＋「單人試跑」連到 `/kart`，`GameMeta.tryAlone`）；房主在等待室選賽道與圈數。單人計時賽 `/kart` 不變。
+- **測試**：`tests/kart/net.test.ts`、`tests/kart/race.test.ts`（裁定、格子、碰撞）、`tests/games/kart.test.ts`（harness 隨機局、流程、從 frame 裁定到完賽、退賽）、`tests/worker/room-realtime.test.ts`（轉送、對時、`goAt`、整場到結果）、`e2e/kart-race.spec.ts`（兩個瀏覽器 context、`?autopilot`、河畔一圈到結果）。
+- **沒做（下一步）**：道具（L4）、觀戰與重播的 state 串流（L5）、多裝置與 6 人實測（`e9-t04` 的跨網路數字、`e9-t11`）、選車與角色（N3）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

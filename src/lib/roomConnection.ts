@@ -53,12 +53,19 @@ export type RoomHandlers = {
   onChat: (messages: ChatMessage[], reset: boolean) => void
   /** Someone's reaction (e7-t11), to float up and be gone */
   onReaction?: (member: string, reaction: number) => void
+  /** A binary frame (e2-t11): a real-time game's, or the answer to a clock ping */
+  onBinary?: (data: Uint8Array) => void
   onEnd: (end: RoomEnd) => void
 }
 
 export type RoomConnection = {
   /** False when it could not go out: before `welcome`, while reconnecting, or after the end */
   send: (message: ClientMessage) => boolean
+  /**
+   * Out without waiting for an answer, as a real-time game's frames and clock pings go: twenty a
+   * second must not each count as a tap the socket owes a reply to. False when it could not go out
+   */
+  sendQuiet: (data: Uint8Array) => boolean
   /** After it, nothing from this socket counts any more */
   leave: () => void
 }
@@ -135,7 +142,7 @@ function finalEnd(code: number): RoomEnd | null {
 /** shared/protocol.ts CloseCode: after any close but the 44xx ones, except `stale` */
 const canReconnectAfter = (code: number) => code === CloseCode.stale || code < 4400 || code >= 4500
 
-type RoomSocket = Pick<RoomConnection, 'send' | 'leave'> & {
+type RoomSocket = Pick<RoomConnection, 'send' | 'sendQuiet' | 'leave'> & {
   /** Checks that the socket still answers; replaced if it does not */
   probe: () => void
 }
@@ -158,6 +165,8 @@ type RoomSocketHandlers = Omit<RoomHandlers, 'onEnd' | 'onReconnecting'> & {
 function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandlers): RoomSocket {
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const socket = new WebSocket(`${scheme}//${window.location.host}${roomSocketPath(roomId)}`)
+  // A real-time game's frames (e2-t11) come as bytes
+  socket.binaryType = 'arraybuffer'
   let current = true
   let heartbeat: ReturnType<typeof setInterval> | undefined
   let joined: { you: string; rev: number; view: RoomView } | null = null
@@ -244,7 +253,12 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
     clearTimeout(probeTimer)
     replyTimer = undefined
     probeTimer = undefined
-    if (!current || typeof event.data !== 'string' || event.data === HEARTBEAT_PONG) return
+    if (!current) return
+    if (event.data instanceof ArrayBuffer) {
+      if (joined) handlers.onBinary?.(new Uint8Array(event.data))
+      return
+    }
+    if (typeof event.data !== 'string' || event.data === HEARTBEAT_PONG) return
     const message = parseServerMessage(event.data)
     switch (message?.t) {
       case 'welcome':
@@ -315,6 +329,15 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
           replyTimer = undefined
           probe()
         }, REPLY_TIMEOUT_MS)
+      }
+      return true
+    },
+    sendQuiet: (data) => {
+      if (!current || !joined || socket.readyState !== WebSocket.OPEN) return false
+      try {
+        socket.send(data as Uint8Array<ArrayBuffer>)
+      } catch {
+        return false
       }
       return true
     },
@@ -431,6 +454,7 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
 
   return {
     send: (message) => socket?.send(message) ?? false,
+    sendQuiet: (data) => socket?.sendQuiet(data) ?? false,
     leave: () => {
       stopReconnecting()
       unwatch()

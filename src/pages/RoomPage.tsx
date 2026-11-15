@@ -191,6 +191,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
     onReopen: room.reopen,
     onRematch: room.rematch,
     act: room.act,
+    realtime: room.realtime,
     chat: {
       messages: room.chat,
       locked: view.game?.chatLocked ?? false,

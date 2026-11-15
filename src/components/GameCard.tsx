@@ -48,6 +48,11 @@ export function GameCard({ game, disabled, onNewRoom }: GameCardProps) {
           {t('rules.howToPlay')}
         </RulesLink>
       )}
+      {game.meta.tryAlone && (
+        <RulesLink to={game.meta.tryAlone} data-try={game.id}>
+          {t(`${i18nKey}.tryAlone`)}
+        </RulesLink>
+      )}
       <Button disabled={disabled} onClick={onNewRoom}>
         {t('lobby.newRoom')}
       </Button>

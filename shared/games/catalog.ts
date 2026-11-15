@@ -7,6 +7,8 @@ import { lanternMessages } from './lantern/i18n.ts'
 import { lanternInfo } from './lantern/info.ts'
 import { clueClashMessages } from './clue-clash/i18n.ts'
 import { clueClashInfo } from './clue-clash/info.ts'
+import { kartMessages } from './kart/i18n.ts'
+import { kartInfo } from './kart/info.ts'
 import { kiteMessages } from './kite/i18n.ts'
 import { kiteInfo } from './kite/info.ts'
 import { oddWordMessages } from './odd-word/i18n.ts'
@@ -55,6 +57,7 @@ export const GAME_INFOS = [
   miseryInfo,
   wordBridgeInfo,
   clueClashInfo,
+  kartInfo,
 ] as unknown as readonly AnyGameInfo[]
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
@@ -87,6 +90,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...palaceMessages.en,
     ...holdemMessages.en,
     ...miseryMessages.en,
+    ...kartMessages.en,
   },
   'zh-TW': {
     ...ticTacToeMessages['zh-TW'],
@@ -106,5 +110,6 @@ export const GAME_MESSAGES: GameMessages = {
     ...palaceMessages['zh-TW'],
     ...holdemMessages['zh-TW'],
     ...miseryMessages['zh-TW'],
+    ...kartMessages['zh-TW'],
   },
 }

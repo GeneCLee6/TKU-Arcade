@@ -11,6 +11,7 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   Scene,
+  Vector3,
   WebGLRenderer,
 } from 'three'
 import type { Wall } from '../../shared/kart/walls.ts'
@@ -42,6 +43,16 @@ export interface Pose {
   readonly heading: number
 }
 
+/** Another racer's kart (e9-t03): where it is drawn this frame, and how it looks */
+export interface OtherKart extends Pose {
+  readonly id: number
+  readonly body: KartBody
+  readonly look: KartLook
+}
+
+/** Where a point of the world is on the canvas, in CSS pixels from its top left; null off screen */
+export type ScreenPoint = { readonly x: number; readonly y: number } | null
+
 export interface KartScene {
   /** The GPU's name where the browser tells, so that an fps number says what it was measured on */
   readonly rendererName: string
@@ -52,6 +63,10 @@ export interface KartScene {
   snapCamera(heading: number): void
   /** Where the best run's ghost is now (e8-t11), or null to hide it */
   ghost(pose: Pose | null): void
+  /** The other racers' karts this frame (e9-t03); one missing from the list is taken away */
+  others(karts: readonly OtherKart[], frameSeconds: number): void
+  /** Where each of these points (x, height, z) is on screen, as of the last frame drawn */
+  project(points: readonly (readonly [number, number, number])[]): ScreenPoint[]
   /** `{width}x{height}` of the drawing buffer */
   drawingBuffer(): string
   /** Frees everything on the GPU and takes the canvas out of the page */
@@ -155,6 +170,9 @@ export function createKartScene(
   const effects = createKartEffects(scene, kart)
   // Made the first time there is a ghost to show
   let ghostKart: KartModel | null = null
+  // The other racers' karts, by id, made when each first appears
+  const otherKarts = new Map<number, KartModel>()
+  const projected = new Vector3()
 
   // One box per wall, along its centre line: the test yard's. A track's art draws its own barriers
   const wallGeometry = new BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS)
@@ -248,6 +266,42 @@ export function createKartScene(
       ghostKart.group.position.set(pose.x, 0, pose.z)
       ghostKart.group.rotation.y = -pose.heading
     },
+    others(karts, frameSeconds) {
+      const seen = new Set<number>()
+      for (const other of karts) {
+        seen.add(other.id)
+        let model = otherKarts.get(other.id)
+        if (model && model.body !== other.body) {
+          scene.remove(model.group)
+          model.dispose()
+          model = undefined
+        }
+        if (!model) {
+          model = buildKartModel(false, false, other.body)
+          otherKarts.set(other.id, model)
+          scene.add(model.group)
+        }
+        model.group.position.set(other.x, 0, other.z)
+        model.group.rotation.y = -other.heading
+        model.update(other.look, frameSeconds)
+      }
+      for (const [id, model] of otherKarts) {
+        if (seen.has(id)) continue
+        scene.remove(model.group)
+        model.dispose()
+        otherKarts.delete(id)
+      }
+    },
+    project(points) {
+      const { clientWidth: width, clientHeight: height } = container
+      return points.map(([x, y, z]) => {
+        projected.set(x, y, z).project(camera)
+        if (projected.z > 1 || Math.abs(projected.x) > 1.1 || Math.abs(projected.y) > 1.1) {
+          return null
+        }
+        return { x: ((projected.x + 1) / 2) * width, y: ((1 - projected.y) / 2) * height }
+      })
+    },
     drawingBuffer: () => `${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`,
     dispose() {
       observer.disconnect()
@@ -261,6 +315,7 @@ export function createKartScene(
       speedLines.dispose()
       kart.dispose()
       ghostKart?.dispose()
+      for (const model of otherKarts.values()) model.dispose()
       art?.dispose()
       grid.material.dispose()
       renderer.dispose()

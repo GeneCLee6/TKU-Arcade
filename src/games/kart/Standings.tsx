@@ -1,0 +1,82 @@
+import styled from 'styled-components'
+import type { KartView } from '../../../shared/games/kart/types.ts'
+import { useT } from '../../i18n/useT.ts'
+import { raceTime } from './raceTime.ts'
+import { monoType } from '../../styles/esports.ts'
+import { color, fontSize, space } from '../../styles/tokens.ts'
+
+/**
+ * The race's standings as the server has judged them, in the order given: each kart's place, name,
+ * and its time at the finish, its laps while racing, or that it dropped out (e9-t08)
+ */
+export function Standings({
+  view,
+  order,
+  nameOf,
+}: {
+  view: KartView
+  order: readonly number[]
+  nameOf: (seat: number) => string
+}) {
+  const t = useT()
+  return (
+    <List aria-label={t('games.kart.race.standings')} data-testid="kart-standings">
+      {order.map((seat, index) => {
+        const racer = view.racers.find((one) => one.seat === seat)
+        if (!racer) return null
+        const detail =
+          racer.finishMs !== null
+            ? raceTime(racer.finishMs)
+            : racer.out
+              ? t('games.kart.race.out')
+              : t('games.kart.race.lap', {
+                  lap: Math.min(racer.lapMs.length + 1, view.laps),
+                  laps: view.laps,
+                })
+        return (
+          <Row key={seat} $you={seat === view.you} data-seat={seat}>
+            <Place>{index + 1}</Place>
+            <Name>
+              {nameOf(seat)}
+              {seat === view.you && ` (${t('games.kart.race.you')})`}
+            </Name>
+            <Detail>{detail}</Detail>
+          </Row>
+        )
+      })}
+    </List>
+  )
+}
+
+const List = styled.ol`
+  display: grid;
+  gap: ${space.xs}px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+`
+
+const Row = styled.li<{ $you: boolean }>`
+  display: grid;
+  grid-template-columns: 2ch minmax(0, 1fr) auto;
+  gap: ${space.sm}px;
+  align-items: baseline;
+  color: ${(p) => (p.$you ? color.accent : color.text)};
+  font-weight: ${(p) => (p.$you ? 700 : 400)};
+`
+
+const Place = styled.span`
+  ${monoType}
+  color: ${color.muted};
+`
+
+const Name = styled.span`
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const Detail = styled.span`
+  ${monoType}
+  font-size: ${fontSize.sm}px;
+`

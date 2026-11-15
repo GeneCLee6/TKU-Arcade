@@ -168,9 +168,9 @@ describe('lobby cards', () => {
     const misery = cardOf('Misery Line')
     expect(within(misery).getByText('2–10 players')).toBeInTheDocument()
     expect(within(misery).getByRole('button', { name: 'New room' })).toBeInTheDocument()
-    // Sixteen open games; the Coming soon card arrives with its lazy chunk
+    // Seventeen open games, the kart's race room among them since 2026-11-14; no Coming soon card
     await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(17))
-    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(16)
+    expect(screen.getAllByRole('button', { name: 'New room' })).toHaveLength(17)
     expect(LOBBY_GAMES.map((game) => game.id)).toEqual([
       'promotion',
       'silent-table',
@@ -188,34 +188,26 @@ describe('lobby cards', () => {
       'misery',
       'word-bridge',
       'clue-clash',
+      'kart',
     ])
   })
 
-  it('shows the games that are not open yet as Coming soon, the kart with a link to try it alone', async () => {
+  it('opens kart rooms, with a link to try the time trial alone (2026-11-14)', async () => {
     renderLobby()
-    // The tag is part of the heading, so a screen reader hears it with the name
-    const heading = await screen.findByRole('heading', { level: 3, name: 'Kart Coming soon' })
+    const heading = await screen.findByRole('heading', { level: 3, name: 'Kart' })
     const card = heading.closest('li')!
-    expect(within(card).queryByRole('button')).not.toBeInTheDocument()
-    // The time trial is open for trying the feel (owner, 2026-11-14): one link, to it
+    expect(within(card).getByRole('button', { name: 'New room' })).toBeInTheDocument()
+    expect(within(card).getByText('1–8 players')).toBeInTheDocument()
     expect(within(card).getByRole('link', { name: 'Try it alone' })).toHaveAttribute('href', '/kart')
-    // A Coming soon card never doubles a listed game: take it out of ComingSoon.tsx when it opens
-    for (const game of LOBBY_GAMES) {
-      const name = translate('en', `${game.meta.i18nKey}.name`)
-      expect(
-        screen.getAllByRole('heading', { level: 3, name: new RegExp(`^${name}`) }),
-      ).toHaveLength(1)
-    }
     // Nothing on the page leads to the kart's hidden spike
     expect(document.querySelector('a[href^="/kart/spike"]')).toBeNull()
   })
 
-  it('translates the Coming soon cards', async () => {
+  it('translates the kart card', async () => {
     setLanguage('zh-TW')
     renderLobby()
-    expect(
-      await screen.findByRole('heading', { level: 3, name: '卡丁車 即將推出' }),
-    ).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', { level: 3, name: '卡丁車' })
+    expect(within(heading.closest('li')!).getByRole('link', { name: '單人試跑' })).toBeInTheDocument()
     setLanguage('en')
   })
 

@@ -256,6 +256,17 @@ export type { ChatMessage }
 /** Someone's reaction (e7-t11), to everyone in the room, the sender too. Gone once it has floated */
 export type ReactionMessage = { t: 'reaction'; member: string; reaction: number }
 
+/**
+ * A clock ping (e9-t01), as a binary frame so that it costs the first load nothing: CLOCK_FRAME,
+ * then the browser's own time as a float64 (little-endian); the answer is the same with the
+ * server's clock (ms since the epoch) after it. A real-time game uses it to count down to the
+ * same moment everywhere (shared/kart/net.ts `clockOffset`). Relayed frames start with a seat
+ * (0 to 63), so the first byte tells the two apart
+ */
+export const CLOCK_FRAME = 255
+export const CLOCK_PING_BYTES = 9
+export const CLOCK_ANSWER_BYTES = 17
+
 export type ServerMessage =
   | WelcomeMessage
   | SnapshotMessage

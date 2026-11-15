@@ -3,9 +3,18 @@ import { CHAT_CHUNK, CHAT_HISTORY, ChatRateLimit, type ChatMessage } from '../sh
 import type { ReplayStep } from '../shared/games/match.ts'
 import { keepHidden, parseOptions } from '../shared/games/options.ts'
 import { createRng } from '../shared/games/rng.ts'
-import type { AnyGameModule, GameProjection, OptionValues, Viewer } from '../shared/games/types.ts'
+import type {
+  AnyGameModule,
+  GameProjection,
+  OptionValues,
+  RealtimeMemory,
+  Viewer,
+} from '../shared/games/types.ts'
 import { diff, type JsonValue } from '../shared/patch.ts'
 import {
+  CLOCK_ANSWER_BYTES,
+  CLOCK_FRAME,
+  CLOCK_PING_BYTES,
   CloseCode,
   JOIN_TIMEOUT_MS,
   KICK_BAN_MS,
@@ -110,6 +119,8 @@ export type StoredRoom = {
 export type RoomHostDeps = {
   sockets: {
     send(conn: string, message: ServerMessage): void
+    /** A binary frame (a real-time game's, e2-t11): without waiting, and lost if the socket is closing */
+    sendBinary?(conn: string, data: Uint8Array): void
     close(conn: string, code: number, reason: string): void
   }
   /**
@@ -182,6 +193,14 @@ export class RoomHost {
   private readonly deps: RoomHostDeps
   /** When each member last reacted (e7-t11); forgotten on hibernation, which costs nothing */
   private readonly reactedAt = new Map<string, number>()
+  /**
+   * A real-time game's scratch space (e2-t11), for the game it was made for: in memory only, so
+   * an eviction starts it over and the module rebuilds what it needs from the next frames
+   */
+  private realtimeMemory: { game: StoredGame['seed']; gameId: string; memory: RealtimeMemory } | null =
+    null
+  /** While the clock's actions are being applied: they change the game, which asks again */
+  private clocking = false
 
   constructor(deps: RoomHostDeps) {
     this.deps = deps
@@ -420,6 +439,113 @@ export class RoomHost {
       case 'cover':
         this.cover(conn, member, message.seat, message.how)
         return
+    }
+  }
+
+  /**
+   * A binary frame (e2-t11): a real-time game's, from a seat in it, judged by the module and passed
+   * on to every other joined socket with the seat in front. Frames still in flight when the race
+   * ends, or from someone without a seat in it, are ignored; in a room whose game is not real-time,
+   * a binary frame is a protocol error as before.
+   */
+  binary(conn: string, data: ArrayBuffer): void {
+    const connection = this.conns.get(conn)
+    const room = this.room
+    if (!connection || !room) return
+    // A clock ping, from anyone who has joined: answered with the server's time
+    const bytes = new Uint8Array(data)
+    if (bytes.byteLength === CLOCK_PING_BYTES && bytes[0] === CLOCK_FRAME) {
+      if (connection.member === null || !this.deps.sockets.sendBinary) return
+      const answer = new Uint8Array(CLOCK_ANSWER_BYTES)
+      answer.set(bytes)
+      new DataView(answer.buffer).setFloat64(CLOCK_PING_BYTES, this.deps.now(), true)
+      this.deps.sockets.sendBinary(conn, answer)
+      return
+    }
+    const game = this.game
+    const module = game ? this.deps.games(game.gameId) : null
+    if (!game || !module?.realtime) return this.badFrame(conn)
+    const now = this.deps.now()
+    connection.lastSeen = now
+    const member = connection.member === null ? undefined : this.members.get(connection.member)
+    const seat = member?.seat ?? null
+    if (room.status !== 'playing' || seat === null || !game.seats.some((one) => one.id === seat)) {
+      return
+    }
+    let answer: { relay: Uint8Array | null; actions: JsonValue[] }
+    try {
+      answer = module.realtime.frame(
+        game.match.state,
+        this.memoryFor(game),
+        seat,
+        bytes,
+        now,
+      )
+    } catch (error) {
+      console.error(`game ${game.gameId}: realtime frame threw`, error)
+      return
+    }
+    if (answer.relay && this.deps.sockets.sendBinary) {
+      const relayed = new Uint8Array(answer.relay.byteLength + 1)
+      relayed[0] = seat
+      relayed.set(answer.relay, 1)
+      for (const [other, { member: joined }] of this.conns) {
+        if (other !== conn && joined !== null) this.deps.sockets.sendBinary(other, relayed)
+      }
+    }
+    for (const action of answer.actions) this.systemAction(action, now)
+  }
+
+  /** The real-time module's scratch space for this game, new for each game */
+  private memoryFor(game: StoredGame): RealtimeMemory {
+    const known = this.realtimeMemory
+    if (known && known.game === game.seed && known.gameId === game.gameId) return known.memory
+    const memory = this.deps.games(game.gameId)?.realtime?.memory() ?? {}
+    this.realtimeMemory = { game: game.seed, gameId: game.gameId, memory }
+    return memory
+  }
+
+  /** An action the room itself takes for a real-time game (a judged lap, the start time) */
+  private systemAction(action: JsonValue, now: number): void {
+    const room = this.room
+    const game = this.game
+    if (!room || !game || room.status !== 'playing') return
+    const module = this.deps.games(game.gameId)
+    if (!module) return
+    const outcome = playAction(module, game, action, 'system', now)
+    if (outcome.kind === 'accepted') return this.accept(room, game.steps, outcome)
+    if (outcome.kind === 'refused') {
+      console.error(`game ${game.gameId}: realtime action refused: ${outcome.error.gameError}`)
+    }
+  }
+
+  /**
+   * What a real-time game asks of the clock after a change (the kart's start time), applied at
+   * once with the same `now`. A few rounds at most: a module that keeps asking is a bug
+   */
+  private runClock(): void {
+    if (this.clocking) return
+    this.clocking = true
+    try {
+      for (let round = 0; round < 4; round++) {
+        const room = this.room
+        const game = this.game
+        if (!room || !game || room.status !== 'playing') return
+        const realtime = this.deps.games(game.gameId)?.realtime
+        if (!realtime?.clock) return
+        const now = this.deps.now()
+        let actions: JsonValue[]
+        try {
+          actions = realtime.clock(game.match.state, now)
+        } catch (error) {
+          console.error(`game ${game.gameId}: realtime clock threw`, error)
+          return
+        }
+        if (actions.length === 0) return
+        for (const action of actions) this.systemAction(action, now)
+      }
+    } finally {
+      this.clocking = false
     }
   }
 
@@ -688,6 +814,7 @@ export class RoomHost {
       this.deps.storage.saveRoom(room)
     })
     this.deps.metric?.('game_started', game.gameId)
+    this.runClock()
   }
 
   private act(conn: string, member: MemberRecord, action: JsonValue): void {
@@ -722,6 +849,7 @@ export class RoomHost {
       }
     })
     if (outcome.over) this.deps.metric?.('game_finished', outcome.game.gameId)
+    else this.runClock()
   }
 
   /**

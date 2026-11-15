@@ -1,5 +1,5 @@
-// The parts of a lobby card: GameCard's, and the Coming soon cards' (ComingSoon.tsx). A file of its
-// own so that the lazy Coming soon chunk imports nothing else of GameCard: importing GameCard itself
+// The parts of a lobby card: GameCard's, and those of the Coming soon cards (ComingSoon.tsx, gone
+// since the kart opened on 2026-11-14). A file of its own so that the lazy Coming soon chunk imported nothing else of GameCard: importing GameCard itself
 // made the bundler split rulesDoc out of the first load into a chunk of its own, about 0.5 kB more
 // on every first screen (E3)
 import styled from 'styled-components'

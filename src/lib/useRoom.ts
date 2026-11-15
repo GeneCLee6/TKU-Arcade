@@ -45,6 +45,19 @@ export type RoomHandle = {
   /** e7-t11: the reactions floating now, oldest first */
   reactions: readonly FloatingReaction[]
   react(reaction: number): void
+  /** A real-time game's channel (e2-t11): frames and clock pings, outside React */
+  realtime: RoomRealtime
+}
+
+/**
+ * A real-time game's channel (e2-t11): binary frames both ways, the race loop's own, outside React.
+ * What comes in is a relayed frame (the sender's seat first) or a clock answer (CLOCK_FRAME first)
+ */
+export type RoomRealtime = {
+  /** False when it could not go out (reconnecting) */
+  send(data: Uint8Array): boolean
+  /** Returns the way to stop listening */
+  listen(listener: (data: Uint8Array) => void): () => void
 }
 
 /** More than this many on screen and the oldest go first */
@@ -69,6 +82,15 @@ export function useRoom(roomId: string, name: string): RoomHandle {
   const reactionId = useRef(0)
   const chatSends = useRef(new ChatSends())
   const you = useRef<string | null>(null)
+  // One channel for the life of the page: the race loop holds on to it across reconnects
+  const listeners = useRef(new Set<(data: Uint8Array) => void>())
+  const [realtime] = useState<RoomRealtime>(() => ({
+    send: (data) => connection.current?.sendQuiet(data) ?? false,
+    listen: (listener) => {
+      listeners.current.add(listener)
+      return () => listeners.current.delete(listener)
+    },
+  }))
 
   useEffect(() => {
     if (session.phase === 'joined') you.current = session.you
@@ -104,6 +126,9 @@ export function useRoom(roomId: string, name: string): RoomHandle {
         if (!chatSends.current.refused(error.code)) toast(errorText(error), { tone: 'danger' })
       },
       onTimers: setTimers,
+      onBinary: (data) => {
+        for (const listener of listeners.current) listener(data)
+      },
       onReaction: (member, reaction) => {
         const id = ++reactionId.current
         setReactions((current) => [...current, { id, member, reaction }].slice(-MAX_FLOATING))
@@ -203,5 +228,6 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     reactions,
     react,
     sendChat,
+    realtime,
   }
 }
