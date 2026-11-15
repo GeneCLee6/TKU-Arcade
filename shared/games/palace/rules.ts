@@ -11,6 +11,7 @@
 //
 // docs/PRD/e17-palace-bluff.md has the rules and every detail decided here.
 import { palaceInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   PalaceAct,
@@ -481,6 +482,7 @@ export function phaseMs(phase: PalacePhase, seconds: PalaceWindow): number | nul
 
 export const palace: GameModule<PalaceState, PalaceAction, PalaceView, PalaceOptions> = {
   ...palaceInfo,
+  meta: GAME_META.palace,
 
   init(seats, options, rng) {
     let deck = newDeck(rng)

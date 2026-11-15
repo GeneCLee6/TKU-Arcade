@@ -1,4 +1,4 @@
-import { promotionBoard } from '../../styles/tokens.ts'
+import { promotionBoard } from '../../styles/promotionTokens.ts'
 
 // The promotion board's rice paper and greens: plain values, the same in both themes, and no new
 // colours in everyone's first load

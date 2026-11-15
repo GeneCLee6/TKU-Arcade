@@ -1,8 +1,8 @@
-// Every player-facing string of this game. `en` is the source; the type makes zh-TW keep the same
-// keys. src/i18n merges these through GAME_MESSAGES (shared/games/catalog.ts).
+// What the room says of this game before its screen has loaded: the options form, errors and results.
+// Not in the first load: the room loads this file when it opens a room of this game
+// (src/i18n/gameDetails.ts). The name and summary are the lobby's (shared/games/lobby.en.ts).
+// `en` is the source; the type makes zh-TW keep the same keys.
 const en = {
-  'games.tictactoe.name': 'Tic-Tac-Toe',
-  'games.tictactoe.summary': 'Three in a row wins.',
   'games.tictactoe.option.firstMove': 'Who goes first',
   'games.tictactoe.option.firstMove.random': 'Random',
   'games.tictactoe.option.firstMove.lowestSeat': 'First seat',
@@ -18,8 +18,6 @@ const en = {
 }
 
 const zhTW: Record<keyof typeof en, string> = {
-  'games.tictactoe.name': '井字棋',
-  'games.tictactoe.summary': '三子連線獲勝。',
   'games.tictactoe.option.firstMove': '誰先下',
   'games.tictactoe.option.firstMove.random': '隨機',
   'games.tictactoe.option.firstMove.lowestSeat': '第一個座位',

@@ -1,20 +1,11 @@
-// What the browser needs to know of this game before anyone plays it: no rules, so that they stay
-// out of the first load (shared/games/catalog.ts). `rules.ts` spreads this into the module.
+// The room's options for this game: no rules, and not in the first load either. The room loads this
+// file when it opens a room of this game (src/i18n/gameDetails.ts). The lobby card's players and
+// minutes are the module's `meta`, from shared/games/lobby.ts. `rules.ts` spreads this into the module.
 import type { GameInfo } from '../types.ts'
 import type { SpectrumOptions } from './types.ts'
 
 export const spectrumInfo: GameInfo<SpectrumOptions> = {
   id: 'spectrum',
-  // Listed on the owner's request, 2026-11-12, under its working title (PRD Q3 still open). No
-  // `proxyTurns`: an answer has to come from a person.
-  // 4 to 11: at least three answerers, so that the largest and the smallest are two different
-  // calls; at most ten, so that ten different numbers go round
-  meta: {
-    minPlayers: 4,
-    maxPlayers: 11,
-    minutes: 25,
-    i18nKey: 'games.spectrum',
-  },
 
   options: {
     mode: {

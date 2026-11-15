@@ -5,8 +5,7 @@ import type { OptionValues } from '../../shared/games/types.ts'
 import type { JsonValue } from '../../shared/patch.ts'
 import type { ClientMessage, CoverMessage, ErrorMessage, RoomView } from '../../shared/protocol.ts'
 import { useToast } from '../components/useToast.ts'
-import { en } from '../i18n/en.ts'
-import { t, type TextKey } from '../i18n/t.ts'
+import { hasMessage, t, type TextKey } from '../i18n/t.ts'
 import { ChatSends, mergeChat, type ChatSendResult } from './chatState.ts'
 import { connectRoom, type RoomConnection, type RoomEnd, type RoomTimer } from './roomConnection.ts'
 
@@ -67,7 +66,7 @@ function errorText(error: ErrorMessage): string {
   if (error.code === 'game_error') return t(error.error.gameError as TextKey, error.error.params)
   const key = `room.error.${error.code}`
   // A newer server can send a code this page does not know
-  return t(key in en ? (key as TextKey) : 'room.error.generic')
+  return t(hasMessage(key) ? (key as TextKey) : 'room.error.generic')
 }
 
 /** One person's connection to a room. Rules stay on the server: this only shows `view` and asks */

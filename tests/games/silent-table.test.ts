@@ -3,6 +3,8 @@ import { GAME_IDS, getGame, LOBBY_GAMES } from '../../shared/games/index.ts'
 import { makeSeats, projectGame, startMatch, applyAction } from '../../shared/games/match.ts'
 import { defaultOptions, parseOptions } from '../../shared/games/options.ts'
 import { createRng } from '../../shared/games/rng.ts'
+import { lobbyEn } from '../../shared/games/lobby.en.ts'
+import { lobbyZhTW } from '../../shared/games/lobby.zh-TW.ts'
 import { silentTableMessages } from '../../shared/games/silent-table/i18n.ts'
 import { silentTableScreenMessages } from '../../shared/games/silent-table/i18n.screen.ts'
 import { MOVES_PER_ROUND, silentTable } from '../../shared/games/silent-table/rules.ts'
@@ -737,8 +739,8 @@ describe('whole games through the harness', () => {
 })
 
 describe('strings', () => {
-  const en = { ...silentTableMessages.en, ...silentTableScreenMessages.en }
-  const zhTW = { ...silentTableMessages['zh-TW'], ...silentTableScreenMessages['zh-TW'] }
+  const en: Record<string, string> = { ...lobbyEn, ...silentTableMessages.en, ...silentTableScreenMessages.en }
+  const zhTW: Record<string, string> = { ...lobbyZhTW, ...silentTableMessages['zh-TW'], ...silentTableScreenMessages['zh-TW'] }
 
   it('has the owner-chosen names', () => {
     expect(en['games.silent-table.name']).toBe('Silent Table')

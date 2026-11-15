@@ -14,7 +14,7 @@ import type {
   KiteViewHand,
 } from '../../../shared/games/kite/types.ts'
 import type { Translate } from '../../i18n/t.ts'
-import { promotionBoard as board } from '../../styles/tokens.ts'
+import { promotionBoard as board } from '../../styles/promotionTokens.ts'
 
 /**
  * The kites' paints. The same in both themes, as a deck of cards is, and taken from the palace

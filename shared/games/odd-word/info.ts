@@ -1,5 +1,6 @@
-// What the browser needs to know of this game before anyone plays it: no rules, so that they stay
-// out of the first load (shared/games/catalog.ts). `rules.ts` spreads this into the module.
+// The room's options for this game: no rules, and not in the first load either. The room loads this
+// file when it opens a room of this game (src/i18n/gameDetails.ts). The lobby card's players and
+// minutes are the module's `meta`, from shared/games/lobby.ts. `rules.ts` spreads this into the module.
 import type { GameInfo } from '../types.ts'
 import type { OddWordOptions } from './types.ts'
 
@@ -7,13 +8,6 @@ export const ODD_DEFAULT_ROUNDS = 8
 
 export const oddWordInfo: GameInfo<OddWordOptions> = {
   id: 'odd-word',
-  // 3 to 12: the owner's numbers (2026-11-14). The talking is on the friends' own voice call
-  meta: {
-    minPlayers: 3,
-    maxPlayers: 12,
-    minutes: 20,
-    i18nKey: 'games.odd-word',
-  },
 
   options: {
     undercovers: {

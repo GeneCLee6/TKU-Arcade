@@ -21,7 +21,8 @@ import { promotionScreenMessages } from '../../../shared/games/promotion/i18n.sc
 import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { registerMessages, type Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
-import { color, font, promotionBoard as paint, seatColor } from '../../styles/tokens.ts'
+import { promotionBoard as paint } from '../../styles/promotionTokens.ts'
+import { color, font, seatColor } from '../../styles/tokens.ts'
 import {
   arcControl,
   arcPoints,

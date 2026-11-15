@@ -13,6 +13,7 @@
 //
 // docs/PRD/e15-lantern-lane.md has the rules and every detail decided here.
 import { lanternInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   LanternAction,
@@ -180,6 +181,7 @@ const lastToAgree = (state: LanternState, player: LanternPlayer): boolean =>
 
 export const lantern: GameModule<LanternState, LanternAction, LanternView, LanternOptions> = {
   ...lanternInfo,
+  meta: GAME_META.lantern,
 
   init(seats, options, rng) {
     const players = seats.map(

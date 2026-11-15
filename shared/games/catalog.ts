@@ -1,6 +1,8 @@
-// What the browser needs of every game: names, player counts, rule options and the strings for them.
-// No rules: src/ imports this file, and whatever it imports is in everyone's first load. The Worker's
-// registry with the rules is shared/games/index.ts; a new game adds itself to both.
+// Every game's info (options included) and every string the room may need before a screen loads, in
+// both languages: for the Worker, the scripts, check-i18n and the tests. No rules (shared/games/index.ts
+// has them). The browser must not import this file, or every game's options and strings are in its
+// first load (tests/games/catalog.test.ts checks): the lobby has lobby.ts and one language's
+// lobby table, and a room loads its own game's info.ts and i18n.ts (src/i18n/gameDetails.ts).
 import { bluffMessages } from './bluff/i18n.ts'
 import { bluffInfo } from './bluff/info.ts'
 import { lanternMessages } from './lantern/i18n.ts'
@@ -37,7 +39,11 @@ import { wordBridgeMessages } from './word-bridge/i18n.ts'
 import { wordBridgeInfo } from './word-bridge/info.ts'
 import { wasabiMessages } from './wasabi/i18n.ts'
 import { wasabiInfo } from './wasabi/info.ts'
+import { lobbyEn } from './lobby.en.ts'
+import { lobbyZhTW } from './lobby.zh-TW.ts'
 import type { AnyGameInfo, GameMessages } from './types.ts'
+
+export { LOBBY_GAMES } from './lobby.ts'
 
 export const GAME_INFOS = [
   ticTacToeInfo,
@@ -62,17 +68,15 @@ export const GAME_INFOS = [
 
 const BY_ID: ReadonlyMap<string, AnyGameInfo> = new Map(GAME_INFOS.map((game) => [game.id, game]))
 
-/** The games the lobby shows a card for, in order */
-export const LOBBY_GAMES: readonly AnyGameInfo[] = GAME_INFOS.filter((game) => !game.meta.unlisted)
-
 /** This game's info, or null: ids come from the network */
 export function getGameInfo(id: string): AnyGameInfo | null {
   return BY_ID.get(id) ?? null
 }
 
-/** Every game's first-load strings, for src/i18n to merge into its dictionaries */
+/** Every game's lobby and room strings: what the browser has by the time a room of that game shows */
 export const GAME_MESSAGES: GameMessages = {
   en: {
+    ...lobbyEn,
     ...ticTacToeMessages.en,
     ...promotionMessages.en,
     ...silentTableMessages.en,
@@ -83,6 +87,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...tilesMessages.en,
     ...wordBridgeMessages.en,
     ...clueClashMessages.en,
+    ...kartMessages.en,
     ...kiteMessages.en,
     ...tradersMessages.en,
     ...secretScrollMessages.en,
@@ -90,9 +95,9 @@ export const GAME_MESSAGES: GameMessages = {
     ...palaceMessages.en,
     ...holdemMessages.en,
     ...miseryMessages.en,
-    ...kartMessages.en,
   },
   'zh-TW': {
+    ...lobbyZhTW,
     ...ticTacToeMessages['zh-TW'],
     ...promotionMessages['zh-TW'],
     ...silentTableMessages['zh-TW'],
@@ -103,6 +108,7 @@ export const GAME_MESSAGES: GameMessages = {
     ...tilesMessages['zh-TW'],
     ...wordBridgeMessages['zh-TW'],
     ...clueClashMessages['zh-TW'],
+    ...kartMessages['zh-TW'],
     ...kiteMessages['zh-TW'],
     ...tradersMessages['zh-TW'],
     ...secretScrollMessages['zh-TW'],
@@ -110,6 +116,5 @@ export const GAME_MESSAGES: GameMessages = {
     ...palaceMessages['zh-TW'],
     ...holdemMessages['zh-TW'],
     ...miseryMessages['zh-TW'],
-    ...kartMessages['zh-TW'],
   },
 }

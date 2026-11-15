@@ -7,6 +7,7 @@
 // docs/PRD/e22-tamsui-traders.md has the rules and every detail decided here.
 import { TRADERS_CARDS, TRADERS_PATRONS } from './bank.ts'
 import { tradersInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type SeatId } from '../types.ts'
 import type {
   TradersAction,
@@ -400,7 +401,7 @@ export const TRADERS_DEFAULT_TARGET = 15
 
 export const traders: GameModule<TradersState, TradersAction, TradersView, TradersOptions> = {
   id: tradersInfo.id,
-  meta: tradersInfo.meta,
+  meta: GAME_META.traders,
   // Hidden (types.ts): settable when a room is made and by `npm run play -- traders --option
   // target=10`, not shown in the waiting room
   options: {

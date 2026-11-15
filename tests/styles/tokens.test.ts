@@ -3,10 +3,10 @@ import {
   color,
   colorVariables,
   palette,
-  promotionBoard as board,
   space,
   type ColorName,
 } from '../../src/styles/tokens.ts'
+import { promotionBoard as board } from '../../src/styles/promotionTokens.ts'
 import { tradersPieces } from '../../src/styles/tradersTokens.ts'
 
 function luminance(hex: string): number {

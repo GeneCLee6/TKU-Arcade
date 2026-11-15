@@ -2,9 +2,8 @@
 // only the characters the board draws. Google then sends one small font of those glyphs instead of a
 // whole CJK face, and nothing is bundled, committed or kept on R2. Until it arrives, or if it never
 // does, `font.kai` falls back to the system's own kai and then to a serif.
-import { BOARD, FACES } from '../../../shared/games/promotion/board.ts'
+import { BOARD } from '../../../shared/games/promotion/board.ts'
 import { promotionScreenMessages } from '../../../shared/games/promotion/i18n.screen.ts'
-import { promotionMessages } from '../../../shared/games/promotion/i18n.ts'
 
 const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ·'
 
@@ -14,9 +13,8 @@ export const boardCharacters = (): string =>
     ...new Set(
       LATIN +
         BOARD.map((cell) => cell.name['zh-TW']).join('') +
-        Object.values(promotionScreenMessages['zh-TW']).join('') +
-        // The four results, which the board writes in Chinese in both languages
-        FACES.map((face) => promotionMessages['zh-TW'][`games.promotion.glyph.${face}`]).join(''),
+        // The four results among them, which the board writes in Chinese in both languages
+        Object.values(promotionScreenMessages['zh-TW']).join(''),
     ),
   ]
     .sort()

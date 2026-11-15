@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import styled from 'styled-components'
-import type { AnyGameInfo } from '../../shared/games/types.ts'
+import type { GameCard as GameCardInfo } from '../../shared/games/lobby.ts'
 import { useT } from '../i18n/useT.ts'
 import { Link } from '../lib/router.tsx'
 import { hasRules } from '../lib/rulesList.ts'
@@ -13,7 +13,7 @@ import { Body, Heading, Monogram, Name, Summary } from './gameCardParts.ts'
 const GameArt = lazy(() => import('./GameArt.tsx'))
 
 interface GameCardProps {
-  game: AnyGameInfo
+  game: GameCardInfo
   /** A room is being created: a second click would make a second room */
   disabled: boolean
   onNewRoom: () => void

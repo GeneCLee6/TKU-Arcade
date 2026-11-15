@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App.tsx'
+import { loadStartLanguage } from './i18n/t.ts'
 import { startAccount } from './lib/account.ts'
 import { installErrorReporting } from './lib/errorReport.ts'
 import { startInstallSupport } from './lib/installApp.ts'
@@ -16,9 +17,13 @@ startInstallSupport()
 // First thing: a token the bridge table sent back leaves the address before anything reads it
 void startAccount()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <GlobalStyle />
-    <App />
-  </StrictMode>,
-)
+// The page's language arrives as a chunk of its own (src/i18n/t.ts), already on its way since
+// index.html: render once it is here, so that a Chinese page never shows English first
+void loadStartLanguage().then(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <GlobalStyle />
+      <App />
+    </StrictMode>,
+  )
+})

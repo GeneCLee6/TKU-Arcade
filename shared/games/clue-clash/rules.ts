@@ -9,6 +9,7 @@
 import { CC_WORDS } from './bank.ts'
 import { CC_ERROR, clashKey, clueProblem, guessProblem, isRight, tidyClue } from './clue.ts'
 import { CC_CARDS, clueClashInfo } from './info.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type { CcAction, CcClue, CcGuess, CcOptions, CcOutcome, CcState, CcView, CcWord } from './types.ts'
 
@@ -215,6 +216,7 @@ const waitingOn = (state: CcState, seat: SeatId): boolean =>
 
 export const clueClash: GameModule<CcState, CcAction, CcView, CcOptions> = {
   ...clueClashInfo,
+  meta: GAME_META['clue-clash'],
 
   init(seats, options, rng) {
     const players = seats.map((seat) => seat.id)

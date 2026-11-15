@@ -11,6 +11,7 @@
 // - `MOVES_PER_ROUND` caps a seat's moves in a round, so a round always ends without a clock.
 import { COMMUNITY_BY_ROUND, ROUNDS, silentTableInfo } from './info.ts'
 import { bestHand, fullDeck, type Card } from '../../poker/hand.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   Reveal,
@@ -217,6 +218,7 @@ export const silentTable: GameModule<
   SilentTableOptions
 > = {
   ...silentTableInfo,
+  meta: GAME_META['silent-table'],
 
   init(seats, options, rng) {
     const players = seats.map(

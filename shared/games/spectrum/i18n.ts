@@ -1,10 +1,9 @@
-// What the lobby and the waiting room say of this game: these are in everyone's first load, through
-// GAME_MESSAGES (shared/games/catalog.ts), so keep them few. All the rest is in i18n.screen.ts, which
-// loads with the screen. `en` is the source; the type makes zh-TW keep the same keys.
+// What the room says of this game before its screen has loaded: the options form, errors and results.
+// Not in the first load: the room loads this file when it opens a room of this game
+// (src/i18n/gameDetails.ts). The name and summary are the lobby's (shared/games/lobby.en.ts).
+// `en` is the source; the type makes zh-TW keep the same keys.
+// All the rest is in i18n.screen.ts, which loads with the screen.
 const en = {
-  'games.spectrum.name': 'Spectrum',
-  'games.spectrum.summary':
-    'Say where your secret number sits on a scale; the guesser puts everyone in order.',
   'games.spectrum.option.mode': 'The guesser picks',
   'games.spectrum.option.mode.extremes': 'The largest and the smallest',
   'games.spectrum.option.mode.order': 'Everyone in order',
@@ -14,8 +13,6 @@ const en = {
 }
 
 const zhTW: Record<keyof typeof en, string> = {
-  'games.spectrum.name': '光譜',
-  'games.spectrum.summary': '用一個回答說出祕密數字在兩端之間的位置，猜題者排出大家的順序。',
   'games.spectrum.option.mode': '猜題者要猜',
   'games.spectrum.option.mode.extremes': '最大和最小',
   'games.spectrum.option.mode.order': '所有人的順序',

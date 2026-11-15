@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import type { ChatMessage } from '../../shared/chat.ts'
 import { RoomChatPanel, type RoomParts } from '../../src/components/GameLayout.tsx'
 import { ToastProvider } from '../../src/components/Toast.tsx'
-import { en } from '../../src/i18n/en.ts'
+import { en } from '../strings.ts'
 import { setLanguage } from '../../src/i18n/t.ts'
 import { ChatDraft, unreadCount } from '../../src/lib/chatState.ts'
 import { stubDialog } from '../lib/stubDialog.ts'

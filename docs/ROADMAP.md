@@ -62,6 +62,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | [ ] D2（#14，程式與文件；等擁有者簽核與四人實測） | `e7-t05` `e7-t06` `e7-t08` `e12-t09` | 大廳與房間手機版面；鍵盤與焦點、axe 骨架；繁中全站走查；`IP-CHECKLIST.md` 與陞官圖簽核。**M0 完成：4 個朋友實測一局陞官圖** | C3, D1 |
 | [x] D3（#17，經擁有者同意 2026-11-07 從 I3 提前） | `e2-t12` | 遊戲登記表拆成瀏覽器用的 `catalog.ts`（不含規則）與 Worker 用的 `index.ts`，首屏少約 3.5 kB；測試擋 `src/` import 規則 | G2 |
 | [x] D4（#31，擁有者 2026-11-12 要求） | `e12-t12` | 首屏預算騰空間，使用者看到的不變：入口靜態載入的全部併成一個 chunk（`vite.config.ts`）、陞官圖的格子／官階／狀態字串移出首屏、`react-router-dom` 換成站內的小路由（`src/lib/router.tsx`）；每條線少 15–19 kB；`npm run budget -- --chunks` 列出每條線的 chunk | C5 |
+| [x] D5（路線圖外，2026-11-15，`feat/first-screen-diet`） | `e12-t14` | 首屏只帶一種語言、大廳清單瘦身：入口不含字串表，目前語言的字串是 lazy chunk（`index.html` 預先下載）；房間的字串、遊戲的選項與房間字串隨房間載入；大廳只留 `shared/games/lobby.ts` 的 meta 與名稱；陞官圖完整版字串分語言；主站 109.3 → 97.6 kB、完整版那條 149.8 → 139.7 kB（新量法含語言 chunk）；主站上限 103 kB、測試擋入口長回去 | D4 |
 
 ## Phase E · 介面方向（擁有者 2026-11-09 要求，2026-11-11 核准）
 

@@ -355,10 +355,9 @@ export interface RealtimeModule<S extends JsonValue, A extends JsonValue> {
 /** A real-time module's scratch space: plain data or not, it never leaves the room's memory */
 export type RealtimeMemory = Record<string, unknown>
 
-/** A game as the browser knows it before anyone plays: no rules (shared/games/catalog.ts) */
+/** A game's options as the room's form has them (shared/games/<id>/info.ts): no rules, and no lobby card (lobby.ts) */
 export type GameInfo<O extends OptionValues = OptionValues> = {
   id: string
-  meta: GameMeta
   options: OptionsSchema<O>
 }
 

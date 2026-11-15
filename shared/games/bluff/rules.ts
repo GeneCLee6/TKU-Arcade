@@ -10,6 +10,7 @@
 // detail decided here.
 import { bluffInfo } from './info.ts'
 import { BLUFF_TERMS, BLUFF_WORDS } from './bank.ts'
+import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
   BluffAction,
@@ -239,6 +240,7 @@ function skip(state: BluffState, seat: SeatId, rng: Rng): BluffState | null {
 
 export const bluff: GameModule<BluffState, BluffAction, BluffView, BluffOptions> = {
   ...bluffInfo,
+  meta: GAME_META.bluff,
 
   init(seats, options, rng) {
     const players = seats.map((seat) => ({ seat: seat.id, score: 0 }))

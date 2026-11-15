@@ -22,6 +22,7 @@ import {
   type Standing,
   type TimerSpec,
 } from '../types.ts'
+import { GAME_META } from '../lobby.ts'
 import { kartInfo, MAX_LAPS } from './info.ts'
 import type { KartAction, KartOptions, KartRacer, KartState, KartView } from './types.ts'
 
@@ -91,6 +92,7 @@ function standings(state: KartState): Standing[] {
 
 export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
   ...kartInfo,
+  meta: GAME_META.kart,
 
   init(seats, options) {
     const track = raceTrack(options.track) ? options.track : kartInfo.options.track.default

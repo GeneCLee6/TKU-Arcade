@@ -1,4 +1,4 @@
-import { createElement, Suspense, useEffect, useMemo, useState } from 'react'
+import { createElement, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import '../i18n/roomExtras.ts'
 import styled from 'styled-components'
 import type { ReplayResponse } from '../../shared/games/replay.ts'
@@ -10,6 +10,7 @@ import { Button } from '../components/Button.tsx'
 import { GameLayout, type RoomParts } from '../components/GameLayout.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { gameScreen } from '../games/screens.ts'
+import { useGameDetails } from '../i18n/gameDetails.ts'
 import { useT } from '../i18n/useT.ts'
 import { ChatDraft } from '../lib/chatState.ts'
 import { Link } from '../lib/router.tsx'
@@ -68,12 +69,21 @@ export function ReplayPage() {
         ) : loaded.status === 'failed' ? (
           <p role="alert">{t('room.extra.replay.failed')}</p>
         ) : (
-          <Player id={id} replay={loaded.replay} />
+          <WithGameDetails gameId={loaded.replay.gameId}>
+            <Player id={id} replay={loaded.replay} />
+          </WithGameDetails>
         )}
         <Back to={`/r/${id}`}>{t('room.extra.replay.back')}</Back>
       </Main>
     </>
   )
+}
+
+/** The game's room strings (its results) before its screen: src/i18n/gameDetails.ts */
+function WithGameDetails({ gameId, children }: { gameId: string; children: ReactNode }) {
+  const t = useT()
+  if (useGameDetails(gameId) === undefined) return <p role="status">{t('common.loading')}</p>
+  return children
 }
 
 function Player({ id, replay }: { id: string; replay: ReplayResponse }) {

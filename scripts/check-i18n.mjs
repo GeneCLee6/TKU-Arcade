@@ -10,6 +10,13 @@ import { pathToFileURL } from 'node:url'
 
 const SITE_EN = 'src/i18n/en.ts'
 const SITE_ZH = 'src/i18n/zh-TW.ts'
+// The room's own strings, a chunk of their own in each language (src/i18n/roomStrings.ts)
+const ROOM_EN = 'src/i18n/room.en.ts'
+const ROOM_ZH = 'src/i18n/room.zh-TW.ts'
+// What a lobby card says of every game, one language per chunk (shared/games/lobby.ts)
+const LOBBY_EN = 'shared/games/lobby.en.ts'
+const LOBBY_ZH = 'shared/games/lobby.zh-TW.ts'
+const LOBBY_KEY = /^games\.[a-z-]+\.(name|summary|tryAlone)$/
 const GAMES = 'shared/games/index.ts'
 const GAME_SCREENS = 'shared/games/screenMessages.ts'
 const KART = 'shared/kart/i18n.ts' // Registered by the kart's lazy chunk, so not in the site's catalogs
@@ -303,7 +310,7 @@ function checkSource(file) {
 const sourceFiles = existsSync(SOURCE_ROOT)
   ? readdirSync(SOURCE_ROOT, { recursive: true, encoding: 'utf8' })
       .map((path) => `${SOURCE_ROOT}/${path.replaceAll('\\', '/')}`)
-      .filter((path) => /\.tsx?$/.test(path) && path !== SITE_EN && path !== SITE_ZH)
+      .filter((path) => /\.tsx?$/.test(path) && ![SITE_EN, SITE_ZH, ROOM_EN, ROOM_ZH].includes(path))
       .sort()
   : []
 
@@ -314,6 +321,18 @@ const gamesEn = gameMessages.en ?? {}
 const gamesZh = gameMessages['zh-TW'] ?? {}
 
 checkParity(siteEn, SITE_EN, siteZh, SITE_ZH)
+// Each is checked when it exists (the tests' fixtures have only some)
+const roomEn = existsSync(ROOM_EN) ? await load(ROOM_EN, 'roomEn') : {}
+if (existsSync(ROOM_EN)) checkParity(roomEn, ROOM_EN, await load(ROOM_ZH, 'roomZhTW'), ROOM_ZH)
+for (const key of Object.keys(roomEn)) {
+  if (key in siteEn) problems.push(`${ROOM_EN}: '${key}' is in ${SITE_EN} too`)
+}
+// The lobby tables are in everyone's first load: a game's name and summary, and nothing more
+const lobbyEn = existsSync(LOBBY_EN) ? await load(LOBBY_EN, 'lobbyEn') : {}
+if (existsSync(LOBBY_EN)) checkParity(lobbyEn, LOBBY_EN, await load(LOBBY_ZH, 'lobbyZhTW'), LOBBY_ZH)
+for (const key of Object.keys(lobbyEn)) {
+  if (!LOBBY_KEY.test(key)) problems.push(`${LOBBY_EN}: '${key}': only names, summaries and tryAlone here`)
+}
 checkParity(gamesEn, `${GAMES} (en)`, gamesZh, `${GAMES} (zh-TW)`)
 const screenMessages = existsSync(GAME_SCREENS) ? await load(GAME_SCREENS, 'SCREEN_MESSAGES') : {}
 const screensEn = screenMessages.en ?? {}
@@ -330,7 +349,7 @@ checkParity(kartEn, `${KART} (en)`, kartMessages['zh-TW'] ?? {}, `${KART} (zh-TW
 for (const key of Object.keys(kartEn)) {
   if (!key.startsWith('kart.')) problems.push(`${KART}: '${key}': keys here start with kart.`)
 }
-for (const [catalog, file] of [[siteEn, SITE_EN], [siteZh, SITE_ZH]]) {
+for (const [catalog, file] of [[siteEn, SITE_EN], [siteZh, SITE_ZH], [roomEn, ROOM_EN]]) {
   for (const key of Object.keys(catalog)) {
     if (key.startsWith('games.')) problems.push(`${file}: '${key}': games.* belongs to game modules`)
   }
@@ -345,6 +364,7 @@ if (problems.length > 0) {
 } else {
   const keys =
     Object.keys(siteEn).length +
+    Object.keys(roomEn).length +
     Object.keys(gamesEn).length +
     Object.keys(screensEn).length +
     Object.keys(kartEn).length

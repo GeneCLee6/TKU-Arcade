@@ -1,12 +1,10 @@
-// What the lobby and the waiting room say of this game, and what the room may show before the screen
-// has loaded (errors, results): these are in everyone's first load, through GAME_MESSAGES
-// (shared/games/catalog.ts). The screen's own words, cell and rank names included, are in
-// i18n.detail.ts and i18n.screen.ts, which load with the screen. `en` is the source; the type makes
-// zh-TW keep the same keys.
+// What the room says of this game before its screen has loaded: the options form, errors and results.
+// Not in the first load: the room loads this file when it opens a room of this game
+// (src/i18n/gameDetails.ts). The name and summary are the lobby's (shared/games/lobby.en.ts).
+// `en` is the source; the type makes zh-TW keep the same keys.
+// The screen's own words, cell and rank names included, are in i18n.detail.ts and i18n.screen.ts.
 
 const en = {
-  'games.promotion.name': 'Promotion',
-  'games.promotion.summary': 'Roll your way from commoner to the top of the imperial civil service.',
   'games.promotion.option.dice': 'Dice',
   'games.promotion.option.dice.fourSided': 'Four-sided top',
   'games.promotion.option.dice.sixSided': 'Four six-sided dice',
@@ -20,11 +18,6 @@ const en = {
   'games.promotion.option.decisionSeconds': 'Seconds to answer an offer or a purchase',
   'games.promotion.option.buying': 'Buying office (捐納)',
   'games.promotion.option.endAtDahe': 'End at the first grand congratulations (大賀)',
-  // The character on the top, Chinese in both languages: it is the game's own look
-  'games.promotion.glyph.de': '德',
-  'games.promotion.glyph.cai': '才',
-  'games.promotion.glyph.gong': '功',
-  'games.promotion.glyph.zang': '贓',
   'games.promotion.error.badAction': 'That is not a move in this game.',
   'games.promotion.error.over': 'The game is over.',
   'games.promotion.error.notYourTurn': 'It is not your turn.',
@@ -43,8 +36,6 @@ const en = {
 }
 
 const zhTW: Record<keyof typeof en, string> = {
-  'games.promotion.name': '陞官圖',
-  'games.promotion.summary': '從白丁一路擲到位極人臣，看誰先榮歸故里。',
   'games.promotion.option.dice': '骰子',
   'games.promotion.option.dice.fourSided': '四面陀螺',
   'games.promotion.option.dice.sixSided': '四顆六面骰',
@@ -57,10 +48,6 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.promotion.option.decisionSeconds': '回答授職或捐官的秒數',
   'games.promotion.option.buying': '捐納（花銀子買官）',
   'games.promotion.option.endAtDahe': '第一個人大賀就結束',
-  'games.promotion.glyph.de': '德',
-  'games.promotion.glyph.cai': '才',
-  'games.promotion.glyph.gong': '功',
-  'games.promotion.glyph.zang': '贓',
   'games.promotion.error.badAction': '這不是這款遊戲的動作。',
   'games.promotion.error.over': '這局已經結束了。',
   'games.promotion.error.notYourTurn': '還沒輪到你。',

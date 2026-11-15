@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { getGameInfo } from '../../shared/games/catalog.ts'
+import { getGameCard } from '../../shared/games/lobby.ts'
 import { useT } from '../i18n/useT.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
 import {
@@ -25,7 +25,7 @@ export function PublicRooms() {
   const navigate = useNavigate()
   const { rooms, failed } = usePublicRooms()
   // A game that is not on offer stays out even if someone made a room of it by hand
-  const listed = (rooms ?? []).filter(({ gameId }) => getGameInfo(gameId)?.meta.unlisted !== true)
+  const listed = (rooms ?? []).filter(({ gameId }) => getGameCard(gameId)?.meta.unlisted !== true)
   // e1-t15: which game, and room for how many of us
   const [filter, setFilter] = useState<RoomFilter>(ANY_ROOM)
   const shown = filterRooms(listed, filter)

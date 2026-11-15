@@ -1,10 +1,9 @@
-// What the lobby and the waiting room say of this game: these are in everyone's first load, through
-// GAME_MESSAGES (shared/games/catalog.ts). All the rest is in i18n.screen.ts, which loads with the screen.
+// What the room says of this game before its screen has loaded: the options form, errors and results.
+// Not in the first load: the room loads this file when it opens a room of this game
+// (src/i18n/gameDetails.ts). The name and summary are the lobby's (shared/games/lobby.en.ts).
 // `en` is the source; the type makes zh-TW keep the same keys.
+// All the rest is in i18n.screen.ts, which loads with the screen.
 const en = {
-  'games.silent-table.name': 'Silent Table',
-  'games.silent-table.summary':
-    'Co-operative poker without a word: use rank chips to put your hands in order.',
   'games.silent-table.option.levelsToWin': 'Levels in a row to win',
   'games.silent-table.option.failureLimit': 'Failed levels that end the game',
   'games.silent-table.option.allowTakeFromPlayers': 'Chips can be taken from other players',
@@ -21,8 +20,6 @@ const en = {
 }
 
 const zhTW: Record<keyof typeof en, string> = {
-  'games.silent-table.name': '默契牌局',
-  'games.silent-table.summary': '不說話的合作撲克：用順位籌碼排出大家手牌的強弱。',
   'games.silent-table.option.levelsToWin': '連過幾關獲勝',
   'games.silent-table.option.failureLimit': '失敗幾關算輸',
   'games.silent-table.option.allowTakeFromPlayers': '可以從別的玩家手上拿籌碼',

@@ -5,7 +5,7 @@
 import { END_CELL, getCell } from '../../../shared/games/promotion/board.ts'
 import type { CSSProperties } from 'react'
 import { DEPARTMENTS, knobOf } from '../../../shared/games/promotion/departments.ts'
-import { promotionBoard } from '../../styles/tokens.ts'
+import { promotionBoard } from '../../styles/promotionTokens.ts'
 import sprite from './rankArt.svg?no-inline'
 
 export type RankArt =

@@ -47,8 +47,8 @@ describe('the race room in the lobby (e9-t07)', () => {
     expect(track.kind).toBe('select')
     expect(track.choices.map((choice) => choice.value)).toEqual([...RACE_TRACK_IDS])
     for (const id of RACE_TRACK_IDS) {
-      expect(SCREEN_MESSAGES.en[`games.kart.track.${id}`]).toBeTruthy()
-      expect(SCREEN_MESSAGES['zh-TW'][`games.kart.track.${id}`]).toBeTruthy()
+      expect(GAME_MESSAGES.en[`games.kart.track.${id}`]).toBeTruthy()
+      expect(GAME_MESSAGES['zh-TW'][`games.kart.track.${id}`]).toBeTruthy()
     }
     expect(getGame('kart')).toBe(kart)
     expect(GAME_MESSAGES.en['games.kart.name']).toBe('Kart')

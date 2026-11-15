@@ -5,6 +5,7 @@
 // That is the simple edition, and the default. The room option `edition: 'full'` plays the full
 // edition instead (C6, rulesFull.ts): `promotion` at the bottom of this file picks one at `init` and
 // tells their states apart by the full one's `edition` field.
+import { GAME_META } from '../lobby.ts'
 import { DEFAULT_TURN_LIMIT, promotionInfo } from './info.ts'
 import {
   gameError,
@@ -108,7 +109,7 @@ export const promotionSimple: GameModule<
   PromotionOptions
 > = {
   id: promotionInfo.id,
-  meta: promotionInfo.meta,
+  meta: GAME_META.promotion,
   options: PROMOTION_OPTIONS,
 
   init(seats, options, rng) {
@@ -226,7 +227,7 @@ export const promotion: GameModule<
   PromotionOptions
 > = {
   id: promotionInfo.id,
-  meta: promotionInfo.meta,
+  meta: GAME_META.promotion,
   options: PROMOTION_OPTIONS,
 
   init(seats, options, rng) {

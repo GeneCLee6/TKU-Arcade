@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { GAME_INFOS, getGameInfo, LOBBY_GAMES } from '../../shared/games/catalog.ts'
+import { GAME_INFOS, GAME_MESSAGES, getGameInfo, LOBBY_GAMES } from '../../shared/games/catalog.ts'
 import { GAME_IDS, getGame } from '../../shared/games/index.ts'
+import { GAME_CARDS, getGameCard } from '../../shared/games/lobby.ts'
+import { lobbyEn } from '../../shared/games/lobby.en.ts'
+import { lobbyZhTW } from '../../shared/games/lobby.zh-TW.ts'
 import type { AnyOptionField } from '../../shared/games/types.ts'
 
 const raw = (files: Record<string, unknown>) => files as Record<string, string>
@@ -45,10 +48,10 @@ function localImports(path: string, source: string): string[] {
 }
 
 /** Every file the browser's code pulls in at load time, following imports through shared/ too */
-function reachableFromSite(skip = (_path: string) => false): Set<string> {
+function reachableFromSite(skip = (_path: string) => false, from = Object.keys(SOURCES)): Set<string> {
   const all = { ...SOURCES, ...SHARED }
   const seen = new Set<string>()
-  const queue = Object.keys(SOURCES).filter((path) => !skip(path))
+  const queue = from.filter((path) => !skip(path))
   while (queue.length > 0) {
     const path = queue.pop() as string
     if (seen.has(path) || all[path] === undefined) continue
@@ -61,12 +64,13 @@ function reachableFromSite(skip = (_path: string) => false): Set<string> {
 describe('the catalog against the registry', () => {
   it('lists the same games, in the same order', () => {
     expect(GAME_INFOS.map((game) => game.id)).toEqual(GAME_IDS)
+    expect(GAME_CARDS.map((game) => game.id)).toEqual(GAME_IDS)
   })
 
   it.each(GAME_IDS)('%s: the module carries the very info the browser sees', (id) => {
     const info = getGameInfo(id)
     const module = getGame(id)
-    expect(module?.meta).toBe(info?.meta)
+    expect(module?.meta).toBe(getGameCard(id)?.meta)
     // Field by field: a module may add hidden fields (types.ts), and only those
     const fields = Object.entries((module?.options ?? {}) as Record<string, AnyOptionField>)
     const shown = (info?.options ?? {}) as Record<string, unknown>
@@ -81,6 +85,19 @@ describe('the catalog against the registry', () => {
 
   it('answers null for an id it does not know', () => {
     expect(getGameInfo('no-such-game')).toBeNull()
+    expect(getGameCard('no-such-game')).toBeNull()
+  })
+
+  // A lobby card shows these before anything else loads (shared/games/lobby.ts)
+  it.each(GAME_IDS)('%s: has its name and summary in both lobby tables, and nothing else there', (id) => {
+    const tables: Record<string, string>[] = [lobbyEn, lobbyZhTW]
+    for (const table of tables) {
+      expect(table[`games.${id}.name`]).toBeTruthy()
+      expect(table[`games.${id}.summary`]).toBeTruthy()
+    }
+    const own = Object.keys(lobbyEn).filter((key) => key.startsWith(`games.${id}.`))
+    expect(own.every((key) => /\.(name|summary|tryAlone)$/.test(key))).toBe(true)
+    if (getGameCard(id)?.meta.tryAlone) expect(GAME_MESSAGES.en).toHaveProperty(`games.${id}.tryAlone`)
   })
 
   it('keeps unlisted games out of the lobby', () => {
@@ -124,10 +141,28 @@ describe('the browser loads no rules', () => {
   // Followed all the way down: a rules file or the topic bank one import away still lands in the download
   it('reaches no rules and no topic bank through any chain of imports', () => {
     const reached = [...reachableFromSite()]
-    expect(reached).toContain('/shared/games/catalog.ts')
-    expect(reached).toContain('/shared/games/spectrum/info.ts')
+    expect(reached).toContain('/shared/games/lobby.ts')
+    expect(reached).toContain('/shared/games/kite/limits.ts')
     expect(reached.filter((path) => WORKER_ONLY.test(path))).toEqual([])
     expect(reached.some((path) => FULL_SCREEN.test(path))).toBe(true)
+  })
+
+  // The first load stays small as games are added (2026-11-15, docs/ARCHITECTURE.md §5): the entry
+  // has the lobby's record and no language at all; every game's options and room strings, the
+  // catalog with all of them, and each language's tables load as chunks of their own. Static imports
+  // only: a dynamic import() or import.meta.glob is not followed, which is the point
+  it('keeps every language, the catalog and each game’s room details out of the entry', () => {
+    const entry = [...reachableFromSite(undefined, ['/src/main.tsx'])]
+    expect(entry).toContain('/src/pages/HomePage.tsx')
+    expect(entry).toContain('/shared/games/lobby.ts')
+    const lazyOnly =
+      /^\/shared\/games\/(catalog|lobby\.(en|zh-TW))\.ts$|^\/shared\/games\/[^/]+\/(info|i18n[^/]*)\.ts$|^\/src\/i18n\/(en|zh-TW|room\.(en|zh-TW)|messages\.(en|zh-TW))\.ts$/
+    expect(entry.filter((path) => lazyOnly.test(path))).toEqual([])
+  })
+
+  it('has no static import of the full catalog anywhere in the site', () => {
+    const reached = [...reachableFromSite()]
+    expect(reached.filter((path) => /\/shared\/games\/(catalog|index)\.ts$/.test(path))).toEqual([])
   })
 
   it('loads the full board only by the full screen’s dynamic import, after its first paint', () => {

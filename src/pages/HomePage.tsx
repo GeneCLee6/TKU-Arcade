@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import styled, { css, keyframes } from 'styled-components'
 import { APP_NAME } from '../../shared/app.ts'
-import { LOBBY_GAMES } from '../../shared/games/catalog.ts'
+import { LOBBY_GAMES } from '../../shared/games/lobby.ts'
 import { AccountControl } from '../components/AccountControl.tsx'
 import { Button } from '../components/Button.tsx'
 import { Dialog } from '../components/Dialog.tsx'
@@ -164,7 +164,7 @@ function HeroArt() {
   const t = useT()
   return (
     <Art aria-hidden="true">
-      <Tile $at="a">{t('games.promotion.glyph.de')}</Tile>
+      <Tile $at="a">{t('home.heroGlyph')}</Tile>
       <Tile $at="b" />
       <Tile $at="c" />
       <Tile $at="d" />

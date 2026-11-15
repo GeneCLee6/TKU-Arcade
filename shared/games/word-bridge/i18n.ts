@@ -1,9 +1,8 @@
-// What the lobby and the waiting room say of this game: in everyone's first load, through
-// GAME_MESSAGES (shared/games/catalog.ts), so keep them few. `en` is the source.
+// What the room says of this game before its screen has loaded: the options form, errors and results.
+// Not in the first load: the room loads this file when it opens a room of this game
+// (src/i18n/gameDetails.ts). The name and summary are the lobby's (shared/games/lobby.en.ts).
+// `en` is the source; the type makes zh-TW keep the same keys.
 const en = {
-  // Working title (owner's request 2026-11-14)
-  'games.word-bridge.name': 'Word Bridge',
-  'games.word-bridge.summary': 'One-word clues bridge your partners to your words. Teams or co-op.',
   'games.word-bridge.option.mode': 'Mode',
   'games.word-bridge.option.mode.auto': 'Auto',
   'games.word-bridge.option.mode.teams': 'Two teams',
@@ -13,8 +12,6 @@ const en = {
 }
 
 const zhTW: Record<keyof typeof en, string> = {
-  'games.word-bridge.name': '搭橋',
-  'games.word-bridge.summary': '用一個詞替隊友搭橋，連到自己的詞。分隊對戰或兩人合作。',
   'games.word-bridge.option.mode': '模式',
   'games.word-bridge.option.mode.auto': '依人數',
   'games.word-bridge.option.mode.teams': '兩隊對戰',
