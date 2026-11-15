@@ -15,9 +15,8 @@ registerMessages(soonMessages)
 // owner's request, 2026-11-12; Bluff Reader with its screen, I2). Take a game out of here the day it
 // is listed. Its id, where its strings are (`${keys}.name` and `${keys}.summary`), and a page to try
 // it alone, if any (the kart's time trial, owner 2026-11-14)
-const SOON: readonly (readonly [id: string, keys: string, tryAt?: string])[] = [
-  ['kart', 'games.kart', '/kart'],
-]
+// The kart opened as a race room on 2026-11-14 and left this list: none for now
+const SOON: readonly (readonly [id: string, keys: string, tryAt?: string])[] = []
 
 /**
  * The games that are not open yet, as items of the lobby's list of games: name, summary and a

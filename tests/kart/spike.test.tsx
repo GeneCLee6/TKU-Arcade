@@ -36,7 +36,8 @@ describe('the spike route', () => {
     window.history.pushState({}, '', '/')
     render(<App />)
     const addresses = screen.queryAllByRole('link').map((link) => link.getAttribute('href'))
-    expect(addresses.filter((address) => address?.includes('kart'))).toEqual([])
+    // The kart card links to the time trial (/kart), never to the spike
+    expect(addresses.filter((address) => address?.includes('kart/spike'))).toEqual([])
   })
 
   // e8-t14: /kart is the time trial now; only an address under it that is not a page is unknown

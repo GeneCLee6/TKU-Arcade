@@ -17,7 +17,9 @@ import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TAMKANG } from '../../shared/kart/tracks/tamkang.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
+import { bumpKart } from '../../shared/kart/race.ts'
 import {
+  COUNTDOWN_SECONDS,
   currentLap,
   lapSteps,
   seconds,
@@ -44,7 +46,7 @@ import {
 } from '../../shared/kart/physics.ts'
 import { calloutAtStart, calloutBetween, louder, type Callout } from './callouts.ts'
 import { readGamepad } from './devices.ts'
-import { createKartScene } from './Scene.ts'
+import { createKartScene, type KartScene, type OtherKart } from './Scene.ts'
 import type { KartLook } from './art/kartModel.ts'
 
 const STATS_EVERY_MS = 500
@@ -180,6 +182,30 @@ declare global {
   }
 }
 
+/**
+ * e9: a race in a room against other karts (src/kart/race/). Everything the loop needs of the
+ * network, read every step or frame; without it the loop is the time trial as ever. In a race no
+ * record or ghost is kept: the room keeps the times
+ */
+export interface SpikeNet {
+  /** This kart's place on the grid */
+  readonly start: Spot
+  /** Laps in this race, as the room set them */
+  readonly laps: number
+  /** Seconds to GO by the room's shared clock; null while the start is not set yet */
+  countdown(): number | null
+  /** After each step: the race so far, the input it ran with, and whether the kart was reset */
+  afterStep(trial: Trial, input: KartInput, reset: boolean): void
+  /** The other karts as drawn now, to bump into (e9-t09) */
+  bumpers(): readonly { x: number; z: number; vx: number; vz: number }[]
+  /** Each frame: the other karts to draw */
+  others(): readonly OtherKart[]
+  /** After each frame is drawn: to put the name tags where the karts are */
+  drawn(scene: Pick<KartScene, 'project'>): void
+  /** Drives the kart instead of the keys (testing a room alone, `?autopilot`) */
+  readonly autopilot?: (trial: Trial) => KartInput
+}
+
 /** Read every frame, so that a remap or a rule switch applies at once */
 export interface SpikeControls {
   readonly bindings: Bindings
@@ -210,6 +236,8 @@ export interface SpikeOptions {
   readonly onClock?: (total: number, lap: number) => void
   /** Called once, with a way to start the race over from the grid */
   readonly onReady?: (handle: { restart: () => void }) => void
+  /** A race against others in a room (e9); see `SpikeNet` */
+  readonly net?: SpikeNet
 }
 
 const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
@@ -254,15 +282,25 @@ function report(fps: number, loadMs: number, quality: Quality): void {
 export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): () => void {
   const loadStarted = performance.now()
   const track = spikeTrack(options.course ?? 'arena')
-  const course = track ? courseOf(track) : TEST_ARENA
+  const net = options.net
+  const plainCourse = track ? courseOf(track) : TEST_ARENA
+  // In a race each kart starts on its own place on the grid
+  const course =
+    net && plainCourse.checkpoints
+      ? {
+          ...plainCourse,
+          start: net.start,
+          checkpoints: { ...plainCourse.checkpoints, laps: net.laps },
+        }
+      : plainCourse
   const trialCourse: TrialCourse | null = track
-    ? { ...courseOf(track), checkpoints: courseOf(track).checkpoints!, road: track.road }
+    ? { ...course, checkpoints: course.checkpoints!, road: track.road }
     : null
   let trial: Trial | null = trialCourse ? startTrial(trialCourse) : null
   let lastTrial: SpikeTrial | undefined
   // e8-t11: the best run to race against, and this run as it is recorded
-  let best: Ghost | null = track ? loadGhost(recordKey(track)) : null
-  let bestLap: number | null = track ? loadBestLap(recordKey(track)) : null
+  let best: Ghost | null = track && !net ? loadGhost(recordKey(track)) : null
+  let bestLap: number | null = track && !net ? loadBestLap(recordKey(track)) : null
   let recorder: GhostRecorder | null = null
   let news: RecordNews | null = null
   const scene = createKartScene(
@@ -332,20 +370,39 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     accumulator = clock.accumulator
     let callout: Callout | undefined
     for (let step = 0; step < clock.steps; step++) {
-      const input = enabled
-        ? readInput(bindings, { held, pad: pad?.snapshot, boostTapped, resetTapped })
-        : NO_INPUT
+      const driven = net?.autopilot && trial ? net.autopilot(trial) : null
+      const input =
+        driven ??
+        (enabled
+          ? readInput(bindings, { held, pad: pad?.snapshot, boostTapped, resetTapped })
+          : NO_INPUT)
       boostTapped = false
       resetTapped = false
       const before = run
       if (trial && trialCourse && track) {
         const was = trial.phase
+        if (net && was === 'countdown') {
+          // Counted down to the room's GO, not this browser's: held on the grid until it is set
+          const left = net.countdown()
+          trial = { ...trial, countdown: left === null ? COUNTDOWN_SECONDS + 1 : Math.min(left, COUNTDOWN_SECONDS) }
+        }
         trial = stepTrial(trial, input, trialCourse, tuning, rules)
         run = trial.run
+        if (net && trial.phase !== 'countdown') {
+          // e9-t09: pushed out of the other karts, as this browser draws them
+          const bumped = bumpKart(run.kart, net.bumpers())
+          if (bumped.kart !== run.kart) {
+            run = { ...run, kart: bumped.kart }
+            trial = { ...trial, run }
+            if (bumped.hit >= HIT_SPEED) audio.hit(Math.min(1, bumped.hit / 30))
+          }
+        }
         if (was === 'countdown' && trial.phase === 'racing') {
           callout = louder(callout, calloutAtStart(trial.start))
-          recorder = startRecording(recordKey(track))
-          recordStep(recorder, 0, run.kart)
+          if (!net) {
+            recorder = startRecording(recordKey(track))
+            recordStep(recorder, 0, run.kart)
+          }
         } else if (trial.phase !== 'countdown' && was === 'racing' && recorder) {
           recordStep(recorder, trial.steps, run.kart)
         }
@@ -376,6 +433,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         audio.hit(run.impact)
       }
       debug.input = input
+      if (net && trial) net.afterStep(trial, input, run.resets !== before.resets)
     }
     const current = run.kart
     debug.tick += clock.steps
@@ -407,12 +465,14 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
             : 0,
       bursts,
     }
+    if (net) scene.others(net.others(), frameMs / 1000)
     scene.draw(
       poseBetween(previous, current, clock.alpha),
       { heading: current.heading, vx: current.vx, vz: current.vz, boosting, skidding },
       frameMs / 1000,
       look,
     )
+    net?.drawn(scene)
     audio.update({
       speed: look.speed,
       throttle: debug.input.throttle,
@@ -435,7 +495,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         phase: trial.phase,
         countdown: Math.ceil(trial.countdown - 1e-9),
         lap: currentLap(trial),
-        laps: track.laps,
+        laps: trialCourse?.checkpoints.laps ?? track.laps,
         lapTimes: trial.laps.map(seconds),
         wrongWay: trial.wrongWay,
         total: trial.phase === 'finished' ? seconds(trial.steps) : null,

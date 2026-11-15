@@ -229,6 +229,11 @@ export type GameMeta = {
    * without decisions that matter: nobody should lose a game to a coin flip they did not ask for.
    */
   proxyTurns?: true
+  /**
+   * A page to play alone, linked from the lobby card as `<i18nKey>.tryAlone` (the kart's time
+   * trial, 2026-11-14)
+   */
+  tryAlone?: string
 }
 
 /**
@@ -303,7 +308,52 @@ export interface GameModule<
 
   /** Whether the room's chat is closed in this state; leaving it out means never */
   chatLocked?(state: S): boolean
+
+  /**
+   * A real-time game's extra half (e2-t11, the kart): binary frames from the seats, passed on to
+   * everyone else and judged in memory. Leave out for a turn-based game. See `RealtimeModule`
+   */
+  realtime?: RealtimeModule<S, A>
 }
+
+/**
+ * The real-time half of a game (e2-t11, docs/ARCHITECTURE.md §4.13). Each browser simulates its own
+ * kart and sends its state many times a second as a small binary frame. Those frames never go
+ * through `reduce`: storing and diffing twenty a second per player would cost far too much. The room
+ * passes each one on to everyone else at once, and hands it here first, so that the module can judge
+ * it against the game's own state (in order checkpoints, a lap, a finish) and answer with actions.
+ * Those go through `reduce` as `actor: 'system'` like a timer's, so the stored log still replays
+ * the game.
+ *
+ * `memory` is the module's scratch space for this game, kept by the room in memory only: it is new
+ * for each game, and lost if the Durable Object is evicted, so it must be rebuildable from the next
+ * frames and the state. It is the only place a module may keep anything between calls.
+ *
+ * `now` is the server's clock (ms since the epoch): the one thing a module never gets elsewhere.
+ */
+export interface RealtimeModule<S extends JsonValue, A extends JsonValue> {
+  /** Fresh scratch space for a new game */
+  memory(): RealtimeMemory
+  /**
+   * One binary frame from `seat`. `relay`: the bytes everyone else gets (the room puts the seat in
+   * front), or null to drop the frame. `actions`: applied in order as `system`
+   */
+  frame(
+    state: S,
+    memory: RealtimeMemory,
+    seat: SeatId,
+    data: Uint8Array,
+    now: number,
+  ): { relay: Uint8Array | null; actions: A[] }
+  /**
+   * After every change: actions that need the clock (the kart's start time), applied as `system`.
+   * Must eventually answer none, or the room would go round for ever (it stops after a few)
+   */
+  clock?(state: S, now: number): A[]
+}
+
+/** A real-time module's scratch space: plain data or not, it never leaves the room's memory */
+export type RealtimeMemory = Record<string, unknown>
 
 /** A game as the browser knows it before anyone plays: no rules (shared/games/catalog.ts) */
 export type GameInfo<O extends OptionValues = OptionValues> = {

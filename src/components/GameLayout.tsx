@@ -5,6 +5,7 @@ import type { Standing } from '../../shared/games/types.ts'
 import type { JsonValue } from '../../shared/patch.ts'
 import type { RoomMember } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
+import type { RoomRealtime } from '../lib/useRoom.ts'
 import { unreadCount } from '../lib/chatState.ts'
 import { useCompact } from '../lib/useMediaQuery.ts'
 import { color, space } from '../styles/tokens.ts'
@@ -26,6 +27,8 @@ export type RoomParts = Omit<
 > & {
   chat: RoomChat
   act(action: JsonValue): void
+  /** A real-time game's channel (the kart, e2-t11); absent in tests of turn-based screens */
+  realtime?: RoomRealtime
 }
 
 export interface GameLayoutProps {

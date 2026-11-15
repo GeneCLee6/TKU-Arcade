@@ -57,6 +57,15 @@ export class RoomDO extends DurableObject<Env> {
     this.host = new RoomHost({
       sockets: {
         send: (conn, message) => this.send(conn, message),
+        sendBinary: (conn, data) => {
+          for (const ws of ctx.getWebSockets(conn)) {
+            try {
+              ws.send(data)
+            } catch {
+              // The socket is closing; webSocketClose cleans up
+            }
+          }
+        },
         close: (conn, code, reason) => {
           for (const ws of ctx.getWebSockets(conn)) {
             try {
@@ -202,7 +211,7 @@ export class RoomDO extends DurableObject<Env> {
     // Normally answered by the auto-response without waking the object
     if (data === HEARTBEAT_PING) ws.send(HEARTBEAT_PONG)
     else if (typeof data === 'string') this.host.message(conn, data)
-    else this.host.badFrame(conn)
+    else this.host.binary(conn, data)
     await this.settle()
   }
 

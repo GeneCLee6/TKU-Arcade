@@ -256,8 +256,16 @@ export type { ChatMessage }
 /** Someone's reaction (e7-t11), to everyone in the room, the sender too. Gone once it has floated */
 export type ReactionMessage = { t: 'reaction'; member: string; reaction: number }
 
+/**
+ * The answer to a `clock` ping (e9-t01): the browser's own time back as it was sent, and the
+ * server's clock (ms since the epoch) when it answered, so that a real-time game can count down to
+ * the same moment everywhere (shared/kart/net.ts `clockOffset`). Additive: older pages never ask
+ */
+export type ClockServerMessage = { t: 'clock'; c: number; s: number }
+
 export type ServerMessage =
   | WelcomeMessage
+  | ClockServerMessage
   | SnapshotMessage
   | PatchMessage
   | ErrorMessage
@@ -338,8 +346,12 @@ export type ReactMessage = { t: 'react'; reaction: number }
  */
 export type SetPasswordMessage = { t: 'set_password'; password: string | null }
 
+/** A clock ping (e9-t01): `c` is the browser's own time, sent back in the answer */
+export type ClockClientMessage = { t: 'clock'; c: number }
+
 export type ClientMessage =
   | JoinMessage
+  | ClockClientMessage
   | ResyncMessage
   | ActionMessage
   | ChatClientMessage
@@ -549,6 +561,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     }
     case 'resync':
       return { t: 'resync' }
+    case 'clock':
+      return typeof value.c === 'number' && Number.isFinite(value.c) ? { t: 'clock', c: value.c } : null
     case 'action':
       return value.action === undefined ? null : { t: 'action', action: value.action as JsonValue }
     case 'chat': {
@@ -647,6 +661,10 @@ export function parseServerMessage(raw: string): ServerMessage | null {
       return typeof value.code === 'string' ? (value as ErrorMessage) : null
     case 'timer':
       return Array.isArray(value.timers) ? (value as TimerMessage) : null
+    case 'clock':
+      return typeof value.c === 'number' && typeof value.s === 'number'
+        ? (value as ClockServerMessage)
+        : null
     case 'chat':
       return Array.isArray(value.messages) ? (value as ChatServerMessage) : null
     case 'reaction':

@@ -320,12 +320,12 @@ test.describe('the lobby', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await page.waitForLoadState('networkidle')
 
-    // Since E3 the kart is a Coming soon card; since 2026-11-14 it links to the time trial, and
+    // Since 2026-11-14 the kart opens race rooms, and its card still links to the time trial;
     // nothing links to the spike. The link loads nothing of the kart until it is followed
     await expect(page.locator('a[href*="/kart/spike"]')).toHaveCount(0)
-    const card = page.getByRole('heading', { level: 3, name: 'Kart Coming soon' })
+    const card = page.getByRole('heading', { level: 3, name: 'Kart', exact: true })
     await expect(card).toBeVisible()
-    await expect(page.locator('li', { has: card }).locator('button')).toHaveCount(0)
+    await expect(page.locator('li', { has: card }).getByRole('button', { name: 'New room' })).toHaveCount(1)
     await expect(page.locator('li', { has: card }).locator('a[href="/kart"]')).toHaveCount(1)
     expect(scripts.length).toBeGreaterThan(0)
     expect(scripts.filter((url) => /SpikePage|three|Scene/i.test(url))).toEqual([])
