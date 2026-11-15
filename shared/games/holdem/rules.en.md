@@ -15,6 +15,7 @@ The chips are play chips: they are worth nothing, nobody pays to sit down, and e
 
 - On your turn you may **fold**, **check** (when nobody has bet), **call** (match the bet), **bet** or **raise**.
 - No limit: you may bet everything you have at any time. The smallest bet is the big blind.
+- The raise panel has quick sizes: the smallest, **½ pot**, **⅔ pot**, the **pot** and **all in**; the slider sets anything in between.
 - A raise must be at least as big as the last bet or raise in that round. Going **all in** for less is always allowed, but it does not let anyone who has already acted raise again, unless the short all-ins together add up to a full raise.
 - A bet nobody calls comes back to whoever made it.
 
@@ -34,9 +35,8 @@ When someone is all in, they can only win from each other player as much as they
 
 Set by the host in the waiting room.
 
-- **Starting chips**: 1,000, 2,000 or 5,000 each. 1,000 by default.
-- **Blinds**: 5 / 10, 10 / 20 or 25 / 50. 10 / 20 by default.
-- **Blinds double**: off, every 10 hands or every 20 hands. Every 10 hands by default.
+- **Starting chips**: 100 BB · 2,000 chips, 200 BB · 4,000 chips or 300 BB · 6,000 chips each, counted in big blinds (BB). The blinds always start at 10 / 20. 200 BB · 4,000 chips by default.
+- **Blinds go up**: off, every 15 hands or every 20 hands. Off by default. Each step is about half as much again, in round numbers: 10 / 20, 15 / 30, 25 / 50, 40 / 80, 60 / 120, 100 / 200, 150 / 300, 250 / 500, 400 / 800, 600 / 1,200, 1,000 / 2,000, and on the same way. The screen shows the level and when and to what the blinds go up next.
 - **Time to act**: off, 20, 30 or 60 seconds. 30 by default. When time runs out you check if you can, or fold, and you are sat out.
 
 ## Sitting out, and when someone is away
@@ -51,4 +51,4 @@ Set by the host in the waiting room.
 
 ## Players
 
-2 to 9 players. A game takes about 45 minutes, less with blinds that double every 10 hands.
+2 to 9 players. With the blinds fixed, a game goes on until one player has every chip or everyone agrees to stop; blinds that go up bring it to an end sooner.

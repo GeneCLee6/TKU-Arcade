@@ -54,6 +54,8 @@ test('three players call, raise with the quick sizes and fold, on phones', async
   for (const person of people) {
     await expect(person.getByTestId('your-hand').getByRole('img')).toHaveCount(2)
     await expect(person.getByTestId('pot')).toHaveText('Pot 30')
+    // 200 big blinds deep by default: 4,000 chips, less the blinds
+    await expect(person.getByTestId('table')).toContainText('3980')
   }
 
   // Three players: the button acts first before the flop, and calls the big blind
@@ -66,6 +68,15 @@ test('three players call, raise with the quick sizes and fold, on phones', async
   // The small blind raises the pot: 50 in the middle and 10 to call, so the pot raise goes to 20 + 60
   actor = await onTurn(people)
   await actor.getByRole('button', { name: 'Raise' }).click()
+  // Five quick sizes in one row on a 360 px phone, every label whole
+  const quick = actor.getByTestId('raise-panel').getByRole('button', { name: /^(Min|½ pot|⅔ pot|Pot|All in)$/ })
+  await expect(quick).toHaveCount(5)
+  const boxes = await quick.evaluateAll((buttons) =>
+    buttons.map((button) => ({ ...button.getBoundingClientRect().toJSON(), clipped: button.scrollWidth > button.clientWidth })),
+  )
+  expect(new Set(boxes.map((box) => Math.round(box.top))).size).toBe(1)
+  for (const box of boxes) expect(box).toMatchObject({ clipped: false })
+  expect(Math.max(...boxes.map((box) => box.right))).toBeLessThanOrEqual(360)
   await actor.getByTestId('raise-panel').getByRole('button', { name: 'Pot', exact: true }).click()
   await expect(actor.getByTestId('raise-amount')).toHaveText('80')
   await actor.getByRole('button', { name: 'Raise to 80' }).click()

@@ -24,7 +24,7 @@ const cards = (text: string) => text.split(' ') as Card[]
 
 /** Three players, button seat 0, with these cards: seat 0 opens before the flop */
 function dealt(holes = ['Ac Ad', 'Kc Kd', '7h 2s'], board = '9c 9d 9h 3s 2c'): HoldemState {
-  const base = holdem.init(makeSeats(3), { stack: 1000, blinds: 20, blindUp: 10, timer: 30 }, createRng(1))
+  const base = holdem.init(makeSeats(3), { stack: 100, blindUp: 15, timer: 30 }, createRng(1))
   const chosen = [...holes.flatMap(cards), ...cards(board)]
   const deck = [...chosen, ...fullDeck().filter((card) => !chosen.includes(card))]
   const rng: Rng = { float: () => 0, int: () => 0, pick: (items) => items[0], shuffle: <T,>() => [...deck] as unknown as T[] }
@@ -147,12 +147,22 @@ describe('your turn', () => {
     fireEvent.click(buttonNamed('Raise'))
     const panel = screen.getByTestId('raise-panel')
     expect(within(panel).getByTestId('raise-amount')).toHaveTextContent('40')
+    fireEvent.click(within(panel).getByRole('button', { name: '½ pot' }))
+    expect(within(panel).getByTestId('raise-amount')).toHaveTextContent('45')
+    // Two thirds of 50 rounds down: 20 + 33
+    fireEvent.click(within(panel).getByRole('button', { name: '⅔ pot' }))
+    expect(within(panel).getByTestId('raise-amount')).toHaveTextContent('53')
     fireEvent.click(within(panel).getByRole('button', { name: 'Pot' }))
     // 30 in the pot and 20 to call: the pot raise goes to 20 + 50
     expect(within(panel).getByTestId('raise-amount')).toHaveTextContent('70')
     fireEvent.change(within(panel).getByRole('slider', { name: 'Amount' }), { target: { value: '333' } })
     fireEvent.click(within(panel).getByRole('button', { name: 'Raise to 333' }))
     expect(room.act).toHaveBeenCalledWith({ type: 'raise', to: 333 })
+  })
+
+  it('says the blind level and when and to what the blinds next go up', () => {
+    show(dealt(), 0)
+    expect(screen.getByTestId('blinds-up')).toHaveTextContent('Blind level 1 · 15 / 30 from hand 16')
   })
 
   it('names all in on the button that pushes every chip', () => {

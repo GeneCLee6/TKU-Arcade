@@ -32,7 +32,8 @@ export function toCallOf(view: HoldemView): number {
 }
 
 /**
- * The quick raise sizes as the server works them out: the smallest, half the pot, the pot, all in.
+ * The quick raise sizes as the server works them out: the smallest, half, two thirds and the whole
+ * pot, all in.
  * `min` and `max` are the bounds of the slider. Null when you cannot raise
  */
 export function raiseSizes(view: HoldemView, legalRaises: readonly number[]) {
@@ -47,6 +48,7 @@ export function raiseSizes(view: HoldemView, legalRaises: readonly number[]) {
     min,
     max,
     halfPot: clamp(view.currentBet + Math.floor(pot / 2)),
+    twoThirdsPot: clamp(view.currentBet + Math.floor((pot * 2) / 3)),
     pot: clamp(view.currentBet + pot),
   }
 }

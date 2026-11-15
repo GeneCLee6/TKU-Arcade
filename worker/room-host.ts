@@ -667,7 +667,8 @@ export class RoomHost {
       beginGame(
         module,
         seated.map((_, id) => ({ id })),
-        room.options,
+        // Checked again: a room made before a game's options changed may hold values it no longer has
+        parseOptions(module.options, room.options),
         this.deps.newSeed(),
         this.deps.now(),
       )

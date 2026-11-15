@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CHAT_HISTORY, CHAT_RATE, type ChatMessage } from '../../shared/chat.ts'
 import { replayMatch, type ReplayStep } from '../../shared/games/match.ts'
 import { createRng } from '../../shared/games/rng.ts'
+import { holdem } from '../../shared/games/holdem/rules.ts'
 import { promotion } from '../../shared/games/promotion/rules.ts'
 import { ticTacToe } from '../../shared/games/tictactoe/rules.ts'
 import {
@@ -1481,6 +1482,20 @@ describe('rule options', () => {
     expect(b.view?.room.options).toMatchObject({ edition: 'full' })
     a.send({ t: 'start' })
     expect(b.game.view).toMatchObject({ edition: 'full', bank: 200 })
+  })
+
+  // Texas Hold'em changed its options on 2026-11-15: a room waiting since then starts with valid ones
+  it('are checked again when the game starts, so a room kept from before a change gets defaults', () => {
+    const world = new World({ holdem: holdem as unknown as AnyGameModule })
+    expect(world.host.create(ROOM_ID, 'holdem', { stack: 300 })).toBe(true)
+    const a = world.join('A')
+    world.join('B')
+    const stored = world.stored()
+    world.store.set('room', JSON.stringify({ ...stored.room, options: { stack: 1000, blinds: 50, blindUp: 10, timer: 20 } }))
+    world.hibernate()
+    a.send({ t: 'start' })
+    expect(a.game.view).toMatchObject({ options: { stack: 200, blindUp: 0, timer: 20 }, sb: 10, bb: 20 })
+    expect((a.game.view as { players: { stack: number; bet: number }[] }).players.map((p) => p.stack + p.bet)).toEqual([4000, 4000])
   })
 
   it('keep the full edition when a room is made with it', () => {
