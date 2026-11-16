@@ -9,8 +9,22 @@
 // `lap` action, the last of them a finish. CLOSE_AFTER_FINISH_MS after the first finish, or once
 // everyone is done, the race is over; a kart not heard from for RETIRE_AFTER_MS drops out, and
 // RACE_CAP_MS per lap closes a race nobody can end.
+import {
+  decodeItemFrame,
+  drawItem,
+  HARMFUL_ITEMS,
+  isItemId,
+  ITEM_TUNING,
+  itemBoxes,
+  KEEP_EVENTS,
+  placeBucket,
+  rollFor,
+  type ItemFrame,
+  type Warp,
+} from '../../kart/items.ts'
 import { decodeFrame } from '../../kart/net.ts'
-import { judgeFrame, startTracking, type Tracked } from '../../kart/race.ts'
+import { judgeFrame, lapsDone, raceProgress, startTracking, type Tracked } from '../../kart/race.ts'
+import type { Track } from '../../kart/track.ts'
 import { formatTime } from '../../kart/timeTrial.ts'
 import { raceTrack } from '../../kart/tracks/registry.ts'
 import {
@@ -24,7 +38,14 @@ import {
 } from '../types.ts'
 import { GAME_META } from '../lobby.ts'
 import { kartInfo, MAX_LAPS } from './info.ts'
-import type { KartAction, KartOptions, KartRacer, KartState, KartView } from './types.ts'
+import type {
+  KartAction,
+  KartItemEvent,
+  KartOptions,
+  KartRacer,
+  KartState,
+  KartView,
+} from './types.ts'
 
 /** How long the room waits for everyone's track to load before it starts anyway */
 export const LOAD_WAIT_MS = 25_000
@@ -49,6 +70,19 @@ function settle(state: KartState): KartState {
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isTime = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+
+const isSeatList = (value: unknown): value is SeatId[] =>
+  Array.isArray(value) && value.every((seat) => Number.isInteger(seat))
+
+const isWarp = (value: unknown): value is Warp =>
+  isObject(value) &&
+  Number.isInteger(value.seat) &&
+  ['x', 'z', 'heading'].every((key) => isTime(value[key])) &&
+  Number.isInteger(value.nextGate) &&
+  Number.isInteger(value.crossings)
 
 type Memory = { tracked: Map<SeatId, Tracked> }
 
@@ -94,10 +128,17 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
   ...kartInfo,
   meta: GAME_META.kart,
 
-  init(seats, options) {
+  init(seats, options, rng) {
     const track = raceTrack(options.track) ? options.track : kartInfo.options.track.default
     const laps = Math.max(1, Math.min(MAX_LAPS, Math.round(options.laps)))
+    const mode = options.mode === 'race' ? 'race' : 'items'
     return {
+      mode,
+      seed: rng.int(2 ** 31),
+      boxes: mode === 'items' ? itemBoxes(raceTrack(track)!).map(() => 0) : [],
+      draws: 0,
+      events: [],
+      used: 0,
       track,
       laps,
       phase: 'loading',
@@ -108,6 +149,8 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         lapMs: [],
         finishMs: null,
         out: false,
+        item: null,
+        shieldUntil: 0,
       })),
     }
   },
@@ -157,6 +200,77 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         if (!racer || done(racer)) return gameError(BAD)
         const racers = state.racers.map((one) => (one === racer ? { ...one, out: true } : one))
         return settle({ ...state, racers })
+      }
+      case 'got': {
+        if (state.phase !== 'racing' || state.mode !== 'items') return gameError(PHASE)
+        const racer = state.racers.find((one) => one.seat === a.seat)
+        const box = a.box
+        const at = a.at
+        const item = a.item
+        if (
+          !racer ||
+          done(racer) ||
+          (racer.item ?? null) !== null ||
+          !isItemId(item) ||
+          !isTime(at) ||
+          typeof box !== 'number' ||
+          !Number.isInteger(box) ||
+          box < 0 ||
+          box >= state.boxes.length ||
+          state.boxes[box]! > at
+        ) {
+          return gameError(BAD)
+        }
+        return {
+          ...state,
+          boxes: state.boxes.map((ready, i) => (i === box ? at + ITEM_TUNING.boxRespawnMs : ready)),
+          draws: state.draws + 1,
+          racers: state.racers.map((one) => (one === racer ? { ...one, item } : one)),
+        }
+      }
+      case 'use': {
+        if (state.phase !== 'racing' || state.mode !== 'items') return gameError(PHASE)
+        const racer = state.racers.find((one) => one.seat === a.seat)
+        const { item, at, targets, blocked, warps } = a
+        if (
+          !racer ||
+          done(racer) ||
+          !isItemId(item) ||
+          racer.item !== item ||
+          !isTime(at) ||
+          !isSeatList(targets) ||
+          !isSeatList(blocked) ||
+          !Array.isArray(warps) ||
+          !warps.every(isWarp)
+        ) {
+          return gameError(BAD)
+        }
+        const event: KartItemEvent = {
+          n: state.used,
+          item,
+          by: racer.seat,
+          targets,
+          blocked,
+          at,
+          warps,
+        }
+        const racers = state.racers.map((one) => {
+          if (one === racer) {
+            return {
+              ...one,
+              item: null,
+              shieldUntil: item === 'shield' ? at + ITEM_TUNING.shieldMs : one.shieldUntil,
+            }
+          }
+          // A shield that stopped something is used up
+          return blocked.includes(one.seat) ? { ...one, shieldUntil: 0 } : one
+        })
+        return {
+          ...state,
+          racers,
+          used: state.used + 1,
+          events: [...state.events, event].slice(-KEEP_EVENTS),
+        }
       }
       case 'close':
         if (state.phase === 'finished') return gameError(PHASE)
@@ -216,6 +330,10 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
     },
 
     frame(state, memory, seat, data, now) {
+      const itemFrame = decodeItemFrame(data)
+      if (itemFrame) {
+        return { relay: null, actions: judgeItem(state, memoryOf(memory), seat, itemFrame, now) }
+      }
       const frame = decodeFrame(data)
       const racer = state.racers.find((one) => one.seat === seat)
       const track = raceTrack(state.track)
@@ -252,4 +370,136 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
       return { relay: data, actions }
     },
   },
+}
+
+// ── Items (e9-t05, e9-t06a) ──────────────────────────────────────────────────────────────────
+
+type Runner = { seat: SeatId; at: number; tracked: Tracked | undefined }
+
+/** Each kart still racing and how far round it is, by what the server last saw of it: first first */
+function field(state: KartState, tracked: Map<SeatId, Tracked>, track: Track): Runner[] {
+  return state.racers
+    .filter((racer) => !done(racer))
+    .map((racer) => {
+      const one = tracked.get(racer.seat)
+      const last = one?.last
+      const at = one && last ? raceProgress(track, one.crossings, one.nextGate, last.x, last.z) : 0
+      return { seat: racer.seat, at, tracked: one }
+    })
+    .sort((a, b) => b.at - a.at || a.seat - b.seat)
+}
+
+/** How far (x, z) is from the segment from a to b */
+function distanceToSegment(
+  x: number,
+  z: number,
+  a: { x: number; z: number },
+  b: { x: number; z: number },
+): number {
+  const dx = b.x - a.x
+  const dz = b.z - a.z
+  const length = dx * dx + dz * dz
+  const t = length === 0 ? 0 : Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / length))
+  return Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t))
+}
+
+/**
+ * An item frame from `seat`, judged against the state and where the server last saw every kart:
+ * the actions it leads to, none when it is refused. A pickup needs the box there, nothing held and
+ * the kart near the box on its way; the item is drawn by place. A use needs the item held and, for
+ * one that reaches another kart, someone to reach; a shield up stops a harmful one
+ */
+function judgeItem(
+  state: KartState,
+  memory: Memory,
+  seat: SeatId,
+  frame: ItemFrame,
+  now: number,
+): KartAction[] {
+  const racer = state.racers.find((one) => one.seat === seat)
+  const track = raceTrack(state.track)
+  if (state.mode !== 'items' || state.phase !== 'racing' || !racer || done(racer) || !track) {
+    return []
+  }
+  const own = memory.tracked.get(seat)
+  const last = own?.last
+  if (!own || !last) return []
+  const racing = field(state, memory.tracked, track)
+  const place = Math.max(
+    0,
+    racing.findIndex((one) => one.seat === seat),
+  )
+
+  if (frame.op === 'pickup') {
+    const box = itemBoxes(track)[frame.box]
+    if (!box || (racer.item ?? null) !== null || (state.boxes[frame.box] ?? Infinity) > now) {
+      return []
+    }
+    // Where it was last seen, on to where it is heading in the next quarter second
+    const ahead = { x: last.x + last.vx * 0.25, z: last.z + last.vz * 0.25 }
+    if (distanceToSegment(box.x, box.z, last, ahead) > ITEM_TUNING.boxReach) return []
+    // Karts that have finished are ahead of everyone still racing
+    const before = state.racers.filter((one) => one.finishMs !== null).length
+    const bucket = placeBucket(before + place, before + racing.length)
+    const item = drawItem(bucket, rollFor(state.seed, state.draws))
+    return [{ t: 'got', seat, box: frame.box, item, at: now }]
+  }
+
+  const item = frame.item
+  if (racer.item !== item) return []
+  const applied = (targets: SeatId[], warps: Warp[] = []): KartAction[] => {
+    const blocked = HARMFUL_ITEMS.has(item)
+      ? targets.filter(
+          (target) => (state.racers.find((one) => one.seat === target)?.shieldUntil ?? 0) > now,
+        )
+      : []
+    return [{ t: 'use', seat, item, at: now, targets, blocked, warps: blocked.length ? [] : warps }]
+  }
+  const ahead = racing.slice(0, place)
+  const next = ahead[ahead.length - 1]
+  const there = next?.tracked?.last
+  const distance = there ? Math.hypot(there.x - last.x, there.z - last.z) : Infinity
+  switch (item) {
+    case 'boost':
+    case 'shield':
+      return applied([])
+    case 'tow':
+      return next && distance <= ITEM_TUNING.towReach ? applied([next.seat]) : []
+    case 'headwind':
+      return ahead.length > 0 ? applied(ahead.map((one) => one.seat)) : []
+    case 'swap': {
+      const other = next?.tracked
+      if (!next || !other || !there || distance > ITEM_TUNING.swapReach) return []
+      // Only on the same lap: the laps the room has counted stay right for both
+      if (lapsDone(other.crossings) !== lapsDone(own.crossings)) return []
+      const warps: Warp[] = [
+        {
+          seat,
+          x: there.x,
+          z: there.z,
+          heading: there.heading,
+          nextGate: other.nextGate,
+          crossings: other.crossings,
+        },
+        {
+          seat: next.seat,
+          x: last.x,
+          z: last.z,
+          heading: last.heading,
+          nextGate: own.nextGate,
+          crossings: own.crossings,
+        },
+      ]
+      const actions = applied([next.seat], warps)
+      const action = actions[0]
+      // Not stopped by a shield: the server lets each kart jump to where it was sent
+      if (action?.t === 'use') {
+        for (const warp of action.warps) {
+          const one = memory.tracked.get(warp.seat)
+          if (one) memory.tracked.set(warp.seat, { ...one, warp })
+        }
+      }
+      return actions
+    }
+  }
 }

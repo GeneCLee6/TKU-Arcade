@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
-import type { KartAction, KartView } from '../../../shared/games/kart/types.ts'
+import type { KartAction, KartItemEvent, KartView } from '../../../shared/games/kart/types.ts'
+import { actionKeys } from '../../../shared/kart/input.ts'
+import { TARGETED_ITEMS, type ItemId } from '../../../shared/kart/items.ts'
 import { KART_MESSAGES } from '../../../shared/kart/i18n.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import type { JsonValue } from '../../../shared/patch.ts'
@@ -13,7 +15,7 @@ import { displayType, glass, monoType } from '../../styles/esports.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
 import { loadBody } from '../bodies.ts'
 import type { Callout } from '../callouts.ts'
-import { loadBindings, loadRules, loadTuning } from '../devices.ts'
+import { keyLabel, loadBindings, loadRules, loadTuning } from '../devices.ts'
 import { CalloutText, Hud } from '../Hud.tsx'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
@@ -21,6 +23,7 @@ import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
 import { supportsWebGL2 } from '../Scene.ts'
 import { startSpikeLoop, type SpikeCourse, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
 import { autopilot } from './autopilot.ts'
+import { ItemNote, ItemSlot } from './ItemHud.tsx'
 import { createRaceNet, type NameTag, type RaceNet } from './netRace.ts'
 
 registerMessages(KART_MESSAGES)
@@ -35,6 +38,65 @@ const EMPTY_HUD: SpikeHud = {
 }
 
 const CALLOUT_MS = 900
+/** An item's note stays this long */
+const NOTE_MS = 2_200
+/** A use the room has not answered by now found no one to reach */
+const NO_TARGET_MS = 900
+
+type T = ReturnType<typeof useT>
+
+/**
+ * What an item used says to this racer, if anything: what it did for them, what it did to them, or
+ * that a shield stopped it
+ */
+function noteFor(
+  event: KartItemEvent,
+  seat: number,
+  t: T,
+  nameOf: (seat: number) => string,
+): { text: string; bad: boolean } | null {
+  const item = t(`games.kart.item.${event.item}`)
+  const first = event.targets[0]
+  if (event.by === seat) {
+    if (event.blocked.length > 0 && event.blocked.length === event.targets.length) {
+      return {
+        text: t('games.kart.item.stoppedYours', { name: nameOf(event.blocked[0]!), item }),
+        bad: true,
+      }
+    }
+    switch (event.item) {
+      case 'shield':
+        return { text: t('games.kart.item.youShield'), bad: false }
+      case 'tow':
+        return first === undefined
+          ? null
+          : { text: t('games.kart.item.youTow', { name: nameOf(first) }), bad: false }
+      case 'headwind':
+        return { text: t('games.kart.item.youHeadwind'), bad: false }
+      case 'swap':
+        return first === undefined
+          ? null
+          : { text: t('games.kart.item.youSwap', { name: nameOf(first) }), bad: false }
+      default:
+        return null
+    }
+  }
+  if (!event.targets.includes(seat)) return null
+  const by = nameOf(event.by)
+  if (event.blocked.includes(seat)) {
+    return { text: t('games.kart.item.yourBubble', { name: by, item }), bad: false }
+  }
+  switch (event.item) {
+    case 'headwind':
+      return { text: t('games.kart.item.hitHeadwind', { name: by }), bad: true }
+    case 'swap':
+      return { text: t('games.kart.item.hitSwap', { name: by }), bad: true }
+    case 'tow':
+      return { text: t('games.kart.item.hitTow', { name: by }), bad: true }
+    default:
+      return null
+  }
+}
 /** How often the places and the connection's state are read again */
 const POLL_MS = 250
 
@@ -61,6 +123,9 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
   const [callout, setCallout] = useState<{ callout: Callout; id: number }>()
   const [order, setOrder] = useState<number[]>(() => view.racers.map((racer) => racer.seat))
   const [unstable, setUnstable] = useState(false)
+  const [note, setNote] = useState<{ text: string; bad: boolean; id: number }>()
+  const seenEvents = useRef(view.used)
+  const pressed = useRef<{ item: ItemId; at: number } | null>(null)
   const minimap = useRef<MinimapHandle>(null)
   const clock = useRef<RaceClockHandle>(null)
   const tagLayer = useRef<HTMLDivElement>(null)
@@ -74,9 +139,13 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
   // Read by the loop, every step
   const latest = useRef(view)
   const actRef = useRef(act)
+  const tRef = useRef(t)
+  const nameRef = useRef(nameOf)
   useLayoutEffect(() => {
     latest.current = view
     actRef.current = act
+    tRef.current = t
+    nameRef.current = nameOf
   })
   // Testing a room alone: a second tab can drive itself
   const [autopiloted] = useState(() => new URLSearchParams(window.location.search).has('autopilot'))
@@ -97,6 +166,10 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
       body: loadBody(),
       goAt: () => latest.current.goAt,
       laps: latest.current.laps,
+      view: () => latest.current,
+      onItemPress: (item) => {
+        pressed.current = TARGETED_ITEMS.has(item) ? { item, at: performance.now() } : null
+      },
     })
     raceNet.current = net
     net.onTags((tags) => placeTags(tagLayer.current, tags))
@@ -140,9 +213,38 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
       const next = net.order(latest.current.racers)
       setOrder((current) => (current.join() === next.join() ? current : next))
       setUnstable(net.status().unstable && latest.current.phase === 'racing')
+      // An item that reaches someone, pressed and still held: there was no one to reach
+      const press = pressed.current
+      if (press && performance.now() - press.at >= NO_TARGET_MS) {
+        pressed.current = null
+        const me = latest.current.racers.find((racer) => racer.seat === latest.current.you)
+        if (me?.item === press.item) {
+          setNote((last) => ({
+            text: tRef.current('games.kart.item.noTarget'),
+            bad: true,
+            id: (last?.id ?? 0) + 1,
+          }))
+        }
+      }
     }, POLL_MS)
     return () => clearInterval(timer)
   }, [])
+
+  // What each item used says to this racer
+  useEffect(() => {
+    for (const event of view.events) {
+      if (event.n < seenEvents.current) continue
+      seenEvents.current = event.n + 1
+      const next = noteFor(event, seat, tRef.current, nameRef.current)
+      if (next) setNote((last) => ({ ...next, id: (last?.id ?? 0) + 1 }))
+    }
+  }, [view.events, seat])
+
+  useEffect(() => {
+    if (!note) return
+    const timer = window.setTimeout(() => setNote(undefined), NOTE_MS)
+    return () => window.clearTimeout(timer)
+  }, [note])
 
   useEffect(() => {
     if (!callout) return
@@ -164,6 +266,8 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
   const me = view.racers.find((racer) => racer.seat === seat)
   const finished = me?.finishMs != null || trial?.phase === 'finished'
   const ready = view.racers.filter((racer) => racer.loaded).length
+  const firstItemKey = actionKeys(settings.bindings, 'item')[0]
+  const itemKey = firstItemKey ? keyLabel(firstItemKey, t) : t('kart.controls.none')
   const counting = view.phase === 'countdown' && view.goAt !== null && trial?.phase === 'countdown'
 
   return (
@@ -182,6 +286,7 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
         <PlacePanel data-testid="kart-place" aria-label={t('games.kart.race.position')}>
           <PlaceNumber>{t('games.kart.race.place', { place: place || 1, total })}</PlaceNumber>
         </PlacePanel>
+        {note && <ItemNote key={`note-${note.id}`} text={note.text} bad={note.bad} />}
         {unstable && (
           <Unstable role="status" data-testid="kart-unstable">
             {t('games.kart.race.unstable')}
@@ -212,6 +317,11 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
         </Finish>
       )}
       <Bottom>
+        {view.mode === 'items' && (
+          <SlotCorner>
+            <ItemSlot t={t} item={me?.item ?? null} keyName={itemKey} />
+          </SlotCorner>
+        )}
         <Hud t={t} hud={hud} maxStored={settings.tuning.maxStoredBoosts} />
       </Bottom>
     </Page>
@@ -367,6 +477,12 @@ const Bottom = styled.div`
   bottom: ${space.sm}px;
   left: ${space.sm}px;
   right: ${space.sm}px;
+`
+
+const SlotCorner = styled.div`
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: ${space.xs}px;
 `
 
 const Fallback = styled.section`

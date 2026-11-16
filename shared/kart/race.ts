@@ -7,6 +7,7 @@ import { KART_TUNING, type KartState } from './physics.ts'
 import { courseOf, type Track } from './track.ts'
 import { KART_RADIUS } from './walls.ts'
 import type { KartFrame } from './net.ts'
+import type { Warp } from './items.ts'
 
 export const MAX_RACERS = 8
 
@@ -107,6 +108,11 @@ export interface Tracked {
   readonly nextGate: number
   readonly crossings: number
   readonly safe: Spot
+  /**
+   * e9-t06a: where a swap has sent this kart and has not yet seen it arrive. Its next reset frame
+   * there is taken, and the swap's count of gates with it
+   */
+  readonly warp?: Warp | null
 }
 
 export const startTracking = (track: Track, slot: number): Tracked => ({
@@ -176,6 +182,24 @@ export function judgeFrame(tracked: Tracked, frame: KartFrame, context: JudgeCon
     last === null ||
     (tracked.refusedSince !== null && now - tracked.refusedSince >= RESYNC_AFTER_MS)
   const checkpoints = courseOf(track).checkpoints!
+  const warp = tracked.warp ?? null
+  // A swap's jump: taken with the swap's gates, nothing counted on the way
+  if (warp && frame.reset && Math.hypot(frame.x - warp.x, frame.z - warp.z) <= RESET_REACH) {
+    const count = checkpoints.gates.length
+    return {
+      kind: 'taken',
+      lapAt: null,
+      tracked: {
+        last: frame,
+        lastAt: now,
+        refusedSince: null,
+        nextGate: warp.nextGate,
+        crossings: warp.crossings,
+        safe: checkpoints.respawns[(warp.nextGate - 1 + count) % count]!,
+        warp: null,
+      },
+    }
+  }
   if (!resync && last) {
     if (frame.reset) {
       const spots = [...checkpoints.respawns, gridSpot(track, context.slot)]
@@ -243,6 +267,7 @@ export function judgeFrame(tracked: Tracked, frame: KartFrame, context: JudgeCon
       nextGate: progress.nextGate,
       crossings: progress.crossings,
       safe: progress.safe,
+      warp,
     },
   }
 }

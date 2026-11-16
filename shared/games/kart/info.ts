@@ -17,5 +17,15 @@ export const kartInfo: GameInfo<KartOptions> = {
       default: RACE_TRACK_IDS[0],
     },
     laps: { kind: 'int', labelKey: 'games.kart.option.laps', min: 1, max: MAX_LAPS, default: 3 },
+    // e9-t05: item boxes on the road, or a plain race
+    mode: {
+      kind: 'select',
+      labelKey: 'games.kart.option.mode',
+      choices: [
+        { value: 'items', labelKey: 'games.kart.mode.items' },
+        { value: 'race', labelKey: 'games.kart.mode.race' },
+      ],
+      default: 'items',
+    },
   },
 }

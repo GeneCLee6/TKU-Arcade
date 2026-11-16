@@ -114,6 +114,7 @@ describe('the gamepad', () => {
       drift: true,
       boost: true,
       reset: false,
+      item: false,
     })
     expect(
       readInput(DEFAULT_BINDINGS, { held: new Set(), pad: pad((p) => (p.buttons[1] = 1)) }).brake,

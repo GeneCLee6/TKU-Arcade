@@ -30,7 +30,7 @@ import {
   type TrialPhase,
 } from '../../shared/kart/timeTrial.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
-import { startRun, stepRun, type Spot } from '../../shared/kart/course.ts'
+import { startRun, stepRun, type Run, type Spot } from '../../shared/kart/course.ts'
 import { actionKeys, isBoundKey, readInput, type Bindings } from '../../shared/kart/input.ts'
 import {
   kartBoosting,
@@ -46,7 +46,13 @@ import {
 } from '../../shared/kart/physics.ts'
 import { calloutAtStart, calloutBetween, louder, type Callout } from './callouts.ts'
 import { readGamepad } from './devices.ts'
-import { createKartScene, type KartScene, type OtherKart } from './Scene.ts'
+import {
+  createKartScene,
+  type ItemProps,
+  type KartScene,
+  type OtherKart,
+  type Pose,
+} from './Scene.ts'
 import type { KartLook } from './art/kartModel.ts'
 
 const STATS_EVERY_MS = 500
@@ -204,6 +210,14 @@ export interface SpikeNet {
   drawn(scene: Pick<KartScene, 'project'>): void
   /** Drives the kart instead of the keys (testing a room alone, `?autopilot`) */
   readonly autopilot?: (trial: Trial) => KartInput
+  /**
+   * e9-t05, e9-t06a: after each step of the race, what the items do: a box driven through, the item
+   * key, and the effects on this kart (a boost, a tow, a headwind, a swap's jump, which counts as a
+   * reset). Returns the run as it is now
+   */
+  readonly adjust?: (run: Run, input: KartInput) => Run
+  /** Each frame, before drawing: the item boxes and the shields to draw, this kart's at `own` */
+  readonly props?: (own: Pose) => ItemProps
 }
 
 /** Read every frame, so that a remap or a rule switch applies at once */
@@ -315,6 +329,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   // A boost or reset key pressed and let go between two steps still counts
   let boostTapped = false
   let resetTapped = false
+  let itemTapped = false
   let run = startRun(course)
   const debug: SpikeDebug = {
     running: true,
@@ -365,6 +380,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       held.clear()
       boostTapped = false
       resetTapped = false
+      itemTapped = false
     }
     const clock = advanceClock(accumulator, frameMs / 1000)
     accumulator = clock.accumulator
@@ -374,17 +390,21 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       const input =
         driven ??
         (enabled
-          ? readInput(bindings, { held, pad: pad?.snapshot, boostTapped, resetTapped })
+          ? readInput(bindings, { held, pad: pad?.snapshot, boostTapped, resetTapped, itemTapped })
           : NO_INPUT)
       boostTapped = false
       resetTapped = false
+      itemTapped = false
       const before = run
       if (trial && trialCourse && track) {
         const was = trial.phase
         if (net && was === 'countdown') {
           // Counted down to the room's GO, not this browser's: held on the grid until it is set
           const left = net.countdown()
-          trial = { ...trial, countdown: left === null ? COUNTDOWN_SECONDS + 1 : Math.min(left, COUNTDOWN_SECONDS) }
+          trial = {
+            ...trial,
+            countdown: left === null ? COUNTDOWN_SECONDS + 1 : Math.min(left, COUNTDOWN_SECONDS),
+          }
         }
         trial = stepTrial(trial, input, trialCourse, tuning, rules)
         run = trial.run
@@ -395,6 +415,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
             run = { ...run, kart: bumped.kart }
             trial = { ...trial, run }
             if (bumped.hit >= HIT_SPEED) audio.hit(Math.min(1, bumped.hit / 30))
+          }
+          if (net.adjust && trial.phase === 'racing') {
+            const adjusted = net.adjust(run, input)
+            if (adjusted !== run) {
+              run = adjusted
+              trial = { ...trial, run }
+            }
           }
         }
         if (was === 'countdown' && trial.phase === 'racing') {
@@ -461,15 +488,16 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       charge:
         current.releaseWindow > 0
           ? 2
-          : current.burstReady ||
-              (current.drifting && current.driftSeconds >= tuning.chainMinDrift)
+          : current.burstReady || (current.drifting && current.driftSeconds >= tuning.chainMinDrift)
             ? 1
             : 0,
       bursts,
     }
+    const pose = poseBetween(previous, current, clock.alpha)
     if (net) scene.others(net.others(), frameMs / 1000)
+    if (net?.props) scene.items(net.props(pose), frameMs / 1000)
     scene.draw(
-      poseBetween(previous, current, clock.alpha),
+      pose,
       { heading: current.heading, vx: current.vx, vz: current.vz, boosting, skidding },
       frameMs / 1000,
       look,
@@ -559,6 +587,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     if (event.repeat) return
     if (actionKeys(bindings, 'boost').includes(event.code)) boostTapped = true
     if (actionKeys(bindings, 'reset').includes(event.code)) resetTapped = true
+    if (actionKeys(bindings, 'item').includes(event.code)) itemTapped = true
   }
   const onKeyUp = (event: KeyboardEvent) => {
     held.delete(event.code)

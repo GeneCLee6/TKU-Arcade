@@ -1,5 +1,6 @@
 // A careful driver for testing a race room alone (`?autopilot` on the room's address): steers at
-// the road a little ahead, eases off for the bends, never drifts. For the browser tests and for
+// the road a little ahead, eases off for the bends, never drifts. In an item race it taps the item
+// key every second, so whatever it picks up is used. For the browser tests and for
 // trying a room with a second tab nobody drives; not a racing opponent.
 import { NO_INPUT, type KartInput } from '../../../shared/kart/physics.ts'
 import { nearestRoadPoint, type Trial } from '../../../shared/kart/timeTrial.ts'
@@ -20,5 +21,6 @@ export function autopilot(trial: Trial, road: readonly RoadPoint[]): KartInput {
     throttle: !(sharp && speed > 22),
     brake: sharp && speed > 32,
     steer: Math.max(-1, Math.min(1, turn * 3)),
+    item: Math.floor(trial.steps / 30) % 2 === 1,
   }
 }
