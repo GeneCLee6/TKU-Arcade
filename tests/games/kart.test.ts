@@ -20,7 +20,7 @@ import { bytes, driveFrames } from '../kart/raceDriver.ts'
 import { playRandom } from './harness.ts'
 
 const start = (seats: number, laps = 3, track = 'riverside') =>
-  kart.init(makeSeats(seats), { track, laps }, createRng(1))
+  kart.init(makeSeats(seats), { track, laps, mode: 'race' }, createRng(1))
 
 function act(state: KartState, action: KartAction, actor: Actor = 'system'): KartState {
   const next = kart.reduce(state, action, actor, createRng(7))
@@ -61,7 +61,7 @@ describe('the race room in the lobby (e9-t07)', () => {
   })
 
   it('falls back to the first track for one it does not know, and keeps the laps in range', () => {
-    const state = kart.init(makeSeats(2), { track: 'nope', laps: 99 }, createRng(1))
+    const state = kart.init(makeSeats(2), { track: 'nope', laps: 99, mode: 'race' }, createRng(1))
     expect(state.track).toBe(RACE_TRACK_IDS[0])
     expect(state.laps).toBe(9)
   })

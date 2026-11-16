@@ -22,6 +22,7 @@ import { createKartEffects } from './art/effects.ts'
 import { createSpeedLines } from './art/speedLines.ts'
 import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
 import type { KartBody } from './bodies.ts'
+import { createItemArt, type ItemArt, type ItemBoxLook } from './art/itemArt.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 import { kartScene, kartThemes } from '../styles/kartTokens.ts'
@@ -50,6 +51,12 @@ export interface OtherKart extends Pose {
   readonly look: KartLook
 }
 
+/** The item race's things to draw this frame (e9-t05): the boxes, and the karts with a shield up */
+export interface ItemProps {
+  readonly boxes: readonly ItemBoxLook[]
+  readonly shields: readonly { readonly x: number; readonly z: number }[]
+}
+
 /** Where a point of the world is on the canvas, in CSS pixels from its top left; null off screen */
 export type ScreenPoint = { readonly x: number; readonly y: number } | null
 
@@ -65,6 +72,8 @@ export interface KartScene {
   ghost(pose: Pose | null): void
   /** The other racers' karts this frame (e9-t03); one missing from the list is taken away */
   others(karts: readonly OtherKart[], frameSeconds: number): void
+  /** The item boxes and shields this frame (e9-t05); made the first time there are any */
+  items(props: ItemProps, frameSeconds: number): void
   /** Where each of these points (x, height, z) is on screen, as of the last frame drawn */
   project(points: readonly (readonly [number, number, number])[]): ScreenPoint[]
   /** `{width}x{height}` of the drawing buffer */
@@ -172,6 +181,7 @@ export function createKartScene(
   let ghostKart: KartModel | null = null
   // The other racers' karts, by id, made when each first appears
   const otherKarts = new Map<number, KartModel>()
+  let itemArt: ItemArt | null = null
   const projected = new Vector3()
 
   // One box per wall, along its centre line: the test yard's. A track's art draws its own barriers
@@ -292,6 +302,10 @@ export function createKartScene(
         otherKarts.delete(id)
       }
     },
+    items(props, frameSeconds) {
+      itemArt ??= createItemArt(scene)
+      itemArt.update(props.boxes, props.shields, frameSeconds)
+    },
     project(points) {
       const { clientWidth: width, clientHeight: height } = container
       return points.map(([x, y, z]) => {
@@ -316,6 +330,7 @@ export function createKartScene(
       kart.dispose()
       ghostKart?.dispose()
       for (const model of otherKarts.values()) model.dispose()
+      itemArt?.dispose()
       art?.dispose()
       grid.material.dispose()
       renderer.dispose()

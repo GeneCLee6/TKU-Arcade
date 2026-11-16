@@ -11,6 +11,7 @@ export const KART_ACTIONS = [
   'drift',
   'boost',
   'reset',
+  'item',
 ] as const
 export type KartAction = (typeof KART_ACTIONS)[number]
 
@@ -38,7 +39,8 @@ const axis = (index: number, direction: -1 | 1): PadBinding => ({ kind: 'axis', 
 /**
  * Defaults. No Shift and no Ctrl: pressing Shift five times opens Windows' Sticky Keys prompt (a
  * drift is often a tap), and Ctrl with W closes the tab. Arrows with Z and X for the right hand on
- * the arrows; WASD with Space and E for the left hand on the letters. The gamepad follows the
+ * the arrows; WASD with Space and E for the left hand on the letters. The item (e9-t05) is C next to
+ * Z and X, or Q next to WASD, and up on the d-pad. The gamepad follows the
  * browser's standard mapping: left stick or d-pad to steer, A or RT to accelerate, B or LT to brake,
  * RB or LB to drift, X or Y to boost. Reset (e8-t02b) is R, and Back (View) on a gamepad: away from
  * the driving keys, so that it is not pressed by accident, with a second place left empty.
@@ -52,6 +54,7 @@ export const DEFAULT_BINDINGS: Bindings = {
     drift: ['KeyZ', 'Space'],
     boost: ['KeyX', 'KeyE'],
     reset: ['KeyR', null],
+    item: ['KeyC', 'KeyQ'],
   },
   pad: {
     throttle: [button(0), button(7)],
@@ -61,6 +64,7 @@ export const DEFAULT_BINDINGS: Bindings = {
     drift: [button(5), button(4)],
     boost: [button(2), button(3)],
     reset: [button(8), null],
+    item: [button(12), null],
   },
 }
 
@@ -117,12 +121,14 @@ export interface InputSources {
   readonly boostTapped?: boolean
   /** The same for the reset */
   readonly resetTapped?: boolean
+  /** The same for the item */
+  readonly itemTapped?: boolean
 }
 
 /** Keyboard and gamepad together: either can press, and their steering adds up to at most full */
 export function readInput(
   bindings: Bindings,
-  { held, pad, boostTapped, resetTapped }: InputSources,
+  { held, pad, boostTapped, resetTapped, itemTapped }: InputSources,
 ): KartInput {
   const amount = (action: KartAction): number => {
     let value = 0
@@ -143,13 +149,15 @@ export function readInput(
     drift: pressed('drift'),
     boost: pressed('boost') || (boostTapped ?? false),
     reset: pressed('reset') || (resetTapped ?? false),
+    item: pressed('item') || (itemTapped ?? false),
   }
 }
 
 /** The keys an action listens to: its two places, and Shift or Ctrl where nothing else took them */
 export const actionKeys = (bindings: Bindings, action: KartAction): readonly string[] => {
   const own = bindings.keys[action].filter((code): code is string => code !== null)
-  const taken = (code: string) => KART_ACTIONS.some((other) => other !== action && bindings.keys[other].includes(code))
+  const taken = (code: string) =>
+    KART_ACTIONS.some((other) => other !== action && bindings.keys[other].includes(code))
   const always = (ALWAYS_KEYS[action] ?? []).filter((code) => !own.includes(code) && !taken(code))
   return [...own, ...always]
 }

@@ -222,6 +222,7 @@ const en = {
   'kart.action.drift': 'Drift',
   'kart.action.boost': 'Boost',
   'kart.action.reset': 'Reset',
+  'kart.action.item': 'Use item (item race)',
 
   'kart.key.up': 'Up arrow',
   'kart.key.down': 'Down arrow',
@@ -474,6 +475,7 @@ const zhTW: Record<KartMessageKey, string> = {
   'kart.action.drift': '甩尾',
   'kart.action.boost': '噴射',
   'kart.action.reset': '復位',
+  'kart.action.item': '用道具（道具賽）',
 
   'kart.key.up': '上方向鍵',
   'kart.key.down': '下方向鍵',

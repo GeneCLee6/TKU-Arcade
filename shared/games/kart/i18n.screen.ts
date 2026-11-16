@@ -24,6 +24,24 @@ const en = {
   'games.kart.race.noWebgl': 'This browser cannot draw the race (WebGL 2 is needed).',
   'games.kart.race.canvas': 'The race, seen from behind your kart',
   'games.kart.race.you': 'you',
+  // The item race (e9-t05, e9-t06a). Working titles of our own (e10-t01 settles them)
+  'games.kart.item.boost': 'Tailwind',
+  'games.kart.item.shield': 'Bubble',
+  'games.kart.item.tow': 'Tow Line',
+  'games.kart.item.headwind': 'Headwind',
+  'games.kart.item.swap': 'Switcheroo',
+  'games.kart.item.empty': 'No item',
+  'games.kart.item.press': 'Press {key}',
+  'games.kart.item.noTarget': 'No one in reach ahead',
+  'games.kart.item.youShield': 'Bubble up: it stops the next hit',
+  'games.kart.item.youTow': 'Towing on {name}',
+  'games.kart.item.youHeadwind': 'Headwind on everyone ahead',
+  'games.kart.item.youSwap': 'Swapped places with {name}',
+  'games.kart.item.stoppedYours': "{name}'s bubble stopped your {item}",
+  'games.kart.item.yourBubble': "Your bubble stopped {name}'s {item}",
+  'games.kart.item.hitHeadwind': 'Headwind from {name}!',
+  'games.kart.item.hitSwap': '{name} swapped places with you!',
+  'games.kart.item.hitTow': '{name} is towing on you',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -49,6 +67,23 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.race.noWebgl': '這個瀏覽器畫不出比賽（需要 WebGL 2）。',
   'games.kart.race.canvas': '比賽畫面，從你的車後面看',
   'games.kart.race.you': '你',
+  'games.kart.item.boost': '順風',
+  'games.kart.item.shield': '泡泡罩',
+  'games.kart.item.tow': '拖繩',
+  'games.kart.item.headwind': '逆風',
+  'games.kart.item.swap': '調包',
+  'games.kart.item.empty': '沒有道具',
+  'games.kart.item.press': '按 {key}',
+  'games.kart.item.noTarget': '前面沒有人在範圍內',
+  'games.kart.item.youShield': '泡泡罩：擋下下一次攻擊',
+  'games.kart.item.youTow': '拖著 {name} 前進',
+  'games.kart.item.youHeadwind': '前面所有人吹逆風',
+  'games.kart.item.youSwap': '和 {name} 調包了位置',
+  'games.kart.item.stoppedYours': '{name} 的泡泡罩擋下了你的{item}',
+  'games.kart.item.yourBubble': '你的泡泡罩擋下了 {name} 的{item}',
+  'games.kart.item.hitHeadwind': '{name} 吹來逆風！',
+  'games.kart.item.hitSwap': '{name} 和你調包了位置！',
+  'games.kart.item.hitTow': '{name} 拖著你的車尾',
 }
 
 export const kartScreenMessages = { en, 'zh-TW': zhTW }

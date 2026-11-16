@@ -14,12 +14,16 @@ import {
   kartBoosting,
   kartSkidding,
   kartSlip,
+  STEP_SECONDS,
   type KartInput,
 } from '../../../shared/kart/physics.ts'
+import type { Run } from '../../../shared/kart/course.ts'
+import { encodeItemFrame, ITEM_TUNING, itemBoxes, type ItemId } from '../../../shared/kart/items.ts'
+import { boostKart, headwindStep, towStep, warpRun } from '../../../shared/kart/itemEffects.ts'
 import { gridSpot, raceProgress } from '../../../shared/kart/race.ts'
 import type { Trial } from '../../../shared/kart/timeTrial.ts'
 import type { Track } from '../../../shared/kart/track.ts'
-import type { KartRacer } from '../../../shared/games/kart/types.ts'
+import type { KartRacer, KartView } from '../../../shared/games/kart/types.ts'
 import { CLOCK_ANSWER_BYTES, CLOCK_FRAME, CLOCK_PING_BYTES } from '../../../shared/protocol.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
 import { KART_BODIES, type KartBody } from '../bodies.ts'
@@ -77,7 +81,14 @@ export interface RaceNetOptions {
   readonly goAt: () => number | null
   /** Laps in this race: the room's, not the track's own */
   readonly laps: number
+  /** The room's view now (the items: the boxes, what this kart holds, the items used) */
+  readonly view: () => KartView
+  /** The item key pressed with `item` held, as the use goes to the room */
+  readonly onItemPress?: (item: ItemId) => void
 }
+
+/** A pickup or a use sent is not sent again for this long while the room answers, ms */
+const ITEM_WAIT_MS = 700
 
 /** What tests can read */
 export interface RaceDebug {
@@ -94,6 +105,9 @@ export interface RaceDebug {
   /** This kart's own count: finish line crossings and the next gate */
   crossings: number
   nextGate: number
+  /** Item frames sent: pickups and uses */
+  pickups: number
+  uses: number
 }
 
 declare global {
@@ -127,8 +141,23 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     counted: false,
     crossings: 0,
     nextGate: 0,
+    pickups: 0,
+    uses: 0,
   }
   window.__kartRace = debug
+  // The item race (e9-t05, e9-t06a)
+  const boxes = itemBoxes(track)
+  /** Boxes this kart has asked for, hidden here until the room answers (performance.now) */
+  const asked = new Map<number, number>()
+  let pickupWait = 0
+  let useWait = 0
+  let itemHeld = false
+  let tick = 0
+  /** Items used before this browser joined the race are not applied again */
+  let seen = options.view().used
+  let towUntil = 0
+  let towSeat: number | null = null
+  let headwindUntil = 0
 
   const pingClock = () => {
     const ping = new Uint8Array(CLOCK_PING_BYTES)
@@ -165,6 +194,81 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   const pinger = setInterval(() => pingClock(), PING_EVERY_MS)
 
   const serverNow = () => (offset === null ? null : performance.now() + offset)
+  /** The server's clock, or this browser's before the first answer: the items' times need one */
+  const roughNow = () => serverNow() ?? Date.now()
+
+  /** The items used since the last step, applied to this kart */
+  const applyEvents = (run: Run): Run => {
+    const view = options.view()
+    let next = run
+    for (const event of view.events) {
+      if (event.n < seen) continue
+      seen = event.n + 1
+      const reached = event.targets.includes(seat) && !event.blocked.includes(seat)
+      if (event.by === seat) {
+        if (event.item === 'boost') next = { ...next, kart: boostKart(next.kart) }
+        if (event.item === 'tow') {
+          towUntil = event.at + ITEM_TUNING.towMs
+          towSeat = event.targets[0] ?? null
+        }
+      }
+      if (reached && event.item === 'headwind') {
+        headwindUntil = event.at + ITEM_TUNING.headwindMs
+        towUntil = 0
+      }
+      const warp = event.warps.find((one) => one.seat === seat)
+      if (warp) {
+        next = warpRun(next, warp, track)
+        towUntil = 0
+      }
+    }
+    return next
+  }
+
+  const sendItem = (frame: Parameters<typeof encodeItemFrame>[0]) =>
+    realtime.send(encodeItemFrame(frame))
+
+  const adjust = (run: Run, input: KartInput): Run => {
+    const view = options.view()
+    if (view.mode !== 'items') return run
+    let next = applyEvents(run)
+    const now = performance.now()
+    const me = view.racers.find((racer) => racer.seat === seat)
+    const holding = me?.item ?? null
+    // The item key, once per press
+    const pressed = (input.item ?? false) && !itemHeld
+    itemHeld = input.item ?? false
+    if (pressed && holding && now >= useWait) {
+      if (sendItem({ op: 'use', item: holding, tick })) debug.uses++
+      useWait = now + ITEM_WAIT_MS
+      options.onItemPress?.(holding)
+    }
+    // A box driven through, while nothing is held
+    if (!holding && now >= pickupWait) {
+      const at = roughNow()
+      const { x, z } = next.kart
+      const index = boxes.findIndex(
+        (box, i) =>
+          (view.boxes[i] ?? Infinity) <= at &&
+          (asked.get(i) ?? 0) <= now &&
+          Math.hypot(box.x - x, box.z - z) <= ITEM_TUNING.boxTouch,
+      )
+      if (index >= 0) {
+        if (sendItem({ op: 'pickup', box: index, tick })) debug.pickups++
+        asked.set(index, now + ITEM_WAIT_MS)
+        pickupWait = now + ITEM_WAIT_MS
+      }
+    }
+    // What is on this kart now
+    const server = roughNow()
+    const dt = STEP_SECONDS
+    if (server < headwindUntil) next = { ...next, kart: headwindStep(next.kart, dt) }
+    if (server < towUntil && towSeat !== null) {
+      const target = poses.find((pose) => pose.seat === towSeat && !pose.stale)
+      if (target) next = { ...next, kart: towStep(next.kart, target, dt) }
+    }
+    return next
+  }
 
   const send = (trial: Trial, input: KartInput, reset: boolean) => {
     const kart = trial.run.kart
@@ -205,6 +309,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     },
     afterStep(trial, input, reset) {
       steps++
+      tick = trial.steps
       own = {
         crossings: trial.run.crossings,
         nextGate: trial.run.nextGate,
@@ -232,6 +337,25 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           boosting: pose.frame.boosting,
         },
       }))
+    },
+    adjust,
+    props(pose) {
+      const view = options.view()
+      if (view.mode !== 'items') return { boxes: [], shields: [] }
+      const at = roughNow()
+      const now = performance.now()
+      const shields = view.racers
+        .filter((racer) => (racer.shieldUntil ?? 0) > at)
+        .map((racer) => (racer.seat === seat ? pose : poses.find((one) => one.seat === racer.seat)))
+        .filter((one): one is { x: number; z: number } & typeof pose => one !== undefined)
+      return {
+        boxes: boxes.map((box, i) => ({
+          x: box.x,
+          z: box.z,
+          shown: (view.boxes[i] ?? Infinity) <= at && (asked.get(i) ?? 0) <= now,
+        })),
+        shields,
+      }
     },
     drawn(scene) {
       if (!tagListener) return

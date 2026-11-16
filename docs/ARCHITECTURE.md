@@ -414,6 +414,18 @@ src/kart/
 - **測試**：`tests/kart/net.test.ts`、`tests/kart/race.test.ts`（裁定、格子、碰撞）、`tests/games/kart.test.ts`（harness 隨機局、流程、從 frame 裁定到完賽、退賽）、`tests/worker/room-realtime.test.ts`（轉送、對時、`goAt`、整場到結果）、`e2e/kart-race.spec.ts`（兩個瀏覽器 context、`?autopilot`、河畔一圈到結果）。
 - **沒做（下一步）**：道具（L4）、觀戰與重播的 state 串流（L5）、多裝置與 6 人實測（`e9-t04` 的跨網路數字、`e9-t11`）、選車與角色（N3）。
 
+### 4.15 L4：道具賽與直接型道具（`e9-t05` `e9-t06a`，2026-11-16）
+
+線上格式與數字在 [`KART-NETCODE.md`](KART-NETCODE.md) §10。
+
+- **`shared/kart/items.ts`**（瀏覽器與 Worker 共用）：道具 id（`boost` `shield` `tow` `headwind` `swap`）、`ITEM_TUNING`（所有秒數與距離）、`itemBoxes(track)`（每圈 3 排 × 5 個，放在 gate 上、不放終點線，從 gate 算所以每張圖都有、改圖會跟著動）、8 bytes 的道具 frame（`pickup`／`use`）、`ITEM_TABLE`（依名次前段／中段／後段的權重）與 `drawItem`、`rollFor(seed, n)`（決定性的抽籤）。
+- **房間**（`shared/games/kart/rules.ts`）：選項多 `mode`（`items` 預設／`race`）。state 多 `mode`、`seed`、`boxes`（每個箱子回來的伺服器時間）、`draws`、`events`（最近 16 個用掉的道具）、`used`；每位車手多 `item` 與 `shieldUntil`。`realtime.frame` 收到道具 frame 就走 `judgeItem`：拿取看箱子在不在、手上空不空、伺服器最後看到的位置往前 0.25 秒的線段離箱子 12 m 內，依名次抽一個，回 `got`；使用看手上是不是那個道具、有沒有人可打，回 `use`（`targets`、被泡泡罩擋下的 `blocked`、調包的 `warps`）。兩個都是 `system` 動作，進動作紀錄、可重播；道具 frame 不轉送。
+- **調包**：伺服器在記憶體的 `Tracked.warp` 記下每台車要跳去的位置與 gate 數；那台車下一個帶重置旗標、落在那裡 30 m 內的 frame 就照收，gate 數換成對方的（`judgeFrame`）。只准同一圈，房間記的圈數才不會錯。
+- **瀏覽器**（`src/kart/race/netRace.ts` 的 `adjust`、`props`）：每一步讀房間 view 的新 `events`，套到自己的車（`shared/kart/itemEffects.ts`：`boostKart`、`headwindStep`、`towStep`、`warpRun`；調包算一次重置，攝影機跟著跳）；開過箱子送 `pickup`（送出後那個箱子在本機先藏 0.7 秒）、按道具鍵送 `use`。效果的時間用對好的伺服器錶算。`spikeLoop.ts` 的 `SpikeNet` 多 `adjust`（每步）與 `props`（每幀，畫道具箱與泡泡），只加不改；單機計時賽不受影響。
+- **畫面**：`src/kart/art/itemArt.ts`（原創造型：立在角上的琥珀色半透明立方體、淡色核心，上下浮動旋轉；泡泡罩是藍色半透明球），色值在 `kartTokens.ts`；`src/kart/race/ItemHud.tsx`（道具欄、自己畫的線條圖示、提示）。輸入多一個 `item` 動作（`shared/kart/input.ts`，C／Q、十字鍵上），「操作設定」自動多一列。
+- **測試**：`tests/kart/items.test.ts`（箱子位置、frame、抽籤權重、四種效果）、`tests/games/kart-items.test.ts`（先到先得、回來時間、離太遠、第一名只拿順風或泡泡罩、5 種道具的對象、泡泡罩擋一次、調包同一圈與跳躍被收）、`e2e/kart-race.spec.ts`（兩個瀏覽器道具賽一圈，有拿有用）。
+- **沒做（下一步）**：投射型道具（L5 `e9-t06b`）、道具音效、別人被逆風吹到時的外觀（現在只有被打的人自己看得到減速與提示）、正式名稱與外觀（`e10-t01`）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

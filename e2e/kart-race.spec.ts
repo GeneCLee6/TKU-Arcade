@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { joinRoom, newPerson } from './helpers.ts'
 
-// e9 (L1–L3): a race room with two people, each in their own browser. The room is made through the
+// e9 (L1–L4): an item race room with two people, each in their own browser. The room is made through the
 // API on the shortest setting (one lap), both drive with the test autopilot (`?autopilot`), and the
 // race has to count down, show each the other's kart, and finish with both in the results. Headless
 // Chromium draws with a software renderer (the flag lets it): slow, but the physics keeps time.
@@ -17,6 +17,8 @@ interface RaceReading {
   countdown: number | null
   counted: boolean
   crossings: number
+  pickups: number
+  uses: number
 }
 
 const race = (page: Page): Promise<RaceReading | null> =>
@@ -33,7 +35,7 @@ test('two people race each other in one room, from the countdown to the results'
     await page.addInitScript(() => localStorage.setItem('tku-arcade.kart.quality', 'low'))
   }
   const response = await ann.request.post('/api/rooms', {
-    data: { gameId: 'kart', options: { track: 'riverside', laps: 1 } },
+    data: { gameId: 'kart', options: { track: 'riverside', laps: 1, mode: 'items' } },
   })
   const { id } = (await response.json()) as { id: string }
   await joinRoom(ann, `/r/${id}?autopilot`, 'Ann')
@@ -62,6 +64,12 @@ test('two people race each other in one room, from the countdown to the results'
   expect(reading?.sent).toBeGreaterThan(20)
   expect(reading?.received).toBeGreaterThan(20)
   for (const page of [ann, bob]) await expect(page.getByTestId('kart-lap')).toHaveText('Lap 1/1')
+  // e9-t05: an item race. The autopilot drives through the middle box of a row and taps the item key
+  for (const page of [ann, bob]) await expect(page.getByTestId('kart-item')).toBeVisible()
+  await expect
+    .poll(async () => (await race(ann))?.pickups ?? 0, { timeout: 90_000 })
+    .toBeGreaterThan(0)
+  await expect.poll(async () => (await race(ann))?.uses ?? 0, { timeout: 30_000 }).toBeGreaterThan(0)
   // One lap, then the room's results with both names and a time
   for (const page of [ann, bob]) {
     await expect(page.getByText('Race over')).toBeVisible({ timeout: 180_000 })

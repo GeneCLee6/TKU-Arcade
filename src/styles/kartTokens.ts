@@ -53,6 +53,10 @@ export const kartScene = {
   speedLine: '#F2FBFF',
   // The best run's ghost (e8-t11)
   ghost: '#9AD8FF',
+  // The item race (e9-t05): the boxes' amber shell and pale core, and a shield's bubble
+  itemBox: '#FFA62B',
+  itemBoxCore: '#FFF6DA',
+  shield: '#6FE0FF',
   flame: '#FFB020',
   flameCore: '#FFF3C4',
   lightSky: '#FFFFFF',

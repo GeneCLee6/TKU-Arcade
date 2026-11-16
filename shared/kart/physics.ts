@@ -43,6 +43,8 @@ export interface KartInput {
    * ignores it: the course does it (shared/kart/course.ts), since only the course knows where.
    */
   readonly reset?: boolean
+  /** Uses the item held, in an item race (e9-t05), when it goes from up to down. The physics ignores it */
+  readonly item?: boolean
 }
 
 export interface KartState {
@@ -152,6 +154,7 @@ export const NO_INPUT: KartInput = {
   drift: false,
   boost: false,
   reset: false,
+  item: false,
 }
 
 /**

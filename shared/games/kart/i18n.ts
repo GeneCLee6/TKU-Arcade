@@ -5,6 +5,9 @@
 const en = {
   'games.kart.option.track': 'Track',
   'games.kart.option.laps': 'Laps',
+  'games.kart.option.mode': 'Mode',
+  'games.kart.mode.items': 'Item race',
+  'games.kart.mode.race': 'Speed race (no items)',
   // Working titles, as on the time trial's course menu
   'games.kart.track.riverside': 'Riverside',
   'games.kart.track.harbour': 'Harbour Hairpins',
@@ -14,6 +17,9 @@ const en = {
 const zhTW: Record<keyof typeof en, string> = {
   'games.kart.option.track': '賽道',
   'games.kart.option.laps': '圈數',
+  'games.kart.option.mode': '模式',
+  'games.kart.mode.items': '道具賽',
+  'games.kart.mode.race': '競速賽（沒有道具）',
   'games.kart.track.riverside': '河畔',
   'games.kart.track.harbour': '漁港髮夾彎',
   'games.kart.track.tamkang': '淡江校園',
