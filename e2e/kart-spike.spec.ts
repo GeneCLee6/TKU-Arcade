@@ -192,10 +192,13 @@ test.describe('on a phone', () => {
     locale: 'zh-TW',
   })
 
-  test('says plainly that it cannot be driven by touch', async ({ page }) => {
+  // 2026-11-17: touch buttons (e2e/kart-touch.spec.ts); a tap on the race itself drives nothing, and
+  // the automatic throttle waits for a button
+  test('shows the touch buttons, and a tap on the race does not drive', async ({ page }) => {
     await page.goto('/kart/spike')
     await expect(page.locator('canvas')).toBeVisible()
-    await expect(page.getByText('這個測試沒有觸控操作')).toBeVisible()
+    await expect(page.getByTestId('kart-touch-gas')).toBeVisible()
+    await expect(page.getByText('把手機轉橫')).toBeVisible()
 
     await page.locator('canvas').tap()
     await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
