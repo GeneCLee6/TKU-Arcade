@@ -8,10 +8,17 @@ import {
   type Ghost,
   type GhostRecorder,
 } from '../../shared/kart/ghost.ts'
-import { keepIfBetter, loadBestLap, loadGhost, type RecordNews } from './records.ts'
+import {
+  keepIfBetter,
+  loadBestLap,
+  loadGhost,
+  loadKartGhost,
+  type GhostPick,
+  type RecordNews,
+} from './records.ts'
 import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
-import { DEFAULT_KART, kartMass, type DriverId } from '../../shared/kart/karts.ts'
+import { DEFAULT_KART, kartMass, type DriverId, type KartId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { courseOf, parseTrack, recordKey, type Track } from '../../shared/kart/track.ts'
 import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
@@ -153,6 +160,14 @@ export interface SpikeTrial {
   /** Set at the finish: whether this run set them */
   readonly newBestRun: boolean
   readonly newBestLap: boolean
+  /**
+   * 2026-11-17: the kart the overall record was driven in; 'unknown' for one kept before records
+   * knew the kart (records.ts)
+   */
+  readonly recordKart: KartId | 'unknown' | null
+  /** The best run in this kart on this track, seconds, and whether this run set it */
+  readonly kartBestRun: number | null
+  readonly newKartBestRun: boolean
 }
 
 const sameTrial = (a: SpikeTrial | undefined, b: SpikeTrial): boolean =>
@@ -163,7 +178,10 @@ const sameTrial = (a: SpikeTrial | undefined, b: SpikeTrial): boolean =>
   a.wrongWay === b.wrongWay &&
   a.lapTimes.length === b.lapTimes.length &&
   a.bestRun === b.bestRun &&
-  a.newBestRun === b.newBestRun
+  a.newBestRun === b.newBestRun &&
+  a.recordKart === b.recordKart &&
+  a.kartBestRun === b.kartBestRun &&
+  a.newKartBestRun === b.newKartBestRun
 
 /** What tests and a curious owner can read from the console. It stays after the loop stops. */
 export interface SpikeDebug {
@@ -264,6 +282,8 @@ export interface SpikeOptions {
   readonly driver?: DriverId
   /** Every frame, where the car is: the minimap moves its marker with it, outside React */
   readonly onPose?: (x: number, z: number, heading: number, nextGate: number) => void
+  /** 2026-11-17: which ghost races along: the track's overall best (the default), this kart's, none */
+  readonly ghostPick?: GhostPick
   /** On a track: the time trial's state, when it changes */
   readonly onTrial?: (trial: SpikeTrial) => void
   /** On a track, every frame: the race time and the lap's, seconds, written straight into the page */
@@ -332,8 +352,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     : null
   let trial: Trial | null = trialCourse ? startTrial(trialCourse) : null
   let lastTrial: SpikeTrial | undefined
-  // e8-t11: the best run to race against, and this run as it is recorded
+  // e8-t11: the best run to race against, and this run as it is recorded. 2026-11-17: the track's
+  // overall best and this kart's own best, the pick says which one races along
+  const kartId: KartId = options.body ?? DEFAULT_KART
+  const pick: GhostPick = options.ghostPick ?? 'overall'
   let best: Ghost | null = track && !net ? loadGhost(recordKey(track)) : null
+  let kartBest: Ghost | null = track && !net ? loadKartGhost(recordKey(track), kartId) : null
+  const chased = (): Ghost | null => (pick === 'off' ? null : pick === 'kart' ? kartBest : best)
   let bestLap: number | null = track && !net ? loadBestLap(recordKey(track)) : null
   let recorder: GhostRecorder | null = null
   let news: RecordNews | null = null
@@ -456,9 +481,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
           recordStep(recorder, trial.steps, run.kart)
         }
         if (was === 'racing' && trial.phase === 'finished' && recorder) {
-          const ghost = finishRecording(recorder, trial.steps, trial.laps)
+          const ghost: Ghost = {
+            ...finishRecording(recorder, trial.steps, trial.laps),
+            kart: kartId,
+          }
           news = keepIfBetter(ghost)
           if (news.bestRun) best = ghost
+          if (news.kartBestRun) kartBest = ghost
           bestLap = news.lapSteps
         }
       } else {
@@ -560,13 +589,17 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         bestLap: bestLap === null ? null : seconds(bestLap),
         newBestRun: news?.bestRun ?? false,
         newBestLap: news?.bestLap ?? false,
+        recordKart: best ? (best.kart ?? 'unknown') : null,
+        kartBestRun: news ? seconds(news.kartRunSteps) : kartBest ? seconds(kartBest.total) : null,
+        newKartBestRun: news?.kartBestRun ?? false,
       }
       if (!sameTrial(lastTrial, view)) {
         lastTrial = view
         options.onTrial?.(view)
       }
       options.onClock?.(seconds(trial.steps), seconds(lapSteps(trial)))
-      scene.ghost(best ? ghostAt(best, trial.steps) : null)
+      const ghost = chased()
+      scene.ghost(ghost ? ghostAt(ghost, trial.steps) : null)
     }
     if (!sameHud(lastHud, hud)) {
       lastHud = hud

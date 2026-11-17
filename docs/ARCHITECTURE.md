@@ -540,6 +540,21 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **數字**：卡丁車線 **298.6 kB** gzip（合併 #91 之後）（預算 600 kB），編輯器相關約 18 kB（`build` 5.5、`EditorPage` 6.4、字串約 3、`RoomTrackPicker` 1.1、`View3D` 1.0）；主站與各遊戲首屏不變（等待室只多一個控制項登記與兩個常數）。
 - **沒做**：存 R2、帳號下的「我的賽道」、公開賽道列表（等 F1）；高低差、跳台、分岔（物理是平面，分岔要手工的路中牆）；在 3D 裡直接拖曳編輯；自訂賽道的地標與場景物件擺放；`/kart` 計時賽的圈數固定 3。
 
+### 4.24 路線圖外：大獎賽、每台車的紀錄與幽靈車（2026-11-17，`feat/kart-grand-prix`）
+
+擁有者要求繼續開發卡丁車：把 §4.20 的對戰電腦延伸成盃賽，並補 #84 的「紀錄不分車」。程式都在 `src/kart/cup/`（新檔），`/kart` 頂欄不加按鈕（1180 px 寬時頂欄已經剛好一行，再加會折行壓到面板）：「對戰電腦」面板最上面多一顆「大獎賽」，換成大獎賽的面板；計時框下面多一組幽靈車按鈕。
+
+- **盃**（`cups.ts`）：`ebb`（河畔→漁港）、`hill`（淡江→老街）、`rivermouth`（四張依序）、`sprint`（只有 `?autopilot` 看得到的一場測試短盃）。名稱是暫名（`KART-WORLD.md` §6.1，`shared/kart/i18n.cup.ts`）。
+- **積分**（`points.ts`，原創，不是任何遊戲或賽事的表）：`racePoints(名次, 台數) = 台數 − 名次 + 1 + [3, 2, 1][名次 − 1]`（8 台 11、9、7、5、4、3、2、1；2 台 5、3）。名次用房間 `result` 的 `rank`，所以沒跑完、照圈數同名次的車同分。總表 `cupTable`：積分 → 勝場 → 最近一場的名次 → 座位。
+- **狀態機**（`cupRun.ts`，純函式）：`startCup`（抽一次電腦車：名字、車款、車手整盃固定）→ `ready` →`beginRace`→ `racing` →`finishRace(每個座位的名次)`→ 下一場 `ready` 或最後一場後 `podium`。`quitRace`／`resumeCup`（比賽中離開或重新整理：該場回 `ready`、從起跑重來）、`leaveCup`（回選單，`away` 讓重新整理留在選單）。放棄＝刪存檔。每場的種子由盃的種子與場次算出（`raceSeed`）。座位：電腦車 0…n−1、玩家最後（和對戰電腦一樣）。
+- **存檔**（`store.ts`，`storage.ts` 不會丟例外，讀回一律 `parseCupRun` 檢查格式、名次範圍、場數與 phase 是否一致）：`tku-arcade.kart.cup.run`（每一步存）、`…cup.setup`（上次的設定）、`…cup.best.<盃>`（名次優先、同名次比積分；到頒獎台時記一次）。`KartPlay` 開頁時有進行中且沒 `away` 的盃就直接開 `CupView`。
+- **畫面**：`CupSetupPanel.tsx`（選單面板：盃與賽道、最佳成績、設定、繼續／放棄）；`CupView.tsx`（lazy chunk）：盃賽卡（下一場、第一場前列參賽者、之後列累計積分榜與每場得分）、比賽（`BotRaceView` 多一個選用的 `cup`：用盃的電腦車與種子，完賽只有「看積分榜」，回傳每個座位的 `rank`；畫面上方的「離開比賽」回盃賽卡）、頒獎台（第二／第一／第三名的台子由下往上長出來，`prefers-reduced-motion` 時不動）。獎盃 `Trophy.tsx` 是程式畫的 SVG：碗口寬度、碗上的波紋圈數、頂上星星的角數由盃 id 的雜湊決定（`trophyShape.ts`），兩側把手是捲起的浪，底座一場一階；顏色全部來自 tokens。
+- **每台車的紀錄**（`src/kart/records.ts`）：總最佳沿用 e8-t11 的 key `tku-arcade.kart.ghost.<賽道>`、`…bestLap.<賽道>`，另存每台車的 `…kartGhost.<車>.<賽道>`、`…kartBestLap.<車>.<賽道>`。賽道 key（`recordKey`，或賽道編輯器的內容雜湊）是任意字串、永遠放在最後一段，前綴不同所以不會互撞。幽靈車（`shared/kart/ghost.ts`）多一個選用的 `kart`（格式版本不變，不認得的車款當作沒有）。`keepIfBetter` 一次比總最佳與那台車的最佳。
+- **舊紀錄的遷移**：不用搬：舊 key 原地就是總最佳。舊幽靈車沒有 `kart`，畫面標「未知車款」，**不歸到 `tide`**：#61（2026-11-14）起就能換車而紀錄不知道，舊紀錄可能是任何一台開的；歸給標準車會讓一台快車的時間變成 `tide` 永遠破不了的紀錄。之後誰破了總最佳，就換成有車款的新紀錄。
+- **追哪個幽靈**：計時框下面的「幽靈車」三個按鈕（`src/kart/GhostPicker.tsx`；不用下拉，因為被點過的下拉會吃掉方向鍵）（`tku-arcade.kart.ghostPick`：`overall` 預設／`kart`／`off`），`spikeLoop` 的 `ghostPick` 選項；換了就重開這一趟（和換車一樣）。計時框的「紀錄」標車款，多一行「這台車」；完賽時只破了這台車的紀錄也會提示。
+- **測試**：`tests/kart/cup.test.tsx`、`tests/kart/ghost.test.ts`（見 `NEXT.md`）、`e2e/kart-cup.spec.ts`。
+- **已知限制**：比賽中重新整理那一場從起跑重來；每台車各存一份幽靈車（最多 6 台 × 每張賽道一份，約 30 kB 一份）；盃賽中途換車照樣算（每場用車庫當下的車）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

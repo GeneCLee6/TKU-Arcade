@@ -7,7 +7,16 @@ import {
   recordStep,
   startRecording,
 } from '../../shared/kart/ghost.ts'
-import { keepIfBetter, loadBestLap, loadGhost } from '../../src/kart/records.ts'
+import type { KartId } from '../../shared/kart/karts.ts'
+import {
+  keepIfBetter,
+  loadBestLap,
+  loadGhost,
+  loadGhostPick,
+  loadKartBestLap,
+  loadKartGhost,
+  saveGhostPick,
+} from '../../src/kart/records.ts'
 
 // e8-t11 (AC-8.4): the best run, recorded, played back and kept
 
@@ -77,5 +86,97 @@ describe('the records', () => {
   it('shrug off a broken entry', () => {
     localStorage.setItem('tku-arcade.kart.ghost.test-oval', '{not json')
     expect(loadGhost('test-oval')).toBeNull()
+  })
+})
+
+// 2026-11-17 (docs/ARCHITECTURE.md §4.24): the records of each kart, beside the track's overall ones
+describe('each kart’s records', () => {
+  beforeEach(() => localStorage.clear())
+
+  const run = (total: number, laps: number[], kart?: KartId) => ({
+    ...straightRun(30, 1),
+    total,
+    laps,
+    ...(kart ? { kart } : {}),
+  })
+
+  it('keep the overall best and each kart’s best apart', () => {
+    expect(keepIfBetter(run(900, [300, 300, 300], 'heron'))).toMatchObject({
+      bestRun: true,
+      kartBestRun: true,
+      kartRunSteps: 900,
+    })
+    // A slower kart: not the track's record, but its own
+    expect(keepIfBetter(run(960, [330, 310, 320], 'tide'))).toMatchObject({
+      bestRun: false,
+      runSteps: 900,
+      kartBestRun: true,
+      kartRunSteps: 960,
+      kartBestLap: true,
+      kartLapSteps: 310,
+    })
+    // The same kart, slower than its own: nothing new
+    expect(keepIfBetter(run(990, [330, 330, 330], 'tide'))).toMatchObject({
+      bestRun: false,
+      kartBestRun: false,
+      kartRunSteps: 960,
+    })
+    expect(loadGhost('test-oval')).toMatchObject({ total: 900, kart: 'heron' })
+    expect(loadKartGhost('test-oval', 'tide')).toMatchObject({ total: 960, kart: 'tide' })
+    expect(loadKartGhost('test-oval', 'heron')?.total).toBe(900)
+    expect(loadKartGhost('test-oval', 'crab')).toBeNull()
+    expect(loadKartBestLap('test-oval', 'tide')).toBe(310)
+    expect(loadBestLap('test-oval')).toBe(300)
+  })
+
+  it('leave a record kept before karts were told where it was: the overall best, its kart unknown', () => {
+    // As e8-t11 kept it: under the track's id, with no kart
+    const old = straightRun(30, 1)
+    localStorage.setItem('tku-arcade.kart.ghost.test-oval', JSON.stringify({ ...old, total: 900 }))
+    localStorage.setItem('tku-arcade.kart.bestLap.test-oval', '290')
+    const kept = loadGhost('test-oval')
+    expect(kept?.total).toBe(900)
+    expect(kept && 'kart' in kept).toBe(false)
+    expect(loadBestLap('test-oval')).toBe(290)
+    // Not handed to any kart: the standard kart has no record yet
+    expect(loadKartGhost('test-oval', 'tide')).toBeNull()
+    // A slower run keeps it, and starts the kart's own
+    expect(keepIfBetter(run(950, [320, 310, 320], 'tide'))).toMatchObject({
+      bestRun: false,
+      runSteps: 900,
+      bestLap: false,
+      lapSteps: 290,
+      kartBestRun: true,
+    })
+    expect(loadGhost('test-oval')?.total).toBe(900)
+    // A faster one replaces it, and says which kart
+    keepIfBetter(run(880, [300, 290, 290], 'crab'))
+    expect(loadGhost('test-oval')).toMatchObject({ total: 880, kart: 'crab' })
+  })
+
+  it('work with any track key: a revision, a content hash', () => {
+    for (const key of ['riverside@4', 'custom.9f86d081884c7d65', 'a.b.c']) {
+      const ghost = { ...run(700, [700], 'ray'), track: key }
+      keepIfBetter(ghost)
+      expect(loadGhost(key)?.total).toBe(700)
+      expect(loadKartGhost(key, 'ray')?.total).toBe(700)
+    }
+    // Keys of one track never reach another's
+    expect(loadGhost('custom')).toBeNull()
+    expect(loadKartGhost('c', 'ray')).toBeNull()
+  })
+
+  it('drop a kart the ghost names that is not one', () => {
+    const json = JSON.parse(JSON.stringify(run(900, [300], 'tide')))
+    expect(parseGhost(json, 'test-oval')?.kart).toBe('tide')
+    expect(parseGhost({ ...json, kart: 'rocket' }, 'test-oval')).not.toHaveProperty('kart')
+  })
+
+  it('remember which ghost races along, the overall best unless told otherwise', () => {
+    expect(loadGhostPick()).toBe('overall')
+    saveGhostPick('kart')
+    expect(loadGhostPick()).toBe('kart')
+    localStorage.setItem('tku-arcade.kart.ghostPick', 'nonsense')
+    expect(loadGhostPick()).toBe('overall')
   })
 })

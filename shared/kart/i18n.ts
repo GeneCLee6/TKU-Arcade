@@ -3,6 +3,7 @@
 // en is the source, zh-TW has the same keys, and `npm run check-i18n` compares them.
 import { KART_BOTS_MESSAGES, type KartBotsKey } from './i18n.bots.ts'
 import { KART_EDITOR_MESSAGES, type KartEditorKey } from './i18n.editor.ts'
+import { KART_CUP_MESSAGES, type KartCupKey } from './i18n.cup.ts'
 import { KART_ROSTER_MESSAGES, type KartRosterKey } from './i18n.roster.ts'
 
 const en = {
@@ -265,7 +266,8 @@ const en = {
   'kart.pad.axis': 'Axis {index} {sign}',
 } as const
 
-export type KartMessageKey = keyof typeof en | KartRosterKey | KartBotsKey | KartEditorKey
+export type KartMessageKey =
+  keyof typeof en | KartRosterKey | KartBotsKey | KartEditorKey | KartCupKey
 
 const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.title': '卡丁車物理測試',
@@ -526,11 +528,13 @@ export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartMessageKey, string
     ...KART_ROSTER_MESSAGES.en,
     ...KART_BOTS_MESSAGES.en,
     ...KART_EDITOR_MESSAGES.en,
+    ...KART_CUP_MESSAGES.en,
   },
   'zh-TW': {
     ...zhTW,
     ...KART_ROSTER_MESSAGES['zh-TW'],
     ...KART_BOTS_MESSAGES['zh-TW'],
     ...KART_EDITOR_MESSAGES['zh-TW'],
+    ...KART_CUP_MESSAGES['zh-TW'],
   },
 }

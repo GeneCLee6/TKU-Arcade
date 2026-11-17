@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { KART_MESSAGES } from '../../shared/kart/i18n.ts'
-import { RaceCenter } from '../../src/kart/RaceOverlay.tsx'
+import { GhostPicker } from '../../src/kart/GhostPicker.tsx'
+import { RaceCenter, RaceClock } from '../../src/kart/RaceOverlay.tsx'
 import type { SpikeTrial } from '../../src/kart/spikeLoop.ts'
 
 // e8-t10: the countdown, the wrong-way warning and the results, as the page shows them
@@ -23,6 +24,9 @@ const base: SpikeTrial = {
   bestLap: null,
   newBestRun: false,
   newBestLap: false,
+  recordKart: null,
+  kartBestRun: null,
+  newKartBestRun: false,
 }
 
 describe('the race overlay', () => {
@@ -83,5 +87,51 @@ describe('the race overlay', () => {
     rerender(<RaceCenter t={t} trial={finished} onRestart={vi.fn()} onGarage={onGarage} />)
     fireEvent.click(screen.getByRole('button', { name: 'Change kart' }))
     expect(onGarage).toHaveBeenCalledOnce()
+  })
+})
+
+// 2026-11-17 (docs/ARCHITECTURE.md §4.24): each kart's records, and which ghost races along
+describe('the records of each kart', () => {
+  it('name the record’s kart, unknown for an old one, and show this kart’s own', () => {
+    const { rerender } = render(
+      <RaceClock t={t} trial={{ ...base, bestRun: 60, recordKart: 'unknown', kartBestRun: 62 }} />,
+    )
+    expect(screen.getByTestId('kart-record-kart')).toHaveTextContent('Record · kart unknown')
+    expect(screen.getByTestId('kart-kart-record')).toHaveTextContent('1:02.000')
+    rerender(<RaceClock t={t} trial={{ ...base, bestRun: 60, recordKart: 'heron' }} />)
+    expect(screen.getByTestId('kart-record-kart')).toHaveTextContent('Record · Egret')
+    expect(screen.queryByTestId('kart-kart-record')).toBeNull()
+  })
+
+  it('say when a run is this kart’s best but not the track’s', () => {
+    render(
+      <RaceCenter
+        t={t}
+        trial={{
+          ...base,
+          phase: 'finished',
+          total: 62,
+          lapTimes: [21, 20, 21],
+          bestRun: 60,
+          kartBestRun: 62,
+          newKartBestRun: true,
+        }}
+        onRestart={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('kart-new-record')).toHaveTextContent('Best yet in this kart!')
+  })
+
+  it('pick the ghost with buttons', () => {
+    const onPick = vi.fn()
+    render(<GhostPicker t={t} pick="overall" onPick={onPick} />)
+    const group = screen.getByRole('group', { name: 'Ghost' })
+    expect(within(group).getAllByRole('button')).toHaveLength(3)
+    expect(within(group).getByRole('button', { name: 'Track record' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    fireEvent.click(within(group).getByRole('button', { name: "This kart's best" }))
+    expect(onPick).toHaveBeenCalledWith('kart')
   })
 })

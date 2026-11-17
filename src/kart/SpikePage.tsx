@@ -46,6 +46,10 @@ import { customTrack } from '../../shared/kart/editor/custom.ts'
 import type { Track } from '../../shared/kart/track.ts'
 import { codeInAddress } from './editor/link.ts'
 import { autopilot } from './race/autopilot.ts'
+import { CupSetupPanel } from './cup/CupSetupPanel.tsx'
+import type { CupRun } from './cup/cupRun.ts'
+import { GhostPicker } from './GhostPicker.tsx'
+import { loadGhostPick, saveGhostPick, type GhostPick } from './records.ts'
 
 registerMessages(KART_MESSAGES)
 
@@ -69,7 +73,7 @@ interface GaragePick {
   driver?: DriverId
 }
 
-type Open = 'controls' | 'tuning' | 'garage' | 'bots' | undefined
+type Open = 'controls' | 'tuning' | 'garage' | 'bots' | 'cup' | undefined
 
 /** What /kart drives on: a course, or the track made in the editor that its link brought (e10-t07) */
 type PlayCourse = SpikeCourse | 'custom'
@@ -97,10 +101,13 @@ function linkedTrack(): Linked {
 export function SpikePage({
   play = false,
   onBotRace,
+  onCup,
 }: {
   play?: boolean
   /** 2026-11-17: /kart's menu starts a race against the computer with these settings */
   onBotRace?: (setup: BotSetup) => void
+  /** 2026-11-17: /kart's menu starts or continues a Grand Prix (src/kart/cup/) */
+  onCup?: (run: CupRun) => void
 } = {}) {
   const t: (key: KartMessageKey, params?: MessageParams) => string = useT()
   const stage = useRef<HTMLDivElement>(null)
@@ -119,6 +126,8 @@ export function SpikePage({
   const tuningOpener = useRef<HTMLButtonElement>(null)
   const garageOpener = useRef<HTMLButtonElement>(null)
   const botsOpener = useRef<HTMLButtonElement>(null)
+  // 2026-11-17: which ghost races along in the time trial
+  const [ghostPick, setGhostPick] = useState<GhostPick>(loadGhostPick)
   // The loop reads these every frame without restarting. The tuning panel leaves the car drivable:
   // its fields keep their own keys (spikeLoop.ts), and a change is best felt at once.
   // e10-t05: the kart and driver to race with; the kart's numbers go on top of the tuning
@@ -182,6 +191,7 @@ export function SpikePage({
         quality,
         body,
         driver,
+        ghostPick,
         onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
         onTrial: setTrial,
         onClock: (total, lap) => clock.current?.set(total, lap),
@@ -193,7 +203,7 @@ export function SpikePage({
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, track, autopiloted, quality, body, driver])
+  }, [course, track, autopiloted, quality, body, driver, ghostPick])
 
   const switchCourse = (next: PlayCourse) => {
     const url = new URL(window.location.href)
@@ -298,6 +308,11 @@ export function SpikePage({
     queueMicrotask(() => focusOpener(garageOpener.current))
   }, [])
   const closeBots = useCallback(() => {
+    setOpen(undefined)
+    queueMicrotask(() => focusOpener(botsOpener.current))
+  }, [])
+  // The Grand Prix opens from the race against the computer's panel, and goes back to its button
+  const closeCup = useCallback(() => {
     setOpen(undefined)
     queueMicrotask(() => focusOpener(botsOpener.current))
   }, [])
@@ -509,6 +524,18 @@ export function SpikePage({
       {track && (
         <MapCorner>
           {trial && <RaceClock ref={clock} t={t} trial={trial} />}
+          {trial && (
+            <GhostPicker
+              t={t}
+              pick={ghostPick}
+              onPick={(next) => {
+                if (next === ghostPick) return
+                saveGhostPick(next)
+                setTrial(undefined)
+                setGhostPick(next)
+              }}
+            />
+          )}
           <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} walls={track.walls} />
         </MapCorner>
       )}
@@ -556,9 +583,11 @@ export function SpikePage({
           t={t}
           onStart={onBotRace}
           onClose={closeBots}
+          onGrandPrix={onCup ? () => setOpen('cup') : undefined}
           custom={custom ? { code: custom.code, name: customName } : undefined}
         />
       )}
+      {open === 'cup' && onCup && <CupSetupPanel t={t} onCup={onCup} onClose={closeCup} />}
       {controlsOpen && (
         <ControlsPanel
           t={t}

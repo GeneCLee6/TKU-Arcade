@@ -21,7 +21,7 @@ import { color, fontSize, space } from '../../styles/tokens.ts'
 import RaceView from '../race/RaceView.tsx'
 import { botSeats, createBotRace } from './botRace.ts'
 import { createLocalRoom } from './localRoom.ts'
-import { drawBots } from './roster.ts'
+import { drawBots, type BotEntry } from './roster.ts'
 import { botTrackId, type BotSetup } from './setup.ts'
 
 registerMessages(KART_MESSAGES)
@@ -29,25 +29,48 @@ registerMessages(KART_MESSAGES)
 /** How often the bots are run up to the clock, ms: they step at 60 Hz on their own count */
 const RUN_EVERY_MS = 16
 
-export interface BotRaceViewProps {
-  readonly setup: BotSetup
-  /** Back to /kart's menu */
-  readonly onMenu: () => void
+/**
+ * A race of a Grand Prix (src/kart/cup/, docs/ARCHITECTURE.md §4.24): the cup's own opponents and
+ * seed, and at the results the way on to the cup's standings instead of racing again
+ */
+export interface CupRace {
+  readonly entries: readonly BotEntry[]
+  readonly seed: number
+  /** Every seat's rank in the race (1 is first), by seat */
+  readonly onNext: (ranks: readonly number[]) => void
 }
 
-export default function BotRaceView({ setup, onMenu }: BotRaceViewProps) {
+export interface BotRaceViewProps {
+  readonly setup: BotSetup
+  /** Back to /kart's menu (in a cup: back to the cup, the race to be run again) */
+  readonly onMenu: () => void
+  readonly cup?: CupRace
+}
+
+export default function BotRaceView({ setup, onMenu, cup }: BotRaceViewProps) {
   // A new round is a new room and new bots
   const [round, setRound] = useState(0)
   return (
-    <BotRound key={round} setup={setup} onAgain={() => setRound((n) => n + 1)} onMenu={onMenu} />
+    <BotRound
+      key={round}
+      setup={setup}
+      cup={cup}
+      onAgain={() => setRound((n) => n + 1)}
+      onMenu={onMenu}
+    />
   )
 }
 
-function BotRound({ setup, onAgain, onMenu }: BotRaceViewProps & { readonly onAgain: () => void }) {
+function BotRound({
+  setup,
+  cup,
+  onAgain,
+  onMenu,
+}: BotRaceViewProps & { readonly onAgain: () => void }) {
   const t = useT()
   const [game] = useState(() => {
-    const seed = Math.floor(Math.random() * 2 ** 31)
-    const entries = drawBots(setup.bots, seed)
+    const seed = cup?.seed ?? Math.floor(Math.random() * 2 ** 31)
+    const entries = cup ? [...cup.entries] : drawBots(setup.bots, seed)
     // The player starts at the back of the grid, the bots ahead
     const playerSeat = entries.length
     const room = createLocalRoom({
@@ -102,7 +125,8 @@ function BotRound({ setup, onAgain, onMenu }: BotRaceViewProps & { readonly onAg
   )
 
   if (view.phase === 'finished') {
-    const order = kart.result(game.room.state()).standings.map((line) => line.seat)
+    const standings = kart.result(game.room.state()).standings
+    const order = standings.map((line) => line.seat)
     const me = view.racers.find((racer) => racer.seat === game.playerSeat)
     const place = order.indexOf(game.playerSeat) + 1
     return (
@@ -116,12 +140,28 @@ function BotRound({ setup, onAgain, onMenu }: BotRaceViewProps & { readonly onAg
           </Place>
           <Standings view={view} order={order} nameOf={nameOf} />
           <Actions>
-            <Button type="button" onClick={onAgain} data-testid="kart-bots-again">
-              {t('kart.bots.again')}
-            </Button>
-            <Button type="button" $variant="secondary" onClick={onMenu}>
-              {t('kart.bots.menu')}
-            </Button>
+            {cup ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  const ranks: number[] = []
+                  for (const line of standings) ranks[line.seat] = line.rank
+                  cup.onNext(ranks)
+                }}
+                data-testid="kart-cup-next"
+              >
+                {t('kart.cup.next')}
+              </Button>
+            ) : (
+              <>
+                <Button type="button" onClick={onAgain} data-testid="kart-bots-again">
+                  {t('kart.bots.again')}
+                </Button>
+                <Button type="button" $variant="secondary" onClick={onMenu}>
+                  {t('kart.bots.menu')}
+                </Button>
+              </>
+            )}
           </Actions>
         </Card>
       </Results>
