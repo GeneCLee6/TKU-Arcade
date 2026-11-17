@@ -49,6 +49,15 @@ function firstSpec(): TrackSpec {
 /** One line for a piece in the list */
 function pieceText(t: T, piece: Piece): string {
   if (piece.kind === 'straight') return t('kart.editor.piece.straight', { length: piece.length })
+  if (piece.kind === 'slope') {
+    return t(piece.rise > 0 ? 'kart.editor.piece.uphill' : 'kart.editor.piece.downhill', {
+      length: piece.length,
+      rise: Math.abs(piece.rise),
+    })
+  }
+  if (piece.kind === 'jump') {
+    return t('kart.editor.piece.jump', { length: piece.length, height: piece.height })
+  }
   return t(piece.angle < 0 ? 'kart.editor.piece.left' : 'kart.editor.piece.right', {
     angle: Math.abs(piece.angle),
     radius: piece.radius,
@@ -429,6 +438,44 @@ export default function EditorPage() {
                     onValue={(length) => editPiece(at, { length })}
                     testId="kart-editor-length"
                   />
+                ) : piece.kind === 'slope' ? (
+                  <>
+                    <NumberField
+                      label={t('kart.editor.length')}
+                      value={piece.length}
+                      min={LIMITS.minSlope}
+                      max={LIMITS.maxLength}
+                      onValue={(length) => editPiece(at, { length })}
+                      testId="kart-editor-length"
+                    />
+                    <NumberField
+                      label={t('kart.editor.rise')}
+                      value={piece.rise}
+                      min={-LIMITS.maxRise}
+                      max={LIMITS.maxRise}
+                      onValue={(rise) => editPiece(at, { rise: rise === 0 ? piece.rise : rise })}
+                      testId="kart-editor-rise"
+                    />
+                  </>
+                ) : piece.kind === 'jump' ? (
+                  <>
+                    <NumberField
+                      label={t('kart.editor.length')}
+                      value={piece.length}
+                      min={LIMITS.minJump}
+                      max={LIMITS.maxJump}
+                      onValue={(length) => editPiece(at, { length })}
+                      testId="kart-editor-length"
+                    />
+                    <NumberField
+                      label={t('kart.editor.jumpHeight')}
+                      value={piece.height}
+                      min={LIMITS.minJumpHeight}
+                      max={LIMITS.maxJumpHeight}
+                      onValue={(height) => editPiece(at, { height })}
+                      testId="kart-editor-jump-height"
+                    />
+                  </>
                 ) : (
                   <>
                     <Inline>
@@ -473,29 +520,33 @@ export default function EditorPage() {
                   onValue={(next) => editPiece(at, { width: next })}
                   testId="kart-editor-width"
                 />
-                <Inline>
-                  <span>{t('kart.editor.pad')}</span>
-                  <select
-                    value={piece.pad}
-                    onChange={(event) => editPiece(at, { pad: event.target.value as PadPlace })}
-                    data-testid="kart-editor-pad"
-                  >
-                    {PAD_PLACES.map((place) => (
-                      <option key={place} value={place}>
-                        {t(`kart.editor.pad.${place}`)}
-                      </option>
-                    ))}
-                  </select>
-                </Inline>
-                <Inline>
-                  <input
-                    type="checkbox"
-                    checked={piece.boxes}
-                    onChange={(event) => editPiece(at, { boxes: event.target.checked })}
-                    data-testid="kart-editor-boxes"
-                  />
-                  <span>{t('kart.editor.boxes')}</span>
-                </Inline>
+                {piece.kind !== 'jump' && (
+                  <>
+                    <Inline>
+                      <span>{t('kart.editor.pad')}</span>
+                      <select
+                        value={piece.pad}
+                        onChange={(event) => editPiece(at, { pad: event.target.value as PadPlace })}
+                        data-testid="kart-editor-pad"
+                      >
+                        {PAD_PLACES.map((place) => (
+                          <option key={place} value={place}>
+                            {t(`kart.editor.pad.${place}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </Inline>
+                    <Inline>
+                      <input
+                        type="checkbox"
+                        checked={piece.boxes}
+                        onChange={(event) => editPiece(at, { boxes: event.target.checked })}
+                        data-testid="kart-editor-boxes"
+                      />
+                      <span>{t('kart.editor.boxes')}</span>
+                    </Inline>
+                  </>
+                )}
               </Form>
             </section>
           )}

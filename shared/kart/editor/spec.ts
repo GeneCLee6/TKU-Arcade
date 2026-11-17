@@ -39,7 +39,33 @@ export interface Turn extends PieceBase {
   readonly radius: number
 }
 
-export type Piece = Straight | Turn
+/**
+ * A straight that climbs or falls (2026-11-17, terrain.ts): `rise` metres over its length, eased in
+ * and out so the road bends smoothly into and out of the slope
+ */
+export interface Slope extends PieceBase {
+  readonly kind: 'slope'
+  readonly length: number
+  /** Metres; positive climbs, negative falls */
+  readonly rise: number
+}
+
+/**
+ * A straight with a jump (2026-11-17, terrain.ts): a ramp RAMP_LENGTH metres long up to its lip,
+ * `height` metres high, then the road on at the height it had, for the rest of `length` to land on.
+ * No boost pad or item boxes on it: a car flies over them
+ */
+export interface Jump extends PieceBase {
+  readonly kind: 'jump'
+  readonly length: number
+  /** The lip's height over the road, metres */
+  readonly height: number
+}
+
+export type Piece = Straight | Turn | Slope | Jump
+
+/** The jump ramp's length, from the road to its lip, metres */
+export const RAMP_LENGTH = 14
 
 export interface TrackSpec {
   /** What its maker called it; may be empty (the page then says "untitled") */
@@ -66,6 +92,18 @@ export const LIMITS = {
   maxTrack: 6000,
   /** Characters of the name */
   maxName: 24,
+  // Slopes and jumps (2026-11-17)
+  minSlope: 30,
+  /** Metres either way, of one slope */
+  maxRise: 24,
+  /** A slope rises at most this much for each metre of its length on average (eased: 1.5 times at its steepest) */
+  maxGrade: 0.12,
+  /** The road never goes higher or lower than this from the start line, metres */
+  maxHeight: 40,
+  minJump: 50,
+  maxJump: 200,
+  minJumpHeight: 1,
+  maxJumpHeight: 4,
 } as const
 
 /** Rounds to the tenth that every number in a spec is kept to */
@@ -86,6 +124,22 @@ export const turn = (
   width = 36,
   more: Partial<PieceBase> = {},
 ): Turn => ({ kind: 'turn', angle, radius, width, pad: 'none', boxes: false, ...more })
+
+export const slope = (
+  length: number,
+  rise: number,
+  width = 36,
+  more: Partial<PieceBase> = {},
+): Slope => ({ kind: 'slope', length, rise, width, pad: 'none', boxes: false, ...more })
+
+export const jump = (length = 80, height = 2.5, width = 36): Jump => ({
+  kind: 'jump',
+  length,
+  height,
+  width,
+  pad: 'none',
+  boxes: false,
+})
 
 /** A new track: a plain loop that is already legal, to change from */
 export const starterSpec = (): TrackSpec => ({

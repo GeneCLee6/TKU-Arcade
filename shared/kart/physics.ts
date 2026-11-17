@@ -114,6 +114,14 @@ export interface KartState {
    * counter-steer now opens the release window
    */
   readonly burstReady: boolean
+  /**
+   * Slopes and jumps (2026-11-17, terrain.ts): the height, the upward speed in the air and how long
+   * the car has been in the air (0 on the ground). Only on a track with terrain: a flat track's cars
+   * never have them, and their state is exactly what it always was
+   */
+  readonly y?: number
+  readonly vy?: number
+  readonly air?: number
 }
 
 export const INITIAL_KART: KartState = {
@@ -426,6 +434,11 @@ export function stepKart(
   input: KartInput,
   tuning: KartTuning = KART_TUNING,
   rules: KartRules = DEFAULT_RULES,
+  /**
+   * The top speed's scale (terrain.ts: a little less uphill, a little more downhill). 1 on a flat
+   * track, where multiplying by it changes nothing
+   */
+  limitScale = 1,
 ): KartState {
   const dt = STEP_SECONDS
   const steer = clamp(input.steer, -1, 1)
@@ -606,7 +619,7 @@ export function stepKart(
 
   // One limit on the whole speed, sideways included, or a slide would add to the top speed. Above
   // it, from a boost that ended, the car eases down instead of stopping dead.
-  const limit = tuning.topSpeed * factor
+  const limit = tuning.topSpeed * factor * limitScale
   const speed = Math.hypot(newForward, newSide)
   if (speed > limit) {
     const allowed = Math.max(limit, Math.hypot(state.vx, state.vz) - tuning.overSpeedDrag * dt)
@@ -707,10 +720,14 @@ export function poseBetween(
   from: KartState,
   to: KartState,
   alpha: number,
-): { x: number; z: number; heading: number } {
-  return {
+): { x: number; z: number; heading: number; y?: number } {
+  const pose = {
     x: from.x + (to.x - from.x) * alpha,
     z: from.z + (to.z - from.z) * alpha,
     heading: wrapAngle(from.heading + wrapAngle(to.heading - from.heading) * alpha),
   }
+  // A track with terrain (terrain.ts): the height too
+  if (to.y === undefined) return pose
+  const fromY = from.y ?? to.y
+  return { ...pose, y: fromY + (to.y - fromY) * alpha }
 }

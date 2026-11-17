@@ -4,7 +4,8 @@
 // FRAME_BYTES long and a relayed one RELAYED_BYTES.
 //
 //   0  u8   kind (FRAME_KIND)
-//   1  u8   flags (FLAG_*), and the drift's way in bits 5–6 (0 none, 1 left, 2 right)
+//   1  u8   flags (FLAG_*), and the drift's way in bits 5–6 (0 none, 1 left, 2 right); bit 7 is
+//           FLAG_AIRBORNE (2026-11-17, a track with jumps), which a page from before ignores
 //   2  u8   the kart (low four bits) and its driver (high four bits): karts.ts, loadoutByte
 //   3  i8   steer × 100
 //   4  i32  race tick: steps of 1/60 s since GO, negative before it
@@ -30,6 +31,11 @@ export const FLAG_BOOSTING = 4
 export const FLAG_SKIDDING = 8
 /** The sender's own count says it has finished */
 export const FLAG_FINISHED = 16
+/**
+ * The kart is in the air, off a jump (2026-11-17, terrain.ts): the others draw it on its flight, not
+ * on the road. Never set on a flat track. The bit was free, so the frame keeps its size and layout
+ */
+export const FLAG_AIRBORNE = 128
 
 export interface KartFrame {
   readonly tick: number
@@ -49,6 +55,8 @@ export interface KartFrame {
   readonly crossings: number
   readonly nextGate: number
   readonly seq: number
+  /** In the air, off a jump (FLAG_AIRBORNE); only ever present when true */
+  readonly airborne?: boolean
 }
 
 const clampByte = (value: number) => Math.max(0, Math.min(255, Math.round(value)))
@@ -62,7 +70,8 @@ export function encodeFrame(frame: KartFrame): Uint8Array {
     (frame.boosting ? FLAG_BOOSTING : 0) |
     (frame.skidding ? FLAG_SKIDDING : 0) |
     (frame.finished ? FLAG_FINISHED : 0) |
-    ((frame.driftDirection === -1 ? 1 : frame.driftDirection === 1 ? 2 : 0) << 5)
+    ((frame.driftDirection === -1 ? 1 : frame.driftDirection === 1 ? 2 : 0) << 5) |
+    (frame.airborne ? FLAG_AIRBORNE : 0)
   view.setUint8(0, FRAME_KIND)
   view.setUint8(1, flags)
   view.setUint8(2, clampByte(frame.body))
@@ -105,6 +114,7 @@ export function decodeFrame(bytes: Uint8Array): KartFrame | null {
     crossings: view.getUint8(28),
     nextGate: view.getUint8(29),
     seq: view.getUint16(30, true),
+    ...((flags & FLAG_AIRBORNE) !== 0 ? { airborne: true } : {}),
   }
   const numbers = [frame.x, frame.z, frame.heading, frame.vx, frame.vz]
   return numbers.every(Number.isFinite) ? frame : null

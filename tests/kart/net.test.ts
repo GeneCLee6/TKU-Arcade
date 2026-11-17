@@ -3,6 +3,7 @@ import {
   clockOffset,
   decodeFrame,
   encodeFrame,
+  FLAG_AIRBORNE,
   FRAME_BYTES,
   readRelayed,
   RELAYED_BYTES,
@@ -76,5 +77,20 @@ describe('the shared clock', () => {
       { sent: 2000, received: 2300, server: 12_000 },
     ])
     expect(offset).toBe(11_020 - 1020)
+  })
+})
+
+describe('the airborne flag (2026-11-17, a track with jumps)', () => {
+  it('rides in the free top bit of the flags: same size, same bytes otherwise', () => {
+    const plain = encodeFrame(FRAME)
+    const flying = encodeFrame({ ...FRAME, airborne: true })
+    expect(flying.byteLength).toBe(FRAME_BYTES)
+    expect(flying[1]).toBe(plain[1]! | FLAG_AIRBORNE)
+    expect([...flying.slice(2)]).toEqual([...plain.slice(2)])
+    expect(decodeFrame(flying)).toEqual({ ...FRAME, airborne: true })
+    // A frame on the ground has no airborne key at all, as before
+    expect('airborne' in decodeFrame(plain)!).toBe(false)
+    // and the drift's way still reads under it
+    expect(decodeFrame(flying)!.driftDirection).toBe(-1)
   })
 })

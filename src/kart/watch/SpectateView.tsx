@@ -117,6 +117,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
             heading: pose.heading,
             vx: pose.vx,
             vz: pose.vz,
+            airborne: pose.frame.airborne === true,
             skidding: pose.frame.skidding,
             // e10-t05: the frame's body byte names the kart and its driver
             ...kartOfByte(pose.frame.body),

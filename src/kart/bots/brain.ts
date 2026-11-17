@@ -37,6 +37,13 @@ const STUCK_STEPS = 90
 const WRONG_STEPS = 45
 /** How long a line holds before it sways the other way, metres of road */
 const SWAY_METRES = 160
+/**
+ * A jump ahead (2026-11-17, shared/kart/terrain.ts) this near, metres plus this many seconds of
+ * travel: no new drift, no tap, any drift let go, and the line straight down the middle, so the kart
+ * takes off square and lands in line (for the landing boost)
+ */
+const JUMP_CLEAR = 18
+const JUMP_SECONDS = 0.9
 
 type Move =
   | { readonly kind: 'none' }
@@ -86,6 +93,8 @@ export function createBotBrain(
   road: readonly RoadPoint[],
   tuning: KartTuning,
   seed: number,
+  /** The track's jump lips (road point indices), if it has any */
+  jumps: readonly number[] = [],
 ): BotBrain {
   const t = tuning
   const rng = createRng(seed)
@@ -100,7 +109,19 @@ export function createBotBrain(
     total += Math.hypot(next.x - point.x, next.z - point.z)
   })
 
+  /** How far along the road the next jump lip is from road point `from`; Infinity with none */
+  const toJump = (from: number): number => {
+    let least = Infinity
+    for (const lip of jumps) {
+      const ahead = (along[lip]! - along[from]! + total) % total
+      if (ahead < least) least = ahead
+    }
+    return least
+  }
+
   let move: Move = NONE
+  /** Straight down the middle for a jump: set each step before the line is worked out */
+  let jumpLine = false
   let wasDrifting = false
   let boostPressed = false
   let lastTap: -1 | 1 = 1
@@ -130,7 +151,7 @@ export function createBotBrain(
     const ahead = pointAhead(road, nearest, metres)
     const { dx, dz } = roadDirection(road, ahead.index)
     // Right of the road's direction: heading 0 faces -z, clockwise
-    const offset = offsetAt(ahead.index)
+    const offset = jumpLine ? 0 : offsetAt(ahead.index)
     const tx = ahead.x - dz * offset
     const tz = ahead.z + dx * offset
     const angle = wrap(Math.atan2(tx - x, -(tz - z)) - heading)
@@ -162,6 +183,16 @@ export function createBotBrain(
     }
 
     const nearest = nearestRoadPoint(road, kart.x, kart.z)
+    // In the air: hold the throttle for the landing boost, the nose kept in line with the flight
+    if ((kart.air ?? 0) > 0) {
+      move = NONE
+      wasDrifting = false
+      const flight = Math.atan2(kart.vx, -kart.vz)
+      return { ...NO_INPUT, throttle: true, steer: clampSteer(wrap(flight - kart.heading) * 4) }
+    }
+    const jumpNear = jumps.length > 0 && toJump(nearest) < JUMP_CLEAR + speed * JUMP_SECONDS
+    if (jumpNear && (move.kind === 'tap' || move.kind === 'double')) move = NONE
+    jumpLine = jumpNear
     const travel = speed > 3 ? Math.atan2(kart.vx, -kart.vz) : kart.heading
     // Slow hands look further ahead, to make up for answering late
     const reach = 14 + speed * (REACH + skill.reactionSteps / 120)
@@ -225,6 +256,10 @@ export function createBotBrain(
 
     let drift = false
     let steer = gripSteer
+    if (jumpNear) {
+      // A jump ahead: let any drift go and line up, on the throttle (a release boost still fires)
+      return { ...base, steer: gripSteer }
+    }
     if (kart.drifting) {
       const dir = kart.driftDirection
       const slipWanted = Math.min(

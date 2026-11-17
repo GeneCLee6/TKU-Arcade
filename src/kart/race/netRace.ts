@@ -397,7 +397,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       body,
       crossings: trial.run.crossings,
       nextGate: trial.run.nextGate,
-      seq: seq++,
+      seq: seq++,      // Off a jump (2026-11-17): the others draw it in the air
+      ...((kart.air ?? 0) > 0 ? { airborne: true } : {}),
     }
     if (realtime.send(encodeFrame(frame))) debug.sent++
   }
@@ -440,6 +441,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           x: pose.x,
           z: pose.z,
           heading: pose.heading,
+          // A track with jumps (2026-11-17): in the air only when its frame says so
+          airborne: pose.frame.airborne === true,
           body: kart,
           driver,
           look: {

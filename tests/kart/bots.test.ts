@@ -33,7 +33,7 @@ function solo(track: Track, difficulty: Difficulty, seed: number) {
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
   const skill = BOT_SKILLS[difficulty]
-  const brain = createBotBrain(skill, track.road, KART_TUNING, seed)
+  const brain = createBotBrain(skill, track.road, KART_TUNING, seed, track.jumps)
   let trial = startTrial(course)
   let wrongWays = 0
   for (let step = 0; trial.phase !== 'finished' && step < 400 * 60; step++) {

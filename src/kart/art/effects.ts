@@ -49,6 +49,10 @@ const MARK_FADE = 1.6
 /** Skid mark pieces kept: about 20 s of sliding, both corners; the oldest are laid over again */
 const SKIDS = 2400
 const SKID_WIDTH = 0.42
+/** A landing (a hill track, 2026-11-17) leaves a dark mark for this long after touching down ... */
+const LANDING_MARK_SECONDS = 0.16
+/** ... and throws up this many puffs of dust */
+const LANDING_PUFFS = 10
 /** A skid mark fades out over this many seconds */
 const SKID_FADE = 14
 /** How dark a fresh skid mark is: its opacity */
@@ -57,7 +61,12 @@ const SKID_OPACITY = 0.7
 const SKID_HEIGHT = MARK_HEIGHT - 0.004
 
 export interface KartEffects {
-  update(pose: { x: number; z: number; heading: number }, look: KartLook, seconds: number): void
+  /** `pose.y` is the road's height under the kart on a hill track (2026-11-17); left out, 0 */
+  update(
+    pose: { x: number; z: number; heading: number; y?: number },
+    look: KartLook,
+    seconds: number,
+  ): void
   /** Forgets the trails, as after a reset: the next drift does not join up with the last */
   lift(): void
   dispose(): void
@@ -235,6 +244,10 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   let flicker = 0
   let bursts = 0
   let burstAge = BURST_SECONDS
+  // A hill track (2026-11-17): the height marks, dust and sparks start from, and the landings seen
+  let floor = 0
+  let landings = 0
+  let landAge = LANDING_MARK_SECONDS
 
   const toWorld = (pose: { x: number; z: number; heading: number }, lx: number, lz: number) => {
     const cos = Math.cos(pose.heading)
@@ -253,16 +266,16 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     positions.set(
       [
         from.x + nx,
-        MARK_HEIGHT,
+        MARK_HEIGHT + floor,
         from.z + nz,
         from.x - nx,
-        MARK_HEIGHT,
+        MARK_HEIGHT + floor,
         from.z - nz,
         to.x + nx,
-        MARK_HEIGHT,
+        MARK_HEIGHT + floor,
         to.z + nz,
         to.x - nx,
-        MARK_HEIGHT,
+        MARK_HEIGHT + floor,
         to.z - nz,
       ],
       nextMark * 12,
@@ -279,7 +292,7 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     if (length < 0.02 || length > MAX_PIECE) return
     const nx = (-dz / length) * (SKID_WIDTH / 2)
     const nz = (dx / length) * (SKID_WIDTH / 2)
-    const y = SKID_HEIGHT
+    const y = SKID_HEIGHT + floor
     skidPositions.set(
       [
         from.x + nx,
@@ -337,21 +350,33 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   return {
     update(pose, look, seconds) {
       clock += seconds
-      const sliding = look.drift !== 0 && Math.abs(look.speed) > 6
+      floor = pose.y ?? 0
+      // In the air (a hill track) nothing touches the road: no marks, no dust, no sparks
+      const flying = look.airborne ?? false
+      const sliding = !flying && look.drift !== 0 && Math.abs(look.speed) > 6
       const corners = kart.rearContacts.map(([lx, lz]) => toWorld(pose, lx, lz))
+      // A landing: a puff of dust from both corners and a short dark mark where the tyres hit
+      const landed = (look.landings ?? 0) > landings
+      landings = look.landings ?? 0
+      if (landed) {
+        landAge = 0
+        puffDue += LANDING_PUFFS
+      }
+      landAge += seconds
+      const marking = sliding || (!flying && landAge < LANDING_MARK_SECONDS)
 
-      if (sliding && lastCorners)
+      if (marking && lastCorners)
         corners.forEach((corner, index) => {
-          layMark(lastCorners![index]!, corner)
+          if (sliding) layMark(lastCorners![index]!, corner)
           laySkid(lastCorners![index]!, corner)
         })
-      lastCorners = sliding ? corners : null
+      lastCorners = marking ? corners : null
       // Faded every frame while a trail or a skid mark still shows, then left alone
       if (sliding || fading) fading = fadeMarks()
-      if (sliding || skidsShowing) skidsShowing = fadeSkids()
+      if (marking || skidsShowing) skidsShowing = fadeSkids()
 
       // Dust: a light stream while drifting, a faint one under boost
-      puffDue += (sliding ? 12 : look.boosting ? 4 : 0) * seconds
+      puffDue += (sliding ? 12 : look.boosting && !flying ? 4 : 0) * seconds
       while (puffDue >= 1) {
         puffDue -= 1
         const corner = corners[nextPuff % corners.length]!
@@ -360,7 +385,7 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         puff.vy = 0.5 + Math.random() * 0.5
         puff.sprite.position.set(
           corner.x + (Math.random() - 0.5) * 0.4,
-          0.2,
+          0.2 + floor,
           corner.z + (Math.random() - 0.5) * 0.4,
         )
         puff.sprite.visible = true
@@ -381,7 +406,7 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
       // drift has earned its release boost; pale blue from both corners while its window is open
       const charge = look.charge ?? 0
       const ready = charge === 2
-      sparkDue += (ready ? 140 : sliding ? (charge === 1 ? 110 : 70) : 0) * seconds
+      sparkDue += (ready && !flying ? 140 : sliding ? (charge === 1 ? 110 : 70) : 0) * seconds
       const cos = Math.cos(pose.heading)
       const sin = Math.sin(pose.heading)
       const throwSpark = (
@@ -397,7 +422,7 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         spark.vz = outward * sin + back * cos
         spark.vy = 1.5 + Math.random() * 2.5
         spark.sprite.material = material
-        spark.sprite.position.set(corner.x, 0.25, corner.z)
+        spark.sprite.position.set(corner.x, 0.25 + floor, corner.z)
         spark.sprite.visible = true
         nextSpark = (nextSpark + 1) % SPARKS
       }
@@ -433,7 +458,7 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         const { position } = spark.sprite
         position.x += spark.vx * seconds
         position.z += spark.vz * seconds
-        position.y = Math.max(0.12, position.y + spark.vy * seconds)
+        position.y = Math.max(0.12 + floor, position.y + spark.vy * seconds)
         const size = 0.3 * (1 - Math.min(1, spark.age / SPARK_LIFE)) + 0.05
         spark.sprite.scale.set(size, size, 1)
         if (spark.age >= SPARK_LIFE) spark.sprite.visible = false

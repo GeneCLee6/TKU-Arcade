@@ -3,7 +3,7 @@
 // came from so that a problem can name the piece. Pure.
 import type { Spot } from '../course.ts'
 import type { RoadPoint } from '../track.ts'
-import type { Piece } from './spec.ts'
+import { RAMP_LENGTH, type Piece } from './spec.ts'
 
 /** Metres between road points, as the hand-made tracks */
 export const SAMPLE = 6
@@ -20,11 +20,11 @@ export const rightOf = (h: number) => ({ x: Math.cos(h), z: Math.sin(h) })
 
 /** How long a piece is along its centre line, metres */
 export const pieceLength = (piece: Piece): number =>
-  piece.kind === 'straight' ? piece.length : piece.radius * Math.abs(piece.angle) * RADIANS
+  piece.kind === 'turn' ? piece.radius * Math.abs(piece.angle) * RADIANS : piece.length
 
 /** Where a piece that starts at `from` puts you `distance` metres along it */
 export function along(piece: Piece, from: Spot, distance: number): Spot {
-  if (piece.kind === 'straight') {
+  if (piece.kind !== 'turn') {
     const f = forward(from.heading)
     return { x: from.x + f.x * distance, z: from.z + f.z * distance, heading: from.heading }
   }
@@ -48,9 +48,48 @@ export interface Laid {
   readonly joints: Spot[]
   /** Each piece's length, metres */
   readonly lengths: number[]
+  /** The road's height where each piece starts, and (last) where the last one ends (2026-11-17) */
+  readonly heights: number[]
+  /** The road points that are jump lips, in order */
+  readonly jumps: number[]
 }
 
 const round = (value: number) => Math.round(value * 100) / 100
+
+/** Whether any piece leaves the flat: then every road point has a height (track.ts) */
+export const hasHeights = (pieces: readonly Piece[]): boolean =>
+  pieces.some((piece) => piece.kind === 'slope' || piece.kind === 'jump')
+
+/** Eases 0 to 1 in and out: a slope's share of its rise at that share of its length */
+const ease = (t: number) => t * t * (3 - 2 * t)
+
+/** A jump's ramp: RAMP_LENGTH, or half the piece if that is shorter */
+const rampOf = (length: number) => Math.min(RAMP_LENGTH, length / 2)
+
+/**
+ * The distances along a piece its road points go at: evenly, as always; or for a jump, the ramp's
+ * foot, middle and lip (the lip's index in the list as `lip`), then evenly on
+ */
+function samples(piece: Piece, length: number): { at: number[]; lip: number } {
+  if (piece.kind === 'jump') {
+    const ramp = rampOf(length)
+    const at = [0, ramp / 2, ramp]
+    for (let d = ramp + 3; d < length - 1; d += SAMPLE) at.push(d)
+    return { at, lip: 2 }
+  }
+  const count = Math.max(1, Math.round(length / SAMPLE))
+  return { at: Array.from({ length: count }, (_, step) => (length * step) / count), lip: -1 }
+}
+
+/** The road's height `distance` metres along a piece that starts at height `base` */
+function heightOn(piece: Piece, base: number, distance: number, length: number): number {
+  if (piece.kind === 'slope') return base + piece.rise * ease(Math.min(1, distance / length))
+  if (piece.kind === 'jump') {
+    const ramp = rampOf(length)
+    return distance <= ramp ? base + piece.height * (distance / ramp) : base
+  }
+  return base
+}
 
 /** The road the pieces make, from the origin facing heading 0 */
 export function layout(pieces: readonly Piece[]): Laid {
@@ -58,28 +97,36 @@ export function layout(pieces: readonly Piece[]): Laid {
   const pieceOf: number[] = []
   const joints: Spot[] = [{ x: 0, z: 0, heading: 0 }]
   const lengths: number[] = []
+  const heights: number[] = [0]
+  const jumps: number[] = []
+  // Heights only when a piece leaves the flat: a flat track's road is exactly what it always was
+  const lifted = hasHeights(pieces)
   pieces.forEach((piece, index) => {
     const from = joints[index]!
+    const base = heights[index]!
     const length = pieceLength(piece)
     const before = pieces[(index - 1 + pieces.length) % pieces.length]!.width
     const blend = Math.min(length, BLEND)
-    const count = Math.max(1, Math.round(length / SAMPLE))
-    for (let step = 0; step < count; step++) {
-      const distance = (length * step) / count
+    const { at: distances, lip } = samples(piece, length)
+    distances.forEach((distance, sample) => {
       const at = along(piece, from, distance)
       const mix = blend > 0 ? Math.min(1, distance / blend) : 1
       // A short piece's point too near the last one is left out: the format wants them apart
       const last = road[road.length - 1]
-      if (last && Math.hypot(at.x - last.x, at.z - last.z) < MIN_GAP) continue
-      road.push({
-        x: round(at.x),
-        z: round(at.z),
-        width: Math.round((before + (piece.width - before) * mix) * 10) / 10,
-      })
+      if (last && Math.hypot(at.x - last.x, at.z - last.z) < MIN_GAP) return
+      const width = Math.round((before + (piece.width - before) * mix) * 10) / 10
+      if (sample === lip) jumps.push(road.length)
+      const y = round(heightOn(piece, base, distance, length))
+      road.push(
+        lifted
+          ? { x: round(at.x), z: round(at.z), width, y }
+          : { x: round(at.x), z: round(at.z), width },
+      )
       pieceOf.push(index)
-    }
+    })
     lengths.push(length)
     joints.push(along(piece, from, length))
+    heights.push(base + (piece.kind === 'slope' ? piece.rise : 0))
   })
   // Nor may the last point sit on the first, where the loop closes
   while (road.length > 1) {
@@ -88,7 +135,14 @@ export function layout(pieces: readonly Piece[]): Laid {
     road.pop()
     pieceOf.pop()
   }
-  return { road, pieceOf, joints, lengths }
+  return {
+    road,
+    pieceOf,
+    joints,
+    lengths,
+    heights,
+    jumps: jumps.filter((at) => at < road.length),
+  }
 }
 
 /** An angle brought into -π to π */

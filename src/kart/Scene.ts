@@ -17,6 +17,7 @@ import {
 } from 'three'
 import type { Wall } from '../../shared/kart/walls.ts'
 import type { Track } from '../../shared/kart/track.ts'
+import { groundAt, heightGuess, pitchOf, terrainOf } from '../../shared/kart/terrain.ts'
 import { buildTrackArt, themeOf, type TrackArt } from './art/trackArt.ts'
 import { QUALITY, type Quality } from './quality.ts'
 import { createKartEffects } from './art/effects.ts'
@@ -29,6 +30,7 @@ import { createHitArt, type HitArt, type HitBurst } from './art/hitArt.ts'
 import { OWN_KART, type SpinPose } from './hitFx.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
+const FLAT = { y: 0, pitch: 0 }
 import { kartScene, kartThemes } from '../styles/kartTokens.ts'
 import { fieldOfView, followCar, REFERENCE_SPEED, startRig, type Chased } from './camera.ts'
 
@@ -37,6 +39,8 @@ const GRID_CELL = 5
 const CAMERA_BACK = 7.5
 const CAMERA_UP = 3.4
 const CAMERA_LOOK_AHEAD = 3
+/** How fast the camera's height follows the kart's on a hill track, per second: it lags a jump a little */
+const CAMERA_RISE = 7
 /** Watching from above (e9-t10): this high, this far behind the kart */
 const OVERHEAD_UP = 55
 const OVERHEAD_BACK = 18
@@ -49,6 +53,18 @@ export interface Pose {
   readonly x: number
   readonly z: number
   readonly heading: number
+  /**
+   * A hill track (2026-11-17, shared/kart/terrain.ts): the kart's height, where the physics knows it
+   * (this browser's own kart); left out, it is worked out from the ground and any jump behind
+   */
+  readonly y?: number
+  /** Its speed, m/s, for that guess (a ghost's, worked out from its samples) */
+  readonly speed?: number
+  /**
+   * Whether it is in the air, where its frame says (FLAG_AIRBORNE): false keeps it on the road.
+   * Left out (a replay, a ghost), the guess decides
+   */
+  readonly airborne?: boolean
 }
 
 /** Another racer's kart (e9-t03): where it is drawn this frame, and how it looks */
@@ -95,7 +111,7 @@ export interface KartScene {
    */
   watch(pose: Pose, chased: Chased, frameSeconds: number, overhead: boolean): void
   /** Puts the camera straight behind the car at once, as after a reset */
-  snapCamera(heading: number): void
+  snapCamera(heading: number, y?: number): void
   /** Where the best run's ghost is now (e8-t11), or null to hide it */
   ghost(pose: Pose | null): void
   /** The other racers' karts this frame (e9-t03); one missing from the list is taken away */
@@ -217,10 +233,28 @@ export function createKartScene(
   let spins: ReadonlyMap<number, SpinPose> = new Map()
   let shake = { x: 0, y: 0 }
   /** A spin is added to the drawn model only: the kart is where the physics has it */
-  const spinModel = (group: Group, heading: number, spin: SpinPose | undefined) => {
-    group.rotation.set(0, -heading - (spin?.yaw ?? 0), spin?.roll ?? 0, 'YXZ')
-    group.position.y = spin?.lift ?? 0
+  const spinModel = (
+    group: Group,
+    heading: number,
+    spin: SpinPose | undefined,
+    lift: { y: number; pitch: number } = FLAT,
+  ) => {
+    group.rotation.set(lift.pitch, -heading - (spin?.yaw ?? 0), spin?.roll ?? 0, 'YXZ')
+    group.position.y = lift.y + (spin?.lift ?? 0)
   }
+  // A hill track (2026-11-17): every kart drawn at its height, nose along the slope or the flight
+  const terrain = track ? terrainOf(track) : null
+  const roadHeight = terrain ? (x: number, z: number) => groundAt(terrain, x, z).y : undefined
+  const liftOf = (pose: Pose, speed: number): { y: number; pitch: number } => {
+    if (!terrain) return FLAT
+    const y =
+      pose.y ??
+      (pose.airborne === false
+        ? groundAt(terrain, pose.x, pose.z).y
+        : heightGuess(terrain, pose.x, pose.z, speed))
+    return { y, pitch: pitchOf(terrain, pose.x, pose.z, pose.heading, speed, y) }
+  }
+  let cameraY = 0
   const projected = new Vector3()
 
   // One box per wall, along its centre line: the test yard's. A track's art draws its own barriers
@@ -266,11 +300,14 @@ export function createKartScene(
   return {
     rendererName,
     canvas: renderer.domElement,
-    draw({ x, z, heading }, chased, frameSeconds, look = STILL) {
+    draw(pose, chased, frameSeconds, look = STILL) {
+      const { x, z, heading } = pose
+      const lift = liftOf(pose, Math.abs(look.speed))
       car.position.set(x, 0, z)
-      spinModel(car, heading, spins.get(OWN_KART))
+      spinModel(car, heading, spins.get(OWN_KART), lift)
       kart.update(look, frameSeconds)
-      effects.update({ x, z, heading }, look, frameSeconds)
+      effects.update(terrain ? { x, z, heading, y: lift.y } : { x, z, heading }, look, frameSeconds)
+      if (terrain) cameraY += (lift.y - cameraY) * (1 - Math.exp(-CAMERA_RISE * frameSeconds))
 
       // The plane has no end: ground and grid follow the car in whole cells, so the lines stay put
       const snappedX = Math.round(x / GRID_CELL) * GRID_CELL
@@ -278,8 +315,8 @@ export function createKartScene(
       ground.position.set(snappedX, 0, snappedZ)
       grid.position.set(snappedX, 0.01, snappedZ)
       if (shadows) {
-        sun.position.set(x + sunX, sunY, z + sunZ)
-        sun.target.position.set(x, 0, z)
+        sun.position.set(x + sunX, sunY + cameraY, z + sunZ)
+        sun.target.position.set(x, cameraY, z)
       }
       art?.update(performance.now() / 1000)
 
@@ -295,17 +332,22 @@ export function createKartScene(
       const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * 1.2 : 0)
       const sin = Math.sin(rig.heading)
       const cos = Math.cos(rig.heading)
-      camera.position.set(x - sin * back, CAMERA_UP, z + cos * back)
+      camera.position.set(x - sin * back, CAMERA_UP + cameraY, z + cos * back)
       if (motion) camera.position.add(projected.set(cos * shake.x, shake.y, sin * shake.x))
-      camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6, z - cos * CAMERA_LOOK_AHEAD)
+      camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6 + cameraY, z - cos * CAMERA_LOOK_AHEAD)
 
       renderer.render(scene, camera)
     },
-    watch({ x, z }, chased, frameSeconds, overhead) {
+    watch(pose, chased, frameSeconds, overhead) {
+      const { x, z } = pose
       car.visible = false
+      if (terrain) {
+        const { y } = liftOf(pose, Math.hypot(chased.vx, chased.vz))
+        cameraY += (y - cameraY) * (1 - Math.exp(-CAMERA_RISE * frameSeconds))
+      }
       if (shadows) {
-        sun.position.set(x + sunX, sunY, z + sunZ)
-        sun.target.position.set(x, 0, z)
+        sun.position.set(x + sunX, sunY + cameraY, z + sunZ)
+        sun.target.position.set(x, cameraY, z)
       }
       art?.update(performance.now() / 1000)
       rig = followCar(rig, chased, frameSeconds)
@@ -320,17 +362,18 @@ export function createKartScene(
       const cos = Math.cos(rig.heading)
       if (overhead) {
         // High above and a little behind, still turning with the kart's way so the road reads ahead
-        camera.position.set(x - sin * OVERHEAD_BACK, OVERHEAD_UP, z + cos * OVERHEAD_BACK)
-        camera.lookAt(x + sin * CAMERA_LOOK_AHEAD * 4, 0, z - cos * CAMERA_LOOK_AHEAD * 4)
+        camera.position.set(x - sin * OVERHEAD_BACK, OVERHEAD_UP + cameraY, z + cos * OVERHEAD_BACK)
+        camera.lookAt(x + sin * CAMERA_LOOK_AHEAD * 4, cameraY, z - cos * CAMERA_LOOK_AHEAD * 4)
       } else {
         const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * 1.2 : 0)
-        camera.position.set(x - sin * back, CAMERA_UP, z + cos * back)
-        camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6, z - cos * CAMERA_LOOK_AHEAD)
+        camera.position.set(x - sin * back, CAMERA_UP + cameraY, z + cos * back)
+        camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6 + cameraY, z - cos * CAMERA_LOOK_AHEAD)
       }
       renderer.render(scene, camera)
     },
-    snapCamera(heading) {
+    snapCamera(heading, y) {
       rig = startRig(heading)
+      if (y !== undefined) cameraY = y
       effects.lift()
     },
     ghost(pose) {
@@ -343,6 +386,8 @@ export function createKartScene(
       ghostKart.group.visible = true
       ghostKart.group.position.set(pose.x, 0, pose.z)
       ghostKart.group.rotation.y = -pose.heading
+      if (terrain)
+        spinModel(ghostKart.group, pose.heading, undefined, liftOf(pose, pose.speed ?? 0))
     },
     others(karts, frameSeconds) {
       const seen = new Set<number>()
@@ -360,7 +405,12 @@ export function createKartScene(
           scene.add(model.group)
         }
         model.group.position.set(other.x, 0, other.z)
-        spinModel(model.group, other.heading, spins.get(other.id))
+        spinModel(
+          model.group,
+          other.heading,
+          spins.get(other.id),
+          liftOf(other, Math.abs(other.look.speed)),
+        )
         model.update(other.look, frameSeconds)
       }
       for (const [id, model] of otherKarts) {
@@ -371,14 +421,14 @@ export function createKartScene(
       }
     },
     items(props, frameSeconds) {
-      itemArt ??= createItemArt(scene)
+      itemArt ??= createItemArt(scene, roadHeight)
       itemArt.update(props.boxes, props.shields, frameSeconds, props.shots)
     },
     hits(frame, frameSeconds) {
       spins = frame.spins
       shake = frame.shake ?? { x: 0, y: 0 }
       if (!hitArt && frame.bursts.length === 0) return
-      hitArt ??= createHitArt(scene)
+      hitArt ??= createHitArt(scene, roadHeight)
       hitArt.update(frame.bursts, frameSeconds)
     },
     project(points) {

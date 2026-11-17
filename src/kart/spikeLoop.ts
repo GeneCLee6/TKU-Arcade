@@ -3,6 +3,7 @@ import type { KartTelemetry } from '../../shared/protocol.ts'
 import {
   finishRecording,
   ghostAt,
+  GHOST_STEPS,
   recordStep,
   startRecording,
   type Ghost,
@@ -21,6 +22,7 @@ import type { Quality } from './quality.ts'
 import { DEFAULT_KART, kartMass, type DriverId, type KartId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { courseOf, parseTrack, recordKey, type Track } from '../../shared/kart/track.ts'
+import { GUANYIN } from '../../shared/kart/tracks/guanyin.ts'
 import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { OLDSTREET } from '../../shared/kart/tracks/oldstreet.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
@@ -55,6 +57,7 @@ import {
   kartSpeed,
   NO_INPUT,
   poseBetween,
+  STEP_SECONDS,
   type KartInput,
   type KartRules,
   type KartState,
@@ -126,7 +129,15 @@ export interface SpikeHud {
  * What /kart/spike drives on: the walled yard of J3, J4's test oval, J5's first track, N1's second or
  * the Tamkang campus (2026-11-14), or N2's item track, the old street
  */
-export type SpikeCourse = 'arena' | 'oval' | 'riverside' | 'harbour' | 'tamkang' | 'oldstreet'
+export type SpikeCourse =
+  | 'arena'
+  | 'oval'
+  | 'riverside'
+  | 'harbour'
+  | 'tamkang'
+  | 'oldstreet'
+  // 2026-11-17: slopes and jumps (shared/kart/terrain.ts)
+  | 'guanyin'
 
 export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'arena',
@@ -135,6 +146,7 @@ export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'harbour',
   'tamkang',
   'oldstreet',
+  'guanyin',
 ]
 
 const TRACKS = {
@@ -143,7 +155,19 @@ const TRACKS = {
   harbour: HARBOUR,
   tamkang: TAMKANG,
   oldstreet: OLDSTREET,
+  guanyin: GUANYIN,
 } as const
+
+/** Where the ghost is, and (for its height on a hill track) how fast it goes there */
+function ghostPose(ghost: Ghost, steps: number): Pose | null {
+  const at = ghostAt(ghost, steps)
+  const ahead = ghostAt(ghost, steps + GHOST_STEPS)
+  if (!at || !ahead) return at
+  return {
+    ...at,
+    speed: Math.hypot(ahead.x - at.x, ahead.z - at.z) / (GHOST_STEPS * STEP_SECONDS),
+  }
+}
 
 /** A course's track, checked like any track file; null for the yard, which is not a track */
 export function spikeTrack(course: SpikeCourse): Track | null {
@@ -210,6 +234,9 @@ export interface SpikeDebug {
   /** Wall hits so far, and resets so far */
   hits: number
   resets: number
+  /** A hill track (2026-11-17): jumps taken off and landed so far */
+  takeoffs: number
+  landings: number
   /** The tuning the last step ran with */
   tuning: KartTuning | undefined
   /** On a track: finish line crossings and the next gate (e8-t04) */
@@ -401,12 +428,14 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     impact: 0,
     hits: 0,
     resets: 0,
+    takeoffs: 0,
+    landings: 0,
     tuning: undefined,
     crossings: 0,
     nextGate: 0,
   }
   window.__kartSpike = debug
-  scene.snapCamera(run.kart.heading)
+  scene.snapCamera(run.kart.heading, run.kart.y)
 
   let previous: KartState = run.kart
   let hits = 0
@@ -415,6 +444,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let handle = 0
   let lastHud: SpikeHud | undefined
   let bursts = 0
+  // A hill track (2026-11-17): landings, for the dust and the thump
+  let landings = 0
 
   let statsFrom: number | undefined
   let statsFrames = 0
@@ -520,7 +551,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       if (run.resets !== before.resets) {
         // A jump, not a move: nothing to draw in between, and the camera starts behind the car
         previous = run.kart
-        scene.snapCamera(run.kart.heading)
+        scene.snapCamera(run.kart.heading, run.kart.y)
       } else {
         previous = before.kart
         callout = louder(callout, calloutBetween(before.kart, run.kart))
@@ -530,6 +561,12 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         if (kart.miniSeconds > was.miniSeconds || kart.boostSeconds > was.boostSeconds) {
           bursts++
           touch?.buzz(BOOST_BUZZ_MS)
+        }
+        if (run.terrainEvent === 'takeoff') debug.takeoffs++
+        if (run.terrainEvent === 'landing') {
+          debug.landings++
+          landings++
+          audio.hit(Math.min(0.5, (was.air ?? 0) * 0.4))
         }
       }
       // One hit per crash, not one per step of pushing against the wall after it
@@ -570,6 +607,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
             ? 1
             : 0,
       bursts,
+      ...(trialCourse?.terrain ? { airborne: (current.air ?? 0) > 0, landings } : {}),
     }
     const pose = poseBetween(previous, current, clock.alpha)
     const hitFrame = net?.fx?.(pose)
@@ -626,7 +664,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       }
       options.onClock?.(seconds(trial.steps), seconds(lapSteps(trial)))
       const ghost = chased()
-      scene.ghost(ghost ? ghostAt(ghost, trial.steps) : null)
+      scene.ghost(ghost ? ghostPose(ghost, trial.steps) : null)
     }
     if (!sameHud(lastHud, hud)) {
       lastHud = hud

@@ -93,6 +93,7 @@
 | `harbour` | 漁港髮夾彎／Harbour Hairpins | **漁人碼頭** | **Fisherman's Wharf** | 淡水真的地名，夕陽、燈塔、漁船都對得上 |
 | `tamkang` | 淡江校園／Tamkang Campus | **五虎崗** | **Five Tigers Hill** | 淡江所在的山崗，校內人都懂；不直接把校名當賽道名 |
 | `oldstreet`（道具型，N2，#83） | 燈籠老街／Lantern Old Street | 燈籠老街（不改）或 **老街夜市** | Lantern Old Street（不改）或 **Night Market** | PRD 列的主題；寬路、多道具箱、廟口分岔，正好是夜市巷子。#83 的暫名已經合這個調性，兩個都可以 |
+| `guanyin`（坡道與跳台，`feat/kart-jumps`） | 觀音山坡道／Guanyin Hill Road | 觀音山坡道（暫名） | Guanyin Hill Road（暫名） | 淡水河對岸的觀音山；第一張有上下坡與兩個跳台的賽道。山名是地名，不是誰的商標 |
 
 測試場（`arena`）、測試橢圓（`oval`）是開發用的，不用命名。
 

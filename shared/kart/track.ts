@@ -6,6 +6,7 @@
 // Coordinates are metres on the ground plane: x to the right, z towards the viewer, as in
 // physics.ts; heading 0 faces -z and grows clockwise.
 import type { Course, Spot } from './course.ts'
+import { terrainOf, type Terrain } from './terrain.ts'
 import type { Wall } from './walls.ts'
 
 /** The lights a track can be drawn in: src/styles/kartTokens.ts's `kartThemes` has each */
@@ -21,6 +22,11 @@ export interface RoadPoint {
   readonly z: number
   /** Kerb to kerb, metres */
   readonly width: number
+  /**
+   * The road's height here, metres (2026-11-17, terrain.ts); flat across the road. Left out on a
+   * flat track, which then has no terrain at all
+   */
+  readonly y?: number
 }
 
 /**
@@ -77,6 +83,11 @@ export interface TrackJson {
   readonly boostPads: readonly BoostPad[]
   readonly itemBoxes: readonly { readonly x: number; readonly z: number }[]
   readonly decor: readonly Decor[]
+  /**
+   * Jump lips (2026-11-17, terrain.ts): road point indices, each a line across the road that a car
+   * crossing it forwards takes off from. Left out when there are none
+   */
+  readonly jumps?: readonly number[]
 }
 
 export interface Track extends TrackJson {
@@ -91,6 +102,14 @@ const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const MAX_ROAD_POINTS = 2000
 const MAX_GATES = 200
 const MAX_THINGS = 500
+/** Terrain (2026-11-17): no road point higher or lower than this, metres */
+export const MAX_HEIGHT = 80
+/**
+ * The steepest the road may climb or fall between two road points, rise over run, but for the drop
+ * straight after a jump lip (the back of the ramp, which a car flies over)
+ */
+export const MAX_GRADE = 0.4
+const MAX_JUMPS = 40
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -184,7 +203,14 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
       problems.push(`${at}: width from 4 to 90 m`)
       return null
     }
-    return { x: point.x, z: point.z, width: point.width }
+    const y = (item as { y?: unknown }).y
+    if (y !== undefined && (!isNumber(y) || Math.abs(y) > MAX_HEIGHT)) {
+      problems.push(`${at}: y a number from -${MAX_HEIGHT} to ${MAX_HEIGHT} m`)
+      return null
+    }
+    return y === undefined
+      ? { x: point.x, z: point.z, width: point.width }
+      : { x: point.x, z: point.z, width: point.width, y }
   })
   if (road.length < 4) problems.push('road: at least 4 points')
   for (let index = 0; index < road.length; index++) {
@@ -192,6 +218,26 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     const b = road[(index + 1) % road.length]!
     if (Math.hypot(b.x - a.x, b.z - a.z) < 0.5)
       problems.push(`road[${index}]: closer than 0.5 m to the next point`)
+  }
+
+  const jumps = list(json.jumps ?? [], 'jumps', MAX_JUMPS, problems, (item, at) => {
+    if (!Number.isInteger(item) || (item as number) < 0 || (item as number) >= road.length) {
+      problems.push(`${at}: a road point index`)
+      return null
+    }
+    return item as number
+  })
+  if (new Set(jumps).size !== jumps.length) problems.push('jumps: each road point once')
+  if (road.some((point) => point.y !== undefined)) {
+    const lips = new Set(jumps)
+    for (let index = 0; index < road.length; index++) {
+      const a = road[index]!
+      const b = road[(index + 1) % road.length]!
+      const run = Math.hypot(b.x - a.x, b.z - a.z)
+      if (!lips.has(index) && Math.abs((b.y ?? 0) - (a.y ?? 0)) > MAX_GRADE * run) {
+        problems.push(`road[${index}]: steeper than ${MAX_GRADE} to the next point`)
+      }
+    }
   }
 
   const gates = list(json.gates, 'gates', MAX_GATES, problems, (item, at) =>
@@ -245,6 +291,7 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     boostPads,
     itemBoxes,
     decor,
+    ...(jumps.length > 0 ? { jumps } : {}),
   }
   return { track: { ...base, allWalls: [...kerbs(road), ...walls] } }
 }
@@ -374,13 +421,27 @@ export function gateCrossing(
   return direction
 }
 
-/** The course the physics drives on: every wall, and the pole position */
-export const courseOf = (track: Track): Course => ({
-  walls: track.allWalls,
-  start: track.grid[0]!,
-  checkpoints: { gates: track.gates, respawns: track.respawns, laps: track.laps },
-  boostPads: track.boostPads,
-})
+/** Each track's terrain, worked out once */
+const terrains = new WeakMap<Track, Terrain | null>()
+
+/**
+ * The course the physics drives on: every wall, and the pole position; and on a track with slopes
+ * or jumps, its terrain (a flat track's course is what it always was)
+ */
+export const courseOf = (track: Track): Course => {
+  let terrain = terrains.get(track)
+  if (terrain === undefined) {
+    terrain = terrainOf(track)
+    terrains.set(track, terrain)
+  }
+  return {
+    walls: track.allWalls,
+    start: track.grid[0]!,
+    checkpoints: { gates: track.gates, respawns: track.respawns, laps: track.laps },
+    boostPads: track.boostPads,
+    ...(terrain ? { terrain } : {}),
+  }
+}
 
 /** The smallest box holding the road and its kerbs, for the minimap */
 export function trackBounds(track: Pick<Track, 'road'>): {

@@ -1,6 +1,6 @@
 // e10-t07: the editor's piece library. Each button adds one piece or a few (an S-bend is two), all of
 // them ordinary pieces that can be changed afterwards; the road keeps the width it had.
-import { straight, turn, type Piece } from '../../../shared/kart/editor/spec.ts'
+import { jump, slope, straight, turn, type Piece } from '../../../shared/kart/editor/spec.ts'
 import type { KartEditorKey } from '../../../shared/kart/i18n.editor.ts'
 
 export interface Preset {
@@ -63,4 +63,8 @@ export const PRESETS: readonly Preset[] = [
     label: 'kart.editor.preset.boxes',
     make: (w) => [straight(60, w, { boxes: true })],
   },
+  // 2026-11-17: slopes and jumps (shared/kart/terrain.ts). A climb wants a fall somewhere after it
+  { id: 'uphill', label: 'kart.editor.preset.uphill', make: (w) => [slope(100, 8, w)] },
+  { id: 'downhill', label: 'kart.editor.preset.downhill', make: (w) => [slope(100, -8, w)] },
+  { id: 'jump', label: 'kart.editor.preset.jump', make: (w) => [jump(80, 2.5, w)] },
 ]

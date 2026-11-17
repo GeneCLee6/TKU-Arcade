@@ -13,6 +13,7 @@ const en = {
   'games.kart.track.harbour': 'Harbour Hairpins',
   'games.kart.track.tamkang': 'Tamkang Campus',
   'games.kart.track.oldstreet': 'Lantern Old Street',
+  'games.kart.track.guanyin': 'Guanyin Hill Road',
   // e10-t08: a track made in the editor (/kart/editor), given as its link
   'games.kart.track.custom': 'A track from the editor',
   'games.kart.option.custom': 'Custom track',
@@ -62,6 +63,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.track.harbour': '漁港髮夾彎',
   'games.kart.track.tamkang': '淡江校園',
   'games.kart.track.oldstreet': '燈籠老街',
+  'games.kart.track.guanyin': '觀音山坡道',
   'games.kart.track.custom': '自訂賽道（編輯器）',
   'games.kart.option.custom': '自訂賽道',
   'games.kart.custom.paste': '貼上賽道連結',
