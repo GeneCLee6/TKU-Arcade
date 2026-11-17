@@ -23,8 +23,20 @@ import {
   type Warp,
 } from '../../kart/items.ts'
 import { decodeFrame } from '../../kart/net.ts'
+import {
+  dropPuddle,
+  isShot,
+  isShotItem,
+  keepShots,
+  sendCloud,
+  SHOT_TUNING,
+  shotHits,
+  throwHail,
+  type Fix,
+  type KartShot,
+} from '../../kart/shots.ts'
 import { judgeFrame, lapsDone, raceProgress, startTracking, type Tracked } from '../../kart/race.ts'
-import type { Track } from '../../kart/track.ts'
+import { courseOf, type Track } from '../../kart/track.ts'
 import { formatTime } from '../../kart/timeTrial.ts'
 import { raceTrack } from '../../kart/tracks/registry.ts'
 import {
@@ -57,6 +69,9 @@ export const CLOSE_AFTER_FINISH_MS = 30_000
 export const RETIRE_AFTER_MS = 20_000
 /** A race closes after this long per lap, whatever happens */
 export const RACE_CAP_MS = 4 * 60_000
+
+/** A kart's path between two frames further apart than this is not judged against shots, only its end */
+const PATH_GAP_MS = 1_000
 
 const PHASE = 'games.kart.error.phase'
 const BAD = 'games.kart.error.badAction'
@@ -139,6 +154,7 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
       draws: 0,
       events: [],
       used: 0,
+      shots: [],
       track,
       laps,
       phase: 'loading',
@@ -232,6 +248,7 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         if (state.phase !== 'racing' || state.mode !== 'items') return gameError(PHASE)
         const racer = state.racers.find((one) => one.seat === a.seat)
         const { item, at, targets, blocked, warps } = a
+        const shot = a.shot ?? null
         if (
           !racer ||
           done(racer) ||
@@ -241,7 +258,11 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
           !isSeatList(targets) ||
           !isSeatList(blocked) ||
           !Array.isArray(warps) ||
-          !warps.every(isWarp)
+          !warps.every(isWarp) ||
+          // A thrown or dropped item puts its shot on the road, and nothing else does
+          (isShotItem(item)
+            ? !isShot(shot) || shot.item !== item || shot.by !== racer.seat || shot.n !== state.used
+            : shot !== null)
         ) {
           return gameError(BAD)
         }
@@ -253,6 +274,7 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
           blocked,
           at,
           warps,
+          hit: false,
         }
         const racers = state.racers.map((one) => {
           if (one === racer) {
@@ -270,6 +292,38 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
           racers,
           used: state.used + 1,
           events: [...state.events, event].slice(-KEEP_EVENTS),
+          shots: keepShots(isShot(shot) ? [...(state.shots ?? []), shot] : (state.shots ?? []), at),
+        }
+      }
+      case 'hit': {
+        if (state.phase !== 'racing' || state.mode !== 'items') return gameError(PHASE)
+        const racer = state.racers.find((one) => one.seat === a.seat)
+        const shot = (state.shots ?? []).find((one) => one.n === a.shot)
+        const at = a.at
+        if (!racer || done(racer) || !shot || !isTime(at)) return gameError(BAD)
+        // A shield up stops it, and is used up doing it
+        const blocked = racer.shieldUntil > at
+        const event: KartItemEvent = {
+          n: state.used,
+          item: shot.item,
+          by: shot.by,
+          targets: [racer.seat],
+          blocked: blocked ? [racer.seat] : [],
+          at,
+          warps: [],
+          hit: true,
+        }
+        return {
+          ...state,
+          racers: state.racers.map((one) =>
+            one === racer && blocked ? { ...one, shieldUntil: 0 } : one,
+          ),
+          used: state.used + 1,
+          events: [...state.events, event].slice(-KEEP_EVENTS),
+          shots: keepShots(
+            (state.shots ?? []).filter((one) => one !== shot),
+            at,
+          ),
         }
       }
       case 'close':
@@ -344,6 +398,7 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
       if (state.phase === 'loading' || done(racer)) return { relay: data, actions: [] }
       const { tracked } = memoryOf(memory)
       const slot = state.racers.indexOf(racer)
+      const before = tracked.get(seat)
       const verdict = judgeFrame(tracked.get(seat) ?? startTracking(track, slot), frame, {
         track,
         slot,
@@ -356,6 +411,18 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
       const actions: KartAction[] = []
       if (verdict.lapAt !== null && state.phase === 'racing') {
         actions.push({ t: 'lap', seat, ms: Math.max(0, verdict.lapAt) })
+      }
+      // e9-t06b: the kart's path since its last frame, against every shot on the road
+      const finishing = verdict.lapAt !== null && racer.lapMs.length + 1 >= state.laps
+      if (state.phase === 'racing' && state.mode === 'items' && !finishing) {
+        // After a jump (a reset, a swap) or a long gap, only where the kart is now counts
+        const last = before?.last
+        const from: Fix | null =
+          last && !frame.reset && now - before.lastAt <= PATH_GAP_MS
+            ? { x: last.x, z: last.z, at: before.lastAt }
+            : null
+        const hit = shotHitting(state.shots ?? [], seat, from, { x: frame.x, z: frame.z, at: now })
+        if (hit) actions.push({ t: 'hit', seat, shot: hit.n, at: now })
       }
       // Anyone gone quiet too long drops out; judged whenever someone else's frame comes in
       if (state.phase === 'racing' && state.goAt !== null) {
@@ -372,7 +439,20 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
   },
 }
 
-// ── Items (e9-t05, e9-t06a) ──────────────────────────────────────────────────────────────────
+/**
+ * The first shot (oldest first) that hits kart `seat` on its way from `from` to `to`: one a frame,
+ * so that a shield stops only the first
+ */
+export function shotHitting(
+  shots: readonly KartShot[],
+  seat: SeatId,
+  from: Fix | null,
+  to: Fix,
+): KartShot | null {
+  return shots.find((shot) => shotHits(shot, seat, from, to)) ?? null
+}
+
+// ── Items (e9-t05, e9-t06a, e9-t06b) ──────────────────────────────────────────────────────────────────
 
 type Runner = { seat: SeatId; at: number; tracked: Tracked | undefined }
 
@@ -453,7 +533,30 @@ function judgeItem(
           (target) => (state.racers.find((one) => one.seat === target)?.shieldUntil ?? 0) > now,
         )
       : []
-    return [{ t: 'use', seat, item, at: now, targets, blocked, warps: blocked.length ? [] : warps }]
+    return [
+      {
+        t: 'use',
+        seat,
+        item,
+        at: now,
+        targets,
+        blocked,
+        warps: blocked.length ? [] : warps,
+        shot: null,
+      },
+    ]
+  }
+  /** A thrown or dropped item: its shot goes on the road, from where the kart was last seen */
+  const thrown = (shot: KartShot, targets: SeatId[] = []): KartAction[] => [
+    { t: 'use', seat, item, at: now, targets, blocked: [], warps: [], shot },
+  ]
+  const thrower = {
+    seat,
+    x: last.x,
+    z: last.z,
+    heading: last.heading,
+    vx: last.vx,
+    vz: last.vz,
   }
   const ahead = racing.slice(0, place)
   const next = ahead[ahead.length - 1]
@@ -501,5 +604,12 @@ function judgeItem(
       }
       return actions
     }
+    case 'hail':
+      return thrown(throwHail(state.used, thrower, now, courseOf(track).walls))
+    case 'puddle':
+      return thrown(dropPuddle(state.used, thrower, now))
+    case 'cloud':
+      if (!next || !there || distance > SHOT_TUNING.cloudReach) return []
+      return thrown(sendCloud(state.used, thrower, next.seat, distance, now), [next.seat])
   }
 }

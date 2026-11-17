@@ -424,7 +424,8 @@ src/kart/
 - **瀏覽器**（`src/kart/race/netRace.ts` 的 `adjust`、`props`）：每一步讀房間 view 的新 `events`，套到自己的車（`shared/kart/itemEffects.ts`：`boostKart`、`headwindStep`、`towStep`、`warpRun`；調包算一次重置，攝影機跟著跳）；開過箱子送 `pickup`（送出後那個箱子在本機先藏 0.7 秒）、按道具鍵送 `use`。效果的時間用對好的伺服器錶算。`spikeLoop.ts` 的 `SpikeNet` 多 `adjust`（每步）與 `props`（每幀，畫道具箱與泡泡），只加不改；單機計時賽不受影響。
 - **畫面**：`src/kart/art/itemArt.ts`（原創造型：立在角上的琥珀色半透明立方體、淡色核心，上下浮動旋轉；泡泡罩是藍色半透明球），色值在 `kartTokens.ts`；`src/kart/race/ItemHud.tsx`（道具欄、自己畫的線條圖示、提示）。輸入多一個 `item` 動作（`shared/kart/input.ts`，C／Q、十字鍵上），「操作設定」自動多一列。
 - **測試**：`tests/kart/items.test.ts`（箱子位置、frame、抽籤權重、四種效果）、`tests/games/kart-items.test.ts`（先到先得、回來時間、離太遠、第一名只拿順風或泡泡罩、5 種道具的對象、泡泡罩擋一次、調包同一圈與跳躍被收）、`e2e/kart-race.spec.ts`（兩個瀏覽器道具賽一圈，有拿有用）。
-- **沒做（下一步）**：投射型道具（L5 `e9-t06b`）、道具音效、別人被逆風吹到時的外觀（現在只有被打的人自己看得到減速與提示）、正式名稱與外觀（`e10-t01`）。
+- **L5 投射型（`e9-t06b`，2026-11-17）**：`shared/kart/shots.ts`（冰雹 `hail`、雷雲 `cloud`、泥水坑 `puddle`，暫名）。state 多 `shots`（投射物：起點、時間、速度、結束時間，位置由這些算出來，不逐格推進）；`use` 多帶 `shot`；新的 `system` 動作 `hit`。命中在 `realtime.frame` 裁定：frame 被 `judgeFrame` 收下後，用那台車上一個 frame 到這個 frame 的直線掃過每顆投射物（`shotHits`），打到就回 `hit`，`reduce` 判泡泡罩、拿掉投射物、加一個 `hit: true` 的事件。瀏覽器讀到打中自己就套 `stunStep`（`itemEffects.ts`）；`itemArt.ts` 畫冰球、三團烏雲加黃色閃電、扁平泥坑（色值在 `kartTokens.ts`）；道具欄多 3 個線條圖示。`ITEM_TABLE`：第一名多泥水坑，中段多冰雹與少量雷雲，後段雷雲最多；第一名永遠拿不到冰雹與雷雲。測試：`tests/kart/shots.test.ts`（生成、飛行、撞牆、掃掠命中、閃開、泥水坑對主人的延遲、雷雲到時、保留上限、暈）、`tests/games/kart-shots.test.ts`（房間裡丟、打中、泡泡罩擋、完賽不打、動作檢查）。線上格式在 `KART-NETCODE.md` §10.1。
+- **沒做（下一步）**：道具音效、別人被打到時的外觀（現在只有被打的人自己看得到減速與提示；被打的車沒有打轉動畫）、正式名稱與外觀（`e10-t01`）。
 
 ## 5. i18n
 

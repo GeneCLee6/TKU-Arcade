@@ -1,4 +1,4 @@
-// e9-t05, e9-t06a: the item race's HUD. The slot shows the item held, its name and the key that uses
+// e9-t05, e9-t06a, e9-t06b: the item race's HUD. The slot shows the item held, its name and the key that uses
 // it; the note under the place says what an item just did to this kart or for it. Icons are our own,
 // drawn here in a few strokes; colours come from the tokens.
 import { memo } from 'react'
@@ -21,6 +21,13 @@ const ICON_PATHS: Record<ItemId, string> = {
   headwind: 'M28 10 H12 A4 4 0 1 1 16 6 M28 17 H6 M28 24 H14 A4 4 0 1 0 18 28',
   // Two arrows trading places
   swap: 'M6 11 H24 M19 6 L24 11 L19 16 M26 21 H8 M13 16 L8 21 L13 26',
+  // A ball with speed lines behind it (e9-t06b)
+  hail: 'M27 16 A6 6 0 1 1 26.99 16 Z M4 12 H11 M2 17 H10 M4 22 H11',
+  // A cloud with a bolt under it
+  cloud: 'M8 18 A5 5 0 0 1 10 9 A7 7 0 0 1 23 9 A5 5 0 0 1 24 18 Z M17 19 L13 25 H18 L15 30',
+  // A flat puddle with a splash
+  puddle:
+    'M4 23 C4 19 12 18 16 19 C21 20 28 19 28 23 C28 27 4 27 4 23 Z M12 13 L10 9 M16 12 V7 M20 13 L22 9',
 }
 
 export const ItemIcon = memo(function ItemIcon({ item }: { item: ItemId }) {

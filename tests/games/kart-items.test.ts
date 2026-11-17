@@ -1,5 +1,6 @@
 // e9-t05, e9-t06a: the item race as the room judges it: boxes first come first served, the draw by
-// place, and each of the five direct items reaching whom it should, shields and all.
+// place, and each of the five direct items reaching whom it should, shields and all. The three thrown
+// and dropped ones (e9-t06b) are in kart-shots.test.ts.
 import { describe, expect, it } from 'vitest'
 import { makeSeats } from '../../shared/games/match.ts'
 import { createRng } from '../../shared/games/rng.ts'
@@ -171,7 +172,7 @@ describe('the item race room (e9-t05)', () => {
     expect(send(state, memory, 0, { op: 'pickup', box: 200, tick: 600 }).actions).toEqual([])
   })
 
-  it('draws by place: the leader only ever gets a boost or a shield', () => {
+  it('draws by place: the leader only ever gets a boost, a shield or a puddle', () => {
     const memory = kart.realtime!.memory()
     let state = racing(3)
     const box = itemBoxes(track)[4]!
@@ -188,8 +189,7 @@ describe('the item race room (e9-t05)', () => {
       if (got?.t !== 'got') throw new Error('no item')
       seen.add(got.item)
     }
-    expect([...seen].every((item) => item === 'boost' || item === 'shield')).toBe(true)
-    expect(seen.size).toBe(2)
+    expect([...seen].sort()).toEqual(['boost', 'puddle', 'shield'])
   })
 
   it('checks every got and use it is handed', () => {
@@ -382,7 +382,7 @@ describe('the direct items (e9-t06a)', () => {
   })
 
   it('never gives the leader an item that reaches someone ahead', () => {
-    for (const item of ['tow', 'headwind', 'swap'] as const) {
+    for (const item of ['tow', 'headwind', 'swap', 'hail', 'cloud'] as const) {
       expect(ITEM_TABLE.front[item] ?? 0).toBe(0)
     }
   })
