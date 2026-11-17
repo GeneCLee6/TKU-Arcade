@@ -1,4 +1,4 @@
-// Where the spike page's panels start. Below this width the top row's buttons wrap onto a second
-// line, so the panels and the numbers start lower to leave it showing.
-export const NARROW_TOP = '(max-width: 560px)'
-export const NARROW_PANEL_TOP = 104
+// The kart page's top row. Wide screens show every control in one row; below this width (where the
+// English row stops fitting) or on a short screen (a phone held sideways), the controls fold into a
+// menu, so the row stays one line: the back link and the menu button. Panels then start under it.
+export const KART_COMPACT = '(max-width: 1179px), (max-height: 500px)'

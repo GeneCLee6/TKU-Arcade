@@ -327,7 +327,9 @@ test.describe('the lobby', () => {
     await expect(page.locator('a[href*="/kart/spike"]')).toHaveCount(0)
     const card = page.getByRole('heading', { level: 3, name: 'Kart', exact: true })
     await expect(card).toBeVisible()
-    await expect(page.locator('li', { has: card }).getByRole('button', { name: 'New room' })).toHaveCount(1)
+    await expect(
+      page.locator('li', { has: card }).getByRole('button', { name: 'New room' }),
+    ).toHaveCount(1)
     await expect(page.locator('li', { has: card }).locator('a[href="/kart"]')).toHaveCount(1)
     expect(scripts.length).toBeGreaterThan(0)
     expect(scripts.filter((url) => /SpikePage|three|Scene/i.test(url))).toEqual([])
@@ -516,7 +518,10 @@ test.describe('remapping keys', () => {
     await page.getByRole('button', { name: 'Drift, Keyboard 1: Z' }).click()
     await page.keyboard.press('q')
     await expect(page.getByRole('button', { name: 'Drift, Keyboard 1: Q' })).toBeVisible()
-    await expect(page.getByTestId('kart-controls-status')).toHaveText('Drift: Q.')
+    // Q was the item key's second key (L4): it moves, and the panel says so
+    await expect(page.getByTestId('kart-controls-status')).toHaveText(
+      'Drift: Q. It was taken from Use item (item race), Keyboard 2, which now has nothing there.',
+    )
 
     // A key another action has moves, and the panel says where from
     await page.getByRole('button', { name: 'Boost, Keyboard 2: E' }).click()
@@ -608,6 +613,9 @@ for (const scheme of ['light', 'dark'] as const) {
         const { violations } = await new AxeBuilder({ page }).analyze()
         return violations.map(({ id, nodes }) => ({ id, nodes: nodes.map((node) => node.target) }))
       }
+      expect(await problems()).toEqual([])
+      // At phone width the controls are in the top row's menu, which has no problems either
+      await page.getByTestId('kart-menu').click()
       expect(await problems()).toEqual([])
       await page.getByRole('button', { name: 'Controls' }).click()
       await page.getByRole('button', { name: 'Drift, Keyboard 1: Z' }).click()
@@ -745,6 +753,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.keyboard.up('ArrowRight')
       await page.keyboard.up('ArrowUp')
 
+      await page.getByTestId('kart-menu').click()
       await page.getByRole('button', { name: '調參' }).click()
       await expect(page.getByTestId('kart-tuning')).toBeVisible()
       expect(await problems()).toEqual([])
@@ -891,6 +900,7 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
     'Riverside (graybox)',
     'Harbour Hairpins',
     'Tamkang Campus',
+    'Lantern Old Street',
   ])
   await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
   await expect(page.getByText('Time trial')).toBeVisible()
@@ -930,4 +940,69 @@ test('a kept best run shows as the record, its ghost racing along', async ({ pag
   // Some frames with the ghost drawn: a slow software renderer manages few
   await expect.poll(() => framesOf(page), { timeout: 15_000 }).toBeGreaterThan(30)
   expect(errors).toEqual([])
+})
+
+// PR #88 left the top row crowded on a small screen: its controls fold into a menu, which every
+// phone size can reach without the page scrolling sideways; the how-to-drive text starts folded
+for (const [width, height] of [
+  [360, 740],
+  [390, 844],
+  [480, 320],
+  [667, 375],
+  [844, 390],
+]) {
+  test(`the top row folds into a menu at ${width}×${height}`, async ({ page }) => {
+    await page.setViewportSize({ width, height })
+    await page.addInitScript(() => localStorage.setItem('tku-arcade.kart.quality', 'low'))
+    await page.goto('/kart')
+    await expect(page.locator('canvas')).toBeVisible()
+    await expect(page.getByTestId('kart-help')).not.toHaveAttribute('open')
+    const menu = page.getByTestId('kart-menu')
+    await expect(page.getByTestId('kart-garage-open')).toBeHidden()
+    await menu.click()
+    await expect(menu).toHaveAttribute('aria-expanded', 'true')
+    // Every control in reach: a click lands on it, not on something drawn over it
+    await page.getByTestId('kart-sound').click()
+    await page.getByTestId('kart-course').selectOption('harbour')
+    await expect(page).toHaveURL(/track=harbour/)
+    await page.getByTestId('kart-quality').selectOption('low')
+    await page.getByTestId('kart-body').selectOption('comet')
+    await page.getByRole('button', { name: 'Controls' }).click({ trial: true })
+    await page.getByTestId('kart-bots-open').click({ trial: true })
+    await page.getByTestId('kart-garage-open').click()
+    await expect(menu).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByTestId('kart-garage')).toBeVisible()
+    await page.getByRole('button', { name: 'Close the garage' }).click()
+    // The garage's button is folded away again: the keyboard goes back to the menu
+    await expect(menu).toBeFocused()
+    await menu.click()
+    await page.keyboard.press('Escape')
+    await expect(menu).toHaveAttribute('aria-expanded', 'false')
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+    ).toBeLessThanOrEqual(0)
+  })
+}
+
+// PR #86 left a new kart restarting the race behind the open garage: the pick now waits for the
+// panel to close, and the countdown starts then
+test('a kart picked in the garage races once the garage closes', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.addInitScript(() => {
+    localStorage.setItem('tku-arcade.kart.quality', 'low')
+    localStorage.setItem('tku-arcade.kart.body', 'tide')
+  })
+  await page.goto('/kart?track=oval')
+  await expect(page.locator('canvas')).toBeVisible()
+  await expect(page.getByTestId('kart-countdown')).toHaveCount(0, { timeout: 15_000 })
+  await page.getByTestId('kart-garage-open').click()
+  await page.getByRole('radio', { name: 'Comet' }).click()
+  await expect(page.getByRole('radio', { name: 'Comet' })).toHaveAttribute('aria-checked', 'true')
+  // Still the race under way: no countdown behind the panel
+  await page.waitForTimeout(1500)
+  await expect(page.getByTestId('kart-countdown')).toHaveCount(0)
+  await expect(page.getByTestId('kart-body')).toHaveValue('tide')
+  await page.getByRole('button', { name: 'Close the garage' }).click()
+  await expect(page.getByTestId('kart-body')).toHaveValue('comet')
+  await expect(page.getByTestId('kart-countdown')).toBeVisible({ timeout: 15_000 })
 })

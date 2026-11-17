@@ -5,7 +5,6 @@ import styled from 'styled-components'
 import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
 import { Button } from '../../components/Button.tsx'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
-import { NARROW_PANEL_TOP, NARROW_TOP } from '../layout.ts'
 import { RosterPicker, type RosterT } from './RosterPicker.tsx'
 
 export interface GaragePanelProps {
@@ -49,9 +48,6 @@ const Panel = styled.section`
   top: 56px;
   right: ${space.sm}px;
 
-  @media ${NARROW_TOP} {
-    top: ${NARROW_PANEL_TOP}px;
-  }
   bottom: ${space.sm}px;
   width: min(420px, calc(100% - ${2 * space.sm}px));
   overflow-y: auto;

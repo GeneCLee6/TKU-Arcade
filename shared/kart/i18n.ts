@@ -49,6 +49,8 @@ const en = {
   'kart.spike.contextLost':
     'The browser took the graphics context away. Reload the page to start again.',
   'kart.spike.back': 'Back to the lobby',
+  'kart.spike.menu': 'Menu',
+  'kart.spike.howTo': 'How to drive',
   'kart.spike.showNumbers': 'Show numbers',
   'kart.spike.hideNumbers': 'Hide numbers',
   'kart.spike.fps': 'Frames per second',
@@ -305,6 +307,8 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.noWebgl': '這個瀏覽器無法執行 WebGL 2，所以測試無法開始。',
   'kart.spike.contextLost': '瀏覽器收回了繪圖資源。請重新整理頁面再開始。',
   'kart.spike.back': '回大廳',
+  'kart.spike.menu': '選單',
+  'kart.spike.howTo': '怎麼開',
   'kart.spike.showNumbers': '顯示數字',
   'kart.spike.hideNumbers': '隱藏數字',
   'kart.spike.fps': '每秒影格數',

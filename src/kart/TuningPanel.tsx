@@ -20,7 +20,6 @@ import {
 import { Button } from '../components/Button.tsx'
 import type { MessageParams } from '../i18n/t.ts'
 import { color, font, fontSize, radius, space } from '../styles/tokens.ts'
-import { NARROW_PANEL_TOP, NARROW_TOP } from './layout.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -232,9 +231,6 @@ const Panel = styled.section`
   top: 56px;
   right: ${space.sm}px;
 
-  @media ${NARROW_TOP} {
-    top: ${NARROW_PANEL_TOP}px;
-  }
   bottom: ${space.sm}px;
   width: min(420px, calc(100% - ${2 * space.sm}px));
   overflow-y: auto;
