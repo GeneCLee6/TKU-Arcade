@@ -80,12 +80,21 @@ export interface ItemBox {
 const ROWS = 3
 const PER_ROW = 5
 
+/** At most this many boxes: a pickup frame names its box in one byte */
+export const MAX_BOXES = 255
+
 /**
- * Where a track's item boxes are: ROWS rows a lap, spread round it at gates (never the finish
- * line), PER_ROW boxes across each, evenly between the gate's ends. Read from the gates, so that
+ * Where a track's item boxes are. A track that places its own (`itemBoxes` in its file: N2's item
+ * track) has them there. Any other has ROWS rows a lap, spread round it at gates (never the finish
+ * line), PER_ROW boxes across each, evenly between the gate's ends: read from the gates, so that
  * every track has them without drawing them in its file, and a reshaped track moves them with it
  */
-export function itemBoxes(track: Pick<Track, 'gates'>): ItemBox[] {
+export function itemBoxes(
+  track: Pick<Track, 'gates'> & Partial<Pick<Track, 'itemBoxes'>>,
+): ItemBox[] {
+  if (track.itemBoxes && track.itemBoxes.length > 0) {
+    return track.itemBoxes.slice(0, MAX_BOXES).map(({ x, z }) => ({ x, z }))
+  }
   const count = track.gates.length
   if (count < 2) return []
   const boxes: ItemBox[] = []

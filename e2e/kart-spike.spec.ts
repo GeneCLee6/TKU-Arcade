@@ -845,6 +845,28 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
   expect(errors).toEqual([])
 })
 
+// N2 (e10-t04a, e10-t04b): the item track, the old street night market, picked on the kart page; its
+// minimap shows the stall island that splits the temple fork
+test('the old street item track opens from the picker, its fork on the map', async ({ page }) => {
+  // Night scenery and a few hundred stalls: a software renderer under parallel tests needs the time
+  test.setTimeout(60_000)
+  const errors = watchConsole(page)
+  await page.goto('/kart')
+  await expect(page.locator('canvas')).toBeVisible()
+  await page.getByTestId('kart-course').selectOption('oldstreet')
+  await expect(page).toHaveURL(/track=oldstreet/)
+  await expect(page.getByTestId('kart-course').locator('option:checked')).toHaveText(
+    'Lantern Old Street',
+  )
+  const map = page.getByRole('img', { name: 'Track map' })
+  await expect(map).toBeVisible()
+  // The island's walls, drawn over the road
+  await expect.poll(() => map.locator('line').count()).toBeGreaterThan(100)
+  await expect(page.getByTestId('kart-race-clock')).toBeVisible({ timeout: 15_000 })
+  await expect.poll(() => framesOf(page), { timeout: 30_000 }).toBeGreaterThan(10)
+  expect(errors).toEqual([])
+})
+
 // e8-t14: the kart page itself, a time trial without the spike's tools; e8-t07 its kart and effects
 test('the kart page races on Riverside without the tuning tools, and the sound switches', async ({
   page,
