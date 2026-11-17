@@ -1,5 +1,5 @@
 // 2026-11-17: the art of a track with slopes and jumps (shared/kart/terrain.ts, docs/ARCHITECTURE.md
-// §4.25): the ground rising and falling with the road (a height field, the road's height near it
+// §4.26): the ground rising and falling with the road (a height field, the road's height near it
 // fading back to the plain far off), and each jump's ramp, a red and white wedge with dark sides.
 // The road, kerbs and barriers themselves follow the road points' heights in trackArt.ts. Original,
 // built in code like the rest.

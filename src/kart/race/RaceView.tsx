@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import styled, { keyframes } from 'styled-components'
+import styled, { css, keyframes } from 'styled-components'
 import type { KartAction, KartItemEvent, KartView } from '../../../shared/games/kart/types.ts'
 import { actionKeys } from '../../../shared/kart/input.ts'
 import { TARGETED_ITEMS, type ItemId } from '../../../shared/kart/items.ts'
@@ -29,6 +29,9 @@ import { ItemNote, ItemSlot } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
 import { StunHud } from './HitHud.tsx'
 import { createRaceNet, type NameTag, type RaceNet } from './netRace.ts'
+import { TouchControls } from '../touch/TouchControls.tsx'
+import { useTouchControls } from '../touch/useTouchControls.ts'
+import { touchBottom, touchCorner, touchSpace } from '../touch/touchLayout.ts'
 
 registerMessages(KART_MESSAGES)
 
@@ -46,6 +49,8 @@ const CALLOUT_MS = 900
 const NOTE_MS = 2_200
 /** A use the room has not answered by now found no one to reach */
 const NO_TARGET_MS = 900
+/** Hit by a shot: a buzz this long on a phone driven by touch */
+const HIT_BUZZ_MS = 80
 
 type T = ReturnType<typeof useT>
 
@@ -186,6 +191,9 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
   // e10-t05: the kart and driver picked on /kart or in the waiting room; the kart's numbers go
   // into the tuning
   const [loadout] = useState(() => ({ body: loadBody(), driver: loadDriver() }))
+  // 2026-11-17: buttons on the screen for a phone
+  const touch = useTouchControls()
+  const touchSource = touch.source
   const [settings] = useState(() => ({
     bindings: loadBindings(),
     rules: loadRules(),
@@ -210,6 +218,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       },
       onForeseenHit: (_, ms) => {
         foreseenAt.current = performance.now()
+        touchSource.buzz(HIT_BUZZ_MS)
         setStun((last) => ({ ms, id: (last?.id ?? 0) + 1 }))
       },
     })
@@ -230,6 +239,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
         onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
         onTrial: setTrial,
         onClock: (total, lap) => clock.current?.set(total, lap),
+        touch: touchSource,
         net: autopiloted
           ? { ...net.net, autopilot: (trial) => autopilot(trial, track.road) }
           : net.net,
@@ -247,7 +257,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       net.stop()
       raceNet.current = null
     }
-  }, [realtime, track, seat, slot, failure, settings, autopiloted, loadout])
+  }, [realtime, track, seat, slot, failure, settings, autopiloted, loadout, touchSource])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -285,9 +295,10 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       // (already up if this browser foresaw it, #86)
       if (spin?.kind === 'spin' && performance.now() - foreseenAt.current > FORESEEN_LATE_MS) {
         setStun((last) => ({ ms: spin.ms, id: (last?.id ?? 0) + 1 }))
+        touchSource.buzz(HIT_BUZZ_MS)
       }
     }
-  }, [view.events, seat])
+  }, [view.events, seat, touchSource])
 
   useEffect(() => {
     if (!note) return
@@ -322,11 +333,15 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
   const finished = me?.finishMs != null || trial?.phase === 'finished'
   const ready = view.racers.filter((racer) => racer.loaded).length
   const firstItemKey = actionKeys(settings.bindings, 'item')[0]
-  const itemKey = firstItemKey ? keyLabel(firstItemKey, t) : t('kart.controls.none')
+  const itemKey = touch.shown
+    ? t('kart.touch.item')
+    : firstItemKey
+      ? keyLabel(firstItemKey, t)
+      : t('kart.controls.none')
   const counting = view.phase === 'countdown' && view.goAt !== null && trial?.phase === 'countdown'
 
   return (
-    <Page data-testid="kart-race">
+    <Page data-testid="kart-race" style={touch.shown ? touchSpace(touch.settings) : undefined}>
       <Stage ref={stage} role="img" aria-label={t('games.kart.race.canvas')} />
       <Tags ref={tagLayer} aria-hidden="true">
         {view.racers
@@ -337,6 +352,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
             </Tag>
           ))}
       </Tags>
+      <TouchControls t={t} touch={touch} items={view.mode === 'items'} />
       <TopLeft>
         <PlacePanel data-testid="kart-place" aria-label={t('games.kart.race.position')}>
           <PlaceNumber>{t('games.kart.race.place', { place: place || 1, total })}</PlaceNumber>
@@ -350,7 +366,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       </TopLeft>
       {stun && <StunHud key={`stun-${stun.id}`} t={t} ms={stun.ms} />}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
-      <MapCorner>
+      <MapCorner $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}>
         {trial && <RaceClock ref={clock} t={t} trial={trial} />}
         <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} walls={track.walls} />
       </MapCorner>
@@ -382,13 +398,13 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
           )}
         </Finish>
       )}
-      <Bottom>
+      <Bottom $touch={touch.shown}>
         {view.mode === 'items' && (
           <SlotCorner>
             <ItemSlot t={t} item={me?.item ?? null} keyName={itemKey} />
           </SlotCorner>
         )}
-        <Hud t={t} hud={hud} maxStored={settings.tuning.maxStoredBoosts} />
+        <Hud t={t} hud={hud} maxStored={settings.tuning.maxStoredBoosts} dense={touch.shown} />
       </Bottom>
     </Page>
   )
@@ -422,6 +438,7 @@ const Page = styled.main`
 const Stage = styled.div`
   position: absolute;
   inset: 0;
+  touch-action: none;
 `
 
 const Tags = styled.div`
@@ -488,7 +505,9 @@ const Unstable = styled.p`
   }
 `
 
-const MapCorner = styled.div`
+// With the touch buttons on a phone held sideways: the map beside the clock, and over the steering
+// (on the left, under the place, unless left-handed)
+const MapCorner = styled.div<{ $touch: 'left' | 'right' | null }>`
   position: absolute;
   top: ${space.sm}px;
   right: ${space.sm}px;
@@ -496,6 +515,16 @@ const MapCorner = styled.div`
   justify-items: end;
   gap: ${space.xs}px;
   pointer-events: none;
+
+  ${({ $touch }) =>
+    $touch &&
+    css`
+      ${touchCorner($touch)}
+
+      @media (max-height: 500px) {
+        top: ${$touch === 'left' ? 64 : space.sm}px;
+      }
+    `}
 `
 
 const Center = styled.p`
@@ -538,11 +567,13 @@ const Muted = styled.p`
   font-size: ${fontSize.sm}px;
 `
 
-const Bottom = styled.div`
+const Bottom = styled.div<{ $touch: boolean }>`
   position: absolute;
   bottom: ${space.sm}px;
   left: ${space.sm}px;
   right: ${space.sm}px;
+
+  ${({ $touch }) => $touch && touchBottom}
 `
 
 const SlotCorner = styled.div`

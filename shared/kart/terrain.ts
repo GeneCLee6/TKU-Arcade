@@ -1,5 +1,5 @@
 // 2026-11-17 (owner: "keep developing the kart"; #83 and #92 both noted that the physics was flat):
-// slopes and jumps, docs/ARCHITECTURE.md §4.25. A track may give its road points a height (`y`) and
+// slopes and jumps, docs/ARCHITECTURE.md §4.26. A track may give its road points a height (`y`) and
 // mark some of them as jump lips (`jumps`); a track that does neither has no terrain at all, and its
 // cars take exactly the path they always took (course.ts never calls in here: the flat physics is
 // bit for bit what it was, tests/kart/flatGolden.test.ts).

@@ -279,7 +279,7 @@ JSON patch 少約 **73–76%**（本機 1.52 → 0.36、預覽站 1.46 → 0.40 
 
 ## 16. 高低差與跳台：frame 的「在空中」旗標（2026-11-17，`feat/kart-jumps`）
 
-物理與賽道在 [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.25。線上只多一個 bit。
+物理與賽道在 [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.26。線上只多一個 bit。
 
 | 方向 | 格式 | 內容 |
 | --- | --- | --- |

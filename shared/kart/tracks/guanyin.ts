@@ -1,5 +1,5 @@
 // 2026-11-17 (owner: keep developing the kart; outside the roadmap): the first track with slopes and
-// jumps (terrain.ts, docs/ARCHITECTURE.md §4.25), a working name: Guanyin Hill Road (觀音山坡道), an
+// jumps (terrain.ts, docs/ARCHITECTURE.md §4.26), a working name: Guanyin Hill Road (觀音山坡道), an
 // original mountain road across the river from Tamsui. Laid with the track editor's own pieces
 // (editor/spec.ts), so it is built and checked exactly as a shared track is: the long start straight,
 // a right onto a 16 m climb, an S over the shoulder of the hill, the first jump on the hilltop, a

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// Slopes and jumps (2026-11-17, docs/ARCHITECTURE.md §4.25): Guanyin Hill Road, the first track with
+// Slopes and jumps (2026-11-17, docs/ARCHITECTURE.md §4.26): Guanyin Hill Road, the first track with
 // them, raced against a computer kart for one lap from /kart's menu. The player drives with the test
 // autopilot (`?autopilot`), which takes both jumps like anyone crossing a lip; the page counts the
 // take-offs and landings, the bot's kart is drawn from its frames (in the air when they say so), and

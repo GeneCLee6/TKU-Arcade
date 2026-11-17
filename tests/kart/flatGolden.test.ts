@@ -8,7 +8,7 @@ import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
 import { BOT_SKILLS } from '../../src/kart/bots/skill.ts'
 
-// The flat tracks do not change (2026-11-17, slopes and jumps; docs/ARCHITECTURE.md §4.25). The
+// The flat tracks do not change (2026-11-17, slopes and jumps; docs/ARCHITECTURE.md §4.26). The
 // hashes below were taken on main at 7f53e13, BEFORE the terrain came in: the same inputs on the four
 // flat tracks (and the test yard) must give the very same trajectory, bit for bit, every step. If one
 // of them changes, the physics of the flat tracks changed and every record and ghost with it.

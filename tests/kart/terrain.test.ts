@@ -36,7 +36,7 @@ import { RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
 import { BOT_SKILLS } from '../../src/kart/bots/skill.ts'
 
-// Slopes and jumps (2026-11-17, shared/kart/terrain.ts, docs/ARCHITECTURE.md §4.25). The flat tracks
+// Slopes and jumps (2026-11-17, shared/kart/terrain.ts, docs/ARCHITECTURE.md §4.26). The flat tracks
 // staying bit for bit what they were is tests/kart/flatGolden.test.ts.
 
 /** A long straight road towards -z, its height from `height(z)`, with jump lips at `lips` */

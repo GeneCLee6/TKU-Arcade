@@ -42,7 +42,14 @@ import {
 } from '../../shared/kart/timeTrial.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
 import { startRun, stepRun, type Run, type Spot } from '../../shared/kart/course.ts'
-import { actionKeys, isBoundKey, readInput, type Bindings } from '../../shared/kart/input.ts'
+import {
+  actionKeys,
+  activeControls,
+  isBoundKey,
+  readInput,
+  type Bindings,
+} from '../../shared/kart/input.ts'
+import { mergeInputs } from '../../shared/kart/touch.ts'
 import {
   kartBoosting,
   kartSkidding,
@@ -68,6 +75,7 @@ import {
 } from './Scene.ts'
 import type { KartLook } from './art/kartModel.ts'
 import type { ItemCue } from './hitFx.ts'
+import type { TouchSource } from './touch/touchSource.ts'
 
 const STATS_EVERY_MS = 500
 
@@ -87,6 +95,9 @@ export const KMH_PER_MPS = 3.6 * SPEEDOMETER_SCALE
 
 /** A hit at least this fast into the wall (m/s) counts as one for the debug count and the HUD flash */
 const HIT_SPEED = 4
+
+/** A boost fired: a buzz this long on a phone driven by touch */
+const BOOST_BUZZ_MS = 25
 
 export interface SpikeStats {
   readonly fps: number
@@ -319,6 +330,8 @@ export interface SpikeOptions {
   readonly onReady?: (handle: { restart: () => void }) => void
   /** A race against others in a room (e9); see `SpikeNet` */
   readonly net?: SpikeNet
+  /** 2026-11-17: the on-screen buttons of a phone (src/kart/touch/), driving along with the keys */
+  readonly touch?: TouchSource
 }
 
 const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
@@ -453,7 +466,11 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
 
     const { bindings, rules, tuning, enabled } = options.controls()
     const pad = readGamepad()
+    const touch = options.touch
+    // A gamepad in use hides the buttons on the screen, as a key does
+    if (touch && pad && activeControls(pad.snapshot).length > 0) touch.otherDevice()
     if (!enabled) {
+      touch?.clear()
       held.clear()
       boostTapped = false
       resetTapped = false
@@ -465,11 +482,18 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     for (let step = 0; step < clock.steps; step++) {
       const pilot = net?.autopilot ?? options.autopilot
       const driven = pilot && trial ? pilot(trial) : null
-      const input =
-        driven ??
-        (enabled
-          ? readInput(bindings, { held, pad: pad?.snapshot, boostTapped, resetTapped, itemTapped })
-          : NO_INPUT)
+      const keyed = enabled
+        ? readInput(bindings, { held, pad: pad?.snapshot, boostTapped, resetTapped, itemTapped })
+        : NO_INPUT
+      // Read even when the autopilot drives, so that a tap is used up and not kept for later
+      const touched =
+        enabled && touch
+          ? touch.read({
+              racing: !trial || trial.phase !== 'countdown',
+              burstWaiting: run.kart.burstReady || run.kart.releaseWindow > 0,
+            })
+          : null
+      const input = driven ?? (touched ? mergeInputs(keyed, touched) : keyed)
       boostTapped = false
       resetTapped = false
       itemTapped = false
@@ -534,7 +558,10 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         // Any boost fired (a charge, a release boost, a pad, the start): the thrusters burst
         const { kart } = run
         const was = before.kart
-        if (kart.miniSeconds > was.miniSeconds || kart.boostSeconds > was.boostSeconds) bursts++
+        if (kart.miniSeconds > was.miniSeconds || kart.boostSeconds > was.boostSeconds) {
+          bursts++
+          touch?.buzz(BOOST_BUZZ_MS)
+        }
         if (run.terrainEvent === 'takeoff') debug.takeoffs++
         if (run.terrainEvent === 'landing') {
           debug.landings++
@@ -681,6 +708,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     if (isField(event.target)) return
     if (!ownsKey(event.code, bindings)) return
     event.preventDefault()
+    // A driving key hides the buttons on the screen: this player has a keyboard
+    options.touch?.otherDevice()
     held.add(event.code)
     if (event.repeat) return
     if (actionKeys(bindings, 'boost').includes(event.code)) boostTapped = true
@@ -692,8 +721,11 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     const { bindings, enabled } = options.controls()
     if (enabled && !isField(event.target) && ownsKey(event.code, bindings)) event.preventDefault()
   }
-  // The key-up of a key let go in another window never arrives
-  const onBlur = () => held.clear()
+  // The key-up of a key let go in another window never arrives; nor does a finger's lift
+  const onBlur = () => {
+    held.clear()
+    options.touch?.clear()
+  }
   // Ctrl boosts, and Ctrl with W closes the tab before any page can stop it: during a race, the
   // browser asks first (2026-11-14)
   const onBeforeUnload = (event: BeforeUnloadEvent) => {
