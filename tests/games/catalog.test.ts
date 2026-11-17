@@ -74,12 +74,16 @@ describe('the catalog against the registry', () => {
     const info = getGameInfo(id)
     const module = getGame(id)
     expect(module?.meta).toBe(getGameCard(id)?.meta)
-    // Field by field: a module may add hidden fields (types.ts), and only those
+    // Field by field: a module may add hidden fields (types.ts), and only those; and to a text
+    // field, the Worker's own full check (e10-t08: the kart's custom track), all else the same
     const fields = Object.entries((module?.options ?? {}) as Record<string, AnyOptionField>)
     const shown = (info?.options ?? {}) as Record<string, unknown>
     for (const [key, field] of fields) {
       if (field.hidden) expect(shown, key).not.toHaveProperty(key)
-      else expect(shown[key], key).toBe(field)
+      else if (field.kind === 'text' && field.check) {
+        const { check: _check, ...rest } = field
+        expect(shown[key], key).toEqual(rest)
+      } else expect(shown[key], key).toBe(field)
     }
     expect(Object.keys(shown)).toEqual(
       fields.filter(([, field]) => !field.hidden).map(([key]) => key),

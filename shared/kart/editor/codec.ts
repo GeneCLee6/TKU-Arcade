@@ -1,0 +1,160 @@
+// e10-t07, e10-t08: a track spec as a short code for a link (`/kart?custom=<code>`), a save and a
+// room's options: compact JSON in base64url. Codes come from anyone (a pasted link, the network), so
+// `decodeSpec` takes nothing on trust: a size cap before anything is read, then every field checked,
+// every number finite, in range and kept to a tenth. Pure; the browser and the Worker both have
+// TextEncoder, btoa and atob.
+import { CODE_PATTERN, MAX_CODE_CHARS } from './codeShape.ts'
+import {
+  LIMITS,
+  PAD_PLACES,
+  TRACK_THEMES,
+  tenth,
+  type PadPlace,
+  type Piece,
+  type TrackSpec,
+  type TrackTheme,
+} from './spec.ts'
+
+export { CODE_PATTERN, MAX_CODE_CHARS }
+
+/** The code's own version, its first field */
+export const CODE_VERSION = 1
+type PieceTuple =
+  | readonly ['s', number, number, number, number]
+  | readonly ['t', number, number, number, number, number]
+
+const padIndex = (pad: PadPlace) => PAD_PLACES.indexOf(pad)
+
+function pieceTuple(piece: Piece): PieceTuple {
+  const pad = padIndex(piece.pad)
+  const boxes = piece.boxes ? 1 : 0
+  return piece.kind === 'straight'
+    ? ['s', tenth(piece.length), tenth(piece.width), pad, boxes]
+    : ['t', tenth(piece.angle), tenth(piece.radius), tenth(piece.width), pad, boxes]
+}
+
+function toBase64Url(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function fromBase64Url(code: string): string | null {
+  try {
+    const binary = atob(code.replace(/-/g, '+').replace(/_/g, '/'))
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes)
+  } catch {
+    return null
+  }
+}
+
+/** The name as kept: control characters out, spaces trimmed, at most LIMITS.maxName characters */
+export function cleanName(name: string): string {
+  const plain = Array.from(name)
+    .filter((char) => {
+      const code = char.codePointAt(0)!
+      // Control characters, and the two line breaks JSON lets through
+      return code >= 0x20 && !(code >= 0x7f && code <= 0x9f) && code !== 0x2028 && code !== 0x2029
+    })
+    .join('')
+    .trim()
+  return Array.from(plain).slice(0, LIMITS.maxName).join('').trim()
+}
+
+/** The pieces alone, as the code has them: what a track's records are kept by (`specHash`) */
+export const piecesKey = (pieces: readonly Piece[]): string =>
+  JSON.stringify(pieces.map(pieceTuple))
+
+export function encodeSpec(spec: TrackSpec): string {
+  return toBase64Url(
+    JSON.stringify({
+      v: CODE_VERSION,
+      n: cleanName(spec.name),
+      t: spec.theme,
+      p: spec.pieces.map(pieceTuple),
+    }),
+  )
+}
+
+/** A whole number from `min` to `max`, or a number kept to a tenth in that range; else null */
+function numberIn(value: unknown, min: number, max: number): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  if (Math.abs(value * 10 - Math.round(value * 10)) > 1e-6) return null
+  const kept = tenth(value)
+  return kept >= min && kept <= max ? kept : null
+}
+
+function readPiece(value: unknown): Piece | null {
+  if (!Array.isArray(value)) return null
+  const extra = (pad: unknown, boxes: unknown) => {
+    const place = typeof pad === 'number' && Number.isInteger(pad) ? PAD_PLACES[pad] : undefined
+    if (place === undefined || (boxes !== 0 && boxes !== 1)) return null
+    return { pad: place, boxes: boxes === 1 }
+  }
+  if (value[0] === 's' && value.length === 5) {
+    const length = numberIn(value[1], LIMITS.minLength, LIMITS.maxLength)
+    const width = numberIn(value[2], LIMITS.minWidth, LIMITS.maxWidth)
+    const more = extra(value[3], value[4])
+    if (length === null || width === null || !more) return null
+    return { kind: 'straight', length, width, ...more }
+  }
+  if (value[0] === 't' && value.length === 6) {
+    const angle = numberIn(value[1], -LIMITS.maxAngle, LIMITS.maxAngle)
+    const radius = numberIn(value[2], LIMITS.minRadius, LIMITS.maxRadius)
+    const width = numberIn(value[3], LIMITS.minWidth, LIMITS.maxWidth)
+    const more = extra(value[4], value[5])
+    if (angle === null || angle === 0 || radius === null || width === null || !more) return null
+    return { kind: 'turn', angle, radius, width, ...more }
+  }
+  return null
+}
+
+/**
+ * The spec in a code, or null for anything that is not one: too long, not base64url, not JSON, a
+ * field missing, out of range or not a number. Whether the pieces make a legal track is build.ts's
+ */
+export function decodeSpec(code: string): TrackSpec | null {
+  if (typeof code !== 'string' || code.length > MAX_CODE_CHARS || !CODE_PATTERN.test(code)) {
+    return null
+  }
+  const text = fromBase64Url(code)
+  if (text === null) return null
+  let json: unknown
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) return null
+  const { v, n, t, p } = json as Record<string, unknown>
+  if (v !== CODE_VERSION || typeof n !== 'string' || typeof t !== 'string') return null
+  if (!TRACK_THEMES.includes(t as TrackTheme)) return null
+  if (!Array.isArray(p) || p.length < LIMITS.minPieces || p.length > LIMITS.maxPieces) return null
+  const pieces: Piece[] = []
+  for (const item of p) {
+    const piece = readPiece(item)
+    if (!piece) return null
+    pieces.push(piece)
+  }
+  return { name: cleanName(n), theme: t as TrackTheme, pieces }
+}
+
+/**
+ * A short hash of the pieces (cyrb53, base 36): the same layout has the same one, whatever it is
+ * called or drawn like, so its records and ghost follow it from link to link
+ */
+export function specHash(pieces: readonly Piece[]): string {
+  const text = piecesKey(pieces)
+  let h1 = 0xdeadbeef
+  let h2 = 0x41c6ce57
+  for (let index = 0; index < text.length; index++) {
+    const char = text.charCodeAt(index)
+    h1 = Math.imul(h1 ^ char, 2654435761)
+    h2 = Math.imul(h2 ^ char, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)
+}

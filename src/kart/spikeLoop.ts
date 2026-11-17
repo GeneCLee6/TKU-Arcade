@@ -246,6 +246,13 @@ export interface SpikeOptions {
   readonly onCallout: (callout: Callout) => void
   readonly onContextLost: () => void
   readonly course?: SpikeCourse
+  /**
+   * A track to drive on instead of `course`'s: a race room's (any of them, a custom one too), or
+   * one made in the editor (e10-t07)
+   */
+  readonly track?: Track
+  /** Drives the kart instead of the keys in a time trial (testing, `?autopilot`) */
+  readonly autopilot?: (trial: Trial) => KartInput
   /** e8-t06: how much to draw */
   readonly quality?: Quality
   /**
@@ -308,7 +315,7 @@ function report(fps: number, loadMs: number, quality: Quality): void {
 
 export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): () => void {
   const loadStarted = performance.now()
-  const track = spikeTrack(options.course ?? 'arena')
+  const track = options.track ?? spikeTrack(options.course ?? 'arena')
   const net = options.net
   const plainCourse = track ? courseOf(track) : TEST_ARENA
   // In a race each kart starts on its own place on the grid
@@ -400,7 +407,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     accumulator = clock.accumulator
     let callout: Callout | undefined
     for (let step = 0; step < clock.steps; step++) {
-      const driven = net?.autopilot && trial ? net.autopilot(trial) : null
+      const pilot = net?.autopilot ?? options.autopilot
+      const driven = pilot && trial ? pilot(trial) : null
       const input =
         driven ??
         (enabled

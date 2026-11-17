@@ -8,6 +8,10 @@
 import type { Course, Spot } from './course.ts'
 import type { Wall } from './walls.ts'
 
+/** The lights a track can be drawn in: src/styles/kartTokens.ts's `kartThemes` has each */
+export const TRACK_THEME_NAMES = ['day', 'sunset', 'campus', 'night'] as const
+export type TrackThemeName = (typeof TRACK_THEME_NAMES)[number]
+
 /** The format's version: a track says which one it was written for */
 export const TRACK_FORMAT = 1
 
@@ -54,6 +58,11 @@ export interface TrackJson {
    * ghosts kept for the old layout are set aside (`recordKey`)
    */
   readonly revision?: number
+  /**
+   * The light and sky to draw it in (e10-t07): a track made in the editor says; the hand-made ones
+   * leave it out and are drawn as before (src/kart/art/trackArt.ts's `themeOf`)
+   */
+  readonly theme?: TrackThemeName
   readonly laps: number
   /** The centre line as a closed loop, in driving order; the last point joins the first */
   readonly road: readonly RoadPoint[]
@@ -161,6 +170,9 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
   ) {
     problems.push('revision: a whole number from 1 to 999')
   }
+  if (json.theme !== undefined && !TRACK_THEME_NAMES.includes(json.theme as TrackThemeName)) {
+    problems.push(`theme: one of ${TRACK_THEME_NAMES.join(', ')}`)
+  }
   if (!Number.isInteger(json.laps) || (json.laps as number) < 1 || (json.laps as number) > 20) {
     problems.push('laps: a whole number from 1 to 20')
   }
@@ -223,6 +235,7 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     ...(json.revision !== undefined && json.revision !== 1
       ? { revision: json.revision as number }
       : {}),
+    ...(json.theme !== undefined ? { theme: json.theme as TrackThemeName } : {}),
     laps: json.laps as number,
     road,
     gates,
