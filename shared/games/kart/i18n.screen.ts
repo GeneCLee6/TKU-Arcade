@@ -24,7 +24,7 @@ const en = {
   'games.kart.race.noWebgl': 'This browser cannot draw the race (WebGL 2 is needed).',
   'games.kart.race.canvas': 'The race, seen from behind your kart',
   'games.kart.race.you': 'you',
-  // The item race (e9-t05, e9-t06a). Working titles of our own (e10-t01 settles them)
+  // The item race (e9-t05, e9-t06a, e9-t06b). Working titles of our own (e10-t01 settles them)
   'games.kart.item.boost': 'Tailwind',
   'games.kart.item.shield': 'Bubble',
   'games.kart.item.tow': 'Tow Line',
@@ -42,6 +42,14 @@ const en = {
   'games.kart.item.hitHeadwind': 'Headwind from {name}!',
   'games.kart.item.hitSwap': '{name} swapped places with you!',
   'games.kart.item.hitTow': '{name} is towing on you',
+  'games.kart.item.hail': 'Hailstone',
+  'games.kart.item.cloud': 'Thundercloud',
+  'games.kart.item.puddle': 'Mud Puddle',
+  'games.kart.item.youCloud': 'Thundercloud after {name}',
+  'games.kart.item.cloudComing': "{name}'s thundercloud is coming for you!",
+  'games.kart.item.youHit': 'Your {item} hit {name}',
+  'games.kart.item.hitShot': "{name}'s {item} got you!",
+  'games.kart.item.hitOwn': 'You drove into your own {item}!',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -84,6 +92,14 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.item.hitHeadwind': '{name} 吹來逆風！',
   'games.kart.item.hitSwap': '{name} 和你調包了位置！',
   'games.kart.item.hitTow': '{name} 拖著你的車尾',
+  'games.kart.item.hail': '冰雹',
+  'games.kart.item.cloud': '雷雲',
+  'games.kart.item.puddle': '泥水坑',
+  'games.kart.item.youCloud': '雷雲追著 {name} 去了',
+  'games.kart.item.cloudComing': '{name} 的雷雲朝你飄來了！',
+  'games.kart.item.youHit': '你的{item}打中了 {name}',
+  'games.kart.item.hitShot': '被 {name} 的{item}打中了！',
+  'games.kart.item.hitOwn': '你開進了自己的{item}！',
 }
 
 export const kartScreenMessages = { en, 'zh-TW': zhTW }

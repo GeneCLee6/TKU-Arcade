@@ -22,7 +22,7 @@ import { createKartEffects } from './art/effects.ts'
 import { createSpeedLines } from './art/speedLines.ts'
 import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
 import type { KartBody } from './bodies.ts'
-import { createItemArt, type ItemArt, type ItemBoxLook } from './art/itemArt.ts'
+import { createItemArt, type ItemArt, type ItemBoxLook, type ShotLook } from './art/itemArt.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 import { kartScene, kartThemes } from '../styles/kartTokens.ts'
@@ -51,10 +51,14 @@ export interface OtherKart extends Pose {
   readonly look: KartLook
 }
 
-/** The item race's things to draw this frame (e9-t05): the boxes, and the karts with a shield up */
+/**
+ * The item race's things to draw this frame (e9-t05, e9-t06b): the boxes, the karts with a shield up,
+ * and the shots on the road
+ */
 export interface ItemProps {
   readonly boxes: readonly ItemBoxLook[]
   readonly shields: readonly { readonly x: number; readonly z: number }[]
+  readonly shots: readonly ShotLook[]
 }
 
 /** Where a point of the world is on the canvas, in CSS pixels from its top left; null off screen */
@@ -304,7 +308,7 @@ export function createKartScene(
     },
     items(props, frameSeconds) {
       itemArt ??= createItemArt(scene)
-      itemArt.update(props.boxes, props.shields, frameSeconds)
+      itemArt.update(props.boxes, props.shields, frameSeconds, props.shots)
     },
     project(points) {
       const { clientWidth: width, clientHeight: height } = container
