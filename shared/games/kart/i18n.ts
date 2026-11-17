@@ -12,6 +12,7 @@ const en = {
   'games.kart.track.riverside': 'Riverside',
   'games.kart.track.harbour': 'Harbour Hairpins',
   'games.kart.track.tamkang': 'Tamkang Campus',
+  'games.kart.track.oldstreet': 'Lantern Old Street',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -23,6 +24,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.track.riverside': '河畔',
   'games.kart.track.harbour': '漁港髮夾彎',
   'games.kart.track.tamkang': '淡江校園',
+  'games.kart.track.oldstreet': '燈籠老街',
 }
 
 export const kartMessages = { en, 'zh-TW': zhTW } as {

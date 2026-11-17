@@ -14,6 +14,7 @@ import type { Quality } from './quality.ts'
 import type { KartBody } from './bodies.ts'
 import { courseOf, parseTrack, recordKey, type Track } from '../../shared/kart/track.ts'
 import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
+import { OLDSTREET } from '../../shared/kart/tracks/oldstreet.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TAMKANG } from '../../shared/kart/tracks/tamkang.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
@@ -102,9 +103,9 @@ export interface SpikeHud {
 
 /**
  * What /kart/spike drives on: the walled yard of J3, J4's test oval, J5's first track, N1's second or
- * the Tamkang campus (2026-11-14)
+ * the Tamkang campus (2026-11-14), or N2's item track, the old street
  */
-export type SpikeCourse = 'arena' | 'oval' | 'riverside' | 'harbour' | 'tamkang'
+export type SpikeCourse = 'arena' | 'oval' | 'riverside' | 'harbour' | 'tamkang' | 'oldstreet'
 
 export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'arena',
@@ -112,6 +113,7 @@ export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'riverside',
   'harbour',
   'tamkang',
+  'oldstreet',
 ]
 
 const TRACKS = {
@@ -119,6 +121,7 @@ const TRACKS = {
   riverside: RIVERSIDE,
   harbour: HARBOUR,
   tamkang: TAMKANG,
+  oldstreet: OLDSTREET,
 } as const
 
 /** A course's track, checked like any track file; null for the yard, which is not a track */

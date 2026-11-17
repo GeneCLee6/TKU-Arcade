@@ -296,7 +296,7 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       <MapCorner>
         {trial && <RaceClock ref={clock} t={t} trial={trial} />}
-        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
+        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} walls={track.walls} />
       </MapCorner>
       {view.phase === 'loading' && (
         <Center role="status" data-testid="kart-waiting">

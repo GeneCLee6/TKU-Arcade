@@ -168,8 +168,8 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
   const road = list(json.road, 'road', MAX_ROAD_POINTS, problems, (item, at) => {
     if (!numbers(item, ['x', 'z', 'width'], at, problems)) return null
     const point = item as unknown as RoadPoint
-    if (point.width < 4 || point.width > 60) {
-      problems.push(`${at}: width from 4 to 60 m`)
+    if (point.width < 4 || point.width > 90) {
+      problems.push(`${at}: width from 4 to 90 m`)
       return null
     }
     return { x: point.x, z: point.z, width: point.width }
