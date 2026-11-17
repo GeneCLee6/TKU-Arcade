@@ -412,7 +412,7 @@ src/kart/
 - **其他車**（`src/kart/race/remotes.ts`）：100 ms 插值、每台車自己學時鐘差、最多外推 200 ms、重置直接跳。`netRace.ts` 管對時、送出、名次（完賽的依伺服器時間，其他依 gate 進度）與「連線不穩」。
 - **大廳**：卡丁車從「即將推出」變成正式卡片（建立房間＋「單人試跑」連到 `/kart`，`GameMeta.tryAlone`）；房主在等待室選賽道與圈數。單人計時賽 `/kart` 不變。
 - **測試**：`tests/kart/net.test.ts`、`tests/kart/race.test.ts`（裁定、格子、碰撞）、`tests/games/kart.test.ts`（harness 隨機局、流程、從 frame 裁定到完賽、退賽）、`tests/worker/room-realtime.test.ts`（轉送、對時、`goAt`、整場到結果）、`e2e/kart-race.spec.ts`（兩個瀏覽器 context、`?autopilot`、河畔一圈到結果）。
-- **沒做（下一步）**：道具（L4）、觀戰與重播的 state 串流（L5）、多裝置與 6 人實測（`e9-t04` 的跨網路數字、`e9-t11`）、選車與角色（N3）。
+- **後來補上的**：道具（L4，§4.15）、投射型道具與觀戰重播（L5）、選車與角色（N3）。**壓測**（`e9-t11` 的數據部分）：`npm run kart:loadtest`（`scripts/kart-loadtest.ts`、`scripts/kart/loadtest-bot.ts`、純邏輯的統計與報表 `scripts/kart/loadtest-report.ts`）在一個 Node 程序裡開 N 個機器人，用真的 WebSocket 協定開房、入座、選車、對時、跑物理＋`autopilot` 送 frame、拿箱用道具，跑完由房主 `dissolve`；數字在 `KART-NETCODE.md` §8。**還沒做**：兩台不同裝置／兩種網路（`e9-t04`）、真人 6 人實測（`e9-t11` 的手感部分）。
 
 ### 4.15 L4：道具賽與直接型道具（`e9-t05` `e9-t06a`，2026-11-16）
 
