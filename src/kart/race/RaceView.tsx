@@ -8,6 +8,7 @@ import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import type { JsonValue } from '../../../shared/patch.ts'
 import '../../games/kart/messages.ts'
 import { Standings } from '../../games/kart/Standings.tsx'
+import { Button } from '../../components/Button.tsx'
 import { registerMessages } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
@@ -105,6 +106,8 @@ export interface RaceViewProps {
   realtime: RoomRealtime
   act: (action: JsonValue) => void
   nameOf: (seat: number) => string
+  /** After the finish: watch the others instead (e9-t10) */
+  onWatch?: () => void
 }
 
 /**
@@ -114,7 +117,7 @@ export interface RaceViewProps {
  * unstable connection are shown on top. At the finish it shows this kart's place and waits for the
  * others; the room's result panel takes over when the server says the race is over.
  */
-export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps) {
+export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceViewProps) {
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
   const [failure, setFailure] = useState(() => !supportsWebGL2())
@@ -314,6 +317,16 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
           <FinishTitle>{t('games.kart.race.finishedPlace', { place: place || 1 })}</FinishTitle>
           <Standings view={view} order={order} nameOf={nameOf} />
           <Muted>{t('games.kart.race.waitingOthers')}</Muted>
+          {onWatch && (
+            <Button
+              $variant="secondary"
+              $size="sm"
+              onClick={onWatch}
+              data-testid="kart-watch-others"
+            >
+              {t('games.kart.watch.others')}
+            </Button>
+          )}
         </Finish>
       )}
       <Bottom>

@@ -1,0 +1,387 @@
+// e9-t10: the whole race again, after it (AC-9.5). The replay is what this browser recorded while
+// the race ran (shared/kart/replay.ts): every kart ten times a second, the items used and held, and
+// the results. Play, pause, speed, jump about the timeline, follow any kart, from behind or above.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import styled from 'styled-components'
+import { ITEM_TUNING } from '../../../shared/kart/items.ts'
+import {
+  advancePlayhead,
+  heldAt,
+  lapsAt,
+  msToTicks,
+  openReplay,
+  sampleAt,
+  seekPlayhead,
+  shieldsAt,
+  stepSpeed,
+  TICKS_PER_SECOND,
+  togglePlayhead,
+  type Playhead,
+  type Replay,
+  type ReplayReel,
+} from '../../../shared/kart/replay.ts'
+import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
+import type { Track } from '../../../shared/kart/track.ts'
+import {
+  cycleSeat,
+  SEEK_SECONDS,
+  watchOrder,
+  type WatchCommand,
+} from '../../../shared/kart/watch.ts'
+import { Button } from '../../components/Button.tsx'
+import { raceTime } from '../../games/kart/raceTime.ts'
+import '../../games/kart/messages.ts'
+import { useT } from '../../i18n/useT.ts'
+import { monoType } from '../../styles/esports.ts'
+import { color, fontSize, space } from '../../styles/tokens.ts'
+import { KART_BODIES } from '../bodies.ts'
+import { Minimap, type MinimapHandle } from '../Minimap.tsx'
+import { loadQuality } from '../quality.ts'
+import { supportsWebGL2 } from '../Scene.ts'
+import { startWatchLoop, type WatchedKart } from './watchLoop.ts'
+import {
+  Fallback,
+  MapCorner,
+  NameTag,
+  Note,
+  Row,
+  TagLayer,
+  TopLeft,
+  WatchControls,
+  WatchedPanel,
+  WatchPage,
+  WatchStage,
+} from './WatchParts.tsx'
+import { placeTags, TAG_HEIGHT, useWatchKeys } from './watchDom.ts'
+
+/** How often the controls and the panel catch up with the playhead */
+const UI_MS = 100
+/** An item used shows this long after its moment, ticks */
+const NOTE_TICKS = 2 * TICKS_PER_SECOND
+const SHIELD_TICKS = msToTicks(ITEM_TUNING.shieldMs)
+
+export interface ReplayViewProps {
+  replay: Replay
+  nameOf: (seat: number) => string
+  /** Who is watching: the first kart followed, if it raced */
+  you: number | null
+  onClose: () => void
+}
+
+const bodyOf = (index: number) => KART_BODIES[index] ?? KART_BODIES[0]!
+
+/** Every kart at `tick` */
+function kartsAt(reel: ReplayReel, tick: number): WatchedKart[] {
+  const karts: WatchedKart[] = []
+  for (const [seat, samples] of reel.samples) {
+    const one = sampleAt(samples, tick)
+    if (!one) continue
+    karts.push({
+      id: seat,
+      x: one.x,
+      z: one.z,
+      heading: one.heading,
+      vx: one.vx,
+      vz: one.vz,
+      skidding: one.skidding,
+      body: bodyOf(one.body),
+      look: {
+        speed: one.vx * Math.sin(one.heading) - one.vz * Math.cos(one.heading),
+        steer: one.steer,
+        drift: one.driftDirection,
+        boosting: one.boosting,
+      },
+    })
+  }
+  return karts
+}
+
+/** The places at `tick`: a finish counts from its moment on */
+function orderAt(track: Track, reel: ReplayReel, tick: number): number[] {
+  return watchOrder(
+    track,
+    reel.replay.racers.map((racer) => ({
+      seat: racer.seat,
+      finishMs:
+        racer.finishMs !== null && msToTicks(racer.finishMs) <= tick ? racer.finishMs : null,
+      out: racer.out && tick >= (reel.samples.get(racer.seat)?.at(-1)?.tick ?? 0),
+    })),
+    (seat) => {
+      const samples = reel.samples.get(seat)
+      return samples ? sampleAt(samples, tick) : null
+    },
+  )
+}
+
+export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewProps) {
+  const t = useT()
+  const stage = useRef<HTMLDivElement>(null)
+  const tagLayer = useRef<HTMLDivElement>(null)
+  const minimap = useRef<MinimapHandle>(null)
+  const [failure, setFailure] = useState(() => !supportsWebGL2())
+  const reel = useMemo(() => openReplay(replay), [replay])
+  const track = useMemo(() => raceTrack(replay.track), [replay.track])
+  const [shown, setShown] = useState<Playhead>(() => ({
+    tick: reel.start,
+    playing: true,
+    speed: 1,
+  }))
+  const head = useRef<Playhead>(shown)
+  const seats = useMemo(() => [...reel.samples.keys()], [reel])
+  const [follow, setFollow] = useState<number | null>(() =>
+    you !== null && reel.samples.has(you) ? you : (seats[0] ?? null),
+  )
+  const [overhead, setOverhead] = useState(false)
+  const followRef = useRef(follow)
+  const overheadRef = useRef(overhead)
+  useLayoutEffect(() => {
+    followRef.current = follow
+    overheadRef.current = overhead
+  })
+  const order = useMemo(
+    () => (track ? orderAt(track, reel, shown.tick) : seats),
+    [track, reel, shown.tick, seats],
+  )
+
+  const move = (next: Playhead) => {
+    head.current = next
+    setShown(next)
+  }
+  const command = (which: WatchCommand) => {
+    const now = head.current
+    switch (which) {
+      case 'view':
+        setOverhead((on) => !on)
+        return
+      case 'next':
+      case 'previous':
+        setFollow((seat) => cycleSeat(order, seat, which === 'next' ? 1 : -1))
+        return
+      case 'pause':
+        return move(togglePlayhead(now, reel))
+      case 'back':
+      case 'forward': {
+        const jump = SEEK_SECONDS * TICKS_PER_SECOND * (which === 'back' ? -1 : 1)
+        return move(seekPlayhead(now, now.tick + jump, reel))
+      }
+      case 'slower':
+      case 'faster':
+        return move({ ...now, speed: stepSpeed(now.speed, which === 'faster' ? 1 : -1) })
+    }
+  }
+  const commandRef = useRef(command)
+  useLayoutEffect(() => {
+    commandRef.current = command
+  })
+  useWatchKeys(command)
+
+  useEffect(() => {
+    if (!stage.current || !track || failure) return
+    let stop: (() => void) | undefined
+    try {
+      stop = startWatchLoop(stage.current, {
+        track,
+        quality: loadQuality(),
+        frame(seconds) {
+          head.current = advancePlayhead(head.current, seconds, reel)
+          const tick = head.current.tick
+          const karts = kartsAt(reel, tick)
+          const props =
+            reel.replay.mode === 'items'
+              ? {
+                  boxes: [],
+                  shields: shieldsAt(reel.replay.events, tick, SHIELD_TICKS)
+                    .map((seat) => karts.find((kart) => kart.id === seat))
+                    .filter((kart) => kart !== undefined),
+                }
+              : null
+          return { karts, follow: followRef.current, overhead: overheadRef.current, props }
+        },
+        drawn(scene, frame) {
+          const others = frame.karts.filter((kart) => kart.id !== frame.follow)
+          const points = scene.project(others.map((kart) => [kart.x, TAG_HEIGHT, kart.z] as const))
+          placeTags(
+            tagLayer.current,
+            others.map((kart, i) => ({ seat: kart.id, at: points[i] ?? null })),
+          )
+          const followed = frame.karts.find((kart) => kart.id === frame.follow)
+          const samples = frame.follow === null ? undefined : reel.samples.get(frame.follow)
+          if (followed && samples) {
+            const gate = sampleAt(samples, head.current.tick)?.nextGate ?? 0
+            minimap.current?.place(followed.x, followed.z, followed.heading, gate)
+          }
+        },
+        onCommand: (which) => commandRef.current(which),
+        onContextLost: () => setFailure(true),
+      })
+    } catch {
+      queueMicrotask(() => setFailure(true))
+    }
+    return () => stop?.()
+  }, [track, reel, failure])
+
+  // The controls follow the playhead a few times a second, not every frame
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setShown((last) =>
+        last.tick === head.current.tick && last.playing === head.current.playing
+          ? last
+          : head.current,
+      )
+    }, UI_MS)
+    return () => clearInterval(timer)
+  }, [])
+
+  if (failure || !track) {
+    return (
+      <Fallback>
+        <p role="alert">{t('games.kart.race.noWebgl')}</p>
+        <Button $variant="secondary" $size="sm" onClick={onClose}>
+          {t('games.kart.watch.close')}
+        </Button>
+      </Fallback>
+    )
+  }
+
+  const tick = shown.tick
+  const racer = replay.racers.find((one) => one.seat === follow)
+  const finished = racer?.finishMs != null && msToTicks(racer.finishMs) <= tick
+  const lapsDone = racer ? lapsAt(racer, tick) : 0
+  const detail = !racer
+    ? ''
+    : finished
+      ? t('games.kart.race.finished')
+      : t('games.kart.race.lap', {
+          lap: Math.min(lapsDone + 1, replay.laps),
+          laps: replay.laps,
+        })
+  const name = follow === null ? null : nameOf(follow)
+  const recent = replay.events.filter(
+    (event) => event.tick <= tick && tick - event.tick < NOTE_TICKS,
+  )
+  const ms = (ticks: number) => (Math.max(0, ticks) * 1000) / TICKS_PER_SECOND
+
+  return (
+    <WatchPage data-testid="kart-replay">
+      <WatchStage
+        ref={stage}
+        role="img"
+        aria-label={t('games.kart.watch.canvas', { name: name ?? '' })}
+      />
+      <TagLayer ref={tagLayer} aria-hidden="true">
+        {seats.map((seat) => (
+          <NameTag key={seat} data-tag={seat} style={{ display: 'none' }}>
+            {nameOf(seat)}
+          </NameTag>
+        ))}
+      </TagLayer>
+      <TopLeft>
+        <Title>{t('games.kart.replay.title')}</Title>
+        <WatchedPanel
+          t={t}
+          name={name}
+          place={follow === null ? 0 : order.indexOf(follow) + 1}
+          total={replay.racers.length}
+          detail={detail}
+          item={
+            replay.mode === 'items' && follow !== null
+              ? heldAt(replay.held, follow, tick)
+              : undefined
+          }
+        />
+        {reel.start > 0 && <Note>{t('games.kart.replay.partial')}</Note>}
+        {recent.map((event) => (
+          <Note key={`${event.tick}-${event.by}-${event.item}`}>
+            {t('games.kart.replay.used', {
+              name: nameOf(event.by),
+              item: t(`games.kart.item.${event.item}`),
+            })}
+          </Note>
+        ))}
+      </TopLeft>
+      <MapCorner>
+        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
+      </MapCorner>
+      <WatchControls
+        t={t}
+        overhead={overhead}
+        onCommand={command}
+        onClose={onClose}
+        keys={`${t('games.kart.watch.keys')} · ${t('games.kart.replay.keys')}`}
+      >
+        <Timeline>
+          <Time>{raceTime(ms(tick))}</Time>
+          <input
+            type="range"
+            min={reel.start}
+            max={reel.end}
+            step={1}
+            value={Math.round(tick)}
+            aria-label={t('games.kart.replay.timeline')}
+            aria-valuetext={raceTime(ms(tick))}
+            data-testid="kart-replay-timeline"
+            onChange={(event) => move(seekPlayhead(head.current, Number(event.target.value), reel))}
+          />
+          <Time>{raceTime(ms(reel.end))}</Time>
+        </Timeline>
+        <Row>
+          <Button $variant="secondary" $size="sm" onClick={() => command('back')}>
+            {t('games.kart.replay.back')}
+          </Button>
+          <Button
+            $size="sm"
+            onClick={() => command('pause')}
+            data-testid="kart-replay-play"
+            data-playing={shown.playing}
+          >
+            {shown.playing ? t('games.kart.replay.pause') : t('games.kart.replay.play')}
+          </Button>
+          <Button $variant="secondary" $size="sm" onClick={() => command('forward')}>
+            {t('games.kart.replay.forward')}
+          </Button>
+          <Button $variant="ghost" $size="sm" onClick={() => command('slower')}>
+            {t('games.kart.replay.slower')}
+          </Button>
+          <Speed data-testid="kart-replay-speed">
+            {t('games.kart.replay.speed', { speed: shown.speed })}
+          </Speed>
+          <Button $variant="ghost" $size="sm" onClick={() => command('faster')}>
+            {t('games.kart.replay.faster')}
+          </Button>
+        </Row>
+      </WatchControls>
+    </WatchPage>
+  )
+}
+
+const Title = styled.h2`
+  margin: 0;
+  color: ${color.text};
+  font-size: ${fontSize.lg}px;
+`
+
+const Timeline = styled.div`
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: ${space.sm}px;
+  align-items: center;
+  width: 100%;
+
+  input {
+    width: 100%;
+    accent-color: ${color.accent};
+  }
+`
+
+const Time = styled.span`
+  ${monoType}
+  color: ${color.text};
+  font-size: ${fontSize.sm}px;
+`
+
+const Speed = styled.span`
+  ${monoType}
+  min-width: 4ch;
+  color: ${color.text};
+  text-align: center;
+`
