@@ -48,6 +48,7 @@ import {
 } from '../../../shared/kart/karts.ts'
 import type { KartBody } from '../bodies.ts'
 import type { OtherKart, ScreenPoint } from '../Scene.ts'
+import { skidStrength } from '../feelFx.ts'
 import {
   confirmsForeseen,
   createHitFeed,
@@ -436,6 +437,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       debug.others = poses.filter((pose) => !pose.stale).length
       return poses.map((pose): OtherKart => {
         const { kart, driver } = loadoutOfByte(pose.frame.body)
+        const forward = pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading)
+        const side = pose.vx * Math.cos(pose.heading) + pose.vz * Math.sin(pose.heading)
         return {
           id: pose.seat,
           x: pose.x,
@@ -446,10 +449,16 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           body: kart,
           driver,
           look: {
-            speed: pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading),
+            speed: forward,
             steer: pose.frame.steer,
             drift: pose.frame.driftDirection,
             boosting: pose.frame.boosting,
+            // How hard its tyres slide (2026-11-17, feelFx.ts): its skid marks and smoke
+            skid: skidStrength(
+              Math.atan2(side, forward),
+              Math.hypot(pose.vx, pose.vz),
+              pose.frame.drifting || pose.frame.skidding,
+            ),
           },
         }
       })

@@ -68,6 +68,9 @@ export const kartScene = {
   hitStar: '#FFE98A',
   hitFlash: '#FFFFFF',
   popShard: '#C9F6FF',
+  // The arrow boards along the outside of a corner (2026-11-17): the board and its arrows
+  sign: '#FFD21F',
+  signEdge: '#16171A',
   flame: '#FFB020',
   flameCore: '#FFF3C4',
   lightSky: '#FFFFFF',

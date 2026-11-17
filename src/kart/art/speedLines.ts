@@ -31,9 +31,9 @@ const WIDTH_MORE = 0.03
 /** In a boost the streaks rush by at least this fast, m/s, even from a standstill */
 const BOOST_RUSH = 60
 
-/** How strong the streaks are, 0 to 1: from just under flat out, or with any boost */
+/** How strong the streaks are, 0 to 1: over the plain top speed (downhill, after a boost), or with any boost */
 export const speedLineStrength = (pace: number, boost: number): number =>
-  Math.max(0, Math.min(1, Math.max((pace - 0.92) / 0.5, boost * 0.85)))
+  Math.max(0, Math.min(1, Math.max((pace - 1.02) / 0.4, boost * 0.85)))
 
 export interface SpeedLines {
   /**

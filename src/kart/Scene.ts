@@ -20,7 +20,7 @@ import type { Track } from '../../shared/kart/track.ts'
 import { groundAt, heightGuess, pitchOf, terrainOf } from '../../shared/kart/terrain.ts'
 import { buildTrackArt, themeOf, type TrackArt } from './art/trackArt.ts'
 import { QUALITY, type Quality } from './quality.ts'
-import { createKartEffects } from './art/effects.ts'
+import { createKartEffects, type KartEffects } from './art/effects.ts'
 import { createSpeedLines } from './art/speedLines.ts'
 import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
 import type { DriverId } from '../../shared/kart/karts.ts'
@@ -244,6 +244,8 @@ export function createKartScene(
   let ghostKart: KartModel | null = null
   // The other racers' karts, by id, made when each first appears
   const otherKarts = new Map<number, KartModel>()
+  // What each of them leaves behind (2026-11-17): skid marks, smoke, sparks and boost flames
+  const otherEffects = new Map<number, KartEffects>()
   let itemArt: ItemArt | null = null
   let hitArt: HitArt | null = null
   let spins: ReadonlyMap<number, SpinPose> = new Map()
@@ -444,6 +446,8 @@ export function createKartScene(
         let model = otherKarts.get(other.id)
         if (model && (model.body !== other.body || model.driver !== other.driver)) {
           scene.remove(model.group)
+          otherEffects.get(other.id)?.dispose()
+          otherEffects.delete(other.id)
           model.dispose()
           model = undefined
         }
@@ -451,19 +455,25 @@ export function createKartScene(
           model = buildKartModel(false, false, other.body, other.driver)
           otherKarts.set(other.id, model)
           scene.add(model.group)
+          otherEffects.set(other.id, createKartEffects(scene, model, true))
         }
         model.group.position.set(other.x, 0, other.z)
-        spinModel(
-          model.group,
-          other.heading,
-          spins.get(other.id),
-          liftOf(other, Math.abs(other.look.speed)),
-        )
+        const lift = liftOf(other, Math.abs(other.look.speed))
+        spinModel(model.group, other.heading, spins.get(other.id), lift)
         model.update(other.look, frameSeconds)
+        otherEffects
+          .get(other.id)
+          ?.update(
+            { x: other.x, z: other.z, heading: other.heading, ...(terrain ? { y: lift.y } : {}) },
+            other.airborne === true ? { ...other.look, airborne: true } : other.look,
+            frameSeconds,
+          )
       }
       for (const [id, model] of otherKarts) {
         if (seen.has(id)) continue
         scene.remove(model.group)
+        otherEffects.get(id)?.dispose()
+        otherEffects.delete(id)
         model.dispose()
         otherKarts.delete(id)
       }
@@ -502,6 +512,7 @@ export function createKartScene(
       speedLines.dispose()
       kart.dispose()
       ghostKart?.dispose()
+      for (const fx of otherEffects.values()) fx.dispose()
       for (const model of otherKarts.values()) model.dispose()
       itemArt?.dispose()
       hitArt?.dispose()
