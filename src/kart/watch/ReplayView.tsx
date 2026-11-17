@@ -1,6 +1,7 @@
 // e9-t10: the whole race again, after it (AC-9.5). The replay is what this browser recorded while
 // the race ran (shared/kart/replay.ts): every kart ten times a second, the items used and held, and
 // the results. Play, pause, speed, jump about the timeline, follow any kart, from behind or above.
+import { loadoutOfByte } from '../../../shared/kart/karts.ts'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { ITEM_TUNING } from '../../../shared/kart/items.ts'
@@ -35,7 +36,6 @@ import '../../games/kart/messages.ts'
 import { useT } from '../../i18n/useT.ts'
 import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import { KART_BODIES } from '../bodies.ts'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { supportsWebGL2 } from '../Scene.ts'
@@ -55,6 +55,12 @@ import {
 } from './WatchParts.tsx'
 import { placeTags, TAG_HEIGHT, useWatchKeys } from './watchDom.ts'
 
+/** The kart and driver a frame's body byte names (e10-t05) */
+function kartOfByte(byte: number) {
+  const { kart, driver } = loadoutOfByte(byte)
+  return { body: kart, driver }
+}
+
 /** How often the controls and the panel catch up with the playhead */
 const UI_MS = 100
 /** An item used shows this long after its moment, ticks */
@@ -68,8 +74,6 @@ export interface ReplayViewProps {
   you: number | null
   onClose: () => void
 }
-
-const bodyOf = (index: number) => KART_BODIES[index] ?? KART_BODIES[0]!
 
 /** Every kart at `tick` */
 function kartsAt(reel: ReplayReel, tick: number): WatchedKart[] {
@@ -85,7 +89,8 @@ function kartsAt(reel: ReplayReel, tick: number): WatchedKart[] {
       vx: one.vx,
       vz: one.vz,
       skidding: one.skidding,
-      body: bodyOf(one.body),
+      // e10-t05: the frame's body byte names the kart and its driver
+      ...kartOfByte(one.body),
       look: {
         speed: one.vx * Math.sin(one.heading) - one.vz * Math.cos(one.heading),
         steer: one.steer,

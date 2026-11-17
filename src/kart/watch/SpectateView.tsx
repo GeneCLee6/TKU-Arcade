@@ -2,6 +2,7 @@
 // or never sat down) and for a racer who has finished or dropped out. Every joined socket already
 // gets every kart's frames (docs/KART-NETCODE.md §2): they are drawn as a racer draws the others
 // (remotes.ts, 100 ms behind), and the camera follows the kart chosen, from behind or from above.
+import { loadoutOfByte } from '../../../shared/kart/karts.ts'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KartView } from '../../../shared/games/kart/types.ts'
 import { itemBoxes } from '../../../shared/kart/items.ts'
@@ -12,7 +13,6 @@ import { cycleSeat, watchOrder, type WatchCommand } from '../../../shared/kart/w
 import '../../games/kart/messages.ts'
 import { useT } from '../../i18n/useT.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
-import { KART_BODIES } from '../bodies.ts'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { createRemotes } from '../race/remotes.ts'
@@ -33,6 +33,12 @@ import {
 import { placeTags, TAG_HEIGHT, useWatchKeys } from './watchDom.ts'
 import { Button } from '../../components/Button.tsx'
 
+/** The kart and driver a frame's body byte names (e10-t05) */
+function kartOfByte(byte: number) {
+  const { kart, driver } = loadoutOfByte(byte)
+  return { body: kart, driver }
+}
+
 /** How often the places are worked out again */
 const POLL_MS = 250
 
@@ -42,8 +48,6 @@ export interface SpectateViewProps {
   nameOf: (seat: number) => string
   onClose: () => void
 }
-
-const bodyOf = (index: number) => KART_BODIES[index] ?? KART_BODIES[0]!
 
 export default function SpectateView({ view, realtime, nameOf, onClose }: SpectateViewProps) {
   const t = useT()
@@ -104,7 +108,8 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
             vx: pose.vx,
             vz: pose.vz,
             skidding: pose.frame.skidding,
-            body: bodyOf(pose.frame.body),
+            // e10-t05: the frame's body byte names the kart and its driver
+            ...kartOfByte(pose.frame.body),
             look: {
               speed: pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading),
               steer: pose.frame.steer,

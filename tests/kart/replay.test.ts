@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { loadoutByte, loadoutOfByte } from '../../shared/kart/karts.ts'
 import type { KartFrame } from '../../shared/kart/net.ts'
 import {
   advancePlayhead,
@@ -138,6 +139,18 @@ const samples = (ticks: number[]): ReplaySample[] => {
   for (const tick of ticks) tape.add(frame(tick))
   return decodeTape(tape.bytes())
 }
+
+describe('the kart and driver in a replay (e10-t05)', () => {
+  it('keeps the body byte whole, so the replay draws the kart and driver that raced', () => {
+    const byte = loadoutByte('flyfish', 'club')
+    const tape = createKartTape()
+    for (let tick = 0; tick <= 60; tick += 3) tape.add(frame(tick, { body: byte }))
+    const samples = decodeTape(tape.bytes())
+    expect(samples.length).toBeGreaterThan(2)
+    for (const one of samples)
+      expect(loadoutOfByte(one.body)).toEqual({ kart: 'flyfish', driver: 'club' })
+  })
+})
 
 describe('reading a replay at any moment', () => {
   it('finds the sample at or before a tick', () => {

@@ -453,6 +453,18 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **數字**：卡丁車 chunk 230.4 → **234.3 kB** gzip（預算 600 kB）；主站與各遊戲首屏不變（房間選項只多一個 id 與兩個名稱字串）。
 - **沒做**：跳台與高低差（物理是平面）；人甩尾實測與多人道具賽實測；攤位與燈籠的動畫（只有招牌亮度微微閃、河水流動）；夜景在實體手機上的亮度。
 
+### 4.18 N3：車款 6、角色 4、選車畫面（`e10-t05a` `e10-t05b`，2026-11-17）
+
+名稱與數值表在 [`KART-WORLD.md`](KART-WORLD.md)（草稿，名稱待拍板）。
+
+- **`shared/kart/karts.ts`**（瀏覽器與 Worker 共用）：`KART_IDS`（6）、`DRIVER_IDS`（4）、每台車的級別與五項點數（−2～+2）。`applyKart(tuning, id)` 把點數換成物理參數的倍率（極速 `topSpeed`、加速 `acceleration`、操控 `turnRate`／`driftTurnRate`／`driftSteerRate`、集氣 `gaugeFillRate`），疊在標準調校或調參面板的數字上；`kartMass` 給車撞車用。`tide` 全 0＝原本的手感。
+- **套用**：`/kart` 與比賽畫面把 `applyKart` 後的 tuning 交給 `spikeLoop`（物理本身沒改）；`bumpKart` 多一個自己的質量與對方的 `mass`，輕的分到比較多的推力（相等時和原本一樣各一半）。
+- **線上**：frame 第 2 個 byte＝車 index（低 4 bit）＋角色 index（高 4 bit）（`loadoutByte`／`loadoutOfByte`；舊的 0–2 讀成同一台車、第一個角色）。別人的車照這個 byte 畫。伺服器 `judgeFrame` 多一個 `speedCap`，房間用 frame 那台車的 `speedCapFor`（該車極速 × 疊噴倍率 × 1.5）；`SPEED_CAP` 改成最快那台車的上限。
+- **等待室同步**：協定的 `set_look`（`RoomMember.look`，格式 `^[a-z0-9-]{1,16}(\.[a-z0-9-]{1,16})?$`，房間不懂內容；卡丁車放 `kart.driver`），存在成員紀錄裡，任何狀態都能改。等待室在卡丁車房 lazy 載 `src/kart/roster/RoomGarage.tsx`：進來就把瀏覽器存的選擇送出去，列出每個座位的選擇。比賽本身不讀 `look`，讀瀏覽器存的選擇（兩者同一份）。
+- **模型**：`src/kart/art/kartModel.ts` 的車身（`tide` `comet` `ray`）＋ `rosterBodies.ts`（`crab` `heron` `flyfish`）；車手抽到 `driverModel.ts`，裝在車身的 `seat`（掛點）上。顏色在 `kartTokens.ts` 的 `kartBodies`（車）與 `kartDrivers`（角色）。
+- **畫面**：`src/kart/roster/RosterPicker.tsx`（純 DOM，選車、數值條、選角色），`/kart` 用 `GaragePanel.tsx` 包成面板，等待室用 `RoomGarage.tsx`。字串在 `shared/kart/i18n.roster.ts`（併進 `KART_MESSAGES`，等待室只註冊這一份；原本三台車的名稱也搬來這裡，內容沒改）。
+- **測試**：`tests/kart/karts.test.ts`（點數加總 0、PRD 範圍、極速差 ≤ 3%、物理實測、調參範圍、byte 與 look 來回、每台車的速度上限、房間照 frame 的車裁定、重量）、`tests/kart/roster.test.tsx`（車庫與等待室）、`tests/worker/room-host.test.ts`（`set_look`）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

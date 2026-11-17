@@ -2490,6 +2490,26 @@ describe('a room password', () => {
   })
 })
 
+// e10-t05: a member's cosmetic choice (the kart room's kart and driver), for everyone to see
+describe('a member look', () => {
+  it('is shown to everyone, changed, kept with the member and taken away', () => {
+    const world = room()
+    const ann = world.join('Ann')
+    const bob = world.join('Bob')
+    expect(bob.fresh().members[ann.you]).not.toHaveProperty('look')
+    ann.send({ t: 'set_look', look: 'heron.club' })
+    expect(bob.fresh().members[ann.you]?.look).toBe('heron.club')
+    ann.send({ t: 'set_look', look: 'crab.heart' })
+    expect(bob.fresh().members[ann.you]?.look).toBe('crab.heart')
+    world.disconnect(ann)
+    const back = world.join('Ann', ann.token)
+    expect(back.fresh().members[back.you]?.look).toBe('crab.heart')
+    back.send({ t: 'set_look', look: null })
+    expect(bob.fresh().members[back.you]).not.toHaveProperty('look')
+    expect(ann.errors).toEqual([])
+  })
+})
+
 // e12-t07: the room counts what it does, nothing else
 describe('daily metrics', () => {
   it('counts a room opened, a game started and a game finished', () => {

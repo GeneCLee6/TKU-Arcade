@@ -22,6 +22,7 @@ import {
   type ItemFrame,
   type Warp,
 } from '../../kart/items.ts'
+import { loadoutOfByte } from '../../kart/karts.ts'
 import { decodeFrame } from '../../kart/net.ts'
 import {
   dropPuddle,
@@ -35,7 +36,14 @@ import {
   type Fix,
   type KartShot,
 } from '../../kart/shots.ts'
-import { judgeFrame, lapsDone, raceProgress, startTracking, type Tracked } from '../../kart/race.ts'
+import {
+  judgeFrame,
+  lapsDone,
+  raceProgress,
+  speedCapFor,
+  startTracking,
+  type Tracked,
+} from '../../kart/race.ts'
 import { courseOf, type Track } from '../../kart/track.ts'
 import { formatTime } from '../../kart/timeTrial.ts'
 import { raceTrack } from '../../kart/tracks/registry.ts'
@@ -405,6 +413,8 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         now,
         goAt: state.goAt,
         laps: racer.lapMs.length,
+        // e10-t05a: held to its own kart's top speed, which the frame names (a faster kart is not a bug)
+        speedCap: speedCapFor(loadoutOfByte(frame.body).kart),
       })
       tracked.set(seat, verdict.tracked)
       if (verdict.kind === 'refused') return { relay: null, actions: [] }

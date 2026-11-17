@@ -244,6 +244,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
             onSetGame={room.setGame}
             onSetOptions={room.setOptions}
             onSetPassword={room.setPassword}
+            onSetLook={room.setLook}
             aside={!compact && <RoomChatPanel room={parts} />}
           />
           {/* On a phone the chat is a drawer, its bar stuck to the bottom of the whole page */}

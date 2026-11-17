@@ -11,6 +11,7 @@ import {
 import { keepIfBetter, loadBestLap, loadGhost, type RecordNews } from './records.ts'
 import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
+import { DEFAULT_KART, kartMass, type DriverId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { courseOf, parseTrack, recordKey, type Track } from '../../shared/kart/track.ts'
 import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
@@ -206,7 +207,7 @@ export interface SpikeNet {
   /** After each step: the race so far, the input it ran with, and whether the kart was reset */
   afterStep(trial: Trial, input: KartInput, reset: boolean): void
   /** The other karts as drawn now, to bump into (e9-t09) */
-  bumpers(): readonly { x: number; z: number; vx: number; vz: number }[]
+  bumpers(): readonly { x: number; z: number; vx: number; vz: number; mass?: number }[]
   /** Each frame: the other karts to draw */
   others(): readonly OtherKart[]
   /** After each frame is drawn: to put the name tags where the karts are */
@@ -243,8 +244,13 @@ export interface SpikeOptions {
   readonly course?: SpikeCourse
   /** e8-t06: how much to draw */
   readonly quality?: Quality
-  /** Which hover kart to draw (2026-11-14): cosmetic, every body drives the same */
+  /**
+   * Which hover kart to draw (2026-11-14). Its numbers (e10-t05a, karts.ts) are already in the
+   * tuning `controls` gives; here it is the look, and the kart's weight in a bump
+   */
   readonly body?: KartBody
+  /** e10-t05b: who sits in it, looks only */
+  readonly driver?: DriverId
   /** Every frame, where the car is: the minimap moves its marker with it, outside React */
   readonly onPose?: (x: number, z: number, heading: number, nextGate: number) => void
   /** On a track: the time trial's state, when it changes */
@@ -326,6 +332,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     track ?? undefined,
     options.quality,
     options.body,
+    options.driver,
   )
   const audio = createKartAudio()
   const held = new Set<string>()
@@ -413,7 +420,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         run = trial.run
         if (net && trial.phase !== 'countdown') {
           // e9-t09: pushed out of the other karts, as this browser draws them
-          const bumped = bumpKart(run.kart, net.bumpers())
+          const bumped = bumpKart(run.kart, net.bumpers(), kartMass(options.body ?? DEFAULT_KART))
           if (bumped.kart !== run.kart) {
             run = { ...run, kart: bumped.kart }
             trial = { ...trial, run }

@@ -21,6 +21,7 @@ import { QUALITY, type Quality } from './quality.ts'
 import { createKartEffects } from './art/effects.ts'
 import { createSpeedLines } from './art/speedLines.ts'
 import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
+import type { DriverId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { createItemArt, type ItemArt, type ItemBoxLook, type ShotLook } from './art/itemArt.ts'
 
@@ -51,6 +52,8 @@ export interface Pose {
 export interface OtherKart extends Pose {
   readonly id: number
   readonly body: KartBody
+  /** e10-t05b: who sits in it */
+  readonly driver: DriverId
   readonly look: KartLook
 }
 
@@ -109,6 +112,7 @@ export function createKartScene(
   track?: Track,
   quality: Quality = 'high',
   body: KartBody = 'tide',
+  driver: DriverId = 'spade',
 ): KartScene {
   const settings = QUALITY[quality]
   const renderer = new WebGLRenderer({
@@ -185,7 +189,7 @@ export function createKartScene(
   }
 
   // The hover kart and its driver (e8-t07, 2026-11-14), with its sparks, trails and boost flames
-  const kart = buildKartModel(shadows, false, body)
+  const kart = buildKartModel(shadows, false, body, driver)
   const car = kart.group
   scene.add(car)
   const effects = createKartEffects(scene, kart)
@@ -310,7 +314,7 @@ export function createKartScene(
         if (ghostKart) ghostKart.group.visible = false
         return
       }
-      ghostKart ??= buildKartModel(false, true, body)
+      ghostKart ??= buildKartModel(false, true, body, driver)
       if (!ghostKart.group.parent) scene.add(ghostKart.group)
       ghostKart.group.visible = true
       ghostKart.group.position.set(pose.x, 0, pose.z)
@@ -321,13 +325,13 @@ export function createKartScene(
       for (const other of karts) {
         seen.add(other.id)
         let model = otherKarts.get(other.id)
-        if (model && model.body !== other.body) {
+        if (model && (model.body !== other.body || model.driver !== other.driver)) {
           scene.remove(model.group)
           model.dispose()
           model = undefined
         }
         if (!model) {
-          model = buildKartModel(false, false, other.body)
+          model = buildKartModel(false, false, other.body, other.driver)
           otherKarts.set(other.id, model)
           scene.add(model.group)
         }
