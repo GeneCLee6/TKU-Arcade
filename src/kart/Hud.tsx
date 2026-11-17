@@ -104,6 +104,7 @@ const CALLOUT_KEYS = {
   broken: 'kart.callout.broken',
   boost: 'kart.callout.boost',
   start: 'kart.callout.start',
+  quick: 'kart.callout.quick',
   stall: 'kart.callout.stall',
 } as const satisfies Record<Exclude<Callout['kind'], 'chain'>, KartMessageKey>
 
@@ -321,6 +322,7 @@ const calloutFill: Record<Callout['kind'], string> = {
   boost: color.accent,
   chain: color.magenta,
   start: color.success,
+  quick: color.accent,
   stall: color.danger,
   double: color.magenta,
   catch: color.success,

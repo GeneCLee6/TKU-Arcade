@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { KART_TUNING, kartSpeed, STEP_SECONDS, type KartInput } from '../../shared/kart/physics.ts'
+import {
+  ARCADE_TUNING as KART_TUNING,
+  kartSpeed,
+  STEP_SECONDS,
+  type KartInput,
+} from '../../shared/kart/physics.ts'
 import {
   COUNTDOWN_SECONDS,
   bestLap,
@@ -11,7 +16,7 @@ import {
   seconds,
   startFrom,
   startTrial,
-  stepTrial,
+  stepTrial as stepTrialWith,
   type Trial,
   type TrialCourse,
 } from '../../shared/kart/timeTrial.ts'
@@ -20,6 +25,11 @@ import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
 import { alongRoad, sharpCorners } from './trackShape.ts'
+
+// Pinned to the arcade feel (the "arcade (old)" preset, before 2026-11-17): these tests lock what it
+// always did. The classic feel, the default since, has its own (tests/kart/classic.test.ts)
+const stepTrial = (...[a, b, c, tuning = KART_TUNING, ...rest]: Parameters<typeof stepTrialWith>) =>
+  stepTrialWith(a, b, c, tuning, ...rest)
 
 // e8-t05a, e8-t10 (AC-8.4): the first track and the time trial on it
 

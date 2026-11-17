@@ -39,6 +39,8 @@ const GRID_CELL = 5
 const CAMERA_BACK = 7.5
 const CAMERA_UP = 3.4
 const CAMERA_LOOK_AHEAD = 3
+/** How much further back the camera sits at full pace, metres (it was 1.2 before 2026-11-17) */
+const CAMERA_PULL = 0.4
 /** How fast the camera's height follows the kart's on a hill track, per second: it lags a jump a little */
 const CAMERA_RISE = 7
 /** Watching from above (e9-t10): this high, this far behind the kart */
@@ -328,8 +330,8 @@ export function createKartScene(
       }
       const motion = !(reducedMotion?.matches ?? false)
       speedLines.update(rig.pace, rig.pace * REFERENCE_SPEED, frameSeconds, !motion)
-      // A little further back at speed, so the road rushes up from under the camera
-      const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * 1.2 : 0)
+      // Only a touch further back at speed (2026-11-17: less than before, so the road rushes by)
+      const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * CAMERA_PULL : 0)
       const sin = Math.sin(rig.heading)
       const cos = Math.cos(rig.heading)
       camera.position.set(x - sin * back, CAMERA_UP + cameraY, z + cos * back)
@@ -365,7 +367,7 @@ export function createKartScene(
         camera.position.set(x - sin * OVERHEAD_BACK, OVERHEAD_UP + cameraY, z + cos * OVERHEAD_BACK)
         camera.lookAt(x + sin * CAMERA_LOOK_AHEAD * 4, cameraY, z - cos * CAMERA_LOOK_AHEAD * 4)
       } else {
-        const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * 1.2 : 0)
+        const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * CAMERA_PULL : 0)
         camera.position.set(x - sin * back, CAMERA_UP + cameraY, z + cos * back)
         camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6 + cameraY, z - cos * CAMERA_LOOK_AHEAD)
       }

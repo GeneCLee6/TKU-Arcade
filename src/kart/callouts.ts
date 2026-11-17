@@ -20,6 +20,7 @@ export type CalloutKind =
   | 'stack'
   | 'broken'
   | 'start'
+  | 'quick'
   | 'stall'
 
 export interface Callout {
@@ -55,7 +56,9 @@ export function calloutBetween(before: KartState, after: KartState): Callout | u
 
 /** How the car left the grid, worth a callout at GO; undefined for a plain start */
 export const calloutAtStart = (start: TrialStart): Callout | undefined =>
-  start === 'none' ? undefined : { kind: start === 'boost' ? 'start' : 'stall', count: 0 }
+  start === 'none'
+    ? undefined
+    : { kind: start === 'boost' ? 'start' : start === 'quick' ? 'quick' : 'stall', count: 0 }
 
 const RANK: Record<CalloutKind, number> = {
   drift: 0,
@@ -70,6 +73,7 @@ const RANK: Record<CalloutKind, number> = {
   stack: 6,
   broken: 6,
   start: 7,
+  quick: 7,
   stall: 7,
 }
 

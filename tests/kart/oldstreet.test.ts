@@ -95,7 +95,7 @@ describe('the old street (N2 item track)', () => {
     expect(track.id).toBe('oldstreet')
     expect(RACE_TRACK_IDS).toContain('oldstreet')
     expect(raceTrack('oldstreet')?.road).toEqual(track.road)
-    expect(recordKey(track)).toBe('oldstreet')
+    expect(recordKey(track)).toBe('oldstreet@2')
     // The line is on the promenade, driven northwards (-z); the grid is behind it
     expect(track.road[0]!.x).toBeCloseTo(0)
     for (const place of track.grid) {

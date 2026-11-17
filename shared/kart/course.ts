@@ -11,6 +11,7 @@ import {
   DEFAULT_RULES,
   INITIAL_KART,
   KART_TUNING,
+  MODEL_CLASSIC,
   stepKart,
   STEP_SECONDS,
   type KartInput,
@@ -59,7 +60,28 @@ export function onPad(pad: BoostPad, x: number, z: number): boolean {
 /** After the walls: a hard hit breaks the chain, and a boost pad boosts */
 function afterWalls(kart: KartState, hitSpeed: number, course: Course, tuning: KartTuning) {
   let next = kart
-  if (hitSpeed >= tuning.wallBreakSpeed) {
+  if (hitSpeed >= tuning.wallBreakSpeed && tuning.model === MODEL_CLASSIC) {
+    // The classic feel (2026-11-17): a hard crash also ends the drift and its dash, and keeps only
+    // `wallGaugeKeep` of the gauge; the drift key must come up before the next drift
+    next = {
+      ...next,
+      chain: 0,
+      chainWindow: 0,
+      releaseWindow: 0,
+      burstReady: false,
+      stackSeconds: 0,
+      doubleWindow: 0,
+      doubleArmed: false,
+      drifting: false,
+      driftDirection: 0,
+      driftSeconds: 0,
+      slideDirection: 0,
+      traction: 1,
+      driftPeak: 0,
+      driftLatch: next.driftKey ?? false,
+      gauge: next.gauge * tuning.wallGaugeKeep,
+    }
+  } else if (hitSpeed >= tuning.wallBreakSpeed) {
     next = {
       ...next,
       chain: 0,

@@ -4,7 +4,7 @@
 // other. Pure: the Worker and the browser run the same code (docs/KART-NETCODE.md).
 import { passGates, type Spot } from './course.ts'
 import { applyKart, KART_IDS, type KartId } from './karts.ts'
-import { KART_TUNING, type KartState } from './physics.ts'
+import { ARCADE_TUNING, KART_TUNING, type KartState } from './physics.ts'
 import { courseOf, type Track } from './track.ts'
 import { KART_RADIUS } from './walls.ts'
 import type { KartFrame } from './net.ts'
@@ -84,8 +84,17 @@ export function raceProgress(
  * (karts.ts), so that a faster kart or a faster tuning moves it too (e10-t05a)
  */
 export function speedCapFor(kart: KartId): number {
-  const tuning = applyKart(KART_TUNING, kart)
-  return tuning.topSpeed * Math.max(tuning.boostTopSpeedFactor, tuning.boostStackFactor) * 1.5
+  // Either feel (2026-11-17): the classic is the default, and the arcade (old) preset can still be
+  // chosen on the tuning panel, which a race room drives with
+  return Math.max(
+    ...[KART_TUNING, ARCADE_TUNING].map((base) => {
+      const tuning = applyKart(base, kart)
+      const dash =
+        tuning.miniTopSpeedFactor + tuning.chainSpeedStep * Math.max(0, tuning.chainSpeedLinks)
+      const most = Math.max(tuning.boostTopSpeedFactor, tuning.boostStackFactor, dash)
+      return tuning.topSpeed * most * 1.5
+    }),
+  )
 }
 /** The cap for the fastest kart: what a frame is held to when its kart is not known */
 export const SPEED_CAP = Math.max(...KART_IDS.map(speedCapFor))

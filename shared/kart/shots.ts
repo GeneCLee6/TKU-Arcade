@@ -12,7 +12,6 @@
 // A hit stuns the kart (itemEffects.ts's `stunStep`). A bubble up stops the hit, and both are gone.
 //
 // Pure and shared: the browser and the Worker read the same shots.
-import { KART_TUNING } from './physics.ts'
 import { KART_RADIUS, type Wall } from './walls.ts'
 
 /** A seat in the room (shared/games/types.ts's SeatId) */
@@ -26,7 +25,9 @@ export const isShotItem = (value: unknown): value is ShotItem =>
 
 export const SHOT_TUNING = {
   /** Hail: speed on top of the thrower's own forward speed, m/s, and how far it flies at most, m */
-  hailSpeed: KART_TUNING.topSpeed * 1.4,
+  // 1.4 times the arcade feel's top speed of 60 m/s: kept when the classic feel raised the top speed
+  // (2026-11-17), since it adds to the thrower's own speed anyway
+  hailSpeed: 60 * 1.4,
   hailRange: 220,
   /** Hail: it leaves this far ahead of the thrower's centre, m */
   hailLead: 2.6,

@@ -115,8 +115,9 @@ export interface TouchMoment {
   /** Past GO (or no countdown at all): the automatic throttle may run */
   readonly racing: boolean
   /**
-   * A release boost waits for a fresh press of the throttle: the drift was let go long enough ago
-   * and the slide-out not yet caught (`burstReady`), or caught and its window open
+   * A release boost waits for a fresh press of the throttle (physics.ts's kartBurstWaiting): in the
+   * arcade feel from the drift let go until the window shuts; in the classic feel only once the car
+   * has straightened, since while it slides counter-steering with the throttle held fires it
    */
   readonly burstWaiting: boolean
 }
@@ -149,6 +150,8 @@ export function touchInput(
   return {
     ...NO_INPUT,
     throttle,
+    // A tap of GAS shorter than a step is still a fresh press (the classic feel's instant boost)
+    ...(tapped.has('throttle') ? { throttleTap: true } : {}),
     brake,
     steer,
     drift,
@@ -166,6 +169,7 @@ export function mergeInputs(a: KartInput, b: KartInput): KartInput {
     steer: clamp(a.steer + b.steer, -1, 1),
     drift: a.drift || b.drift,
     boost: a.boost || b.boost,
+    ...(a.throttleTap || b.throttleTap ? { throttleTap: true } : {}),
     reset: (a.reset ?? false) || (b.reset ?? false),
     item: (a.item ?? false) || (b.item ?? false),
   }

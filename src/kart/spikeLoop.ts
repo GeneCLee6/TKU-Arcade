@@ -52,6 +52,7 @@ import {
 import { mergeInputs } from '../../shared/kart/touch.ts'
 import {
   kartBoosting,
+  kartBurstWaiting,
   kartSkidding,
   kartSlip,
   kartSpeed,
@@ -80,16 +81,17 @@ import type { TouchSource } from './touch/touchSource.ts'
 const STATS_EVERY_MS = 500
 
 /**
- * How much faster the speedometer reads than the real speed (2026-11-14, owner: kart racers' dials
- * read 300 to 400). The world stays in true metres, so the tracks keep sensible sizes; only the dial
- * is scaled, the way arcade racers scale theirs.
+ * How much faster the speedometer reads than the real speed. 2026-11-14 (owner: kart racers' dials
+ * read 300 to 400) it was 1.45; 2026-11-17 (owner: "the speed is odd"; docs/KART-FEEL.md) the dial is
+ * honest again and the classic feel's top speed went up instead, so the number and what the eye sees
+ * agree.
  */
-export const SPEEDOMETER_SCALE = 1.45
+export const SPEEDOMETER_SCALE = 1
 
 /**
- * The HUD's speed: metres per second times 3.6 (the real conversion) times SPEEDOMETER_SCALE. The
- * standard top speed of 60 m/s reads 313 km/h, a release boost 376 (up to 413 in a chain), a boost
- * 454 and a stacked boost 501.
+ * The HUD's speed: metres per second times 3.6, the real conversion. The classic feel's top speed of
+ * 68 m/s reads 245 km/h, an instant boost up to about 262, a boost about 310 and a boost fired again
+ * about 320.
  */
 export const KMH_PER_MPS = 3.6 * SPEEDOMETER_SCALE
 
@@ -416,6 +418,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let boostTapped = false
   let resetTapped = false
   let itemTapped = false
+  let throttleTapped = false
   let run = startRun(course)
   const debug: SpikeDebug = {
     running: true,
@@ -475,6 +478,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       boostTapped = false
       resetTapped = false
       itemTapped = false
+      throttleTapped = false
     }
     const clock = advanceClock(accumulator, frameMs / 1000)
     accumulator = clock.accumulator
@@ -483,23 +487,32 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       const pilot = net?.autopilot ?? options.autopilot
       const driven = pilot && trial ? pilot(trial) : null
       const keyed = enabled
-        ? readInput(bindings, { held, pad: pad?.snapshot, boostTapped, resetTapped, itemTapped })
+        ? readInput(bindings, {
+            held,
+            pad: pad?.snapshot,
+            boostTapped,
+            resetTapped,
+            itemTapped,
+            throttleTapped,
+          })
         : NO_INPUT
       // Read even when the autopilot drives, so that a tap is used up and not kept for later
       const touched =
         enabled && touch
           ? touch.read({
               racing: !trial || trial.phase !== 'countdown',
-              burstWaiting: run.kart.burstReady || run.kart.releaseWindow > 0,
+              burstWaiting: kartBurstWaiting(run.kart, tuning),
             })
           : null
       const input = driven ?? (touched ? mergeInputs(keyed, touched) : keyed)
       boostTapped = false
       resetTapped = false
       itemTapped = false
+      throttleTapped = false
       const before = run
       if (trial && trialCourse && track) {
         const was = trial.phase
+        const startBefore = trial.start
         if (net && was === 'countdown') {
           // Counted down to the room's GO, not this browser's: held on the grid until it is set
           const left = net.countdown()
@@ -525,6 +538,10 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
               trial = { ...trial, run }
             }
           }
+        }
+        // The classic feel's start boost may come just after GO (`startLate`)
+        if (was === 'racing' && trial.start !== startBefore) {
+          callout = louder(callout, calloutAtStart(trial.start))
         }
         if (was === 'countdown' && trial.phase === 'racing') {
           callout = louder(callout, calloutAtStart(trial.start))
@@ -715,6 +732,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     if (actionKeys(bindings, 'boost').includes(event.code)) boostTapped = true
     if (actionKeys(bindings, 'reset').includes(event.code)) resetTapped = true
     if (actionKeys(bindings, 'item').includes(event.code)) itemTapped = true
+    if (actionKeys(bindings, 'throttle').includes(event.code)) throttleTapped = true
   }
   const onKeyUp = (event: KeyboardEvent) => {
     held.delete(event.code)

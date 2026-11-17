@@ -100,7 +100,7 @@ describe('callouts', () => {
       kind: 'double',
       count: 0,
     })
-    expect(en('kart.callout.double')).toBe('Double release!')
+    expect(en('kart.callout.double')).toBe('Double!')
     expect(zh('kart.callout.double')).toBe('雙收尾！')
   })
 
@@ -163,7 +163,10 @@ describe('the chase camera', () => {
 
   it('widens the view with speed too, fully at the top speed', () => {
     expect(fieldOfView(60, { heading: 0, boost: 0, pace: 1 }, false)).toBe(60 + SPEED_FOV_KICK)
-    expect(fieldOfView(60, { heading: 0, boost: 0, pace: 0.65 }, false)).toBeCloseTo(65, 9)
+    // 60° to 75° (2026-11-17, the classic feel)
+    expect(fieldOfView(60, { heading: 0, boost: 0, pace: 0.65 }, false)).toBeCloseTo(67.5, 9)
+    expect(SPEED_FOV_KICK).toBe(15)
+    expect(BOOST_FOV_KICK).toBe(8)
     expect(fieldOfView(60, { heading: 0, boost: 1, pace: 1.4 }, true)).toBe(60)
     // The pace follows the speed
     let rig = startRig(0)

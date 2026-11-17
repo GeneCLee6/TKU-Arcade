@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { KART_TUNING } from '../../shared/kart/physics.ts'
+import {
+  ARCADE_TUNING,
+  KART_TUNING,
+  MODEL_ARCADE,
+  MODEL_CLASSIC,
+} from '../../shared/kart/physics.ts'
 import {
   MAX_TUNING_TEXT,
   parseStoredTuning,
   parseTuning,
   PRESET_IDS,
   presetOf,
+  shownKeys,
   PRESETS,
   serializeTuning,
   shownValue,
@@ -36,14 +42,31 @@ describe('the tuning specs', () => {
     expect(storedValue('boostTopSpeedFactor', 1.3)).toBe(1.3)
     expect(storedValue('chainGrace', 0.30000000000000004)).toBe(0.3)
     expect(storedValue('driftMaxSlip', 40)).toBeCloseTo((40 * Math.PI) / 180, 12)
-    expect(shownValue('driftMaxSlip', KART_TUNING.driftMaxSlip)).toBeCloseTo(58, 9)
+    expect(shownValue('driftMaxSlip', KART_TUNING.driftMaxSlip)).toBeCloseTo(50, 9)
+    expect(shownValue('driftMaxSlip', ARCADE_TUNING.driftMaxSlip)).toBeCloseTo(58, 9)
   })
 })
 
 describe('the presets', () => {
-  it('are three, with standard being the physics defaults', () => {
-    expect(PRESET_IDS).toEqual(['standard', 'planted', 'loose'])
+  it('are four, with standard being the physics defaults (the classic feel), and the arcade (old)', () => {
+    expect(PRESET_IDS).toEqual(['standard', 'planted', 'loose', 'arcade'])
     expect(PRESETS.standard).toBe(KART_TUNING)
+    expect(PRESETS.arcade).toBe(ARCADE_TUNING)
+    for (const id of ['standard', 'planted', 'loose'] as const) {
+      expect(PRESETS[id].model).toBe(MODEL_CLASSIC)
+    }
+    expect(ARCADE_TUNING.model).toBe(MODEL_ARCADE)
+  })
+
+  it('show on the panel only the numbers their own physics reads', () => {
+    const classic = shownKeys(KART_TUNING)
+    const arcade = shownKeys(ARCADE_TUNING)
+    expect(classic).toContain('dashMinSlip')
+    expect(classic).not.toContain('driftAlign')
+    expect(arcade).toContain('driftAlign')
+    expect(arcade).not.toContain('dashMinSlip')
+    expect(classic).not.toContain('model')
+    expect(arcade).not.toContain('model')
   })
 
   for (const id of PRESET_IDS) {
@@ -60,8 +83,10 @@ describe('the presets', () => {
     const standard = steadySlips(PRESETS.standard)
     const planted = steadySlips(PRESETS.planted)
     const loose = steadySlips(PRESETS.loose)
-    // The measured angles, rounded (2026-11-14, the drift as a real slide; they were 33°, 23°, 13°)
-    expect(standard).toEqual({ into: 50, centred: 38, out: 21 })
+    // The measured angles, rounded (2026-11-14, the drift as a real slide; they were 33°, 23°, 13°;
+    // then the classic feel, 2026-11-17, whose drift swings to the angle it is told)
+    expect(standard).toEqual({ into: 42, centred: 30, out: 18 })
+    expect(steadySlips(PRESETS.arcade)).toEqual({ into: 50, centred: 38, out: 21 })
     expect(planted.into).toBeLessThan(standard.into)
     expect(planted.centred).toBeLessThan(standard.centred)
     expect(loose.into).toBeGreaterThan(standard.into)
@@ -81,7 +106,8 @@ describe('parseTuning', () => {
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
     expect(parsed.tuning).toEqual({ ...KART_TUNING, grip: 12, topSpeed: 33 })
-    expect(parsed.missing).toHaveLength(TUNING_KEYS.length - 2)
+    // Missing: the numbers the panel shows for this feel, less the two given
+    expect(parsed.missing).toHaveLength(shownKeys(KART_TUNING).length - 2)
     expect(parsed.missing).not.toContain('grip')
   })
 
@@ -110,7 +136,7 @@ describe('parseTuning', () => {
     ['an array', '[1, 2, 3]'],
     ['an object with no tuning numbers', '{"hello": "world"}'],
     ['another kind of export', '{"kind": "tku-arcade.kart.bindings", "tuning": {"grip": 12}}'],
-    ['a newer version', '{"kind": "tku-arcade.kart.tuning", "version": 2, "tuning": {"grip": 12}}'],
+    ['a newer version', '{"kind": "tku-arcade.kart.tuning", "version": 3, "tuning": {"grip": 12}}'],
     ['a wrapper with no tuning object', '{"kind": "tku-arcade.kart.tuning", "tuning": [1]}'],
   ])('rejects JSON that is %s', (_, text) => {
     expect(parseTuning(text)).toEqual({ ok: false, error: { reason: 'notTuning' } })
@@ -126,6 +152,15 @@ describe('parseTuning', () => {
     ['a slip cap of 80°', `{"driftMaxSlip": ${(80 * Math.PI) / 180}}`, 'driftMaxSlip'],
   ])('rejects the whole preset when one number is %s', (_, text, key) => {
     expect(parseTuning(text)).toEqual({ ok: false, error: { reason: 'badValue', key } })
+  })
+
+  it('reads an export from before the classic feel (version 1) as the arcade feel', () => {
+    const old = JSON.stringify({ kind: 'tku-arcade.kart.tuning', version: 1, tuning: { grip: 12 } })
+    const parsed = parseTuning(old)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.tuning).toEqual({ ...ARCADE_TUNING, grip: 12 })
+    expect(parsed.tuning.model).toBe(MODEL_ARCADE)
   })
 
   it('takes nothing from a preset with one bad number among good ones', () => {

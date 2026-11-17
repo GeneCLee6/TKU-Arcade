@@ -3,7 +3,13 @@
 // boost, a counter-steer and a release boost after every drift, the double after that, and chains
 // tapped drifts and release boosts down the straights. Not a racing AI: a fixed recipe on the middle of the road,
 // enough to show what the techniques are worth on a lap.
-import { KART_TUNING, NO_INPUT, type KartInput, type KartState } from '../../shared/kart/physics.ts'
+// The arcade feel's drivers (the "arcade (old)" preset): their timing is that physics'
+import {
+  ARCADE_TUNING as KART_TUNING,
+  NO_INPUT,
+  type KartInput,
+  type KartState,
+} from '../../shared/kart/physics.ts'
 import type { Trial } from '../../shared/kart/timeTrial.ts'
 
 type Road = readonly { x: number; z: number }[]

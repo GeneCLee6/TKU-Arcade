@@ -207,6 +207,10 @@ function stepAir(
     traction: Math.min(1, state.traction + dt / Math.max(dt, tuning.driftRecovery)),
     boostHeld: input.boost,
     throttleHeld: input.throttle,
+    // The classic feel's start boost runs down in the air too; the arcade feel never has one
+    ...(state.launchSeconds === undefined
+      ? {}
+      : { launchSeconds: Math.max(0, state.launchSeconds - dt) }),
   }
 }
 

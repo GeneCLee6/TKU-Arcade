@@ -24,6 +24,8 @@
 // Units are metres, seconds and radians. Seen from above, heading 0 faces -z and heading grows
 // clockwise, so a positive steer turns right.
 
+import { stepClassic } from './classic.ts'
+
 /** The simulation's one fixed step: 60 Hz, whatever the display does */
 export const STEP_SECONDS = 1 / 60
 
@@ -36,6 +38,12 @@ export interface KartInput {
   /** -1 is full left, 1 is full right; a stick gives anything in between */
   readonly steer: number
   readonly drift: boolean
+  /**
+   * The classic feel (2026-11-17, docs/KART-FEEL.md): the throttle was pressed since the last step,
+   * even if it was let go and pressed again in between, so that a quick re-press is still a fresh
+   * press. The arcade feel ignores it
+   */
+  readonly throttleTap?: boolean
   /** Fires a stored boost when it goes from up to down (held down, it fires only once) */
   readonly boost: boolean
   /**
@@ -122,6 +130,17 @@ export interface KartState {
   readonly y?: number
   readonly vy?: number
   readonly air?: number
+  /**
+   * The classic feel only (2026-11-17, classic.ts; docs/KART-FEEL.md): the steering as the wheels
+   * have it (it follows the stick quickly, not at once), the deepest slip angle of this drift, the
+   * drift key as it was at the last step, whether the drift key must be let go before it drifts
+   * again, and the seconds of start boost left. The arcade feel never sets them
+   */
+  readonly steerNow?: number
+  readonly driftPeak?: number
+  readonly driftKey?: boolean
+  readonly driftLatch?: boolean
+  readonly launchSeconds?: number
 }
 
 export const INITIAL_KART: KartState = {
@@ -166,15 +185,16 @@ export const NO_INPUT: KartInput = {
 }
 
 /**
- * Every number the physics reads, in one object, so that the tuning panel (e8-t03) can edit them and
+ * The arcade feel's numbers (everything before 2026-11-17), kept as the "arcade (old)" preset: every
+ * number the physics read, in one object, so that the tuning panel (e8-t03) can edit them and
  * save presets. Starting values, not a signed-off feel (AC-8.3, AC-8.8). Speeds are m/s, rates per
  * second, angles radians. All of them in a table: docs/PRD/e8-kart-single-player-core.md, in the
  * section on what J2 settled.
  */
-export const KART_TUNING = {
+const ARCADE_NUMBERS = {
   /**
-   * Straight-line top speed (2026-11-14, owner "too slow": 30 to 40, to 50, then 56 m/s). The HUD
-   * reads it through SPEEDOMETER_SCALE: 302 km/h. 0 to top takes topSpeed / acceleration = 2.15 s
+   * Straight-line top speed (2026-11-14, owner "too slow": 30 to 40, to 50, then 60 m/s): 216 km/h
+   * on the honest dial since 2026-11-17. 0 to top takes topSpeed / acceleration = 2.15 s
    */
   topSpeed: 60,
   reverseSpeed: 10,
@@ -323,7 +343,150 @@ export const KART_TUNING = {
   wallBreakSpeed: 4,
 }
 
+/** Which physics a tuning drives: `model` is one of these */
+export const MODEL_ARCADE = 0
+export const MODEL_CLASSIC = 1
+
+const DEG = Math.PI / 180
+
+/**
+ * The classic feel (2026-11-17, owner: "the feel is wrong ... still far from the classic kart racers'
+ * design and feel, and the speed is odd"; docs/KART-FEEL.md). The default. Speeds are true: the
+ * speedometer reads m/s times 3.6, so the top speed of 68 m/s reads 245 km/h and a boost about 310.
+ * The engine pushes against drag (a = acceleration × (1 − dragShare·u − (1 − dragShare)·u²), u the
+ * speed over the top speed), so it pulls hard from a standstill and eases into the top speed instead
+ * of hitting a wall. The drift is a slip angle the car swings to in `driftSlipIn` and lets go of at
+ * `driftRecoverRate` (twice as fast counter-steering); a drift at least `dashMinSlip` deep earns an
+ * instant boost (the dash), fired by counter-steer with the throttle while the car still slides, or by
+ * a fresh press of the throttle up to `releaseWindow` after it straightens. classic.ts has the step.
+ */
+export const KART_TUNING = {
+  ...ARCADE_NUMBERS,
+  // Speed: true m/s, an engine against drag
+  topSpeed: 68,
+  acceleration: 34,
+  braking: 56,
+  coastDrag: 4,
+  reverseSpeed: 10,
+  /** The share of the drag that grows with the speed; the rest grows with its square */
+  dragShare: 0.3,
+  /** Off the throttle, this share of the drag still slows the car (plus coastDrag) */
+  coastDragShare: 0.25,
+
+  // Steering with grip
+  turnRate: 2.5,
+  turnLossAtTopSpeed: 0.5,
+  fullTurnSpeed: 8,
+  grip: 10,
+  /** How fast the wheels follow the stick, per second: a key's full lock takes 1/7 s, not one step */
+  steerResponse: 7,
+  /**
+   * Turning hard on grip scrubs speed off: this much a second at full lock and the top speed (less
+   * with the square of the speed). A drift through the same corner loses less
+   */
+  gripScrub: 14,
+
+  // The drift
+  driftMinSpeed: 12,
+  driftExitSpeed: 7,
+  /** How fast the direction of travel comes round in a drift, stick centred, at driftFullSpeed or more */
+  driftTurnRate: 1.75,
+  /** Steering into the drift turns it this share faster; steering out, this share slower */
+  driftSteerShare: 0.4,
+  /** Below this speed a drift turns proportionally less, so the car does not spin on the spot */
+  driftFullSpeed: 20,
+  /** The slip angle a drift swings to, stick centred ... */
+  driftSlip: 30 * DEG,
+  /** ... plus this much steering into it, minus this much steering out (42 and 18 degrees) */
+  driftSlipSteer: 12 * DEG,
+  /** How long the swing to that angle takes (90% of it) */
+  driftSlipIn: 0.22,
+  driftMaxSlip: 50 * DEG,
+  /** Sliding scrubs this much a second at the top speed, fully sideways (by the sine of the slip) */
+  driftScrub: 18,
+  /** Let go, the slip straightens at this many radians a second (75°/s); counter-steering, twice */
+  driftRecoverRate: 1.3,
+  /** The drift's turn still carried while sliding out, as a share, the less the straighter */
+  slideCarry: 0.45,
+  /** The share of the engine's pull in a drift, and while sliding out of one */
+  driftPull: 1,
+  slidePull: 0.85,
+
+  // The boost gauge and the boost (N2O)
+  /** Gauge points a second drifting at the top speed (in proportion to the speed) ... */
+  gaugeFillRate: 60,
+  /** ... at the start of a drift; after this many seconds of the same drift, half that, and so on */
+  gaugeFade: 1,
+  maxStoredBoosts: 2,
+  boostDuration: 2.9,
+  /** A boost multiplies the engine's pull by this ... */
+  boostAccelFactor: 1.5,
+  /** ... and lets the car go this much over the top speed */
+  boostTopSpeedFactor: 1.28,
+  overSpeedDrag: 9,
+  /**
+   * A boost fired while one runs starts it over (it does not add up) and, for boostStackSeconds,
+   * pushes this much harder (m/s²) with the top speed at boostStackFactor
+   */
+  stackPush: 12,
+  boostStackSeconds: 0.4,
+  boostStackFactor: 1.32,
+  padBoostSeconds: 1.2,
+
+  // The start boost (timeTrial.ts)
+  /** The throttle pressed this long before GO, or less, and held: the full start boost */
+  startWindow: 0.5,
+  /** Its length, multiplying the engine's pull by startAccelFactor */
+  startBoostDuration: 1.5,
+  startAccelFactor: 1.7,
+  /** Held from earlier than the window: this share of the start boost, and no stall */
+  startEarlyShare: 0.5,
+  /** Pressed afresh within this long after GO still counts as on time */
+  startLate: 0.1,
+
+  // The dash (the instant boost out of a drift) and its chain
+  /** The deepest slip angle a drift must reach to earn a dash */
+  dashMinSlip: 20 * DEG,
+  /** After the car straightens, a fresh press of the throttle within this long fires a waiting dash */
+  releaseWindow: 0.5,
+  /** How long a dash lasts ... */
+  chainDuration: 0.5,
+  /** ... multiplying the engine's pull by this ... */
+  dashAccelFactor: 1.4,
+  /** ... with the top speed this much higher */
+  miniTopSpeedFactor: 1.07,
+  /** Dashes in a row within this long of each other chain ... */
+  chainGrace: 1,
+  /** ... each link after the first adding this to the dash's top speed factor ... */
+  chainSpeedStep: 0.01,
+  /** ... and this to its pull ... */
+  chainAccelStep: 0.05,
+  /** ... for up to this many links */
+  chainSpeedLinks: 3,
+  /** After a dash, a drift begun within this long earns the next however short (the double) */
+  doubleWindow: 0.5,
+  /** The cut: a fresh drift press while counter-steering a slide straightens it in this long */
+  cutSeconds: 0.1,
+
+  // Walls
+  wallBounce: 0.15,
+  wallImpactLoss: 0.55,
+  wallScrapeDrag: 8,
+  wallBreakSpeed: 8,
+  /** A hit at least wallBreakSpeed hard keeps this share of the gauge */
+  wallGaugeKeep: 0.5,
+
+  /** MODEL_CLASSIC */
+  model: MODEL_CLASSIC as number,
+}
+
 export type KartTuning = { readonly [K in keyof typeof KART_TUNING]: number }
+
+/** The arcade feel (before 2026-11-17), the "arcade (old)" preset: bit for bit what it always drove */
+export const ARCADE_TUNING: KartTuning = { ...KART_TUNING, ...ARCADE_NUMBERS, model: MODEL_ARCADE }
+
+/** Whether these numbers drive the classic feel */
+export const isClassic = (tuning: KartTuning): boolean => tuning.model === MODEL_CLASSIC
 
 /** The rule options a room will choose (the spike page has switches for them) */
 export interface KartRules {
@@ -440,6 +603,8 @@ export function stepKart(
    */
   limitScale = 1,
 ): KartState {
+  // The classic feel (2026-11-17) is a step of its own; what follows is the arcade feel, unchanged
+  if (tuning.model === MODEL_CLASSIC) return stepClassic(state, input, tuning, rules, limitScale)
   const dt = STEP_SECONDS
   const steer = clamp(input.steer, -1, 1)
 
@@ -702,7 +867,18 @@ export const kartSkidding = (state: KartState): boolean => state.drifting || sta
 
 /** Whether any boost (from the gauge, the start or a release) is running */
 export const kartBoosting = (state: KartState): boolean =>
-  state.boostSeconds > 0 || state.miniSeconds > 0
+  state.boostSeconds > 0 || state.miniSeconds > 0 || (state.launchSeconds ?? 0) > 0
+
+/**
+ * Whether a release boost (the arcade feel) or a dash (the classic feel) waits for a fresh press of
+ * the throttle, so that the touch screen's automatic throttle lets go for the tap. In the classic
+ * feel only once the car has straightened: while it still slides, counter-steering with the throttle
+ * held fires the dash, so the automatic throttle stays on
+ */
+export const kartBurstWaiting = (state: KartState, tuning: KartTuning): boolean =>
+  tuning.model === MODEL_CLASSIC
+    ? state.releaseWindow > 0 && !state.drifting && state.slideDirection === 0
+    : state.burstReady || state.releaseWindow > 0
 
 export const kartSpeed = (state: KartState): number => Math.hypot(state.vx, state.vz)
 

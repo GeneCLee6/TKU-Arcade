@@ -5,7 +5,7 @@ import { formatTime } from '../../shared/kart/timeTrial.ts'
 import { Button } from '../components/Button.tsx'
 import type { MessageParams } from '../i18n/t.ts'
 import { displayType, glass, monoType } from '../styles/esports.ts'
-import { color, fontSize, space } from '../styles/tokens.ts'
+import { color, fontSize, radius, space } from '../styles/tokens.ts'
 import type { SpikeTrial } from './spikeLoop.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
@@ -97,9 +97,13 @@ export function RaceCenter({
 }) {
   if (trial.phase === 'countdown') {
     return (
-      <Big key={`countdown-${trial.countdown}`} role="status" data-testid="kart-countdown">
-        {trial.countdown > 0 ? String(trial.countdown) : t('kart.race.go')}
-      </Big>
+      <>
+        <Big key={`countdown-${trial.countdown}`} role="status" data-testid="kart-countdown">
+          {trial.countdown > 0 ? String(trial.countdown) : t('kart.race.go')}
+        </Big>
+        {/* 2026-11-17 (the classic feel): how to launch */}
+        <StartHint data-testid="kart-start-hint">{t('kart.race.startHint')}</StartHint>
+      </>
     )
   }
   if (trial.phase === 'finished' && trial.total !== null) {
@@ -208,6 +212,22 @@ const Big = styled.p`
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }
+`
+
+const StartHint = styled.p`
+  position: absolute;
+  top: calc(30% + 120px);
+  left: 50%;
+  margin: 0;
+  padding: ${space.xs}px ${space.md}px;
+  translate: -50% 0;
+  max-width: calc(100% - ${space.lg * 2}px);
+  color: ${color.text};
+  background: ${color.surface};
+  border-radius: ${radius.component}px;
+  font-size: ${fontSize.md}px;
+  text-align: center;
+  pointer-events: none;
 `
 
 const Warning = styled.p`

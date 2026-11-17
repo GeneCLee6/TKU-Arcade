@@ -109,9 +109,9 @@ describe('the wide tracks', () => {
   })
 
   it('keeps the new layouts’ records apart from the old ones', () => {
-    expect(recordKey(load(RIVERSIDE))).toBe('riverside@6')
-    expect(recordKey(load(HARBOUR))).toBe('harbour@6')
-    expect(recordKey(load(TAMKANG))).toBe('tamkang@5')
+    expect(recordKey(load(RIVERSIDE))).toBe('riverside@7')
+    expect(recordKey(load(HARBOUR))).toBe('harbour@7')
+    expect(recordKey(load(TAMKANG))).toBe('tamkang@6')
   })
 })
 

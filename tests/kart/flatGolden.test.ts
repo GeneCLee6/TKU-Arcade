@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { TEST_ARENA } from '../../shared/kart/arena.ts'
 import { startRun, stepRun, type Run } from '../../shared/kart/course.ts'
-import { KART_TUNING, NO_INPUT, type KartInput, type KartState } from '../../shared/kart/physics.ts'
+import {
+  ARCADE_TUNING,
+  KART_TUNING,
+  NO_INPUT,
+  type KartInput,
+  type KartState,
+  type KartTuning,
+} from '../../shared/kart/physics.ts'
 import { startTrial, stepTrial, type Trial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
 import { courseOf } from '../../shared/kart/track.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
@@ -12,6 +19,10 @@ import { BOT_SKILLS } from '../../src/kart/bots/skill.ts'
 // hashes below were taken on main at 7f53e13, BEFORE the terrain came in: the same inputs on the four
 // flat tracks (and the test yard) must give the very same trajectory, bit for bit, every step. If one
 // of them changes, the physics of the flat tracks changed and every record and ghost with it.
+//
+// Then the classic feel (2026-11-17, docs/KART-FEEL.md) became the default: the hashes taken at
+// 7f53e13 now lock the "arcade (old)" preset (ARCADE_TUNING), which must still drive exactly as it
+// always did, and a second set locks the classic feel as it was signed in.
 
 /** FNV-1a over the bytes of every number that matters in each step's state */
 function hasher() {
@@ -54,16 +65,16 @@ function hasher() {
 }
 
 /** The hard bot, three laps (or 200 s), every step hashed */
-function trackHash(id: string, seed: number): { hash: string; steps: number } {
+function trackHash(id: string, seed: number, tuning: KartTuning): { hash: string; steps: number } {
   const track = raceTrack(id)!
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
-  const brain = createBotBrain(BOT_SKILLS.hard, track.road, KART_TUNING, seed)
+  const brain = createBotBrain(BOT_SKILLS.hard, track.road, tuning, seed)
   const hash = hasher()
   let trial: Trial = startTrial(course)
   let steps = 0
   for (; trial.phase !== 'finished' && steps < 200 * 60; steps++) {
-    trial = stepTrial(trial, brain(trial, { speedShare: 1 }), course, KART_TUNING)
+    trial = stepTrial(trial, brain(trial, { speedShare: 1 }), course, tuning)
     hash.kart(trial.run.kart, trial.run)
   }
   hash.keys(trial.run.kart)
@@ -71,7 +82,7 @@ function trackHash(id: string, seed: number): { hash: string; steps: number } {
 }
 
 /** The test yard, a fixed script of inputs: drives, drifts, hits walls, boosts, resets */
-function arenaHash(): string {
+function arenaHash(tuning: KartTuning): string {
   const hash = hasher()
   let run = startRun(TEST_ARENA)
   for (let step = 0; step < 60 * 40; step++) {
@@ -85,25 +96,37 @@ function arenaHash(): string {
       boost: step % 97 === 0,
       reset: step % 900 === 899,
     }
-    run = stepRun(run, input, TEST_ARENA)
+    run = stepRun(run, input, TEST_ARENA, tuning)
     hash.kart(run.kart, run)
   }
   hash.keys(run.kart)
   return hash.value
 }
 
-describe('the flat tracks are unchanged by the terrain', () => {
-  it.each([
-    ['riverside', 1],
-    ['harbour', 2],
-    ['tamkang', 3],
-    ['oldstreet', 4],
-  ] as const)('%s: the hard bot drives the very same three laps', (id, seed) => {
-    expect(trackHash(id, seed)).toEqual(GOLDEN[id])
+const TRACKS = [
+  ['riverside', 1],
+  ['harbour', 2],
+  ['tamkang', 3],
+  ['oldstreet', 4],
+] as const
+
+describe('the arcade (old) preset is unchanged, on the flat tracks', () => {
+  it.each(TRACKS)('%s: the hard bot drives the very same three laps', (id, seed) => {
+    expect(trackHash(id, seed, ARCADE_TUNING)).toEqual(GOLDEN[id])
   })
 
   it('the test yard: the same scripted inputs give the same steps', () => {
-    expect(arenaHash()).toBe(GOLDEN_ARENA)
+    expect(arenaHash(ARCADE_TUNING)).toBe(GOLDEN_ARENA)
+  })
+})
+
+describe('the classic feel is locked too', () => {
+  it.each(TRACKS)('%s: the hard bot drives the very same three laps', (id, seed) => {
+    expect(trackHash(id, seed, KART_TUNING)).toEqual(CLASSIC_GOLDEN[id])
+  })
+
+  it('the test yard: the same scripted inputs give the same steps', () => {
+    expect(arenaHash(KART_TUNING)).toBe(CLASSIC_GOLDEN_ARENA)
   })
 })
 
@@ -115,3 +138,13 @@ const GOLDEN: Record<string, { hash: string; steps: number }> = {
   oldstreet: { hash: '03b2e55f', steps: 5285 },
 }
 const GOLDEN_ARENA = '72389793'
+
+// Taken when the classic feel came in (2026-11-17), by this file's own functions. When the classic
+// feel is changed on purpose, take them again (and raise the built-in tracks' revisions)
+const CLASSIC_GOLDEN: Record<string, { hash: string; steps: number }> = {
+  riverside: { hash: '34dd8091', steps: 6578 },
+  harbour: { hash: 'e5623742', steps: 6995 },
+  tamkang: { hash: '7a4075fc', steps: 7153 },
+  oldstreet: { hash: 'b910579e', steps: 6295 },
+}
+const CLASSIC_GOLDEN_ARENA = 'ddd6236c'
