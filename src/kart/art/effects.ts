@@ -32,20 +32,20 @@ import { kartHover, kartScene } from '../../styles/kartTokens.ts'
 import type { KartLook, KartModel } from './kartModel.ts'
 
 /** Dust puffs alive at once, at most */
-const PUFFS = 110
+const FULL_PUFFS = 110
 const PUFF_LIFE = 1.1
 /** Smoke puffs a second from a slide just deep enough to mark the road, and how many more at full */
 const PUFF_RATE = 16
 const PUFF_RATE_MORE = 44
 /** Sparks alive at once, at most */
-const SPARKS = 150
+const FULL_SPARKS = 150
 const SPARK_LIFE = 0.45
 /** A boost fired throws this many sparks out of the back at once ... */
 const BURST_SPARKS = 36
 /** ... and stretches the flames for this long */
 const BURST_SECONDS = 0.45
 /** Pieces of the fire a boost leaves behind the thrusters, alive at once at most ... */
-const JETS = 160
+const FULL_JETS = 160
 const JET_LIFE = 0.32
 /** ... this many a second from each thruster */
 const JET_RATE = 100
@@ -53,7 +53,7 @@ const JET_RATE = 100
 const RING_SECONDS = 0.42
 const RING_REACH = 4.6
 /** Trail pieces kept: about two seconds of a drift, both corners; the oldest are laid over again */
-const MARKS = 260
+const FULL_MARKS = 260
 const MARK_WIDTH = 0.18
 /** Just above the road and kerbs (trackArt.ts LIFT), under the kart's glow */
 const MARK_HEIGHT = 0.085
@@ -65,7 +65,7 @@ const MAX_PIECE = 8
 /** A trail fades out over this many seconds */
 const MARK_FADE = 1.6
 /** Skid mark pieces kept: about 50 s of sliding, both corners; the oldest are laid over again */
-const SKIDS = 6000
+const FULL_SKIDS = 6000
 const SKID_WIDTH = 0.5
 /** A piece of trail or skid mark is laid once the corner has moved this far, metres */
 const MIN_PIECE = 0.22
@@ -108,7 +108,16 @@ function softTexture(): CanvasTexture {
   return new CanvasTexture(canvas)
 }
 
-export function createKartEffects(world: Object3D, kart: KartModel): KartEffects {
+/**
+ * `lite` is for another racer's kart (2026-11-17): the same marks, smoke, sparks and flames from
+ * smaller pools, so that a full grid costs little; its marks stay about a fifth as long
+ */
+export function createKartEffects(world: Object3D, kart: KartModel, lite = false): KartEffects {
+  const PUFFS = lite ? 36 : FULL_PUFFS
+  const SPARKS = lite ? 50 : FULL_SPARKS
+  const MARKS = lite ? 120 : FULL_MARKS
+  const JETS = lite ? 48 : FULL_JETS
+  const SKIDS = lite ? 1200 : FULL_SKIDS
   const texture = softTexture()
   let clock = 0
 
@@ -451,17 +460,18 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
           corners[0]!.z - lastCorners[0]!.z,
         )
         if (moved >= MIN_PIECE) {
-          const dark = Math.max(skid, landing ? 0.8 : 0)
+          const dark = Math.max(skid, landing ? 0.8 : 0) * (lite ? 0.75 : 1)
           const from = lastCorners
           corners.forEach((corner, index) => {
-            if (sliding) layMark(from[index]!, corner)
+            // Another racer's kart leaves the dark marks only: eight glowing trails are a mess
+            if (sliding && !lite) layMark(from[index]!, corner)
             if (dark > 0) laySkid(from[index]!, corner, dark)
           })
           lastCorners = corners
         }
       } else lastCorners = marking ? corners : null
       // Faded every frame while a trail or a skid mark still shows, then left alone
-      if (sliding || fading) fading = fadeMarks()
+      if ((sliding && !lite) || fading) fading = fadeMarks()
       if (marking || skidsShowing) skidsShowing = fadeSkids()
 
       // Tyre smoke: thick from a deep slide, rolling away to the outside of the drift; a faint

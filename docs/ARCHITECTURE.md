@@ -663,6 +663,17 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **測試**：`tests/kart/classic.test.ts`（反打＋一直按前進＝不噴，甩尾中、滑出中、回正後都驗；反打確實比不打早回正；甩尾中往內打重踩油門不結束甩尾；一路按油門的人放開再按才噴；雙收尾也要新按；觸控滑出中自動油門鬆開、點 GAS 才噴、沒資格的滑出不鬆；完美起跑 1.5 秒領先 > 12 m、超過極速、0–100 < 0.6 秒）、`tests/kart/feelFx.test.ts`（胎痕與尖叫的觸發條件、噴射分類與力道、鏡頭 kick 的衰減與幀率無關、速度線）、`tests/kart/kartAudio.test.ts`（檔位）；e2e `kart-touch.spec.ts` 的甩尾手勢改成「反打後點 GAS」。
 - **限制**：這些都是視聽回饋的第一版，強度（鏡頭甩多遠、煙多濃、聲音大小）沒有人用實機調過；聲音是合成的，尖叫像不像輪胎見仁見智；胎痕只有自己的車有（別人的車只有發光軌跡），觀戰與重播也還沒有新的點火特效；懸浮車沒有輪子（擁有者 2026-11-14 的決定），「胎痕」是車尾兩個接地點留下的。
 
+### 4.29 路線圖外：彎道箭頭板、別人的車的特效（2026-11-17，`feat/kart-race-dressing`）
+
+接 §4.28（同一則擁有者回饋的「地圖也要盡量像跑跑」「toy project」）。`docs/KART-FEEL.md` §8，含還沒做的差距清單。
+
+- **`shared/kart/cornerSigns.ts`**（純函式）：`roadCorners(road)` 算每點的轉角（相鄰兩段的 heading 差）、五點平滑的曲率，`|k| ≥ 1/CORNER_RADIUS`（80 m）且同向的連續區段（容許 2 點的空隙）、總轉角 ≥ `CORNER_TURN`（40°）就是一個彎；從一段直路開始掃，所以環的接縫不會把彎切兩半。`cornerSigns(road, share)` 在每個彎的外側（右彎＝路的左邊：`a.x − cos(h)·turn·reach`）從入彎前 `LEAD` 14 m 到 70% 處每 `SIGN_SPACING` 10 m 一塊，離路緣 `SIGN_OFFSET` 1.8 m，最多 9 塊；`roadClearance` < 1.08 m（旁邊是另一段路）不立；`share` < 0.75（畫質低）隔一塊。只看 `road`，所以編輯器做的賽道也有。
+- **`src/kart/art/cornerArt.ts`**：`buildCornerSigns(kit, heightAt)`，`trackArt.ts` 在比賽日佈置之前呼叫。左彎、右彎各一張 canvas 貼圖（三個箭頭）、各一個 `InstancedMesh`（`MeshBasicMaterial`，不受光）；柱子一個 `InstancedMesh`。坡道賽道用該路點的高度。多 3 個 draw call。
+- **別人的車的特效**：`createKartEffects(world, kart, lite)`：`lite` 用小池子（胎痕 1200、煙 36、火花 50、軌跡 120、火 48），不鋪發光軌跡，胎痕淡 25%。`Scene.others` 每台車建一份、每幀 `update`、換車或離開時 `dispose`。`netRace.ts` 的 `others()` 用 frame 的速度與車頭算側滑角，填 `look.skid`（`skidStrength`）。協定、frame 都沒動。7 台電腦車在 1280×720（真 GPU）仍是 60 fps。
+- **速度線**：`speedLineStrength` 的速度門檻 0.92 → 1.02 倍極速（平常開不出線）。
+- **測試**：`tests/kart/cornerSigns.test.ts`（體育場形的路：兩個右彎、反向是左彎、大半徑不算彎；板子在路外、在外側、箭頭方向、入彎前就開始、間距、低畫質變少；五張內建賽道每個彎至少 2 塊、沒有一塊在路上、同一條路給同一組板子）。
+- **限制**：箭頭板可能和樹、旗桿、看台重疊（都在護欄外，沒有逐一避開）；觀戰與重播的車沒有特效；別人的車沒有點火的光環與鏡頭效果（frame 裡沒有「哪一種噴射」）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

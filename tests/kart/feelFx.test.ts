@@ -184,10 +184,11 @@ describe('a boost kicks', () => {
   })
 
   it('brings the speed lines even from a standstill', () => {
-    // No boost: only near the top speed
+    // No boost: only over the plain top speed (a boost just ended, a downhill)
     expect(speedLineStrength(0.5, 0)).toBe(0)
-    expect(speedLineStrength(1, 0)).toBeGreaterThan(0)
-    expect(speedLineStrength(1, 0)).toBeLessThan(0.3)
+    expect(speedLineStrength(1, 0)).toBe(0)
+    expect(speedLineStrength(1.1, 0)).toBeGreaterThan(0)
+    expect(speedLineStrength(1.1, 0)).toBeLessThan(0.3)
     // A boost: at once, whatever the speed
     expect(speedLineStrength(0, 1)).toBeGreaterThan(0.8)
     expect(speedLineStrength(1.3, 1)).toBeLessThanOrEqual(1)

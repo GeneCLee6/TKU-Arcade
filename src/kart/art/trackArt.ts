@@ -47,6 +47,7 @@ import {
   tamkangGround,
   tamkangTreeFits,
 } from './tamkangArt.ts'
+import { buildCornerSigns } from './cornerArt.ts'
 import { buildFestival } from './festival.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { buildOldStreet, inOldStreetRiver, oldStreetTreeFits } from './oldStreetArt.ts'
@@ -714,6 +715,12 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     group.add(buildHillGround(kit, hillAt))
     for (const ramp of buildJumpRamps(kit)) group.add(ramp)
   }
+
+  // ── The arrow boards along the outside of every corner (2026-11-17, cornerArt.ts) ──
+  buildCornerSigns(
+    { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
+    (index) => roadHeights?.[index] ?? 0,
+  )
 
   // ── Race-day dressing on every track: arch, flags, grandstands and crowds, flowers, a Ferris
   // wheel, balloons, a skyline (festival.ts) ──
