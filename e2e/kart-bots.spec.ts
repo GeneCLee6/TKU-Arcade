@@ -1,0 +1,57 @@
+import { expect, test, type Page } from '@playwright/test'
+
+// Racing the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.19): /kart's menu starts an item
+// race against a computer kart, run by the race room's own rules in this browser. The player drives
+// with the test autopilot (`?autopilot`); the race counts down, the bot's kart is drawn from its
+// frames, both pick up boxes, and the results come up with both names. Headless Chromium draws with
+// a software renderer (the flag lets it): slow, but the physics keeps time.
+test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } })
+test.setTimeout(240_000)
+
+interface RaceReading {
+  counted: boolean
+  others: number
+  crossings: number
+  pickups: number
+}
+
+const race = (page: Page): Promise<RaceReading | null> =>
+  page.evaluate(() => (window as unknown as { __kartRace?: RaceReading }).__kartRace ?? null)
+
+test('one person races a computer kart in an item race, from the menu to the results', async ({
+  page,
+}) => {
+  test.setTimeout(240_000)
+  await page.setViewportSize({ width: 960, height: 600 })
+  await page.addInitScript(() => {
+    localStorage.setItem('tku-arcade.kart.quality', 'low')
+    localStorage.setItem('tku-arcade.language', 'en')
+  })
+  await page.goto('/kart?autopilot')
+  await page.getByTestId('kart-bots-open').click()
+  const setup = page.getByTestId('kart-bots-setup')
+  await expect(setup).toBeVisible()
+  await setup.getByTestId('kart-bots-track').selectOption('riverside')
+  await setup.getByTestId('kart-bots-count').selectOption('1')
+  await setup.getByTestId('kart-bots-difficulty').selectOption('easy')
+  await setup.getByTestId('kart-bots-mode').selectOption('items')
+  await setup.getByTestId('kart-bots-laps').selectOption('1')
+  await setup.getByTestId('kart-bots-start').click()
+
+  await expect(page.getByTestId('kart-race')).toBeVisible({ timeout: 30_000 })
+  await expect
+    .poll(async () => (await race(page))?.counted ?? false, { timeout: 30_000 })
+    .toBe(true)
+  // The bot's kart, drawn from the frames it sends the room
+  await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 30_000 }).toBe(1)
+  await expect(page.getByTestId('kart-item')).toBeVisible()
+  await expect
+    .poll(async () => (await race(page))?.pickups ?? 0, { timeout: 90_000 })
+    .toBeGreaterThan(0)
+  // One lap, then the results: both karts, the bot by its name
+  const results = page.getByTestId('kart-bots-results')
+  await expect(results).toBeVisible({ timeout: 180_000 })
+  await expect(results.getByTestId('kart-standings').locator('li')).toHaveCount(2)
+  await expect(results).toContainText('(CPU)')
+  await expect(results.getByTestId('kart-bots-again')).toBeVisible()
+})

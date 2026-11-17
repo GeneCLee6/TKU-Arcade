@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { setSoundOn, useSoundOn } from '../lib/sound.ts'
 import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
-import {
-  KART_BODIES,
-  loadBody,
-  loadDriver,
-  saveBody,
-  saveDriver,
-  type KartBody,
-} from './bodies.ts'
+import { KART_BODIES, loadBody, loadDriver, saveBody, saveDriver, type KartBody } from './bodies.ts'
 import { applyKart, type DriverId } from '../../shared/kart/karts.ts'
 import { GaragePanel } from './roster/GaragePanel.tsx'
 import styled, { keyframes } from 'styled-components'
@@ -47,6 +40,8 @@ import {
 } from './spikeLoop.ts'
 import { NARROW_PANEL_TOP, NARROW_TOP } from './layout.ts'
 import { TuningPanel } from './TuningPanel.tsx'
+import { BotSetupPanel } from './bots/BotSetupPanel.tsx'
+import type { BotSetup } from './bots/setup.ts'
 
 registerMessages(KART_MESSAGES)
 
@@ -64,7 +59,7 @@ const EMPTY_HUD: SpikeHud = {
 /** How long a callout stays up; its animation fades it out by then */
 const CALLOUT_MS = 900
 
-type Open = 'controls' | 'tuning' | 'garage' | undefined
+type Open = 'controls' | 'tuning' | 'garage' | 'bots' | undefined
 
 /**
  * e8-t01: three.js, a fixed-step loop and a box car, to see whether the stack holds up in a browser.
@@ -76,7 +71,14 @@ type Open = 'controls' | 'tuning' | 'garage' | undefined
  * `play`: the kart page itself (/kart, e8-t14): a time trial on a track, without the test yard,
  * the tuning panel or the numbers, which stay on /kart/spike for tuning
  */
-export function SpikePage({ play = false }: { play?: boolean } = {}) {
+export function SpikePage({
+  play = false,
+  onBotRace,
+}: {
+  play?: boolean
+  /** 2026-11-17: /kart's menu starts a race against the computer with these settings */
+  onBotRace?: (setup: BotSetup) => void
+} = {}) {
   const t: (key: KartMessageKey, params?: MessageParams) => string = useT()
   const stage = useRef<HTMLDivElement>(null)
   const [failure, setFailure] = useState<Failure | undefined>(() =>
@@ -93,6 +95,7 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
   const controlsOpener = useRef<HTMLButtonElement>(null)
   const tuningOpener = useRef<HTMLButtonElement>(null)
   const garageOpener = useRef<HTMLButtonElement>(null)
+  const botsOpener = useRef<HTMLButtonElement>(null)
   // The loop reads these every frame without restarting. The tuning panel leaves the car drivable:
   // its fields keep their own keys (spikeLoop.ts), and a change is best felt at once.
   // e10-t05: the kart and driver to race with; the kart's numbers go on top of the tuning
@@ -200,6 +203,10 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
     setOpen(undefined)
     queueMicrotask(() => garageOpener.current?.focus())
   }, [])
+  const closeBots = useCallback(() => {
+    setOpen(undefined)
+    queueMicrotask(() => botsOpener.current?.focus())
+  }, [])
   const pickBody = (next: KartBody) => {
     saveBody(next)
     setTrial(undefined)
@@ -240,6 +247,17 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
           <Link to="/">{t('kart.spike.back')}</Link>
         </Panel>
         <Buttons>
+          {onBotRace && (
+            <Button
+              ref={botsOpener}
+              $size="sm"
+              aria-expanded={open === 'bots'}
+              onClick={() => (open === 'bots' ? closeBots() : setOpen('bots'))}
+              data-testid="kart-bots-open"
+            >
+              {t('kart.bots.open')}
+            </Button>
+          )}
           <Button
             ref={controlsOpener}
             $variant="secondary"
@@ -389,6 +407,9 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
           onDriver={pickDriver}
           onClose={closeGarage}
         />
+      )}
+      {open === 'bots' && onBotRace && (
+        <BotSetupPanel t={t} onStart={onBotRace} onClose={closeBots} />
       )}
       {controlsOpen && (
         <ControlsPanel
