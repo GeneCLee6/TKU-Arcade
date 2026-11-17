@@ -53,3 +53,18 @@ export function placeTags(
     if (!shown.has(Number(element.dataset.tag))) element.style.display = 'none'
   }
 }
+
+/**
+ * #86: a browser lets a page make sound only after a gesture. Tries at once (a page already clicked
+ * on may), then on every key and tap until it stops; returns the way to stop listening
+ */
+export function unlockOnGesture(player: { unlock(): void }): () => void {
+  const unlock = () => player.unlock()
+  unlock()
+  window.addEventListener('pointerdown', unlock)
+  window.addEventListener('keydown', unlock)
+  return () => {
+    window.removeEventListener('pointerdown', unlock)
+    window.removeEventListener('keydown', unlock)
+  }
+}

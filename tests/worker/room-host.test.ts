@@ -242,7 +242,7 @@ describe('a room', () => {
   it('exists once created, and only once', () => {
     const world = new World()
     expect(world.host.summary()).toBeNull()
-    expect(world.host.admit('1')).toMatchObject({ code: CloseCode.roomNotFound })
+    expect(world.host.admit(String(PROTOCOL_VERSION))).toMatchObject({ code: CloseCode.roomNotFound })
     expect(world.host.create(ROOM_ID, 'nope', undefined)).toBe(false)
     expect(world.host.create(ROOM_ID, 'tictactoe', undefined)).toBe(true)
     expect(world.host.create(ROOM_ID, 'tictactoe', undefined)).toBe(false)
@@ -266,10 +266,11 @@ describe('a room', () => {
 
   it('refuses another protocol version, and more sockets than it takes', () => {
     const world = room()
-    expect(world.host.admit('0')).toMatchObject({ code: CloseCode.versionMismatch })
+    // A page from before protocol 2 (arrays diffed in patches), and one that sent none
+    expect(world.host.admit('1')).toMatchObject({ code: CloseCode.versionMismatch })
     expect(world.host.admit(null)).toMatchObject({ code: CloseCode.versionMismatch })
     for (let i = 0; i < MAX_CONNECTIONS; i++) world.open()
-    expect(world.host.admit('1')).toMatchObject({ code: CloseCode.roomFull })
+    expect(world.host.admit(String(PROTOCOL_VERSION))).toMatchObject({ code: CloseCode.roomFull })
   })
 
   it('makes the first to join the host and seats people until the seats run out', () => {
@@ -1333,7 +1334,7 @@ describe('dissolving', () => {
     expect(x.closed).toBe(CloseCode.dissolved)
     expect(o.closed).toBe(CloseCode.dissolved)
     expect(world.host.summary()).toBeNull()
-    expect(world.host.admit('1')).toMatchObject({ code: CloseCode.roomNotFound })
+    expect(world.host.admit(String(PROTOCOL_VERSION))).toMatchObject({ code: CloseCode.roomNotFound })
     expect(world.host.nextAlarm()).toBeNull()
     expect(world.store.size).toBe(0)
     expect(world.steps.size).toBe(0)
@@ -2118,7 +2119,7 @@ describe('clean-up (e1-t10)', () => {
     expect(world.host.summary()).not.toBeNull()
     runAlarms(world, start + ROOM_CLEANUP_MS)
     wiped(world)
-    expect(world.host.admit('1')).toMatchObject({ code: CloseCode.roomNotFound })
+    expect(world.host.admit(String(PROTOCOL_VERSION))).toMatchObject({ code: CloseCode.roomNotFound })
   })
 
   it('counts from the last socket going, and starts over for someone coming back', () => {

@@ -18,6 +18,9 @@ import { loadQuality } from '../quality.ts'
 import { createRemotes } from '../race/remotes.ts'
 import { supportsWebGL2 } from '../Scene.ts'
 import { createHitFeed, hitFrameOf } from '../hitFx.ts'
+import { createCuePlayer } from '../kartAudio.ts'
+import { createWatchEars } from '../watchSounds.ts'
+import { unlockOnGesture } from './watchDom.ts'
 import { createServerClock } from './serverClock.ts'
 import { startWatchLoop, type WatchedKart } from './watchLoop.ts'
 import {
@@ -96,6 +99,10 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
     const boxes = itemBoxes(track)
     // 2026-11-17: the hits from here on spin their karts (hitFx.ts)
     const hitFeed = createHitFeed(null, latest.current.used)
+    // #86: and the items sound around the kart followed
+    const ears = createWatchEars(latest.current.used)
+    const player = createCuePlayer()
+    const stopUnlock = unlockOnGesture(player)
     let stop: (() => void) | undefined
     try {
       stop = startWatchLoop(stage.current, {
@@ -126,9 +133,11 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
           if (room.mode === 'items') {
             const now = clock.now()
             const started = hitFeed.read(room.events, now).effects
-            hits = hitFrameOf(hitFeed.effects, started, now, (seat) =>
-              karts.find((kart) => kart.id === seat),
-            )
+            const where = (seat: number) => karts.find((kart) => kart.id === seat)
+            hits = hitFrameOf(hitFeed.effects, started, now, where)
+            for (const heard of ears.read(room.events, now, followRef.current, where)) {
+              player.cue(heard.cue, heard.volume)
+            }
             props = {
               boxes: boxes.map((box, i) => ({
                 x: box.x,
@@ -180,6 +189,8 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       stop?.()
       stopListening()
       clock.stop()
+      stopUnlock()
+      player.dispose()
     }
   }, [realtime, track, failure])
 

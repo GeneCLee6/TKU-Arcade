@@ -27,7 +27,7 @@ Cloudflare Worker（單一，帶靜態資產）
 
 ```
 shared/                 前後端共用、純 TS、可在 Node 測
-  protocol.ts           協定 v1（welcome/snapshot/patch/action/error/timer/chat/ping）
+  protocol.ts           協定 v2（2026-11-17 起 patch 也送陣列的差異，§4.22；welcome/snapshot/patch/action/error/timer/chat/ping）
   patch.ts              diff 推送（移植 LongTalk）
   room-id.ts            10 碼 base58（移植 LongTalk）
   chat.ts               聊天限制（移植 LongTalk）
@@ -510,6 +510,19 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **畫面**：等待室的房主多一塊「電腦車」（`src/kart/bots/RoomBots.tsx`，lazy chunk）：選難度、加一台（車款與車手隨機，當作 `look` 送出），座位滿了按鈕就停用。座位列表的電腦車顯示「名字（電腦）」與難度，房主有「移除」（不用確認、比賽中不顯示），沒有「移交房主」。名字怎麼顯示統一走 `src/lib/memberName.ts`：`games.<id>.bot.name.<name>` 與 `games.<id>.bot.tag`（卡丁車的字串在 `shared/games/kart/i18n.ts`，隨房間載入），等待室、成員列表、結果、反應、車庫的選車列表、比賽中的名牌與名次、觀戰、重播都用它。
 - **測試**：`tests/worker/room-bots.test.ts`（新訊息的解析；加到最低空座位、名字不重複、永遠 ready／online；非房主不能加、難度不對、座位滿；沒有電腦車的遊戲與換遊戲；移除不記 ban、比賽中不能移除；hibernation 之後不會變 absent；開賽重編號；只有房主能替電腦車座位送 action 與 frame、不能替真人或空座位；代送的 frame 照常判圈、轉給所有人包括房主；交出房主後電腦車退賽、舊房主的代送被丟；房主斷線電腦車立刻退賽、loading 時不卡開賽、只剩房主與電腦車時比賽照常）；`tests/kart/roomBots.test.ts`（`botRace.ts` 透過真的 `RoomHost` 代送，兩台電腦車跑完一圈道具賽並由房間判完賽；房間判退賽後不再送）；`tests/components/WaitingRoom.test.tsx`（電腦車的名字、難度、房主的移除）；`e2e/kart-race.spec.ts`（兩人房加一台普通電腦車跑一圈：兩邊都看到 2 台別人的車、結果三人都有時間、電腦車的名字在結果裡）。
 - **已知限制**：房主的上傳每台電腦車多 20 frame／秒（每台約 0.7 kB/s，7 台約 5 kB/s），房主的瀏覽器多跑每台的物理與駕駛；房主的分頁在背景太久（瀏覽器把計時器壓到一分鐘一次）電腦車還是會落後；房主斷線電腦車就退賽，不交接。
+
+### 4.22 路線圖外：patch 送陣列的差異、被打從頭轉與本機預測、觀戰與重播的音效（2026-11-17，`feat/kart-net-deltas`）
+
+補 #86、#87 留下的三個限制。線上格式與實測在 [`KART-NETCODE.md`](KART-NETCODE.md) §15。
+
+- **patch 對陣列也做差異（協定 v2）**：`shared/patch.ts` 的 `diff` 原本遇到陣列整個替換；現在同長度時逐個位置比（物件元素再往下逐 key 比，路徑用字串索引，例 `['racers','2','item']`），長度變了用新的 op `splice { path, at, del, items }`（共同開頭與結尾之間那一段），「最舊的掉、最新的加在後面」的清單（`events` 最多 16 筆）用兩個 `splice`。每次都把候選（整個替換、逐位置、一段 splice、滑動窗）用 `JSON.stringify` 長度比，取最短，所以 **patch 永遠不會比 v1 長**（隨機測試擋）。`applyPatch` 對陣列也複製路徑上的節點、其他共用（React 照舊只看到變的地方）；索引必須是範圍內的整數、`splice` 必須落在陣列內，否則丟例外；陣列元素不能 `del`。所有遊戲都走這條路，`tests/games/harness.ts` 對每款遊戲每一步檢查 patch 能重建 projection。
+- **相容性**：舊頁面（v1）的 `applyPatch` 會把「陣列加索引」當成物件改，陣列會變成物件，所以 `PROTOCOL_VERSION` 1 → 2：部署後舊分頁重連時在 upgrade 被 `versionMismatch`（4400）擋下、畫面請他重新載入（原本的流程）。**回合制遊戲的重播**（`GET /api/rooms/<id>/replay`，`shared/games/replay.ts`）不走 WebSocket、沒有版本檢查，舊頁面也可能拿到，所以它用 `diff(…, { wholeArrays: true })` 照 v1 的樣子送。
+- **被打中的打轉從收到時算**（`src/kart/hitFx.ts`）：房間的 `hit` 事件 `at` 是房間收到被打那台車的 frame 的時間，patch 再過半個來回才到，原本從 `at` 算會從轉了一點的地方開始。`liveStart(at, 收到, seat, own)`：自己的車從收到那一刻從頭轉；別人的車（畫在最新 frame 之前 100 ms，`remotes.ts` 的 `INTERP_DELAY`）在收到後 `DRAWN_BEHIND_MS`（100 ms）才轉，大約就是畫出來的車開到被打的地方；不會早於 `at`。`createHitFeed` 多一個「還沒開始」的清單，星光粒子在效果真的開始那一幀才噴。暈（物理）也改成從收到時起算整段（`netRace.ts`）。重播照錄到的時間，不變。
+- **自己被打時本機預測**（客戶端預測，伺服器仍是唯一裁定）：`netRace.ts` 的 `adjust` 每一步（60 Hz）拿自己「上一步 → 這一步」的路線（用對好的伺服器錶）和 view 的 `shots` 跑 `shared/kart/shots.ts` 的 `foreseeHit`：同一個 `shotHits`，但冰雹與泥水坑要比邊緣再近 `FORESEE_SLACK`（冰雹 0.5 m、泥水坑 0.3 m）才算（房間用 20 Hz 的 frame 與到達時間判，擦邊的可能判不同）；雷雲時間到就一定打到追的那台，不用留餘裕。泡泡罩開著不預測、同一顆不重複、跳過重置與調包的跳躍（同 `resets` 且兩步差 20 m 內、1 秒內）。預測到就馬上暈、轉、出聲、HUD 提示（`onForeseenHit`）；房間的 `hit` 在 −300～+1500 ms 內、同一種道具就當作確認（`confirmsForeseen`），不再轉一次、不再響、不再延長暈。**預測錯了**（房間沒判中）：已經暈過的不能退回，只是不會再發生；`window.__kartRace.foreseen`／`confirmed` 數得到。
+- **觀戰與重播的音效**（`src/kart/watchSounds.ts`，純函式）：`watchCuesOf(event, 被跟的車, where)`：被跟的車自己的使用、被打、泡泡破、打中別人的「叮」全音量；別人的照距離衰減（`hearing`：20 m 內全音量、150 m 外沒聲音，中間平方衰減），小於 0.05 不播、沒畫出來的車不播。觀戰用 `createWatchEars`：每個事件只聽一次，延後 `DRAWN_BEHIND_MS` 播，和打轉同時。重播用 `replayCues(events, from, to, 倍速, …)`：只播這一幀「正常往前播」經過的事件；拖時間軸、±5 秒、暫停、倒退都不播（`ReplayView` 比對「上一幀留下的播放頭」有沒有被移過）；4× 只播和被跟的車有關的；每幀最多 3 個、大聲的先。播放器是 `kartAudio.ts` 的 `createCuePlayer()`（只有道具音效、沒有引擎聲，同一份配方與網站靜音開關），`cue(cue, volume)`；車手的 `KartAudio.cue` 也多一個選用的音量。瀏覽器要手勢才能出聲：`watchDom.ts` 的 `unlockOnGesture` 掛載時先試一次（頁面點過就可以），之後每次按鍵或點擊再試。
+- **測試**：`tests/shared/patch.test.ts`（陣列改一個、物件陣列、加在尾巴、清空、填滿、中間刪一個、滑動窗、巢狀、陣列變物件、2,000 組隨機陣列來回且不比整個替換長、索引與 splice 越界丟例外、共用沒改的節點、`wholeArrays`）；`tests/kart/hitFx.test.ts`（`liveStart`、從頭轉、別人的車延後噴、`confirmsForeseen`、預測後房間確認不重來、太久的不配對、觀戰不預測）；`tests/kart/shots.test.ts`（`foreseeHit`：正中、擦邊留給房間、泡泡罩／已預測／自己的冰雹、雷雲、泥水坑）；`tests/kart/watchSounds.test.ts`（衰減、被跟的車全音量、命中與泡泡、即時延後、重播只播經過的、拖曳與暫停不播、每幀上限、4× 只播被跟的）。
+- **已知限制**：預測錯了的暈收不回來（擦邊留了餘裕，機率低）；別人的車延後 100 ms 是固定值，不看每台車實際的轉送延遲；音效沒有左右聲道（只有遠近）；觀戰的聲音沒有人耳聽過。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

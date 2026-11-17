@@ -54,7 +54,9 @@ export function buildReplay<
       throw new Error(`${module.id}: replay step ${index} refused: ${next.gameError}`)
     match = next
     const projection = project(match.state) as unknown as JsonValue
-    const ops = diff(shown, projection)
+    // Arrays whole (protocol 1's patches): a page loaded before an update may fetch this too, and
+    // the replay is fetched once, so the bytes saved are not worth the risk
+    const ops = diff(shown, projection, { wholeArrays: true })
     shown = projection
     return { actor: step.actor, ops }
   })

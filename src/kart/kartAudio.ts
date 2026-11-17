@@ -4,7 +4,7 @@
 // only lets a page make sound after a gesture: `unlock` is called from the first key or tap.
 import { isSoundOn } from '../lib/sound.ts'
 import type { ItemCue } from './hitFx.ts'
-import { voicesOf } from './itemSounds.ts'
+import { voicesOf, type Voice } from './itemSounds.ts'
 
 export interface KartSound {
   readonly speed: number
@@ -19,8 +19,8 @@ export interface KartAudio {
   update(sound: KartSound): void
   /** A wall hit, 0 to 1 */
   hit(strength: number): void
-  /** An item race's sound (2026-11-17, itemSounds.ts) */
-  cue(cue: ItemCue): void
+  /** An item race's sound (2026-11-17, itemSounds.ts), `volume` 0 to 1 */
+  cue(cue: ItemCue, volume?: number): void
   dispose(): void
 }
 
@@ -38,6 +38,87 @@ function noiseBuffer(audio: AudioContext, seconds: number): AudioBuffer {
   const data = buffer.getChannelData(0)
   for (let index = 0; index < data.length; index++) data[index] = Math.random() * 2 - 1
   return buffer
+}
+
+/** One cue's voices, into `destination` now, at `volume` */
+function playVoices(
+  audio: AudioContext,
+  destination: AudioNode,
+  noise: AudioBuffer,
+  voices: readonly Voice[],
+  volume: number,
+): void {
+  const start = audio.currentTime
+  const loudness = Math.max(0, Math.min(1, volume))
+  if (loudness <= 0) return
+  for (const voice of voices) {
+    const at = start + (voice.delay ?? 0)
+    const end = at + voice.seconds
+    const gain = audio.createGain()
+    gain.gain.setValueAtTime(0.0001, start)
+    gain.gain.setValueAtTime(Math.max(0.0002, voice.gain * loudness), at)
+    gain.gain.exponentialRampToValueAtTime(0.0001, end)
+    gain.connect(destination)
+    if (voice.kind === 'tone') {
+      const oscillator = audio.createOscillator()
+      oscillator.type = voice.wave
+      oscillator.frequency.setValueAtTime(voice.from, at)
+      oscillator.frequency.exponentialRampToValueAtTime(voice.to, end)
+      oscillator.connect(gain)
+      oscillator.start(at)
+      oscillator.stop(end + 0.02)
+    } else {
+      const source = audio.createBufferSource()
+      source.buffer = noise
+      const filter = audio.createBiquadFilter()
+      filter.type = voice.filter
+      filter.Q.value = voice.q ?? 1
+      filter.frequency.setValueAtTime(voice.from, at)
+      filter.frequency.exponentialRampToValueAtTime(voice.to, end)
+      source.connect(filter).connect(gain)
+      source.start(at, Math.random())
+      source.stop(end + 0.02)
+    }
+  }
+}
+
+/**
+ * #86: the item sounds alone, for someone watching (no engine of their own): each cue at a volume
+ * (watchSounds.ts). Like the race's, it can only start after a gesture: `unlock` from a key or tap
+ */
+export interface CuePlayer {
+  unlock(): void
+  cue(cue: ItemCue, volume: number): void
+  dispose(): void
+}
+
+export function createCuePlayer(): CuePlayer {
+  let audio: AudioContext | null = null
+  let master: GainNode | null = null
+  let noise: AudioBuffer | null = null
+  return {
+    unlock() {
+      if (typeof window.AudioContext !== 'function') return
+      if (!audio) {
+        audio = new window.AudioContext()
+        master = audio.createGain()
+        master.gain.value = MASTER
+        master.connect(audio.destination)
+        noise = noiseBuffer(audio, 2)
+      }
+      if (audio.state === 'suspended') void audio.resume()
+    },
+    cue(cue, volume) {
+      if (!audio || !master || !noise || !isSoundOn() || audio.state !== 'running') return
+      playVoices(audio, master, noise, voicesOf(cue), volume)
+    },
+    dispose() {
+      void audio?.close()
+      audio = null
+      master = null
+      noise = null
+    },
+  }
 }
 
 export function createKartAudio(): KartAudio {
@@ -150,38 +231,9 @@ export function createKartAudio(): KartAudio {
       source.start(now)
       source.stop(now + 0.4)
     },
-    cue(cue) {
+    cue(cue, volume = 1) {
       if (!audio || !nodes || !isSoundOn()) return
-      const start = audio.currentTime
-      for (const voice of voicesOf(cue)) {
-        const at = start + (voice.delay ?? 0)
-        const end = at + voice.seconds
-        const gain = audio.createGain()
-        gain.gain.setValueAtTime(0.0001, start)
-        gain.gain.setValueAtTime(voice.gain, at)
-        gain.gain.exponentialRampToValueAtTime(0.001, end)
-        gain.connect(nodes.master)
-        if (voice.kind === 'tone') {
-          const oscillator = audio.createOscillator()
-          oscillator.type = voice.wave
-          oscillator.frequency.setValueAtTime(voice.from, at)
-          oscillator.frequency.exponentialRampToValueAtTime(voice.to, end)
-          oscillator.connect(gain)
-          oscillator.start(at)
-          oscillator.stop(end + 0.02)
-        } else {
-          const source = audio.createBufferSource()
-          source.buffer = nodes.noise
-          const filter = audio.createBiquadFilter()
-          filter.type = voice.filter
-          filter.Q.value = voice.q ?? 1
-          filter.frequency.setValueAtTime(voice.from, at)
-          filter.frequency.exponentialRampToValueAtTime(voice.to, end)
-          source.connect(filter).connect(gain)
-          source.start(at, Math.random())
-          source.stop(end + 0.02)
-        }
-      }
+      playVoices(audio, nodes.master, nodes.noise, voicesOf(cue), volume)
     },
     dispose() {
       void audio?.close()

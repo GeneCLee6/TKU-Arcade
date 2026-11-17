@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { SHOT_TUNING } from '../../shared/kart/shots.ts'
 import { ITEM_IDS } from '../../shared/kart/items.ts'
 import {
+  confirmsForeseen,
   createHitFeed,
   crossed,
+  DRAWN_BEHIND_MS,
+  FORESEEN_LATE_MS,
+  liveStart,
   cuesOf,
   effectsOf,
   hitFrameOf,
@@ -18,6 +22,7 @@ import {
   type FxEvent,
 } from '../../src/kart/hitFx.ts'
 import { CUE_SOUNDS, cueSeconds, USE_SOUNDS, voicesOf } from '../../src/kart/itemSounds.ts'
+import { INTERP_DELAY } from '../../src/kart/race/remotes.ts'
 
 // 2026-11-17: a hit's looks and sounds, derived from the room's item events alone
 
@@ -179,5 +184,77 @@ describe('a live feed of the room events', () => {
     expect(feed.effects).toHaveLength(1)
     feed.read(events, 1000 + SHOT_TUNING.stunMs.hail + 2000)
     expect(feed.effects).toHaveLength(0)
+  })
+})
+
+describe('a live hit starts from when it is heard of (#86)', () => {
+  it('its own kart at once, another once it is drawn there, never before the hit', () => {
+    expect(DRAWN_BEHIND_MS).toBe(INTERP_DELAY * 1000)
+    // Heard of 60 ms after the room judged it
+    expect(liveStart(10_000, 10_060, 1, 1)).toBe(10_060)
+    expect(liveStart(10_000, 10_060, 2, 1)).toBe(10_060 + DRAWN_BEHIND_MS)
+    expect(liveStart(10_000, 10_060, 2, null)).toBe(10_060 + DRAWN_BEHIND_MS)
+    // A clock that runs behind the room's
+    expect(liveStart(10_000, 9_900, 1, 1)).toBe(10_000)
+  })
+
+  it('spins from the start, not part way through', () => {
+    const feed = createHitFeed(1, 0)
+    const read = feed.read([{ ...hit({ at: 10_000 }), n: 0 }], 10_080)
+    expect(read.effects).toEqual([
+      { kind: 'spin', seat: 1, at: 10_080, ms: SHOT_TUNING.stunMs.hail, item: 'hail' },
+    ])
+    expect(spinsAt(feed.effects, 10_080).get(1)).toEqual(STILL_SPIN)
+  })
+
+  it('bursts on another kart once it is drawn where it was hit', () => {
+    const feed = createHitFeed(null, 0)
+    const event = { ...hit({ at: 10_000 }), n: 0 }
+    expect(feed.read([event], 10_050).effects).toEqual([])
+    expect(feed.effects.map((one) => one.at)).toEqual([10_050 + DRAWN_BEHIND_MS])
+    expect(feed.read([event], 10_100).effects).toEqual([])
+    expect(feed.read([event], 10_160).effects.map((one) => one.at)).toEqual([10_150])
+    expect(feed.read([event], 10_200).effects).toEqual([])
+  })
+})
+
+describe('a hit foreseen on its own kart (#86)', () => {
+  it('is the room’s hit of the same item a little later, on this kart', () => {
+    const foreseen = [{ item: 'hail' as const, at: 10_000 }]
+    expect(confirmsForeseen(hit({ at: 10_040 }), 1, foreseen)).toBe(0)
+    expect(confirmsForeseen(hit({ at: 10_040, item: 'puddle' }), 1, foreseen)).toBe(-1)
+    expect(confirmsForeseen(hit({ at: 10_000 + FORESEEN_LATE_MS + 1 }), 1, foreseen)).toBe(-1)
+    expect(confirmsForeseen(hit({ at: 10_040, targets: [2] }), 1, foreseen)).toBe(-1)
+    expect(confirmsForeseen(hit({ at: 10_040 }), null, foreseen)).toBe(-1)
+    expect(confirmsForeseen(hit({ at: 10_040, hit: false }), 1, foreseen)).toBe(-1)
+  })
+
+  it('spins and sounds at once, and the room’s word does not start it again', () => {
+    const feed = createHitFeed(1, 0)
+    feed.foresee('hail', 10_000)
+    const now = feed.read([], 10_010)
+    expect(now.effects.map((one) => one.at)).toEqual([10_000])
+    expect(now.cues).toEqual([{ kind: 'hit' }])
+    expect(feed.read([{ ...hit({ at: 10_050 }), n: 0 }], 10_090)).toEqual({
+      effects: [],
+      cues: [],
+    })
+    expect(feed.effects).toHaveLength(1)
+  })
+
+  it('a hit not foreseen still spins, and one foreseen long ago is not matched', () => {
+    const feed = createHitFeed(1, 0)
+    feed.foresee('hail', 10_000)
+    feed.read([], 10_010)
+    const late = 10_000 + FORESEEN_LATE_MS + 500
+    const read = feed.read([{ ...hit({ at: late }), n: 0 }], late + 40)
+    expect(read.cues).toEqual([{ kind: 'hit' }])
+    expect(read.effects.map((one) => one.at)).toEqual([late + 40])
+  })
+
+  it('a watcher foresees nothing', () => {
+    const feed = createHitFeed(null, 0)
+    feed.foresee('hail', 10_000)
+    expect(feed.read([], 10_010)).toEqual({ effects: [], cues: [] })
   })
 })
