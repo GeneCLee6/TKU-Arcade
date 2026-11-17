@@ -48,7 +48,10 @@ function localImports(path: string, source: string): string[] {
 }
 
 /** Every file the browser's code pulls in at load time, following imports through shared/ too */
-function reachableFromSite(skip = (_path: string) => false, from = Object.keys(SOURCES)): Set<string> {
+function reachableFromSite(
+  skip = (_path: string) => false,
+  from = Object.keys(SOURCES),
+): Set<string> {
   const all = { ...SOURCES, ...SHARED }
   const seen = new Set<string>()
   const queue = from.filter((path) => !skip(path))
@@ -89,16 +92,20 @@ describe('the catalog against the registry', () => {
   })
 
   // A lobby card shows these before anything else loads (shared/games/lobby.ts)
-  it.each(GAME_IDS)('%s: has its name and summary in both lobby tables, and nothing else there', (id) => {
-    const tables: Record<string, string>[] = [lobbyEn, lobbyZhTW]
-    for (const table of tables) {
-      expect(table[`games.${id}.name`]).toBeTruthy()
-      expect(table[`games.${id}.summary`]).toBeTruthy()
-    }
-    const own = Object.keys(lobbyEn).filter((key) => key.startsWith(`games.${id}.`))
-    expect(own.every((key) => /\.(name|summary|tryAlone)$/.test(key))).toBe(true)
-    if (getGameCard(id)?.meta.tryAlone) expect(GAME_MESSAGES.en).toHaveProperty(`games.${id}.tryAlone`)
-  })
+  it.each(GAME_IDS)(
+    '%s: has its name and summary in both lobby tables, and nothing else there',
+    (id) => {
+      const tables: Record<string, string>[] = [lobbyEn, lobbyZhTW]
+      for (const table of tables) {
+        expect(table[`games.${id}.name`]).toBeTruthy()
+        expect(table[`games.${id}.summary`]).toBeTruthy()
+      }
+      const own = Object.keys(lobbyEn).filter((key) => key.startsWith(`games.${id}.`))
+      expect(own.every((key) => /\.(name|summary|tryAlone)$/.test(key))).toBe(true)
+      if (getGameCard(id)?.meta.tryAlone)
+        expect(GAME_MESSAGES.en).toHaveProperty(`games.${id}.tryAlone`)
+    },
+  )
 
   it('keeps unlisted games out of the lobby', () => {
     expect(LOBBY_GAMES.length).toBeGreaterThan(0)
@@ -117,8 +124,16 @@ const WORKER_ONLY =
   /(^|\/)shared\/games\/index\.ts$|shared\/games\/[^/]+\/(rules|rulesFull|boardFull|topics|bank)\.ts$/
 const FULL_SCREEN = /^\/src\/games\/promotion\/full\//
 const FULL_BOARD = /shared\/games\/promotion\/boardFull\.ts$/
+/**
+ * The one exception (2026-11-17, docs/ARCHITECTURE.md §4.20): racing the computer runs the kart
+ * race room's own rules in the browser, so that items are judged exactly as online. Only the bots'
+ * lazy chunk (src/kart/bots/) may import them, and nothing else comes with them
+ */
+const BOTS = /^\/src\/kart\/bots\//
+const KART_RULES = /shared\/games\/kart\/rules\.ts$/
 /** What a file may not import statically */
-const forbidden = (_path: string, from: string) => WORKER_ONLY.test(from)
+const forbidden = (path: string, from: string) =>
+  WORKER_ONLY.test(from) && !(BOTS.test(path) && KART_RULES.test(from))
 
 describe('the browser loads no rules', () => {
   const paths = Object.keys(SOURCES)
@@ -143,8 +158,16 @@ describe('the browser loads no rules', () => {
     const reached = [...reachableFromSite()]
     expect(reached).toContain('/shared/games/lobby.ts')
     expect(reached).toContain('/shared/games/kite/limits.ts')
-    expect(reached.filter((path) => WORKER_ONLY.test(path))).toEqual([])
+    expect(reached.filter((path) => WORKER_ONLY.test(path) && !KART_RULES.test(path))).toEqual([])
     expect(reached.some((path) => FULL_SCREEN.test(path))).toBe(true)
+  })
+
+  it('lets only the bots’ chunk import the kart race room’s rules', () => {
+    const importers = Object.entries(SOURCES)
+      .filter(([, source]) => staticImports(source).some((from) => KART_RULES.test(from)))
+      .map(([path]) => path)
+    expect(importers.length).toBeGreaterThan(0)
+    expect(importers.filter((path) => !BOTS.test(path))).toEqual([])
   })
 
   // The first load stays small as games are added (2026-11-15, docs/ARCHITECTURE.md §5): the entry

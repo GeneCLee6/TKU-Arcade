@@ -1,6 +1,7 @@
 // The kart's own strings, registered by its lazy chunk (src/i18n/t.ts registerMessages), so that
 // they stay out of the first load of the lobby and the board games. Same rules as any catalog:
 // en is the source, zh-TW has the same keys, and `npm run check-i18n` compares them.
+import { KART_BOTS_MESSAGES, type KartBotsKey } from './i18n.bots.ts'
 import { KART_ROSTER_MESSAGES, type KartRosterKey } from './i18n.roster.ts'
 
 const en = {
@@ -261,7 +262,7 @@ const en = {
   'kart.pad.axis': 'Axis {index} {sign}',
 } as const
 
-export type KartMessageKey = keyof typeof en | KartRosterKey
+export type KartMessageKey = keyof typeof en | KartRosterKey | KartBotsKey
 
 const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.title': '卡丁車物理測試',
@@ -515,6 +516,6 @@ const zhTW: Record<keyof typeof en, string> = {
 
 // e10-t05: the garage's strings live in their own file (i18n.roster.ts) and join the rest here
 export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartMessageKey, string>> = {
-  en: { ...en, ...KART_ROSTER_MESSAGES.en },
-  'zh-TW': { ...zhTW, ...KART_ROSTER_MESSAGES['zh-TW'] },
+  en: { ...en, ...KART_ROSTER_MESSAGES.en, ...KART_BOTS_MESSAGES.en },
+  'zh-TW': { ...zhTW, ...KART_ROSTER_MESSAGES['zh-TW'], ...KART_BOTS_MESSAGES['zh-TW'] },
 }

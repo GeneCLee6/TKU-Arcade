@@ -1,0 +1,81 @@
+// Racing the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.20): the menu's, the race's and the
+// bots' strings. Merged into KART_MESSAGES (i18n.ts), so the same check covers them. The bots' names
+// are working titles of our own, like every name in the kart's world until KART-WORLD.md (e10-t01).
+// `en` is the source.
+const en = {
+  'kart.bots.open': 'Race the computer',
+  'kart.bots.title': 'Race the computer',
+  'kart.bots.close': 'Close',
+  'kart.bots.track': 'Track',
+  'kart.bots.count': 'Opponents',
+  'kart.bots.difficulty': 'Difficulty',
+  'kart.bots.difficulty.easy': 'Easy',
+  'kart.bots.difficulty.normal': 'Normal',
+  'kart.bots.difficulty.hard': 'Hard',
+  'kart.bots.mode': 'Race type',
+  'kart.bots.mode.items': 'Item race',
+  'kart.bots.mode.race': 'Speed race',
+  'kart.bots.laps': 'Laps',
+  'kart.bots.start': 'Start',
+  'kart.bots.note':
+    'Computer karts drive the same physics and the same karts as you, and never go faster than their kart can. Your kart and driver are the garage’s.',
+  'kart.bots.tag': '{name} (CPU)',
+  'kart.bots.you': 'You',
+  'kart.bots.loading': 'Setting up the race…',
+  'kart.bots.quit': 'Quit the race',
+  'kart.bots.showResults': 'See the results now',
+  'kart.bots.results': 'Results',
+  'kart.bots.place': 'You finished {place} of {total}',
+  'kart.bots.notFinished': 'You did not finish',
+  'kart.bots.again': 'Race again',
+  'kart.bots.menu': 'Change the settings',
+  'kart.bots.name.pepper': 'Pepper',
+  'kart.bots.name.mochi': 'Mochi',
+  'kart.bots.name.typhoon': 'Typhoon',
+  'kart.bots.name.boba': 'Boba',
+  'kart.bots.name.scooter': 'Scooter',
+  'kart.bots.name.sunset': 'Sunset',
+  'kart.bots.name.ferry': 'Ferry',
+  'kart.bots.name.kite': 'Kite',
+}
+
+export type KartBotsKey = keyof typeof en
+
+const zhTW: Record<KartBotsKey, string> = {
+  'kart.bots.open': '對戰電腦',
+  'kart.bots.title': '對戰電腦',
+  'kart.bots.close': '關閉',
+  'kart.bots.track': '賽道',
+  'kart.bots.count': '對手數',
+  'kart.bots.difficulty': '難度',
+  'kart.bots.difficulty.easy': '簡單',
+  'kart.bots.difficulty.normal': '普通',
+  'kart.bots.difficulty.hard': '困難',
+  'kart.bots.mode': '賽制',
+  'kart.bots.mode.items': '道具賽',
+  'kart.bots.mode.race': '純競速',
+  'kart.bots.laps': '圈數',
+  'kart.bots.start': '開始',
+  'kart.bots.note':
+    '電腦車和你用一樣的物理、一樣的車款，速度不會超過車款本身的極速。你的車與車手照車庫的選擇。',
+  'kart.bots.tag': '{name}（電腦）',
+  'kart.bots.you': '你',
+  'kart.bots.loading': '比賽準備中…',
+  'kart.bots.quit': '離開比賽',
+  'kart.bots.showResults': '直接看成績',
+  'kart.bots.results': '成績',
+  'kart.bots.place': '你跑了第 {place} 名（共 {total} 台）',
+  'kart.bots.notFinished': '你沒有跑完',
+  'kart.bots.again': '再跑一場',
+  'kart.bots.menu': '改設定',
+  'kart.bots.name.pepper': '胡椒',
+  'kart.bots.name.mochi': '麻糬',
+  'kart.bots.name.typhoon': '颱風',
+  'kart.bots.name.boba': '珍奶',
+  'kart.bots.name.scooter': '小綿羊',
+  'kart.bots.name.sunset': '夕陽',
+  'kart.bots.name.ferry': '渡輪',
+  'kart.bots.name.kite': '風箏',
+}
+
+export const KART_BOTS_MESSAGES = { en, 'zh-TW': zhTW }
