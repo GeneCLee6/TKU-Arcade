@@ -8,6 +8,7 @@ import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import type { JsonValue } from '../../../shared/patch.ts'
 import '../../games/kart/messages.ts'
 import { Standings } from '../../games/kart/Standings.tsx'
+import { Button } from '../../components/Button.tsx'
 import { registerMessages } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
@@ -58,6 +59,25 @@ function noteFor(
 ): { text: string; bad: boolean } | null {
   const item = t(`games.kart.item.${event.item}`)
   const first = event.targets[0]
+  // A shot that hit someone (e9-t06b)
+  if (event.hit) {
+    if (first === undefined) return null
+    const stopped = event.blocked.includes(first)
+    if (first === seat) {
+      if (stopped)
+        return {
+          text: t('games.kart.item.yourBubble', { name: nameOf(event.by), item }),
+          bad: false,
+        }
+      return event.by === seat
+        ? { text: t('games.kart.item.hitOwn', { item }), bad: true }
+        : { text: t('games.kart.item.hitShot', { name: nameOf(event.by), item }), bad: true }
+    }
+    if (event.by !== seat) return null
+    return stopped
+      ? { text: t('games.kart.item.stoppedYours', { name: nameOf(first), item }), bad: true }
+      : { text: t('games.kart.item.youHit', { name: nameOf(first), item }), bad: false }
+  }
   if (event.by === seat) {
     if (event.blocked.length > 0 && event.blocked.length === event.targets.length) {
       return {
@@ -78,6 +98,10 @@ function noteFor(
         return first === undefined
           ? null
           : { text: t('games.kart.item.youSwap', { name: nameOf(first) }), bad: false }
+      case 'cloud':
+        return first === undefined
+          ? null
+          : { text: t('games.kart.item.youCloud', { name: nameOf(first) }), bad: false }
       default:
         return null
     }
@@ -94,6 +118,8 @@ function noteFor(
       return { text: t('games.kart.item.hitSwap', { name: by }), bad: true }
     case 'tow':
       return { text: t('games.kart.item.hitTow', { name: by }), bad: true }
+    case 'cloud':
+      return { text: t('games.kart.item.cloudComing', { name: by }), bad: true }
     default:
       return null
   }
@@ -106,6 +132,8 @@ export interface RaceViewProps {
   realtime: RoomRealtime
   act: (action: JsonValue) => void
   nameOf: (seat: number) => string
+  /** After the finish: watch the others instead (e9-t10) */
+  onWatch?: () => void
 }
 
 /**
@@ -115,7 +143,7 @@ export interface RaceViewProps {
  * unstable connection are shown on top. At the finish it shows this kart's place and waits for the
  * others; the room's result panel takes over when the server says the race is over.
  */
-export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps) {
+export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceViewProps) {
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
   const [failure, setFailure] = useState(() => !supportsWebGL2())
@@ -302,7 +330,7 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       <MapCorner>
         {trial && <RaceClock ref={clock} t={t} trial={trial} />}
-        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
+        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} walls={track.walls} />
       </MapCorner>
       {view.phase === 'loading' && (
         <Center role="status" data-testid="kart-waiting">
@@ -320,6 +348,16 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
           <FinishTitle>{t('games.kart.race.finishedPlace', { place: place || 1 })}</FinishTitle>
           <Standings view={view} order={order} nameOf={nameOf} />
           <Muted>{t('games.kart.race.waitingOthers')}</Muted>
+          {onWatch && (
+            <Button
+              $variant="secondary"
+              $size="sm"
+              onClick={onWatch}
+              data-testid="kart-watch-others"
+            >
+              {t('games.kart.watch.others')}
+            </Button>
+          )}
         </Finish>
       )}
       <Bottom>

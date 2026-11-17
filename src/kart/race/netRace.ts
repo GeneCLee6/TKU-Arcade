@@ -19,7 +19,14 @@ import {
 } from '../../../shared/kart/physics.ts'
 import type { Run } from '../../../shared/kart/course.ts'
 import { encodeItemFrame, ITEM_TUNING, itemBoxes, type ItemId } from '../../../shared/kart/items.ts'
-import { boostKart, headwindStep, towStep, warpRun } from '../../../shared/kart/itemEffects.ts'
+import {
+  boostKart,
+  headwindStep,
+  stunStep,
+  towStep,
+  warpRun,
+} from '../../../shared/kart/itemEffects.ts'
+import { SHOT_TUNING, shotLive, shotPosition } from '../../../shared/kart/shots.ts'
 import { gridSpot, raceProgress } from '../../../shared/kart/race.ts'
 import type { Trial } from '../../../shared/kart/timeTrial.ts'
 import type { Track } from '../../../shared/kart/track.ts'
@@ -167,6 +174,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   let towUntil = 0
   let towSeat: number | null = null
   let headwindUntil = 0
+  /** Hit by a shot (e9-t06b): stunned until then, by the server's clock */
+  let stunUntil = 0
 
   const pingClock = () => {
     const ping = new Uint8Array(CLOCK_PING_BYTES)
@@ -214,6 +223,17 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       if (event.n < seen) continue
       seen = event.n + 1
       const reached = event.targets.includes(seat) && !event.blocked.includes(seat)
+      // A shot that hit this kart (e9-t06b): stunned, and a tow let go
+      if (event.hit) {
+        if (
+          reached &&
+          (event.item === 'hail' || event.item === 'cloud' || event.item === 'puddle')
+        ) {
+          stunUntil = event.at + SHOT_TUNING.stunMs[event.item]
+          towUntil = 0
+        }
+        continue
+      }
       if (event.by === seat) {
         if (event.item === 'boost') next = { ...next, kart: boostKart(next.kart) }
         if (event.item === 'tow') {
@@ -272,6 +292,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     const server = roughNow()
     const dt = STEP_SECONDS
     if (server < headwindUntil) next = { ...next, kart: headwindStep(next.kart, dt) }
+    if (server < stunUntil) next = { ...next, kart: stunStep(next.kart, dt) }
     if (server < towUntil && towSeat !== null) {
       const target = poses.find((pose) => pose.seat === towSeat && !pose.stale)
       if (target) next = { ...next, kart: towStep(next.kart, target, dt) }
@@ -357,7 +378,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     adjust,
     props(pose) {
       const view = options.view()
-      if (view.mode !== 'items') return { boxes: [], shields: [] }
+      if (view.mode !== 'items') return { boxes: [], shields: [], shots: [] }
       const at = roughNow()
       const now = performance.now()
       const shields = view.racers
@@ -371,6 +392,18 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           shown: (view.boxes[i] ?? Infinity) <= at && (asked.get(i) ?? 0) <= now,
         })),
         shields,
+        // e9-t06b: the shots on the road; a cloud flies at its target as this browser sees it
+        shots: (view.shots ?? [])
+          .filter((shot) => shotLive(shot, at))
+          .map((shot) => {
+            const target =
+              shot.target === null
+                ? null
+                : shot.target === seat
+                  ? pose
+                  : (poses.find((one) => one.seat === shot.target && !one.stale) ?? null)
+            return { n: shot.n, item: shot.item, ...shotPosition(shot, at, target) }
+          }),
       }
     },
     drawn(scene) {

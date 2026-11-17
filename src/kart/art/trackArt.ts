@@ -48,6 +48,7 @@ import {
   tamkangTreeFits,
 } from './tamkangArt.ts'
 import { buildFestival } from './festival.ts'
+import { buildOldStreet, inOldStreetRiver, oldStreetTreeFits } from './oldStreetArt.ts'
 import {
   ASPHALT_LENGTH,
   BARRIER_LENGTH,
@@ -78,7 +79,9 @@ export const themeOf = (track: Pick<Track, 'id'>): KartTheme =>
     ? kartThemes.sunset
     : track.id === 'tamkang'
       ? kartThemes.campus
-      : kartThemes.day
+      : track.id === 'oldstreet'
+        ? kartThemes.night
+        : kartThemes.day
 
 /** What a track's own scenery (harbourArt.ts) builds with: shared, and freed with the rest */
 export interface ArtKit {
@@ -282,6 +285,8 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   const harbour = track.id === 'harbour'
   // The campus on its hilltop (2026-11-14): its own ground, falling away beyond the campus
   const tamkang = track.id === 'tamkang'
+  // N2's item track: a night market by the river (oldStreetArt.ts)
+  const oldStreet = track.id === 'oldstreet'
   const geometries: BufferGeometry[] = []
   const materials: Material[] = []
   const extraTextures: Texture[] = []
@@ -390,11 +395,14 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     )
     group.add(shadowed(wall))
   }
+  // One material for them all: the old street's stall island alone is a hundred of them
+  const extraMaterial =
+    track.walls.length > 0 ? standard(kartScene.barrier, textures.barrier) : null
   for (const extra of track.walls) {
     const span = Math.hypot(extra.bx - extra.ax, extra.bz - extra.az)
     const block = new Mesh(
       keep(new BoxGeometry(span, BARRIER_HEIGHT, BARRIER_THICKNESS)),
-      standard(kartScene.barrier, textures.barrier),
+      extraMaterial!,
     )
     block.position.set((extra.ax + extra.bx) / 2, BARRIER_HEIGHT / 2, (extra.az + extra.bz) / 2)
     block.rotation.y = -Math.atan2(extra.bz - extra.az, extra.bx - extra.ax)
@@ -468,7 +476,10 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     clearance: 7,
     spacing: 4.5,
     fits: (x, z) =>
-      !inRiver(x) && (!harbour || harbourTreeFits(x, z)) && (!tamkang || tamkangTreeFits(x, z)),
+      !inRiver(x) &&
+      (!harbour || harbourTreeFits(x, z)) &&
+      (!tamkang || tamkangTreeFits(x, z)) &&
+      (!oldStreet || oldStreetTreeFits(x, z)),
   })
   const trunks = new InstancedMesh(
     keep(new CylinderGeometry(0.22, 0.32, 2.2, 6)),
@@ -561,7 +572,10 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
         matrix.scale(new Vector3(0.45, 0.22, 0.45))
       }
       // At the campus, none stands in the river: the mountain across it is its own (tamkangArt.ts)
-      if (tamkang && inTamkangRiver(matrix.elements[12]!, matrix.elements[14]!, 160)) {
+      if (
+        (tamkang && inTamkangRiver(matrix.elements[12]!, matrix.elements[14]!, 160)) ||
+        (oldStreet && inOldStreetRiver(matrix.elements[12]!, matrix.elements[14]!, 160))
+      ) {
         matrix.scale(new Vector3(0.001, 0.001, 0.001))
       }
       // The y scale is the cone's height; its centre sits half of that up, on the ground
@@ -678,7 +692,13 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     {
       groundAt,
       fits: (x, z) =>
-        harbour ? !inHarbourSea(x, z, 8) : tamkang ? tamkangFestivalFits(x, z) : !inRiver(x),
+        harbour
+          ? !inHarbourSea(x, z, 8)
+          : tamkang
+            ? tamkangFestivalFits(x, z)
+            : oldStreet
+              ? oldStreetTreeFits(x, z)
+              : !inRiver(x),
     },
   )
 
@@ -792,6 +812,22 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       })
     : null
 
+  // ── The old street: its river, stalls, lanterns, shophouses and temple ──
+  const oldStreetScenery = oldStreet
+    ? buildOldStreet({
+        track,
+        level,
+        group,
+        textures,
+        keep,
+        own,
+        ownTexture,
+        standard,
+        shadowed,
+        place,
+      })
+    : null
+
   for (const instances of group.children) {
     if (instances instanceof InstancedMesh) {
       instances.instanceMatrix.setUsage(DynamicDrawUsage)
@@ -807,6 +843,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       harbourScenery?.update(seconds)
       festival.update(seconds)
       tamkangScenery?.update(seconds)
+      oldStreetScenery?.update(seconds)
     },
     dispose() {
       for (const geometry of geometries) geometry.dispose()

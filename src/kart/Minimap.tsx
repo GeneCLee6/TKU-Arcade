@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
 import styled from 'styled-components'
 import { trackBounds, type Gate, type RoadPoint } from '../../shared/kart/track.ts'
+import type { Wall } from '../../shared/kart/walls.ts'
 import type { KartMessageKey } from '../../shared/kart/i18n.ts'
 import type { MessageParams } from '../i18n/t.ts'
 import { color } from '../styles/tokens.ts'
@@ -15,6 +16,8 @@ interface MinimapProps {
   t: (key: KartMessageKey, params?: MessageParams) => string
   road: readonly RoadPoint[]
   gates: readonly Gate[]
+  /** Walls on the road beyond its kerbs (N2: the old street's stall island), drawn over it */
+  walls?: readonly Wall[]
 }
 
 /** Room around the road, metres */
@@ -26,7 +29,7 @@ const MARGIN = 6
  * own coordinates; it does not turn with the car.
  */
 export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
-  { t, road, gates },
+  { t, road, gates, walls = [] },
   ref,
 ) {
   const box = useMemo(() => trackBounds({ road }), [road])
@@ -82,6 +85,18 @@ export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
           strokeWidth={1.5}
           strokeDasharray="6 6"
         />
+        {walls.map((wall, index) => (
+          <line
+            key={index}
+            x1={wall.ax}
+            y1={wall.az}
+            x2={wall.bx}
+            y2={wall.bz}
+            stroke={kartScene.barrier}
+            strokeWidth={4}
+            strokeLinecap="round"
+          />
+        ))}
         {finish && (
           <line
             x1={finish.ax}

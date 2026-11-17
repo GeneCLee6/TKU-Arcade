@@ -27,7 +27,8 @@ describe('item boxes (e9-t05)', () => {
     for (const id of RACE_TRACK_IDS) {
       const track = raceTrack(id)!
       const boxes = itemBoxes(track)
-      expect(boxes).toHaveLength(15)
+      // N2's item track places its own (tests/kart/oldstreet.test.ts)
+      expect(boxes).toHaveLength(track.itemBoxes.length > 0 ? track.itemBoxes.length : 15)
       const line = track.gates[0]!
       for (const box of boxes) {
         // Somewhere near the road's centre line (the road is at least 28 m wide)

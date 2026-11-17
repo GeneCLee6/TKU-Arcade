@@ -23,7 +23,7 @@ import { createSpeedLines } from './art/speedLines.ts'
 import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
 import type { DriverId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
-import { createItemArt, type ItemArt, type ItemBoxLook } from './art/itemArt.ts'
+import { createItemArt, type ItemArt, type ItemBoxLook, type ShotLook } from './art/itemArt.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 import { kartScene, kartThemes } from '../styles/kartTokens.ts'
@@ -34,6 +34,9 @@ const GRID_CELL = 5
 const CAMERA_BACK = 7.5
 const CAMERA_UP = 3.4
 const CAMERA_LOOK_AHEAD = 3
+/** Watching from above (e9-t10): this high, this far behind the kart */
+const OVERHEAD_UP = 55
+const OVERHEAD_BACK = 18
 const MAX_PIXEL_RATIO = 2
 /** Walls are drawn this high and this thick; the physics sees only their centre line */
 const WALL_HEIGHT = 1.1
@@ -54,10 +57,14 @@ export interface OtherKart extends Pose {
   readonly look: KartLook
 }
 
-/** The item race's things to draw this frame (e9-t05): the boxes, and the karts with a shield up */
+/**
+ * The item race's things to draw this frame (e9-t05, e9-t06b): the boxes, the karts with a shield up,
+ * and the shots on the road
+ */
 export interface ItemProps {
   readonly boxes: readonly ItemBoxLook[]
   readonly shields: readonly { readonly x: number; readonly z: number }[]
+  readonly shots: readonly ShotLook[]
 }
 
 /** Where a point of the world is on the canvas, in CSS pixels from its top left; null off screen */
@@ -69,6 +76,11 @@ export interface KartScene {
   readonly canvas: HTMLCanvasElement
   /** `chased` is what the chase camera follows: the direction of travel, and whether it boosts */
   draw(pose: Pose, chased: Chased, frameSeconds: number, look?: KartLook): void
+  /**
+   * Watching (e9-t10): no kart of this browser's own; the camera follows `pose` (a kart drawn by
+   * `others`) from behind, or from high above it with `overhead`
+   */
+  watch(pose: Pose, chased: Chased, frameSeconds: number, overhead: boolean): void
   /** Puts the camera straight behind the car at once, as after a reset */
   snapCamera(heading: number): void
   /** Where the best run's ghost is now (e8-t11), or null to hide it */
@@ -265,6 +277,34 @@ export function createKartScene(
 
       renderer.render(scene, camera)
     },
+    watch({ x, z }, chased, frameSeconds, overhead) {
+      car.visible = false
+      if (shadows) {
+        sun.position.set(x + sunX, sunY, z + sunZ)
+        sun.target.position.set(x, 0, z)
+      }
+      art?.update(performance.now() / 1000)
+      rig = followCar(rig, chased, frameSeconds)
+      const motion = !(reducedMotion?.matches ?? false) && !overhead
+      const fov = overhead ? baseFov : fieldOfView(baseFov, rig, !motion)
+      if (fov !== camera.fov) {
+        camera.fov = fov
+        camera.updateProjectionMatrix()
+      }
+      speedLines.update(rig.pace, rig.pace * REFERENCE_SPEED, frameSeconds, !motion)
+      const sin = Math.sin(rig.heading)
+      const cos = Math.cos(rig.heading)
+      if (overhead) {
+        // High above and a little behind, still turning with the kart's way so the road reads ahead
+        camera.position.set(x - sin * OVERHEAD_BACK, OVERHEAD_UP, z + cos * OVERHEAD_BACK)
+        camera.lookAt(x + sin * CAMERA_LOOK_AHEAD * 4, 0, z - cos * CAMERA_LOOK_AHEAD * 4)
+      } else {
+        const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * 1.2 : 0)
+        camera.position.set(x - sin * back, CAMERA_UP, z + cos * back)
+        camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6, z - cos * CAMERA_LOOK_AHEAD)
+      }
+      renderer.render(scene, camera)
+    },
     snapCamera(heading) {
       rig = startRig(heading)
       effects.lift()
@@ -308,7 +348,7 @@ export function createKartScene(
     },
     items(props, frameSeconds) {
       itemArt ??= createItemArt(scene)
-      itemArt.update(props.boxes, props.shields, frameSeconds)
+      itemArt.update(props.boxes, props.shields, frameSeconds, props.shots)
     },
     project(points) {
       const { clientWidth: width, clientHeight: height } = container

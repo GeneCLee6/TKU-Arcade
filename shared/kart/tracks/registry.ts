@@ -3,6 +3,7 @@
 // sides always agree on the gates.
 import { parseTrack, type Track, type TrackJson } from '../track.ts'
 import { HARBOUR } from './harbour.ts'
+import { OLDSTREET } from './oldstreet.ts'
 import type { RaceTrackId } from './list.ts'
 import { RIVERSIDE } from './riverside.ts'
 import { TAMKANG } from './tamkang.ts'
@@ -11,6 +12,7 @@ export const RACE_TRACKS: Readonly<Record<RaceTrackId, TrackJson>> = {
   riverside: RIVERSIDE,
   harbour: HARBOUR,
   tamkang: TAMKANG,
+  oldstreet: OLDSTREET,
 }
 
 const parsed = new Map<string, Track>()

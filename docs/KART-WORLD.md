@@ -72,7 +72,7 @@
 
 ## 5. 道具
 
-現在道具賽的五個道具（`e9-t06a`，L4）＋平行 PR 正在做的投射型道具（L5，名稱合併後補進這張表）。
+道具賽的五個直接型道具（`e9-t06a`，L4）＋三個投射型道具（`e9-t06b`，L5，#82）。
 
 | id | 現行暫名（程式裡） | 建議名稱 zh-TW | 建議名稱 en | 理由 |
 | --- | --- | --- | --- | --- |
@@ -81,7 +81,9 @@
 | `tow` | 拖繩／Tow Line | **牽罟繩** | **Haul Line** | 牽罟是北海岸漁村拉網的老方法，正好是「把人拉過來」 |
 | `headwind` | 逆風／Headwind | **東北季風** | **Monsoon** | 淡水的冬天就是東北季風；四個字有點長，名牌放不下就留「逆風」 |
 | `swap` | 調包／Switcheroo | **洗牌** | **Shuffle** | 打牌的人一看就懂：位置重洗 |
-| （投射型，L5） | 平行 PR 定 | — | — | 合併後依同一個調性補：建議用河口的東西（例：漂流木、浪花、魚丸） |
+| `hail` | 冰雹／Hailstone | **浪花**（提案） | **Splash**（提案） | 往前直射、撞牆就停：一道打過來的浪；河口的東西，口吻也比「冰雹」輕 |
+| `cloud` | 雷雲／Thundercloud | **午後雷陣雨**→名牌放不下就用**雷陣雨**（提案） | **Thunder Shower**（提案） | 追著前一名、到了就打：淡水夏天午後說來就來的雷陣雨 |
+| `puddle` | 泥水坑／Mud Puddle | **泥灘**（提案） | **Mudflat**（提案） | 丟在路上誰踩到都滑：河口退潮露出的泥灘（挖仔尾） |
 
 ## 6. 賽道
 
@@ -90,14 +92,14 @@
 | `riverside` | 河畔（灰盒）／Riverside (graybox) | **金色水岸** | **Golden Riverbank** | 淡水河岸步道的夕陽；「灰盒」兩字早該拿掉（已經有美術） |
 | `harbour` | 漁港髮夾彎／Harbour Hairpins | **漁人碼頭** | **Fisherman's Wharf** | 淡水真的地名，夕陽、燈塔、漁船都對得上 |
 | `tamkang` | 淡江校園／Tamkang Campus | **五虎崗** | **Five Tigers Hill** | 淡江所在的山崗，校內人都懂；不直接把校名當賽道名 |
-| （道具型，N2） | 平行 PR 定 | **老街夜市** | **Night Market** | PRD 列的主題；寬路、多道具箱、捷徑，正好是夜市巷子 |
+| `oldstreet`（道具型，N2，#83） | 燈籠老街／Lantern Old Street | 燈籠老街（不改）或 **老街夜市** | Lantern Old Street（不改）或 **Night Market** | PRD 列的主題；寬路、多道具箱、廟口分岔，正好是夜市巷子。#83 的暫名已經合這個調性，兩個都可以 |
 
 測試場（`arena`）、測試橢圓（`oval`）是開發用的，不用命名。
 
 ## 7. 拍板後怎麼改（給實作的人）
 
 - **字串**：車名 `shared/kart/i18n.roster.ts` 的 `kart.body.<id>`；車手 `kart.driver.<id>`；一句話介紹 `kart.blurb.<id>`、`kart.driverBlurb.<id>`；賽道 `shared/kart/i18n.ts` 的 `kart.course.<id>` 與 `shared/games/kart/i18n.ts` 的 `games.kart.track.<id>`（多人房的選項）；道具 `shared/games/kart/i18n.screen.ts` 的 `games.kart.item.<id>`；各賽道檔的 `name`。en 是來源，zh-TW 同步，`npm run check-i18n` 會擋。
-- **id 不改**：`tide`、`comet`……、`riverside`、`harbour`、`tamkang`、道具 id。
+- **id 不改**：`tide`、`comet`……、`riverside`、`harbour`、`tamkang`、`oldstreet`、道具 id（含 `hail` `cloud` `puddle`）。
 - **註解**：程式裡寫「working names until KART-WORLD.md」的註解改成「names settled in KART-WORLD.md」。
 - e2e 裡有比對車名的測試（`e2e/kart-spike.spec.ts`），一起改。
 - `IP-CHECKLIST.md` 補一行：新名稱再搜尋一次原作名稱。
@@ -107,6 +109,6 @@
 - [ ] 世界觀「河口盃」、橋藝社四人一桌的設定可以嗎？
 - [ ] 角色：花色本名，還是擬人小名（阿桃、心心、小方、梅子）？英文名？
 - [ ] 車：渡輪、阿給兩個改名要不要？其他四個維持？
-- [ ] 道具：牽罟繩、東北季風、洗牌要不要？
-- [ ] 賽道：金色水岸、漁人碼頭、五虎崗、老街夜市要不要？用「淡江」二字當賽道名可以嗎？
+- [ ] 道具：牽罟繩、東北季風、洗牌要不要？投射型三個：浪花、雷陣雨、泥灘（提案）還是維持冰雹、雷雲、泥水坑？
+- [ ] 賽道：金色水岸、漁人碼頭、五虎崗要不要？第四張維持「燈籠老街」還是改「老街夜市」？用「淡江」二字當賽道名可以嗎？
 - [ ] 數值：極速差 3% 夠不夠「有感」？要不要分車記錄計時賽紀錄？

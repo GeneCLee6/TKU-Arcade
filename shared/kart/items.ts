@@ -4,23 +4,38 @@
 // again (`use`), and the room judges who it reaches from where it last saw every kart; the effect
 // goes out to everyone in the game's state, and each browser applies what it does to its own kart.
 //
-// Five direct items (L4); the thrown and dropped ones come with L5 (e9-t06b). Names and looks are
-// working titles of our own, to be settled with the kart's world (e10-t01).
+// Five direct items (L4) and three thrown or dropped ones (L5, e9-t06b; shots.ts). Names and looks
+// are working titles of our own, to be settled with the kart's world (e10-t01).
 //
 // Pure and shared: the browser and the Worker read the same boxes, frames and table.
 import { KART_TUNING } from './physics.ts'
 import type { Spot } from './course.ts'
 import { courseOf, type Track } from './track.ts'
 
-export const ITEM_IDS = ['boost', 'shield', 'tow', 'headwind', 'swap'] as const
+export const ITEM_IDS = [
+  'boost',
+  'shield',
+  'tow',
+  'headwind',
+  'swap',
+  'hail',
+  'cloud',
+  'puddle',
+] as const
 export type ItemId = (typeof ITEM_IDS)[number]
 
 export const isItemId = (value: unknown): value is ItemId =>
   typeof value === 'string' && (ITEM_IDS as readonly string[]).includes(value)
 
-/** Items that reach another kart (a shield can stop them); the rest are for the kart itself */
-export const TARGETED_ITEMS: ReadonlySet<ItemId> = new Set(['tow', 'headwind', 'swap'])
-/** Of those, the ones that harm: a shield stops them, and is used up doing it */
+/**
+ * Items that need another kart to reach when used, or the room refuses them; the rest are for the
+ * kart itself or go on the road (hail and puddles: shots.ts)
+ */
+export const TARGETED_ITEMS: ReadonlySet<ItemId> = new Set(['tow', 'headwind', 'swap', 'cloud'])
+/**
+ * Of the direct ones, those that harm as they are used: a shield stops them, and is used up doing
+ * it. The shots harm later, when they hit, and a shield is judged then (shots.ts)
+ */
 export const HARMFUL_ITEMS: ReadonlySet<ItemId> = new Set(['headwind', 'swap'])
 
 // ── Numbers ──────────────────────────────────────────────────────────────────────────────────
@@ -65,12 +80,21 @@ export interface ItemBox {
 const ROWS = 3
 const PER_ROW = 5
 
+/** At most this many boxes: a pickup frame names its box in one byte */
+export const MAX_BOXES = 255
+
 /**
- * Where a track's item boxes are: ROWS rows a lap, spread round it at gates (never the finish
- * line), PER_ROW boxes across each, evenly between the gate's ends. Read from the gates, so that
+ * Where a track's item boxes are. A track that places its own (`itemBoxes` in its file: N2's item
+ * track) has them there. Any other has ROWS rows a lap, spread round it at gates (never the finish
+ * line), PER_ROW boxes across each, evenly between the gate's ends: read from the gates, so that
  * every track has them without drawing them in its file, and a reshaped track moves them with it
  */
-export function itemBoxes(track: Pick<Track, 'gates'>): ItemBox[] {
+export function itemBoxes(
+  track: Pick<Track, 'gates'> & Partial<Pick<Track, 'itemBoxes'>>,
+): ItemBox[] {
+  if (track.itemBoxes && track.itemBoxes.length > 0) {
+    return track.itemBoxes.slice(0, MAX_BOXES).map(({ x, z }) => ({ x, z }))
+  }
   const count = track.gates.length
   if (count < 2) return []
   const boxes: ItemBox[] = []
@@ -141,15 +165,16 @@ export function decodeItemFrame(bytes: Uint8Array): ItemFrame | null {
 export type PlaceBucket = 'front' | 'middle' | 'back'
 
 /**
- * How likely each item is, by place: the leader gets only a boost or a shield; the back of the
- * field gets the items that catch up. Weights, not shares; tune freely (a test checks that every
- * item can come out of some place, and nothing that reaches a kart ahead is ever given to the leader)
+ * How likely each item is, by place: the leader gets a boost, a shield or a puddle to drop behind
+ * it; the back of the field gets the items that catch up, the chasing cloud most of all. Weights,
+ * not shares; tune freely (a test checks that every item can come out of some place, and nothing
+ * that reaches a kart ahead, hail included, is ever given to the leader)
  */
 export const ITEM_TABLE: Readonly<Record<PlaceBucket, Readonly<Partial<Record<ItemId, number>>>>> =
   {
-    front: { boost: 5, shield: 5 },
-    middle: { boost: 4, shield: 2, tow: 3, swap: 1 },
-    back: { boost: 3, shield: 1, tow: 3, headwind: 3, swap: 2 },
+    front: { boost: 5, shield: 4, puddle: 3 },
+    middle: { boost: 4, shield: 2, tow: 3, swap: 1, hail: 3, puddle: 2, cloud: 1 },
+    back: { boost: 3, shield: 1, tow: 3, headwind: 3, swap: 2, hail: 2, cloud: 3 },
   }
 
 /** Which part of the field a place (0 is first) out of `racing` is in */

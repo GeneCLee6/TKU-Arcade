@@ -364,7 +364,7 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
       {track && (
         <MapCorner>
           {trial && <RaceClock ref={clock} t={t} trial={trial} />}
-          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
+          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} walls={track.walls} />
         </MapCorner>
       )}
       {track && trial && (

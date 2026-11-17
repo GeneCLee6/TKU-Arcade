@@ -424,9 +424,36 @@ src/kart/
 - **瀏覽器**（`src/kart/race/netRace.ts` 的 `adjust`、`props`）：每一步讀房間 view 的新 `events`，套到自己的車（`shared/kart/itemEffects.ts`：`boostKart`、`headwindStep`、`towStep`、`warpRun`；調包算一次重置，攝影機跟著跳）；開過箱子送 `pickup`（送出後那個箱子在本機先藏 0.7 秒）、按道具鍵送 `use`。效果的時間用對好的伺服器錶算。`spikeLoop.ts` 的 `SpikeNet` 多 `adjust`（每步）與 `props`（每幀，畫道具箱與泡泡），只加不改；單機計時賽不受影響。
 - **畫面**：`src/kart/art/itemArt.ts`（原創造型：立在角上的琥珀色半透明立方體、淡色核心，上下浮動旋轉；泡泡罩是藍色半透明球），色值在 `kartTokens.ts`；`src/kart/race/ItemHud.tsx`（道具欄、自己畫的線條圖示、提示）。輸入多一個 `item` 動作（`shared/kart/input.ts`，C／Q、十字鍵上），「操作設定」自動多一列。
 - **測試**：`tests/kart/items.test.ts`（箱子位置、frame、抽籤權重、四種效果）、`tests/games/kart-items.test.ts`（先到先得、回來時間、離太遠、第一名只拿順風或泡泡罩、5 種道具的對象、泡泡罩擋一次、調包同一圈與跳躍被收）、`e2e/kart-race.spec.ts`（兩個瀏覽器道具賽一圈，有拿有用）。
-- **沒做（下一步）**：投射型道具（L5 `e9-t06b`）、道具音效、別人被逆風吹到時的外觀（現在只有被打的人自己看得到減速與提示）、正式名稱與外觀（`e10-t01`）。
+- **L5 投射型（`e9-t06b`，2026-11-17）**：`shared/kart/shots.ts`（冰雹 `hail`、雷雲 `cloud`、泥水坑 `puddle`，暫名）。state 多 `shots`（投射物：起點、時間、速度、結束時間，位置由這些算出來，不逐格推進）；`use` 多帶 `shot`；新的 `system` 動作 `hit`。命中在 `realtime.frame` 裁定：frame 被 `judgeFrame` 收下後，用那台車上一個 frame 到這個 frame 的直線掃過每顆投射物（`shotHits`），打到就回 `hit`，`reduce` 判泡泡罩、拿掉投射物、加一個 `hit: true` 的事件。瀏覽器讀到打中自己就套 `stunStep`（`itemEffects.ts`）；`itemArt.ts` 畫冰球、三團烏雲加黃色閃電、扁平泥坑（色值在 `kartTokens.ts`）；道具欄多 3 個線條圖示。`ITEM_TABLE`：第一名多泥水坑，中段多冰雹與少量雷雲，後段雷雲最多；第一名永遠拿不到冰雹與雷雲。測試：`tests/kart/shots.test.ts`（生成、飛行、撞牆、掃掠命中、閃開、泥水坑對主人的延遲、雷雲到時、保留上限、暈）、`tests/games/kart-shots.test.ts`（房間裡丟、打中、泡泡罩擋、完賽不打、動作檢查）。線上格式在 `KART-NETCODE.md` §10.1。
+- **沒做（下一步）**：道具音效、別人被打到時的外觀（現在只有被打的人自己看得到減速與提示；被打的車沒有打轉動畫）、正式名稱與外觀（`e10-t01`）。
 
-### 4.16 N3：車款 6、角色 4、選車畫面（`e10-t05a` `e10-t05b`，2026-11-17）
+### 4.16 L5：觀戰與整場重播（`e9-t10`，2026-11-17）
+
+資料從哪來、大小與流量的取捨在 [`KART-NETCODE.md`](KART-NETCODE.md) §11。**伺服器與協定都沒改**：旁觀者本來就收得到所有 frame，重播由每個瀏覽器自己錄。
+
+- **`shared/kart/replay.ts`**（純函式）：`createKartTape`（每台車降到 10 Hz、差分編碼，15 bytes 一個樣本）、`decodeTape`、`sampleAt`（內插、朝向走短邊、重置不內插）、`createReplayRecorder`（frame、道具 `events`、手上道具的變化、結果）、`encodeReplay`／`decodeReplay`（一包，留給 R2）、`openReplay`（時間軸起訖）、`advancePlayhead`／`seekPlayhead`／`togglePlayhead`／`stepSpeed`、`lapsAt`／`heldAt`／`shieldsAt`／`shotsAt`（投射物：錄房間 view 的 `shots`，時間換成從 GO 起算的 ms，提早從 `shots` 消失的就當在那一刻打中，播放時用 `shotPosition` 算位置）。觀戰畫面也照 view 的 `shots` 畫投射物。
+- **`shared/kart/watch.ts`**（純函式）：`watchOrder`（完賽依時間、比賽中依進度、退賽最後）、`cycleSeat`、`keyCommand`、`padCommands`（標準手把：LB RB／十字鍵左右換車、Y 視角、A 播放、扳機 ±5 秒、十字鍵上下速度）。
+- **錄製**：`src/games/kart/useRaceRecorder.ts` 在 `KartScreen`（遊戲畫面 chunk，不含 three.js）裡，每個 seed 一份；聽 `realtime` 的轉送 frame，並包一層 `send` 把自己送出的 frame 也錄下來（`RaceView` 拿到的是包過的 `realtime`，`netRace.ts` 不用改）。
+- **畫面**：`src/kart/watch/`（卡丁車 chunk，lazy）：`watchLoop.ts`（沒有自己的車的場景迴圈：所有車都當「其他車」畫，攝影機跟一台，每幀讀手把）、`SpectateView.tsx`（即時，`remotes.ts` 插值）、`ReplayView.tsx`（重播，`sampleAt`）、`WatchParts.tsx`（HUD 與按鈕）、`watchDom.ts`（按鍵、名牌）、`serverClock.ts`（旁觀者的對時）。`Scene.ts` 只多一個 `watch(pose, chased, seconds, overhead)`：藏起自己的車、車後或俯瞰的攝影機。
+- **接到房間**：`KartScreen` 決定畫什麼：沒座位或退賽 → 觀戰（可關掉看名次表）；車手 → `RaceView`，完賽面板多一個「看其他人跑」（`onWatch`）；結束後結果面板（`resultExtra`）多「看重播」。字串在 `shared/games/kart/i18n.watch.ts`（獨立一檔，跟著比賽畫面的字串註冊）。
+- **沒做（下一步）**：重播存 R2／分享連結、晚來的人拿到整場（要房間錄，見 KART-NETCODE §11 的表）、重播裡的道具箱、自由視角（PRD 寫的「自由視角」先用俯瞰代替）。
+
+### 4.17 N2：道具型賽道「燈籠老街」（`e10-t04a` `e10-t04b`，2026-11-17，`feat/kart-track-3`）
+
+N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發卡丁車；投射型道具在 #82，已先合併）。設計理由與給擁有者試的在 e10 epic 的「N2」一節。
+
+- **佈局**（`shared/kart/tracks/oldstreet.ts`，id `oldstreet`，暫名「燈籠老街」／"Lantern Old Street"）：和其他三張一樣用控制點＋封閉 Catmull-Rom 樣條（`spline.ts`）畫，每 6 m 一點、每 7 點一個 gate（58 個 gate），一圈 **2.42 km**，最窄 28 m（後巷與髮夾彎），直線 40–44 m，起終點在河邊步道 z ≈ 86（往北）。`revision` 省略（第一版是 1，`recordKey` 就是 `oldstreet`）；改佈局時照慣例加 `revision`。
+- **分岔**：格式裡的路還是**一條封閉中線**（沒有加「分支」到賽道格式），分岔是「很寬的路＋路中間一圈牆」：廟口那段路寬 84 m（`FORK_WIDTH`），寬度 ≥ 82 m 的路點上，中線右邊 7–13 m（`ISLAND_INNER`、`ISLAND_OUTER`）是一座攤販島，邊緣與兩端的尖頭用 `walls`（110 段，封閉）圍起來。中線在外道裡、離島 7 m，所以 gate、復位點、逆向判定、小地圖、自動駕駛都不用改；內道（島到內側路緣）最窄 28 m（測試用牆到路緣的實際距離擋）。`parseTrack` 的路寬上限 60 → **90 m**（只為了這段，其他檢查不變）。
+- **道具箱照賽道資料**（`shared/kart/items.ts`）：`itemBoxes(track)` 在賽道有 `itemBoxes` 時直接用（最多 255 個，pickup frame 用一個 byte 指箱子），否則照舊從 gate 算每圈 3 排 × 5 個。房間（`rules.ts`）與瀏覽器（`netRace.ts`）本來就都呼叫 `itemBoxes(track)`，所以不用改；另外三張圖的箱子位置不變。
+- **選得到的地方**：`shared/kart/tracks/list.ts` 的 `RACE_TRACK_IDS` 與 `registry.ts`（多人房間的賽道選項）、`spikeLoop.ts` 的 `SPIKE_COURSES` 與 `TRACKS`（`/kart` 的「場地」選單，`?track=oldstreet`）、兩個 i18n 檔的名稱。最佳紀錄、最快單圈、幽靈車照 `recordKey`，和漁港一樣不用改。
+- **小地圖**（`Minimap.tsx`）：多一個選填的 `walls`，把路緣以外的牆（這張的攤販島）畫在路上，看得出分岔；另外三張沒有 `walls`，畫面不變。
+- **美術**（`src/kart/art/oldStreetArt.ts`，全部程式產生）：主題 `kartThemes.night`（深藍到紫的夜空、月亮用既有的太陽盤畫在西北、半球光調亮到看得清路）；河（步道西邊，水面暗藍、加色混合的燈影、石砌岸與欄杆）；地面鋪石板（canvas 畫的錯縫磚）；攤位（櫃台、亮的櫃台燈條、條紋雨棚、發光招牌、櫃台上的貨，全部 instanced、每攤隨機配色）沿夜市街、燈籠巷、老街、店屋街與攤販島；夜市街與老街每 18 m 一條橫過路面的燈籠串（9.4 m 高、往下垂）、步道河側的燈籠柱；紅磚店屋（亭仔腳拱廊與亮窗用 emissive 貼圖）；廟埕上的廟（石台、紅牆紅柱、兩層橘色歇山意象的屋頂、香爐、燈籠）；攤販島兩端各一塊發光的黃色箭頭板。共用的樹、燈柱、輪胎堆、看台、比賽日佈置照舊（樹不長在河岸與廟埕）。招牌只有顏色、**沒有文字**。`trackArt.ts` 的路外牆改共用一個材質（這張圖的島有 110 段）。
+- **畫質**：攤位、燈籠、店屋照 `density`（低一半、中三分之二、高全部）。
+- **測試**：`tests/kart/oldstreet.test.ts`（合法、在房間選單、`recordKey`、長度、最窄 28 m 與兩條道各 28 m 以上、不自交與路緣不折疊、島是封閉的牆且不擋復位點與起跑格、內道比外道最貼的線短 70 m 以上、道具箱照檔案擺且都在路上、不在內道、不在終點線、自動駕駛三圈不逆向；河與廟離路、廟上不長樹）；`tests/kart/items.test.ts` 改成「沒有自己箱子的賽道」每圈 15 個。
+- **數字**：卡丁車 chunk 230.4 → **234.3 kB** gzip（預算 600 kB）；主站與各遊戲首屏不變（房間選項只多一個 id 與兩個名稱字串）。
+- **沒做**：跳台與高低差（物理是平面）；人甩尾實測與多人道具賽實測；攤位與燈籠的動畫（只有招牌亮度微微閃、河水流動）；夜景在實體手機上的亮度。
+
+### 4.18 N3：車款 6、角色 4、選車畫面（`e10-t05a` `e10-t05b`，2026-11-17）
 
 名稱與數值表在 [`KART-WORLD.md`](KART-WORLD.md)（草稿，名稱待拍板）。
 

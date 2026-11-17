@@ -1,9 +1,10 @@
-// e9-t06a: what an item does to a kart, in its own browser. The room decides who an item reaches
+// e9-t06a, e9-t06b: what an item does to a kart, in its own browser. The room decides who an item reaches
 // (shared/games/kart/rules.ts); each browser then changes its own kart, step by step, with these.
 // Pure, so that the numbers are tested without a page.
 import type { Run } from './course.ts'
 import { HEADWIND_TOP_SPEED, ITEM_TUNING, safeBehind, TOW_TOP_SPEED, type Warp } from './items.ts'
-import type { KartState } from './physics.ts'
+import { KART_TUNING, type KartState } from './physics.ts'
+import { SHOT_TUNING } from './shots.ts'
 import type { Track } from './track.ts'
 
 /** The boost: the physics' own, so that it looks, sounds and stacks as any other */
@@ -77,5 +78,30 @@ export function warpRun(run: Run, warp: Warp, track: Track): Run {
     candidate: null,
     candidateSeconds: 0,
     resets: run.resets + 1,
+  }
+}
+
+/** The top speed while stunned by a shot (e9-t06b), m/s */
+export const STUN_TOP_SPEED = KART_TUNING.topSpeed * SHOT_TUNING.stunTopFactor
+
+/**
+ * A stunned step (e9-t06b, hit by a shot): every boost lost, and the speed brought down
+ * hard to the stun's top. Harsher than a headwind, and shorter
+ */
+export function stunStep(kart: KartState, seconds: number): KartState {
+  const speed = Math.hypot(kart.vx, kart.vz)
+  const calm = kart.boostSeconds === 0 && kart.miniSeconds === 0 && kart.stackSeconds === 0
+  if (speed <= STUN_TOP_SPEED && calm) return kart
+  const share =
+    speed > STUN_TOP_SPEED
+      ? Math.max(STUN_TOP_SPEED / speed, 1 - SHOT_TUNING.stunDrag * seconds)
+      : 1
+  return {
+    ...kart,
+    vx: kart.vx * share,
+    vz: kart.vz * share,
+    boostSeconds: 0,
+    miniSeconds: 0,
+    stackSeconds: 0,
   }
 }

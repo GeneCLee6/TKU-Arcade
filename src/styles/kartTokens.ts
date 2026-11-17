@@ -57,6 +57,12 @@ export const kartScene = {
   itemBox: '#FFA62B',
   itemBoxCore: '#FFF6DA',
   shield: '#6FE0FF',
+  // The shots (e9-t06b): an icy hailstone, a dark thundercloud and its bolt, a mud puddle
+  hail: '#E3F4FF',
+  cloud: '#4A5262',
+  bolt: '#FFE14D',
+  puddle: '#7A5A36',
+  puddleDeep: '#4E3820',
   flame: '#FFB020',
   flameCore: '#FFF3C4',
   lightSky: '#FFFFFF',
@@ -129,6 +135,22 @@ export const kartThemes = {
     sunDirection: [-45, 70, 35],
     sunDisc: null,
     sunGlow: null,
+  },
+  // N2's item track (e10-t04b): a night market, the moon low over the river, the haze of the
+  // street lights on the horizon; light enough to read the road by
+  night: {
+    skyTop: '#070B24',
+    skyMiddle: '#1F2158',
+    skyHorizon: '#4D3A74',
+    fog: '#2C2552',
+    hemisphereSky: '#A7B2FF',
+    hemisphereGround: '#5A4466',
+    hemisphereIntensity: 1.6,
+    sun: '#C9D5FF',
+    sunIntensity: 1.25,
+    sunDirection: [-55, 40, -45],
+    sunDisc: '#F6F2DC',
+    sunGlow: '#8EA2E8',
   },
 } as const satisfies Record<string, KartTheme>
 
@@ -261,4 +283,40 @@ export const tamkangScene = {
   townRoofs: ['#8C4A32', '#6B6F78', '#A85B3A', '#4E5A63'],
   window: '#33465A',
   signText: '#2B2B2B',
+} as const
+
+/**
+ * N2's item track, the old street night market (e10-t04b): our own palette. Stone paving, red brick
+ * shophouses with lit windows, stall canopies and bright signboards, red lanterns, a temple with
+ * red columns and orange tiled roofs, the river dark under the moon.
+ */
+export const oldStreetScene = {
+  paving: '#6E6670',
+  pavingJoint: '#4E4752',
+  river: '#2B3F6E',
+  riverGlint: '#FFD38A',
+  rail: '#3A3540',
+  shopWalls: ['#9C4A36', '#B0593F', '#8A4032', '#A86E52', '#C49A74'],
+  shopRoof: '#3B2F33',
+  arcade: '#1E1A22',
+  window: '#2A2734',
+  windowLit: '#FFC873',
+  canopies: ['#E8423F', '#F2B530', '#2E9CCA', '#43B36B', '#E86AA6', '#F47B30', '#F4F1EA'],
+  signs: ['#FF4F6E', '#FFD447', '#4FE3FF', '#7CFF8A', '#FF9F43', '#C68BFF', '#FFFFFF'],
+  counter: '#5A3B2B',
+  counterLight: '#FFE2A6',
+  goods: ['#F2C14E', '#E4572E', '#7FB069', '#F6E8C3', '#C8553D'],
+  lantern: '#FF4A2E',
+  lanternCap: '#2B1B14',
+  pole: '#2E2A30',
+  templeWall: '#B8322B',
+  templeColumn: '#C9302C',
+  templeRoof: '#E07A2E',
+  templeRidge: '#2F8F7A',
+  templeStone: '#A9A29A',
+  censer: '#3D3530',
+  chevron: '#FFD23F',
+  // The house fronts' texture: near white, each house tinting it; black where a glow map is unlit
+  facade: '#F2F2F2',
+  unlit: '#000000',
 } as const
