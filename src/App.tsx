@@ -33,8 +33,9 @@ const RulesPage = lazy(() =>
 // e8-t01: reached only by typing the address. Nothing links here, and three.js loads with this chunk
 // e8-t14: the kart's time trial, the same chunk as the spike without its tools. Not in the lobby
 // until the handling is signed off (K3)
+// 2026-11-17: with a race against the computer from its menu (src/kart/bots/KartPlay.tsx)
 const KartPlayPage = lazy(() =>
-  import('./kart/SpikePage.tsx').then(({ SpikePage }) => ({ default: () => <SpikePage play /> })),
+  import('./kart/bots/KartPlay.tsx').then(({ KartPlay }) => ({ default: KartPlay })),
 )
 
 const KartSpikePage = lazy(() =>
