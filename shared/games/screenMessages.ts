@@ -5,6 +5,7 @@ import { bluffScreenMessages } from './bluff/i18n.screen.ts'
 import { lanternScreenMessages } from './lantern/i18n.screen.ts'
 import { clueClashScreenMessages } from './clue-clash/i18n.screen.ts'
 import { kartScreenMessages } from './kart/i18n.screen.ts'
+import { kartWatchMessages } from './kart/i18n.watch.ts'
 import { kiteScreenMessages } from './kite/i18n.screen.ts'
 import { miseryScreenMessages } from './misery/i18n.screen.ts'
 import { oddWordScreenMessages } from './odd-word/i18n.screen.ts'
@@ -48,6 +49,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...holdemScreenMessages.en,
     ...miseryScreenMessages.en,
     ...kartScreenMessages.en,
+    ...kartWatchMessages.en,
     ...roomExtraMessages.en,
   },
   'zh-TW': {
@@ -72,6 +74,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...holdemScreenMessages['zh-TW'],
     ...miseryScreenMessages['zh-TW'],
     ...kartScreenMessages['zh-TW'],
+    ...kartWatchMessages['zh-TW'],
     ...roomExtraMessages['zh-TW'],
   },
 }

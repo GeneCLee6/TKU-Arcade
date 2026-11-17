@@ -427,6 +427,17 @@ src/kart/
 - **L5 投射型（`e9-t06b`，2026-11-17）**：`shared/kart/shots.ts`（冰雹 `hail`、雷雲 `cloud`、泥水坑 `puddle`，暫名）。state 多 `shots`（投射物：起點、時間、速度、結束時間，位置由這些算出來，不逐格推進）；`use` 多帶 `shot`；新的 `system` 動作 `hit`。命中在 `realtime.frame` 裁定：frame 被 `judgeFrame` 收下後，用那台車上一個 frame 到這個 frame 的直線掃過每顆投射物（`shotHits`），打到就回 `hit`，`reduce` 判泡泡罩、拿掉投射物、加一個 `hit: true` 的事件。瀏覽器讀到打中自己就套 `stunStep`（`itemEffects.ts`）；`itemArt.ts` 畫冰球、三團烏雲加黃色閃電、扁平泥坑（色值在 `kartTokens.ts`）；道具欄多 3 個線條圖示。`ITEM_TABLE`：第一名多泥水坑，中段多冰雹與少量雷雲，後段雷雲最多；第一名永遠拿不到冰雹與雷雲。測試：`tests/kart/shots.test.ts`（生成、飛行、撞牆、掃掠命中、閃開、泥水坑對主人的延遲、雷雲到時、保留上限、暈）、`tests/games/kart-shots.test.ts`（房間裡丟、打中、泡泡罩擋、完賽不打、動作檢查）。線上格式在 `KART-NETCODE.md` §10.1。
 - **沒做（下一步）**：道具音效、別人被打到時的外觀（現在只有被打的人自己看得到減速與提示；被打的車沒有打轉動畫）、正式名稱與外觀（`e10-t01`）。
 
+### 4.16 L5：觀戰與整場重播（`e9-t10`，2026-11-17）
+
+資料從哪來、大小與流量的取捨在 [`KART-NETCODE.md`](KART-NETCODE.md) §11。**伺服器與協定都沒改**：旁觀者本來就收得到所有 frame，重播由每個瀏覽器自己錄。
+
+- **`shared/kart/replay.ts`**（純函式）：`createKartTape`（每台車降到 10 Hz、差分編碼，15 bytes 一個樣本）、`decodeTape`、`sampleAt`（內插、朝向走短邊、重置不內插）、`createReplayRecorder`（frame、道具 `events`、手上道具的變化、結果）、`encodeReplay`／`decodeReplay`（一包，留給 R2）、`openReplay`（時間軸起訖）、`advancePlayhead`／`seekPlayhead`／`togglePlayhead`／`stepSpeed`、`lapsAt`／`heldAt`／`shieldsAt`／`shotsAt`（投射物：錄房間 view 的 `shots`，時間換成從 GO 起算的 ms，提早從 `shots` 消失的就當在那一刻打中，播放時用 `shotPosition` 算位置）。觀戰畫面也照 view 的 `shots` 畫投射物。
+- **`shared/kart/watch.ts`**（純函式）：`watchOrder`（完賽依時間、比賽中依進度、退賽最後）、`cycleSeat`、`keyCommand`、`padCommands`（標準手把：LB RB／十字鍵左右換車、Y 視角、A 播放、扳機 ±5 秒、十字鍵上下速度）。
+- **錄製**：`src/games/kart/useRaceRecorder.ts` 在 `KartScreen`（遊戲畫面 chunk，不含 three.js）裡，每個 seed 一份；聽 `realtime` 的轉送 frame，並包一層 `send` 把自己送出的 frame 也錄下來（`RaceView` 拿到的是包過的 `realtime`，`netRace.ts` 不用改）。
+- **畫面**：`src/kart/watch/`（卡丁車 chunk，lazy）：`watchLoop.ts`（沒有自己的車的場景迴圈：所有車都當「其他車」畫，攝影機跟一台，每幀讀手把）、`SpectateView.tsx`（即時，`remotes.ts` 插值）、`ReplayView.tsx`（重播，`sampleAt`）、`WatchParts.tsx`（HUD 與按鈕）、`watchDom.ts`（按鍵、名牌）、`serverClock.ts`（旁觀者的對時）。`Scene.ts` 只多一個 `watch(pose, chased, seconds, overhead)`：藏起自己的車、車後或俯瞰的攝影機。
+- **接到房間**：`KartScreen` 決定畫什麼：沒座位或退賽 → 觀戰（可關掉看名次表）；車手 → `RaceView`，完賽面板多一個「看其他人跑」（`onWatch`）；結束後結果面板（`resultExtra`）多「看重播」。字串在 `shared/games/kart/i18n.watch.ts`（獨立一檔，跟著比賽畫面的字串註冊）。
+- **沒做（下一步）**：重播存 R2／分享連結、晚來的人拿到整場（要房間錄，見 KART-NETCODE §11 的表）、重播裡的道具箱、自由視角（PRD 寫的「自由視角」先用俯瞰代替）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
