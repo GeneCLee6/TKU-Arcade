@@ -50,6 +50,9 @@ const en = {
   'games.kart.item.youHit': 'Your {item} hit {name}',
   'games.kart.item.hitShot': "{name}'s {item} got you!",
   'games.kart.item.hitOwn': 'You drove into your own {item}!',
+  'games.kart.item.stunned': 'Spun out!',
+  'games.kart.result.garage': 'Change kart or driver',
+  'games.kart.result.garageClose': 'Done',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -100,6 +103,9 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.item.youHit': '你的{item}打中了 {name}',
   'games.kart.item.hitShot': '被 {name} 的{item}打中了！',
   'games.kart.item.hitOwn': '你開進了自己的{item}！',
+  'games.kart.item.stunned': '被打得團團轉！',
+  'games.kart.result.garage': '換車或換角色',
+  'games.kart.result.garageClose': '選好了',
 }
 
 export const kartScreenMessages = { en, 'zh-TW': zhTW }

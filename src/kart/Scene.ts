@@ -1,5 +1,6 @@
 import {
   BoxGeometry,
+  Group,
   Color,
   DirectionalLight,
   Fog,
@@ -24,6 +25,8 @@ import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.t
 import type { DriverId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { createItemArt, type ItemArt, type ItemBoxLook, type ShotLook } from './art/itemArt.ts'
+import { createHitArt, type HitArt, type HitBurst } from './art/hitArt.ts'
+import { OWN_KART, type SpinPose } from './hitFx.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 import { kartScene, kartThemes } from '../styles/kartTokens.ts'
@@ -67,6 +70,16 @@ export interface ItemProps {
   readonly shots: readonly ShotLook[]
 }
 
+/**
+ * A hit's looks this frame (2026-11-17, hitFx.ts): each kart's spin by id (OWN_KART for this
+ * browser's), the bursts to start, and the chase camera's shake
+ */
+export interface HitFrame {
+  readonly spins: ReadonlyMap<number, SpinPose>
+  readonly bursts: readonly HitBurst[]
+  readonly shake?: { readonly x: number; readonly y: number }
+}
+
 /** Where a point of the world is on the canvas, in CSS pixels from its top left; null off screen */
 export type ScreenPoint = { readonly x: number; readonly y: number } | null
 
@@ -89,6 +102,8 @@ export interface KartScene {
   others(karts: readonly OtherKart[], frameSeconds: number): void
   /** The item boxes and shields this frame (e9-t05); made the first time there are any */
   items(props: ItemProps, frameSeconds: number): void
+  /** A hit's spins, bursts and shake (2026-11-17); called before `others` and `draw` */
+  hits(frame: HitFrame, frameSeconds: number): void
   /** Where each of these points (x, height, z) is on screen, as of the last frame drawn */
   project(points: readonly (readonly [number, number, number])[]): ScreenPoint[]
   /** `{width}x{height}` of the drawing buffer */
@@ -198,6 +213,14 @@ export function createKartScene(
   // The other racers' karts, by id, made when each first appears
   const otherKarts = new Map<number, KartModel>()
   let itemArt: ItemArt | null = null
+  let hitArt: HitArt | null = null
+  let spins: ReadonlyMap<number, SpinPose> = new Map()
+  let shake = { x: 0, y: 0 }
+  /** A spin is added to the drawn model only: the kart is where the physics has it */
+  const spinModel = (group: Group, heading: number, spin: SpinPose | undefined) => {
+    group.rotation.set(0, -heading - (spin?.yaw ?? 0), spin?.roll ?? 0, 'YXZ')
+    group.position.y = spin?.lift ?? 0
+  }
   const projected = new Vector3()
 
   // One box per wall, along its centre line: the test yard's. A track's art draws its own barriers
@@ -245,7 +268,7 @@ export function createKartScene(
     canvas: renderer.domElement,
     draw({ x, z, heading }, chased, frameSeconds, look = STILL) {
       car.position.set(x, 0, z)
-      car.rotation.y = -heading
+      spinModel(car, heading, spins.get(OWN_KART))
       kart.update(look, frameSeconds)
       effects.update({ x, z, heading }, look, frameSeconds)
 
@@ -273,6 +296,7 @@ export function createKartScene(
       const sin = Math.sin(rig.heading)
       const cos = Math.cos(rig.heading)
       camera.position.set(x - sin * back, CAMERA_UP, z + cos * back)
+      if (motion) camera.position.add(projected.set(cos * shake.x, shake.y, sin * shake.x))
       camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6, z - cos * CAMERA_LOOK_AHEAD)
 
       renderer.render(scene, camera)
@@ -336,7 +360,7 @@ export function createKartScene(
           scene.add(model.group)
         }
         model.group.position.set(other.x, 0, other.z)
-        model.group.rotation.y = -other.heading
+        spinModel(model.group, other.heading, spins.get(other.id))
         model.update(other.look, frameSeconds)
       }
       for (const [id, model] of otherKarts) {
@@ -349,6 +373,13 @@ export function createKartScene(
     items(props, frameSeconds) {
       itemArt ??= createItemArt(scene)
       itemArt.update(props.boxes, props.shields, frameSeconds, props.shots)
+    },
+    hits(frame, frameSeconds) {
+      spins = frame.spins
+      shake = frame.shake ?? { x: 0, y: 0 }
+      if (!hitArt && frame.bursts.length === 0) return
+      hitArt ??= createHitArt(scene)
+      hitArt.update(frame.bursts, frameSeconds)
     },
     project(points) {
       const { clientWidth: width, clientHeight: height } = container
@@ -375,6 +406,7 @@ export function createKartScene(
       ghostKart?.dispose()
       for (const model of otherKarts.values()) model.dispose()
       itemArt?.dispose()
+      hitArt?.dispose()
       art?.dispose()
       grid.material.dispose()
       renderer.dispose()

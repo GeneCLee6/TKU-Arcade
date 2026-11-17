@@ -17,6 +17,8 @@ const RaceView = lazy(() => import('../../kart/race/RaceView.tsx'))
 // Watching it live and its replay (e9-t10): the same scene, loaded only when asked for
 const SpectateView = lazy(() => import('../../kart/watch/SpectateView.tsx'))
 const ReplayView = lazy(() => import('../../kart/watch/ReplayView.tsx'))
+// 2026-11-17: the waiting room's garage, opened from the results to race the rematch in another kart
+const RoomGarage = lazy(() => import('../../kart/roster/RoomGarage.tsx'))
 
 /**
  * The race room's screen (e9-t07, e9-t08, e9-t10). A racer gets the race full screen, from the grid
@@ -32,6 +34,7 @@ export default function KartScreen({ room, game }: GameScreenProps) {
   // Watching live: null until chosen, and then the default is whether there is no kart to drive
   const [watchChoice, setWatchChoice] = useState<boolean | null>(null)
   const [replay, setReplay] = useState<Replay | null>(null)
+  const [garage, setGarage] = useState(false)
   const nameOf = (seat: number) =>
     Object.values(room.view.members).find((member) => member.seat === seat)?.name ??
     t('room.waiting.seat', { seat: seat + 1 })
@@ -65,22 +68,42 @@ export default function KartScreen({ room, game }: GameScreenProps) {
     )
   }
   const canReplay = game.over && recording.recorder.hasFrames()
+  const canChange = game.over && me !== undefined && room.onSetLook !== undefined
   return (
     <>
       <GameLayout
         room={room}
         resultExtra={
-          canReplay && (
-            <Button
-              $variant="secondary"
-              onClick={() => setReplay(recording.recorder.replay())}
-              data-testid="kart-replay-open"
-            >
-              {t('games.kart.replay.watch')}
-            </Button>
+          (canReplay || canChange) && (
+            <>
+              {canReplay && (
+                <Button
+                  $variant="secondary"
+                  onClick={() => setReplay(recording.recorder.replay())}
+                  data-testid="kart-replay-open"
+                >
+                  {t('games.kart.replay.watch')}
+                </Button>
+              )}
+              {canChange && (
+                <Button
+                  $variant="secondary"
+                  aria-expanded={garage}
+                  onClick={() => setGarage((open) => !open)}
+                  data-testid="kart-result-garage"
+                >
+                  {t(garage ? 'games.kart.result.garageClose' : 'games.kart.result.garage')}
+                </Button>
+              )}
+            </>
           )
         }
       >
+        {canChange && garage && room.onSetLook && (
+          <Suspense fallback={loading}>
+            <RoomGarage members={room.view.members} you={room.you} onSetLook={room.onSetLook} />
+          </Suspense>
+        )}
         {!game.over && (
           <Watching>
             <p role="status">{t('games.kart.watch.spectating')}</p>

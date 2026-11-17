@@ -39,6 +39,7 @@ import { color, fontSize, space } from '../../styles/tokens.ts'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { supportsWebGL2 } from '../Scene.ts'
+import { crossed, effectsOf, hitFrameOf } from '../hitFx.ts'
 import { startWatchLoop, type WatchedKart } from './watchLoop.ts'
 import {
   Fallback,
@@ -184,6 +185,11 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
   useEffect(() => {
     if (!stage.current || !track || failure) return
     let stop: (() => void) | undefined
+    // 2026-11-17: the recorded hits spin their karts; a burst only when playing through its moment
+    const hitEffects = reel.replay.events.flatMap((event) =>
+      effectsOf({ ...event, at: (event.tick * 1000) / TICKS_PER_SECOND }),
+    )
+    let lastMs: number | null = null
     try {
       stop = startWatchLoop(stage.current, {
         track,
@@ -192,6 +198,15 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
           head.current = advancePlayhead(head.current, seconds, reel)
           const tick = head.current.tick
           const karts = kartsAt(reel, tick)
+          const nowMs = (tick * 1000) / TICKS_PER_SECOND
+          const playedThrough = lastMs !== null && nowMs > lastMs && nowMs - lastMs < 500
+          const hits = hitFrameOf(
+            hitEffects,
+            playedThrough ? crossed(hitEffects, lastMs as number, nowMs) : [],
+            nowMs,
+            (seat) => karts.find((kart) => kart.id === seat),
+          )
+          lastMs = nowMs
           const props =
             reel.replay.mode === 'items'
               ? {
@@ -206,7 +221,7 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
                   ),
                 }
               : null
-          return { karts, follow: followRef.current, overhead: overheadRef.current, props }
+          return { karts, follow: followRef.current, overhead: overheadRef.current, props, hits }
         },
         drawn(scene, frame) {
           const others = frame.karts.filter((kart) => kart.id !== frame.follow)

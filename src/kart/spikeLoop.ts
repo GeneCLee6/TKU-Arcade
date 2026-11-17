@@ -50,12 +50,14 @@ import { calloutAtStart, calloutBetween, louder, type Callout } from './callouts
 import { readGamepad } from './devices.ts'
 import {
   createKartScene,
+  type HitFrame,
   type ItemProps,
   type KartScene,
   type OtherKart,
   type Pose,
 } from './Scene.ts'
 import type { KartLook } from './art/kartModel.ts'
+import type { ItemCue } from './hitFx.ts'
 
 const STATS_EVERY_MS = 500
 
@@ -222,6 +224,8 @@ export interface SpikeNet {
   readonly adjust?: (run: Run, input: KartInput) => Run
   /** Each frame, before drawing: the item boxes and the shields to draw, this kart's at `own` */
   readonly props?: (own: Pose) => ItemProps
+  /** 2026-11-17: each frame, before drawing: a hit's spins, bursts and shake, and the item sounds */
+  readonly fx?: (own: Pose) => (HitFrame & { readonly cues: readonly ItemCue[] }) | null
 }
 
 /** Read every frame, so that a remap or a rule switch applies at once */
@@ -504,6 +508,11 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       bursts,
     }
     const pose = poseBetween(previous, current, clock.alpha)
+    const hitFrame = net?.fx?.(pose)
+    if (hitFrame) {
+      scene.hits(hitFrame, frameMs / 1000)
+      for (const cue of hitFrame.cues) audio.cue(cue)
+    }
     if (net) scene.others(net.others(), frameMs / 1000)
     if (net?.props) scene.items(net.props(pose), frameMs / 1000)
     scene.draw(

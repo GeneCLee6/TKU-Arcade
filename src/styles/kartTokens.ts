@@ -63,6 +63,11 @@ export const kartScene = {
   bolt: '#FFE14D',
   puddle: '#7A5A36',
   puddleDeep: '#4E3820',
+  // A hit (2026-11-17): the four-pointed sparkles thrown up round a stunned kart, the white flash
+  // of the moment it is hit, and the pale shards of a shield bubble popping
+  hitStar: '#FFE98A',
+  hitFlash: '#FFFFFF',
+  popShard: '#C9F6FF',
   flame: '#FFB020',
   flameCore: '#FFF3C4',
   lightSky: '#FFFFFF',
