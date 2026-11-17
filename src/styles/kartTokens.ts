@@ -57,6 +57,12 @@ export const kartScene = {
   itemBox: '#FFA62B',
   itemBoxCore: '#FFF6DA',
   shield: '#6FE0FF',
+  // The shots (e9-t06b): an icy hailstone, a dark thundercloud and its bolt, a mud puddle
+  hail: '#E3F4FF',
+  cloud: '#4A5262',
+  bolt: '#FFE14D',
+  puddle: '#7A5A36',
+  puddleDeep: '#4E3820',
   flame: '#FFB020',
   flameCore: '#FFF3C4',
   lightSky: '#FFFFFF',
