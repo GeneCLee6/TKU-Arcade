@@ -18,6 +18,7 @@ import {
   type KartState,
   type KartTuning,
 } from './physics.ts'
+import { settleTerrain, stepOnTerrain, type Terrain, type TerrainEvent } from './terrain.ts'
 import { gateCrossing, type BoostPad, type Gate } from './track.ts'
 import { collideWalls, KART_RADIUS, wallClearance, type Wall } from './walls.ts'
 
@@ -39,6 +40,11 @@ export interface Course {
   }
   /** Strips on the road that boost whoever drives over them */
   readonly boostPads?: readonly BoostPad[]
+  /**
+   * Slopes and jumps (2026-11-17, terrain.ts); absent on a flat track, whose cars then take exactly
+   * the steps they always took
+   */
+  readonly terrain?: Terrain
 }
 
 /** Whether (x, z) is on `pad`: within half its length along its heading and half its width across */
@@ -66,7 +72,8 @@ function afterWalls(kart: KartState, hitSpeed: number, course: Course, tuning: K
     }
   }
   const pads = course.boostPads
-  if (pads && pads.length > 0 && next.boostSeconds < tuning.padBoostSeconds) {
+  // A car in the air (terrain.ts) flies over a pad: `air` is never set on a flat track
+  if (pads && pads.length > 0 && next.boostSeconds < tuning.padBoostSeconds && !next.air) {
     if (pads.some((pad) => onPad(pad, next.x, next.z))) {
       next = { ...next, boostSeconds: tuning.padBoostSeconds }
     }
@@ -100,6 +107,11 @@ export interface Run {
   readonly nextGate: number
   /** On a track: how many times the finish line has been crossed going forwards, in order */
   readonly crossings: number
+  /**
+   * On a track with terrain (terrain.ts): whether the last step took off or landed, for the sound
+   * and the look. Absent on a flat track
+   */
+  readonly terrainEvent?: TerrainEvent
 }
 
 const placed = (spot: Spot): KartState => ({ ...INITIAL_KART, ...spot })
@@ -194,14 +206,25 @@ export function stepRun(
   const resetPressed = (input.reset ?? false) && !run.resetHeld
   if (resetPressed) return { ...resetRun(run), resetHeld: true }
 
-  const moved = stepKart(run.kart, input, tuning, rules)
+  const terrain = course.terrain
+  const moved = terrain
+    ? stepOnTerrain(run.kart, input, terrain, tuning, rules)
+    : stepKart(run.kart, input, tuning, rules)
   const {
     state: walled,
     impact,
     hitSpeed,
     touching,
   } = collideWalls(run.kart, moved, course.walls, tuning)
-  const kart = afterWalls(walled, hitSpeed, course, tuning)
+  let kart = afterWalls(walled, hitSpeed, course, tuning)
+  // On a track with terrain: take off, land, or sit on the ground
+  let terrainEvent: TerrainEvent | undefined
+  if (terrain) {
+    const settled = settleTerrain(run.kart, kart, input, terrain)
+    kart = settled.kart
+    terrainEvent = settled.event
+  }
+  const marked = terrainEvent === undefined ? {} : { terrainEvent }
 
   let { safe, candidate, candidateSeconds } = run
   const { nextGate, crossings } = run
@@ -225,6 +248,7 @@ export function stepRun(
       resets: run.resets,
       nextGate: passed.nextGate,
       crossings: passed.crossings,
+      ...marked,
     }
   }
 
@@ -260,5 +284,6 @@ export function stepRun(
     resets: run.resets,
     nextGate,
     crossings,
+    ...marked,
   }
 }

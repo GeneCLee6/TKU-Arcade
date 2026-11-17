@@ -48,6 +48,7 @@ import {
   tamkangTreeFits,
 } from './tamkangArt.ts'
 import { buildFestival } from './festival.ts'
+import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { buildOldStreet, inOldStreetRiver, oldStreetTreeFits } from './oldStreetArt.ts'
 import {
   ASPHALT_LENGTH,
@@ -143,7 +144,8 @@ function edges(track: Pick<Track, 'road'>, inset = 0) {
 function strip(
   inner: { x: number; z: number }[],
   outer: { x: number; z: number }[],
-  y: number,
+  /** The height: one for the whole loop, or (a track with terrain, 2026-11-17) one per point */
+  y: number | readonly number[],
   along: number[],
   length: number,
   every: number,
@@ -156,7 +158,8 @@ function strip(
   for (let index = 0; index <= count; index++) {
     const at = index % count
     const v = (index === count ? length : along[at]!) / every
-    positions.push(inner[at]!.x, y, inner[at]!.z, outer[at]!.x, y, outer[at]!.z)
+    const height = typeof y === 'number' ? y : y[at]!
+    positions.push(inner[at]!.x, height, inner[at]!.z, outer[at]!.x, height, outer[at]!.z)
     uvs.push(0, v, 1, v)
     if (index < count) {
       const a = index * 2
@@ -172,6 +175,8 @@ function barrier(
   out: { x: number; z: number }[],
   along: number[],
   length: number,
+  /** A track with terrain (2026-11-17): the road's height at each point; the back reaches the ground below */
+  heights?: readonly number[],
 ): BufferGeometry {
   const positions: number[] = []
   const uvs: number[] = []
@@ -184,19 +189,20 @@ function barrier(
     const u = (index === count ? length : along[at]!) / BARRIER_LENGTH
     const backX = p.x + o.x * BARRIER_THICKNESS
     const backZ = p.z + o.z * BARRIER_THICKNESS
+    const base = heights ? heights[at]! : 0
     // Face (bottom, top), top's back edge, back face bottom
     positions.push(
       p.x,
-      0,
+      base,
       p.z,
       p.x,
-      BARRIER_HEIGHT,
+      base + BARRIER_HEIGHT,
       p.z,
       backX,
-      BARRIER_HEIGHT,
+      base + BARRIER_HEIGHT,
       backZ,
       backX,
-      0,
+      heights ? base - 4 : 0,
       backZ,
     )
     uvs.push(u, 0, u, 0.82, u, 1, u, 0)
@@ -296,8 +302,13 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   const keep = <T extends BufferGeometry>(geometry: T) => (geometries.push(geometry), geometry)
   const own = <T extends Material>(material: T) => (materials.push(material), material)
   const ownTexture = <T extends Texture>(texture: T) => (extraTextures.push(texture), texture)
-  /** How high the ground is: flat but for the harbour's hillside */
-  const groundAt = harbour ? harbourGround : tamkang ? tamkangGround : () => 0
+  // 2026-11-17: a track with slopes and jumps (hillArt.ts): its ground follows the road
+  const hillAt = hillGround(track)
+  /** How high the ground is: flat but for the harbour's hillside, the campus and a hill track */
+  const groundAt = harbour ? harbourGround : tamkang ? tamkangGround : (hillAt ?? (() => 0))
+  /** The road's height at each point: none on a flat track */
+  const roadHeights = hillAt ? track.road.map((point) => point.y ?? 0) : null
+  const lifted = (lift: number) => (roadHeights ? roadHeights.map((height) => height + lift) : lift)
   const standard = (color: string, map?: Texture) =>
     own(
       new MeshStandardMaterial({
@@ -343,7 +354,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   textures.grass.repeat.set(groundWidth / 10, groundDepth / 10)
   ground.rotation.x = -Math.PI / 2
   ground.position.set(groundWest + groundWidth / 2, 0, groundNorth + groundDepth / 2)
-  // The campus brings its own ground, with the hillside in it
+  // The campus brings its own ground, with the hillside in it; a hill track its height field, over
+  // a plain a little lower
+  if (roadHeights) ground.position.y = Math.min(0, ...roadHeights) - 0.6
   if (!tamkang) group.add(shadowed(ground, false))
   const dome = sky(theme)
   keep(dome.geometry)
@@ -356,7 +369,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     strip(
       sides.map((side) => side.left),
       sides.map((side) => side.right),
-      LIFT.road,
+      lifted(LIFT.road),
       along,
       length,
       ASPHALT_LENGTH,
@@ -376,7 +389,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
         strip(
           sides.map((edge) => edge[side]),
           kerbInner.map((edge) => edge[side]),
-          LIFT.kerb,
+          lifted(LIFT.kerb),
           along,
           length,
           KERB_LENGTH,
@@ -392,6 +405,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
           sides.map((edge) => edge[`${side}Out`]),
           along,
           length,
+          roadHeights ?? undefined,
         ),
       ),
       own(new MeshLambertMaterial({ map: textures.barrier, side: DoubleSide })),
@@ -425,7 +439,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     )
     textures.checker.repeat.set(span / 2.4, 1)
     band.rotation.set(-Math.PI / 2, 0, angle)
-    band.position.set(midX, LIFT.line, midZ)
+    band.position.set(midX, LIFT.line + (roadHeights?.[0] ?? 0), midZ)
     group.add(shadowed(band, false))
     const gantry = new Group()
     const steel = standard(kartScene.metal)
@@ -440,7 +454,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     )
     beam.position.set(0, 6.3, 0)
     gantry.add(shadowed(beam))
-    gantry.position.set(midX, 0, midZ)
+    gantry.position.set(midX, roadHeights?.[0] ?? 0, midZ)
     gantry.rotation.y = angle
     group.add(gantry)
   }
@@ -620,8 +634,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     lamps.length,
   )
   lamps.forEach((lamp, index) => {
-    place(poles, index, lamp.x, 3.5, lamp.z, [1, 1, 1])
-    dummy.position.set(lamp.x, 6.9, lamp.z)
+    const base = hillAt ? hillAt(lamp.x, lamp.z) : 0
+    place(poles, index, lamp.x, 3.5 + base, lamp.z, [1, 1, 1])
+    dummy.position.set(lamp.x, 6.9 + base, lamp.z)
     dummy.rotation.set(0, lamp.turn + Math.PI / 2, 0)
     dummy.scale.set(1, 1, 1)
     dummy.updateMatrix()
@@ -650,7 +665,11 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   )
   stacks.forEach((stack, index) => {
     for (let level = 0; level < 3; level++) {
-      dummy.position.set(stack.x, 0.2 + level * 0.38, stack.z)
+      dummy.position.set(
+        stack.x,
+        0.2 + level * 0.38 + (hillAt ? hillAt(stack.x, stack.z) : 0),
+        stack.z,
+      )
       dummy.rotation.set(Math.PI / 2, 0, 0)
       dummy.scale.set(1, 1, 1)
       dummy.updateMatrix()
@@ -684,8 +703,16 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       0,
       start.z + side * dx * offset - dz * 10,
     )
+    if (hillAt) stand.position.y = hillAt(stand.position.x, stand.position.z)
     stand.rotation.y = Math.atan2(dx, dz) - Math.PI / 2
     if (roadClearance(track.road, stand.position.x, stand.position.z) > 4) group.add(stand)
+  }
+
+  // ── A hill track (2026-11-17): the ground's height field and the jumps' ramps ──
+  if (hillAt) {
+    const kit = { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place }
+    group.add(buildHillGround(kit, hillAt))
+    for (const ramp of buildJumpRamps(kit)) group.add(ramp)
   }
 
   // ── Race-day dressing on every track: arch, flags, grandstands and crowds, flowers, a Ferris

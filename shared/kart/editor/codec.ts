@@ -19,18 +19,29 @@ export { CODE_PATTERN, MAX_CODE_CHARS }
 
 /** The code's own version, its first field */
 export const CODE_VERSION = 1
+// 2026-11-17: slopes ('u') and jumps ('j') are new tuples; a code without them is exactly what it
+// was, so every old code reads as before (and keeps its hash, its records and its ghost)
 type PieceTuple =
   | readonly ['s', number, number, number, number]
   | readonly ['t', number, number, number, number, number]
+  | readonly ['u', number, number, number, number, number]
+  | readonly ['j', number, number, number]
 
 const padIndex = (pad: PadPlace) => PAD_PLACES.indexOf(pad)
 
 function pieceTuple(piece: Piece): PieceTuple {
   const pad = padIndex(piece.pad)
   const boxes = piece.boxes ? 1 : 0
-  return piece.kind === 'straight'
-    ? ['s', tenth(piece.length), tenth(piece.width), pad, boxes]
-    : ['t', tenth(piece.angle), tenth(piece.radius), tenth(piece.width), pad, boxes]
+  switch (piece.kind) {
+    case 'straight':
+      return ['s', tenth(piece.length), tenth(piece.width), pad, boxes]
+    case 'turn':
+      return ['t', tenth(piece.angle), tenth(piece.radius), tenth(piece.width), pad, boxes]
+    case 'slope':
+      return ['u', tenth(piece.length), tenth(piece.rise), tenth(piece.width), pad, boxes]
+    case 'jump':
+      return ['j', tenth(piece.length), tenth(piece.height), tenth(piece.width)]
+  }
 }
 
 function toBase64Url(text: string): string {
@@ -107,6 +118,21 @@ function readPiece(value: unknown): Piece | null {
     const more = extra(value[4], value[5])
     if (angle === null || angle === 0 || radius === null || width === null || !more) return null
     return { kind: 'turn', angle, radius, width, ...more }
+  }
+  if (value[0] === 'u' && value.length === 6) {
+    const length = numberIn(value[1], LIMITS.minSlope, LIMITS.maxLength)
+    const rise = numberIn(value[2], -LIMITS.maxRise, LIMITS.maxRise)
+    const width = numberIn(value[3], LIMITS.minWidth, LIMITS.maxWidth)
+    const more = extra(value[4], value[5])
+    if (length === null || rise === null || rise === 0 || width === null || !more) return null
+    return { kind: 'slope', length, rise, width, ...more }
+  }
+  if (value[0] === 'j' && value.length === 4) {
+    const length = numberIn(value[1], LIMITS.minJump, LIMITS.maxJump)
+    const height = numberIn(value[2], LIMITS.minJumpHeight, LIMITS.maxJumpHeight)
+    const width = numberIn(value[3], LIMITS.minWidth, LIMITS.maxWidth)
+    if (length === null || height === null || width === null) return null
+    return { kind: 'jump', length, height, width, pad: 'none', boxes: false }
   }
   return null
 }

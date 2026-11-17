@@ -78,9 +78,15 @@ interface Bit {
   vy: number
   vz: number
   spin: number
+  /** The ground under it (a hill track, 2026-11-17): it never falls below this */
+  floor: number
 }
 
-export function createHitArt(scene: Scene): HitArt {
+/** `ground` gives the road's height at a place: 0 everywhere on a flat track */
+export function createHitArt(
+  scene: Scene,
+  ground: (x: number, z: number) => number = () => 0,
+): HitArt {
   const sparkle = sparkleTexture()
   const glow = glowTexture()
   const textures: Texture[] = [sparkle, glow]
@@ -98,7 +104,18 @@ export function createHitArt(scene: Scene): HitArt {
     const sprite = new Sprite(own)
     sprite.visible = false
     scene.add(sprite)
-    bits.push({ sprite, material: own, age: 1, life: 0, size: 0, vx: 0, vy: 0, vz: 0, spin: 0 })
+    bits.push({
+      sprite,
+      material: own,
+      age: 1,
+      life: 0,
+      size: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      spin: 0,
+      floor: 0.1,
+    })
   }
   const flashes: Bit[] = []
   for (let i = 0; i < FLASHES; i++) {
@@ -106,13 +123,25 @@ export function createHitArt(scene: Scene): HitArt {
     const sprite = new Sprite(own)
     sprite.visible = false
     scene.add(sprite)
-    flashes.push({ sprite, material: own, age: 1, life: 0, size: 0, vx: 0, vy: 0, vz: 0, spin: 0 })
+    flashes.push({
+      sprite,
+      material: own,
+      age: 1,
+      life: 0,
+      size: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      spin: 0,
+      floor: 0.1,
+    })
   }
   let nextBit = 0
   let nextFlash = 0
 
   const launch = (burst: HitBurst) => {
     const star = burst.kind === 'star'
+    const base = ground(burst.x, burst.z)
     const count = star ? STARS_PER_HIT : SHARDS_PER_POP
     for (let i = 0; i < count; i++) {
       const bit = bits[nextBit]!
@@ -127,7 +156,8 @@ export function createHitArt(scene: Scene): HitArt {
       bit.vy = star ? 5 + Math.random() * 2.5 : (Math.random() - 0.3) * 5
       bit.spin = (Math.random() - 0.5) * 8
       bit.material.color.set(star ? kartScene.hitStar : kartScene.popShard)
-      bit.sprite.position.set(burst.x, star ? 1.2 : 0.9, burst.z)
+      bit.floor = 0.1 + base
+      bit.sprite.position.set(burst.x, (star ? 1.2 : 0.9) + base, burst.z)
       bit.sprite.visible = true
     }
     const flash = flashes[nextFlash]!
@@ -136,7 +166,7 @@ export function createHitArt(scene: Scene): HitArt {
     flash.life = FLASH_LIFE
     flash.size = star ? 4.5 : 5.5
     flash.material.color.set(star ? kartScene.hitFlash : kartScene.shield)
-    flash.sprite.position.set(burst.x, 1, burst.z)
+    flash.sprite.position.set(burst.x, 1 + base, burst.z)
     flash.sprite.visible = true
   }
 
@@ -152,7 +182,7 @@ export function createHitArt(scene: Scene): HitArt {
         }
         bit.vy -= GRAVITY * seconds
         bit.sprite.position.x += bit.vx * seconds
-        bit.sprite.position.y = Math.max(0.1, bit.sprite.position.y + bit.vy * seconds)
+        bit.sprite.position.y = Math.max(bit.floor, bit.sprite.position.y + bit.vy * seconds)
         bit.sprite.position.z += bit.vz * seconds
         const left = 1 - bit.age / bit.life
         bit.material.opacity = left

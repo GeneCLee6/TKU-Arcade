@@ -483,6 +483,7 @@ export class Bot {
       crossings: trial.run.crossings,
       nextGate: trial.run.nextGate,
       seq: this.seq++,
+      ...((kart.air ?? 0) > 0 ? { airborne: true } : {}),
     }
     const now = performance.now()
     // Judged by the room (and so counted) while the race runs and this kart is still in it

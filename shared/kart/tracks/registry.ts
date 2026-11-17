@@ -3,6 +3,7 @@
 // sides always agree on the gates.
 import { CUSTOM_PREFIX, customTrack, isCustomId } from '../editor/custom.ts'
 import { parseTrack, type Track, type TrackJson } from '../track.ts'
+import { GUANYIN } from './guanyin.ts'
 import { HARBOUR } from './harbour.ts'
 import { OLDSTREET } from './oldstreet.ts'
 import type { RaceTrackId } from './list.ts'
@@ -14,6 +15,7 @@ export const RACE_TRACKS: Readonly<Record<RaceTrackId, TrackJson>> = {
   harbour: HARBOUR,
   tamkang: TAMKANG,
   oldstreet: OLDSTREET,
+  guanyin: GUANYIN,
 }
 
 const parsed = new Map<string, Track>()

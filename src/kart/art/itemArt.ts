@@ -54,7 +54,11 @@ const PUDDLE_RADIUS = 1.9
 const glowing = (colour: string, glow: number) =>
   new MeshLambertMaterial({ color: colour, emissive: colour, emissiveIntensity: glow })
 
-export function createItemArt(scene: Scene): ItemArt {
+/** `ground` gives the road's height at a place (a hill track, 2026-11-17): 0 on a flat one */
+export function createItemArt(
+  scene: Scene,
+  ground: (x: number, z: number) => number = () => 0,
+): ItemArt {
   const shell = new BoxGeometry(BOX_SIZE, BOX_SIZE, BOX_SIZE)
   const core = new BoxGeometry(BOX_SIZE * 0.45, BOX_SIZE * 0.45, BOX_SIZE * 0.45)
   const bubble = new IcosahedronGeometry(SHIELD_RADIUS, 2)
@@ -142,7 +146,11 @@ export function createItemArt(scene: Scene): ItemArt {
         if (!look.shown) return
         // Each a little out of step with the next, so a row does not move as one
         const phase = time * 1.6 + index * 0.7
-        group.position.set(look.x, BOX_HEIGHT + Math.sin(phase) * 0.18, look.z)
+        group.position.set(
+          look.x,
+          BOX_HEIGHT + Math.sin(phase) * 0.18 + ground(look.x, look.z),
+          look.z,
+        )
         group.rotation.y = time * 1.4 + index
       })
       for (let i = looks.length; i < boxes.length; i++) boxes[i]!.visible = false
@@ -156,7 +164,7 @@ export function createItemArt(scene: Scene): ItemArt {
         const at = shields[index]
         mesh.visible = at !== undefined
         if (!at) return
-        mesh.position.set(at.x, 0.9, at.z)
+        mesh.position.set(at.x, 0.9 + ground(at.x, at.z), at.z)
         mesh.rotation.y = time * 0.8
         mesh.scale.setScalar(1 + Math.sin(time * 5) * 0.03)
       })
@@ -170,13 +178,17 @@ export function createItemArt(scene: Scene): ItemArt {
           shotGroups.set(shot.n, group)
         }
         if (shot.item === 'hail') {
-          group.position.set(shot.x, HAIL_HEIGHT, shot.z)
+          group.position.set(shot.x, HAIL_HEIGHT + ground(shot.x, shot.z), shot.z)
           group.rotation.set(time * 9, time * 7, 0)
         } else if (shot.item === 'cloud') {
-          group.position.set(shot.x, CLOUD_HEIGHT + Math.sin(time * 3 + shot.n) * 0.2, shot.z)
+          group.position.set(
+            shot.x,
+            CLOUD_HEIGHT + Math.sin(time * 3 + shot.n) * 0.2 + ground(shot.x, shot.z),
+            shot.z,
+          )
           group.rotation.y = time * 0.6
         } else {
-          group.position.set(shot.x, 0.04, shot.z)
+          group.position.set(shot.x, 0.04 + ground(shot.x, shot.z), shot.z)
         }
       }
       for (const [n, group] of shotGroups) {

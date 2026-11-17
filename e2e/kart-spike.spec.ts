@@ -901,6 +901,7 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
     'Harbour Hairpins',
     'Tamkang Campus',
     'Lantern Old Street',
+    'Guanyin Hill Road',
   ])
   await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
   await expect(page.getByText('Time trial')).toBeVisible()

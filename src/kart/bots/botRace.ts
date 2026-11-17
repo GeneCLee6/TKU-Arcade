@@ -169,7 +169,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
       entry,
       skill,
       course,
-      brain: createBotBrain(skill, track.road, tuning, options.seed * 31 + seat),
+      brain: createBotBrain(skill, track.road, tuning, options.seed * 31 + seat, track.jumps),
       rider: createItemRider(seat, track, room.state().used),
       mass: kartMass(entry.kart),
       body: loadoutByte(entry.kart, entry.driver),
@@ -269,6 +269,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
       crossings: trial.run.crossings,
       nextGate: trial.run.nextGate,
       seq: bot.seq++ & 0xffff,
+      ...((kart.air ?? 0) > 0 ? { airborne: true } : {}),
     }
     room.frame(bot.seat, encodeFrame(frame), at)
   }

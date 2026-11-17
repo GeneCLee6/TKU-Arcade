@@ -35,7 +35,19 @@ const ROW = 5
 const MAX_BOXES = 255
 
 export type ProblemCode =
-  'open' | 'crosses' | 'tight' | 'short' | 'long' | 'grid' | 'boxes' | 'pieces'
+  | 'open'
+  | 'crosses'
+  | 'tight'
+  | 'short'
+  | 'long'
+  | 'grid'
+  | 'boxes'
+  | 'pieces'
+  // Slopes and jumps (2026-11-17): the loop must end at the height it began, never climb past
+  // LIMITS.maxHeight either way, and no slope may be steeper than LIMITS.maxGrade
+  | 'level'
+  | 'high'
+  | 'steep'
 
 export interface Problem {
   readonly code: ProblemCode
@@ -168,6 +180,34 @@ export function buildSpec(spec: TrackSpec): Built {
     }
   })
 
+  // Slopes: none too steep, the loop back at the start's height, never too high or too low
+  pieces.forEach((piece, index) => {
+    if (piece.kind === 'slope' && Math.abs(piece.rise) > piece.length * LIMITS.maxGrade + 1e-9) {
+      problems.push({
+        code: 'steep',
+        pieces: [index],
+        params: { rise: Math.floor(piece.length * LIMITS.maxGrade) },
+      })
+    }
+  })
+  const { heights } = laid
+  const finalHeight = heights[heights.length - 1] ?? 0
+  if (Math.abs(finalHeight) > 0.05) {
+    problems.push({
+      code: 'level',
+      pieces: last >= 0 ? [last] : [],
+      params: { gap: Math.round(finalHeight * 10) / 10 },
+    })
+  }
+  const highest = heights.findIndex((height) => Math.abs(height) > LIMITS.maxHeight + 1e-9)
+  if (highest >= 0) {
+    problems.push({
+      code: 'high',
+      pieces: [Math.max(0, highest - 1)],
+      params: { max: LIMITS.maxHeight },
+    })
+  }
+
   const { at, total } = road.length > 1 ? distances(road) : { at: [0], total: 0 }
   if (total < LIMITS.minTrack) {
     problems.push({ code: 'short', pieces: [], params: { min: LIMITS.minTrack } })
@@ -202,6 +242,8 @@ export function buildSpec(spec: TrackSpec): Built {
     const mid = mids[index]!
     if (mid < 0) return
     const width = road[mid]!.width
+    // A jump has neither: a car flies over them
+    if (piece.kind === 'jump') return
     if (piece.pad !== 'none') {
       const across = piece.pad === 'left' ? -width / 4 : piece.pad === 'right' ? width / 4 : 0
       padSpots.push([mid, across])
@@ -236,6 +278,7 @@ export function buildSpec(spec: TrackSpec): Built {
     boostPads: road.length > 0 ? padsAlong(road, padSpots) : [],
     itemBoxes: boxes.slice(0, MAX_BOXES),
     decor: [],
+    ...(laid.jumps.length > 0 ? { jumps: laid.jumps } : {}),
   }
   return { track, laid, length: total, problems }
 }

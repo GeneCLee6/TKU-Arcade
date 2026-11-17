@@ -92,8 +92,24 @@ function endOf(pieces: readonly Piece[], start: Spot): Spot {
  */
 export function closeLoop(spec: TrackSpec): Piece[] | null {
   if (spec.pieces.length === 0) return null
-  const { joints } = layout(spec.pieces)
+  const { joints, heights } = layout(spec.pieces)
   const end = joints[joints.length - 1]!
+  // 2026-11-17: a track that ends higher or lower than it began comes back down (or up) on the
+  // closing straight, when it is long enough for the slope
+  const gap = tenth(heights[heights.length - 1] ?? 0)
+  const level = (pieces: Piece[]): Piece[] => {
+    if (gap === 0) return pieces
+    const at = pieces.findIndex(
+      (piece) =>
+        piece.kind === 'straight' &&
+        piece.length >= Math.max(LIMITS.minSlope, Math.abs(gap) / LIMITS.maxGrade),
+    )
+    if (at < 0) return pieces
+    const flat = pieces[at]!
+    return pieces.map((piece, index) =>
+      index === at && flat.kind === 'straight' ? { ...flat, kind: 'slope', rise: -gap } : piece,
+    )
+  }
   const goal: Spot = { x: 0, z: 0, heading: 0 }
   const width = spec.pieces[spec.pieces.length - 1]!.width
   const tries: Piece[][] = []
@@ -111,7 +127,7 @@ export function closeLoop(spec: TrackSpec): Piece[] | null {
         if (Math.hypot(arrived.x, arrived.z) > 1 || Math.abs(wrapAngle(arrived.heading)) > 0.02) {
           continue
         }
-        if (pieces.length > 0) tries.push(pieces)
+        if (pieces.length > 0) tries.push(level(pieces))
       }
     }
   }

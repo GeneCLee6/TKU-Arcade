@@ -58,6 +58,9 @@ export interface KartLook {
   readonly charge?: 0 | 1 | 2
   /** Counts boosts fired, of any kind: when it goes up the thrusters burst */
   readonly bursts?: number
+  /** A hill track (2026-11-17): whether the kart is in the air, and a count of its landings */
+  readonly airborne?: boolean
+  readonly landings?: number
 }
 
 export interface KartModel {
