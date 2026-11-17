@@ -3,6 +3,7 @@
 // (shared/kart/net.ts, the module's `realtime`). Only what has to be agreed and kept is: the track,
 // who has loaded, the start time, every lap and finish the server judged, and who dropped out.
 import type { ItemId, Warp } from '../../kart/items.ts'
+import type { KartShot } from '../../kart/shots.ts'
 import type { SeatId } from '../types.ts'
 
 /** A plain race, or one with item boxes on the road (e9-t05) */
@@ -33,7 +34,10 @@ export type KartRacer = {
   shieldUntil: number
 }
 
-/** An item used (e9-t06a): what everyone's browser reads to show it and to apply it */
+/**
+ * An item used (e9-t06a), or a shot that hit (e9-t06b): what everyone's browser reads to show it and
+ * to apply it
+ */
 export type KartItemEvent = {
   /** Counts up through the race: a browser applies each one once */
   n: number
@@ -46,6 +50,11 @@ export type KartItemEvent = {
   at: number
   /** A swap: where each kart goes */
   warps: Warp[]
+  /**
+   * A shot that hit (e9-t06b): `targets` is the kart it hit, `blocked` the same if a shield stopped
+   * it, and `by` who threw it. False when the item was used (a cloud's `targets` is whom it chases)
+   */
+  hit: boolean
 }
 
 export type KartState = {
@@ -66,6 +75,8 @@ export type KartState = {
   events: KartItemEvent[]
   /** Items used so far: the next event's `n` */
   used: number
+  /** Shots on the road (e9-t06b, shared/kart/shots.ts), oldest first */
+  shots: KartShot[]
 }
 
 export type KartAction =
@@ -94,7 +105,11 @@ export type KartAction =
       targets: SeatId[]
       blocked: SeatId[]
       warps: Warp[]
+      /** A thrown or dropped item: the shot it put on the road (e9-t06b); null for the others */
+      shot: KartShot | null
     }
+  /** System: shot `shot` hit `seat` at server time `at`; a shield up then stops it (e9-t06b) */
+  | { t: 'hit'; seat: SeatId; shot: number; at: number }
 
 /** Nothing is hidden in a race: every viewer sees the state, and whose seat they are */
 export type KartView = KartState & { you: SeatId | null }

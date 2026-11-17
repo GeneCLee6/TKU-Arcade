@@ -58,6 +58,25 @@ function noteFor(
 ): { text: string; bad: boolean } | null {
   const item = t(`games.kart.item.${event.item}`)
   const first = event.targets[0]
+  // A shot that hit someone (e9-t06b)
+  if (event.hit) {
+    if (first === undefined) return null
+    const stopped = event.blocked.includes(first)
+    if (first === seat) {
+      if (stopped)
+        return {
+          text: t('games.kart.item.yourBubble', { name: nameOf(event.by), item }),
+          bad: false,
+        }
+      return event.by === seat
+        ? { text: t('games.kart.item.hitOwn', { item }), bad: true }
+        : { text: t('games.kart.item.hitShot', { name: nameOf(event.by), item }), bad: true }
+    }
+    if (event.by !== seat) return null
+    return stopped
+      ? { text: t('games.kart.item.stoppedYours', { name: nameOf(first), item }), bad: true }
+      : { text: t('games.kart.item.youHit', { name: nameOf(first), item }), bad: false }
+  }
   if (event.by === seat) {
     if (event.blocked.length > 0 && event.blocked.length === event.targets.length) {
       return {
@@ -78,6 +97,10 @@ function noteFor(
         return first === undefined
           ? null
           : { text: t('games.kart.item.youSwap', { name: nameOf(first) }), bad: false }
+      case 'cloud':
+        return first === undefined
+          ? null
+          : { text: t('games.kart.item.youCloud', { name: nameOf(first) }), bad: false }
       default:
         return null
     }
@@ -94,6 +117,8 @@ function noteFor(
       return { text: t('games.kart.item.hitSwap', { name: by }), bad: true }
     case 'tow':
       return { text: t('games.kart.item.hitTow', { name: by }), bad: true }
+    case 'cloud':
+      return { text: t('games.kart.item.cloudComing', { name: by }), bad: true }
     default:
       return null
   }

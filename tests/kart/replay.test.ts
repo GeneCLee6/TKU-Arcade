@@ -17,6 +17,7 @@ import {
   sampleIndex,
   seekPlayhead,
   shieldsAt,
+  shotsAt,
   stepSpeed,
   togglePlayhead,
   type RecordedView,
@@ -244,6 +245,51 @@ describe('recording a race', () => {
       ],
     })
     expect(recorder.replay().events.map((event) => event.tick)).toEqual([120])
+  })
+
+  it('keeps the shots thrown (e9-t06b), cut short when they leave the room early, and places them', () => {
+    const hail = {
+      n: 7,
+      item: 'hail' as const,
+      by: 0,
+      at: 101_000,
+      x: 0,
+      z: 0,
+      vx: 80,
+      vz: 0,
+      until: 103_000,
+      target: null,
+    }
+    const cloud = {
+      n: 8,
+      item: 'cloud' as const,
+      by: 1,
+      at: 101_000,
+      x: 0,
+      z: 0,
+      vx: 0,
+      vz: 0,
+      until: 102_000,
+      target: 0,
+    }
+    const recorder = createReplayRecorder(VIEW)
+    recorder.frame(0, frame(60))
+    recorder.view({ ...VIEW, shots: [hail, cloud] })
+    // Half a second later the hail is gone: it hit something
+    recorder.frame(0, frame(90))
+    recorder.view({ ...VIEW, shots: [cloud] })
+    const shots = recorder.replay().shots!
+    expect(shots.map((shot) => [shot.n, shot.at, shot.until])).toEqual([
+      [7, 1000, 1500],
+      [8, 1000, 2000],
+    ])
+    const at = (tick: number) => shotsAt(shots, tick, () => ({ x: 100, z: 0 }))
+    expect(at(30)).toEqual([])
+    expect(at(80).find((shot) => shot.n === 7)!.x).toBeCloseTo(80 * (1 / 3))
+    expect(at(120).map((shot) => shot.n)).toEqual([8])
+    expect(at(120)[0]!.x).toBeCloseTo(100)
+    expect(at(121)).toEqual([])
+    expect(createReplayRecorder(VIEW).replay().shots).toBeUndefined()
   })
 
   it('packs into one blob and back', () => {

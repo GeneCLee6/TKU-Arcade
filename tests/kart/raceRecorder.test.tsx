@@ -47,6 +47,7 @@ const view = (seed: number, you: number | null): KartView => ({
   boxes: [],
   draws: 0,
   events: [],
+  shots: [],
   used: 0,
   you,
 })

@@ -13,6 +13,7 @@ import {
   sampleAt,
   seekPlayhead,
   shieldsAt,
+  shotsAt,
   stepSpeed,
   TICKS_PER_SECOND,
   togglePlayhead,
@@ -193,6 +194,11 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
                   shields: shieldsAt(reel.replay.events, tick, SHIELD_TICKS)
                     .map((seat) => karts.find((kart) => kart.id === seat))
                     .filter((kart) => kart !== undefined),
+                  shots: shotsAt(
+                    reel.replay.shots,
+                    tick,
+                    (seat) => karts.find((kart) => kart.id === seat) ?? null,
+                  ),
                 }
               : null
           return { karts, follow: followRef.current, overhead: overheadRef.current, props }

@@ -19,6 +19,7 @@
 import type { ItemId } from './items.ts'
 import { FLAG_BOOSTING, FLAG_DRIFTING, FLAG_FINISHED, FLAG_RESET, FLAG_SKIDDING } from './net.ts'
 import type { KartFrame } from './net.ts'
+import { shotPosition, type KartShot, type ShotItem } from './shots.ts'
 
 /** Physics steps a second: a frame's tick counts these from GO */
 export const TICKS_PER_SECOND = 60
@@ -91,6 +92,8 @@ export interface Replay {
   readonly karts: readonly { readonly seat: number; readonly bytes: Uint8Array }[]
   readonly events: readonly ReplayEvent[]
   readonly held: readonly HeldChange[]
+  /** The shots thrown (e9-t06b), their times in ms from GO; absent in a race without them */
+  readonly shots?: readonly KartShot[]
 }
 
 // ── Coding one kart's samples ────────────────────────────────────────────────────────────────
@@ -358,6 +361,8 @@ export interface RecordedView {
     readonly blocked: readonly number[]
     readonly at: number
   }[]
+  /** The shots on the road (e9-t06b) */
+  readonly shots?: readonly KartShot[]
 }
 
 export interface ReplayRecorder {
@@ -381,6 +386,8 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
   let latest = first
   let nextEvent = -1
   let now: number | null = null
+  // Shots by number, times from GO; one gone from the view before its time hit something then
+  const shots = new Map<number, KartShot>()
 
   const recorder: ReplayRecorder = {
     frame(seat, frame) {
@@ -412,6 +419,20 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
           })
         }
       }
+      // Shots: each once; one that left the room's list early ended there (a hit or a block)
+      if (goAt !== null) {
+        const live = new Set<number>()
+        for (const shot of view.shots ?? []) {
+          live.add(shot.n)
+          if (!shots.has(shot.n))
+            shots.set(shot.n, { ...shot, at: shot.at - goAt, until: shot.until - goAt })
+        }
+        const nowMs = now === null ? null : (now * 1000) / TICKS_PER_SECOND
+        for (const [n, shot] of shots) {
+          if (live.has(n) || nowMs === null || nowMs >= shot.until || nowMs < shot.at) continue
+          shots.set(n, { ...shot, until: nowMs })
+        }
+      }
       // Items held: the room does not say when one was taken, so "now" is as near as it gets
       for (const racer of view.racers) {
         const item = racer.item ?? null
@@ -438,11 +459,31 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
         karts: [...tapes].map(([seat, tape]) => ({ seat, bytes: tape.bytes() })),
         events: [...events],
         held: [...held].sort((a, b) => a.tick - b.tick),
+        ...(shots.size > 0 ? { shots: [...shots.values()] } : {}),
       }
     },
   }
   recorder.view(first)
   return recorder
+}
+
+/**
+ * The shots on the road at `tick` (e9-t06b), where each is; a cloud flies at its target's kart as
+ * the replay has it (`kartAt`)
+ */
+export function shotsAt(
+  shots: readonly KartShot[] | undefined,
+  tick: number,
+  kartAt: (seat: number) => { readonly x: number; readonly z: number } | null,
+): { n: number; item: ShotItem; x: number; z: number }[] {
+  const ms = (tick * 1000) / TICKS_PER_SECOND
+  return (shots ?? [])
+    .filter((shot) => ms >= shot.at && ms <= shot.until)
+    .map((shot) => ({
+      n: shot.n,
+      item: shot.item,
+      ...shotPosition(shot, ms, shot.target === null ? null : kartAt(shot.target)),
+    }))
 }
 
 // ── One blob: for a file, a message or R2 later ──────────────────────────────────────────────
