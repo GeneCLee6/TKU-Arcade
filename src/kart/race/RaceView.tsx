@@ -13,7 +13,8 @@ import { useT } from '../../i18n/useT.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
 import { displayType, glass, monoType } from '../../styles/esports.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
-import { loadBody } from '../bodies.ts'
+import { applyKart } from '../../../shared/kart/karts.ts'
+import { loadBody, loadDriver } from '../bodies.ts'
 import type { Callout } from '../callouts.ts'
 import { keyLabel, loadBindings, loadRules, loadTuning } from '../devices.ts'
 import { CalloutText, Hud } from '../Hud.tsx'
@@ -149,10 +150,13 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
   })
   // Testing a room alone: a second tab can drive itself
   const [autopiloted] = useState(() => new URLSearchParams(window.location.search).has('autopilot'))
+  // e10-t05: the kart and driver picked on /kart or in the waiting room; the kart's numbers go
+  // into the tuning
+  const [loadout] = useState(() => ({ body: loadBody(), driver: loadDriver() }))
   const [settings] = useState(() => ({
     bindings: loadBindings(),
     rules: loadRules(),
-    tuning: loadTuning().tuning,
+    tuning: applyKart(loadTuning().tuning, loadout.body),
     enabled: true,
   }))
 
@@ -163,7 +167,8 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
       track,
       seat,
       slot,
-      body: loadBody(),
+      body: loadout.body,
+      driver: loadout.driver,
       goAt: () => latest.current.goAt,
       laps: latest.current.laps,
       view: () => latest.current,
@@ -183,7 +188,8 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
         onContextLost: () => setFailure(true),
         course: track.id as SpikeCourse,
         quality: loadQuality(),
-        body: loadBody(),
+        body: loadout.body,
+        driver: loadout.driver,
         onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
         onTrial: setTrial,
         onClock: (total, lap) => clock.current?.set(total, lap),
@@ -204,7 +210,7 @@ export default function RaceView({ view, realtime, act, nameOf }: RaceViewProps)
       net.stop()
       raceNet.current = null
     }
-  }, [realtime, track, seat, slot, failure, settings, autopiloted])
+  }, [realtime, track, seat, slot, failure, settings, autopiloted, loadout])
 
   useEffect(() => {
     const timer = setInterval(() => {

@@ -98,6 +98,8 @@ export type MemberRecord = {
    * account's. Absent for a guest. Never part of a view
    */
   account?: string
+  /** A game's cosmetic choice, shown to everyone (e10-t05, RoomMember.look) */
+  look?: string
 }
 
 /**
@@ -430,6 +432,9 @@ export class RoomHost {
       case 'set_password':
         this.setPassword(conn, member, message.password)
         return
+      case 'set_look':
+        this.setLook(member, message.look)
+        return
       case 'react':
         this.react(member, message.reaction)
         return
@@ -752,6 +757,16 @@ export class RoomHost {
     this.change(() => {
       member.seat = seat
       if (seat === null) member.ready = false
+      this.saveMembers()
+    })
+  }
+
+  /** e10-t05: a cosmetic choice for the others to see, in any status; it changes no game */
+  private setLook(member: MemberRecord, look: string | null): void {
+    if ((member.look ?? null) === look) return
+    this.change(() => {
+      if (look === null) delete member.look
+      else member.look = look
       this.saveMembers()
     })
   }
@@ -1223,6 +1238,7 @@ export class RoomHost {
         host: member.id === room.hostId,
         online: member.conn !== null,
         absent: member.absent,
+        ...(member.look !== undefined ? { look: member.look } : {}),
       }
     }
     const game = this.game

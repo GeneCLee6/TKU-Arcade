@@ -155,6 +155,11 @@ export type RoomMember = {
   online: boolean
   /** Offline for longer than RECONNECT_GRACE_MS: the host can cover this seat's turns */
   absent: boolean
+  /**
+   * A game's cosmetic choice, for the others to see (e10-t05: the kart's `kart.driver`). The room
+   * only checks its shape (LOOK_PATTERN); the game reads it. Absent until set
+   */
+  look?: string
 }
 
 /** A seat the game is waiting for, whose player is absent or gone, and what the host can do */
@@ -349,6 +354,12 @@ export type ReactMessage = { t: 'react'; reaction: number }
  */
 export type SetPasswordMessage = { t: 'set_password'; password: string | null }
 
+/** What a `look` may be: one or two short lowercase words joined by a dot */
+export const LOOK_PATTERN = /^[a-z0-9-]{1,16}(?:\.[a-z0-9-]{1,16})?$/
+
+/** Show the others a cosmetic choice (RoomMember.look), or take it away with null. Any status */
+export type SetLookMessage = { t: 'set_look'; look: string | null }
+
 export type ClientMessage =
   | JoinMessage
   | ResyncMessage
@@ -366,6 +377,7 @@ export type ClientMessage =
   | SetGameMessage
   | SetOptionsMessage
   | SetPasswordMessage
+  | SetLookMessage
   | ReactMessage
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────────────────────
@@ -607,6 +619,11 @@ export function parseClientMessage(raw: string): ClientMessage | null {
         (value.reaction as number) >= 0 &&
         (value.reaction as number) < REACTION_COUNT
         ? { t: 'react', reaction: value.reaction as number }
+        : null
+    case 'set_look':
+      return value.look === null ||
+        (typeof value.look === 'string' && LOOK_PATTERN.test(value.look))
+        ? { t: 'set_look', look: value.look as string | null }
         : null
     case 'set_password': {
       if (value.password === null) return { t: 'set_password', password: null }

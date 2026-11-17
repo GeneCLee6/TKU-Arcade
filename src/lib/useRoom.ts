@@ -39,6 +39,8 @@ export type RoomHandle = {
   setOptions(options: OptionValues): void
   /** e1-t16: the host's; null takes the password away */
   setPassword(password: string | null): void
+  /** e10-t05: a cosmetic choice for the others to see (RoomMember.look); null takes it away */
+  setLook(look: string | null): void
   /** Settles when the room has answered or won't: anything but `sent` means it did not arrive */
   sendChat(text: string): Promise<ChatSendResult>
   /** e7-t11: the reactions floating now, oldest first */
@@ -196,6 +198,11 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     (password: string | null) => send({ t: 'set_password', password }),
     [send],
   )
+  // e10-t05: quiet when offline: the choice is sent again when the waiting room comes back
+  const setLook = useCallback(
+    (look: string | null) => void connection.current?.send({ t: 'set_look', look }),
+    [],
+  )
   const sendChat = useCallback((raw: string): Promise<ChatSendResult> => {
     // The room closes the socket over a message that does not parse
     const text = normalizeChatText(raw)
@@ -224,6 +231,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     setGame,
     setOptions,
     setPassword,
+    setLook,
     reactions,
     react,
     sendChat,

@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { setSoundOn, useSoundOn } from '../lib/sound.ts'
 import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
-import { KART_BODIES, loadBody, saveBody, type KartBody } from './bodies.ts'
+import {
+  KART_BODIES,
+  loadBody,
+  loadDriver,
+  saveBody,
+  saveDriver,
+  type KartBody,
+} from './bodies.ts'
+import { applyKart, type DriverId } from '../../shared/kart/karts.ts'
+import { GaragePanel } from './roster/GaragePanel.tsx'
 import styled, { keyframes } from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
 import { KART_ACTIONS, type Bindings, type KartAction } from '../../shared/kart/input.ts'
@@ -55,7 +64,7 @@ const EMPTY_HUD: SpikeHud = {
 /** How long a callout stays up; its animation fades it out by then */
 const CALLOUT_MS = 900
 
-type Open = 'controls' | 'tuning' | undefined
+type Open = 'controls' | 'tuning' | 'garage' | undefined
 
 /**
  * e8-t01: three.js, a fixed-step loop and a box car, to see whether the stack holds up in a browser.
@@ -83,12 +92,17 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
   const [callout, setCallout] = useState<{ callout: Callout; id: number }>()
   const controlsOpener = useRef<HTMLButtonElement>(null)
   const tuningOpener = useRef<HTMLButtonElement>(null)
+  const garageOpener = useRef<HTMLButtonElement>(null)
   // The loop reads these every frame without restarting. The tuning panel leaves the car drivable:
   // its fields keep their own keys (spikeLoop.ts), and a change is best felt at once.
-  const controls = useRef({ bindings, rules, tuning, enabled: !controlsOpen })
+  // e10-t05: the kart and driver to race with; the kart's numbers go on top of the tuning
+  const [body, setBody] = useState<KartBody>(loadBody)
+  const [driver, setDriver] = useState<DriverId>(loadDriver)
+  const driven = useMemo(() => applyKart(tuning, body), [tuning, body])
+  const controls = useRef({ bindings, rules, tuning: driven, enabled: !controlsOpen })
   useEffect(() => {
-    controls.current = { bindings, rules, tuning, enabled: !controlsOpen }
-  }, [bindings, rules, tuning, controlsOpen])
+    controls.current = { bindings, rules, tuning: driven, enabled: !controlsOpen }
+  }, [bindings, rules, driven, controlsOpen])
   // e8-t04, e8-t05a: the yard, or a track with its minimap and a time trial (?track=oval|riverside|harbour)
   const courses = play ? SPIKE_COURSES.filter((one) => one !== 'arena') : SPIKE_COURSES
   const soundOn = useSoundOn()
@@ -102,7 +116,6 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
   const race = useRef<{ restart: () => void } | null>(null)
   const [trial, setTrial] = useState<SpikeTrial>()
   const [quality, setQuality] = useState<Quality>(loadQuality)
-  const [body, setBody] = useState<KartBody>(loadBody)
   const [showNumbers, setShowNumbers] = useState(() =>
     new URLSearchParams(window.location.search).has('fps'),
   )
@@ -121,6 +134,7 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
         course,
         quality,
         body,
+        driver,
         onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
         onTrial: setTrial,
         onClock: (total, lap) => clock.current?.set(total, lap),
@@ -132,7 +146,7 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, quality, body])
+  }, [course, quality, body, driver])
 
   const switchCourse = (next: SpikeCourse) => {
     const url = new URL(window.location.href)
@@ -182,6 +196,20 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
     setOpen(undefined)
     queueMicrotask(() => tuningOpener.current?.focus())
   }, [])
+  const closeGarage = useCallback(() => {
+    setOpen(undefined)
+    queueMicrotask(() => garageOpener.current?.focus())
+  }, [])
+  const pickBody = (next: KartBody) => {
+    saveBody(next)
+    setTrial(undefined)
+    setBody(next)
+  }
+  const pickDriver = (next: DriverId) => {
+    saveDriver(next)
+    setTrial(undefined)
+    setDriver(next)
+  }
 
   /** The first control of an action, for the hint: a key, else a gamepad control */
   const firstControl = (action: KartAction): string => {
@@ -233,6 +261,16 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
             </Button>
           )}
           <Button
+            ref={garageOpener}
+            $variant="secondary"
+            $size="sm"
+            aria-expanded={open === 'garage'}
+            onClick={() => (open === 'garage' ? closeGarage() : setOpen('garage'))}
+            data-testid="kart-garage-open"
+          >
+            {t('kart.roster.open')}
+          </Button>
+          <Button
             $variant="secondary"
             $size="sm"
             aria-pressed={soundOn}
@@ -264,12 +302,7 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
             <span>{t('kart.spike.body')}</span>
             <select
               value={body}
-              onChange={(event) => {
-                const next = event.target.value as KartBody
-                saveBody(next)
-                setTrial(undefined)
-                setBody(next)
-              }}
+              onChange={(event) => pickBody(event.target.value as KartBody)}
               data-testid="kart-body"
             >
               {KART_BODIES.map((one) => (
@@ -346,6 +379,16 @@ export function SpikePage({ play = false }: { play?: boolean } = {}) {
       </Bottom>
       {open === 'tuning' && (
         <TuningPanel t={t} tuning={tuning} onTuning={changeTuning} onClose={closeTuning} />
+      )}
+      {open === 'garage' && (
+        <GaragePanel
+          t={t}
+          kart={body}
+          driver={driver}
+          onKart={pickBody}
+          onDriver={pickDriver}
+          onClose={closeGarage}
+        />
       )}
       {controlsOpen && (
         <ControlsPanel

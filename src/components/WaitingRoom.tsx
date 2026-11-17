@@ -28,12 +28,16 @@ export interface WaitingRoomProps {
   onSetOptions(options: OptionValues): void
   /** e1-t16: the host sets or takes away the room's password */
   onSetPassword?(password: string | null): void
+  /** e10-t05: a member's cosmetic choice for the others to see (the kart room's kart and driver) */
+  onSetLook?(look: string | null): void
   /** Below the setup in the right-hand column of a wide screen: the room's chat */
   aside?: ReactNode
 }
 
 // e1-t16: its own chunk, with its strings
 const RoomPasswordSetting = lazy(() => import('./RoomPasswordSetting.tsx'))
+// e10-t05: the kart room's garage, its own chunk, only in a kart room
+const RoomGarage = lazy(() => import('../kart/roster/RoomGarage.tsx'))
 
 export function WaitingRoom({
   roomId,
@@ -48,6 +52,7 @@ export function WaitingRoom({
   onSetGame,
   onSetOptions,
   onSetPassword,
+  onSetLook,
   aside,
 }: WaitingRoomProps) {
   const t = useT()
@@ -127,6 +132,13 @@ export function WaitingRoom({
             <Muted>{t('room.waiting.waitForHost')}</Muted>
           )}
         </StartBar>
+
+        {/* Below the start bar, so that on a phone it does not push Start out of reach */}
+        {view.room.gameId === 'kart' && me && onSetLook && (
+          <Suspense>
+            <RoomGarage members={view.members} you={you} onSetLook={onSetLook} />
+          </Suspense>
+        )}
       </Column>
 
       <Column>

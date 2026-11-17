@@ -3,6 +3,7 @@
 // (plausible or not, which gates it crossed, whether a lap ended) and the push two karts give each
 // other. Pure: the Worker and the browser run the same code (docs/KART-NETCODE.md).
 import { passGates, type Spot } from './course.ts'
+import { applyKart, KART_IDS, type KartId } from './karts.ts'
 import { KART_TUNING, type KartState } from './physics.ts'
 import { courseOf, type Track } from './track.ts'
 import { KART_RADIUS } from './walls.ts'
@@ -78,13 +79,16 @@ export function raceProgress(
 // ── Judging frames on the server ─────────────────────────────────────────────────────────────
 
 /**
- * The fastest a kart can go, with every boost stacked, times 1.5: anything faster is a bug (or a
- * cheat, which is not what this is for). Read from the physics, so that a faster tuning moves it too
+ * The fastest this kart can go, with every boost stacked, times 1.5: anything faster is a bug (or a
+ * cheat, which is not what this is for). Read from the physics with the kart's own numbers
+ * (karts.ts), so that a faster kart or a faster tuning moves it too (e10-t05a)
  */
-export const SPEED_CAP =
-  KART_TUNING.topSpeed *
-  Math.max(KART_TUNING.boostTopSpeedFactor, KART_TUNING.boostStackFactor) *
-  1.5
+export function speedCapFor(kart: KartId): number {
+  const tuning = applyKart(KART_TUNING, kart)
+  return tuning.topSpeed * Math.max(tuning.boostTopSpeedFactor, tuning.boostStackFactor) * 1.5
+}
+/** The cap for the fastest kart: what a frame is held to when its kart is not known */
+export const SPEED_CAP = Math.max(...KART_IDS.map(speedCapFor))
 /** A tick may run this far ahead of the server's clock since GO, in seconds (clocks are never exact) */
 export const TICK_LEAD_SECONDS = 1
 /** Slack on top of the furthest a kart can go between two frames, metres */
@@ -140,6 +144,8 @@ export interface JudgeContext {
   readonly goAt: number | null
   /** Laps the game has already counted for this kart */
   readonly laps: number
+  /** The kart's own speed cap (speedCapFor); SPEED_CAP, the fastest kart's, when left out */
+  readonly speedCap?: number
 }
 
 const near = (spots: readonly Spot[], x: number, z: number, reach: number) =>
@@ -167,13 +173,14 @@ function crossingShare(
  */
 export function judgeFrame(tracked: Tracked, frame: KartFrame, context: JudgeContext): Verdict {
   const { track, now, goAt } = context
+  const cap = context.speedCap ?? SPEED_CAP
   const refuse = (why: RefusedWhy): Verdict => ({
     kind: 'refused',
     why,
     tracked: { ...tracked, refusedSince: tracked.refusedSince ?? now },
   })
   if (Math.abs(frame.x) > 20_000 || Math.abs(frame.z) > 20_000) return refuse('far')
-  if (Math.hypot(frame.vx, frame.vz) > SPEED_CAP) return refuse('speed')
+  if (Math.hypot(frame.vx, frame.vz) > cap) return refuse('speed')
   const elapsed = goAt === null ? 0 : (now - goAt) / 1000
   if (frame.tick / 60 > Math.max(0, elapsed) + TICK_LEAD_SECONDS) return refuse('tick')
   const last = tracked.last
@@ -206,7 +213,7 @@ export function judgeFrame(tracked: Tracked, frame: KartFrame, context: JudgeCon
       if (!near(spots, frame.x, frame.z, RESET_REACH)) return refuse('reset')
     } else {
       const seconds = Math.max((frame.tick - last.tick) / 60, (now - tracked.lastAt) / 1000) + 0.1
-      if (Math.hypot(frame.x - last.x, frame.z - last.z) > SPEED_CAP * seconds + JUMP_SLACK) {
+      if (Math.hypot(frame.x - last.x, frame.z - last.z) > cap * seconds + JUMP_SLACK) {
         return refuse('jump')
       }
     }
@@ -282,8 +289,10 @@ export const BUMP_MIN_PUSH = 2
 /**
  * e9-t09: this kart, pushed out of any other it overlaps. Each browser does it for its own kart
  * against where it draws the others; nothing about it is sent, so two screens can disagree a little
- * about a bump, which a race between friends can live with. The other kart is taken to weigh the
- * same and to be standing still (its own browser pushes it the other way).
+ * about a bump, which a race between friends can live with. The other kart is taken to be standing
+ * still (its own browser pushes it the other way). e10-t05a: each kart has a mass (karts.ts's
+ * `kartMass`, 1 when not given); the lighter of two takes the larger share of the push, equal karts
+ * half each.
  */
 export function bumpKart(
   kart: KartState,
@@ -292,7 +301,9 @@ export function bumpKart(
     readonly z: number
     readonly vx: number
     readonly vz: number
+    readonly mass?: number
   }[],
+  mass = 1,
 ): { kart: KartState; hit: number } {
   let { x, z, vx, vz } = kart
   let hit = 0
@@ -305,14 +316,15 @@ export function bumpKart(
     // Exactly on top of each other: apart sideways
     const nx = distance > 1e-6 ? dx / distance : Math.cos(kart.heading)
     const nz = distance > 1e-6 ? dz / distance : Math.sin(kart.heading)
-    // Out of the overlap, half each: the other browser moves its kart the other half
+    // Out of the overlap, this kart's share: the other browser moves its kart the rest
+    const share = (other.mass ?? 1) / ((other.mass ?? 1) + mass)
     const overlap = reach - distance
-    x += nx * overlap * 0.5
-    z += nz * overlap * 0.5
+    x += nx * overlap * share
+    z += nz * overlap * share
     // The closing speed along the line between the two
     const closing = (vx - other.vx) * nx + (vz - other.vz) * nz
     if (closing < 0) {
-      const change = -closing * (1 + BUMP_BOUNCE) * 0.5 + BUMP_MIN_PUSH
+      const change = -closing * (1 + BUMP_BOUNCE) * share + BUMP_MIN_PUSH
       vx += nx * change
       vz += nz * change
       hit = Math.max(hit, -closing)

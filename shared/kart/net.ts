@@ -5,7 +5,7 @@
 //
 //   0  u8   kind (FRAME_KIND)
 //   1  u8   flags (FLAG_*), and the drift's way in bits 5–6 (0 none, 1 left, 2 right)
-//   2  u8   the kart's body (cosmetic: an index into the bodies the browser knows)
+//   2  u8   the kart (low four bits) and its driver (high four bits): karts.ts, loadoutByte
 //   3  i8   steer × 100
 //   4  i32  race tick: steps of 1/60 s since GO, negative before it
 //   8  f32  x        12 f32 z        16 f32 heading     20 f32 vx      24 f32 vz

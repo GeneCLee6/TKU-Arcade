@@ -40,6 +40,10 @@ test('two people race each other in one room, from the countdown to the results'
   const { id } = (await response.json()) as { id: string }
   await joinRoom(ann, `/r/${id}?autopilot`, 'Ann')
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
+  // e10-t05: Bob picks a kart and a driver in the waiting room, and Ann sees it
+  await bob.getByTestId('kart-room-garage').getByRole('radio', { name: /Egret/ }).click()
+  await bob.getByTestId('kart-room-garage').getByRole('radio', { name: 'Club' }).click()
+  await expect(ann.getByTestId('kart-picks')).toContainText('Egret with Club')
   await ann.getByRole('button', { name: 'Start game' }).click()
 
   for (const page of [ann, bob]) await expect(page.getByTestId('kart-race')).toBeVisible()

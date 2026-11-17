@@ -1,6 +1,8 @@
 // The kart's own strings, registered by its lazy chunk (src/i18n/t.ts registerMessages), so that
 // they stay out of the first load of the lobby and the board games. Same rules as any catalog:
 // en is the source, zh-TW has the same keys, and `npm run check-i18n` compares them.
+import { KART_ROSTER_MESSAGES, type KartRosterKey } from './i18n.roster.ts'
+
 const en = {
   'kart.spike.title': 'Kart physics test',
   'kart.spike.course': 'Course',
@@ -11,11 +13,9 @@ const en = {
   'kart.quality.low': 'Low',
   'kart.quality.medium': 'Medium',
   'kart.quality.high': 'High',
-  // The hover karts (2026-11-14): working names until KART-WORLD.md (e10-t01)
+  // The hover karts (2026-11-14): working names until KART-WORLD.md (e10-t01); their names are in
+  // i18n.roster.ts (e10-t05)
   'kart.spike.body': 'Kart',
-  'kart.body.tide': 'Tide Runner',
-  'kart.body.comet': 'Comet',
-  'kart.body.ray': 'Stingray',
   'kart.course.arena': 'Test yard',
   'kart.course.oval': 'Test oval',
   'kart.course.riverside': 'Riverside (graybox)',
@@ -259,9 +259,9 @@ const en = {
   'kart.pad.axis': 'Axis {index} {sign}',
 } as const
 
-export type KartMessageKey = keyof typeof en
+export type KartMessageKey = keyof typeof en | KartRosterKey
 
-const zhTW: Record<KartMessageKey, string> = {
+const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.title': '卡丁車物理測試',
   'kart.spike.course': '場地',
   'kart.spike.soundOn': '聲音開',
@@ -272,9 +272,6 @@ const zhTW: Record<KartMessageKey, string> = {
   'kart.quality.medium': '中',
   'kart.quality.high': '高',
   'kart.spike.body': '車款',
-  'kart.body.tide': '浪行者',
-  'kart.body.comet': '彗星',
-  'kart.body.ray': '魟魚',
   'kart.course.arena': '測試場',
   'kart.course.oval': '測試橢圓',
   'kart.course.riverside': '河畔（灰盒）',
@@ -512,4 +509,8 @@ const zhTW: Record<KartMessageKey, string> = {
   'kart.pad.axis': '軸 {index} {sign}',
 }
 
-export const KART_MESSAGES = { en, 'zh-TW': zhTW }
+// e10-t05: the garage's strings live in their own file (i18n.roster.ts) and join the rest here
+export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartMessageKey, string>> = {
+  en: { ...en, ...KART_ROSTER_MESSAGES.en },
+  'zh-TW': { ...zhTW, ...KART_ROSTER_MESSAGES['zh-TW'] },
+}

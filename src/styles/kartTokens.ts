@@ -165,34 +165,31 @@ export const harbourScene = {
 } as const
 
 /**
- * The hover karts (owner, 2026-11-14: karts with no tyres, hugging the floor): our own three bodies
- * and their colours. `glow` is the underglow, the thrusters and the drift sparks.
+ * The hover karts (owner, 2026-11-14: karts with no tyres, hugging the floor; e10-t05a: six): our
+ * own bodies and their colours. `glow` is the underglow, the thrusters and the drift sparks. The
+ * drivers' colours are kartDrivers, below: any driver sits in any kart
  */
 export const kartBodies = {
-  tide: {
-    main: '#14A3A8',
-    second: '#F4F7F6',
-    accent: '#FFC53D',
-    glow: '#5CF2FF',
-    suit: '#0F4C5C',
-    helmet: '#F4F7F6',
-  },
-  comet: {
-    main: '#F2623B',
-    second: '#FFE8C7',
-    accent: '#2B2D42',
-    glow: '#FFB547',
-    suit: '#7A2E1B',
-    helmet: '#FFE8C7',
-  },
-  ray: {
-    main: '#6D4AFF',
-    second: '#1F1B3A',
-    accent: '#F5C542',
-    glow: '#C18BFF',
-    suit: '#2A1F66',
-    helmet: '#F5C542',
-  },
+  tide: { main: '#14A3A8', second: '#F4F7F6', accent: '#FFC53D', glow: '#5CF2FF' },
+  comet: { main: '#F2623B', second: '#FFE8C7', accent: '#2B2D42', glow: '#FFB547' },
+  ray: { main: '#6D4AFF', second: '#1F1B3A', accent: '#F5C542', glow: '#C18BFF' },
+  // A mangrove green with one big orange claw
+  crab: { main: '#2F9C67', second: '#1E3A2F', accent: '#FF7F3F', glow: '#8CFF9E' },
+  // An egret's white with a dark crown and a yellow bill
+  heron: { main: '#EEF3F8', second: '#1B2A41', accent: '#FFB000', glow: '#9FE7FF' },
+  // Deep sea blue with pink fins
+  flyfish: { main: '#1F4E9C', second: '#C9E6FF', accent: '#FF5D8F', glow: '#FF8FC1' },
+} as const
+
+/**
+ * The four drivers (e10-t05b), card suits made people (club as in our bridge club): a suit, a
+ * glossy helmet and the suit's crest on top of it
+ */
+export const kartDrivers = {
+  spade: { suit: '#1F2433', helmet: '#F4F7F6', crest: '#2B3247', trim: '#9AA6C4' },
+  heart: { suit: '#B3123E', helmet: '#FFE3EA', crest: '#E8174B', trim: '#FFFFFF' },
+  diamond: { suit: '#B8540C', helmet: '#FFF1D6', crest: '#F28C28', trim: '#FFE07A' },
+  club: { suit: '#1E6B3A', helmet: '#E9F7EC', crest: '#2E9C55', trim: '#F5C542' },
 } as const
 
 /** The hover parts every body shares: thruster housings, the cockpit glass, the sparks */

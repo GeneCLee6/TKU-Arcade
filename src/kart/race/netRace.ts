@@ -26,7 +26,13 @@ import type { Track } from '../../../shared/kart/track.ts'
 import type { KartRacer, KartView } from '../../../shared/games/kart/types.ts'
 import { CLOCK_ANSWER_BYTES, CLOCK_FRAME, CLOCK_PING_BYTES } from '../../../shared/protocol.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
-import { KART_BODIES, type KartBody } from '../bodies.ts'
+import {
+  kartMass,
+  loadoutByte,
+  loadoutOfByte,
+  type DriverId,
+} from '../../../shared/kart/karts.ts'
+import type { KartBody } from '../bodies.ts'
 import type { OtherKart, ScreenPoint } from '../Scene.ts'
 import type { SpikeNet } from '../spikeLoop.ts'
 import { createRemotes, type RemotePose } from './remotes.ts'
@@ -77,6 +83,8 @@ export interface RaceNetOptions {
   /** This kart's place in the race's list: its place on the grid */
   readonly slot: number
   readonly body: KartBody
+  /** e10-t05b: who sits in it */
+  readonly driver: DriverId
   /** The room's GO, by the server's clock (ms since the epoch); null until set */
   readonly goAt: () => number | null
   /** Laps in this race: the room's, not the track's own */
@@ -129,7 +137,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   let poses: RemotePose[] = []
   let tagListener: ((tags: readonly NameTag[]) => void) | null = null
   let own = { crossings: 0, nextGate: 0, x: 0, z: 0 }
-  const body = Math.max(0, KART_BODIES.indexOf(options.body))
+  // e10-t05: the kart and driver in one byte; the room holds the frame to this kart's top speed
+  const body = loadoutByte(options.body, options.driver)
   const debug: RaceDebug = {
     seat,
     offset: null,
@@ -320,23 +329,30 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       debug.nextGate = own.nextGate
       if (reset || steps % SEND_EVERY_STEPS === 0) send(trial, input, reset)
     },
-    bumpers: () => poses.filter((pose) => !pose.stale),
+    bumpers: () =>
+      poses
+        .filter((pose) => !pose.stale)
+        .map((pose) => ({ ...pose, mass: kartMass(loadoutOfByte(pose.frame.body).kart) })),
     others() {
       poses = remotes.poses(performance.now() / 1000)
       debug.others = poses.filter((pose) => !pose.stale).length
-      return poses.map((pose): OtherKart => ({
-        id: pose.seat,
-        x: pose.x,
-        z: pose.z,
-        heading: pose.heading,
-        body: KART_BODIES[pose.frame.body] ?? 'tide',
-        look: {
-          speed: pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading),
-          steer: pose.frame.steer,
-          drift: pose.frame.driftDirection,
-          boosting: pose.frame.boosting,
-        },
-      }))
+      return poses.map((pose): OtherKart => {
+        const { kart, driver } = loadoutOfByte(pose.frame.body)
+        return {
+          id: pose.seat,
+          x: pose.x,
+          z: pose.z,
+          heading: pose.heading,
+          body: kart,
+          driver,
+          look: {
+            speed: pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading),
+            steer: pose.frame.steer,
+            drift: pose.frame.driftDirection,
+            boosting: pose.frame.boosting,
+          },
+        }
+      })
     },
     adjust,
     props(pose) {

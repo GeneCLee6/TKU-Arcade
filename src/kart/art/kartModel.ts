@@ -1,15 +1,18 @@
 // The karts (e8-t07; owner 2026-11-14: "no tyres, hugging the floor"): hover karts of our own, made
 // in code. No wheels: each body rides about a third of a metre above the road on its thrusters, with
-// a soft bob, a glow on the road beneath it and glowing thruster mouths at the back. Three bodies,
-// all our own shapes and colours (kartBodies), with working names until KART-WORLD.md (e10-t01):
+// a soft bob, a glow on the road beneath it and glowing thruster mouths at the back. Six bodies
+// (e10-t05a), all our own shapes and colours (kartBodies), with working names until KART-WORLD.md
+// (e10-t01):
 //
 // - `tide`, a catamaran: two long pontoons joined by a deck, a thruster at the back of each;
 // - `comet`, a rounded pod with a skirt round it and one big ring thruster;
-// - `ray`, a wide, flat delta with twin tail fins.
+// - `ray`, a wide, flat delta with twin tail fins;
+// - `crab`, `heron` and `flyfish` in rosterBodies.ts.
 //
-// The driver is chibi: a big round helmet on a small body, the karts small beside the tracks'
-// oversized scenery. Cosmetic only: every body drives the same (physics.ts). The footprint matches
-// the physics: about 1.5 m wide and 2.6 m long (KART_RADIUS 1.2).
+// The driver (driverModel.ts, e10-t05b) is chibi, one of four, mounted at the body's seat: any
+// driver in any kart, the karts small beside the tracks' oversized scenery. A kart's numbers are in
+// shared/kart/karts.ts; the model is looks only. The footprint matches the physics: about 1.5 m wide
+// and 2.6 m long (KART_RADIUS 1.2).
 //
 // It moves like a hover kart: it bobs, banks into a drift and a fast turn, dips under braking, lifts
 // its nose pulling away, and the thrusters glow brighter with speed and flare in a boost.
@@ -33,8 +36,11 @@ import {
   type Material,
   type Texture,
 } from 'three'
+import type { DriverId } from '../../../shared/kart/karts.ts'
 import { kartBodies, kartHover, kartScene } from '../../styles/kartTokens.ts'
 import type { KartBody } from '../bodies.ts'
+import { buildDriver, type ModelKit } from './driverModel.ts'
+import { buildRosterBody, isRosterBody } from './rosterBodies.ts'
 
 /** What the model shows each frame, besides where it is */
 export interface KartLook {
@@ -57,6 +63,7 @@ export interface KartLook {
 export interface KartModel {
   readonly group: Group
   readonly body: KartBody
+  readonly driver: DriverId
   /** The glow colour: the drift sparks and trails match it */
   readonly glow: string
   /** Under the back corners, in the kart's own frame (x, z): where the drift trails and sparks start */
@@ -133,6 +140,7 @@ export function buildKartModel(
   shadows: boolean,
   ghost = false,
   body: KartBody = 'tide',
+  driverId: DriverId = 'spade',
 ): KartModel {
   const colours = kartBodies[body]
   const geometries: BufferGeometry[] = []
@@ -176,10 +184,13 @@ export function buildKartModel(
   const accent = paint(colours.accent)
   const housing = paint(kartHover.housing, 0.5, 0.5)
   const glass = paint(kartHover.glass, 0.1, 0.6)
-  const suit = paint(colours.suit, 0.7, 0)
-  const helmet = paint(colours.helmet, 0.25, 0.25)
-  // The helmet is round and glossy, not faceted
-  if (helmet instanceof MeshStandardMaterial) helmet.flatShading = false
+  const kit: ModelKit = {
+    part,
+    paint,
+    smooth: (material) => {
+      if (material instanceof MeshStandardMaterial) material.flatShading = false
+    },
+  }
   const mouth = shine(colours.glow, 0.95)
 
   const group = new Group()
@@ -261,6 +272,10 @@ export function buildKartModel(
       [-0.5, 1.1],
       [0.5, 1.1],
     ]
+  } else if (isRosterBody(body)) {
+    const fit = buildRosterBody(body, kit, chassis, { main, second, accent, glass }, thrusterAt)
+    seat = fit.seat
+    rearContacts = fit.rearContacts
   } else {
     // A wide, flat delta, a hump for the cockpit, twin tail fins and two thrusters
     chassis.add(
@@ -330,29 +345,9 @@ export function buildKartModel(
   bar.add(grip)
   chassis.add(bar)
 
-  // The driver, chibi: a small body and a big round helmet, a visor and a stripe over the top
-  const driver = new Group()
+  // The driver (driverModel.ts), mounted at the seat
+  const { group: driver, head } = buildDriver(kit, driverId)
   driver.position.set(0, seat.y, seat.z)
-  driver.add(part(new CapsuleGeometry(0.15, 0.14, 3, 10), suit, 0, 0.24, 0))
-  for (const side of [-1, 1]) {
-    const arm = part(new CapsuleGeometry(0.05, 0.26, 2, 6), suit, side * 0.17, 0.3, -0.2)
-    arm.rotation.x = -1.15
-    driver.add(arm)
-  }
-  const head = new Group()
-  head.position.set(0, 0.68, 0.02)
-  head.add(part(new SphereGeometry(0.34, 16, 12), helmet))
-  head.add(
-    part(
-      new SphereGeometry(0.3, 14, 8, -Math.PI * 0.8, Math.PI * 0.6, Math.PI * 0.34, Math.PI * 0.28),
-      glass,
-      0,
-      0,
-      -0.07,
-    ),
-  )
-  head.add(part(new BoxGeometry(0.08, 0.06, 0.6), accent, 0, 0.32, 0.02))
-  driver.add(head)
   chassis.add(driver)
 
   // The glow on the road beneath: not on a ghost
@@ -391,6 +386,7 @@ export function buildKartModel(
   return {
     group,
     body,
+    driver: driverId,
     glow: colours.glow,
     rearContacts,
     thrusters,

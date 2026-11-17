@@ -833,7 +833,15 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
     'Tide Runner',
     'Comet',
     'Stingray',
+    'Fiddler',
+    'Egret',
+    'Flying Fish',
   ])
+  // e10-t05: the garage picks a driver too, and shows the kart's stats
+  await page.getByTestId('kart-garage-open').click()
+  await expect(page.getByTestId('kart-stats')).toBeVisible()
+  await page.getByRole('radio', { name: 'Diamond' }).click()
+  await page.getByRole('button', { name: 'Close the garage' }).click()
   await page.getByTestId('kart-body').selectOption('ray')
   await page.getByTestId('kart-course').selectOption('tamkang')
   await expect(page).toHaveURL(/track=tamkang/)
@@ -842,6 +850,8 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
   await expect.poll(() => framesOf(page), { timeout: 30_000 }).toBeGreaterThan(10)
   await page.reload()
   await expect(page.getByTestId('kart-body')).toHaveValue('ray')
+  await page.getByTestId('kart-garage-open').click()
+  await expect(page.getByRole('radio', { name: 'Diamond' })).toHaveAttribute('aria-checked', 'true')
   expect(errors).toEqual([])
 })
 
