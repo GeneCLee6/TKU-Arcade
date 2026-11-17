@@ -46,6 +46,7 @@ import {
 } from '../../kart/race.ts'
 import { courseOf, type Track } from '../../kart/track.ts'
 import { formatTime } from '../../kart/timeTrial.ts'
+import { CUSTOM_PREFIX, isCustomId, isTrackCode } from '../../kart/editor/custom.ts'
 import { raceTrack } from '../../kart/tracks/registry.ts'
 import {
   gameError,
@@ -58,7 +59,7 @@ import {
 } from '../types.ts'
 import { GAME_META } from '../lobby.ts'
 import { BOT_LEVELS, BOT_NAMES } from './bots.ts'
-import { kartInfo, MAX_LAPS } from './info.ts'
+import { CUSTOM_TRACK, kartInfo, MAX_LAPS } from './info.ts'
 import type {
   KartAction,
   KartItemEvent,
@@ -148,12 +149,32 @@ function standings(state: KartState): Standing[] {
   return lines
 }
 
+/**
+ * The track a race runs on: one of the tracks by id, or (e10-t08) a track from the editor as
+ * `custom:<code>`, built and checked again here whatever the options said; else the first track
+ */
+export function raceTrackId(options: Pick<KartOptions, 'track' | 'custom'>): string {
+  if (options.track === CUSTOM_TRACK) {
+    const id = `${CUSTOM_PREFIX}${options.custom}`
+    return raceTrack(id) ? id : kartInfo.options.track.default
+  }
+  return !isCustomId(options.track) && raceTrack(options.track)
+    ? options.track
+    : kartInfo.options.track.default
+}
+
 export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
   ...kartInfo,
   meta: GAME_META.kart,
+  // e10-t08: the Worker's copy checks a custom track in full when the host sets it (custom.ts); the
+  // browser's form (info.ts) checks only its shape
+  options: {
+    ...kartInfo.options,
+    custom: { ...kartInfo.options.custom, check: isTrackCode },
+  } as typeof kartInfo.options,
 
   init(seats, options, rng) {
-    const track = raceTrack(options.track) ? options.track : kartInfo.options.track.default
+    const track = raceTrackId(options)
     const laps = Math.max(1, Math.min(MAX_LAPS, Math.round(options.laps)))
     const mode = options.mode === 'race' ? 'race' : 'items'
     return {

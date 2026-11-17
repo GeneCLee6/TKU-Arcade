@@ -157,15 +157,39 @@ export type SelectOption<T extends string | number> = {
   showIf?: ShowIf
 }
 
+/**
+ * e10-t08: a short text a host gives, such as a kart track made in the editor (its code). `pattern`
+ * and `maxLength` are checked wherever options are (shared/games/options.ts); `check`, set only on
+ * the Worker's copy of the schema (the module's), checks the rest, so that what it needs stays out
+ * of the browser's first load. A value that fails either is replaced by the default. `control`
+ * names the control the waiting room draws for it (src/components/optionControls.ts); without one
+ * it is a plain text box
+ */
+export type TextOption = {
+  kind: 'text'
+  labelKey: string
+  default: string
+  maxLength: number
+  pattern: RegExp
+  check?: (value: string) => boolean
+  control?: string
+  hidden?: true
+  showIf?: ShowIf
+}
+
 /** Any one field, whatever its value's type */
-export type AnyOptionField = BooleanOption | IntOption | SelectOption<string> | SelectOption<number>
+export type AnyOptionField =
+  BooleanOption | IntOption | SelectOption<string> | SelectOption<number> | TextOption
 
 export type OptionField<T> = [T] extends [boolean]
   ? BooleanOption
   : [T] extends [number]
     ? IntOption | SelectOption<T>
     : [T] extends [string]
-      ? SelectOption<T>
+      ? // Any string at all may be typed in (TextOption); a set of them is chosen from
+        [string] extends [T]
+        ? SelectOption<T> | TextOption
+        : SelectOption<T>
       : AnyOptionField
 
 /**

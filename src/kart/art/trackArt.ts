@@ -74,14 +74,17 @@ export interface TrackArt {
 }
 
 /** A track's sky and light: the harbour's sunset, or the sunny afternoon of every other track */
-export const themeOf = (track: Pick<Track, 'id'>): KartTheme =>
-  track.id === 'harbour'
-    ? kartThemes.sunset
-    : track.id === 'tamkang'
-      ? kartThemes.campus
-      : track.id === 'oldstreet'
-        ? kartThemes.night
-        : kartThemes.day
+export const themeOf = (track: Pick<Track, 'id' | 'theme'>): KartTheme =>
+  // e10-t07: a track from the editor names its own
+  track.theme
+    ? kartThemes[track.theme]
+    : track.id === 'harbour'
+      ? kartThemes.sunset
+      : track.id === 'tamkang'
+        ? kartThemes.campus
+        : track.id === 'oldstreet'
+          ? kartThemes.night
+          : kartThemes.day
 
 /** What a track's own scenery (harbourArt.ts) builds with: shared, and freed with the rest */
 export interface ArtKit {

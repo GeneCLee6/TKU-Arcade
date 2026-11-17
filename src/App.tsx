@@ -38,6 +38,9 @@ const KartPlayPage = lazy(() =>
   import('./kart/bots/KartPlay.tsx').then(({ KartPlay }) => ({ default: KartPlay })),
 )
 
+// e10-t07: the track editor. Its own chunk; three.js comes only with its 3D view
+const KartEditorPage = lazy(() => import('./kart/editor/EditorPage.tsx'))
+
 const KartSpikePage = lazy(() =>
   import('./kart/SpikePage.tsx').then(({ SpikePage }) => ({ default: SpikePage })),
 )
@@ -59,6 +62,7 @@ function AppRoutes() {
           <Route path="/r/:id/replay" element={<ReplayPage />} />
           <Route path="/games/:id/rules" element={<RulesPage />} />
           <Route path="/kart/spike" element={<KartSpikePage />} />
+          <Route path="/kart/editor" element={<KartEditorPage />} />
           <Route path="/kart" element={<KartPlayPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="*" element={<NotFoundPage />} />

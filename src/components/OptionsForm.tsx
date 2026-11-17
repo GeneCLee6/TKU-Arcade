@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { Suspense, useId, useState } from 'react'
 import styled from 'styled-components'
 import { parseOptions } from '../../shared/games/options.ts'
 import type {
@@ -9,11 +9,13 @@ import type {
   OptionValue,
   OptionValues,
   SelectOption,
+  TextOption,
 } from '../../shared/games/types.ts'
 import type { TextKey } from '../i18n/t.ts'
 import { useT } from '../i18n/useT.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import { FieldLabel, ReadOnlyField, ReadOnlyFields, SelectInput, TextInput } from './Field.tsx'
+import { OPTION_CONTROLS } from './optionControls.ts'
 
 export interface OptionsFormProps {
   schema: OptionsSchema<OptionValues>
@@ -34,7 +36,9 @@ export function OptionsForm({ schema, values, editable, onChange }: OptionsFormP
   // A field the room has no valid value for (an older room, say) shows what the server would use
   const complete = parseOptions(schema, values)
   // A field that only matters for another field's value is left out otherwise (`showIf`), its value kept
-  const fields = all.filter(([, field]) => !field.showIf || complete[field.showIf.field] === field.showIf.value)
+  const fields = all.filter(
+    ([, field]) => !field.showIf || complete[field.showIf.field] === field.showIf.value,
+  )
 
   if (!editable) {
     return (
@@ -71,6 +75,15 @@ function ValueText({ field, value }: { field: AnyOptionField; value: OptionValue
       return <>{value ? t('room.options.on') : t('room.options.off')}</>
     case 'int':
       return <>{value}</>
+    case 'text': {
+      const Control = field.control ? OPTION_CONTROLS[field.control] : undefined
+      if (!Control) return <>{value}</>
+      return (
+        <Suspense fallback={null}>
+          <Control value={String(value)} editable={false} onPick={() => {}} />
+        </Suspense>
+      )
+    }
     case 'select': {
       const choice = choicesOf(field).find((other) => other.value === value)
       if (!choice) return <>{value}</>
@@ -98,18 +111,54 @@ function ControlFor({ field, value, onPick }: ControlProps<AnyOptionField, Optio
       return <IntControl field={field} value={Number(value)} onPick={onPick} />
     case 'select':
       return <SelectControl field={field} value={value} onPick={onPick} />
+    case 'text':
+      return <TextControl field={field} value={String(value)} onPick={onPick} />
   }
+}
+
+/** A game's own control when it names one (optionControls.ts), else a text box sent on Enter or blur */
+function TextControl({ field, value, onPick }: ControlProps<TextOption, string>) {
+  const t = useT()
+  const id = useId()
+  const [draft, setDraft] = useState<{ text: string; base: string } | null>(null)
+  const Control = field.control ? OPTION_CONTROLS[field.control] : undefined
+  if (Control) {
+    return (
+      <div>
+        <FieldLabel as="p">{t(field.labelKey as TextKey)}</FieldLabel>
+        <Suspense fallback={null}>
+          <Control value={value} editable onPick={onPick} />
+        </Suspense>
+      </div>
+    )
+  }
+  const typing = draft !== null && draft.base === value
+  const commit = () => {
+    setDraft(null)
+    if (typing && draft.text !== value) onPick(draft.text)
+  }
+  return (
+    <div>
+      <FieldLabel htmlFor={id}>{t(field.labelKey as TextKey)}</FieldLabel>
+      <TextInput
+        id={id}
+        maxLength={field.maxLength}
+        value={typing ? draft.text : value}
+        onChange={(event) => setDraft({ text: event.target.value, base: value })}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') commit()
+        }}
+      />
+    </div>
+  )
 }
 
 function BooleanControl({ field, value, onPick }: ControlProps<BooleanOption, boolean>) {
   const t = useT()
   return (
     <CheckLabel>
-      <Check
-        type="checkbox"
-        checked={value}
-        onChange={(event) => onPick(event.target.checked)}
-      />
+      <Check type="checkbox" checked={value} onChange={(event) => onPick(event.target.checked)} />
       {t(field.labelKey as TextKey)}
     </CheckLabel>
   )

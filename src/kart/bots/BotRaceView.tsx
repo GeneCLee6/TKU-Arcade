@@ -22,7 +22,7 @@ import RaceView from '../race/RaceView.tsx'
 import { botSeats, createBotRace } from './botRace.ts'
 import { createLocalRoom } from './localRoom.ts'
 import { drawBots } from './roster.ts'
-import type { BotSetup } from './setup.ts'
+import { botTrackId, type BotSetup } from './setup.ts'
 
 registerMessages(KART_MESSAGES)
 
@@ -52,7 +52,7 @@ function BotRound({ setup, onAgain, onMenu }: BotRaceViewProps & { readonly onAg
     const playerSeat = entries.length
     const room = createLocalRoom({
       seats: entries.length + 1,
-      options: { track: setup.track, laps: setup.laps, mode: setup.mode },
+      options: { track: setup.track, custom: setup.custom, laps: setup.laps, mode: setup.mode },
       seed,
       now: () => Date.now(),
     })
@@ -61,7 +61,7 @@ function BotRound({ setup, onAgain, onMenu }: BotRaceViewProps & { readonly onAg
   const [view, setView] = useState(() => game.room.view(game.playerSeat))
 
   useEffect(() => {
-    const track = raceTrack(setup.track)
+    const track = raceTrack(botTrackId(setup))
     if (!track) return
     // Watching first: the race screen's `loaded` (its effect runs before this one) and the bots'
     // put the race into its countdown at once, and the view must carry the start time

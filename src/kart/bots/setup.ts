@@ -2,13 +2,17 @@
 // the menu opens with the last ones (storage.ts never throws).
 import type { KartMode } from '../../../shared/games/kart/types.ts'
 import { MAX_LAPS } from '../../../shared/games/kart/info.ts'
+import { CUSTOM_PREFIX } from '../../../shared/kart/editor/custom.ts'
 import { RACE_TRACK_IDS, type RaceTrackId } from '../../../shared/kart/tracks/list.ts'
 import { readStored, writeStored } from '../../lib/storage.ts'
 import { MAX_BOTS } from './roster.ts'
 import { isDifficulty, type Difficulty } from './skill.ts'
 
 export interface BotSetup {
-  readonly track: RaceTrackId
+  /** `custom`: the track made in the editor that /kart was opened with (e10-t07), in `custom` */
+  readonly track: RaceTrackId | 'custom'
+  /** Its code; not kept: the next visit has no such track unless its link is opened again */
+  readonly custom?: string
   readonly bots: number
   readonly difficulty: Difficulty
   readonly mode: KartMode
@@ -52,4 +56,11 @@ export function loadBotSetup(): BotSetup {
   }
 }
 
-export const saveBotSetup = (setup: BotSetup): void => writeStored(KEY, JSON.stringify(setup))
+export const saveBotSetup = (setup: BotSetup): void => {
+  const { custom: _custom, ...kept } = setup
+  writeStored(KEY, JSON.stringify(kept))
+}
+
+/** The race room's id for the setup's track: a custom one is `custom:<code>` */
+export const botTrackId = (setup: BotSetup): string =>
+  setup.track === 'custom' ? `${CUSTOM_PREFIX}${setup.custom ?? ''}` : setup.track

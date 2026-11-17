@@ -44,8 +44,9 @@ describe('the race room in the lobby (e9-t07)', () => {
     const info = LOBBY_GAMES.find((game) => game.id === 'kart')
     expect(info?.meta).toMatchObject({ minPlayers: 1, maxPlayers: 8, tryAlone: '/kart' })
     const track = kart.options.track
-    expect(track.kind).toBe('select')
-    expect(track.choices.map((choice) => choice.value)).toEqual([...RACE_TRACK_IDS])
+    if (track.kind !== 'select') throw new Error('the track is chosen from a list')
+    // e10-t08: and a track made in the editor
+    expect(track.choices.map((choice) => choice.value)).toEqual([...RACE_TRACK_IDS, 'custom'])
     for (const id of RACE_TRACK_IDS) {
       expect(GAME_MESSAGES.en[`games.kart.track.${id}`]).toBeTruthy()
       expect(GAME_MESSAGES['zh-TW'][`games.kart.track.${id}`]).toBeTruthy()
