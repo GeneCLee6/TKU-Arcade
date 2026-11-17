@@ -21,6 +21,8 @@ import {
   MAX_CONNECTIONS,
   MAX_MEMBERS,
   PROTOCOL_VERSION,
+  PROXY_FRAME,
+  PROXY_HEADER_BYTES,
   RECONNECT_GRACE_MS,
   ROOM_CLEANUP_MS,
   STALE_AFTER_MS,
@@ -100,6 +102,11 @@ export type MemberRecord = {
   account?: string
   /** A game's cosmetic choice, shown to everyone (e10-t05, RoomMember.look) */
   look?: string
+  /**
+   * A computer member (2026-11-17, shared/protocol.ts 14.): never has a socket, is never offline,
+   * and its moves come from the host's browser. Its `name` is its name's id
+   */
+  bot?: { level: string; name: string }
 }
 
 /**
@@ -243,7 +250,7 @@ export class RoomHost {
       if (conn) conn.member = member.id
       this.members.set(
         member.id,
-        conn
+        conn || member.bot
           ? { ...member, offlineAt: null, absent: false }
           : { ...member, conn: null, offlineAt: member.offlineAt ?? this.deps.now() },
       )
@@ -397,7 +404,10 @@ export class RoomHost {
         })
         return
       case 'action':
-        this.act(conn, member, message.action)
+        this.act(conn, member, message.action, message.botSeat ?? null)
+        return
+      case 'add_bot':
+        this.addBot(conn, member, message.level, message.look ?? null)
         return
       case 'sit':
         this.sit(conn, member, message.seat)
@@ -473,19 +483,23 @@ export class RoomHost {
     const now = this.deps.now()
     connection.lastSeen = now
     const member = connection.member === null ? undefined : this.members.get(connection.member)
-    const seat = member?.seat ?? null
+    // The host's frame for a computer seat (shared/protocol.ts 14.): judged as that seat's, and
+    // passed on to the host too, whose race draws the computer karts from them like anyone's
+    const proxied = bytes[0] === PROXY_FRAME
+    if (proxied && bytes.byteLength <= PROXY_HEADER_BYTES) return
+    const wanted = bytes[1] ?? -1
+    const seat = proxied
+      ? member && this.isBotSeatFor(member, wanted)
+        ? wanted
+        : null
+      : (member?.seat ?? null)
     if (room.status !== 'playing' || seat === null || !game.seats.some((one) => one.id === seat)) {
       return
     }
+    const payload = proxied ? bytes.subarray(PROXY_HEADER_BYTES) : bytes
     let answer: { relay: Uint8Array | null; actions: JsonValue[] }
     try {
-      answer = module.realtime.frame(
-        game.match.state,
-        this.memoryFor(game),
-        seat,
-        bytes,
-        now,
-      )
+      answer = module.realtime.frame(game.match.state, this.memoryFor(game), seat, payload, now)
     } catch (error) {
       console.error(`game ${game.gameId}: realtime frame threw`, error)
       return
@@ -495,10 +509,44 @@ export class RoomHost {
       relayed[0] = seat
       relayed.set(answer.relay, 1)
       for (const [other, { member: joined }] of this.conns) {
-        if (other !== conn && joined !== null) this.deps.sockets.sendBinary(other, relayed)
+        if ((proxied || other !== conn) && joined !== null) {
+          this.deps.sockets.sendBinary(other, relayed)
+        }
       }
     }
     for (const action of answer.actions) this.systemAction(action, now)
+  }
+
+  /** Whether `member` may move `seat` for the computer: the host, for a computer member's seat */
+  private isBotSeatFor(member: MemberRecord, seat: number): boolean {
+    if (member.id !== this.room?.hostId || member.bot) return false
+    return [...this.members.values()].some((other) => other.bot && other.seat === seat)
+  }
+
+  /**
+   * Nobody runs the computer seats any more (their host's socket closed, or the host changed):
+   * during a real-time game, the module says what becomes of them (the kart retires them)
+   */
+  private abandonBots(): void {
+    const room = this.room
+    const game = this.game
+    if (room?.status !== 'playing' || !game) return
+    const realtime = this.deps.games(game.gameId)?.realtime
+    if (!realtime?.abandon) return
+    const seats = [...this.members.values()]
+      .filter((member) => member.bot && member.seat !== null)
+      .map((member) => member.seat as number)
+      .filter((seat) => game.seats.some((one) => one.id === seat))
+    if (seats.length === 0) return
+    const now = this.deps.now()
+    let actions: JsonValue[]
+    try {
+      actions = realtime.abandon(game.match.state, seats, now)
+    } catch (error) {
+      console.error(`game ${game.gameId}: realtime abandon threw`, error)
+      return
+    }
+    for (const action of actions) this.systemAction(action, now)
   }
 
   /** The real-time module's scratch space for this game, new for each game */
@@ -660,7 +708,8 @@ export class RoomHost {
 
   /** `name`, or with the first free suffix among every member but `self` (uniqueName) */
   private uniqueAmongOthers(name: string, self: string | null): string {
-    const others = [...this.members.values()].filter((other) => other.id !== self)
+    // A computer member's name is an id, shown through the game's strings: nobody's to clash with
+    const others = [...this.members.values()].filter((other) => other.id !== self && !other.bot)
     return uniqueName(
       name,
       others.map((other) => other.name),
@@ -682,6 +731,7 @@ export class RoomHost {
     }
     const known = token === null ? undefined : this.findByToken(token)
     if (known) {
+      const replaced = known.conn !== null
       if (known.conn !== null) {
         // A second tab, or a reload that beat the old socket's close
         this.conns.delete(known.conn)
@@ -700,6 +750,8 @@ export class RoomHost {
         this.saveMembers()
       })
       this.welcome(conn, known)
+      // A reload that beat the old socket's close: the old page ran the computer karts, not this one
+      if (replaced && known.id === this.room?.hostId) this.abandonBots()
       return
     }
     // Someone new to a room with a password (e1-t16); a member coming back has their token instead
@@ -771,6 +823,43 @@ export class RoomHost {
     })
   }
 
+  /**
+   * 2026-11-17 (shared/protocol.ts 14.): a computer member in the lowest free seat, for a game that
+   * has them, named by the room with the first of the game's names no other computer member has
+   */
+  private addBot(conn: string, member: MemberRecord, level: string, look: string | null): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    if (room.status === 'playing') return this.refuse(conn, 'wrong_status')
+    const bots = this.deps.games(room.gameId)?.bots
+    if (!bots || !bots.levels.includes(level)) return this.refuse(conn, 'bad_game')
+    const taken = new Set([...this.members.values()].map((other) => other.seat))
+    let seat: number | null = null
+    for (let one = 0; one < room.maxSeats && seat === null; one++) if (!taken.has(one)) seat = one
+    const named = new Set([...this.members.values()].map((other) => other.bot?.name))
+    const name = bots.names.find((one) => !named.has(one))
+    if (seat === null || name === undefined || this.members.size >= MAX_MEMBERS) {
+      return this.refuse(conn, 'seat_taken')
+    }
+    const bot: MemberRecord = {
+      id: this.deps.newMemberId(),
+      name,
+      // Never sent to anyone: nobody can come back as a computer member
+      token: this.deps.newToken(),
+      seat,
+      ready: true,
+      conn: null,
+      offlineAt: null,
+      absent: false,
+      bot: { level, name },
+      ...(look !== null ? { look } : {}),
+    }
+    this.change(() => {
+      this.members.set(bot.id, bot)
+      this.saveMembers()
+    })
+  }
+
   private ready(conn: string, member: MemberRecord, ready: boolean): void {
     const room = this.requireRoom()
     if (room.status !== 'waiting') return this.refuse(conn, 'wrong_status')
@@ -832,15 +921,21 @@ export class RoomHost {
     this.runClock()
   }
 
-  private act(conn: string, member: MemberRecord, action: JsonValue): void {
+  /** `forSeat`: the host acting for a computer seat (shared/protocol.ts 14.), else null */
+  private act(conn: string, member: MemberRecord, action: JsonValue, forSeat: number | null): void {
     const room = this.requireRoom()
     const game = this.game
     if (room.status !== 'playing' || !game) return this.refuse(conn, 'no_game')
-    // The seat is the one this socket's member holds: nothing in the message can say otherwise
-    if (member.seat === null) return this.refuse(conn, 'not_seated')
+    // The seat is the one this socket's member holds: nothing in the message can say otherwise,
+    // but for the host's computer seats
+    if (forSeat !== null && !this.isBotSeatFor(member, forSeat)) {
+      return this.refuse(conn, 'forbidden')
+    }
+    const seat = forSeat ?? member.seat
+    if (seat === null) return this.refuse(conn, 'not_seated')
     const module = this.deps.games(game.gameId)
     if (!module) return this.refuse(conn, 'game_failed')
-    const outcome = playAction(module, game, action, member.seat, this.deps.now())
+    const outcome = playAction(module, game, action, seat, this.deps.now())
     if (outcome.kind === 'refused') {
       this.deps.sockets.send(conn, { t: 'error', code: 'game_error', error: outcome.error })
       return
@@ -925,6 +1020,7 @@ export class RoomHost {
       room.hostId = next.id
       this.deps.storage.saveRoom(room)
     })
+    this.abandonBots()
   }
 
   /** They hold no seat and take up one of MAX_MEMBERS; returning, they are someone new */
@@ -1064,6 +1160,12 @@ export class RoomHost {
       room.maxSeats = module.meta.maxPlayers
       room.status = 'waiting'
       this.deps.storage.saveRoom(room)
+      // A game without computer seats has no computer members
+      if (!module.bots) {
+        for (const other of [...this.members.values()]) {
+          if (other.bot) this.members.delete(other.id)
+        }
+      }
       // After the new maxSeats: those without a seat in this game take one that is left, if any
       const others = [...this.members.values()]
       const homeless = others.filter((other) => other.seat !== null && other.seat >= room.maxSeats)
@@ -1111,6 +1213,8 @@ export class RoomHost {
       room.hostId = target.id
       this.deps.storage.saveRoom(room)
     })
+    // The new host's browser is not running the computer karts
+    this.abandonBots()
   }
 
   private kick(conn: string, member: MemberRecord, targetId: string): void {
@@ -1118,6 +1222,15 @@ export class RoomHost {
     if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
     const target = this.members.get(targetId)
     if (!target || target === member) return this.refuse(conn, 'bad_member')
+    if (target.bot) {
+      // A computer member leaves with no ban, and not from a game under way
+      if (room.status === 'playing') return this.refuse(conn, 'wrong_status')
+      this.change(() => {
+        this.members.delete(target.id)
+        this.saveMembers()
+      })
+      return
+    }
     if (target.conn !== null) {
       // Gone first, so that nothing below is sent to it and its close tells nobody it went offline
       this.conns.delete(target.conn)
@@ -1234,11 +1347,13 @@ export class RoomHost {
         id: member.id,
         name: member.name,
         seat: member.seat,
-        ready: member.ready,
+        // A computer member is always set, and always there
+        ready: member.ready || member.bot !== undefined,
         host: member.id === room.hostId,
-        online: member.conn !== null,
+        online: member.conn !== null || member.bot !== undefined,
         absent: member.absent,
         ...(member.look !== undefined ? { look: member.look } : {}),
+        ...(member.bot ? { bot: { ...member.bot } } : {}),
       }
     }
     const game = this.game
@@ -1299,6 +1414,8 @@ export class RoomHost {
       member.offlineAt = this.deps.now()
       this.saveMembers()
     })
+    // The host's browser ran the computer karts: nobody does now (shared/protocol.ts 14.)
+    if (member.id === this.room?.hostId) this.abandonBots()
   }
 
   private saveMembers(): void {

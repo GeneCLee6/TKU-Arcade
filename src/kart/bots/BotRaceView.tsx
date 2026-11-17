@@ -19,7 +19,7 @@ import { readNickname } from '../../lib/nickname.ts'
 import { displayType, glass } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import RaceView from '../race/RaceView.tsx'
-import { createBotRace } from './botRace.ts'
+import { botSeats, createBotRace } from './botRace.ts'
 import { createLocalRoom } from './localRoom.ts'
 import { drawBots } from './roster.ts'
 import type { BotSetup } from './setup.ts'
@@ -71,10 +71,8 @@ function BotRound({ setup, onAgain, onMenu }: BotRaceViewProps & { readonly onAg
       room: game.room,
       track,
       laps: setup.laps,
-      difficulty: setup.difficulty,
-      entries: game.entries,
-      firstSeat: 0,
-      playerSeat: game.playerSeat,
+      bots: botSeats(game.entries, 0, setup.difficulty),
+      players: [game.playerSeat],
       seed: game.seed,
       now: Date.now(),
     })

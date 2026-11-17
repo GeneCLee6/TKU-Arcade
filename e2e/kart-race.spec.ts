@@ -107,3 +107,43 @@ test('two people race each other in one room, from the countdown to the results'
   await ann.getByTestId('kart-replay-play').click()
   await expect(ann.getByTestId('kart-replay-play')).toHaveAttribute('data-playing', 'false')
 })
+
+// 2026-11-17: a computer kart in a room of two. The host adds it in the waiting room; the host's
+// browser drives it and its frames go through the room like anyone's, so both see it, and it is in
+// the results with its name.
+test('two people and a computer kart race one lap in one room', async ({ browser }) => {
+  const viewport = { width: 480, height: 320 }
+  const ann = await newPerson(browser, { viewport })
+  const bob = await newPerson(browser, { viewport })
+  for (const page of [ann, bob]) {
+    await page.addInitScript(() => localStorage.setItem('tku-arcade.kart.quality', 'low'))
+  }
+  const response = await ann.request.post('/api/rooms', {
+    data: { gameId: 'kart', options: { track: 'riverside', laps: 1, mode: 'race' } },
+  })
+  const { id } = (await response.json()) as { id: string }
+  await joinRoom(ann, `/r/${id}?autopilot`, 'Ann')
+  await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
+  // Only the host gets the computer karts' panel
+  await expect(bob.getByTestId('kart-room-bots')).toHaveCount(0)
+  await ann.getByTestId('kart-room-bots-level').selectOption('normal')
+  await ann.getByTestId('kart-room-bots-add').click()
+  for (const page of [ann, bob]) {
+    await expect(page.getByTestId('bot-member')).toHaveText(/\(CPU\)$/)
+  }
+  const botName = (await ann.getByTestId('bot-member').textContent()) ?? ''
+  await ann.getByRole('button', { name: 'Start game' }).click()
+
+  for (const page of [ann, bob]) await expect(page.getByTestId('kart-race')).toBeVisible()
+  // Each sees the other person's kart and the computer's, from their frames
+  for (const page of [ann, bob]) {
+    await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 90_000 }).toBe(2)
+  }
+  for (const page of [ann, bob]) {
+    await expect(page.getByText('Race over')).toBeVisible({ timeout: 180_000 })
+  }
+  // The computer kart is in the results by name, with a time: the room judged its lap
+  const results = bob.getByRole('region', { name: 'Results' })
+  await expect(results).toContainText(botName)
+  await expect(results.getByText(/Finished in \d:\d\d\.\d{3}/)).toHaveCount(3)
+})

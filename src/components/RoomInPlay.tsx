@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import type { CoverableSeat, CoverMessage, RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import type { RoomTimer } from '../lib/roomConnection.ts'
+import { memberName } from '../lib/memberName.ts'
 import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
 import { Avatar } from './Avatar.tsx'
 import { Button } from './Button.tsx'
@@ -109,7 +110,7 @@ export function RoomInPlay({
             return (
               <MemberRow key={member.id} $turn={hasTurn}>
                 <Avatar
-                  name={member.name}
+                  name={memberName(member, view.room.gameId)}
                   tint={seatTint && member.seat !== null ? seatColor(member.seat) : undefined}
                 />
                 {member.seat !== null && (
@@ -121,6 +122,8 @@ export function RoomInPlay({
                   viewerIsHost={isHost}
                   onKick={onKick}
                   onTransfer={onTransfer}
+                  gameId={view.room.gameId}
+                  playing={status === 'playing'}
                 />
                 {hasTurn && <TurnMark>{t('room.turnBadge')}</TurnMark>}
                 {detail && <SeatDetail>{detail}</SeatDetail>}

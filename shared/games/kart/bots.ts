@@ -1,0 +1,23 @@
+// Computer karts' levels and names (docs/ARCHITECTURE.md §4.20, §4.21): shared by the race against
+// the computer on /kart and by the race room, where the host adds computer karts to free seats and
+// the room picks each one's name from this list. The names are working titles of our own
+// (`kart.bots.name.<id>` and `games.kart.bot.name.<id>`), like every name in the kart's world until
+// KART-WORLD.md settles them (e10-t01). Pure: no strings to show, only ids.
+
+export const BOT_LEVELS = ['easy', 'normal', 'hard'] as const
+export type BotLevel = (typeof BOT_LEVELS)[number]
+
+export const BOT_NAMES = [
+  'pepper',
+  'mochi',
+  'typhoon',
+  'boba',
+  'scooter',
+  'sunset',
+  'ferry',
+  'kite',
+] as const
+export type BotName = (typeof BOT_NAMES)[number]
+
+export const isBotName = (value: unknown): value is BotName =>
+  BOT_NAMES.some((one) => one === value)

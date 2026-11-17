@@ -31,6 +31,8 @@ export type RoomParts = Omit<
   realtime?: RoomRealtime
   /** e10-t05: this member's cosmetic pick (the kart's garage); absent in tests */
   onSetLook?(look: string | null): void
+  /** 2026-11-17: the host's browser acting for a computer seat (the kart); absent in tests */
+  actFor?(seat: number, action: JsonValue): boolean
 }
 
 export interface GameLayoutProps {

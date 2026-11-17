@@ -3,7 +3,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { ToastProvider } from '../../src/components/Toast.tsx'
 import { WaitingRoom } from '../../src/components/WaitingRoom.tsx'
-import { initLanguage, setLanguage } from '../../src/i18n/t.ts'
+import { kartMessages } from '../../shared/games/kart/i18n.ts'
+import { initLanguage, registerMessages, setLanguage } from '../../src/i18n/t.ts'
+import { memberName } from '../../src/lib/memberName.ts'
 import { stubDialog } from '../lib/stubDialog.ts'
 
 const ROOM = 'abcdefghij'
@@ -445,5 +447,44 @@ describe('the promotion edition (C7)', () => {
     expect(screen.getByRole('spinbutton', { name: /Seconds to answer/ })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /Buying office/ })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: /End at the first/ })).not.toBeChecked()
+  })
+})
+
+describe('computer members (2026-11-17)', () => {
+  const bot = (over: Partial<RoomMember> = {}) =>
+    member('cpu', {
+      name: 'mochi',
+      seat: 2,
+      ready: true,
+      bot: { level: 'hard', name: 'mochi' },
+      ...over,
+    })
+
+  beforeEach(() => {
+    registerMessages(kartMessages)
+  })
+
+  it('shows its name and level through the game strings, and lets the host remove it', () => {
+    const view = { ...viewOf([al(), bo(), bot()]) }
+    view.room = { ...view.room, gameId: 'kart' }
+    const { onKick } = renderRoom(view)
+    const row = rowOf('Mochi (CPU)')
+    expect(within(row).getByText('Hard')).toBeInTheDocument()
+    // No hand-over to the computer, and its removal needs no confirming
+    expect(within(row).queryByRole('button', { name: /host/i })).not.toBeInTheDocument()
+    fireEvent.click(within(row).getByRole('button', { name: 'Remove Mochi (CPU)' }))
+    expect(onKick).toHaveBeenCalledWith('cpu')
+  })
+
+  it('gives nobody but the host a way to remove it', () => {
+    const view = { ...viewOf([al(), bo(), bot()]) }
+    view.room = { ...view.room, gameId: 'kart' }
+    renderRoom(view, 'Bo')
+    expect(within(rowOf('Mochi (CPU)')).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('falls back to its name id before the game strings are there', () => {
+    expect(memberName(bot(), 'promotion')).toBe('mochi')
+    expect(memberName(al(), 'kart')).toBe('Al')
   })
 })

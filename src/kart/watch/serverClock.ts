@@ -12,6 +12,8 @@ const KEEP_SAMPLES = 8
 export interface ServerClock {
   /** The server's time now (ms since the epoch); this browser's own before the first answer */
   now(): number
+  /** Whether a clock answer has come back: `now` is the server's from then on */
+  synced(): boolean
   stop(): void
 }
 
@@ -41,6 +43,7 @@ export function createServerClock(realtime: RoomRealtime): ServerClock {
   const pinger = setInterval(ping, PING_EVERY_MS)
   return {
     now: () => (offset === null ? Date.now() : performance.now() + offset),
+    synced: () => offset !== null,
     stop() {
       stopListening()
       for (const timer of timers) clearTimeout(timer)

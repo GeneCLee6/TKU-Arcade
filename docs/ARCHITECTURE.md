@@ -495,7 +495,21 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **Rubber band**（`RUBBER_BAND`，只動上面的極速比例）：和玩家差 0.05 圈以內不變；領先越多越收，領先 0.3 圈以上少 0.06；落後越多越放，落後 0.3 圈以上多 0.05，但上限 1（不超過車款極速）。差距用 `raceProgress` 除以每圈閘門數。
 - **道具時機**（`itemSense.ts` 的 `wantsToUse`，看時機的難度）：噴射等直線；護盾在有雷雲追自己或冰雹飛過來時立刻開，否則再拿 8 秒才用；拖曳在前車 0.9 × 拖曳距離內（且不是已經貼著）；逆風前面有人就用；交換要同一圈、在範圍內；雷雲前車在範圍內；冰雹要前車在 120 m 內、偏離車頭 0.12 rad 內；水坑後面 40 m 內有人才丟，否則 8 秒後丟。房間拒絕（沒人可打）就 0.7 秒後再問。
 - **測試**：`tests/kart/bots.test.ts`：每張賽道（含 `oldstreet`）每種難度 3 個種子單獨跑完三圈、從不逆向；平均圈速 困難 < 普通 < 簡單；本機房間裡 4 台電腦車在每張圖跑完道具賽（有拿箱子、有用道具、房間有裁定）、7 台困難在老街有人被投射型道具打中、純競速沒有道具；rubber band 的範圍；`wantsToUse` 每種道具的決策。`e2e/kart-bots.spec.ts`：`/kart?autopilot` 開選單、1 台簡單、1 圈道具賽，倒數、看到電腦車、拿到箱子、成績兩人且有 (CPU)。
-- **多人房加電腦車（不在這批）**：客戶端自主模擬架構下，電腦車要有一個瀏覽器代跑。可行的路：房主的瀏覽器跑 `botRace.ts`，用房間的 realtime 送「替某座位」的 frame（協定要加一種 frame 或讓房主可以佔多個座位），伺服器照常裁定；房主斷線時電腦車要交給下一位或退賽。另評估（`NEXT.md`）。
+- **多人房加電腦車（不在這批）**：客戶端自主模擬架構下，電腦車要有一個瀏覽器代跑。可行的路：房主的瀏覽器跑 `botRace.ts`，用房間的 realtime 送「替某座位」的 frame（協定要加一種 frame 或讓房主可以佔多個座位），伺服器照常裁定；房主斷線時電腦車要交給下一位或退賽。另評估（`NEXT.md`）。後來做了，見 §4.21。
+
+### 4.21 路線圖外：多人房加電腦車（2026-11-17，`feat/kart-room-bots`）
+
+擁有者要求繼續開發卡丁車，照 §4.20 最後一點的評估做：房主在競速房的等待室把電腦車加到空座位，電腦車由**房主的瀏覽器代跑**，伺服器照常裁定。線上格式在 [`KART-NETCODE.md`](KART-NETCODE.md) §13。
+
+- **電腦車是房間的成員**（`worker/room-host.ts`）：`MemberRecord.bot = { level, name }`，沒有 socket、`offlineAt` 永遠是 null（hibernation 的 `restore` 也不補，所以不會被判 `absent`），view 裡 `online`、`ready` 永遠是 true，多一個 `RoomMember.bot`。所以座位、開賽時座位重編號、rematch、結果、觀戰、重播的名字全都照原本的路走，不用另外存一份電腦車名單。房主送 `add_bot { level, look? }`（等待中或結束後；放最低的空座位，名字照 `GameModule.bots.names` 的順序取第一個沒被用的），`kick` 電腦車就是移除（不記 ban；比賽中拒絕）。總人數照原本的 `maxSeats`（卡丁車 8）；換成沒有 `bots` 的遊戲時電腦車一起拿掉。真人的暱稱不會因為和電腦車的名字 id 撞到而加 (2)。
+- **遊戲怎麼說它有電腦車**：`GameModule.bots = { levels, names }`（`shared/games/types.ts`），卡丁車是 `shared/games/kart/bots.ts` 的 `BOT_LEVELS`（easy／normal／hard，和單機的難度同一份）與 `BOT_NAMES`（單機的八個暫名搬過來共用）。`RealtimeModule.abandon(state, seats)`：沒有人會再替這些座位送 frame 了，模組回要套的 `system` action；卡丁車回每台還沒結束的 `retire`。為此 `retire` 在起跑前（loading、countdown）也收，`loaded` 的「大家都到了」不等已退賽的車。
+- **代送的權限**（全部在 `RoomHost.isBotSeatFor`）：送的人必須是**現在的房主**、而且那個座位上坐的是電腦車（不能替真人、不能替空座位、電腦車自己不算房主）。JSON 的 `action` 多一個 `botSeat`（只用在電腦車的 `loaded`），二進位 frame 用 `PROXY_FRAME`（254）＋座位包起來。其他一律照原本：`judgeFrame` 的合理性檢查、圈數、`judgeItem` 的拿取與使用、投射物命中，對電腦車的座位一樣做。
+- **房主斷線：電腦車立刻退賽**（不交接）。房主的 socket 一關（`markOffline`）、`transfer` 給別人、或離線太久被換掉（`replaceAbsentHost`），只要房間在比賽中，就呼叫 `abandon`，還沒跑完的電腦車當場 `retire`，比賽照常進行（只剩房主自己和電腦車的房間，房主仍保有座位、可以回來）。選退賽而不選交接：交接要把物理狀態（位置、速度、甩尾、道具效果、集氣）從最後一個 frame 接回來，在別人的瀏覽器重建一台車，兩邊銜接的那一刻容易跳或被合理性檢查丟掉；朋友之間「房主掉線，電腦車就不跑了」好懂又不會壞掉。重新整理頁面也算斷線（新的 socket 先到、舊的還沒關也算）；房主的頁面只在比賽還在 loading 時才開始代跑，中途才載入的頁面不接手。
+- **房主的瀏覽器怎麼跑**（`src/games/kart/useRoomBots.ts` → `src/kart/bots/roomBots.ts`，只有房主、房裡有電腦車時才載）：掛在 `KartScreen` 底下（房主在比賽、觀戰或看名次表都會跑），每場（seed）一次。`botRace.ts` 改成吃一個 `BotRoom` 介面（`state`、`act`、`frame`、`tick`、`listen`），單機的 `localRoom.ts` 和線上的 adapter 都實作它：線上的 `state` 是房主看到的 view、`act` 送 `{ t: 'action', botSeat }`、`frame` 包成 `PROXY_FRAME` 送出、`tick` 不做事（timer 在伺服器）。時間用房間的錶（`serverClock.ts` 多一個 `synced()`，對到時才開始）。房間把代送的 frame 也轉回房主，所以房主的 `RaceView` 畫電腦車和畫別人一樣（從 frame、100 ms 緩衝），錄影也錄得到。被房間判退賽的電腦車不再送 frame。
+- **和單機的差別**：rubber band 改成和**所有真人的平均進度**比（單機就是那一位玩家）；推開時把每位真人最新的 frame 都當成障礙；隱藏分頁的計時器會變慢，線上允許一次追 2 秒（單機 0.25 秒），免得電腦車在背景分頁裡越跑越慢。
+- **畫面**：等待室的房主多一塊「電腦車」（`src/kart/bots/RoomBots.tsx`，lazy chunk）：選難度、加一台（車款與車手隨機，當作 `look` 送出），座位滿了按鈕就停用。座位列表的電腦車顯示「名字（電腦）」與難度，房主有「移除」（不用確認、比賽中不顯示），沒有「移交房主」。名字怎麼顯示統一走 `src/lib/memberName.ts`：`games.<id>.bot.name.<name>` 與 `games.<id>.bot.tag`（卡丁車的字串在 `shared/games/kart/i18n.ts`，隨房間載入），等待室、成員列表、結果、反應、車庫的選車列表、比賽中的名牌與名次、觀戰、重播都用它。
+- **測試**：`tests/worker/room-bots.test.ts`（新訊息的解析；加到最低空座位、名字不重複、永遠 ready／online；非房主不能加、難度不對、座位滿；沒有電腦車的遊戲與換遊戲；移除不記 ban、比賽中不能移除；hibernation 之後不會變 absent；開賽重編號；只有房主能替電腦車座位送 action 與 frame、不能替真人或空座位；代送的 frame 照常判圈、轉給所有人包括房主；交出房主後電腦車退賽、舊房主的代送被丟；房主斷線電腦車立刻退賽、loading 時不卡開賽、只剩房主與電腦車時比賽照常）；`tests/kart/roomBots.test.ts`（`botRace.ts` 透過真的 `RoomHost` 代送，兩台電腦車跑完一圈道具賽並由房間判完賽；房間判退賽後不再送）；`tests/components/WaitingRoom.test.tsx`（電腦車的名字、難度、房主的移除）；`e2e/kart-race.spec.ts`（兩人房加一台普通電腦車跑一圈：兩邊都看到 2 台別人的車、結果三人都有時間、電腦車的名字在結果裡）。
+- **已知限制**：房主的上傳每台電腦車多 20 frame／秒（每台約 0.7 kB/s，7 台約 5 kB/s），房主的瀏覽器多跑每台的物理與駕駛；房主的分頁在背景太久（瀏覽器把計時器壓到一分鐘一次）電腦車還是會落後；房主斷線電腦車就退賽，不交接。
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

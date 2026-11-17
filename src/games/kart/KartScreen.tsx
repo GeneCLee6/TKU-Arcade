@@ -5,11 +5,13 @@ import type { Replay } from '../../../shared/kart/replay.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
 import { useT } from '../../i18n/useT.ts'
+import { memberName } from '../../lib/memberName.ts'
 import { space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import './messages.ts'
 import { Standings } from './Standings.tsx'
 import { useRaceRecorder } from './useRaceRecorder.ts'
+import { useRoomBots } from './useRoomBots.ts'
 
 // The race itself, three.js and all: the kart's own chunk (docs/ARCHITECTURE.md §4), loaded only
 // by someone with a kart in the race
@@ -31,13 +33,18 @@ export default function KartScreen({ room, game }: GameScreenProps) {
   const t = useT()
   const view = game.view as unknown as KartView
   const recording = useRaceRecorder(view, room.realtime)
+  // 2026-11-17: the host's browser drives the computer karts, whatever it shows
+  useRoomBots(view, room)
   // Watching live: null until chosen, and then the default is whether there is no kart to drive
   const [watchChoice, setWatchChoice] = useState<boolean | null>(null)
   const [replay, setReplay] = useState<Replay | null>(null)
   const [garage, setGarage] = useState(false)
-  const nameOf = (seat: number) =>
-    Object.values(room.view.members).find((member) => member.seat === seat)?.name ??
-    t('room.waiting.seat', { seat: seat + 1 })
+  const nameOf = (seat: number) => {
+    const member = Object.values(room.view.members).find((one) => one.seat === seat)
+    return member
+      ? memberName(member, room.view.room.gameId)
+      : t('room.waiting.seat', { seat: seat + 1 })
+  }
   const me = view.racers.find((racer) => racer.seat === view.you)
   const watching = watchChoice ?? (!me || me.out)
   const loading = <Loading role="status">{t('games.kart.race.loading')}</Loading>

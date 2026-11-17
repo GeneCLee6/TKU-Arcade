@@ -20,6 +20,7 @@ import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
 import { Link } from '../lib/router.tsx'
 import { useCompact } from '../lib/useMediaQuery.ts'
 import { useRoom } from '../lib/useRoom.ts'
+import { memberName } from '../lib/memberName.ts'
 import { useParams } from '../lib/useRouter.ts'
 import { clippedFill, displayType, monoType, SLANT, slantClip } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
@@ -201,6 +202,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
     act: room.act,
     realtime: room.realtime,
     onSetLook: room.setLook,
+    actFor: room.actFor,
     chat: {
       messages: room.chat,
       locked: view.game?.chatLocked ?? false,
@@ -225,7 +227,10 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
             <Reactions
               reactions={room.reactions}
               onReact={room.react}
-              nameOf={(member) => view.members[member]?.name ?? ''}
+              nameOf={(member) => {
+                const one = view.members[member]
+                return one ? memberName(one, view.room.gameId) : ''
+              }}
             />
           </Suspense>
         }
@@ -246,6 +251,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
             onSetOptions={room.setOptions}
             onSetPassword={room.setPassword}
             onSetLook={room.setLook}
+            onAddBot={room.addBot}
             aside={!compact && <RoomChatPanel room={parts} />}
           />
           {/* On a phone the chat is a drawer, its bar stuck to the bottom of the whole page */}

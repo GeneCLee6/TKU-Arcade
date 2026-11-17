@@ -6,7 +6,7 @@ import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
 import type { KartMode } from '../../shared/games/kart/types.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
-import { createBotRace } from '../../src/kart/bots/botRace.ts'
+import { botSeats, createBotRace } from '../../src/kart/bots/botRace.ts'
 import { IDLE_USE_MS, wantsToUse, type ItemSituation } from '../../src/kart/bots/itemSense.ts'
 import { createLocalRoom } from '../../src/kart/bots/localRoom.ts'
 import { drawBots, MAX_BOTS } from '../../src/kart/bots/roster.ts'
@@ -85,10 +85,8 @@ function botsOnly(id: string, mode: KartMode, difficulty: Difficulty, count: num
     room,
     track,
     laps: 3,
-    difficulty,
-    entries: drawBots(count, seed),
-    firstSeat: 0,
-    playerSeat: null,
+    bots: botSeats(drawBots(count, seed), 0, difficulty),
+    players: [],
     seed,
     now,
   })

@@ -59,6 +59,15 @@
 // 12. `sit` also works while `ended`, so that a spectator can take a free seat for the rematch.
 // 13. A room with no socket open for ROOM_CLEANUP_MS, or `ended` with nothing happening for that long,
 //    is deleted: any socket left is closed with CloseCode.roomNotFound (RoomHost.sweep).
+// 14. Computer seats (2026-11-17, a game with `GameModule.bots`: the kart). `add_bot`, from the host
+//    while `waiting` or `ended`, puts a computer member (`RoomMember.bot`) in the lowest free seat;
+//    the room picks its name. `kick` of a computer member removes it, with no ban, but not while a
+//    game is played. A computer seat is always ready and never offline, and plays like any other;
+//    its moves come from the host's browser: an `action` with `botSeat`, and binary frames wrapped in
+//    PROXY_FRAME. The room takes either only from the host and only for a computer seat in the game;
+//    everything else about them is judged as for anyone. When the host's socket closes or the host
+//    changes during a game, the game is told nobody will move the computer seats any more
+//    (`RealtimeModule.abandon`: the kart retires them).
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
@@ -160,6 +169,11 @@ export type RoomMember = {
    * only checks its shape (LOOK_PATTERN); the game reads it. Absent until set
    */
   look?: string
+  /**
+   * A computer member (14. above): its level (`GameModule.bots.levels`) and its name's id
+   * (`bots.names`), which the browser shows through the game's strings; `name` is only a fallback
+   */
+  bot?: { level: string; name: string }
 }
 
 /** A seat the game is waiting for, whose player is absent or gone, and what the host can do */
@@ -272,6 +286,25 @@ export const CLOCK_FRAME = 255
 export const CLOCK_PING_BYTES = 9
 export const CLOCK_ANSWER_BYTES = 17
 
+/**
+ * A frame the host sends for a computer seat (14. above): PROXY_FRAME, the seat, then the frame as
+ * that seat's own browser would send it. The room takes it only from the host, for a computer seat in
+ * the game, judges it as that seat's and passes it on to everyone, the host too (whose race draws
+ * the computer karts from those, like anyone else's)
+ */
+export const PROXY_FRAME = 254
+/** PROXY_FRAME and the seat */
+export const PROXY_HEADER_BYTES = 2
+
+/** `frame`, wrapped to go in for `seat` */
+export function proxyFrame(seat: SeatId, frame: Uint8Array): Uint8Array {
+  const bytes = new Uint8Array(frame.byteLength + PROXY_HEADER_BYTES)
+  bytes[0] = PROXY_FRAME
+  bytes[1] = seat
+  bytes.set(frame, PROXY_HEADER_BYTES)
+  return bytes
+}
+
 export type ServerMessage =
   | WelcomeMessage
   | SnapshotMessage
@@ -302,8 +335,11 @@ export function normalizePassword(value: unknown): string | null {
 /** A `patch` went missing: send a `snapshot` */
 export type ResyncMessage = { t: 'resync' }
 
-/** A game action. Only its envelope is checked here: `GameModule.reduce` checks `action` itself */
-export type ActionMessage = { t: 'action'; action: JsonValue }
+/**
+ * A game action. Only its envelope is checked here: `GameModule.reduce` checks `action` itself.
+ * `botSeat`: the host acting for a computer seat (14. above); left out, it is the sender's own
+ */
+export type ActionMessage = { t: 'action'; action: JsonValue; botSeat?: SeatId }
 
 export type ChatClientMessage = { t: 'chat'; text: string }
 
@@ -324,6 +360,9 @@ export type CoverMessage = { t: 'cover'; seat: SeatId; how: 'skip' | 'proxy' }
 
 /** The host starts a new game from an `ended` room, with whoever is seated */
 export type RematchMessage = { t: 'rematch' }
+
+/** The host adds a computer member at `level` to the lowest free seat (14. above); `look` as set_look */
+export type AddBotMessage = { t: 'add_bot'; level: string; look?: string }
 
 /** The host removes a member from the room; their token cannot join again for KICK_BAN_MS */
 export type KickMessage = { t: 'kick'; member: string }
@@ -379,6 +418,7 @@ export type ClientMessage =
   | SetPasswordMessage
   | SetLookMessage
   | ReactMessage
+  | AddBotMessage
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -573,7 +613,17 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     case 'resync':
       return { t: 'resync' }
     case 'action':
-      return value.action === undefined ? null : { t: 'action', action: value.action as JsonValue }
+      if (value.action === undefined) return null
+      if (value.botSeat === undefined) return { t: 'action', action: value.action as JsonValue }
+      return Number.isSafeInteger(value.botSeat) && (value.botSeat as number) >= 0
+        ? { t: 'action', action: value.action as JsonValue, botSeat: value.botSeat as SeatId }
+        : null
+    case 'add_bot':
+      if (typeof value.level !== 'string' || !/^[a-z0-9-]{1,16}$/.test(value.level)) return null
+      if (value.look === undefined) return { t: 'add_bot', level: value.level }
+      return typeof value.look === 'string' && LOOK_PATTERN.test(value.look)
+        ? { t: 'add_bot', level: value.level, look: value.look }
+        : null
     case 'chat': {
       const text = normalizeChatText(value.text)
       return text === null ? null : { t: 'chat', text }
