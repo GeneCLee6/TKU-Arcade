@@ -140,11 +140,13 @@ const GOLDEN: Record<string, { hash: string; steps: number }> = {
 const GOLDEN_ARENA = '72389793'
 
 // Taken when the classic feel came in (2026-11-17), by this file's own functions. When the classic
-// feel is changed on purpose, take them again (and raise the built-in tracks' revisions)
+// feel is changed on purpose, take them again (and raise the built-in tracks' revisions). Taken
+// again the same day: the instant boost fires only on a fresh press of the throttle and pulls
+// harder, and the start boost lifts the top speed (the yard's script fires neither: unchanged)
 const CLASSIC_GOLDEN: Record<string, { hash: string; steps: number }> = {
-  riverside: { hash: '34dd8091', steps: 6578 },
-  harbour: { hash: 'e5623742', steps: 6995 },
-  tamkang: { hash: '7a4075fc', steps: 7153 },
-  oldstreet: { hash: 'b910579e', steps: 6295 },
+  riverside: { hash: 'dde528f3', steps: 6291 },
+  harbour: { hash: '00815ec9', steps: 7049 },
+  tamkang: { hash: 'd0d222a6', steps: 6776 },
+  oldstreet: { hash: '2e98ab28', steps: 6147 },
 }
 const CLASSIC_GOLDEN_ARENA = 'ddd6236c'

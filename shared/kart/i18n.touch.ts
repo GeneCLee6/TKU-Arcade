@@ -18,7 +18,7 @@ const en = {
   'kart.touch.steerSlider': 'Slider: drag sideways',
   'kart.touch.autoThrottle': 'Automatic throttle',
   'kart.touch.autoThrottleNote':
-    'The engine runs by itself after GO. Gas is then only tapped: for a release boost, or held just before GO for a start boost.',
+    'The engine runs by itself after GO. Gas is then only tapped: for an instant boost out of a drift, or held just before GO for a start boost.',
   'kart.touch.size': 'Button size',
   'kart.touch.opacity': 'Opacity',
   'kart.touch.percent': '{value}%',
@@ -27,7 +27,7 @@ const en = {
   'kart.touch.notSaved': "This browser won't keep it: it lasts until the page closes.",
   'kart.touch.howTo': 'How to drive by touch',
   'kart.touch.help':
-    'Left thumb steers; right thumb drives. To drift, hold Drift and steer: holding Drift keeps the gas on too. Let go of Drift and the kart slides out: steer the other way to catch it (the gold sparks turn blue), then tap Gas for a release boost. Tap Drift again right after it and do the same for a double; keep going, even with short drifts on the straights, to chain them. Boost fires a stored boost, Item uses the item, Brake brakes and reverses, Reset puts the kart back on the road. With the automatic throttle the engine runs by itself after GO; hold Gas just before GO for a start boost.',
+    'Left thumb steers; right thumb drives. To drift, hold Drift and steer: holding Drift keeps the gas on too. Let go of Drift and the kart slides out: steer the other way to pull it straight, then tap Gas for an instant boost (once a drift has earned one, gold sparks, the automatic throttle lets go by itself so that your tap counts; nothing fires until you tap). Tap Drift again right after it and do the same for a double; keep going, even with short drifts on the straights, to chain them. Boost fires a stored boost, Item uses the item, Brake brakes and reverses, Reset puts the kart back on the road. With the automatic throttle the engine runs by itself after GO; hold Gas just before GO for a start boost.',
   'kart.touch.rotate': 'Turn your phone sideways for a better view.',
 } as const
 
@@ -50,7 +50,7 @@ const zhTW: Record<KartTouchKey, string> = {
   'kart.touch.steerSlider': '滑桿：左右拖',
   'kart.touch.autoThrottle': '自動油門',
   'kart.touch.autoThrottleNote':
-    'GO 之後引擎自己跑，油門只要「點」：收尾加速時點一下，或在 GO 前一刻按住拿起步加速。',
+    'GO 之後引擎自己跑，油門只要「點」：甩尾後要瞬間加速時點一下，或在 GO 前一刻按住拿起步加速。',
   'kart.touch.size': '按鍵大小',
   'kart.touch.opacity': '不透明度',
   'kart.touch.percent': '{value}%',
@@ -59,7 +59,7 @@ const zhTW: Record<KartTouchKey, string> = {
   'kart.touch.notSaved': '這個瀏覽器不讓存：關掉頁面前有效。',
   'kart.touch.howTo': '觸控怎麼開',
   'kart.touch.help':
-    '左手轉向，右手開車。甩尾：按住「甩尾」再轉向（按住甩尾時油門也一直踩著）。放開「甩尾」車會滑出去：往反方向轉把它拉回來（金色火花變藍），再點一下「油門」就是收尾加速；噴完馬上再點一下甩尾、照做一次是雙收尾，一路接下去（直線上短甩也行）就是連噴。「噴射」放出存好的加速，「道具」用道具，「煞車」煞車與倒車，「復位」回到路上。開著自動油門時，GO 之後引擎自己跑；GO 前一刻按住油門可以起步加速。',
+    '左手轉向，右手開車。甩尾：按住「甩尾」再轉向（按住甩尾時油門也一直踩著）。放開「甩尾」車會滑出去：往反方向轉把它拉正，再點一下「油門」才會瞬間加速（甩到出金色火花之後，自動油門會自己鬆開等你點；不點就不會噴）；噴完馬上再點一下甩尾、照做一次是雙收尾，一路接下去（直線上短甩也行）就是連噴。「噴射」放出存好的加速，「道具」用道具，「煞車」煞車與倒車，「復位」回到路上。開著自動油門時，GO 之後引擎自己跑；GO 前一刻按住油門可以起步加速。',
   'kart.touch.rotate': '把手機轉橫，畫面比較好看。',
 }
 

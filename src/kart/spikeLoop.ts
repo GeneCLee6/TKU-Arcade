@@ -51,6 +51,7 @@ import {
 } from '../../shared/kart/input.ts'
 import { mergeInputs } from '../../shared/kart/touch.ts'
 import {
+  isClassic,
   kartBoosting,
   kartBurstWaiting,
   kartSkidding,
@@ -65,6 +66,7 @@ import {
   type KartTuning,
 } from '../../shared/kart/physics.ts'
 import { calloutAtStart, calloutBetween, louder, type Callout } from './callouts.ts'
+import { BURST_POWER, burstBetween, skidStrength } from './feelFx.ts'
 import { readGamepad } from './devices.ts'
 import {
   createKartScene,
@@ -125,6 +127,12 @@ export interface SpikeHud {
   readonly chain: number
   /** Counts wall hits, so that the HUD can flash on each one */
   readonly hits: number
+  /**
+   * The instant boost (docs/KART-FEEL.md): 1 once the drift under way has earned one, 2 while a
+   * fresh press of the throttle would fire it (sliding out, or just straightened); 0 or left out
+   * otherwise
+   */
+  readonly dash?: 0 | 1 | 2
 }
 
 /**
@@ -343,7 +351,8 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
   a.hits === b.hits &&
   a.storedBoosts === b.storedBoosts &&
   a.boosting === b.boosting &&
-  a.chain === b.chain
+  a.chain === b.chain &&
+  (a.dash ?? 0) === (b.dash ?? 0)
 
 /**
  * The game loop, outside React (docs/ARCHITECTURE.md §4): rendering follows the display, the physics
@@ -447,6 +456,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let handle = 0
   let lastHud: SpikeHud | undefined
   let bursts = 0
+  /** How hard the last boost kicked (feelFx.ts) */
+  let burstPower = 0
   // A hill track (2026-11-17): landings, for the dust and the thump
   let landings = 0
 
@@ -572,11 +583,15 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       } else {
         previous = before.kart
         callout = louder(callout, calloutBetween(before.kart, run.kart))
-        // Any boost fired (a charge, a release boost, a pad, the start): the thrusters burst
+        // Any boost fired (a charge, an instant boost, a pad, the start): the thrusters burst, the
+        // camera lurches and it bangs, by how hard it kicks
         const { kart } = run
         const was = before.kart
-        if (kart.miniSeconds > was.miniSeconds || kart.boostSeconds > was.boostSeconds) {
+        const fired = burstBetween(was, kart, tuning.startBoostDuration)
+        if (fired) {
           bursts++
+          burstPower = BURST_POWER[fired]
+          audio.burst(burstPower)
           touch?.buzz(BOOST_BUZZ_MS)
         }
         if (run.terrainEvent === 'takeoff') debug.takeoffs++
@@ -610,8 +625,15 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     const skidding = kartSkidding(current)
     // Let go, the car slides on until the grip is back: the nose is still turned the drift's way
     const slideWay = current.driftDirection || (skidding ? -Math.sign(kartSlip(current)) : 0)
+    const forward = current.vx * Math.sin(current.heading) - current.vz * Math.cos(current.heading)
+    const airborne = (current.air ?? 0) > 0
+    // How hard the tyres slide: the skid marks, the smoke and the squeal all follow it
+    const skid = airborne
+      ? 0
+      : skidStrength(kartSlip(current), kartSpeed(current), skidding, debug.input.brake && forward > 0)
+    const waiting = kartBurstWaiting(current, tuning)
     const look: KartLook = {
-      speed: current.vx * Math.sin(current.heading) - current.vz * Math.cos(current.heading),
+      speed: forward,
       steer: debug.input.steer,
       drift: slideWay,
       boosting,
@@ -620,11 +642,16 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       charge:
         current.releaseWindow > 0
           ? 2
-          : current.burstReady || (current.drifting && current.driftSeconds >= tuning.chainMinDrift)
+          : current.burstReady ||
+              (!isClassic(tuning) &&
+                current.drifting &&
+                current.driftSeconds >= tuning.chainMinDrift)
             ? 1
             : 0,
       bursts,
-      ...(trialCourse?.terrain ? { airborne: (current.air ?? 0) > 0, landings } : {}),
+      burstPower,
+      skid,
+      ...(trialCourse?.terrain ? { airborne, landings } : {}),
     }
     const pose = poseBetween(previous, current, clock.alpha)
     const hitFrame = net?.fx?.(pose)
@@ -646,6 +673,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       throttle: debug.input.throttle,
       drifting: skidding,
       boosting,
+      skid,
     })
     if (callout) options.onCallout(callout)
 
@@ -656,6 +684,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       boosting,
       chain: boosting ? current.chain : 0,
       hits,
+      dash: !rules.chainBoosts ? 0 : waiting ? 2 : current.drifting && current.burstReady ? 1 : 0,
     }
     options.onPose?.(current.x, current.z, current.heading, run.nextGate)
     if (trial && track) {

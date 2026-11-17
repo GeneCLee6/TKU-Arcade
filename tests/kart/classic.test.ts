@@ -24,11 +24,16 @@ import { followCar, startRig } from '../../src/kart/camera.ts'
 // The classic feel (2026-11-17, owner: "while the kart is still drifting, not yet pulled back,
 // counter-steer and forward should boost; pressing forward in the countdown should launch; the speed
 // is odd"; docs/KART-FEEL.md): the default physics. The arcade (old) preset keeps its own tests.
+// Later the same day (owner: "after the counter-steer it must not boost by itself: only when the
+// player presses forward does the car pull straight and boost"): only a fresh press of the throttle
+// fires the instant boost.
 
 const T = KART_TUNING
 const DEG = Math.PI / 180
 const GAS: KartInput = { ...NO_INPUT, throttle: true }
 const DRIFT_RIGHT: KartInput = { ...GAS, steer: 1, drift: true }
+/** The throttle let go and pressed again since the last step: a fresh press (the page's tap latch) */
+const TAP: KartInput = { ...GAS, throttleTap: true }
 
 function run(state: KartState, input: KartInput, seconds: number): KartState {
   let current = state
@@ -169,31 +174,69 @@ describe('the instant boost (the dash)', () => {
     expect(dashed(out, stepKart(out, { ...GAS, steer: -1 }))).toBe(false)
   })
 
+  it('never fires by itself: counter-steering with the throttle held all along does nothing', () => {
+    // Still drifting, the drift key down
+    const drift = drifted(0.5)
+    expect(drift.burstReady).toBe(true)
+    expect(drift.throttleHeld).toBe(true)
+    const countered = run(drift, { ...GAS, steer: -1, drift: true }, 0.5)
+    expect(countered.miniSeconds).toBe(0)
+    expect(countered.chain).toBe(0)
+    // The drift key let go, the car sliding out, counter-steered all the way to straight and after
+    let state = drifted(0.5)
+    for (let step = 0; step < 120; step++) {
+      const next = stepKart(state, { ...GAS, steer: step < 40 ? -1 : 0 })
+      expect(dashed(state, next)).toBe(false)
+      state = next
+    }
+    expect(state.slideDirection).toBe(0)
+    expect(state.releaseWindow).toBe(0)
+    // The counter-steer does straighten the car sooner than leaving it alone
+    const straightAfter = (steer: number) => {
+      let sliding = run(drifted(0.5), GAS, STEP_SECONDS)
+      let steps = 0
+      while (sliding.slideDirection !== 0 && steps < 300) {
+        sliding = stepKart(sliding, { ...GAS, steer })
+        steps++
+      }
+      return steps
+    }
+    expect(straightAfter(-1)).toBeLessThan(straightAfter(0) * 0.7)
+  })
+
   it('(a) fires while still drifting: counter-steer and a fresh press of the throttle', () => {
     const coasting = run(atSpeed(), { ...NO_INPUT, steer: 1, drift: true }, 0.5)
     expect(coasting.burstReady).toBe(true)
     const fired = stepKart(coasting, { ...GAS, steer: -1, drift: true })
     expect(dashed(coasting, fired)).toBe(true)
-    // The drift ends and the slide is put away at once
+    // The drift ends and the slide is put away at once: the car is pulled straight
     expect(fired.drifting).toBe(false)
     expect(run(fired, GAS, T.cutSeconds + STEP_SECONDS).slideDirection).toBe(0)
     // The drift key held on does not drift again until it comes up
     expect(run(fired, { ...GAS, steer: 1, drift: true }, 0.2).drifting).toBe(false)
+    // Steering into the drift, the drift key still down, a fresh press is only the throttle again:
+    // lifting off to tighten a drift does not end it
+    const tightened = stepKart(coasting, { ...GAS, steer: 1, drift: true })
+    expect(dashed(coasting, tightened)).toBe(false)
+    expect(tightened.drifting).toBe(true)
   })
 
-  it('(b) fires for a driver who never lets go of the throttle: the counter-steer is enough', () => {
-    const drift = drifted(0.5)
-    expect(drift.throttleHeld).toBe(true)
-    const fired = stepKart(drift, { ...GAS, steer: -1, drift: true })
-    expect(dashed(drift, fired)).toBe(true)
-    // And the same after the drift key is let go, while the car still slides
-    const sliding = run(drifted(0.5), GAS, 0.1)
+  it('(b) fires for a driver who holds the throttle: let go of it and press again', () => {
+    // The drift key let go, the throttle still down: sliding out, nothing yet
+    const sliding = run(drifted(0.5), { ...GAS, steer: -1 }, 0.1)
     expect(sliding.slideDirection).toBe(1)
-    expect(dashed(sliding, stepKart(sliding, { ...GAS, steer: -1 }))).toBe(true)
+    expect(sliding.miniSeconds).toBe(0)
+    // Up for a step, then down
+    const lifted = stepKart(sliding, { ...NO_INPUT, steer: -1 })
+    expect(dashed(sliding, lifted)).toBe(false)
+    const fired = stepKart(lifted, { ...GAS, steer: -1 })
+    expect(dashed(lifted, fired)).toBe(true)
+    // The slide is put away at once
+    expect(run(fired, GAS, T.cutSeconds + STEP_SECONDS).slideDirection).toBe(0)
   })
 
-  it('(c) fires sliding out: counter-steered, then the throttle pressed afresh', () => {
-    const sliding = run(drifted(0.5), { ...NO_INPUT, steer: -1 }, 0.1)
+  it('(c) fires sliding out with no counter-steer too: the fresh press is what counts', () => {
+    const sliding = run(drifted(0.5), NO_INPUT, 0.1)
     expect(sliding.slideDirection).toBe(1)
     expect(sliding.miniSeconds).toBe(0)
     const fired = stepKart(sliding, GAS)
@@ -234,7 +277,7 @@ describe('the instant boost (the dash)', () => {
 
   it('multiplies the pull and lifts the top speed a little, for half a second', () => {
     const drift = drifted(0.6)
-    const fired = run(drift, { ...GAS, steer: -1 }, STEP_SECONDS)
+    const fired = run(drift, { ...TAP, steer: -1 }, STEP_SECONDS)
     expect(fired.miniSeconds).toBeCloseTo(T.chainDuration - STEP_SECONDS, 9)
     // Against letting go without one (chain boosts off)
     const without = (state: KartState, seconds: number) => {
@@ -264,7 +307,7 @@ describe('the instant boost (the dash)', () => {
     let chain = 0
     for (let link = 0; link < 6; link++) {
       state = run(state, DRIFT_RIGHT, 0.3)
-      state = stepKart(state, { ...GAS, steer: -1 })
+      state = stepKart(state, { ...TAP, steer: -1 })
       state = run(state, GAS, 0.2)
       chain = state.chain
     }
@@ -274,14 +317,16 @@ describe('the instant boost (the dash)', () => {
   })
 
   it('the double: a drift begun right after a dash earns the next however short', () => {
-    const fired = stepKart(drifted(0.5), { ...GAS, steer: -1 })
+    const fired = stepKart(drifted(0.5), { ...TAP, steer: -1 })
     expect(fired.doubleWindow).toBeGreaterThan(0)
     // Let the key up, then a three-step tap steering out of it (too shallow on its own)
     let state = run(fired, GAS, 0.1)
     state = run(state, { ...GAS, steer: -0.2, drift: true }, 3 * STEP_SECONDS)
     expect(state.driftPeak!).toBeLessThan(T.dashMinSlip)
     expect(state.burstReady).toBe(true)
-    const second = stepKart(state, { ...GAS, steer: 1 })
+    // Held, it is not the double yet; pressed afresh, it is
+    expect(stepKart(state, { ...GAS, steer: 1 }).doubles).toBe(0)
+    const second = stepKart(state, { ...TAP, steer: 1 })
     expect(second.doubles).toBe(1)
   })
 })
@@ -364,6 +409,25 @@ describe('the start', () => {
     expect(kartSpeed(trial.run.kart)).toBeGreaterThan(kartSpeed(plain.run.kart) + 5)
   })
 
+  it('is a launch: well ahead after a second and a half, and over the plain top speed', () => {
+    const perfect = start(T.startWindow - 0.1).trial.run.kart
+    const plain = start(null).trial.run.kart
+    const gone = (kart: KartState) => Math.hypot(kart.x - plain.x, kart.z - plain.z)
+    // A dozen metres up the road on a plain start, a second and a half after GO
+    expect(gone(perfect)).toBeGreaterThan(12)
+    // Faster than the engine alone ever goes, and never over its own cap
+    expect(kartSpeed(perfect)).toBeGreaterThan(T.topSpeed * 1.03)
+    expect(kartSpeed(perfect)).toBeLessThanOrEqual(T.topSpeed * T.startTopSpeedFactor + 1e-9)
+    // 0 to 100 km/h in well under a second
+    let trial = start(T.startWindow - 0.1, 0).launched
+    let steps = 0
+    while (kartSpeed(trial.run.kart) < 100 / 3.6) {
+      trial = stepTrial(trial, GAS, course)
+      steps++
+    }
+    expect(steps * STEP_SECONDS).toBeLessThan(0.6)
+  })
+
   it('held from too early: a smaller launch, and never a stall', () => {
     const { launched, trial } = start(2.5)
     expect(launched.start).toBe('quick')
@@ -433,17 +497,42 @@ describe('walls', () => {
 })
 
 describe('touch, with the automatic throttle', () => {
-  it('keeps the throttle on through a drift, so the counter-steer fires the dash', () => {
+  it('keeps the throttle on through a drift; a counter-steer alone fires nothing', () => {
     const drift = drifted(0.5)
     const moment = { racing: true, burstWaiting: kartBurstWaiting(drift, T) }
     expect(moment.burstWaiting).toBe(false)
     const input = touchInput(
-      { held: new Set(['left']), tapped: new Set(), slider: 0 },
+      { held: new Set(['left', 'drift']), tapped: new Set(), slider: 0 },
       DEFAULT_TOUCH_SETTINGS,
       moment,
     )
     expect(input.throttle).toBe(true)
-    expect(stepKart(drift, input).miniSeconds).toBeGreaterThan(0)
+    expect(stepKart(drift, input).miniSeconds).toBe(0)
+  })
+
+  it('lets go while the car slides out of a drift that earned a dash: a tap of GAS fires it', () => {
+    const sliding = run(drifted(0.5), GAS, 0.1)
+    expect(sliding.slideDirection).toBe(1)
+    const moment = { racing: true, burstWaiting: kartBurstWaiting(sliding, T) }
+    expect(moment.burstWaiting).toBe(true)
+    const idle = touchInput(
+      { held: new Set(['left']), tapped: new Set(), slider: 0 },
+      DEFAULT_TOUCH_SETTINGS,
+      moment,
+    )
+    expect(idle.throttle).toBe(false)
+    const lifted = stepKart(sliding, idle)
+    expect(lifted.miniSeconds).toBe(0)
+    const tap = touchInput(
+      { held: new Set(['left']), tapped: new Set(['throttle']), slider: 0 },
+      DEFAULT_TOUCH_SETTINGS,
+      { racing: true, burstWaiting: kartBurstWaiting(lifted, T) },
+    )
+    expect(stepKart(lifted, tap).miniSeconds).toBeGreaterThan(0)
+    // A slide-out that earned nothing keeps the engine running
+    const shallow = run(run(atSpeed(), { ...GAS, steer: 0.0001, drift: true }, 2 * STEP_SECONDS), GAS, 0.05)
+    expect(shallow.slideDirection).not.toBe(0)
+    expect(kartBurstWaiting(shallow, T)).toBe(false)
   })
 
   it('lets go once the car has straightened, so a tap of GAS is a fresh press', () => {

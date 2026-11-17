@@ -634,6 +634,35 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **數字**：卡丁車 chunk 約 323 kB gzip（上限 600）；主站與各遊戲首屏不變。
 - **限制**：紀錄只依賽道分，不依手感：在調參面板換成街機（舊）再跑，紀錄會混在一起（以前改調參也是這樣）；手感數字都是起始值，**沒有人用實體鍵盤開過**；電腦車在最急的彎還會擦牆（三圈 1–9 次）。
 
+### 4.28 路線圖外：瞬間加速只認新按前進、噴射與甩尾的畫面聲音（2026-11-17，`feat/kart-feel-fable`）
+
+擁有者（針對 §4.27 上線的版本）：「完美起跑要有噴的感覺，甩尾也要有煞車聲煞車痕，反打之後不能自動噴，要讓玩家在按前進才會拉正噴……跟跑跑比，我們這根本是 toy project。」規格與試玩清單：`docs/KART-FEEL.md` §3.2、§3.3、§6、§7。
+
+- **瞬間加速的觸發**（`classic.ts`）：`whileSliding = burstReady && inSlide && tapped && (!input.drift || countering)`。§4.27 的「反打＋油門按著就噴」拿掉了：只有前進鍵**新按下**（`!state.throttleHeld` 或 `input.throttleTap`）才噴；甩尾鍵還按著時另外要反打（往彎內打時收油再踩不會把甩尾結束）。反打本身只讓回正率 ×2。回正後的窗（`releaseWindow`）照舊。
+- **`kartBurstWaiting`**（`physics.ts`）：經典手感改成「甩尾鍵已放＋（滑出中且 `burstReady`，或窗開著）」。兩個用途：觸控的自動油門在這段時間鬆開等玩家點 GAS（`touch.ts` 不用改）；HUD 的提示。
+- **數字**：`dashAccelFactor` 1.4 → 1.6；`startAccelFactor` 1.7 → 1.9；新 `startTopSpeedFactor` 1.15（起跑加速期間的極速上限；`CLASSIC_ONLY`，調參面板看得到）。完美起跑 0 → 100 km/h 0.47 秒、1.5 秒時 258 km/h。`speedCapFor` 不用動（仍取 `boostStackFactor` 1.32 × 1.5，比 1.15 高）。
+- **電腦車**（`brain.ts` `classicHands`）：`lift` 這個動作多一個 `counter`（反打的方向）。出彎、直線點甩結束、或滑出中還有資格時：放開甩尾＋反打＋油門放開 `LIFT_STEPS` 2 步 → 再踩。街機那條路沒動。
+- **`src/kart/feelFx.ts`**（純函式）：`skidStrength(slip, speed, sliding, braking)` 0–1（3° 以下 0、24° 以上 1、最淺 0.4；急煞 ≥ 14 m/s 給 0.6）；`squealVoice(strength, speed)` → `{ gain, hz }`；`burstBetween(before, after, fullStart)` → `'start' | 'quick' | 'boost' | 'dash' | null`；`BURST_POWER`。`spikeLoop.ts` 每幀算 `skid`、每步算 `burstBetween`，放進 `KartLook`（新欄位 `skid`、`burstPower`，都選填：別人的車沒有就照舊）與 `KartSound.skid`，並呼叫 `audio.burst(power)`。以前起跑加速不算 `bursts`（沒有任何特效），現在算。
+- **鏡頭**（`camera.ts`）：`CameraRig.kick`（0–1，`kickRig(rig, power)` 設、`followCar` 以 `KICK_SECONDS` 0.7 秒指數衰減，30 與 144 fps 一樣）；`cameraPull(rig)`＝噴射中 0.7 m ＋ kick × 2.4 m（鏡頭被甩在後面）、`cameraShake(rig)`＝kick² × 0.11 m、`fieldOfView` 多 kick × 9°。`Scene.ts`：`look.bursts` 變多就 `kickRig`；鏡頭改近改低（後 6.2 m、高 2.6 m、看車前 6 m 高 1 m 的點；原 7.5／3.4／3／0.6）。`prefers-reduced-motion` 全部不做。
+- **速度線**（`art/speedLines.ts`）：一像素的線改成 72 條細帶（一個 draw call）；`speedLineStrength(pace, boost)`＝極速附近或任何噴射（從靜止也有）；噴射時至少以 60 m/s 流過。
+- **特效**（`art/effects.ts`）：胎痕池 2400 → 6000 段、寬 0.5 m、每段記自己的深淺（`skidDark`）、40 秒淡掉、每移動 ≥ 0.22 m 才鋪一段（幀率低也一樣密）；煙 40 → 110 顆、依 `skid` 變濃並往彎外飄；噴射中每個噴口每秒 100 顆的火（留在世界座標，160 顆的池）；點火時地上一圈 `RingGeometry` 光環。全部沿用同一張 canvas 柔光貼圖，沒有新資產。
+- **車身**（`art/kartModel.ts`）：甩尾側傾依 `skid` 加深（0.13 → 最多 0.22 rad）；點火時車頭上揚（依 `burstPower`）再回來。
+- **聲音**（`kartAudio.ts`，全部 WebAudio 合成）：引擎 `engineFrequency` 改成 5 個檔位（`GEAR_SPEEDS`，每檔爬 78 Hz、換檔掉回去）＋兩個微失諧鋸齒波；風聲（速度平方）；輪胎尖叫（兩個帶 17 Hz 顫音的音＋窄頻噪音，跟 `squealVoice`）；噴射轟鳴（帶通噪音＋低頻）；`burst(power)` 一次性的「轟」。
+- **HUD**（`Hud.tsx`）：時速與加速條分開在車的左右（`KART_GAP`），中間下方 `DashPrompt`（`SpikeHud.dash`：1＝甩尾中已有資格、2＝現在新按前進會噴）；`BoostVeil`（噴射中畫面四周透光，`SpikePage`／`RaceView` 都放）；大字提示從 24% 移到 13%；操作說明預設收合。大字提示 `counter` 改成在「放開甩尾、有資格」那一刻出現，文字「重按前進！」。
+- **紀錄**：物理變了，內建賽道 `revision` 再 +1（`riverside@8`、`harbour@8`、`tamkang@7`、`oldstreet@3`），`CUSTOM_REVISION` 2 → 3（自訂賽道與觀音山 `guanyin@3`）；調參存檔 key `.3` → `.4`。`flatGolden` 的街機雜湊不變、經典的四張賽道雜湊重取（測試場的腳本不會噴，雜湊沒變）。
+- **技巧差距**（`npm run kart:feel`，三圈秒數）：
+
+  | 賽道 | 新手 | 一般 | 高手 | 高手比新手 | 高手三圈瞬間加速 |
+  | --- | --- | --- | --- | --- | --- |
+  | 河畔 | 121.3 | 112.0 | **97.5** | 少 20% | 101 |
+  | 漁港 | 139.4 | 125.3 | **113.9** | 少 18% | 109 |
+  | 淡江 | 147.2 | 126.1 | **110.4** | 少 25% | 122 |
+  | 老街 | 130.8 | 111.7 | **96.5** | 少 26% | 87 |
+  | 觀音山 | 96.8 | 86.3 | **76.6** | 少 21% | 66 |
+
+- **測試**：`tests/kart/classic.test.ts`（反打＋一直按前進＝不噴，甩尾中、滑出中、回正後都驗；反打確實比不打早回正；甩尾中往內打重踩油門不結束甩尾；一路按油門的人放開再按才噴；雙收尾也要新按；觸控滑出中自動油門鬆開、點 GAS 才噴、沒資格的滑出不鬆；完美起跑 1.5 秒領先 > 12 m、超過極速、0–100 < 0.6 秒）、`tests/kart/feelFx.test.ts`（胎痕與尖叫的觸發條件、噴射分類與力道、鏡頭 kick 的衰減與幀率無關、速度線）、`tests/kart/kartAudio.test.ts`（檔位）；e2e `kart-touch.spec.ts` 的甩尾手勢改成「反打後點 GAS」。
+- **限制**：這些都是視聽回饋的第一版，強度（鏡頭甩多遠、煙多濃、聲音大小）沒有人用實機調過；聲音是合成的，尖叫像不像輪胎見仁見智；胎痕只有自己的車有（別人的車只有發光軌跡），觀戰與重播也還沒有新的點火特效；懸浮車沒有輪子（擁有者 2026-11-14 的決定），「胎痕」是車尾兩個接地點留下的。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

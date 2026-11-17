@@ -10,6 +10,10 @@
 // the camera swings round smoothly and settles without overshoot, in about FOLLOW_SECONDS (0.2 s
 // behind a slide); the view widens from 60° to 75° with the speed and 8° more in a boost.
 
+// 2026-11-17 (owner: "a perfect start has to feel like a launch"): the kick. A boost that fires
+// lurches the view: the camera is left behind for a moment (the kart leaps away from it), the view
+// widens with a jolt and shakes, all dying away in about KICK_SECONDS. Scene.ts places the camera.
+
 /** Below this forward speed the direction of travel says little: the camera follows the nose */
 const TRAVEL_MIN_SPEED = 3
 /** About how long the camera takes to swing round to its aim: it lags a little, so turns show */
@@ -34,6 +38,17 @@ export const SPEED_FOV_KICK = 15
 export const REFERENCE_SPEED = 68
 /** How fast the pace follows the speed, per second */
 const PACE_EASE = 4
+/** A boost's kick is down to a tenth in about this long */
+export const KICK_SECONDS = 0.7
+const KICK_EASE = Math.LN10 / KICK_SECONDS
+/** A full kick (a perfect start) widens the view this many degrees more, for a moment ... */
+export const KICK_FOV = 9
+/** ... leaves the camera this far further behind, metres ... */
+export const KICK_PULL = 2.4
+/** ... and shakes it by up to this much, metres */
+export const KICK_SHAKE = 0.11
+/** While any boost runs the camera sits this much further back, metres */
+export const BOOST_PULL = 0.7
 
 export interface CameraRig {
   /** Which way the camera looks, as a heading (0 faces -z, growing clockwise) */
@@ -44,6 +59,8 @@ export interface CameraRig {
   readonly pace: number
   /** How fast the camera is swinging round, radians a second (the spring's speed); 0 when left out */
   readonly turn?: number
+  /** 0 to 1: what is left of the last boost's kick; 0 when left out */
+  readonly kick?: number
 }
 
 export interface Chased {
@@ -57,7 +74,19 @@ export interface Chased {
 
 const wrap = (angle: number): number => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI))
 
-export const startRig = (heading: number): CameraRig => ({ heading, boost: 0, pace: 0, turn: 0 })
+export const startRig = (heading: number): CameraRig => ({
+  heading,
+  boost: 0,
+  pace: 0,
+  turn: 0,
+  kick: 0,
+})
+
+/** A boost fired, `power` hard (feelFx.ts's BURST_POWER): the view lurches; never less than it has */
+export const kickRig = (rig: CameraRig, power: number): CameraRig => ({
+  ...rig,
+  kick: Math.max(rig.kick ?? 0, Math.max(0, Math.min(1, power))),
+})
 
 /** Where the camera wants to look: along the travel when going forwards, else along the nose */
 export function aimOf({ heading, vx, vz, skidding }: Chased): number {
@@ -88,16 +117,25 @@ export function followCar(rig: CameraRig, car: Chased, seconds: number): CameraR
     boost: rig.boost + ((car.boosting ? 1 : 0) - rig.boost) * ease,
     pace: rig.pace + (pace - rig.pace) * paceEase,
     turn: nextTurn,
+    kick: (rig.kick ?? 0) * Math.exp(-KICK_EASE * seconds),
   }
 }
 
+/** How far behind its usual place the camera sits, metres: a boost running, and its kick */
+export const cameraPull = (rig: CameraRig): number =>
+  BOOST_PULL * rig.boost + KICK_PULL * (rig.kick ?? 0)
+
+/** How far the camera may be shaken this frame, metres: the kick's, dying faster than the kick */
+export const cameraShake = (rig: CameraRig): number => KICK_SHAKE * (rig.kick ?? 0) ** 2
+
 /**
- * The vertical field of view: wider with speed (from 30% of the top speed to all of it) and wider
- * still in a boost, unless the viewer asked for less motion
+ * The vertical field of view: wider with speed (from 30% of the top speed to all of it), wider
+ * still in a boost and with a jolt when one fires, unless the viewer asked for less motion
  */
 export const fieldOfView = (base: number, rig: CameraRig, reducedMotion: boolean): number =>
   reducedMotion
     ? base
     : base +
       SPEED_FOV_KICK * Math.max(0, Math.min(1, (rig.pace - 0.3) / 0.7)) +
-      BOOST_FOV_KICK * rig.boost
+      BOOST_FOV_KICK * rig.boost +
+      KICK_FOV * (rig.kick ?? 0)

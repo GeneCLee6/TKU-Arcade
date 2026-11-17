@@ -357,8 +357,8 @@ const DEG = Math.PI / 180
  * speed over the top speed), so it pulls hard from a standstill and eases into the top speed instead
  * of hitting a wall. The drift is a slip angle the car swings to in `driftSlipIn` and lets go of at
  * `driftRecoverRate` (twice as fast counter-steering); a drift at least `dashMinSlip` deep earns an
- * instant boost (the dash), fired by counter-steer with the throttle while the car still slides, or by
- * a fresh press of the throttle up to `releaseWindow` after it straightens. classic.ts has the step.
+ * instant boost (the dash), fired only by a fresh press of the throttle: while the car still slides,
+ * or up to `releaseWindow` after it straightens. classic.ts has the step.
  */
 export const KART_TUNING = {
   ...ARCADE_NUMBERS,
@@ -438,7 +438,9 @@ export const KART_TUNING = {
   startWindow: 0.5,
   /** Its length, multiplying the engine's pull by startAccelFactor */
   startBoostDuration: 1.5,
-  startAccelFactor: 1.7,
+  startAccelFactor: 1.9,
+  /** ... and lets the car go this much over the top speed while it lasts */
+  startTopSpeedFactor: 1.15,
   /** Held from earlier than the window: this share of the start boost, and no stall */
   startEarlyShare: 0.5,
   /** Pressed afresh within this long after GO still counts as on time */
@@ -452,7 +454,7 @@ export const KART_TUNING = {
   /** How long a dash lasts ... */
   chainDuration: 0.5,
   /** ... multiplying the engine's pull by this ... */
-  dashAccelFactor: 1.4,
+  dashAccelFactor: 1.6,
   /** ... with the top speed this much higher */
   miniTopSpeedFactor: 1.07,
   /** Dashes in a row within this long of each other chain ... */
@@ -871,13 +873,14 @@ export const kartBoosting = (state: KartState): boolean =>
 
 /**
  * Whether a release boost (the arcade feel) or a dash (the classic feel) waits for a fresh press of
- * the throttle, so that the touch screen's automatic throttle lets go for the tap. In the classic
- * feel only once the car has straightened: while it still slides, counter-steering with the throttle
- * held fires the dash, so the automatic throttle stays on
+ * the throttle, so that the touch screen's automatic throttle lets go for the tap and the HUD says
+ * so. In the classic feel from the drift key coming up (the car still sliding) until `releaseWindow`
+ * after it straightens; during the drift itself the throttle stays on
  */
 export const kartBurstWaiting = (state: KartState, tuning: KartTuning): boolean =>
   tuning.model === MODEL_CLASSIC
-    ? state.releaseWindow > 0 && !state.drifting && state.slideDirection === 0
+    ? !state.drifting &&
+      (state.releaseWindow > 0 || (state.burstReady && state.slideDirection !== 0))
     : state.burstReady || state.releaseWindow > 0
 
 export const kartSpeed = (state: KartState): number => Math.hypot(state.vx, state.vz)

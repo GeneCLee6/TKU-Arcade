@@ -115,7 +115,7 @@ export const HARBOUR: TrackJson = {
   // 2026-11-14, last (owner: "the maps are still too simple"; the slide-out and the counter-steer):
   // two more switchbacks down the west side, where the long fast arc was; old records are set aside
   // 7: the classic feel (2026-11-17): the physics changed, so the old times are set aside
-  revision: 7,
+  revision: 8,
   laps: 3,
   road: fromLine,
   gates,
