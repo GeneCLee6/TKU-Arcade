@@ -17,6 +17,7 @@ import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { createRemotes } from '../race/remotes.ts'
 import { supportsWebGL2 } from '../Scene.ts'
+import { createHitFeed, hitFrameOf } from '../hitFx.ts'
 import { createServerClock } from './serverClock.ts'
 import { startWatchLoop, type WatchedKart } from './watchLoop.ts'
 import {
@@ -93,6 +94,8 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       remotes.add(relayed.seat, relayed.frame, performance.now() / 1000)
     })
     const boxes = itemBoxes(track)
+    // 2026-11-17: the hits from here on spin their karts (hitFx.ts)
+    const hitFeed = createHitFeed(null, latest.current.used)
     let stop: (() => void) | undefined
     try {
       stop = startWatchLoop(stage.current, {
@@ -119,8 +122,13 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
           }))
           const room = latest.current
           let props = null
+          let hits = null
           if (room.mode === 'items') {
             const now = clock.now()
+            const started = hitFeed.read(room.events, now).effects
+            hits = hitFrameOf(hitFeed.effects, started, now, (seat) =>
+              karts.find((kart) => kart.id === seat),
+            )
             props = {
               boxes: boxes.map((box, i) => ({
                 x: box.x,
@@ -147,7 +155,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
                 })),
             }
           }
-          return { karts, follow: followRef.current, overhead: overheadRef.current, props }
+          return { karts, follow: followRef.current, overhead: overheadRef.current, props, hits }
         },
         drawn(scene, frame) {
           const shown = frame.karts.filter((kart) => kart.id !== frame.follow)

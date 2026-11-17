@@ -41,6 +41,7 @@ import {
 } from '../../../shared/kart/karts.ts'
 import type { KartBody } from '../bodies.ts'
 import type { OtherKart, ScreenPoint } from '../Scene.ts'
+import { createHitFeed, hitFrameOf, type ItemCue } from '../hitFx.ts'
 import type { SpikeNet } from '../spikeLoop.ts'
 import { createRemotes, type RemotePose } from './remotes.ts'
 
@@ -176,6 +177,9 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   let headwindUntil = 0
   /** Hit by a shot (e9-t06b): stunned until then, by the server's clock */
   let stunUntil = 0
+  // 2026-11-17: how the hits look and sound (hitFx.ts), from the same events
+  const feed = createHitFeed(seat, seen)
+  let lastHeld = options.view().racers.find((racer) => racer.seat === seat)?.item ?? null
 
   const pingClock = () => {
     const ping = new Uint8Array(CLOCK_PING_BYTES)
@@ -405,6 +409,19 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
             return { n: shot.n, item: shot.item, ...shotPosition(shot, at, target) }
           }),
       }
+    },
+    fx(pose) {
+      const view = options.view()
+      if (view.mode !== 'items') return null
+      const now = roughNow()
+      const read = feed.read(view.events, now)
+      const cues: ItemCue[] = [...read.cues]
+      const holding = view.racers.find((racer) => racer.seat === seat)?.item ?? null
+      if (holding && !lastHeld) cues.unshift({ kind: 'pickup' })
+      lastHeld = holding
+      const where = (one: number) =>
+        one === seat ? pose : poses.find((other) => other.seat === one && !other.stale)
+      return { ...hitFrameOf(feed.effects, read.effects, now, where, seat), cues }
     },
     drawn(scene) {
       if (!tagListener) return

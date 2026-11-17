@@ -3,6 +3,8 @@
 // boost and a thump on a wall. Muted with the site's own sound switch (src/lib/sound.ts). A browser
 // only lets a page make sound after a gesture: `unlock` is called from the first key or tap.
 import { isSoundOn } from '../lib/sound.ts'
+import type { ItemCue } from './hitFx.ts'
+import { voicesOf } from './itemSounds.ts'
 
 export interface KartSound {
   readonly speed: number
@@ -17,6 +19,8 @@ export interface KartAudio {
   update(sound: KartSound): void
   /** A wall hit, 0 to 1 */
   hit(strength: number): void
+  /** An item race's sound (2026-11-17, itemSounds.ts) */
+  cue(cue: ItemCue): void
   dispose(): void
 }
 
@@ -145,6 +149,39 @@ export function createKartAudio(): KartAudio {
       source.connect(filter).connect(gain).connect(nodes.master)
       source.start(now)
       source.stop(now + 0.4)
+    },
+    cue(cue) {
+      if (!audio || !nodes || !isSoundOn()) return
+      const start = audio.currentTime
+      for (const voice of voicesOf(cue)) {
+        const at = start + (voice.delay ?? 0)
+        const end = at + voice.seconds
+        const gain = audio.createGain()
+        gain.gain.setValueAtTime(0.0001, start)
+        gain.gain.setValueAtTime(voice.gain, at)
+        gain.gain.exponentialRampToValueAtTime(0.001, end)
+        gain.connect(nodes.master)
+        if (voice.kind === 'tone') {
+          const oscillator = audio.createOscillator()
+          oscillator.type = voice.wave
+          oscillator.frequency.setValueAtTime(voice.from, at)
+          oscillator.frequency.exponentialRampToValueAtTime(voice.to, end)
+          oscillator.connect(gain)
+          oscillator.start(at)
+          oscillator.stop(end + 0.02)
+        } else {
+          const source = audio.createBufferSource()
+          source.buffer = nodes.noise
+          const filter = audio.createBiquadFilter()
+          filter.type = voice.filter
+          filter.Q.value = voice.q ?? 1
+          filter.frequency.setValueAtTime(voice.from, at)
+          filter.frequency.exponentialRampToValueAtTime(voice.to, end)
+          source.connect(filter).connect(gain)
+          source.start(at, Math.random())
+          source.stop(end + 0.02)
+        }
+      }
     },
     dispose() {
       void audio?.close()
