@@ -144,7 +144,7 @@ describe('storing the tuning', () => {
   })
 
   it('falls back to the standard preset when what is stored is broken', () => {
-    localStorage.setItem('tku-arcade.kart.tuning.2', '{"grip": "lots"}')
+    localStorage.setItem('tku-arcade.kart.tuning.4', '{"grip": "lots"}')
     expect(loadTuning()).toEqual({ tuning: KART_TUNING, preset: 'standard' })
   })
 

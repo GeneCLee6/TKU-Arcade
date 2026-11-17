@@ -18,7 +18,7 @@ import { applyKart } from '../../../shared/kart/karts.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
 import type { Callout } from '../callouts.ts'
 import { keyLabel, loadBindings, loadRules, loadTuning } from '../devices.ts'
-import { CalloutText, Hud } from '../Hud.tsx'
+import { BoostVeil, CalloutText, Hud } from '../Hud.tsx'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
@@ -365,6 +365,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
         )}
       </TopLeft>
       {stun && <StunHud key={`stun-${stun.id}`} t={t} ms={stun.ms} />}
+      {hud.boosting && <BoostVeil aria-hidden="true" data-testid="kart-boost-veil" />}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       <MapCorner $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}>
         {trial && <RaceClock ref={clock} t={t} trial={trial} />}

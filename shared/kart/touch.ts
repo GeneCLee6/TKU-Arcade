@@ -21,8 +21,9 @@ export type SteerStyle = 'buttons' | 'slider'
 export interface TouchSettings {
   readonly steer: SteerStyle
   /**
-   * The engine runs by itself once the race is on; GAS is then only tapped, for a release boost
-   * (it lets go by itself while one waits) or held through the countdown for a start boost
+   * The engine runs by itself once the race is on; GAS is then only tapped, for an instant boost
+   * out of a drift (it lets go by itself while one waits) or held through the countdown for a start
+   * boost
    */
   readonly autoThrottle: boolean
   /** Button size as a share of the standard, MIN_SCALE to MAX_SCALE */
@@ -115,9 +116,9 @@ export interface TouchMoment {
   /** Past GO (or no countdown at all): the automatic throttle may run */
   readonly racing: boolean
   /**
-   * A release boost waits for a fresh press of the throttle (physics.ts's kartBurstWaiting): in the
-   * arcade feel from the drift let go until the window shuts; in the classic feel only once the car
-   * has straightened, since while it slides counter-steering with the throttle held fires it
+   * An instant boost waits for a fresh press of the throttle (physics.ts's kartBurstWaiting): from
+   * the drift let go (the car still sliding out) until the window after it straightens shuts. Only
+   * that press fires it (owner, 2026-11-17: never by itself), so the automatic throttle lets go
    */
   readonly burstWaiting: boolean
 }

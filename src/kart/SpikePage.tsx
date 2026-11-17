@@ -25,7 +25,7 @@ import {
   saveRules,
   saveTuning,
 } from './devices.ts'
-import { CalloutText, Hud } from './Hud.tsx'
+import { BoostVeil, CalloutText, Hud } from './Hud.tsx'
 import { supportsWebGL2 } from './Scene.ts'
 import { Minimap, type MinimapHandle } from './Minimap.tsx'
 import { RaceCenter, RaceClock, type RaceClockHandle } from './RaceOverlay.tsx'
@@ -175,9 +175,8 @@ export function SpikePage({
   const menuButton = useRef<HTMLButtonElement>(null)
   const topRow = useRef<HTMLDivElement>(null)
   const menuId = useId()
-  const [helpOpen, setHelpOpen] = useState(
-    () => !(window.matchMedia?.(KART_COMPACT).matches ?? false),
-  )
+  // 2026-11-17: folded on every screen, so that nothing covers the kart and what it leaves behind
+  const [helpOpen, setHelpOpen] = useState(false)
 
   useEffect(() => {
     if (!stage.current) return
@@ -522,6 +521,7 @@ export function SpikePage({
           <dd data-testid="kart-gamepad">{stats.gamepad ?? t('kart.spike.noGamepad')}</dd>
         </Numbers>
       )}
+      {hud.boosting && <BoostVeil aria-hidden="true" data-testid="kart-boost-veil" />}
       {hud.hits > 0 && (
         <WallFlash key={`hit-${hud.hits}`} aria-hidden="true" data-testid="kart-wall-flash" />
       )}
@@ -799,6 +799,9 @@ const Hint = styled(Panel)<{ $hidden?: boolean }>`
   /* Never taller than half the screen: on a phone held sideways the text scrolls */
   max-height: 45dvh;
   overflow-y: auto;
+  /* Only as wide as its words: folded, a small box in the corner, clear of the kart */
+  justify-self: start;
+  max-width: min(760px, 100%);
 
   ${({ $hidden }) => $hidden && visuallyHidden}
 

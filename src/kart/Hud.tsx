@@ -27,7 +27,9 @@ interface HudProps {
 /**
  * e8-t08: the race HUD in the esports look (docs/DESIGN.md): the speed in km/h, the boost gauge in
  * segments, the stored boosts, and the chain while one runs. Lap, sector and time come with the time
- * trial (e8-t10, J5).
+ * trial (e8-t10, J5). 2026-11-17 (docs/KART-FEEL.md §7): the two panels stand apart, either side of
+ * the kart, so that the kart, its skid marks and its flames are never behind the HUD; and between
+ * them, under the kart, a prompt says when the instant boost is earned and when to tap forward.
  */
 export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudProps) {
   const lit = Math.floor((hud.gauge / GAUGE_FULL) * GAUGE_SEGMENTS)
@@ -38,6 +40,18 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
       aria-label={t('kart.hud.title')}
       role="group"
     >
+      {(hud.dash ?? 0) > 0 && (
+        <DashSlot>
+          <DashPrompt
+            $now={hud.dash === 2}
+            data-testid="kart-dash"
+            data-state={hud.dash}
+            role="status"
+          >
+            {t(hud.dash === 2 ? 'kart.hud.dashNow' : 'kart.hud.dashEarned')}
+          </DashPrompt>
+        </DashSlot>
+      )}
       <SpeedPanel $boosting={hud.boosting}>
         <SpeedNumber
           data-testid="kart-speed"
@@ -133,12 +147,20 @@ const hudPanel = css`
   }
 `
 
+/** The gap left between the two panels for the kart, on a screen wide enough to have one */
+const KART_GAP = 'clamp(220px, 26vw, 420px)'
+
 const Box = styled.div`
+  position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: ${space.md}px;
+  gap: ${KART_GAP};
   pointer-events: none;
+
+  @media (max-width: 1000px) {
+    gap: ${space.md}px;
+  }
 
   /* A phone held upright: one panel over the other, on the right */
   @media (max-width: 760px) and (min-height: 501px) {
@@ -293,6 +315,65 @@ const Tag = styled.span<{ $chain: boolean }>`
   color: ${color.onAccent};
 `
 
+const pulse = keyframes`
+  from { transform: scale(1); }
+  to { transform: scale(1.08); }
+`
+
+/** Out of the panels' row: centred between them, at the bottom */
+const DashSlot = styled.div`
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+
+  @media (max-width: 1000px) {
+    bottom: calc(100% + ${space.sm}px);
+  }
+`
+
+/**
+ * Between the panels, under the kart: the instant boost is earned (gold, like the sparks), or a
+ * fresh press of forward fires it now (bright, pulsing)
+ */
+const DashPrompt = styled.span<{ $now: boolean }>`
+  ${monoType}
+  ${({ $now }) => clippedFill(tagClip, $now ? color.success : color.warning)}
+  padding: ${space.xs}px ${space.lg}px;
+  font-size: ${({ $now }) => ($now ? '16px' : '13px')};
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: ${color.onAccent};
+  animation: ${({ $now }) => ($now ? pulse : 'none')} 0.18s ease-in-out infinite alternate;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`
+
+const veilIn = keyframes`
+  from { opacity: 1; }
+  to { opacity: 0.55; }
+`
+
+/**
+ * Over the whole race while a boost runs: light pouring in from the edges of the screen, brightest
+ * the moment it fires. A fade, not motion. The page puts it over the canvas, under the HUD
+ */
+export const BoostVeil = styled.div`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 90px color-mix(in srgb, ${color.accent} 70%, transparent),
+    inset 0 0 28px color-mix(in srgb, ${color.accent} 55%, transparent);
+  animation: ${veilIn} 0.5s ease-out both;
+`
+
 const pop = keyframes`
   0% { transform: scale(1.4); opacity: 0; }
   15% { transform: scale(1); opacity: 1; }
@@ -302,7 +383,7 @@ const pop = keyframes`
 
 const CalloutBox = styled.div`
   position: absolute;
-  top: 24%;
+  top: 13%;
   left: 0;
   right: 0;
   display: flex;

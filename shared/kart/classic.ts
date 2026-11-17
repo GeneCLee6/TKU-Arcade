@@ -14,11 +14,14 @@
 //   counter-steering; a fresh drift press while counter-steering is the cut, `cutSeconds`).
 //
 // The dash (the instant boost): a drift whose slip has reached `dashMinSlip` earns one (`burstReady`).
-// It fires (a) while the car still drifts or slides, on counter-steer with the throttle down (held
-// all along will do), or on a fresh press of the throttle once the drift key is up; (b) once the car
-// has straightened, on a fresh press within `releaseWindow` (the window is `releaseWindow`). A new
-// drift before it fires forfeits it, except the double: a drift begun within `doubleWindow` of a dash
-// earns the next however short. A dash multiplies the engine's pull and lifts the top speed a little.
+// Only a fresh press of the throttle fires it (let go and pressed again; the page's tap latch counts
+// a press shorter than a step): (a) while the car slides out, the drift key up; (b) while the drift
+// key is still held, with the stick against the drift; (c) once the car has straightened, within
+// `releaseWindow`. Owner, 2026-11-17: "after the counter-steer it must not boost by itself: only when
+// the player presses forward does the car pull straight and boost". The counter-steer alone only
+// straightens the car faster. A new drift before it fires forfeits it, except the double: a drift
+// begun within `doubleWindow` of a dash earns the next however short. A dash multiplies the engine's
+// pull and lifts the top speed a little.
 //
 // Speeds come from an engine against drag, so 0 to the top speed is quick at first and eases in.
 import type { KartInput, KartRules, KartState, KartTuning } from './physics.ts'
@@ -135,8 +138,10 @@ export function stepClassic(
 
   // The dash
   if (rules.chainBoosts) {
-    const whileSliding =
-      burstReady && inSlide && ((countering && input.throttle) || (!state.drifting && tapped))
+    // Never by itself: the throttle held all along fires nothing, however the stick goes. With the
+    // drift key still down the stick must be against the drift, so that lifting off to tighten a
+    // drift and pressing again does not end it
+    const whileSliding = burstReady && inSlide && tapped && (!input.drift || countering)
     const afterStraight = !inSlide && releaseWindow > 0 && tapped
     if (whileSliding || afterStraight) {
       chain = chainWindow > 0 ? chain + 1 : 1
@@ -213,6 +218,7 @@ export function stepClassic(
   }
   if (launchSeconds > 0 || (state.launchSeconds ?? 0) > 0) {
     factor = Math.max(factor, t.startAccelFactor)
+    capFactor = Math.max(capFactor, t.startTopSpeedFactor)
   }
   const push = stacked ? t.stackPush : 0
   const engine = (speed: number, pull: number) =>

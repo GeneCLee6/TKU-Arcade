@@ -19,7 +19,9 @@ const RULES_KEY = 'tku-arcade.kart.rules'
 // `.2` since the drift became a real slide (2026-11-14): numbers saved for the old physics, with
 // names it no longer has, would leave the new ones half applied
 // .3 since the classic feel (2026-11-17): numbers kept for the arcade feel are not carried over
-const TUNING_KEY = 'tku-arcade.kart.tuning.3'
+// .4 the same day: the instant boost fires only on a fresh press, and the standard numbers moved
+// (the start boost, the instant boost's pull), so numbers kept before are not today's standard
+const TUNING_KEY = 'tku-arcade.kart.tuning.4'
 
 // localStorage can be missing, blocked or full: the page then keeps everything in memory
 function read(key: string): string | null {

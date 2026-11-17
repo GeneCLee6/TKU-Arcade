@@ -296,7 +296,7 @@ test.describe('a whole time trial by touch', () => {
 test.describe('the drift by touch, the settings and the keyboard', () => {
   test.use({ viewport: { width: 667, height: 375 }, hasTouch: true, isMobile: true })
 
-  test('hold drift and steer, let go, steer back: an instant boost', async ({ page }) => {
+  test('hold drift and steer, let go, steer back, tap gas: an instant boost', async ({ page }) => {
     test.setTimeout(90_000)
     // The test yard, room to drift in circles. The automatic throttle: the engine runs once a button
     // has been pressed
@@ -313,12 +313,19 @@ test.describe('the drift by touch, the settings and the keyboard', () => {
     await fingers.down(3, await centre(page, 'kart-touch-drift'))
     await expect.poll(async () => (await reading(page)).state.drifting).toBe(true)
     await page.waitForTimeout(700)
+    // Deep enough by now: the HUD says the instant boost is earned, and nothing has fired
+    await expect(page.getByTestId('kart-dash')).toHaveAttribute('data-state', '1')
+    expect((await reading(page)).state.miniSeconds).toBe(0)
+    const gas = await centre(page, 'kart-touch-gas')
+    const left = await centre(page, 'kart-touch-left')
     // Let go of DRIFT: the kart slides out
     await fingers.up(3)
     await expect.poll(async () => (await reading(page)).state.slideDirection).toBe(1)
-    // The steering thumb slides across: the counter-steer. The automatic throttle stays on while the
-    // kart slides (the classic feel, 2026-11-17), so the counter-steer alone fires the instant boost
-    await fingers.move(2, await centre(page, 'kart-touch-left'))
+    // The steering thumb slides across: the counter-steer, which only pulls the kart straight
+    // (owner, 2026-11-17: it must not boost by itself). The automatic throttle lets go while the
+    // instant boost waits, the HUD says to tap, and a tap of GAS is the fresh press that fires it
+    await fingers.move(2, left)
+    await fingers.tap(4, gas)
     await expect.poll(async () => (await reading(page)).state.miniSeconds).toBeGreaterThan(0)
     await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'release')
     await fingers.up(2)

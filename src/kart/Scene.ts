@@ -32,13 +32,27 @@ import { OWN_KART, type SpinPose } from './hitFx.ts'
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 const FLAT = { y: 0, pitch: 0 }
 import { kartScene, kartThemes } from '../styles/kartTokens.ts'
-import { fieldOfView, followCar, REFERENCE_SPEED, startRig, type Chased } from './camera.ts'
+import {
+  cameraPull,
+  cameraShake,
+  fieldOfView,
+  followCar,
+  kickRig,
+  REFERENCE_SPEED,
+  startRig,
+  type Chased,
+} from './camera.ts'
 
 const GROUND_SIZE = 400
 const GRID_CELL = 5
-const CAMERA_BACK = 7.5
-const CAMERA_UP = 3.4
-const CAMERA_LOOK_AHEAD = 3
+// 2026-11-17 (docs/KART-FEEL.md §7): nearer and lower than before (7.5 m back, 3.4 m up), looking
+// further up the road: the kart is bigger on the screen, the road rushes by closer under the camera
+// and more of what is coming is in view
+const CAMERA_BACK = 6.2
+const CAMERA_UP = 2.6
+const CAMERA_LOOK_AHEAD = 6
+/** The height of the point the camera looks at, over the road */
+const CAMERA_LOOK_UP = 1
 /** How much further back the camera sits at full pace, metres (it was 1.2 before 2026-11-17) */
 const CAMERA_PULL = 0.4
 /** How fast the camera's height follows the kart's on a hill track, per second: it lags a jump a little */
@@ -277,6 +291,8 @@ export function createKartScene(
   scene.add(camera)
   const speedLines = createSpeedLines(camera)
   let rig = startRig(0)
+  // Boosts seen fired so far (look.bursts): one more kicks the camera
+  let burstsSeen = 0
   let baseFov = 60
   // The boost's wider view is motion: not for a viewer who asked for less (read live, it can change)
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
@@ -322,6 +338,10 @@ export function createKartScene(
       }
       art?.update(performance.now() / 1000)
 
+      // A boost fired: the view lurches (camera.ts's kick)
+      const fired = look.bursts ?? 0
+      if (fired > burstsSeen) rig = kickRig(rig, look.burstPower ?? 0.6)
+      burstsSeen = fired
       rig = followCar(rig, chased, frameSeconds)
       const fov = fieldOfView(baseFov, rig, reducedMotion?.matches ?? false)
       if (fov !== camera.fov) {
@@ -329,14 +349,35 @@ export function createKartScene(
         camera.updateProjectionMatrix()
       }
       const motion = !(reducedMotion?.matches ?? false)
-      speedLines.update(rig.pace, rig.pace * REFERENCE_SPEED, frameSeconds, !motion)
-      // Only a touch further back at speed (2026-11-17: less than before, so the road rushes by)
-      const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * CAMERA_PULL : 0)
+      speedLines.update(
+        rig.pace,
+        rig.pace * REFERENCE_SPEED,
+        frameSeconds,
+        !motion,
+        Math.min(1, rig.boost + (rig.kick ?? 0)),
+      )
+      // Only a touch further back at speed (2026-11-17: less than before, so the road rushes by);
+      // a boost leaves the camera behind for a moment, so the kart is seen to leap away
+      const back =
+        CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * CAMERA_PULL + cameraPull(rig) : 0)
       const sin = Math.sin(rig.heading)
       const cos = Math.cos(rig.heading)
       camera.position.set(x - sin * back, CAMERA_UP + cameraY, z + cos * back)
-      if (motion) camera.position.add(projected.set(cos * shake.x, shake.y, sin * shake.x))
-      camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6 + cameraY, z - cos * CAMERA_LOOK_AHEAD)
+      if (motion) {
+        const jolt = cameraShake(rig)
+        camera.position.add(
+          projected.set(
+            cos * shake.x + (Math.random() - 0.5) * 2 * jolt,
+            shake.y + (Math.random() - 0.5) * 2 * jolt,
+            sin * shake.x + (Math.random() - 0.5) * 2 * jolt,
+          ),
+        )
+      }
+      camera.lookAt(
+          x + sin * CAMERA_LOOK_AHEAD,
+          CAMERA_LOOK_UP + cameraY,
+          z - cos * CAMERA_LOOK_AHEAD,
+        )
 
       renderer.render(scene, camera)
     },
@@ -369,12 +410,17 @@ export function createKartScene(
       } else {
         const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * CAMERA_PULL : 0)
         camera.position.set(x - sin * back, CAMERA_UP + cameraY, z + cos * back)
-        camera.lookAt(x + sin * CAMERA_LOOK_AHEAD, 0.6 + cameraY, z - cos * CAMERA_LOOK_AHEAD)
+        camera.lookAt(
+          x + sin * CAMERA_LOOK_AHEAD,
+          CAMERA_LOOK_UP + cameraY,
+          z - cos * CAMERA_LOOK_AHEAD,
+        )
       }
       renderer.render(scene, camera)
     },
     snapCamera(heading, y) {
       rig = startRig(heading)
+      burstsSeen = Number.MAX_SAFE_INTEGER
       if (y !== undefined) cameraY = y
       effects.lift()
     },

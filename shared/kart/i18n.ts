@@ -47,7 +47,7 @@ const en = {
   'kart.hud.minimap': 'Track map',
   'kart.spike.canvas': 'A box car in a walled test yard, seen from behind',
   'kart.spike.keys':
-    '{throttle} to accelerate, {brake} to brake or reverse, {left} and {right} to steer. Hold {drift} while steering to drift: the kart swings its nose in and slides round the corner. Once the drift is deep enough (gold sparks), steer the other way with {throttle} down for an instant boost, even while still drifting or sliding; or let go and press {throttle} afresh just after the kart straightens. Drift again right after one for a double, and keep it up to chain them. Tap {drift} while steering the other way to cut a slide short. Drifting fills the boost gauge, short drifts fastest; {boost} fires a boost, and firing again during one starts it over with an extra push. Glowing pads boost; a hard crash breaks your chain and halves your gauge. Press {throttle} in the last moment before GO for a perfect start (earlier still gives a smaller one). {reset} puts the car back at the last safe place. F shows the numbers. Shift drifts and Ctrl boosts too.',
+    '{throttle} to accelerate, {brake} to brake or reverse, {left} and {right} to steer. Hold {drift} while steering to drift: the kart swings its nose in and slides round the corner. Once the drift is deep enough (gold sparks) it has earned an instant boost: let go of {drift}, steer the other way to pull the kart straight, then let go of {throttle} and press it again. Only that fresh press fires it, while the kart still slides or in the half second after it straightens; holding {throttle} all the way never does. Drift again right after one for a double, and keep it up to chain them. Tap {drift} while steering the other way to cut a slide short. Drifting fills the boost gauge, short drifts fastest; {boost} fires a boost, and firing again during one starts it over with an extra push. Glowing pads boost; a hard crash breaks your chain and halves your gauge. Press {throttle} in the last moment before GO for a perfect start (earlier still gives a smaller one). {reset} puts the car back at the last safe place. F shows the numbers. Shift drifts and Ctrl boosts too.',
   'kart.spike.noWebgl': "This browser can't run WebGL 2, so the test can't start.",
   'kart.spike.contextLost':
     'The browser took the graphics context away. Reload the page to start again.',
@@ -75,6 +75,8 @@ const en = {
   'kart.hud.stored': 'Boosts ready: {count} of {max}',
   'kart.hud.boosting': 'Boost',
   'kart.hud.chain': 'Chain ×{count}',
+  'kart.hud.dashEarned': 'Instant boost earned',
+  'kart.hud.dashNow': 'Let go, then tap forward!',
 
   'kart.hud.title': 'Dashboard',
   'kart.hud.speedValue': '{speed} km/h',
@@ -93,7 +95,7 @@ const en = {
   'kart.callout.stack': 'Stacked boost!',
   'kart.callout.double': 'Double!',
   'kart.callout.catch': 'Gas now!',
-  'kart.callout.counter': 'Counter-steer + gas!',
+  'kart.callout.counter': 'Tap forward!',
   'kart.callout.broken': 'Chain broken',
   'kart.callout.pad': 'Boost pad',
 
@@ -172,7 +174,7 @@ const en = {
   'kart.param.startWindow': 'Start boost timing window',
   'kart.param.startBoostDuration': 'Start boost length',
   'kart.param.startStallSeconds': 'Stall after a jump start',
-  'kart.param.releaseWindow': 'Time to press the throttle after the counter-steer',
+  'kart.param.releaseWindow': 'Time to press the throttle after the kart straightens',
   'kart.param.chainDuration': 'Release boost length',
   'kart.param.miniTopSpeedFactor': 'Release boost top speed',
   'kart.param.miniAcceleration': 'Release boost push',
@@ -207,6 +209,7 @@ const en = {
   'kart.param.boostAccelFactor': 'Boost pull',
   'kart.param.stackPush': 'Extra push of a boost fired again',
   'kart.param.startAccelFactor': 'Start boost pull',
+  'kart.param.startTopSpeedFactor': 'Start boost top speed',
   'kart.param.startEarlyShare': 'Start boost held too early',
   'kart.param.startLate': 'Start boost grace after GO',
   'kart.param.dashMinSlip': 'Drift angle that earns an instant boost',
@@ -334,7 +337,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.hud.minimap': '賽道小地圖',
   'kart.spike.canvas': '圍牆圍起來的測試場裡的一台方塊車，從車後看',
   'kart.spike.keys':
-    '{throttle} 加速，{brake} 煞車或倒車，{left}、{right} 轉向。轉向時按住 {drift} 甩尾：車頭甩進彎、整台車滑過去。甩得夠深（金色火花）之後，往反方向打並按著 {throttle} 就是瞬間加速，還在甩、還在滑都可以；或放開後、車回正的一瞬間重按 {throttle}。瞬間加速後馬上再甩是雙收尾，一路甩一路收就是連噴。往反方向打時點一下 {drift} 是斷位，立刻收掉側滑。甩尾會集加速條，短甩集得最快；按 {boost} 噴射，噴射中再按是重新計時並多推一下。發光的加速帶會噴射；重重撞牆會中斷連噴、加速條剩一半。倒數最後一刻按 {throttle} 是完美起跑（更早按住也有小一點的起跑加速）。按 {reset} 回到上一個安全的地方。按 F 看數字。Shift 也能甩尾、Ctrl 也能噴射。',
+    '{throttle} 加速，{brake} 煞車或倒車，{left}、{right} 轉向。轉向時按住 {drift} 甩尾：車頭甩進彎、整台車滑過去。甩得夠深（金色火花）就賺到一次瞬間加速：放開 {drift}、往反方向打把車拉正，再放開 {throttle} 重按一下才會噴，車還在滑、或剛回正的半秒內都可以；一路按著 {throttle} 不會自己噴。瞬間加速後馬上再甩是雙收尾，一路甩一路收就是連噴。往反方向打時點一下 {drift} 是斷位，立刻收掉側滑。甩尾會集加速條，短甩集得最快；按 {boost} 噴射，噴射中再按是重新計時並多推一下。發光的加速帶會噴射；重重撞牆會中斷連噴、加速條剩一半。倒數最後一刻按 {throttle} 是完美起跑（更早按住也有小一點的起跑加速）。按 {reset} 回到上一個安全的地方。按 F 看數字。Shift 也能甩尾、Ctrl 也能噴射。',
   'kart.spike.noWebgl': '這個瀏覽器無法執行 WebGL 2，所以測試無法開始。',
   'kart.spike.contextLost': '瀏覽器收回了繪圖資源。請重新整理頁面再開始。',
   'kart.spike.back': '回大廳',
@@ -361,6 +364,8 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.hud.stored': '可用噴射：{count}／{max}',
   'kart.hud.boosting': '噴射',
   'kart.hud.chain': '連噴 ×{count}',
+  'kart.hud.dashEarned': '瞬間加速 已備妥',
+  'kart.hud.dashNow': '放開前進再按！',
 
   'kart.hud.title': '儀表',
   'kart.hud.speedValue': '時速 {speed} 公里',
@@ -379,7 +384,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.callout.stack': '疊噴！',
   'kart.callout.double': '雙收尾！',
   'kart.callout.catch': '按前進！',
-  'kart.callout.counter': '反打＋前進！',
+  'kart.callout.counter': '重按前進！',
   'kart.callout.broken': '連噴中斷',
   'kart.callout.pad': '加速帶',
 
@@ -457,7 +462,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.param.startWindow': '起跑加速的時機寬度',
   'kart.param.startBoostDuration': '起跑加速長度',
   'kart.param.startStallSeconds': '偷跑熄火時間',
-  'kart.param.releaseWindow': '反打後按油門的時機寬度',
+  'kart.param.releaseWindow': '回正後重按油門的時機寬度',
   'kart.param.chainDuration': '收尾加速長度',
   'kart.param.miniTopSpeedFactor': '收尾加速最高速',
   'kart.param.miniAcceleration': '收尾加速推力',
@@ -492,6 +497,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.param.boostAccelFactor': '噴射推力',
   'kart.param.stackPush': '噴射中再噴的額外推力',
   'kart.param.startAccelFactor': '起跑加速推力',
+  'kart.param.startTopSpeedFactor': '起跑加速最高速',
   'kart.param.startEarlyShare': '太早按住的起跑加速比例',
   'kart.param.startLate': 'GO 之後仍算準時的寬限',
   'kart.param.dashMinSlip': '給瞬間加速的甩尾角度',

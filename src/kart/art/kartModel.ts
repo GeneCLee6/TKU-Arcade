@@ -58,6 +58,16 @@ export interface KartLook {
   readonly charge?: 0 | 1 | 2
   /** Counts boosts fired, of any kind: when it goes up the thrusters burst */
   readonly bursts?: number
+  /**
+   * How hard the last of those kicked, 0 to 1 (feelFx.ts's BURST_POWER): a perfect start throws the
+   * most flame. Left out, a middling one
+   */
+  readonly burstPower?: number
+  /**
+   * How hard the tyres slide, 0 to 1 (feelFx.ts's skidStrength): how dark the skid marks are and how
+   * thick the smoke. Left out (another racer's kart), a drift marks at full strength
+   */
+  readonly skid?: number
   /** A hill track (2026-11-17): whether the kart is in the air, and a count of its landings */
   readonly airborne?: boolean
   readonly landings?: number
@@ -380,6 +390,9 @@ export function buildKartModel(
 
   let roll = 0
   let pitch = 0
+  /** The nose thrown up by a boost that fired, radians, dying away; and the boosts seen so far */
+  let rear = 0
+  let burstsSeen = 0
   let lastSpeed = 0
   let bob = 0
   let flare = 0
@@ -396,14 +409,22 @@ export function buildKartModel(
     update(look, seconds) {
       const speedShare = Math.min(1, Math.abs(look.speed) / 30)
       // Banking into a drift, a little into a fast turn: - about z leans the top towards +x, into a right turn
-      const targetRoll = look.drift !== 0 ? -look.drift * 0.13 : -look.steer * 0.06 * speedShare
+      // (2026-11-17: deeper, by how hard it slides, so that the weight is seen to go over)
+      const targetRoll =
+        look.drift !== 0
+          ? -look.drift * (0.13 + 0.09 * (look.skid ?? 1))
+          : -look.steer * 0.07 * speedShare
       roll = ease(roll, targetRoll, 7, seconds)
       const accel = seconds > 0 ? (look.speed - lastSpeed) / seconds : 0
       lastSpeed = look.speed
       // + about x lifts the nose: up pulling away and in a boost, down under braking
+      // A boost that fires throws the nose up (2026-11-17), settling to a lift while it lasts
+      if ((look.bursts ?? 0) > burstsSeen) rear = 0.1 + 0.12 * (look.burstPower ?? 0.6)
+      burstsSeen = look.bursts ?? 0
+      rear = ease(rear, 0, 5, seconds)
       const targetPitch =
-        Math.max(-0.07, Math.min(0.06, accel * 0.004)) + (look.boosting ? 0.03 : 0)
-      pitch = ease(pitch, targetPitch, 6, seconds)
+        Math.max(-0.08, Math.min(0.07, accel * 0.004)) + (look.boosting ? 0.05 : 0) + rear
+      pitch = ease(pitch, targetPitch, 9, seconds)
       bob += seconds * (2.3 + speedShare * 3)
       chassis.rotation.z = roll
       chassis.rotation.x = pitch

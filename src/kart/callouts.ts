@@ -47,8 +47,11 @@ export function calloutBetween(before: KartState, after: KartState): Callout | u
   if (after.boostSeconds > before.boostSeconds + 1e-9) return { kind: 'pad', count: 0 }
   // The slide-out caught with a release boost waiting: press the throttle now
   if (after.releaseWindow > before.releaseWindow) return { kind: 'catch', count: 0 }
-  // A drift let go that earned a release boost: the car is sliding out, counter-steer now
-  if (!before.burstReady && after.burstReady) return { kind: 'counter', count: 0 }
+  // A drift let go that earned an instant boost: the car is sliding out, and a fresh press of the
+  // throttle fires it now (the classic feel earns it during the drift, the arcade feel on letting go)
+  if (after.burstReady && !after.drifting && (before.drifting || !before.burstReady)) {
+    return { kind: 'counter', count: 0 }
+  }
   if (!before.sliding && after.sliding) return { kind: 'slide', count: 0 }
   if (before.driftDirection === 0 && after.driftDirection !== 0) return { kind: 'drift', count: 0 }
   return undefined

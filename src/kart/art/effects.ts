@@ -6,6 +6,12 @@
 // real slide): the sparks turn gold once the drift has earned its release boost and spray pale blue
 // from both corners while the release window is open, and every boost fired bursts: a fan of sparks
 // out of the back and the flames stretched long for a moment.
+// 2026-11-17 (owner: "a perfect start has to feel like a launch; a drift needs the tyres' squeal and
+// skid marks"; docs/KART-FEEL.md §7): the skid marks are as dark as the slide is deep (feelFx.ts),
+// wider, and stay for most of a lap; braking hard marks the road too; the smoke is thick and rolls
+// away to the outside; a boost leaves a trail of fire behind the thrusters all the while it runs, and
+// the moment it fires a ring of light bursts out on the road under the kart, the bigger the harder
+// it kicks.
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -17,6 +23,7 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
+  RingGeometry,
   Sprite,
   SpriteMaterial,
   type Object3D,
@@ -25,15 +32,26 @@ import { kartHover, kartScene } from '../../styles/kartTokens.ts'
 import type { KartLook, KartModel } from './kartModel.ts'
 
 /** Dust puffs alive at once, at most */
-const PUFFS = 40
-const PUFF_LIFE = 0.8
+const PUFFS = 110
+const PUFF_LIFE = 1.1
+/** Smoke puffs a second from a slide just deep enough to mark the road, and how many more at full */
+const PUFF_RATE = 16
+const PUFF_RATE_MORE = 44
 /** Sparks alive at once, at most */
 const SPARKS = 150
 const SPARK_LIFE = 0.45
 /** A boost fired throws this many sparks out of the back at once ... */
 const BURST_SPARKS = 36
 /** ... and stretches the flames for this long */
-const BURST_SECONDS = 0.35
+const BURST_SECONDS = 0.45
+/** Pieces of the fire a boost leaves behind the thrusters, alive at once at most ... */
+const JETS = 160
+const JET_LIFE = 0.32
+/** ... this many a second from each thruster */
+const JET_RATE = 100
+/** The ring of light on the road when a boost fires: how long it lasts and how wide it gets, metres */
+const RING_SECONDS = 0.42
+const RING_REACH = 4.6
 /** Trail pieces kept: about two seconds of a drift, both corners; the oldest are laid over again */
 const MARKS = 260
 const MARK_WIDTH = 0.18
@@ -46,17 +64,19 @@ const MARK_HEIGHT = 0.085
 const MAX_PIECE = 8
 /** A trail fades out over this many seconds */
 const MARK_FADE = 1.6
-/** Skid mark pieces kept: about 20 s of sliding, both corners; the oldest are laid over again */
-const SKIDS = 2400
-const SKID_WIDTH = 0.42
+/** Skid mark pieces kept: about 50 s of sliding, both corners; the oldest are laid over again */
+const SKIDS = 6000
+const SKID_WIDTH = 0.5
+/** A piece of trail or skid mark is laid once the corner has moved this far, metres */
+const MIN_PIECE = 0.22
 /** A landing (a hill track, 2026-11-17) leaves a dark mark for this long after touching down ... */
 const LANDING_MARK_SECONDS = 0.16
 /** ... and throws up this many puffs of dust */
 const LANDING_PUFFS = 10
 /** A skid mark fades out over this many seconds */
-const SKID_FADE = 14
-/** How dark a fresh skid mark is: its opacity */
-const SKID_OPACITY = 0.7
+const SKID_FADE = 40
+/** How dark a fresh skid mark of a deep slide is: its opacity */
+const SKID_OPACITY = 0.9
 /** The skid marks lie a hair under the trails, so that the glow draws over them */
 const SKID_HEIGHT = MARK_HEIGHT - 0.004
 
@@ -93,7 +113,15 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   let clock = 0
 
   // ── Dust: a light stream from under the back while drifting ──
-  const puffs: { sprite: Sprite; material: SpriteMaterial; age: number; vy: number }[] = []
+  const puffs: {
+    sprite: Sprite
+    material: SpriteMaterial
+    age: number
+    vx: number
+    vy: number
+    vz: number
+    thick: number
+  }[] = []
   for (let index = 0; index < PUFFS; index++) {
     const material = new SpriteMaterial({
       map: texture,
@@ -105,7 +133,7 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     const sprite = new Sprite(material)
     sprite.visible = false
     world.add(sprite)
-    puffs.push({ sprite, material, age: PUFF_LIFE, vy: 0 })
+    puffs.push({ sprite, material, age: PUFF_LIFE, vx: 0, vy: 0, vz: 0, thick: 1 })
   }
   let nextPuff = 0
   let puffDue = 0
@@ -175,6 +203,8 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
   const skidPositions = new Float32Array(SKIDS * 4 * 3)
   const skidColours = new Float32Array(SKIDS * 4 * 4)
   const skidBorn = new Float32Array(SKIDS).fill(-Infinity)
+  /** How dark each piece was laid, 0 to 1 */
+  const skidDark = new Float32Array(SKIDS)
   const skidIndices = new Uint32Array(SKIDS * 6)
   for (let piece = 0; piece < SKIDS; piece++) {
     const a = piece * 4
@@ -241,8 +271,52 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     kart.group.add(group)
     return { group, outer, inner }
   })
+  // ── The fire a boost leaves behind: small bright puffs out of each thruster, left in the world ──
+  const jetMaterials = [kartScene.flameCore, kartScene.flame].map(
+    (color) =>
+      new SpriteMaterial({
+        map: texture,
+        color,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+        blending: AdditiveBlending,
+      }),
+  )
+  const jets: { sprite: Sprite; age: number; vx: number; vy: number; vz: number; size: number }[] =
+    []
+  for (let index = 0; index < JETS; index++) {
+    const sprite = new Sprite(jetMaterials[index % 2]!)
+    sprite.visible = false
+    world.add(sprite)
+    jets.push({ sprite, age: JET_LIFE, vx: 0, vy: 0, vz: 0, size: 1 })
+  }
+  let nextJet = 0
+  let jetDue = 0
+
+  // ── The ring of light on the road when a boost fires ──
+  const ringGeometry = new RingGeometry(0.84, 1, 40)
+  const ringMaterial = new MeshBasicMaterial({
+    color: kartScene.flameCore,
+    transparent: true,
+    opacity: 0,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
+  })
+  const ring = new Mesh(ringGeometry, ringMaterial)
+  ring.rotation.x = -Math.PI / 2
+  ring.visible = false
+  ring.renderOrder = 3
+  world.add(ring)
+  let ringAge = RING_SECONDS
+  let ringPower = 0
+
   let flicker = 0
   let bursts = 0
+  let burstPower = 0
   let burstAge = BURST_SECONDS
   // A hill track (2026-11-17): the height marks, dust and sparks start from, and the landings seen
   let floor = 0
@@ -285,7 +359,7 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     positionAttribute.needsUpdate = true
   }
 
-  const laySkid = (from: { x: number; z: number }, to: { x: number; z: number }) => {
+  const laySkid = (from: { x: number; z: number }, to: { x: number; z: number }, dark: number) => {
     const dx = to.x - from.x
     const dz = to.z - from.z
     const length = Math.hypot(dx, dz)
@@ -311,6 +385,7 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
       nextSkid * 12,
     )
     skidBorn[nextSkid] = clock
+    skidDark[nextSkid] = dark
     nextSkid = (nextSkid + 1) % SKIDS
     skidPositionAttribute.needsUpdate = true
   }
@@ -321,8 +396,8 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
     for (let piece = 0; piece < SKIDS; piece++) {
       const share = Math.max(0, 1 - (clock - skidBorn[piece]!) / SKID_FADE)
       if (share > 0) showing = true
-      // Holds dark for a while, then fades
-      const alpha = Math.min(1, share * 1.6) * SKID_OPACITY
+      // Holds dark for most of its life, then fades
+      const alpha = Math.min(1, share * 2.5) * SKID_OPACITY * skidDark[piece]!
       for (let corner = 0; corner < 4; corner++) skidColours[(piece * 4 + corner) * 4 + 3] = alpha
     }
     skidColourAttribute.needsUpdate = true
@@ -354,6 +429,9 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
       // In the air (a hill track) nothing touches the road: no marks, no dust, no sparks
       const flying = look.airborne ?? false
       const sliding = !flying && look.drift !== 0 && Math.abs(look.speed) > 6
+      // How hard the tyres slide (feelFx.ts): a drift by its depth, a locked brake too. Left out
+      // (another racer's kart), a drift at full strength
+      const skid = flying ? 0 : (look.skid ?? (sliding ? 1 : 0))
       const corners = kart.rearContacts.map(([lx, lz]) => toWorld(pose, lx, lz))
       // A landing: a puff of dust from both corners and a short dark mark where the tyres hit
       const landed = (look.landings ?? 0) > landings
@@ -363,30 +441,51 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         puffDue += LANDING_PUFFS
       }
       landAge += seconds
-      const marking = sliding || (!flying && landAge < LANDING_MARK_SECONDS)
+      const landing = !flying && landAge < LANDING_MARK_SECONDS
+      const marking = sliding || skid > 0 || landing
 
-      if (marking && lastCorners)
-        corners.forEach((corner, index) => {
-          if (sliding) layMark(lastCorners![index]!, corner)
-          laySkid(lastCorners![index]!, corner)
-        })
-      lastCorners = marking ? corners : null
+      if (marking && lastCorners) {
+        // A piece once the kart has moved far enough: a slow frame rate lays as many as a fast one
+        const moved = Math.hypot(
+          corners[0]!.x - lastCorners[0]!.x,
+          corners[0]!.z - lastCorners[0]!.z,
+        )
+        if (moved >= MIN_PIECE) {
+          const dark = Math.max(skid, landing ? 0.8 : 0)
+          const from = lastCorners
+          corners.forEach((corner, index) => {
+            if (sliding) layMark(from[index]!, corner)
+            if (dark > 0) laySkid(from[index]!, corner, dark)
+          })
+          lastCorners = corners
+        }
+      } else lastCorners = marking ? corners : null
       // Faded every frame while a trail or a skid mark still shows, then left alone
       if (sliding || fading) fading = fadeMarks()
       if (marking || skidsShowing) skidsShowing = fadeSkids()
 
-      // Dust: a light stream while drifting, a faint one under boost
-      puffDue += (sliding ? 12 : look.boosting && !flying ? 4 : 0) * seconds
+      // Tyre smoke: thick from a deep slide, rolling away to the outside of the drift; a faint
+      // stream under boost
+      const smoking = skid > 0
+      puffDue +=
+        (smoking ? PUFF_RATE + PUFF_RATE_MORE * skid : look.boosting && !flying ? 4 : 0) * seconds
+      const cos = Math.cos(pose.heading)
+      const sin = Math.sin(pose.heading)
       while (puffDue >= 1) {
         puffDue -= 1
         const corner = corners[nextPuff % corners.length]!
         const puff = puffs[nextPuff]!
         puff.age = 0
-        puff.vy = 0.5 + Math.random() * 0.5
+        puff.thick = smoking ? 0.45 + 0.55 * skid : 0.5
+        // Out to the side the kart slides towards (the outside of the drift), and up
+        const outward = -Math.sign(look.drift) * (smoking ? 1.2 + Math.random() * 2.2 : 0)
+        puff.vx = outward * cos + (Math.random() - 0.5) * 0.8
+        puff.vz = outward * sin + (Math.random() - 0.5) * 0.8
+        puff.vy = 0.7 + Math.random() * 0.9
         puff.sprite.position.set(
-          corner.x + (Math.random() - 0.5) * 0.4,
-          0.2 + floor,
-          corner.z + (Math.random() - 0.5) * 0.4,
+          corner.x + (Math.random() - 0.5) * 0.5,
+          0.22 + floor,
+          corner.z + (Math.random() - 0.5) * 0.5,
         )
         puff.sprite.visible = true
         nextPuff = (nextPuff + 1) % PUFFS
@@ -395,10 +494,12 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         if (puff.age >= PUFF_LIFE) continue
         puff.age += seconds
         const share = Math.min(1, puff.age / PUFF_LIFE)
+        puff.sprite.position.x += puff.vx * seconds
         puff.sprite.position.y += puff.vy * seconds
-        const size = 0.6 + share * 2.2
+        puff.sprite.position.z += puff.vz * seconds
+        const size = 0.9 + share * 3.6
         puff.sprite.scale.set(size, size, 1)
-        puff.material.opacity = 0.45 * (1 - share)
+        puff.material.opacity = 0.8 * puff.thick * (1 - share) ** 1.4
         if (share >= 1) puff.sprite.visible = false
       }
 
@@ -407,8 +508,6 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
       const charge = look.charge ?? 0
       const ready = charge === 2
       sparkDue += (ready && !flying ? 140 : sliding ? (charge === 1 ? 110 : 70) : 0) * seconds
-      const cos = Math.cos(pose.heading)
-      const sin = Math.sin(pose.heading)
       const throwSpark = (
         corner: { x: number; z: number },
         outward: number,
@@ -440,10 +539,19 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         const material = charge === 1 ? sparkMaterials[2]! : sparkMaterials[nextSpark % 2]!
         throwSpark(corner, outward, 3 + Math.random() * 4, material)
       }
-      // A boost fired: a fan of sparks out of the back, and the flames stretch
+      // A boost fired: a fan of sparks out of the back, a ring of light on the road, and the
+      // flames stretch, all by how hard it kicks
       if ((look.bursts ?? 0) > bursts) {
         burstAge = 0
-        for (let index = 0; index < BURST_SPARKS; index++) {
+        burstPower = look.burstPower ?? 0.6
+        if (!flying) {
+          ringAge = 0
+          ringPower = burstPower
+          const behind = toWorld(pose, 0, 0.9)
+          ring.position.set(behind.x, MARK_HEIGHT + 0.02 + floor, behind.z)
+        }
+        jetDue += 24 * burstPower
+        for (let index = 0; index < Math.round(BURST_SPARKS * (0.5 + burstPower)); index++) {
           const corner = corners[index % corners.length]!
           const fan = (Math.random() - 0.5) * 9
           throwSpark(corner, fan, 8 + Math.random() * 9, sparkMaterials[index % 2 === 0 ? 1 : 3]!)
@@ -464,12 +572,56 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
         if (spark.age >= SPARK_LIFE) spark.sprite.visible = false
       }
 
+      // The ring spreads over the road and fades
+      if (ringAge < RING_SECONDS) {
+        ringAge += seconds
+        const share = Math.min(1, ringAge / RING_SECONDS)
+        const reach = 1 + (RING_REACH * (0.4 + 0.6 * ringPower) - 1) * (1 - (1 - share) ** 2)
+        ring.scale.set(reach, reach, 1)
+        ringMaterial.opacity = 0.7 * ringPower * (1 - share)
+        ring.visible = share < 1
+      }
+
+      // The fire left behind the thrusters while a boost runs
+      if (look.boosting) jetDue += JET_RATE * kart.thrusters.length * seconds
+      else jetDue = Math.min(jetDue, 1)
+      let mouth = 0
+      while (jetDue >= 1) {
+        jetDue -= 1
+        const [tx, ty, tz] = kart.thrusters[mouth++ % kart.thrusters.length]!
+        const from = toWorld(pose, tx, tz + 0.2)
+        const jet = jets[nextJet]!
+        jet.age = Math.random() * 0.06
+        // Thrown back out of the kart, a little spread; the kart drives away from it
+        const back = 5 + Math.random() * 7
+        const spread = (Math.random() - 0.5) * 1.6
+        jet.vx = spread * cos - back * sin
+        jet.vz = spread * sin + back * cos
+        jet.vy = (Math.random() - 0.3) * 1.2
+        jet.size = (0.4 + Math.random() * 0.4) * (1 + 0.8 * (1 - burstAge / BURST_SECONDS))
+        jet.sprite.position.set(from.x, ty + 0.34 + floor, from.z)
+        jet.sprite.visible = true
+        nextJet = (nextJet + 1) % JETS
+      }
+      for (const jet of jets) {
+        if (jet.age >= JET_LIFE) continue
+        jet.age += seconds
+        const share = Math.min(1, jet.age / JET_LIFE)
+        const { position } = jet.sprite
+        position.x += jet.vx * seconds
+        position.y += jet.vy * seconds
+        position.z += jet.vz * seconds
+        const size = jet.size * (1 - share * 0.75)
+        jet.sprite.scale.set(size, size, 1)
+        if (share >= 1) jet.sprite.visible = false
+      }
+
       for (const flame of flames) flame.group.visible = look.boosting
       if (look.boosting) {
         flicker += seconds * 40
         for (const flame of flames) {
           // Long and fat just after a boost fires, settling back
-          const burst = 1 + 1.6 * (1 - burstAge / BURST_SECONDS)
+          const burst = 1.25 + (1.2 + 1.6 * burstPower) * (1 - burstAge / BURST_SECONDS)
           const stretch = (0.85 + Math.sin(flicker) * 0.15 + Math.random() * 0.1) * burst
           const fat = 1 + (burst - 1) * 0.35
           flame.outer.scale.set(fat, stretch, fat)
@@ -487,6 +639,11 @@ export function createKartEffects(world: Object3D, kart: KartModel): KartEffects
       }
       for (const spark of sparks) world.remove(spark.sprite)
       for (const material of sparkMaterials) material.dispose()
+      for (const jet of jets) world.remove(jet.sprite)
+      for (const material of jetMaterials) material.dispose()
+      ringGeometry.dispose()
+      ringMaterial.dispose()
+      world.remove(ring)
       texture.dispose()
       markGeometry.dispose()
       markMaterial.dispose()
