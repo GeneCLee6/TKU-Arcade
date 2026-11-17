@@ -1,4 +1,4 @@
-// /kart's menu for the Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.23): a panel over the
+// /kart's menu for the Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.24): a panel over the
 // track like the race against the computer's. The cup (its tracks listed, and the best result in it),
 // how many opponents, how good they are, items or not, and the laps; Start draws the opponents and
 // hands the new cup to the page. A cup under way can be continued or abandoned from here. Escape

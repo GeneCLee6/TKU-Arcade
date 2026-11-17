@@ -17,6 +17,13 @@ function isValid(field: AnyOptionField, value: unknown): boolean {
       return Number.isInteger(value) && Number(value) >= field.min && Number(value) <= field.max
     case 'select':
       return field.choices.some((choice) => choice.value === value)
+    case 'text':
+      return (
+        typeof value === 'string' &&
+        value.length <= field.maxLength &&
+        (value === field.default || field.pattern.test(value)) &&
+        (value === field.default || !field.check || field.check(value))
+      )
   }
 }
 

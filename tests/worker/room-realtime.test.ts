@@ -6,6 +6,8 @@ import { kart } from '../../shared/games/kart/rules.ts'
 import type { KartView } from '../../shared/games/kart/types.ts'
 import type { AnyGameModule, GameProjection } from '../../shared/games/types.ts'
 import { readRelayed, type KartFrame } from '../../shared/kart/net.ts'
+import { encodeSpec } from '../../shared/kart/editor/codec.ts'
+import { starterSpec, straight, turn } from '../../shared/kart/editor/spec.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { applyPatch, type JsonValue } from '../../shared/patch.ts'
 import { ticTacToe } from '../../shared/games/tictactoe/rules.ts'
@@ -181,5 +183,72 @@ describe('a real-time game in a room (e2-t11)', () => {
     xia.send({ t: 'start' })
     xia.frame(frame)
     expect(xia.closed).toBe(CloseCode.badMessage)
+  })
+})
+
+describe('a race on a track made in the editor (e10-t08)', () => {
+  const good = encodeSpec(starterSpec())
+  // Decodes, but runs into itself: a figure of eight
+  const crossing = encodeSpec({
+    name: '',
+    theme: 'day',
+    pieces: [
+      straight(150),
+      turn(270, 60),
+      straight(150),
+      straight(150),
+      turn(-270, 60),
+      straight(150),
+    ],
+  })
+
+  it('keeps a host’s legal track, drops one that is not, and judges laps on it', () => {
+    const world = new World({ kart: kart as unknown as AnyGameModule })
+    expect(world.host.create('abcdefghij', 'kart', { track: 'riverside', laps: 1 }, false)).toBe(
+      true,
+    )
+    const ann = world.join('Ann')
+    const bob = world.join('Bob')
+    // Checked when set: an illegal track, junk or an oversized code is not kept
+    for (const custom of [crossing, '%%%', 'A'.repeat(5_000), 12]) {
+      ann.send({ t: 'set_options', options: { track: 'custom', custom, laps: 1, mode: 'race' } })
+      expect(ann.view?.room.options).toMatchObject({ track: 'custom', custom: '' })
+    }
+    ann.send({
+      t: 'set_options',
+      options: { track: 'custom', custom: good, laps: 1, mode: 'race' },
+    })
+    expect(bob.view?.room.options).toMatchObject({ track: 'custom', custom: good })
+    ann.send({ t: 'start' })
+    // Everyone is sent the track as its code, and builds the same one from it
+    expect(bob.race.track).toBe(`custom:${good}`)
+    ann.send({ t: 'action', action: { t: 'loaded' } })
+    bob.send({ t: 'action', action: { t: 'loaded' } })
+    const goAt = ann.race.goAt as number
+    world.clock = goAt
+    world.host.sweep()
+    const track = raceTrack(bob.race.track)!
+    expect(track.id).toMatch(/^custom-/)
+    const annFrames = driveFrames(track, 0)
+    const bobFrames = driveFrames(track, 1, 2.4)
+    for (let i = 0; i < 3000 && !ann.view?.game?.over; i++) {
+      const a = annFrames.next().value as KartFrame
+      world.clock = goAt + (a.tick / 60) * 1000
+      ann.frame(a)
+      bob.frame(bobFrames.next().value as KartFrame)
+    }
+    expect(ann.view?.game?.over).toBe(true)
+    const standings = ann.view?.game?.result?.standings ?? []
+    expect(standings.map((line) => line.seat)).toEqual([0, 1])
+  })
+
+  it('races the first track when a custom track is chosen with none given', () => {
+    const world = new World({ kart: kart as unknown as AnyGameModule })
+    const options = { track: 'custom', custom: crossing, laps: 1 }
+    expect(world.host.create('abcdefghij', 'kart', options, false)).toBe(true)
+    const ann = world.join('Ann')
+    expect(ann.view?.room.options).toMatchObject({ track: 'custom', custom: '' })
+    ann.send({ t: 'start' })
+    expect(ann.race.track).toBe('riverside')
   })
 })

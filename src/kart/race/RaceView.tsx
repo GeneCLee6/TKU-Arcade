@@ -23,7 +23,7 @@ import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
 import { supportsWebGL2 } from '../Scene.ts'
-import { startSpikeLoop, type SpikeCourse, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
+import { startSpikeLoop, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
 import { autopilot } from './autopilot.ts'
 import { ItemNote, ItemSlot } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
@@ -223,7 +223,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
         onHud: setHud,
         onCallout: (next) => setCallout((last) => ({ callout: next, id: (last?.id ?? 0) + 1 })),
         onContextLost: () => setFailure(true),
-        course: track.id as SpikeCourse,
+        track,
         quality: loadQuality(),
         body: loadout.body,
         driver: loadout.driver,

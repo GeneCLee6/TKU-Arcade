@@ -22,7 +22,7 @@ import RaceView from '../race/RaceView.tsx'
 import { botSeats, createBotRace } from './botRace.ts'
 import { createLocalRoom } from './localRoom.ts'
 import { drawBots, type BotEntry } from './roster.ts'
-import type { BotSetup } from './setup.ts'
+import { botTrackId, type BotSetup } from './setup.ts'
 
 registerMessages(KART_MESSAGES)
 
@@ -30,7 +30,7 @@ registerMessages(KART_MESSAGES)
 const RUN_EVERY_MS = 16
 
 /**
- * A race of a Grand Prix (src/kart/cup/, docs/ARCHITECTURE.md §4.23): the cup's own opponents and
+ * A race of a Grand Prix (src/kart/cup/, docs/ARCHITECTURE.md §4.24): the cup's own opponents and
  * seed, and at the results the way on to the cup's standings instead of racing again
  */
 export interface CupRace {
@@ -75,7 +75,7 @@ function BotRound({
     const playerSeat = entries.length
     const room = createLocalRoom({
       seats: entries.length + 1,
-      options: { track: setup.track, laps: setup.laps, mode: setup.mode },
+      options: { track: setup.track, custom: setup.custom, laps: setup.laps, mode: setup.mode },
       seed,
       now: () => Date.now(),
     })
@@ -84,7 +84,7 @@ function BotRound({
   const [view, setView] = useState(() => game.room.view(game.playerSeat))
 
   useEffect(() => {
-    const track = raceTrack(setup.track)
+    const track = raceTrack(botTrackId(setup))
     if (!track) return
     // Watching first: the race screen's `loaded` (its effect runs before this one) and the bots'
     // put the race into its countdown at once, and the view must carry the start time

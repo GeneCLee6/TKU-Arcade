@@ -1,4 +1,4 @@
-// The Grand Prix's cups (owner 2026-11-17, outside the roadmap; docs/ARCHITECTURE.md §4.23): a few
+// The Grand Prix's cups (owner 2026-11-17, outside the roadmap; docs/ARCHITECTURE.md §4.24): a few
 // races in a row against the same computer karts, points for each place, a podium at the end. The
 // cups' names are working titles of our own (`kart.cup.name.<id>`, KART-WORLD.md §6.1), like every
 // name in the kart's world until the owner settles them; the ids stay (the browser keeps the best

@@ -1,4 +1,4 @@
-// The Grand Prix's points (docs/ARCHITECTURE.md §4.23): a table of our own, not any racing game's or
+// The Grand Prix's points (docs/ARCHITECTURE.md §4.24): a table of our own, not any racing game's or
 // series'. Every kart scores one point for each kart it finished ahead of, plus one for itself, so
 // the last kart still scores and the table grows with the field; the three on the podium of a race
 // get a little more (3, 2 and 1), so that winning a race is worth more than just one place. With the

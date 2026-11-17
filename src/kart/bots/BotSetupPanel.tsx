@@ -17,17 +17,22 @@ export interface BotSetupPanelProps {
   t: (key: KartMessageKey, params?: MessageParams) => string
   onStart(setup: BotSetup): void
   onClose(): void
-  /** 2026-11-17: opens the Grand Prix's panel instead (src/kart/cup/, docs/ARCHITECTURE.md §4.23) */
+  /** 2026-11-17: opens the Grand Prix's panel instead (src/kart/cup/, docs/ARCHITECTURE.md §4.24) */
   onGrandPrix?: () => void
+  /** e10-t07: the track made in the editor that /kart was opened with, offered first */
+  custom?: { readonly code: string; readonly name: string }
 }
 
 const COUNTS = Array.from({ length: MAX_BOTS }, (_, i) => i + 1)
 const LAPS = Array.from({ length: MAX_LAPS }, (_, i) => i + 1)
 
-export function BotSetupPanel({ t, onStart, onClose, onGrandPrix }: BotSetupPanelProps) {
+export function BotSetupPanel({ t, onStart, onClose, custom, onGrandPrix }: BotSetupPanelProps) {
   const ids = useId()
   const title = useRef<HTMLHeadingElement>(null)
-  const [setup, setSetup] = useState<BotSetup>(loadBotSetup)
+  const [setup, setSetup] = useState<BotSetup>(() => {
+    const kept = loadBotSetup()
+    return custom ? { ...kept, track: 'custom', custom: custom.code } : kept
+  })
   useEffect(() => {
     title.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
@@ -68,9 +73,16 @@ export function BotSetupPanel({ t, onStart, onClose, onGrandPrix }: BotSetupPane
           <span>{t('kart.bots.track')}</span>
           <select
             value={setup.track}
-            onChange={(event) => change({ track: event.target.value as RaceTrackId })}
+            onChange={(event) =>
+              change(
+                event.target.value === 'custom' && custom
+                  ? { track: 'custom', custom: custom.code }
+                  : { track: event.target.value as RaceTrackId, custom: undefined },
+              )
+            }
             data-testid="kart-bots-track"
           >
+            {custom && <option value="custom">{custom.name}</option>}
             {RACE_TRACK_IDS.map((id) => (
               <option key={id} value={id}>
                 {t(`kart.course.${id}`)}

@@ -1,4 +1,4 @@
-// A Grand Prix as it goes (docs/ARCHITECTURE.md §4.23): a small state machine, pure, kept in this
+// A Grand Prix as it goes (docs/ARCHITECTURE.md §4.24): a small state machine, pure, kept in this
 // browser after every step (store.ts), so that a reload carries on where it was.
 //
 //   startCup ──▶ ready ──beginRace──▶ racing ──finishRace──▶ ready (next race) … ──▶ podium

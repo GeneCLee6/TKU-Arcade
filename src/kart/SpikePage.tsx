@@ -42,6 +42,10 @@ import { KART_COMPACT } from './layout.ts'
 import { TuningPanel } from './TuningPanel.tsx'
 import { BotSetupPanel } from './bots/BotSetupPanel.tsx'
 import type { BotSetup } from './bots/setup.ts'
+import { customTrack } from '../../shared/kart/editor/custom.ts'
+import type { Track } from '../../shared/kart/track.ts'
+import { codeInAddress } from './editor/link.ts'
+import { autopilot } from './race/autopilot.ts'
 import { CupSetupPanel } from './cup/CupSetupPanel.tsx'
 import type { CupRun } from './cup/cupRun.ts'
 import { GhostPicker } from './GhostPicker.tsx'
@@ -70,6 +74,19 @@ interface GaragePick {
 }
 
 type Open = 'controls' | 'tuning' | 'garage' | 'bots' | 'cup' | undefined
+
+/** What /kart drives on: a course, or the track made in the editor that its link brought (e10-t07) */
+type PlayCourse = SpikeCourse | 'custom'
+
+/** A track from the editor in the address: built and checked, or `bad` for a link that is none */
+type Linked = { readonly code: string; readonly track: Track; readonly name: string } | 'bad' | null
+
+function linkedTrack(): Linked {
+  const code = codeInAddress()
+  if (code === null) return null
+  const result = customTrack(code)
+  return result.ok ? { code, track: result.track, name: result.spec.name } : 'bad'
+}
 
 /**
  * e8-t01: three.js, a fixed-step loop and a box car, to see whether the stack holds up in a browser.
@@ -124,11 +141,21 @@ export function SpikePage({
   // e8-t04, e8-t05a: the yard, or a track with its minimap and a time trial (?track=oval|riverside|harbour)
   const courses = play ? SPIKE_COURSES.filter((one) => one !== 'arena') : SPIKE_COURSES
   const soundOn = useSoundOn()
-  const [course, setCourse] = useState<SpikeCourse>(() => {
+  // e10-t07: a shared track's link (?custom=<code>) opens on that track
+  const [linked] = useState<Linked>(linkedTrack)
+  const custom = linked !== null && linked !== 'bad' ? linked : null
+  const customName = custom ? custom.name || t('kart.editor.untitled') : ''
+  const [course, setCourse] = useState<PlayCourse>(() => {
+    if (custom) return 'custom'
     const asked = new URLSearchParams(window.location.search).get('track')
     return courses.find((one) => one === asked) ?? (play ? 'riverside' : 'arena')
   })
-  const track = useMemo(() => spikeTrack(course), [course])
+  const track = useMemo(
+    () => (course === 'custom' ? (custom?.track ?? null) : spikeTrack(course)),
+    [course, custom],
+  )
+  // Testing: the time trial drives itself (the browser tests)
+  const [autopiloted] = useState(() => new URLSearchParams(window.location.search).has('autopilot'))
   const minimap = useRef<MinimapHandle>(null)
   const clock = useRef<RaceClockHandle>(null)
   const race = useRef<{ restart: () => void } | null>(null)
@@ -157,7 +184,10 @@ export function SpikePage({
         onHud: setHud,
         onCallout: (next) => setCallout((last) => ({ callout: next, id: (last?.id ?? 0) + 1 })),
         onContextLost: () => setFailure('contextLost'),
-        course,
+        ...(course === 'custom' ? { track: track ?? undefined } : { course }),
+        ...(autopiloted && track
+          ? { autopilot: (trial: Parameters<typeof autopilot>[0]) => autopilot(trial, track.road) }
+          : {}),
         quality,
         body,
         driver,
@@ -173,11 +203,11 @@ export function SpikePage({
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, quality, body, driver, ghostPick])
+  }, [course, track, autopiloted, quality, body, driver, ghostPick])
 
-  const switchCourse = (next: SpikeCourse) => {
+  const switchCourse = (next: PlayCourse) => {
     const url = new URL(window.location.href)
-    if (next === 'arena') url.searchParams.delete('track')
+    if (next === 'arena' || next === 'custom') url.searchParams.delete('track')
     else url.searchParams.set('track', next)
     window.history.replaceState(null, '', url)
     setHud(EMPTY_HUD)
@@ -329,6 +359,22 @@ export function SpikePage({
       <TopRow ref={topRow}>
         <Panel>
           <Link to="/">{t('kart.spike.back')}</Link>
+          {play && (
+            <>
+              {' · '}
+              <Link
+                to={custom ? `/kart/editor?custom=${custom.code}` : '/kart/editor'}
+                data-testid="kart-editor-link"
+              >
+                {t(custom ? 'kart.editor.editCopy' : 'kart.editor.open')}
+              </Link>
+            </>
+          )}
+          {linked === 'bad' && (
+            <BadLink role="alert" data-testid="kart-bad-link">
+              {t('kart.editor.badLink')}
+            </BadLink>
+          )}
         </Panel>
         <MenuButton
           ref={menuButton}
@@ -429,9 +475,10 @@ export function SpikePage({
             <span>{t('kart.spike.course')}</span>
             <select
               value={course}
-              onChange={(event) => switchCourse(event.target.value as SpikeCourse)}
+              onChange={(event) => switchCourse(event.target.value as PlayCourse)}
               data-testid="kart-course"
             >
+              {custom && <option value="custom">{customName}</option>}
               {courses.map((one) => (
                 <option key={one} value={one}>
                   {t(`kart.course.${one}`)}
@@ -537,6 +584,7 @@ export function SpikePage({
           onStart={onBotRace}
           onClose={closeBots}
           onGrandPrix={onCup ? () => setOpen('cup') : undefined}
+          custom={custom ? { code: custom.code, name: customName } : undefined}
         />
       )}
       {open === 'cup' && onCup && <CupSetupPanel t={t} onCup={onCup} onClose={closeCup} />}
@@ -578,6 +626,11 @@ const WallFlash = styled.div`
   box-shadow: inset 0 0 64px ${color.danger};
   opacity: 0;
   animation: ${flash} 0.5s ease-out;
+`
+
+const BadLink = styled.p`
+  margin: ${space.xs}px 0 0;
+  color: ${color.danger};
 `
 
 const Panel = styled.div`

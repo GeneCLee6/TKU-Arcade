@@ -10,8 +10,10 @@ import type { SeatId } from '../types.ts'
 export type KartMode = 'items' | 'race'
 
 export type KartOptions = {
-  /** A track id from shared/kart/tracks/list.ts */
+  /** A track id from shared/kart/tracks/list.ts, or `custom` for the track in `custom` (e10-t08) */
   track: string
+  /** A track made in the editor, as its code (shared/kart/editor/codec.ts); empty for none */
+  custom?: string
   laps: number
   mode: KartMode
 }
@@ -58,6 +60,7 @@ export type KartItemEvent = {
 }
 
 export type KartState = {
+  /** A track id, or `custom:<code>` for a track made in the editor (shared/kart/editor/custom.ts) */
   track: string
   laps: number
   phase: KartPhase

@@ -74,6 +74,20 @@ export const kartScene = {
   lightGround: '#6B7280',
 } as const
 
+/** The track editor's map (e10-t07): the road on grass, the piece picked, the pieces at fault */
+export const kartEditor = {
+  ground: '#4F8A3A',
+  road: '#5A5E66',
+  selected: '#38BDF8',
+  problem: '#EF4444',
+  joint: '#E5E7EB',
+  finish: '#F9FAFB',
+  grid: '#FDE68A',
+  pad: '#22D3EE',
+  box: '#FFA62B',
+  arrow: '#F9FAFB',
+} as const
+
 /**
  * A track's light and sky (N1, e10-t03): Riverside and the test tracks keep the sunny afternoon of
  * K1 (the same values as above, so they look as they did); the harbour is a sunset of our own. The
