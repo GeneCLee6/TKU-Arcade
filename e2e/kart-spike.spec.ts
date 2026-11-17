@@ -686,15 +686,15 @@ test.describe('the tuning panel', () => {
     await expect(preset).toHaveValue('standard')
     await preset.focus()
     await preset.selectOption('planted')
-    await expect(page.getByTestId('kart-tuning-status')).toHaveText('Preset: Planted.')
-    await expect.poll(async () => (await reading(page)).tuning?.grip).toBe(16)
+    await expect(page.getByTestId('kart-tuning-status')).toHaveText('Preset: Classic, planted.')
+    await expect.poll(async () => (await reading(page)).tuning?.grip).toBe(14)
 
     // A slider keeps the arrow keys: the car does not move
     const topSpeed = page.getByRole('slider', { name: 'Top speed', exact: true })
     await topSpeed.focus()
     await page.keyboard.press('ArrowRight')
-    await expect(topSpeed).toHaveValue('60.5')
-    await expect.poll(async () => (await reading(page)).tuning?.topSpeed).toBe(60.5)
+    await expect(topSpeed).toHaveValue('68.5')
+    await expect.poll(async () => (await reading(page)).tuning?.topSpeed).toBe(68.5)
     expect((await reading(page)).state.z).toBe(0)
     await expect(preset).toHaveValue('custom')
 
@@ -708,10 +708,10 @@ test.describe('the tuning panel', () => {
     await box.fill('not json at all')
     await page.getByRole('button', { name: 'Import' }).click()
     await expect(page.getByTestId('kart-tuning-status')).toContainText("That isn't JSON")
-    expect((await reading(page)).tuning?.grip).toBe(16)
+    expect((await reading(page)).tuning?.grip).toBe(14)
 
     // Good JSON goes in whole
-    await box.fill('{"kind": "tku-arcade.kart.tuning", "version": 1, "tuning": {"grip": 7.5}}')
+    await box.fill('{"kind": "tku-arcade.kart.tuning", "version": 2, "tuning": {"grip": 7.5}}')
     await page.getByRole('button', { name: 'Import' }).click()
     await expect(page.getByTestId('kart-tuning-status')).toContainText('Imported.')
     await expect.poll(async () => (await reading(page)).tuning?.grip).toBe(7.5)
@@ -719,10 +719,10 @@ test.describe('the tuning panel', () => {
     // Kept across a reload
     await page.reload()
     await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
-    expect((await reading(page)).tuning).toMatchObject({ grip: 7.5, topSpeed: 60.5 })
+    expect((await reading(page)).tuning).toMatchObject({ grip: 7.5, topSpeed: 68.5 })
 
     await page.getByRole('button', { name: 'Tuning' }).click()
-    await page.getByRole('button', { name: 'Back to Standard' }).click()
+    await page.getByRole('button', { name: 'Back to Classic' }).click()
     await expect(page.getByRole('combobox', { name: 'Preset' })).toHaveValue('standard')
     await page.keyboard.press('Escape')
     await expect(page.getByTestId('kart-tuning')).toBeHidden()

@@ -121,7 +121,8 @@ describe('slopes', () => {
     const top = (c: Course) => speedOf(drive(c, going(c, 55), 8 * 60).at(-1)!.kart)
     expect(top(up)).toBeLessThan(top(flat) - 1)
     expect(top(down)).toBeGreaterThan(top(flat) + 1)
-    expect(top(flat)).toBeCloseTo(60, 1)
+    // The classic feel eases into its top speed (2026-11-17)
+    expect(top(flat)).toBeCloseTo(KART_TUNING.topSpeed, 0)
   })
 })
 

@@ -119,6 +119,11 @@ export interface InputSources {
   readonly pad?: PadSnapshot
   /** The boost was pressed since the last step, even if it is already up again */
   readonly boostTapped?: boolean
+  /**
+   * The same for the throttle (2026-11-17, the classic feel): a press let go and pressed again
+   * between two steps is still a fresh press, for the instant boost and the start
+   */
+  readonly throttleTapped?: boolean
   /** The same for the reset */
   readonly resetTapped?: boolean
   /** The same for the item */
@@ -128,7 +133,7 @@ export interface InputSources {
 /** Keyboard and gamepad together: either can press, and their steering adds up to at most full */
 export function readInput(
   bindings: Bindings,
-  { held, pad, boostTapped, resetTapped, itemTapped }: InputSources,
+  { held, pad, boostTapped, resetTapped, itemTapped, throttleTapped }: InputSources,
 ): KartInput {
   const amount = (action: KartAction): number => {
     let value = 0
@@ -143,7 +148,8 @@ export function readInput(
   const pressed = (action: KartAction) => amount(action) >= PRESS_THRESHOLD
   return {
     ...NO_INPUT,
-    throttle: pressed('throttle'),
+    throttle: pressed('throttle') || (throttleTapped ?? false),
+    ...(throttleTapped ? { throttleTap: true } : {}),
     brake: pressed('brake'),
     steer: Math.min(1, Math.max(-1, amount('right') - amount('left'))),
     drift: pressed('drift'),

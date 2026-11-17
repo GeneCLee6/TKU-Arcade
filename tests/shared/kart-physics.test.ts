@@ -2,17 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { advanceClock, MAX_FRAME_SECONDS } from '../../shared/kart/clock.ts'
 import {
   INITIAL_KART,
-  KART_TUNING,
+  ARCADE_TUNING as KART_TUNING,
   kartSkidding,
   kartSlip,
   kartSpeed,
   NO_INPUT,
   poseBetween,
   STEP_SECONDS,
-  stepKart,
+  stepKart as stepPhysics,
   type KartInput,
   type KartState,
 } from '../../shared/kart/physics.ts'
+
+// Pinned to the arcade feel (the "arcade (old)" preset, before 2026-11-17): these tests lock what it
+// always did. The classic feel, the default since, has its own (tests/kart/classic.test.ts)
+const stepKart = (
+  ...[state, input, tuning = KART_TUNING, ...rest]: Parameters<typeof stepPhysics>
+) => stepPhysics(state, input, tuning, ...rest)
 
 const THROTTLE: KartInput = { ...NO_INPUT, throttle: true }
 

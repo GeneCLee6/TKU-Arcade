@@ -3,16 +3,22 @@ import {
   DEFAULT_RULES,
   GAUGE_FULL,
   INITIAL_KART,
-  KART_TUNING,
+  ARCADE_TUNING as KART_TUNING,
   kartSlip,
   kartSpeed,
   NO_INPUT,
   STEP_SECONDS,
-  stepKart,
+  stepKart as stepPhysics,
   type KartInput,
   type KartRules,
   type KartState,
 } from '../../shared/kart/physics.ts'
+
+// Pinned to the arcade feel (the "arcade (old)" preset, before 2026-11-17): these tests lock what it
+// always did. The classic feel, the default since, has its own (tests/kart/classic.test.ts)
+const stepKart = (
+  ...[state, input, tuning = KART_TUNING, ...rest]: Parameters<typeof stepPhysics>
+) => stepPhysics(state, input, tuning, ...rest)
 
 // e8-t02a: the gauge, boosts and chained boosts (AC-8.3; walls and respawn are e8-t02b). 2026-11-14:
 // a quicker gauge, a longer boost, release boosts and their chains, and the boost slide. Then the
@@ -379,7 +385,10 @@ describe('the double', () => {
     expect(second.doubles).toBe(1)
     expect(second.chain).toBe(2)
     // The second release boost adds its length to what is left of the first
-    expect(second.miniSeconds).toBeCloseTo(tapped.miniSeconds + KART_TUNING.chainDuration - STEP_SECONDS, 9)
+    expect(second.miniSeconds).toBeCloseTo(
+      tapped.miniSeconds + KART_TUNING.chainDuration - STEP_SECONDS,
+      9,
+    )
   })
 
   it('is one a drift: the tap after a double earns nothing more', () => {
@@ -458,7 +467,8 @@ describe('tuning', () => {
   it('has a finite, positive value for every number', () => {
     for (const [name, value] of Object.entries(KART_TUNING)) {
       expect(Number.isFinite(value), name).toBe(true)
-      expect(value, name).toBeGreaterThan(0)
+      // `model` says which physics: 0 is the arcade feel
+      if (name !== 'model') expect(value, name).toBeGreaterThan(0)
     }
   })
 })

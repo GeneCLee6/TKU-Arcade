@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { KartInput } from '../../shared/kart/physics.ts'
+import { ARCADE_TUNING as KART_TUNING, type KartInput } from '../../shared/kart/physics.ts'
 import {
   seconds,
   startTrial,
-  stepTrial,
+  stepTrial as stepTrialWith,
   type Trial,
   type TrialCourse,
 } from '../../shared/kart/timeTrial.ts'
@@ -12,6 +12,11 @@ import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TAMKANG } from '../../shared/kart/tracks/tamkang.ts'
 import { createExpert, novice } from './drivers.ts'
+
+// Pinned to the arcade feel (the "arcade (old)" preset, before 2026-11-17): these tests lock what it
+// always did. The classic feel, the default since, has its own (tests/kart/classic.test.ts)
+const stepTrial = (...[a, b, c, tuning = KART_TUNING, ...rest]: Parameters<typeof stepTrialWith>) =>
+  stepTrialWith(a, b, c, tuning, ...rest)
 
 // 2026-11-14 (owner: "the skill ceiling is too low", then "an expert and a novice should differ
 // hugely"): what the techniques are worth. Three scripted drivers race three laps on each track:

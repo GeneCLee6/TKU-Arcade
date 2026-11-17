@@ -141,6 +141,9 @@ function crossings(laid: Laid, at: number[], total: number, max: number): [numbe
   return [...found.values()]
 }
 
+/** Raised whenever the physics changes enough that old times on custom tracks mean nothing */
+export const CUSTOM_REVISION = 2
+
 /** The track the spec makes, under its own id (`custom-<hash>`), and everything wrong with it */
 export function buildSpec(spec: TrackSpec): Built {
   const pieces: readonly Piece[] = spec.pieces
@@ -267,6 +270,9 @@ export function buildSpec(spec: TrackSpec): Built {
   const track: TrackJson = {
     format: TRACK_FORMAT,
     id: `custom-${hash}`,
+    // The physics' version (2: the classic feel, 2026-11-17): the hash is the layout's alone, so
+    // times driven with the old physics are set aside by this (recordKey)
+    revision: CUSTOM_REVISION,
     name: { en: named || 'Custom track', 'zh-TW': named || '自訂賽道' },
     theme: spec.theme,
     laps: 3,

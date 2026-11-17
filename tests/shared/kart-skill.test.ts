@@ -1,17 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { onPad, startRun, stepRun, type Course } from '../../shared/kart/course.ts'
+import { onPad, startRun, stepRun as stepRunWith, type Course } from '../../shared/kart/course.ts'
 import {
   INITIAL_KART,
-  KART_TUNING,
+  ARCADE_TUNING as KART_TUNING,
   kartSlip,
   kartSpeed,
   NO_INPUT,
   STEP_SECONDS,
-  stepKart,
+  stepKart as stepPhysics,
   type KartInput,
   type KartState,
 } from '../../shared/kart/physics.ts'
 import { padsAlong } from '../../shared/kart/track.ts'
+
+// Pinned to the arcade feel (the "arcade (old)" preset, before 2026-11-17): these tests lock what it
+// always did. The classic feel, the default since, has its own (tests/kart/classic.test.ts)
+const stepKart = (
+  ...[state, input, tuning = KART_TUNING, ...rest]: Parameters<typeof stepPhysics>
+) => stepPhysics(state, input, tuning, ...rest)
+const stepRun = (...[a, b, c, tuning = KART_TUNING, ...rest]: Parameters<typeof stepRunWith>) =>
+  stepRunWith(a, b, c, tuning, ...rest)
 
 // 2026-11-14 (owner: much faster, longer boosts, a higher skill ceiling): stacked charges, the
 // counter catch, walls that break the chain, boost pads. The flick is gone (a tapped drift now

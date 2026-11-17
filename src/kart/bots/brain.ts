@@ -9,7 +9,8 @@
 // drives the same race.
 import { createRng } from '../../../shared/games/rng.ts'
 import {
-  KART_TUNING,
+  ARCADE_TUNING,
+  MODEL_CLASSIC,
   NO_INPUT,
   type KartInput,
   type KartTuning,
@@ -20,13 +21,23 @@ import type { BotSkill } from './skill.ts'
 
 const wrap = (angle: number) => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI))
 const clampSteer = (value: number) => Math.max(-1, Math.min(1, value))
+const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value))
 
 /** Seconds of travel looked ahead for the line, on top of 14 m: the slide answers late */
 const REACH = 0.5
 /** The share of the tightest turn a drift can make past which the corner needs the brake too */
 const BRAKE_AT = 0.8
 /** Steps a tapped drift is held: just past chainMinDrift, so that it earns a release boost */
-const TAP_STEPS = Math.ceil(KART_TUNING.chainMinDrift * 60) + 2
+const TAP_STEPS = Math.ceil(ARCADE_TUNING.chainMinDrift * 60) + 2
+/**
+ * The classic feel (2026-11-17, docs/KART-FEEL.md): steps a tapped drift is held, steering into it,
+ * before the counter-steer that fires its instant boost: enough for the slip to reach dashMinSlip
+ */
+const CLASSIC_TAP_STEPS = 7
+/** How hard a tapped drift steers into itself: little, so the tap swerves little */
+const CLASSIC_TAP_STEER = 0.3
+/** The classic feel: the counter-steer short of firing a dash, while a drift still turns */
+const CLASSIC_OUT_MOST = -0.25
 const DOUBLE_STEPS = 3
 const LIFT_STEPS = 2
 const TAP_BEFORE_END = 0.1
@@ -159,6 +170,122 @@ export function createBotBrain(
     return (2 * Math.sin(angle) * Math.max(speed, 5)) / distance
   }
 
+  const classic = t.model === MODEL_CLASSIC
+  /** Whether this drift is to end in an instant boost: decided once a drift, by skill */
+  let dashPlan: boolean | null = null
+
+  /**
+   * The classic feel's hands (2026-11-17): drift where the grip is not enough, and by skill end it
+   * with the counter-steer and the throttle (the instant boost) once it is deep enough; tap short
+   * drifts down the straights for more; fire the boost on a straight, and again near its end
+   */
+  const classicHands = (
+    kart: Trial['run']['kart'],
+    sense: BotSense,
+    speed: number,
+    want: number,
+    noseWant: number,
+    later: number,
+    gripTurn: number,
+    jumpNear: boolean,
+  ): KartInput => {
+    wasDrifting = kart.drifting
+    const straight = Math.abs(later) < gripTurn * 0.4 && Math.abs(want) < gripTurn * 0.4
+    const fire =
+      !boostPressed &&
+      kart.storedBoosts > 0 &&
+      straight &&
+      !kart.drifting &&
+      (kart.boostSeconds === 0 || (skill.stackBoosts && kart.boostSeconds < 0.4))
+    boostPressed = fire
+    const calm =
+      kart.boostSeconds === 0 && kart.miniSeconds === 0 && (kart.launchSeconds ?? 0) === 0
+    const cruising = calm && speed > t.topSpeed * Math.min(1, sense.speedShare)
+    const gripSteer = clampSteer(noseWant / gripTurn)
+    const base = { ...NO_INPUT, throttle: !cruising, boost: fire }
+
+    if (move.kind === 'tap') {
+      const { direction, steps } = move
+      if (steps > 0 && (kart.drifting || steps === CLASSIC_TAP_STEPS)) {
+        move = { kind: 'tap', direction, steps: steps - 1 }
+        return { ...base, drift: true, steer: direction * CLASSIC_TAP_STEER }
+      }
+      // The tap's counter-steer, throttle down: the instant boost
+      move = NONE
+      return { ...base, throttle: true, steer: kart.burstReady ? -direction : gripSteer }
+    }
+    if (move.kind === 'lift') {
+      // A dash waiting after the car straightened: lift, then press afresh
+      const { steps, double } = move
+      if (steps > 0) {
+        move = { kind: 'lift', steps: steps - 1, double }
+        return { ...base, throttle: false, steer: gripSteer }
+      }
+      move = NONE
+      return { ...base, throttle: true, steer: gripSteer }
+    }
+    if (kart.releaseWindow > 0 && dashPlan) {
+      move = { kind: 'lift', steps: LIFT_STEPS - 1, double: false }
+      return { ...base, throttle: false, steer: gripSteer }
+    }
+
+    if (jumpNear) return { ...base, steer: gripSteer }
+
+    const turnMost = t.driftTurnRate * (1 + t.driftSteerShare)
+    if (kart.drifting) {
+      const dir = kart.driftDirection
+      if (dashPlan === null) dashPlan = rng.float() < skill.releaseBoosts
+      const ramp = Math.min(1, speed / Math.max(1, t.driftFullSpeed))
+      const turn = t.driftTurnRate * Math.max(0.2, ramp)
+      const into = (Math.abs(want) / turn - 1) / Math.max(0.05, t.driftSteerShare)
+      const done =
+        kart.driftSeconds > 0.15 &&
+        (Math.sign(want) !== dir || Math.abs(want) < Math.max(gripTurn * 0.7, turn * 0.8))
+      if (done) {
+        // Out of the corner: counter-steer with the throttle down for the dash, or just let go
+        if (dashPlan && kart.burstReady) return { ...base, throttle: true, steer: -dir }
+        return { ...base, steer: gripSteer }
+      }
+      // More corner than even a tight drift turns: scrub speed off with the brake, still drifting
+      const tooTight = into > 1.25 && speed > 30
+      return {
+        ...base,
+        throttle: base.throttle && !tooTight,
+        brake: tooTight,
+        drift: true,
+        steer: dir * clamp(into, CLASSIC_OUT_MOST, 1),
+      }
+    }
+    if (kart.slideDirection === 0) dashPlan = null
+    if (speed > t.driftMinSpeed + 4 && Math.abs(want) > gripTurn * skill.driftAt) {
+      return { ...base, drift: true, steer: Math.sign(want) }
+    }
+    if (
+      skill.taps &&
+      straight &&
+      Math.abs(later) < gripTurn * 0.25 &&
+      Math.abs(noseWant) < gripTurn * 0.25 &&
+      kart.slideDirection === 0 &&
+      kart.boostSeconds === 0 &&
+      kart.miniSeconds < TAP_BEFORE_END &&
+      speed > t.topSpeed * 0.6
+    ) {
+      // A tap down the straight, towards the next bend, else the other way from the last
+      const towards: -1 | 1 = later > 0 ? 1 : -1
+      const direction: -1 | 1 = Math.abs(later) > 0.05 ? towards : lastTap === 1 ? -1 : 1
+      lastTap = direction
+      dashPlan = true
+      move = { kind: 'tap', direction, steps: CLASSIC_TAP_STEPS - 1 }
+      return { ...base, drift: true, steer: direction * CLASSIC_TAP_STEER }
+    }
+    // A corner coming that even a drift cannot take at this speed: slow down before it
+    const brake =
+      (Math.abs(want) > turnMost * BRAKE_AT || Math.abs(later) > turnMost * (speed / t.topSpeed)) &&
+      speed > 30
+    const throttle = base.throttle && !brake
+    return { ...base, throttle, brake, steer: gripSteer }
+  }
+
   const think = (trial: Trial, sense: BotSense): KartInput => {
     const { kart } = trial.run
     if (trial.phase === 'countdown') {
@@ -201,6 +328,9 @@ export function createBotBrain(
     const later = pursuit(kart.x, kart.z, nearest, 30 + speed * 0.9, speed, travel)
     const gripTurn = t.turnRate * (1 - t.turnLossAtTopSpeed * Math.min(1, speed / t.topSpeed))
     const slip = Math.abs(wrap(kart.heading - travel))
+    if (classic) {
+      return classicHands(kart, sense, speed, want, noseWant, later, gripTurn, jumpNear)
+    }
 
     const letGo = wasDrifting && !kart.drifting && (kart.burstReady || kart.releaseWindow > 0)
     if (letGo && move.kind === 'none' && rng.float() < skill.releaseBoosts) {

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_RULES,
   INITIAL_KART,
-  KART_TUNING,
+  ARCADE_TUNING as KART_TUNING,
   NO_INPUT,
-  stepKart,
+  stepKart as stepPhysics,
   type KartInput,
   type KartState,
 } from '../../shared/kart/physics.ts'
@@ -21,6 +21,12 @@ import {
   type TouchMoment,
   type TouchSettings,
 } from '../../shared/kart/touch.ts'
+
+// Pinned to the arcade feel (the "arcade (old)" preset, before 2026-11-17): these tests lock what it
+// always did. The classic feel, the default since, has its own (tests/kart/classic.test.ts)
+const stepKart = (
+  ...[state, input, tuning = KART_TUNING, ...rest]: Parameters<typeof stepPhysics>
+) => stepPhysics(state, input, tuning, ...rest)
 
 const RACING: TouchMoment = { racing: true, burstWaiting: false }
 const MANUAL: TouchSettings = { ...DEFAULT_TOUCH_SETTINGS, autoThrottle: false }

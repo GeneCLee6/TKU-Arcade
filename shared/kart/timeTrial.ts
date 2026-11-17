@@ -9,10 +9,16 @@
 // The start boost (2026-11-14, owner): press the throttle in the last `startWindow` seconds before
 // GO and hold it, and the car leaves the grid with a boost; hold it from earlier than that and the
 // engine bogs down for a moment instead. Letting go and pressing again inside the window still counts.
+//
+// The classic feel (2026-11-17, owner: "pressing forward in the countdown should launch"; docs/
+// KART-FEEL.md): pressed in the last `startWindow` before GO and held, or pressed afresh within
+// `startLate` after it, the full start boost (the engine's pull times `startAccelFactor` for
+// `startBoostDuration`); held from earlier, `startEarlyShare` of it. Never a stall.
 import { resetRun, startRun, stepRun, type Course, type Run } from './course.ts'
 import {
   DEFAULT_RULES,
   KART_TUNING,
+  MODEL_CLASSIC,
   STEP_SECONDS,
   type KartInput,
   type KartRules,
@@ -30,8 +36,11 @@ const WRONG_WAY_DOT = -0.35
 
 export type TrialPhase = 'countdown' | 'racing' | 'finished'
 
-/** How the car left the grid: nothing special, a start boost, or a stall from a jump start */
-export type TrialStart = 'none' | 'boost' | 'stall'
+/**
+ * How the car left the grid: nothing special, a start boost, a stall from a jump start (the arcade
+ * feel), or the smaller start boost of a throttle held from too early (the classic feel)
+ */
+export type TrialStart = 'none' | 'boost' | 'stall' | 'quick'
 
 export interface Trial {
   readonly phase: TrialPhase
@@ -79,7 +88,13 @@ export function startTrial(course: TrialCourse): Trial {
 /** How a throttle pressed with `pressedAt` seconds of countdown left, and held to GO, starts */
 export function startFrom(pressedAt: number | null, tuning: KartTuning): TrialStart {
   if (pressedAt === null) return 'none'
-  return pressedAt <= tuning.startWindow + 1e-9 ? 'boost' : 'stall'
+  if (pressedAt <= tuning.startWindow + 1e-9) return 'boost'
+  return tuning.model === MODEL_CLASSIC ? 'quick' : 'stall'
+}
+
+/** The classic feel's start boost: the car as it leaves the grid */
+function launch(kart: Trial['run']['kart'], seconds: number): Trial['run']['kart'] {
+  return { ...kart, launchSeconds: seconds, throttleHeld: true }
 }
 
 /** Seconds, from steps */
@@ -133,8 +148,14 @@ export function stepTrial(
     if (countdown > 1e-9) return { ...trial, countdown, startPress }
     const start = startFrom(startPress, tuning)
     const kart = trial.run.kart
-    const launched =
-      start === 'boost'
+    const classic = tuning.model === MODEL_CLASSIC
+    const launched = classic
+      ? start === 'boost'
+        ? launch(kart, tuning.startBoostDuration)
+        : start === 'quick'
+          ? launch(kart, tuning.startBoostDuration * tuning.startEarlyShare)
+          : kart
+      : start === 'boost'
         ? {
             ...kart,
             boostSeconds: tuning.startBoostDuration,
@@ -154,7 +175,20 @@ export function stepTrial(
     }
   }
 
-  const run = stepRun(trial.run, input, course, tuning, rules)
+  let before = trial.run
+  let start = trial.start
+  // The classic feel: the throttle pressed afresh just after GO is still on time
+  if (
+    tuning.model === MODEL_CLASSIC &&
+    start === 'none' &&
+    trial.steps < Math.round(tuning.startLate / STEP_SECONDS) &&
+    input.throttle &&
+    !before.kart.throttleHeld
+  ) {
+    start = 'boost'
+    before = { ...before, kart: launch(before.kart, tuning.startBoostDuration) }
+  }
+  const run = stepRun(before, input, course, tuning, rules)
   const steps = trial.steps + 1
   let { laps, lapStartedAt } = trial
   // A finish line crossing ends the lap before it; the first only starts lap 1, timed from GO
@@ -175,7 +209,7 @@ export function stepTrial(
     wrongSeconds,
     wrongWay: wrongSeconds >= WRONG_WAY_SECONDS - 1e-9,
     startPress: null,
-    start: trial.start,
+    start,
   }
 }
 

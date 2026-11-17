@@ -110,7 +110,8 @@ export const RIVERSIDE: TrackJson = {
   // the physics is not, so old records are set aside
   // 2026-11-14, last (owner: "the maps are still too simple"; the slide-out and the counter-steer):
   // redrawn with esses, five hairpins and short straights; old records are set aside
-  revision: 6,
+  // 7: the classic feel (2026-11-17): the physics changed, so the old times are set aside
+  revision: 7,
   laps: 3,
   road: fromLine,
   gates,

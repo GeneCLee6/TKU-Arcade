@@ -296,7 +296,7 @@ test.describe('a whole time trial by touch', () => {
 test.describe('the drift by touch, the settings and the keyboard', () => {
   test.use({ viewport: { width: 667, height: 375 }, hasTouch: true, isMobile: true })
 
-  test('hold drift and steer, let go, steer back, tap gas: a release boost', async ({ page }) => {
+  test('hold drift and steer, let go, steer back: an instant boost', async ({ page }) => {
     test.setTimeout(90_000)
     // The test yard, room to drift in circles. The automatic throttle: the engine runs once a button
     // has been pressed
@@ -316,19 +316,9 @@ test.describe('the drift by touch, the settings and the keyboard', () => {
     // Let go of DRIFT: the kart slides out
     await fingers.up(3)
     await expect.poll(async () => (await reading(page)).state.slideDirection).toBe(1)
-    // The steering thumb slides across: the counter-steer that catches it
+    // The steering thumb slides across: the counter-steer. The automatic throttle stays on while the
+    // kart slides (the classic feel, 2026-11-17), so the counter-steer alone fires the instant boost
     await fingers.move(2, await centre(page, 'kart-touch-left'))
-    await page.waitForFunction(
-      () => {
-        const state = (window as unknown as { __kartSpike: Reading }).__kartSpike.state
-        return state.releaseWindow > 0
-      },
-      undefined,
-      { polling: 'raf', timeout: 5000 },
-    )
-    // The automatic throttle let go while the boost waits: the tap is a fresh press
-    expect((await reading(page)).input.throttle).toBe(false)
-    await fingers.tap(1, await centre(page, 'kart-touch-gas'))
     await expect.poll(async () => (await reading(page)).state.miniSeconds).toBeGreaterThan(0)
     await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'release')
     await fingers.up(2)

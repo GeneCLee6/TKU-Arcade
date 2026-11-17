@@ -12,7 +12,7 @@ import {
   steadySlips,
   storedValue,
   TUNING_GROUPS,
-  TUNING_KEYS,
+  shownKeys,
   TUNING_SPECS,
   type PresetId,
   type TuningKey,
@@ -170,28 +170,30 @@ export const TuningPanel = memo(function TuningPanel({
       {TUNING_GROUPS.map((group) => (
         <Group key={group}>
           <legend>{t(`kart.tuning.group.${group}`)}</legend>
-          {TUNING_KEYS.filter((key) => TUNING_SPECS[key].group === group).map((key) => {
-            const spec = TUNING_SPECS[key]
-            const id = `${ids}${key}`
-            const shown = formatValue(t, key, tuning[key])
-            return (
-              <Slider key={key}>
-                <label htmlFor={id}>{t(`kart.param.${key}`)}</label>
-                <output htmlFor={id}>{shown}</output>
-                <input
-                  id={id}
-                  type="range"
-                  min={spec.min}
-                  max={spec.max}
-                  step={spec.step}
-                  value={shownValue(key, tuning[key])}
-                  aria-valuetext={shown}
-                  data-testid={`tune-${key}`}
-                  onChange={(event) => setValue(key, Number(event.target.value))}
-                />
-              </Slider>
-            )
-          })}
+          {shownKeys(tuning)
+            .filter((key) => TUNING_SPECS[key].group === group)
+            .map((key) => {
+              const spec = TUNING_SPECS[key]
+              const id = `${ids}${key}`
+              const shown = formatValue(t, key, tuning[key])
+              return (
+                <Slider key={key}>
+                  <label htmlFor={id}>{t(`kart.param.${key}`)}</label>
+                  <output htmlFor={id}>{shown}</output>
+                  <input
+                    id={id}
+                    type="range"
+                    min={spec.min}
+                    max={spec.max}
+                    step={spec.step}
+                    value={shownValue(key, tuning[key])}
+                    aria-valuetext={shown}
+                    data-testid={`tune-${key}`}
+                    onChange={(event) => setValue(key, Number(event.target.value))}
+                  />
+                </Slider>
+              )
+            })}
         </Group>
       ))}
       <Group>

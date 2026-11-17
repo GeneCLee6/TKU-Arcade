@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { KART_MESSAGES } from '../../shared/kart/i18n.ts'
 import { KART_TUNING, type KartTuning } from '../../shared/kart/physics.ts'
-import { PRESETS, serializeTuning } from '../../shared/kart/tuning.ts'
+import { PRESETS, serializeTuning, shownKeys } from '../../shared/kart/tuning.ts'
 import { registerMessages, translate } from '../../src/i18n/t.ts'
 import { loadTuning, saveTuning } from '../../src/kart/devices.ts'
 import { TuningPanel } from '../../src/kart/TuningPanel.tsx'
@@ -44,13 +44,14 @@ describe('the tuning panel', () => {
     render(<Harness />)
     expect(screen.getByRole('heading', { name: 'Tuning' })).toHaveFocus()
     expect(screen.getByRole('combobox', { name: 'Preset' })).toHaveValue('standard')
-    expect(screen.getAllByRole('slider')).toHaveLength(Object.keys(KART_TUNING).length)
+    // A slider for every number the classic feel reads (the arcade feel's own are hidden)
+    expect(screen.getAllByRole('slider')).toHaveLength(shownKeys(KART_TUNING).length)
     const top = screen.getByRole('slider', { name: 'Top speed' })
-    expect(top).toHaveValue('60')
-    expect(top).toHaveAttribute('aria-valuetext', '60.0 m/s')
-    expect(screen.getByRole('slider', { name: 'Drift angle cap' })).toHaveValue('58')
+    expect(top).toHaveValue('68')
+    expect(top).toHaveAttribute('aria-valuetext', '68.0 m/s')
+    expect(screen.getByRole('slider', { name: 'Drift angle cap' })).toHaveValue('50')
     expect(screen.getByTestId('kart-slips')).toHaveTextContent(
-      'A drift settles at 50° steering into it, 38° centred and 21° steering out.',
+      'A drift settles at 42° steering into it, 30° centred and 18° steering out.',
     )
   })
 
@@ -71,9 +72,17 @@ describe('the tuning panel', () => {
       target: { value: 'loose' },
     })
     expect(current).toBe(PRESETS.loose)
-    expect(status()).toHaveTextContent('Preset: Loose.')
-    expect(screen.getByTestId('kart-slips')).toHaveTextContent('57° steering into it')
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Standard' }))
+    expect(status()).toHaveTextContent('Preset: Classic, loose.')
+    expect(screen.getByTestId('kart-slips')).toHaveTextContent('50° steering into it')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Preset' }), {
+      target: { value: 'arcade' },
+    })
+    expect(current).toBe(PRESETS.arcade)
+    expect(status()).toHaveTextContent('Preset: Arcade (old).')
+    // The arcade feel's own numbers come back on the panel
+    expect(screen.getAllByRole('slider')).toHaveLength(shownKeys(PRESETS.arcade).length)
+    expect(screen.getByRole('slider', { name: 'Top speed' })).toHaveValue('60')
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Classic' }))
     expect(current).toBe(PRESETS.standard)
   })
 

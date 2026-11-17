@@ -174,6 +174,8 @@ export const OLDSTREET: TrackJson = {
   format: TRACK_FORMAT,
   id: 'oldstreet',
   name: { en: 'Lantern Old Street', 'zh-TW': '燈籠老街' },
+  // 2: the classic feel (2026-11-17): the physics changed, so the old times are set aside
+  revision: 2,
   laps: 3,
   road: fromLine,
   gates,

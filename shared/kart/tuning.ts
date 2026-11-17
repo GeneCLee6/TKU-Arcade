@@ -2,12 +2,15 @@
 // Pure, so that the checks run in Node: a preset shared as JSON is untrusted text, and nothing it
 // says may reach the physics unless every number in it is in range.
 import {
+  ARCADE_TUNING,
   INITIAL_KART,
   KART_TUNING,
+  MODEL_CLASSIC,
   kartSlip,
   NO_INPUT,
   stepKart,
   type KartInput,
+  type KartRules,
   type KartState,
   type KartTuning,
 } from './physics.ts'
@@ -112,9 +115,89 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
   wallImpactLoss: { group: 'walls', min: 0, max: 1, step: 0.05, unit: 'share' },
   wallScrapeDrag: { group: 'walls', min: 0, max: 30, step: 0.5, unit: 'metresPerSecondSquared' },
   wallBreakSpeed: { group: 'walls', min: 0, max: 20, step: 0.5, unit: 'metresPerSecond' },
+
+  // The classic feel's own numbers (2026-11-17, classic.ts; docs/KART-FEEL.md)
+  dragShare: { group: 'speed', min: 0, max: 1, step: 0.05, unit: 'share' },
+  coastDragShare: { group: 'speed', min: 0, max: 1, step: 0.05, unit: 'share' },
+  steerResponse: { group: 'steering', min: 2, max: 30, step: 0.5, unit: 'perSecond' },
+  gripScrub: { group: 'steering', min: 0, max: 40, step: 1, unit: 'metresPerSecondSquared' },
+  driftSteerShare: { group: 'drift', min: 0, max: 1, step: 0.05, unit: 'share' },
+  driftFullSpeed: { group: 'drift', min: 2, max: 40, step: 1, unit: 'metresPerSecond' },
+  driftSlip: { group: 'drift', min: 5, max: 60, step: 1, unit: 'degrees' },
+  driftSlipSteer: { group: 'drift', min: 0, max: 30, step: 1, unit: 'degrees' },
+  driftSlipIn: { group: 'drift', min: 0.05, max: 1, step: 0.01, unit: 'seconds' },
+  driftRecoverRate: { group: 'drift', min: 0.3, max: 5, step: 0.05, unit: 'radiansPerSecond' },
+  driftPull: { group: 'drift', min: 0, max: 1, step: 0.05, unit: 'share' },
+  slidePull: { group: 'drift', min: 0, max: 1, step: 0.05, unit: 'share' },
+  gaugeFade: { group: 'boost', min: 0.1, max: 5, step: 0.1, unit: 'seconds' },
+  boostAccelFactor: { group: 'boost', min: 1, max: 2.5, step: 0.05, unit: 'factor' },
+  stackPush: { group: 'boost', min: 0, max: 60, step: 1, unit: 'metresPerSecondSquared' },
+  startAccelFactor: { group: 'technique', min: 1, max: 3, step: 0.05, unit: 'factor' },
+  startEarlyShare: { group: 'technique', min: 0, max: 1, step: 0.05, unit: 'share' },
+  startLate: { group: 'technique', min: 0, max: 0.5, step: 0.05, unit: 'seconds' },
+  dashMinSlip: { group: 'technique', min: 0, max: 50, step: 1, unit: 'degrees' },
+  dashAccelFactor: { group: 'technique', min: 1, max: 3, step: 0.05, unit: 'factor' },
+  chainAccelStep: { group: 'technique', min: 0, max: 0.3, step: 0.01, unit: 'share' },
+  cutSeconds: { group: 'technique', min: 0.02, max: 0.5, step: 0.01, unit: 'seconds' },
+  wallGaugeKeep: { group: 'walls', min: 0, max: 1, step: 0.05, unit: 'share' },
+  /** Which physics: 0 the arcade feel, 1 the classic. Chosen by the preset, never on a slider */
+  model: { group: 'speed', min: 0, max: 1, step: 1, unit: 'count' },
 }
 
 export const TUNING_KEYS = Object.keys(TUNING_SPECS) as TuningKey[]
+
+/** Numbers only the arcade feel reads: the panel hides them for the classic feel */
+const ARCADE_ONLY: ReadonlySet<TuningKey> = new Set<TuningKey>([
+  'driftSteerRate',
+  'driftAlign',
+  'driftRecovery',
+  'driftGaugeSlip',
+  'catchGrip',
+  'catchSeconds',
+  'gaugeDriftBonus',
+  'boostGaugeShare',
+  'boostAcceleration',
+  'boostMaxSeconds',
+  'startStallSeconds',
+  'miniAcceleration',
+  'chainMinDrift',
+  'slideBoostDrain',
+  'slideScrub',
+])
+
+/** Numbers only the classic feel reads: the panel hides them for the arcade feel */
+const CLASSIC_ONLY: ReadonlySet<TuningKey> = new Set<TuningKey>([
+  'dragShare',
+  'coastDragShare',
+  'steerResponse',
+  'gripScrub',
+  'driftSteerShare',
+  'driftFullSpeed',
+  'driftSlip',
+  'driftSlipSteer',
+  'driftSlipIn',
+  'driftRecoverRate',
+  'driftPull',
+  'slidePull',
+  'gaugeFade',
+  'boostAccelFactor',
+  'stackPush',
+  'startAccelFactor',
+  'startEarlyShare',
+  'startLate',
+  'dashMinSlip',
+  'dashAccelFactor',
+  'chainAccelStep',
+  'cutSeconds',
+  'wallGaugeKeep',
+])
+
+/** The numbers the panel shows for these numbers' feel: the ones its physics reads */
+export const shownKeys = (tuning: KartTuning): TuningKey[] =>
+  TUNING_KEYS.filter(
+    (key) =>
+      key !== 'model' && !(tuning.model === MODEL_CLASSIC ? ARCADE_ONLY : CLASSIC_ONLY).has(key),
+  )
 
 /** A stored value as the panel shows it: degrees for an angle, without the rounding error of radians */
 export const shownValue = (key: TuningKey, value: number): number =>
@@ -138,53 +221,48 @@ export function validValue(key: TuningKey, value: unknown): value is number {
   return shown >= min - 1e-9 && shown <= max + 1e-9
 }
 
-export const PRESET_IDS = ['standard', 'planted', 'loose'] as const
+export const PRESET_IDS = ['standard', 'planted', 'loose', 'arcade'] as const
 export type PresetId = (typeof PRESET_IDS)[number]
 
 /**
- * Three starting points, all original. `standard` is J2's numbers (plus J3's walls), retuned
- * 2026-11-14 (faster, longer boosts, the techniques, then the drift as a real slide, then the
- * slide-out and the counter-steer). `planted` keeps more grip in a drift and slides at a narrower
- * angle, scrubbing off less speed, slides out for less long and gives longer to press the throttle,
- * so it is easier. `loose` slides wider and longer and scrubs off more, with a shorter release
- * window, so it is harder. None is a signed-off feel (AC-8.8).
+ * Four starting points, all original. `standard` is the classic feel (2026-11-17, owner: "still far
+ * from the classic kart racers' feel"; docs/KART-FEEL.md), the default. `planted` slides at a
+ * shallower angle, scrubs less and straightens sooner, with longer to press the throttle, so it is
+ * easier; `loose` slides deeper and longer and scrubs more, with a shorter window, so it is harder.
+ * `arcade` is the feel before it (J2's numbers, retuned 2026-11-14: the drift as a real slide, the
+ * slide-out, the counter-steer and the release boost), kept exactly so that it can be chosen again.
+ * None is a signed-off feel (AC-8.8).
  */
 export const PRESETS: { readonly [P in PresetId]: KartTuning } = {
   standard: KART_TUNING,
   planted: {
     ...KART_TUNING,
     turnRate: 2.7,
-    grip: 16,
-    driftTurnRate: 1.8,
-    driftSteerRate: 0.8,
-    driftAlign: 3.6,
-    driftMaxSlip: 42 * DEGREE,
-    driftScrub: 30,
-    driftRecovery: 0.6,
-    slideCarry: 0.25,
-    gaugeFillRate: 55,
-    chainGrace: 0.4,
-    releaseWindow: 0.5,
-    wallImpactLoss: 0.4,
+    grip: 14,
+    driftSlip: 24 * DEGREE,
+    driftSlipSteer: 10 * DEGREE,
+    driftScrub: 12,
+    driftRecoverRate: 1.6,
+    gripScrub: 10,
+    releaseWindow: 0.6,
+    dashMinSlip: 18 * DEGREE,
+    wallImpactLoss: 0.45,
   },
   loose: {
     ...KART_TUNING,
     turnRate: 2.3,
-    grip: 6,
-    driftTurnRate: 1.6,
-    driftSteerRate: 0.9,
-    driftAlign: 1.6,
-    driftMaxSlip: 66 * DEGREE,
-    driftScrub: 52,
-    driftRecovery: 1.2,
+    grip: 8,
+    driftSlip: 36 * DEGREE,
+    driftSlipSteer: 14 * DEGREE,
+    driftScrub: 24,
+    driftRecoverRate: 1.05,
     slideCarry: 0.6,
-    gaugeFillRate: 60,
-    boostDuration: 2.8,
-    chainGrace: 0.65,
-    releaseWindow: 0.3,
-    chainDuration: 0.6,
+    releaseWindow: 0.4,
+    dashMinSlip: 24 * DEGREE,
+    boostDuration: 2.6,
     wallImpactLoss: 0.6,
   },
+  arcade: ARCADE_TUNING,
 }
 
 /** The preset these numbers are, or undefined when they have been changed from every preset */
@@ -194,7 +272,9 @@ export function presetOf(tuning: KartTuning): PresetId | undefined {
 
 /** What exported JSON says it is, so that a file of something else is not taken for a preset */
 export const TUNING_KIND = 'tku-arcade.kart.tuning'
-export const TUNING_VERSION = 1
+export const TUNING_VERSION = 2
+/** Exports before the classic feel (2026-11-17) say version 1: they are the arcade feel's numbers */
+const ARCADE_VERSION = 1
 
 /** Longer than any real preset by far: a pasted novel is not read */
 export const MAX_TUNING_TEXT = 20_000
@@ -245,10 +325,16 @@ export function parseTuning(text: string, fallback: KartTuning = KART_TUNING): T
     if (data.kind !== TUNING_KIND || !isRecord(data.tuning)) {
       return { ok: false, error: { reason: 'notTuning' } }
     }
-    if (data.version !== undefined && data.version !== TUNING_VERSION) {
+    if (
+      data.version !== undefined &&
+      data.version !== TUNING_VERSION &&
+      data.version !== ARCADE_VERSION
+    ) {
       return { ok: false, error: { reason: 'notTuning' } }
     }
     values = data.tuning
+    // An old export: the numbers it leaves out are the arcade feel's, and so is the physics
+    if (data.version === ARCADE_VERSION) fallback = ARCADE_TUNING
   }
   const known = new Set<string>(TUNING_KEYS)
   const given = TUNING_KEYS.filter((key) => Object.hasOwn(values, key))
@@ -262,7 +348,7 @@ export function parseTuning(text: string, fallback: KartTuning = KART_TUNING): T
   return {
     ok: true,
     tuning,
-    missing: TUNING_KEYS.filter((key) => !given.includes(key)),
+    missing: shownKeys(tuning).filter((key) => !given.includes(key)),
     ignored: Object.keys(values).filter((name) => !known.has(name)),
   }
 }
@@ -284,6 +370,11 @@ export function parseStoredTuning(stored: string | null): StoredTuning {
 
 const DRIFT_ENTRY_STEPS = 6
 const SETTLE_STEPS = 180
+/**
+ * No release boosts while measuring: in the classic feel steering out of a drift with the throttle
+ * down is the counter-steer that fires the instant boost and ends the drift, and the angle is wanted
+ */
+const MEASURING: KartRules = { autoBoost: false, chainBoosts: false }
 
 /**
  * The slip angle a drift settles at with these numbers, in whole degrees, steering into the drift,
@@ -298,10 +389,10 @@ export function steadySlips(tuning: KartTuning): { into: number; centred: number
   const measure = (steer: number): number => {
     let state = start
     for (let step = 0; step < DRIFT_ENTRY_STEPS; step++) {
-      state = stepKart(state, { ...throttle, steer: 1, drift: true }, tuning)
+      state = stepKart(state, { ...throttle, steer: 1, drift: true }, tuning, MEASURING)
     }
     for (let step = 0; step < SETTLE_STEPS; step++) {
-      state = stepKart(state, { ...throttle, steer, drift: true }, tuning)
+      state = stepKart(state, { ...throttle, steer, drift: true }, tuning, MEASURING)
     }
     return state.drifting ? Math.round(Math.abs(kartSlip(state)) / DEGREE) : 0
   }
