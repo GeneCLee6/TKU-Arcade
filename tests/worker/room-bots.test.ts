@@ -1,4 +1,4 @@
-// Computer karts in a race room (2026-11-17, shared/protocol.ts 14., docs/KART-NETCODE.md §13): the
+// Computer karts in a race room (2026-11-17, shared/protocol.ts 14., docs/KART-NETCODE.md §14): the
 // host adds and removes them in the waiting room, the host's browser moves them (an `action` with a
 // seat, frames wrapped in PROXY_FRAME) and nobody else can, the room judges them as anyone, and they
 // drop out when the host goes. RoomHost on a fake clock, fake sockets and a storage kept as JSON, as

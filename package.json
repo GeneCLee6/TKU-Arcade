@@ -21,6 +21,7 @@
     "play": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/play.ts",
     "sim:promotion": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/promotion-sim.ts",
     "sim:traders": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/traders-sim.ts",
+    "kart:loadtest": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/kart-loadtest.ts",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy"
   },

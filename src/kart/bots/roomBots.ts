@@ -1,5 +1,5 @@
 // 2026-11-17: the computer karts of a race room, run by the host's browser (docs/ARCHITECTURE.md
-// §4.21, docs/KART-NETCODE.md §13). The very bots of the race against the computer (botRace.ts),
+// §4.21, docs/KART-NETCODE.md §14). The very bots of the race against the computer (botRace.ts),
 // pointed at the real room instead of one in this browser: their `loaded` goes as an action for
 // their seat, their frames wrapped for their seat (shared/protocol.ts PROXY_FRAME), and the room
 // judges them like anyone's and passes them on, to this browser too, whose race draws them from
