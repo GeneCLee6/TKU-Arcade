@@ -40,6 +40,8 @@ import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { supportsWebGL2 } from '../Scene.ts'
 import { crossed, effectsOf, hitFrameOf } from '../hitFx.ts'
+import { createCuePlayer } from '../kartAudio.ts'
+import { replayCues } from '../watchSounds.ts'
 import { startWatchLoop, type WatchedKart } from './watchLoop.ts'
 import {
   Fallback,
@@ -54,7 +56,7 @@ import {
   WatchPage,
   WatchStage,
 } from './WatchParts.tsx'
-import { placeTags, TAG_HEIGHT, useWatchKeys } from './watchDom.ts'
+import { placeTags, TAG_HEIGHT, unlockOnGesture, useWatchKeys } from './watchDom.ts'
 
 /** The kart and driver a frame's body byte names (e10-t05) */
 function kartOfByte(byte: number) {
@@ -186,26 +188,46 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
     if (!stage.current || !track || failure) return
     let stop: (() => void) | undefined
     // 2026-11-17: the recorded hits spin their karts; a burst only when playing through its moment
-    const hitEffects = reel.replay.events.flatMap((event) =>
-      effectsOf({ ...event, at: (event.tick * 1000) / TICKS_PER_SECOND }),
-    )
+    const fxEvents = reel.replay.events.map((event) => ({
+      ...event,
+      at: (event.tick * 1000) / TICKS_PER_SECOND,
+    }))
+    const hitEffects = fxEvents.flatMap((event) => effectsOf(event))
+    // #86: and the items sound around the kart followed, while it plays through them
+    const player = createCuePlayer()
+    const stopUnlock = unlockOnGesture(player)
     let lastMs: number | null = null
+    /** The playhead as the last frame left it: moved since, it was dragged or jumped */
+    let lastTick: number | null = null
     try {
       stop = startWatchLoop(stage.current, {
         track,
         quality: loadQuality(),
         frame(seconds) {
+          const sought = lastTick !== null && head.current.tick !== lastTick
           head.current = advancePlayhead(head.current, seconds, reel)
           const tick = head.current.tick
+          lastTick = tick
           const karts = kartsAt(reel, tick)
           const nowMs = (tick * 1000) / TICKS_PER_SECOND
-          const playedThrough = lastMs !== null && nowMs > lastMs && nowMs - lastMs < 500
+          const playedThrough =
+            !sought && lastMs !== null && nowMs > lastMs && nowMs - lastMs < 500
+          const where = (seat: number) => karts.find((kart) => kart.id === seat)
           const hits = hitFrameOf(
             hitEffects,
             playedThrough ? crossed(hitEffects, lastMs as number, nowMs) : [],
             nowMs,
-            (seat) => karts.find((kart) => kart.id === seat),
+            where,
           )
+          const heard = replayCues(
+            fxEvents,
+            playedThrough ? lastMs : null,
+            nowMs,
+            head.current.speed,
+            followRef.current,
+            where,
+          )
+          for (const one of heard) player.cue(one.cue, one.volume)
           lastMs = nowMs
           const props =
             reel.replay.mode === 'items'
@@ -243,7 +265,11 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
     } catch {
       queueMicrotask(() => setFailure(true))
     }
-    return () => stop?.()
+    return () => {
+      stop?.()
+      stopUnlock()
+      player.dispose()
+    }
   }, [track, reel, failure])
 
   // The controls follow the playhead a few times a second, not every frame

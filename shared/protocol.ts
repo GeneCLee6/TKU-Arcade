@@ -75,8 +75,14 @@ import { normalizeChatText, type ChatMessage } from './chat.ts'
 import type { GameError, GameProjection, OptionValues, SeatId } from './games/types.ts'
 import type { JsonValue, PatchOp } from './patch.ts'
 
-/** Bumped on any change a browser of the previous version could not understand */
-export const PROTOCOL_VERSION = 1
+/**
+ * Bumped on any change a browser of the previous version could not understand.
+ * 2 (2026-11-17): patches diff arrays too (shared/patch.ts: an item set by its index, `splice`).
+ * A version-1 page would turn an array into an object on such a patch, so it is refused at the
+ * upgrade (CloseCode.versionMismatch) and asked to reload; the replay of a finished game
+ * (GET /api/rooms/<id>/replay) keeps version 1's patches, so an old page can still play it.
+ */
+export const PROTOCOL_VERSION = 2
 
 export const HEARTBEAT_PING = 'ping'
 export const HEARTBEAT_PONG = 'pong'
