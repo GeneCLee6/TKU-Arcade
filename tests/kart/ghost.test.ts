@@ -89,7 +89,7 @@ describe('the records', () => {
   })
 })
 
-// 2026-11-17 (docs/ARCHITECTURE.md §4.22): the records of each kart, beside the track's overall ones
+// 2026-11-17 (docs/ARCHITECTURE.md §4.23): the records of each kart, beside the track's overall ones
 describe('each kart’s records', () => {
   beforeEach(() => localStorage.clear())
 

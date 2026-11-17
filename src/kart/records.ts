@@ -2,7 +2,7 @@
 // E11's). The best run is kept as a ghost to race against. Storage can be missing or full: then the
 // records last as long as the page.
 //
-// 2026-11-17 (docs/ARCHITECTURE.md §4.22): the records are kept twice, the track's overall best and
+// 2026-11-17 (docs/ARCHITECTURE.md §4.23): the records are kept twice, the track's overall best and
 // each kart's best on it, so that a slower kart has a ghost of its own to chase. A track's key is any
 // string (`recordKey`: a track's id, `id@revision`, or a custom track's content hash): it always
 // comes last in a key, after a prefix that ends in a dot.

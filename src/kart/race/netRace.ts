@@ -26,7 +26,14 @@ import {
   towStep,
   warpRun,
 } from '../../../shared/kart/itemEffects.ts'
-import { SHOT_TUNING, shotLive, shotPosition } from '../../../shared/kart/shots.ts'
+import {
+  foreseeHit,
+  SHOT_TUNING,
+  shotLive,
+  shotPosition,
+  type Fix,
+  type ShotItem,
+} from '../../../shared/kart/shots.ts'
 import { gridSpot, raceProgress } from '../../../shared/kart/race.ts'
 import type { Trial } from '../../../shared/kart/timeTrial.ts'
 import type { Track } from '../../../shared/kart/track.ts'
@@ -41,7 +48,13 @@ import {
 } from '../../../shared/kart/karts.ts'
 import type { KartBody } from '../bodies.ts'
 import type { OtherKart, ScreenPoint } from '../Scene.ts'
-import { createHitFeed, hitFrameOf, type ItemCue } from '../hitFx.ts'
+import {
+  confirmsForeseen,
+  createHitFeed,
+  hitFrameOf,
+  type Foreseen,
+  type ItemCue,
+} from '../hitFx.ts'
 import type { SpikeNet } from '../spikeLoop.ts'
 import { createRemotes, type RemotePose } from './remotes.ts'
 
@@ -101,7 +114,14 @@ export interface RaceNetOptions {
   readonly view: () => KartView
   /** The item key pressed with `item` held, as the use goes to the room */
   readonly onItemPress?: (item: ItemId) => void
+  /** #86: this browser foresaw a hit on its own kart, stunned for `ms` (the room still judges) */
+  readonly onForeseenHit?: (item: ShotItem, ms: number) => void
 }
+
+/** Two of this kart's own steps further apart than this are not one straight path, ms */
+const FORESEE_GAP_MS = 1_000
+/** ...or further apart than this, m: a jump (a swap), not a drive */
+const FORESEE_JUMP_M = 20
 
 /** A pickup or a use sent is not sent again for this long while the room answers, ms */
 const ITEM_WAIT_MS = 700
@@ -124,6 +144,9 @@ export interface RaceDebug {
   /** Item frames sent: pickups and uses */
   pickups: number
   uses: number
+  /** #86: hits on this kart foreseen here, and of those the ones the room confirmed */
+  foreseen: number
+  confirmed: number
 }
 
 declare global {
@@ -160,6 +183,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     nextGate: 0,
     pickups: 0,
     uses: 0,
+    foreseen: 0,
+    confirmed: 0,
   }
   window.__kartRace = debug
   // The item race (e9-t05, e9-t06a)
@@ -180,6 +205,11 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   // 2026-11-17: how the hits look and sound (hitFx.ts), from the same events
   const feed = createHitFeed(seat, seen)
   let lastHeld = options.view().racers.find((racer) => racer.seat === seat)?.item ?? null
+  // #86: hits on this kart foreseen before the room's word: where it was last step, and the shots
+  let lastFix: Fix | null = null
+  let lastResets = -1
+  const foreseenShots = new Set<number>()
+  let foreseen: Foreseen[] = []
 
   const pingClock = () => {
     const ping = new Uint8Array(CLOCK_PING_BYTES)
@@ -233,7 +263,15 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           reached &&
           (event.item === 'hail' || event.item === 'cloud' || event.item === 'puddle')
         ) {
-          stunUntil = event.at + SHOT_TUNING.stunMs[event.item]
+          const confirmed = confirmsForeseen(event, seat, foreseen)
+          if (confirmed >= 0) {
+            // Stunned since it was foreseen
+            foreseen = foreseen.filter((_, i) => i !== confirmed)
+            debug.confirmed++
+          } else {
+            // #86: the whole stun from when this browser hears of it, as the spin shows it
+            stunUntil = Math.max(stunUntil, roughNow() + SHOT_TUNING.stunMs[event.item])
+          }
           towUntil = 0
         }
         continue
@@ -292,8 +330,42 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
         pickupWait = now + ITEM_WAIT_MS
       }
     }
-    // What is on this kart now
+    // #86: a shot this kart has just driven into, told at once rather than a round trip later
     const server = roughNow()
+    if (offset !== null && view.phase === 'racing') {
+      const to: Fix = { x: next.kart.x, z: next.kart.z, at: server }
+      const from =
+        lastFix &&
+        next.resets === lastResets &&
+        to.at - lastFix.at <= FORESEE_GAP_MS &&
+        Math.hypot(to.x - lastFix.x, to.z - lastFix.z) <= FORESEE_JUMP_M
+          ? lastFix
+          : null
+      lastFix = to
+      lastResets = next.resets
+      const shot = foreseeHit(
+        view.shots ?? [],
+        seat,
+        from,
+        to,
+        me?.shieldUntil ?? 0,
+        foreseenShots,
+      )
+      if (shot) {
+        const ms = SHOT_TUNING.stunMs[shot.item]
+        foreseenShots.add(shot.n)
+        foreseen = [
+          ...foreseen.filter((one) => server - one.at <= 3_000),
+          { item: shot.item, at: server },
+        ]
+        stunUntil = Math.max(stunUntil, server + ms)
+        towUntil = 0
+        feed.foresee(shot.item, server)
+        debug.foreseen++
+        options.onForeseenHit?.(shot.item, ms)
+      }
+    }
+    // What is on this kart now
     const dt = STEP_SECONDS
     if (server < headwindUntil) next = { ...next, kart: headwindStep(next.kart, dt) }
     if (server < stunUntil) next = { ...next, kart: stunStep(next.kart, dt) }

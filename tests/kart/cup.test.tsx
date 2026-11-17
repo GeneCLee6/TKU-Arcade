@@ -33,7 +33,7 @@ import {
 } from '../../src/kart/cup/store.ts'
 import { trophyShape } from '../../src/kart/cup/trophyShape.ts'
 
-// The Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.22)
+// The Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.23)
 
 registerMessages(KART_MESSAGES)
 const en = (key: string, params?: Record<string, string | number>) =>

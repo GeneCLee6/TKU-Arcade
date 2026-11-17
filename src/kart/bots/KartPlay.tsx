@@ -1,5 +1,5 @@
 // /kart (e8-t14): the time trial, and from its menu a race against the computer (owner 2026-11-17;
-// docs/ARCHITECTURE.md §4.20) or a Grand Prix (§4.22). Each is its own lazy chunk, loaded only when
+// docs/ARCHITECTURE.md §4.20) or a Grand Prix (§4.23). Each is its own lazy chunk, loaded only when
 // one starts. A Grand Prix under way (and not left for the menu) opens again on a reload.
 import { lazy, Suspense, useState } from 'react'
 import styled from 'styled-components'

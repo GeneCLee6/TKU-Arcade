@@ -1,4 +1,4 @@
-// A cup's trophy's shape from its id (Trophy.tsx draws it; docs/ARCHITECTURE.md §4.22). Pure.
+// A cup's trophy's shape from its id (Trophy.tsx draws it; docs/ARCHITECTURE.md §4.23). Pure.
 
 /** A small stable number from a string (FNV-1a) */
 function hashOf(text: string): number {

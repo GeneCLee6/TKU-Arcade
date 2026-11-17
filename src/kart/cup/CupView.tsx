@@ -1,4 +1,4 @@
-// The Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.22): its own lazy chunk, opened from
+// The Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.23): its own lazy chunk, opened from
 // /kart's menu or straight away when a reload finds a cup under way. Between races, the cup's card:
 // the next race, the standings so far and the field; each race is a race against the computer
 // (BotRaceView) with the cup's own opponents; after the last, the podium. Every step is kept in this

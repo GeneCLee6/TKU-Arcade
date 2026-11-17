@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-// The Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.22): /kart's menu (through the race
+// The Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.23): /kart's menu (through the race
 // against the computer's panel) starts the tests' own
 // one-race cup (shown only with `?autopilot`) against one computer kart, one lap. A reload before
 // the race finds the cup where it was; the race runs to the finish on the test autopilot; the

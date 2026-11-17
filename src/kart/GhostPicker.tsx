@@ -1,4 +1,4 @@
-// 2026-11-17 (docs/ARCHITECTURE.md §4.22): which ghost races along in the time trial, under the race
+// 2026-11-17 (docs/ARCHITECTURE.md §4.23): which ghost races along in the time trial, under the race
 // clock: the track's overall best, this kart's own best, or none. Buttons, not a list: a list keeps
 // the arrow keys the kart steers with once it has been clicked (spikeLoop.ts `isField`).
 import styled from 'styled-components'

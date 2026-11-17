@@ -90,7 +90,7 @@ describe('the race overlay', () => {
   })
 })
 
-// 2026-11-17 (docs/ARCHITECTURE.md §4.22): each kart's records, and which ghost races along
+// 2026-11-17 (docs/ARCHITECTURE.md §4.23): each kart's records, and which ghost races along
 describe('the records of each kart', () => {
   it('name the record’s kart, unknown for an old one, and show this kart’s own', () => {
     const { rerender } = render(

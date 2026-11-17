@@ -30,7 +30,7 @@ registerMessages(KART_MESSAGES)
 const RUN_EVERY_MS = 16
 
 /**
- * A race of a Grand Prix (src/kart/cup/, docs/ARCHITECTURE.md §4.22): the cup's own opponents and
+ * A race of a Grand Prix (src/kart/cup/, docs/ARCHITECTURE.md §4.23): the cup's own opponents and
  * seed, and at the results the way on to the cup's standings instead of racing again
  */
 export interface CupRace {

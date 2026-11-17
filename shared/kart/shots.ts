@@ -242,7 +242,14 @@ export function closestApproach(
  * counts). Only over the time both were there: the kart's path before the shot left, or after it
  * was gone, never counts
  */
-export function shotHits(shot: KartShot, seat: SeatId, from: Fix | null, to: Fix): boolean {
+export function shotHits(
+  shot: KartShot,
+  seat: SeatId,
+  from: Fix | null,
+  to: Fix,
+  /** Count only a hit this much closer than the edge, m (foreseeing one, below) */
+  slack = 0,
+): boolean {
   if (shot.item === 'cloud') {
     return seat === shot.target && to.at >= shot.until && to.at <= shot.until + SHOT_TUNING.graceMs
   }
@@ -255,7 +262,7 @@ export function shotHits(shot: KartShot, seat: SeatId, from: Fix | null, to: Fix
   const t1 = Math.min(to.at, shot.until)
   if (t1 < t0) return false
   const reach =
-    KART_RADIUS + (shot.item === 'hail' ? SHOT_TUNING.hailRadius : SHOT_TUNING.puddleRadius)
+    KART_RADIUS + (shot.item === 'hail' ? SHOT_TUNING.hailRadius : SHOT_TUNING.puddleRadius) - slack
   // The kart's straight path from `from` to `to`, at t0, and its velocity
   const span = from ? (to.at - from.at) / 1000 : 0
   const kvx = from && span > 0 ? (to.x - from.x) / span : 0
@@ -266,6 +273,38 @@ export function shotHits(shot: KartShot, seat: SeatId, from: Fix | null, to: Fix
   return (
     closestApproach(kx - there.x, kz - there.z, kvx - shot.vx, kvz - shot.vz, (t1 - t0) / 1000) <=
     reach
+  )
+}
+
+/**
+ * How much closer than the edge a hit must be for a browser to foresee it on its own kart, m (#86):
+ * the room judges the kart's 20 Hz frames at the time they arrive, the browser its own 60 Hz steps
+ * now, so a shot that only grazes may go either way. A puddle lies still, so only the paths differ
+ */
+export const FORESEE_SLACK = { hail: 0.5, puddle: 0.3 } as const
+
+/**
+ * The shot this browser can tell will hit its own kart `seat` on its way from `from` to `to` (its
+ * own steps, by the server's clock as it reckons it), before the room says so; null for none. Not
+ * with a bubble up (the room would pop it), nor a shot in `skip` (already foreseen). A cloud strikes
+ * the kart it chases when its time is up, so that one is certain; hail and puddles need `slack`.
+ * Only foreseen: the room still judges, and a hit it never confirms is simply not repeated
+ */
+export function foreseeHit(
+  shots: readonly KartShot[],
+  seat: SeatId,
+  from: Fix | null,
+  to: Fix,
+  shieldUntil: number,
+  skip: ReadonlySet<number> = new Set(),
+): KartShot | null {
+  if (shieldUntil > to.at) return null
+  return (
+    shots.find(
+      (shot) =>
+        !skip.has(shot.n) &&
+        shotHits(shot, seat, from, to, shot.item === 'cloud' ? 0 : FORESEE_SLACK[shot.item]),
+    ) ?? null
   )
 }
 

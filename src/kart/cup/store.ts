@@ -1,4 +1,4 @@
-// The Grand Prix in this browser (docs/ARCHITECTURE.md §4.22): the cup being run, the last settings,
+// The Grand Prix in this browser (docs/ARCHITECTURE.md §4.23): the cup being run, the last settings,
 // and each cup's best result. storage.ts never throws, and what comes back is checked (cupRun.ts):
 // storage that is missing or full only means the cup lasts as long as the page.
 import { readStored, removeStored, writeStored } from '../../lib/storage.ts'

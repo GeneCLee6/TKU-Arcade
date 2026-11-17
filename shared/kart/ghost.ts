@@ -20,7 +20,7 @@ export interface Ghost {
   /** x, z, heading, repeated: one sample every GHOST_STEPS steps from GO */
   readonly samples: readonly number[]
   /**
-   * The kart it was driven in (2026-11-17, docs/ARCHITECTURE.md §4.22). Ghosts kept before then
+   * The kart it was driven in (2026-11-17, docs/ARCHITECTURE.md §4.23). Ghosts kept before then
    * have none: the kart they were driven in is not known (src/kart/records.ts)
    */
   readonly kart?: KartId

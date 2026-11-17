@@ -1,4 +1,4 @@
-// A cup's trophy (docs/ARCHITECTURE.md §4.22), drawn by code: no picture file, and a shape of our own
+// A cup's trophy (docs/ARCHITECTURE.md §4.23), drawn by code: no picture file, and a shape of our own
 // rather than any game's. Every cup gets its own from its id: how wide the bowl opens, how many bands
 // run round it, how many points the crest's star has; the plinth has one step for each race. The
 // handles curl like the river's waves. Colours from the tokens.

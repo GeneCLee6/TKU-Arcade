@@ -17,7 +17,7 @@ export interface BotSetupPanelProps {
   t: (key: KartMessageKey, params?: MessageParams) => string
   onStart(setup: BotSetup): void
   onClose(): void
-  /** 2026-11-17: opens the Grand Prix's panel instead (src/kart/cup/, docs/ARCHITECTURE.md §4.22) */
+  /** 2026-11-17: opens the Grand Prix's panel instead (src/kart/cup/, docs/ARCHITECTURE.md §4.23) */
   onGrandPrix?: () => void
 }
 
