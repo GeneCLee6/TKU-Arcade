@@ -4,6 +4,7 @@ import type { GameResult, Standing } from '../../shared/games/types.ts'
 import type { RoomView } from '../../shared/protocol.ts'
 import type { TextKey } from '../i18n/t.ts'
 import { useT } from '../i18n/useT.ts'
+import { memberName } from '../lib/memberName.ts'
 import { Link } from '../lib/router.tsx'
 import { useReducedMotion } from '../lib/useMediaQuery.ts'
 import { cornerClip, displayType, glass } from '../styles/esports.ts'
@@ -69,7 +70,9 @@ export function ResultPanel({
         {result.standings.map((standing) => {
           const member = seated.find((candidate) => candidate.seat === standing.seat)
           // Whoever left since the game ended still has their place in it
-          const name = member?.name ?? t('room.waiting.seat', { seat: standing.seat + 1 })
+          const name = member
+            ? memberName(member, view.room.gameId)
+            : t('room.waiting.seat', { seat: standing.seat + 1 })
           const extra =
             detail?.(standing) ??
             (standing.score !== null ? t('room.result.score', { score: standing.score }) : null)

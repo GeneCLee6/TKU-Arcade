@@ -314,6 +314,15 @@ export interface GameModule<
    * everyone else and judged in memory. Leave out for a turn-based game. See `RealtimeModule`
    */
   realtime?: RealtimeModule<S, A>
+
+  /**
+   * Computer seats (2026-11-17, the kart; shared/protocol.ts 14.): the levels the host may add one
+   * at, and the names the room gives them in turn (ids: the browser shows them through the game's
+   * strings). Leave out for a game without them. The computer's moves come from the host's browser
+   * and are judged like anyone's; with a real-time game, `realtime.abandon` says what happens to
+   * them when the host goes
+   */
+  bots?: { levels: readonly string[]; names: readonly string[] }
 }
 
 /**
@@ -350,6 +359,11 @@ export interface RealtimeModule<S extends JsonValue, A extends JsonValue> {
    * Must eventually answer none, or the room would go round for ever (it stops after a few)
    */
   clock?(state: S, now: number): A[]
+  /**
+   * Nobody will send frames for `seats` any more (2026-11-17: computer seats, when the host who ran
+   * them goes): the actions that settle it (the kart retires them), applied as `system`
+   */
+  abandon?(state: S, seats: readonly SeatId[], now: number): A[]
 }
 
 /** A real-time module's scratch space: plain data or not, it never leaves the room's memory */

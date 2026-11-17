@@ -30,6 +30,8 @@ export interface WaitingRoomProps {
   onSetPassword?(password: string | null): void
   /** e10-t05: a member's cosmetic choice for the others to see (the kart room's kart and driver) */
   onSetLook?(look: string | null): void
+  /** 2026-11-17: the host adds a computer member (the kart room's computer karts) */
+  onAddBot?(level: string, look?: string): void
   /** Below the setup in the right-hand column of a wide screen: the room's chat */
   aside?: ReactNode
 }
@@ -38,6 +40,8 @@ export interface WaitingRoomProps {
 const RoomPasswordSetting = lazy(() => import('./RoomPasswordSetting.tsx'))
 // e10-t05: the kart room's garage, its own chunk, only in a kart room
 const RoomGarage = lazy(() => import('../kart/roster/RoomGarage.tsx'))
+// 2026-11-17: the host's computer karts, the same way
+const RoomBots = lazy(() => import('../kart/bots/RoomBots.tsx'))
 
 export function WaitingRoom({
   roomId,
@@ -53,6 +57,7 @@ export function WaitingRoom({
   onSetOptions,
   onSetPassword,
   onSetLook,
+  onAddBot,
   aside,
 }: WaitingRoomProps) {
   const t = useT()
@@ -71,6 +76,7 @@ export function WaitingRoom({
       viewerIsHost={isHost}
       onKick={onKick}
       onTransfer={onTransfer}
+      gameId={view.room.gameId}
     />
   )
 
@@ -137,6 +143,11 @@ export function WaitingRoom({
         {view.room.gameId === 'kart' && me && onSetLook && (
           <Suspense>
             <RoomGarage members={view.members} you={you} onSetLook={onSetLook} />
+          </Suspense>
+        )}
+        {view.room.gameId === 'kart' && isHost && onAddBot && (
+          <Suspense>
+            <RoomBots free={view.room.maxSeats - seated.length} onAdd={onAddBot} />
           </Suspense>
         )}
       </Column>

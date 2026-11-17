@@ -3,8 +3,10 @@
 // physics with the same kart numbers as a player (shared/kart/karts.ts), and the most a bot ever gets
 // is its own kart's top speed. Pure.
 
-export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const
-export type Difficulty = (typeof DIFFICULTIES)[number]
+import { BOT_LEVELS, type BotLevel } from '../../../shared/games/kart/bots.ts'
+
+export const DIFFICULTIES = BOT_LEVELS
+export type Difficulty = BotLevel
 
 export const isDifficulty = (value: unknown): value is Difficulty =>
   DIFFICULTIES.some((one) => one === value)

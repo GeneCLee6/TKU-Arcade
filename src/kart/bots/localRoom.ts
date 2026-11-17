@@ -40,6 +40,8 @@ export interface LocalRoom {
   realtimeFor(seat: SeatId): RoomRealtime
   /** Called after every change of state */
   onChange(listener: () => void): () => void
+  /** Every frame passed on, from any seat (the bots' view of the race: botRace.ts `BotRoom`) */
+  listen(listener: (data: Uint8Array) => void): () => void
 }
 
 export interface LocalRoomOptions {
@@ -150,6 +152,7 @@ export function createLocalRoom({ seats, options, seed, now }: LocalRoomOptions)
       changeListeners.add(listener)
       return () => changeListeners.delete(listener)
     },
+    listen: (listener) => room.realtimeFor(-1).listen(listener),
   }
   syncTimers(now())
   return room

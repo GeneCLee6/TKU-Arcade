@@ -57,6 +57,7 @@ import {
   type TimerSpec,
 } from '../types.ts'
 import { GAME_META } from '../lobby.ts'
+import { BOT_LEVELS, BOT_NAMES } from './bots.ts'
 import { kartInfo, MAX_LAPS } from './info.ts'
 import type {
   KartAction,
@@ -187,7 +188,8 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
       if (actor === 'system' || !racer) return gameError(BAD)
       if (state.phase !== 'loading' || racer.loaded) return gameError(PHASE)
       const racers = state.racers.map((one) => (one === racer ? { ...one, loaded: true } : one))
-      const all = racers.every((one) => one.loaded)
+      // A kart that dropped out before the start (a computer kart whose host went) is not waited for
+      const all = racers.every((one) => one.loaded || one.out)
       return { ...state, racers, phase: all ? 'countdown' : 'loading' }
     }
     // Everything else is the room's own doing: a timer, the clock or a judged frame
@@ -219,11 +221,14 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         return settle({ ...state, racers })
       }
       case 'retire': {
-        if (state.phase !== 'racing') return gameError(PHASE)
+        // Before GO too: a computer kart whose host went (`realtime.abandon`)
+        if (state.phase === 'finished') return gameError(PHASE)
         const racer = state.racers.find((one) => one.seat === a.seat)
         if (!racer || done(racer)) return gameError(BAD)
         const racers = state.racers.map((one) => (one === racer ? { ...one, out: true } : one))
-        return settle({ ...state, racers })
+        // Everyone else on the grid already: the countdown need not wait for this one
+        const loaded = state.phase === 'loading' && racers.every((one) => one.loaded || one.out)
+        return settle({ ...state, racers, phase: loaded ? 'countdown' : state.phase })
       }
       case 'got': {
         if (state.phase !== 'racing' || state.mode !== 'items') return gameError(PHASE)
@@ -382,8 +387,19 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
     }
   },
 
+  // 2026-11-17: computer karts in a race room, run by the host's browser (§4.21)
+  bots: { levels: BOT_LEVELS, names: BOT_NAMES },
+
   realtime: {
     memory: () => ({ tracked: new Map<SeatId, Tracked>() }),
+
+    // The host who ran these computer karts went: they drop out at once
+    abandon(state, seats) {
+      if (state.phase === 'finished') return []
+      return state.racers
+        .filter((racer) => seats.includes(racer.seat) && !done(racer))
+        .map((racer) => ({ t: 'retire', seat: racer.seat }))
+    },
 
     clock(state, now) {
       return state.phase === 'countdown' && state.goAt === null

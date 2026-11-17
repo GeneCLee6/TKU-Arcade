@@ -1,6 +1,9 @@
 import styled from 'styled-components'
 import { KICK_BAN_MS, type RoomMember } from '../../shared/protocol.ts'
+import { hasMessage } from '../i18n/t.ts'
 import { useT } from '../i18n/useT.ts'
+import { memberName } from '../lib/memberName.ts'
+import { Button } from './Button.tsx'
 import { color, fontSize, radius, space, type ColorName } from '../styles/tokens.ts'
 import { ConfirmButton } from './ConfirmButton.tsx'
 
@@ -11,6 +14,10 @@ export interface MemberEntryProps {
   viewerIsHost: boolean
   onKick(memberId: string): void
   onTransfer(memberId: string): void
+  /** The room's game: a computer member's name and level are its strings (memberName) */
+  gameId: string
+  /** A game is being played: a computer member cannot be removed now */
+  playing?: boolean
 }
 
 /**
@@ -18,9 +25,42 @@ export interface MemberEntryProps {
  * `key={member.id}` wherever a row can come to hold someone else (a seat's row, as people move): an
  * open dialog must close then, not go on to name and act on whoever sits there now.
  */
-export function MemberEntry({ member, isYou, viewerIsHost, onKick, onTransfer }: MemberEntryProps) {
+export function MemberEntry({
+  member,
+  isYou,
+  viewerIsHost,
+  onKick,
+  onTransfer,
+  gameId,
+  playing = false,
+}: MemberEntryProps) {
   const t = useT()
-  const { id, name } = member
+  const { id } = member
+  const name = memberName(member, gameId)
+  if (member.bot) {
+    // 2026-11-17: a computer member (shared/protocol.ts 14.): its level, and the host may remove it
+    const levelKey = `games.${gameId}.bot.level.${member.bot.level}` as const
+    return (
+      <>
+        <Name data-testid="bot-member">{name}</Name>
+        <Badges>
+          <Badge $tone="muted">{hasMessage(levelKey) ? t(levelKey) : member.bot.level}</Badge>
+        </Badges>
+        {viewerIsHost && !playing && (
+          <HostActions>
+            <Button
+              $variant="ghost"
+              $size="sm"
+              aria-label={t(`games.${gameId}.bot.removeNamed`, { name })}
+              onClick={() => onKick(id)}
+            >
+              {t(`games.${gameId}.bot.remove`)}
+            </Button>
+          </HostActions>
+        )}
+      </>
+    )
+  }
   return (
     <>
       <Name>{name}</Name>

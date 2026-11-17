@@ -9,6 +9,7 @@ import { lookOf, parseLook, type DriverId, type KartId } from '../../../shared/k
 import type { RoomMember } from '../../../shared/protocol.ts'
 import { Heading, Section } from '../../components/roomParts.ts'
 import { registerMessages } from '../../i18n/t.ts'
+import { memberName } from '../../lib/memberName.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { loadBody, loadDriver, saveBody, saveDriver } from '../bodies.ts'
@@ -60,7 +61,7 @@ export default function RoomGarage({ members, you, onSetLook }: RoomGarageProps)
           const pick = parseLook(member.look)
           return (
             <li key={member.id} data-member={member.id}>
-              <Name>{member.name}</Name>
+              <Name>{memberName(member, 'kart')}</Name>
               <span>
                 {pick
                   ? t('kart.roster.pick', {

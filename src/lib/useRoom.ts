@@ -41,6 +41,13 @@ export type RoomHandle = {
   setPassword(password: string | null): void
   /** e10-t05: a cosmetic choice for the others to see (RoomMember.look); null takes it away */
   setLook(look: string | null): void
+  /** 2026-11-17: the host adds a computer member (shared/protocol.ts 14.) */
+  addBot(level: string, look?: string): void
+  /**
+   * The host's browser acting for a computer seat; quiet when offline (the race loop asks often).
+   * False when it could not go out
+   */
+  actFor(seat: number, action: JsonValue): boolean
   /** Settles when the room has answered or won't: anything but `sent` means it did not arrive */
   sendChat(text: string): Promise<ChatSendResult>
   /** e7-t11: the reactions floating now, oldest first */
@@ -203,6 +210,16 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     (look: string | null) => void connection.current?.send({ t: 'set_look', look }),
     [],
   )
+  const addBot = useCallback(
+    (level: string, look?: string) =>
+      send(look === undefined ? { t: 'add_bot', level } : { t: 'add_bot', level, look }),
+    [send],
+  )
+  const actFor = useCallback(
+    (seat: number, action: JsonValue) =>
+      connection.current?.send({ t: 'action', action, botSeat: seat }) ?? false,
+    [],
+  )
   const sendChat = useCallback((raw: string): Promise<ChatSendResult> => {
     // The room closes the socket over a message that does not parse
     const text = normalizeChatText(raw)
@@ -232,6 +249,8 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     setOptions,
     setPassword,
     setLook,
+    addBot,
+    actFor,
     reactions,
     react,
     sendChat,

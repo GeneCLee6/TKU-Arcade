@@ -3,9 +3,10 @@
 // trial's steps (shared/kart/timeTrial.ts) with its kart's numbers, counted down to the room's GO,
 // pushed out of the other karts, the items' effects applied (effects.ts), its frames sent to the
 // room every third step. Its hands are brain.ts's; when to use an item, itemSense.ts's. The room is
-// localRoom.ts: the race room's own rules, in this browser. Time is given (`advance(now)`), so the
-// tests run a whole race in a moment and the page runs it on the clock.
-import type { KartState as RoomState } from '../../../shared/games/kart/types.ts'
+// localRoom.ts (the race room's own rules, in this browser) or, for computer karts in a race room,
+// the room itself through the host's socket (roomBots.ts, §4.21). Time is given (`advance(now)`), so
+// the tests run a whole race in a moment and the page runs it on the clock (the room's, online).
+import type { KartAction, KartState as RoomState } from '../../../shared/games/kart/types.ts'
 import type { Course } from '../../../shared/kart/course.ts'
 import { encodeItemFrame, ITEM_TUNING, itemBoxes, type ItemId } from '../../../shared/kart/items.ts'
 import { applyKart, kartMass, loadoutByte } from '../../../shared/kart/karts.ts'
@@ -38,7 +39,6 @@ import { courseOf, roadDirection, type Track } from '../../../shared/kart/track.
 import { createBotBrain, pointAhead, type BotBrain } from './brain.ts'
 import { createItemRider, type ItemRider } from './effects.ts'
 import { wantsToUse } from './itemSense.ts'
-import type { LocalRoom } from './localRoom.ts'
 import type { BotEntry } from './roster.ts'
 import { bandedShare, BOT_SKILLS, type BotSkill, type Difficulty } from './skill.ts'
 
@@ -92,20 +92,52 @@ export interface BotRace {
   stop(): void
 }
 
+/**
+ * What the bots need of a room: localRoom.ts in this browser, or a race room through the host's
+ * socket (roomBots.ts). `state` is the room's as it is now (a view of it will do: nothing is hidden)
+ */
+export interface BotRoom {
+  state(): RoomState
+  /** An action from a bot's seat (its `loaded`) */
+  act(action: KartAction, seat: number): void
+  /** A bot's frame, or an item frame, at the room's time `now` */
+  frame(seat: number, data: Uint8Array, now: number): void
+  /** The room's timers up to `now`: in this browser only */
+  tick(now: number): void
+  /** Every frame the room passes on, the seat first (net.ts `readRelayed`) */
+  listen(listener: (data: Uint8Array) => void): () => void
+}
+
+/** One bot: its seat, who it is, and how well it drives */
+export interface BotSeat {
+  readonly seat: number
+  readonly entry: BotEntry
+  readonly difficulty: Difficulty
+}
+
 export interface BotRaceOptions {
-  readonly room: LocalRoom
+  readonly room: BotRoom
   readonly track: Track
   readonly laps: number
-  readonly difficulty: Difficulty
-  /** The bots, in seat order from `firstSeat` */
-  readonly entries: readonly BotEntry[]
-  readonly firstSeat: number
-  /** The player's seat, for the rubber band; null for a race of bots alone (the tests) */
-  readonly playerSeat: number | null
+  readonly bots: readonly BotSeat[]
+  /** The people's seats: to bump into, to aim at, and for the rubber band (none: bots alone) */
+  readonly players: readonly number[]
   readonly seed: number
   /** The room's clock now: the bots start here */
   readonly now: number
+  /**
+   * Behind the clock by more than this (a hidden tab), the bots skip ahead instead of catching up,
+   * ms. Online the host's tab may be hidden for a while, and the bots must keep up with the room
+   */
+  readonly maxBehindMs?: number
 }
+
+/** The race against the computer's bots: `entries` in seat order from `firstSeat`, all at one level */
+export const botSeats = (
+  entries: readonly BotEntry[],
+  firstSeat: number,
+  difficulty: Difficulty,
+): BotSeat[] => entries.map((entry, index) => ({ seat: firstSeat + index, entry, difficulty }))
 
 /** A small seeded generator for the bots' coin flips (mulberry32) */
 function flips(seed: number): () => number {
@@ -119,13 +151,12 @@ function flips(seed: number): () => number {
 }
 
 export function createBotRace(options: BotRaceOptions): BotRace {
-  const { room, track, laps, difficulty, playerSeat } = options
-  const skill = BOT_SKILLS[difficulty]
+  const { room, track, laps, players } = options
   const plain: Course = courseOf(track)
   const boxes = itemBoxes(track)
   const gateCount = track.gates.length
-  const bots: Bot[] = options.entries.map((entry, index) => {
-    const seat = options.firstSeat + index
+  const bots: Bot[] = options.bots.map(({ seat, entry, difficulty }) => {
+    const skill = BOT_SKILLS[difficulty]
     const course: TrialCourse = {
       ...plain,
       start: gridSpot(track, seat),
@@ -155,17 +186,24 @@ export function createBotRace(options: BotRaceOptions): BotRace {
   })
   const tunings = new Map(bots.map((bot) => [bot.seat, applyKart(KART_TUNING, bot.entry.kart)]))
 
-  // The player's kart, as its frames go through the room: to bump into, and for the rubber band
-  let player: KartFrame | null = null
-  const stopListening = room.realtimeFor(-1).listen((data) => {
+  // The people's karts, as their frames go through the room: to bump into, and for the rubber band
+  const people = new Map<number, KartFrame>()
+  const stopListening = room.listen((data) => {
     const relayed = readRelayed(data)
-    if (relayed && relayed.seat === playerSeat) player = relayed.frame
+    if (relayed && players.includes(relayed.seat)) people.set(relayed.seat, relayed.frame)
   })
 
-  // Every bot is on the grid at once
-  for (const bot of bots) room.act({ t: 'loaded' }, bot.seat)
+  // Every bot is on the grid at once (not again, should the race have gone on without them)
+  const atStart = room.state()
+  for (const bot of bots) {
+    const racer = atStart.racers.find((one) => one.seat === bot.seat)
+    if (atStart.phase === 'loading' && racer && !racer.loaded && !racer.out) {
+      room.act({ t: 'loaded' }, bot.seat)
+    }
+  }
 
   let simAt = options.now
+  const maxBehind = options.maxBehindMs ?? MAX_BEHIND_MS
 
   const progressOf = (seat: number): number | null => {
     const bot = bots.find((one) => one.seat === seat)
@@ -173,10 +211,17 @@ export function createBotRace(options: BotRaceOptions): BotRace {
       const { run } = bot.trial
       return raceProgress(track, run.crossings, run.nextGate, run.kart.x, run.kart.z)
     }
-    if (seat === playerSeat && player && player.nextGate < gateCount) {
-      return raceProgress(track, player.crossings, player.nextGate, player.x, player.z)
+    const person = people.get(seat)
+    if (person && person.nextGate < gateCount) {
+      return raceProgress(track, person.crossings, person.nextGate, person.x, person.z)
     }
     return null
+  }
+
+  /** How far round the people are on average, for the rubber band; null before any frame */
+  const peopleProgress = (): number | null => {
+    const known = players.map(progressOf).filter((one): one is number => one !== null)
+    return known.length ? known.reduce((sum, one) => sum + one, 0) / known.length : null
   }
 
   /** Where every other kart is now, with its speed and mass */
@@ -195,15 +240,8 @@ export function createBotRace(options: BotRaceOptions): BotRace {
         mass: bot.mass,
       })
     }
-    if (player && playerSeat !== null) {
-      others.push({
-        seat: playerSeat,
-        x: player.x,
-        z: player.z,
-        vx: player.vx,
-        vz: player.vz,
-        mass: 1,
-      })
+    for (const [person, frame] of people) {
+      others.push({ seat: person, x: frame.x, z: frame.z, vx: frame.vx, vz: frame.vz, mass: 1 })
     }
     return others
   }
@@ -286,8 +324,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
     const poseOf = (seat: number) => others.find((one) => one.seat === seat) ?? null
     const next = aheadOf[0] ? poseOf(aheadOf[0].seat) : null
     const crossingsOf = (seat: number) =>
-      bots.find((one) => one.seat === seat)?.trial.run.crossings ??
-      (seat === playerSeat ? (player?.crossings ?? 0) : 0)
+      bots.find((one) => one.seat === seat)?.trial.run.crossings ?? people.get(seat)?.crossings ?? 0
     const behindDistances = behindOf
       .map((one) => poseOf(one.seat))
       .filter((one) => one !== null)
@@ -329,6 +366,8 @@ export function createBotRace(options: BotRaceOptions): BotRace {
   }
 
   const stepBot = (bot: Bot, state: RoomState, at: number) => {
+    // Dropped out (online, when its host went): nothing more to drive
+    if (state.racers.find((racer) => racer.seat === bot.seat)?.out) return
     let { trial } = bot
     if (trial.phase === 'countdown') {
       // Counted down to the room's GO, as a player's browser does; held on the grid until it is set
@@ -338,9 +377,9 @@ export function createBotRace(options: BotRaceOptions): BotRace {
         countdown: left === null ? COUNTDOWN_SECONDS + 1 : Math.min(left, COUNTDOWN_SECONDS),
       }
     }
-    // The rubber band: by how far it is from the player, in laps
+    // The rubber band: by how far it is from the people (on average), in laps
     const mine = progressOf(bot.seat)
-    const theirs = playerSeat === null ? null : progressOf(playerSeat)
+    const theirs = peopleProgress()
     const lead = mine === null || theirs === null ? 0 : (mine - theirs) / gateCount
     const input = bot.brain(trial, { speedShare: bandedShare(bot.skill.topSpeedShare, lead) })
     const before = trial.run
@@ -369,7 +408,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
 
   return {
     advance(now) {
-      if (now - simAt > MAX_BEHIND_MS) simAt = now - MAX_BEHIND_MS
+      if (now - simAt > maxBehind) simAt = now - maxBehind
       while (simAt + STEP_MS <= now) {
         simAt += STEP_MS
         room.tick(simAt)

@@ -5,18 +5,9 @@
 import { createRng } from '../../../shared/games/rng.ts'
 import { DRIVER_IDS, KART_IDS, type DriverId, type KartId } from '../../../shared/kart/karts.ts'
 import { MAX_RACERS } from '../../../shared/kart/race.ts'
+import { BOT_NAMES, type BotName } from '../../../shared/games/kart/bots.ts'
 
-export const BOT_NAMES = [
-  'pepper',
-  'mochi',
-  'typhoon',
-  'boba',
-  'scooter',
-  'sunset',
-  'ferry',
-  'kite',
-] as const
-export type BotName = (typeof BOT_NAMES)[number]
+export { BOT_NAMES, type BotName } from '../../../shared/games/kart/bots.ts'
 
 /** At most this many bots: the race's grid less the player */
 export const MAX_BOTS = MAX_RACERS - 1
