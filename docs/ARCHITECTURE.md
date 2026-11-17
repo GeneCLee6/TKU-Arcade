@@ -537,7 +537,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **編輯器**（`src/kart/editor/EditorPage.tsx`，lazy chunk；`View3D.tsx` 再一個 lazy chunk，選 3D 才載 three.js）：片段庫（`presets.ts`）、片段列表（選取、上下移、複製、刪除）、選取段的屬性（數字欄位 Enter 或離開才套用，夾在範圍內）、復原（50 步）、平面圖（`MapView.tsx`，SVG，每段一個 path，按一下選取）、3D（`createKartScene` 加 `watch`，一台車沿路 30 m/s 飛）。存檔在 `saves.ts`（`tku-arcade.kart.editor.tracks`，最多 30 筆，讀回來每筆都重新解碼，壞的丟掉，`storage.ts` 不會丟例外）。分享面板給 `/kart?custom=<code>` 與「複製連結」（剪貼簿失敗就請人從框裡複製）。
 - **`/kart`**（`SpikePage.tsx`）：網址有 `custom` 就建那條賽道，「場地」選單多一項（顯示賽道名稱），連結壞了顯示一行提示、照常用內建賽道；左上多「賽道編輯器」（或「複製這條賽道來改」）。對戰電腦的面板也能選它（`BotSetup.track = 'custom'`，代碼不存進設定）。主題：`TrackJson.theme`（選填，`parseTrack` 檢查是四個之一），`trackArt.ts` 的 `themeOf` 先看它；場景走一般賽道的程式產生裝飾（沒有手工賽道的地標）。顏色在 `kartTokens.ts` 的 `kartEditor`。
 - **測試**：`tests/kart/editor.test.ts`（片段幾何與方向、取樣與漸變、起始賽道合法且 8 格起跑格在路上、沒封閉、8 字自交、平行太近、彎太急、太短太長、線剛出彎的起跑格、自動駕駛跑三圈、自動接回四種缺口與斜角、代碼來回與一位小數、60 段在上限內、各種惡意代碼（版本、主題、型別、範圍、小數、tuple 長度、NaN、超長、壞 UTF-8）、雜湊只看片段、`raceTrack` 解析與拒絕）；`tests/kart/editorSaves.test.ts`（貼上的連結、路徑或代碼；存檔的順序、上限、壞資料）；`tests/worker/room-realtime.test.ts`（真的 `RoomHost`：自交、亂碼、超長、非字串的代碼設不進去，合法的同步給大家、開賽 state 是 `custom:<code>`、照那條賽道判圈到完賽；建房給壞代碼就跑第一張圖）；`e2e/kart-editor.spec.ts`（拼賽道→自動接回→存檔→分享→開連結自動駕駛跑完計時賽、幽靈車存在 `custom-<hash>`；兩人房房主貼連結、壞連結當場擋、兩邊看到名稱、跑一圈兩人都有完賽時間）。
-- **數字**：卡丁車線 **297.0 kB** gzip（預算 600 kB），編輯器相關約 18 kB（`build` 5.5、`EditorPage` 6.4、字串約 3、`RoomTrackPicker` 1.1、`View3D` 1.0）；主站與各遊戲首屏不變（等待室只多一個控制項登記與兩個常數）。
+- **數字**：卡丁車線 **298.6 kB** gzip（合併 #91 之後）（預算 600 kB），編輯器相關約 18 kB（`build` 5.5、`EditorPage` 6.4、字串約 3、`RoomTrackPicker` 1.1、`View3D` 1.0）；主站與各遊戲首屏不變（等待室只多一個控制項登記與兩個常數）。
 - **沒做**：存 R2、帳號下的「我的賽道」、公開賽道列表（等 F1）；高低差、跳台、分岔（物理是平面，分岔要手工的路中牆）；在 3D 裡直接拖曳編輯；自訂賽道的地標與場景物件擺放；`/kart` 計時賽的圈數固定 3。
 
 ## 5. i18n
