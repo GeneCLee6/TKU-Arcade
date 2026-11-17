@@ -126,6 +126,12 @@ const Frame = styled.div`
   width: 132px;
   height: 132px;
   padding: 4px;
+
+  /* A phone held sideways: smaller, so that it clears the speed and boost panels */
+  @media (max-height: 500px) {
+    width: 88px;
+    height: 88px;
+  }
   background: color-mix(in srgb, ${color.bg} 55%, transparent);
   box-shadow: 0 0 0 1px ${color.line};
 
