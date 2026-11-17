@@ -1,4 +1,4 @@
-// A race room in this browser, for a race against computer opponents (docs/ARCHITECTURE.md §4.19).
+// A race room in this browser, for a race against computer opponents (docs/ARCHITECTURE.md §4.20).
 // It runs the race room's own module (shared/games/kart/rules.ts: `init`, `reduce`, `timers` and the
 // `realtime` half) the way the Worker's room host does, so that every lap, every item box, every item
 // used and every shot that hits is judged by the very same functions as online; nothing about the

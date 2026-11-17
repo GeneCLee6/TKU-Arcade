@@ -26,6 +26,8 @@ import { supportsWebGL2 } from '../Scene.ts'
 import { startSpikeLoop, type SpikeCourse, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
 import { autopilot } from './autopilot.ts'
 import { ItemNote, ItemSlot } from './ItemHud.tsx'
+import { effectsOf } from '../hitFx.ts'
+import { StunHud } from './HitHud.tsx'
 import { createRaceNet, type NameTag, type RaceNet } from './netRace.ts'
 
 registerMessages(KART_MESSAGES)
@@ -153,6 +155,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
   const [order, setOrder] = useState<number[]>(() => view.racers.map((racer) => racer.seat))
   const [unstable, setUnstable] = useState(false)
   const [note, setNote] = useState<{ text: string; bad: boolean; id: number }>()
+  const [stun, setStun] = useState<{ ms: number; id: number }>()
   const seenEvents = useRef(view.used)
   const pressed = useRef<{ item: ItemId; at: number } | null>(null)
   const minimap = useRef<MinimapHandle>(null)
@@ -271,6 +274,9 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       seenEvents.current = event.n + 1
       const next = noteFor(event, seat, tRef.current, nameRef.current)
       if (next) setNote((last) => ({ ...next, id: (last?.id ?? 0) + 1 }))
+      // 2026-11-17: hit by a shot: the HUD says so while the kart spins
+      const spin = effectsOf(event).find((one) => one.kind === 'spin' && one.seat === seat)
+      if (spin?.kind === 'spin') setStun((last) => ({ ms: spin.ms, id: (last?.id ?? 0) + 1 }))
     }
   }, [view.events, seat])
 
@@ -279,6 +285,12 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
     const timer = window.setTimeout(() => setNote(undefined), NOTE_MS)
     return () => window.clearTimeout(timer)
   }, [note])
+
+  useEffect(() => {
+    if (!stun) return
+    const timer = window.setTimeout(() => setStun(undefined), stun.ms)
+    return () => window.clearTimeout(timer)
+  }, [stun])
 
   useEffect(() => {
     if (!callout) return
@@ -327,6 +339,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
           </Unstable>
         )}
       </TopLeft>
+      {stun && <StunHud key={`stun-${stun.id}`} t={t} ms={stun.ms} />}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       <MapCorner>
         {trial && <RaceClock ref={clock} t={t} trial={trial} />}

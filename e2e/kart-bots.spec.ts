@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// Racing the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.19): /kart's menu starts an item
+// Racing the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.20): /kart's menu starts an item
 // race against a computer kart, run by the race room's own rules in this browser. The player drives
 // with the test autopilot (`?autopilot`); the race counts down, the bot's kart is drawn from its
 // frames, both pick up boxes, and the results come up with both names. Headless Chromium draws with

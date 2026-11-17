@@ -1,4 +1,4 @@
-// What the items the room has judged do to a computer opponent's kart (docs/ARCHITECTURE.md §4.19):
+// What the items the room has judged do to a computer opponent's kart (docs/ARCHITECTURE.md §4.20):
 // the same steps a player's browser takes for its own kart (src/kart/race/netRace.ts's `adjust`),
 // made from the same pure effects (shared/kart/itemEffects.ts), read from the same events in the
 // room's state. Kept apart from netRace.ts so that the online race is left exactly as it is.

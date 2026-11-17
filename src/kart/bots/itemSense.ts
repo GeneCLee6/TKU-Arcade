@@ -1,4 +1,4 @@
-// When a computer opponent uses the item it holds (docs/ARCHITECTURE.md §4.19). The room still judges
+// When a computer opponent uses the item it holds (docs/ARCHITECTURE.md §4.20). The room still judges
 // every use (shared/games/kart/rules.ts, run in this browser by localRoom.ts): a bot that asks with
 // no one to reach is refused like a player, and asks again later. Pure.
 import { ITEM_TUNING, type ItemId } from '../../../shared/kart/items.ts'

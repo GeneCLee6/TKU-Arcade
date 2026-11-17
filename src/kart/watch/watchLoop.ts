@@ -6,7 +6,13 @@ import type { Track } from '../../../shared/kart/track.ts'
 import { padCommands, type WatchCommand } from '../../../shared/kart/watch.ts'
 import { readGamepad } from '../devices.ts'
 import type { Quality } from '../quality.ts'
-import { createKartScene, type ItemProps, type KartScene, type OtherKart } from '../Scene.ts'
+import {
+  createKartScene,
+  type HitFrame,
+  type ItemProps,
+  type KartScene,
+  type OtherKart,
+} from '../Scene.ts'
 
 /** A kart to draw, with what the camera needs to follow it */
 export interface WatchedKart extends OtherKart {
@@ -22,6 +28,8 @@ export interface WatchFrame {
   readonly overhead: boolean
   /** The item race's boxes and shields; null for none */
   readonly props: ItemProps | null
+  /** A hit's spins and bursts (2026-11-17, hitFx.ts); null or absent for none */
+  readonly hits?: HitFrame | null
 }
 
 export interface WatchLoopOptions {
@@ -55,6 +63,7 @@ export function startWatchLoop(container: HTMLElement, options: WatchLoopOptions
     for (const command of padCommands(buttons, pressed)) options.onCommand?.(command)
     buttons = pressed
     const watched = options.frame(seconds)
+    if (watched.hits) scene.hits(watched.hits, seconds)
     scene.others(watched.karts, seconds)
     if (watched.props) scene.items(watched.props, seconds)
     const kart = watched.karts.find((one) => one.id === watched.follow)

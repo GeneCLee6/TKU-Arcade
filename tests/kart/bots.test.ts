@@ -18,7 +18,7 @@ import {
   type Difficulty,
 } from '../../src/kart/bots/skill.ts'
 
-// Computer opponents (owner 2026-11-17; docs/ARCHITECTURE.md §4.19)
+// Computer opponents (owner 2026-11-17; docs/ARCHITECTURE.md §4.20)
 
 const SEEDS = [1, 2, 3]
 

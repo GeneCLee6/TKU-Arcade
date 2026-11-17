@@ -1,4 +1,4 @@
-// Racing the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.19): the menu's, the race's and the
+// Racing the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.20): the menu's, the race's and the
 // bots' strings. Merged into KART_MESSAGES (i18n.ts), so the same check covers them. The bots' names
 // are working titles of our own, like every name in the kart's world until KART-WORLD.md (e10-t01).
 // `en` is the source.

@@ -1,5 +1,5 @@
 // The computer opponents of a race against the computer (owner 2026-11-17; docs/ARCHITECTURE.md
-// §4.19). Each bot is a kart simulated here exactly as a player's browser simulates its own: the time
+// §4.20). Each bot is a kart simulated here exactly as a player's browser simulates its own: the time
 // trial's steps (shared/kart/timeTrial.ts) with its kart's numbers, counted down to the room's GO,
 // pushed out of the other karts, the items' effects applied (effects.ts), its frames sent to the
 // room every third step. Its hands are brain.ts's; when to use an item, itemSense.ts's. The room is

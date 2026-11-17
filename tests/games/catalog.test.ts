@@ -125,7 +125,7 @@ const WORKER_ONLY =
 const FULL_SCREEN = /^\/src\/games\/promotion\/full\//
 const FULL_BOARD = /shared\/games\/promotion\/boardFull\.ts$/
 /**
- * The one exception (2026-11-17, docs/ARCHITECTURE.md §4.19): racing the computer runs the kart
+ * The one exception (2026-11-17, docs/ARCHITECTURE.md §4.20): racing the computer runs the kart
  * race room's own rules in the browser, so that items are judged exactly as online. Only the bots'
  * lazy chunk (src/kart/bots/) may import them, and nothing else comes with them
  */

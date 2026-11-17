@@ -1,4 +1,4 @@
-// A race against the computer's settings (docs/ARCHITECTURE.md §4.19), kept in this browser so that
+// A race against the computer's settings (docs/ARCHITECTURE.md §4.20), kept in this browser so that
 // the menu opens with the last ones (storage.ts never throws).
 import type { KartMode } from '../../../shared/games/kart/types.ts'
 import { MAX_LAPS } from '../../../shared/games/kart/info.ts'

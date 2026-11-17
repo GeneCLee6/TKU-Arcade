@@ -386,7 +386,12 @@ export function SpikePage({
         </MapCorner>
       )}
       {track && trial && (
-        <RaceCenter t={t} trial={trial} onRestart={() => race.current?.restart()} />
+        <RaceCenter
+          t={t}
+          trial={trial}
+          onRestart={() => race.current?.restart()}
+          onGarage={() => setOpen('garage')}
+        />
       )}
       <Bottom>
         <Hud t={t} hud={hud} maxStored={tuning.maxStoredBoosts} />

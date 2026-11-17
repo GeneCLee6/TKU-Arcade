@@ -74,4 +74,14 @@ describe('the race overlay', () => {
     fireEvent.click(within(results).getByRole('button', { name: 'Race again' }))
     expect(onRestart).toHaveBeenCalledOnce()
   })
+
+  it('opens the garage from the results, to race again in another kart (2026-11-17)', () => {
+    const onGarage = vi.fn()
+    const finished = { ...base, phase: 'finished' as const, lapTimes: [40], total: 40 }
+    const { rerender } = render(<RaceCenter t={t} trial={finished} onRestart={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Change kart' })).toBeNull()
+    rerender(<RaceCenter t={t} trial={finished} onRestart={vi.fn()} onGarage={onGarage} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Change kart' }))
+    expect(onGarage).toHaveBeenCalledOnce()
+  })
 })

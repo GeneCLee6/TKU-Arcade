@@ -1,5 +1,5 @@
 // /kart (e8-t14): the time trial, and from its menu a race against the computer (owner 2026-11-17;
-// docs/ARCHITECTURE.md §4.19). The race is its own lazy chunk, loaded only when one starts.
+// docs/ARCHITECTURE.md §4.20). The race is its own lazy chunk, loaded only when one starts.
 import { lazy, Suspense, useState } from 'react'
 import styled from 'styled-components'
 import { useT } from '../../i18n/useT.ts'

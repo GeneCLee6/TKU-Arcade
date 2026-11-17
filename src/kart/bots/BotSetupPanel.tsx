@@ -1,4 +1,4 @@
-// /kart's menu for a race against the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.19): a
+// /kart's menu for a race against the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.20): a
 // panel over the track like the garage. The track, how many opponents, how good they are, items or
 // not, and the laps; Start hands the settings to the page. Escape closes it.
 import { useEffect, useId, useRef, useState } from 'react'

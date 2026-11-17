@@ -1,4 +1,4 @@
-// The computer opponents' names and karts (docs/ARCHITECTURE.md §4.19). Names are working titles of
+// The computer opponents' names and karts (docs/ARCHITECTURE.md §4.20). Names are working titles of
 // our own (shared/kart/i18n.bots.ts, `kart.bots.name.<id>`), like every name in the kart's world
 // until KART-WORLD.md settles them (e10-t01). Each race draws its bots afresh: a name, a kart and a
 // driver each, from the same six karts and four drivers a player picks from (shared/kart/karts.ts).

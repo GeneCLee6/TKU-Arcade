@@ -72,10 +72,13 @@ export function RaceCenter({
   t,
   trial,
   onRestart,
+  onGarage,
 }: {
   t: KartT
   trial: SpikeTrial
   onRestart: () => void
+  /** 2026-11-17: opens the garage, to race again in another kart */
+  onGarage?: () => void
 }) {
   if (trial.phase === 'countdown') {
     return (
@@ -112,6 +115,11 @@ export function RaceCenter({
         <Button onClick={onRestart} autoFocus>
           {t('kart.race.again')}
         </Button>
+        {onGarage && (
+          <Button $variant="secondary" onClick={onGarage} data-testid="kart-results-garage">
+            {t('kart.race.changeKart')}
+          </Button>
+        )}
       </Results>
     )
   }

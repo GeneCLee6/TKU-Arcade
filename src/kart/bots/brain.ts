@@ -1,4 +1,4 @@
-// A computer opponent's hands (owner 2026-11-17; docs/ARCHITECTURE.md §4.19). The room's autopilot
+// A computer opponent's hands (owner 2026-11-17; docs/ARCHITECTURE.md §4.20). The room's autopilot
 // (src/kart/race/autopilot.ts) grown into a racer: pure pursuit of the road ahead, off the middle by
 // a line of its own; a drift whenever a corner wants more turn than the grip gives, and by skill the
 // counter-steer and release boost out of it, the double, tapped drifts down the straights, the start

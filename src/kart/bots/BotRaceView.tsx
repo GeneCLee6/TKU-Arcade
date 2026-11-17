@@ -1,4 +1,4 @@
-// A race against the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.19): its own lazy chunk,
+// A race against the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.20): its own lazy chunk,
 // loaded from /kart's menu. The race room's own rules run in this browser (localRoom.ts) and the
 // bots drive in it (botRace.ts); the player races on the very screen of a room's race (RaceView),
 // which cannot tell the difference. At the finish, the standings as the room judged them, and a

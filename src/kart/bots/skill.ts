@@ -1,4 +1,4 @@
-// Computer opponents (owner 2026-11-17, outside the roadmap; docs/ARCHITECTURE.md §4.19): how well
+// Computer opponents (owner 2026-11-17, outside the roadmap; docs/ARCHITECTURE.md §4.20): how well
 // each difficulty drives. Every number is a handicap or a habit, never a cheat: a bot drives the same
 // physics with the same kart numbers as a player (shared/kart/karts.ts), and the most a bot ever gets
 // is its own kart's top speed. Pure.
