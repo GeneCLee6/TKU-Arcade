@@ -17,6 +17,11 @@ interface HudProps {
   readonly t: KartT
   readonly hud: SpikeHud
   readonly maxStored: number
+  /**
+   * Touch buttons in both bottom corners (2026-11-17): smaller, to fit between them on a phone held
+   * sideways
+   */
+  readonly dense?: boolean
 }
 
 /**
@@ -24,10 +29,15 @@ interface HudProps {
  * segments, the stored boosts, and the chain while one runs. Lap, sector and time come with the time
  * trial (e8-t10, J5).
  */
-export const Hud = memo(function Hud({ t, hud, maxStored }: HudProps) {
+export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudProps) {
   const lit = Math.floor((hud.gauge / GAUGE_FULL) * GAUGE_SEGMENTS)
   return (
-    <Box data-testid="kart-hud" aria-label={t('kart.hud.title')} role="group">
+    <Box
+      data-testid="kart-hud"
+      data-dense={dense || undefined}
+      aria-label={t('kart.hud.title')}
+      role="group"
+    >
       <SpeedPanel $boosting={hud.boosting}>
         <SpeedNumber
           data-testid="kart-speed"
@@ -140,7 +150,14 @@ const Box = styled.div`
   @media (max-height: 500px) {
     gap: ${space.sm}px;
   }
+
+  &[data-dense] {
+    gap: ${space.xs}px;
+  }
 `
+
+/** Inside a dense HUD (between the touch buttons) */
+const DENSE = '[data-dense] &'
 
 const SpeedPanel = styled.div<{ $boosting: boolean }>`
   ${hudPanel}
@@ -149,6 +166,11 @@ const SpeedPanel = styled.div<{ $boosting: boolean }>`
   gap: ${space.sm}px;
   padding: ${space.md}px ${space.xxl}px ${space.md}px ${space.lg}px;
   color: ${({ $boosting }) => ($boosting ? color.magenta : color.text)};
+
+  ${DENSE} {
+    gap: ${space.xs}px;
+    padding: ${space.sm}px ${space.xl}px ${space.sm}px ${space.md}px;
+  }
 `
 
 const SpeedNumber = styled.span`
@@ -162,10 +184,15 @@ const SpeedNumber = styled.span`
   @media (max-width: 760px), (max-height: 500px) {
     font-size: 44px;
   }
+
+  ${DENSE} {
+    font-size: 34px;
+  }
 `
 
 const Label = styled.span`
   ${monoType}
+  white-space: nowrap;
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -178,6 +205,11 @@ const BoostPanel = styled.div`
   gap: ${space.sm}px;
   padding: ${space.md}px ${space.xxl}px ${space.md}px ${space.lg}px;
   color: ${color.text};
+
+  ${DENSE} {
+    gap: ${space.xs}px;
+    padding: ${space.sm}px ${space.xl}px ${space.sm}px ${space.md}px;
+  }
 `
 
 const LabelRow = styled.div`
@@ -202,6 +234,10 @@ const Segments = styled.div`
   @media (max-width: 760px), (max-height: 500px) {
     gap: 3px;
   }
+
+  ${DENSE} {
+    gap: 2px;
+  }
 `
 
 const Segment = styled.i<{ $on: boolean }>`
@@ -215,6 +251,11 @@ const Segment = styled.i<{ $on: boolean }>`
     width: 8px;
     height: 18px;
   }
+
+  ${DENSE} {
+    width: 5px;
+    height: 14px;
+  }
 `
 
 const Charges = styled.span`
@@ -226,6 +267,12 @@ const Charges = styled.span`
 const Charge = styled.i<{ $on: boolean }>`
   width: 26px;
   height: 14px;
+
+  ${DENSE} {
+    width: 16px;
+    height: 10px;
+  }
+
   transform: skewX(${SLANT});
   background: ${({ $on }) => ($on ? color.magenta : 'transparent')};
   box-shadow: ${({ $on }) =>

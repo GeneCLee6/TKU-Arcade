@@ -5,6 +5,7 @@ import { KART_BOTS_MESSAGES, type KartBotsKey } from './i18n.bots.ts'
 import { KART_EDITOR_MESSAGES, type KartEditorKey } from './i18n.editor.ts'
 import { KART_CUP_MESSAGES, type KartCupKey } from './i18n.cup.ts'
 import { KART_ROSTER_MESSAGES, type KartRosterKey } from './i18n.roster.ts'
+import { KART_TOUCH_MESSAGES, type KartTouchKey } from './i18n.touch.ts'
 
 const en = {
   'kart.spike.title': 'Kart physics test',
@@ -45,8 +46,6 @@ const en = {
   'kart.spike.canvas': 'A box car in a walled test yard, seen from behind',
   'kart.spike.keys':
     '{throttle} to accelerate, {brake} to brake or reverse, {left} and {right} to steer. Hold {drift} while steering to drift: the kart slides, and the deeper and longer the slide the more speed it loses, so steer out of it and let go early. The longer and deeper the slide, the more boost gauge; {boost} fires a boost, and a second one during a boost stacks. Let go of {drift} and the kart slides out: steer the other way to catch it (gold sparks), then press {throttle} afresh for a release boost; tap {drift} right after it and do the same for a double; keep going, even with short drifts on the straights, to chain them. Drift during a boost to keep its speed through the corner. Glowing pads boost; walls break your chain. Press {throttle} just before GO for a start boost. {reset} puts the car back at the last safe place. F shows the numbers. Shift drifts and Ctrl boosts too.',
-  'kart.spike.noTouch':
-    'No touch controls in this test: driving needs a keyboard or a gamepad. The numbers still work.',
   'kart.spike.noWebgl': "This browser can't run WebGL 2, so the test can't start.",
   'kart.spike.contextLost':
     'The browser took the graphics context away. Reload the page to start again.',
@@ -267,7 +266,7 @@ const en = {
 } as const
 
 export type KartMessageKey =
-  keyof typeof en | KartRosterKey | KartBotsKey | KartEditorKey | KartCupKey
+  keyof typeof en | KartRosterKey | KartBotsKey | KartEditorKey | KartCupKey | KartTouchKey
 
 const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.title': '卡丁車物理測試',
@@ -306,7 +305,6 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.canvas': '圍牆圍起來的測試場裡的一台方塊車，從車後看',
   'kart.spike.keys':
     '{throttle} 加速，{brake} 煞車或倒車，{left}、{right} 轉向。轉向時按住 {drift} 甩尾：車會側滑，滑得越深、越久掉速越多，所以往外打收淺、早點放開。甩得越久越深，加速條集越多，按 {boost} 噴射，噴射中再發一次是疊噴。放開 {drift} 車會往外滑：往反方向打拉回來（金色火花），再重按 {throttle} 是收尾加速；緊接著輕點 {drift} 再做一次是雙收尾；一路甩一路收（直線用短甩也行）就是連噴。噴射中甩尾過彎不掉速。發光的加速帶會噴射；撞牆會中斷連噴。GO 前一瞬間按 {throttle} 起跑加速。按 {reset} 回到上一個安全的地方。按 F 看數字。Shift 也能甩尾、Ctrl 也能噴射。',
-  'kart.spike.noTouch': '這個測試沒有觸控操作，要鍵盤或手把才能開。數字還是看得到。',
   'kart.spike.noWebgl': '這個瀏覽器無法執行 WebGL 2，所以測試無法開始。',
   'kart.spike.contextLost': '瀏覽器收回了繪圖資源。請重新整理頁面再開始。',
   'kart.spike.back': '回大廳',
@@ -529,6 +527,7 @@ export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartMessageKey, string
     ...KART_BOTS_MESSAGES.en,
     ...KART_EDITOR_MESSAGES.en,
     ...KART_CUP_MESSAGES.en,
+    ...KART_TOUCH_MESSAGES.en,
   },
   'zh-TW': {
     ...zhTW,
@@ -536,5 +535,6 @@ export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartMessageKey, string
     ...KART_BOTS_MESSAGES['zh-TW'],
     ...KART_EDITOR_MESSAGES['zh-TW'],
     ...KART_CUP_MESSAGES['zh-TW'],
+    ...KART_TOUCH_MESSAGES['zh-TW'],
   },
 }

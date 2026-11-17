@@ -422,6 +422,11 @@ const Timeline = styled.div`
   input {
     width: 100%;
     accent-color: ${color.accent};
+
+    /* A thumb drags it on a phone (2026-11-17) */
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
   }
 `
 

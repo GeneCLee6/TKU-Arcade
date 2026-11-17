@@ -4,7 +4,7 @@ import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
 import { KART_BODIES, loadBody, loadDriver, saveBody, saveDriver, type KartBody } from './bodies.ts'
 import { applyKart, type DriverId } from '../../shared/kart/karts.ts'
 import { GaragePanel } from './roster/GaragePanel.tsx'
-import styled, { keyframes } from 'styled-components'
+import styled, { css, keyframes } from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
 import { KART_ACTIONS, type Bindings, type KartAction } from '../../shared/kart/input.ts'
 import type { KartRules, KartTuning } from '../../shared/kart/physics.ts'
@@ -50,6 +50,9 @@ import { CupSetupPanel } from './cup/CupSetupPanel.tsx'
 import type { CupRun } from './cup/cupRun.ts'
 import { GhostPicker } from './GhostPicker.tsx'
 import { loadGhostPick, saveGhostPick, type GhostPick } from './records.ts'
+import { TouchControls } from './touch/TouchControls.tsx'
+import { useTouchControls } from './touch/useTouchControls.ts'
+import { touchBottom, touchCorner, touchSpace } from './touch/touchLayout.ts'
 
 registerMessages(KART_MESSAGES)
 
@@ -164,8 +167,9 @@ export function SpikePage({
   const [showNumbers, setShowNumbers] = useState(() =>
     new URLSearchParams(window.location.search).has('fps'),
   )
-  // Read once: this page does not need useMediaQuery, whose chunk the room would then have to share
-  const [coarsePointer] = useState(() => window.matchMedia?.('(pointer: coarse)').matches ?? false)
+  // 2026-11-17: buttons on the screen for a phone, shown on a coarse pointer or the first touch
+  const touch = useTouchControls()
+  const touchSource = touch.source
   // On a small screen the controls fold into a menu, and the long how-to-drive text starts folded
   const [menuOpen, setMenuOpen] = useState(false)
   const menuButton = useRef<HTMLButtonElement>(null)
@@ -198,12 +202,13 @@ export function SpikePage({
         onReady: (handle) => {
           race.current = handle
         },
+        touch: touchSource,
       })
     } catch {
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, track, autopiloted, quality, body, driver, ghostPick])
+  }, [course, track, autopiloted, quality, body, driver, ghostPick, touchSource])
 
   const switchCourse = (next: PlayCourse) => {
     const url = new URL(window.location.href)
@@ -354,7 +359,7 @@ export function SpikePage({
   }
 
   return (
-    <Page>
+    <Page style={touch.shown ? touchSpace(touch.settings) : undefined}>
       <Stage ref={stage} role="img" aria-label={t('kart.spike.canvas')} />
       <TopRow ref={topRow}>
         <Panel>
@@ -522,7 +527,7 @@ export function SpikePage({
       )}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       {track && (
-        <MapCorner>
+        <MapCorner $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}>
           {trial && <RaceClock ref={clock} t={t} trial={trial} />}
           {trial && (
             <GhostPicker
@@ -539,6 +544,7 @@ export function SpikePage({
           <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} walls={track.walls} />
         </MapCorner>
       )}
+      <TouchControls t={t} touch={touch} />
       {track && trial && (
         <RaceCenter
           t={t}
@@ -547,12 +553,13 @@ export function SpikePage({
           onGarage={() => setOpen('garage')}
         />
       )}
-      <Bottom>
-        <Hud t={t} hud={hud} maxStored={tuning.maxStoredBoosts} />
-        <Hint>
+      <Bottom $touch={touch.shown}>
+        <Hud t={t} hud={hud} maxStored={tuning.maxStoredBoosts} dense={touch.shown} />
+        <Hint $hidden={touch.shown}>
           <HintTitle>{t(play ? 'kart.play.title' : 'kart.spike.title')}</HintTitle>
-          {coarsePointer ? (
-            t('kart.spike.noTouch')
+          {touch.shown ? (
+            // The buttons' own panel (the gear) says how to drive by touch, on screen
+            t('kart.touch.help')
           ) : (
             <details
               open={helpOpen}
@@ -602,6 +609,16 @@ export function SpikePage({
   )
 }
 
+const visuallyHidden = css`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+`
+
 const Page = styled.main`
   position: fixed;
   inset: 0;
@@ -611,6 +628,8 @@ const Page = styled.main`
 const Stage = styled.div`
   position: absolute;
   inset: 0;
+  /* No double-tap zoom and no scrolling from a finger on the race */
+  touch-action: none;
 `
 
 const flash = keyframes`
@@ -730,8 +749,10 @@ const Buttons = styled.div<{ $open: boolean }>`
   }
 `
 
-// Under the top row, on the right: where the eye goes for the course, away from the HUD
-const MapCorner = styled.div`
+// Under the top row, on the right: where the eye goes for the course, away from the HUD. On a
+// phone held sideways with the touch buttons, the map goes beside the clock and over the steering
+// (touchCorner)
+const MapCorner = styled.div<{ $touch: 'left' | 'right' | null }>`
   position: absolute;
   top: 64px;
   right: ${space.sm}px;
@@ -739,6 +760,8 @@ const MapCorner = styled.div`
   justify-items: end;
   gap: ${space.xs}px;
   pointer-events: none;
+
+  ${({ $touch }) => $touch && touchCorner($touch)}
 `
 
 const CourseLabel = styled.label`
@@ -761,19 +784,23 @@ const CourseLabel = styled.label`
   }
 `
 
-const Bottom = styled.div`
+const Bottom = styled.div<{ $touch: boolean }>`
   position: absolute;
   bottom: ${space.sm}px;
   left: ${space.sm}px;
   right: ${space.sm}px;
   display: grid;
   gap: ${space.sm}px;
+
+  ${({ $touch }) => $touch && touchBottom}
 `
 
-const Hint = styled(Panel)`
+const Hint = styled(Panel)<{ $hidden?: boolean }>`
   /* Never taller than half the screen: on a phone held sideways the text scrolls */
   max-height: 45dvh;
   overflow-y: auto;
+
+  ${({ $hidden }) => $hidden && visuallyHidden}
 
   summary {
     cursor: pointer;
