@@ -245,6 +245,18 @@ describe('recording a race', () => {
     expect(recorder.hasFrames()).toBe(true)
   })
 
+  it('keeps whether an event was a shot that hit (2026-11-17), for the replay to spin the kart', () => {
+    const recorder = createReplayRecorder(VIEW)
+    recorder.view({
+      ...VIEW,
+      events: [
+        { n: 0, item: 'hail', by: 0, targets: [], blocked: [], at: 101_000, hit: false },
+        { n: 1, item: 'hail', by: 0, targets: [1], blocked: [], at: 101_500, hit: true },
+      ],
+    })
+    expect(recorder.replay().events.map((event) => event.hit)).toEqual([undefined, true])
+  })
+
   it('does not replay items used before it started listening', () => {
     const recorder = createReplayRecorder({
       ...VIEW,

@@ -66,6 +66,8 @@ export interface ReplayEvent {
   readonly by: number
   readonly targets: readonly number[]
   readonly blocked: readonly number[]
+  /** A shot that hit (e9-t06b), kept since 2026-11-17 so a replay shows the hit; absent for a use */
+  readonly hit?: boolean
 }
 
 /** From `tick` on, `seat` holds `item` (null: nothing) */
@@ -360,6 +362,7 @@ export interface RecordedView {
     readonly targets: readonly number[]
     readonly blocked: readonly number[]
     readonly at: number
+    readonly hit?: boolean
   }[]
   /** The shots on the road (e9-t06b) */
   readonly shots?: readonly KartShot[]
@@ -416,6 +419,7 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
             by: event.by,
             targets: [...event.targets],
             blocked: [...event.blocked],
+            ...(event.hit ? { hit: true } : {}),
           })
         }
       }

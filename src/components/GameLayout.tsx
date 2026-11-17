@@ -29,6 +29,8 @@ export type RoomParts = Omit<
   act(action: JsonValue): void
   /** A real-time game's channel (the kart, e2-t11); absent in tests of turn-based screens */
   realtime?: RoomRealtime
+  /** e10-t05: this member's cosmetic pick (the kart's garage); absent in tests */
+  onSetLook?(look: string | null): void
 }
 
 export interface GameLayoutProps {

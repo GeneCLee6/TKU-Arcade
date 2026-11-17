@@ -465,6 +465,16 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **畫面**：`src/kart/roster/RosterPicker.tsx`（純 DOM，選車、數值條、選角色），`/kart` 用 `GaragePanel.tsx` 包成面板，等待室用 `RoomGarage.tsx`。字串在 `shared/kart/i18n.roster.ts`（併進 `KART_MESSAGES`，等待室只註冊這一份；原本三台車的名稱也搬來這裡，內容沒改）。
 - **測試**：`tests/kart/karts.test.ts`（點數加總 0、PRD 範圍、極速差 ≤ 3%、物理實測、調參範圍、byte 與 look 來回、每台車的速度上限、房間照 frame 的車裁定、重量）、`tests/kart/roster.test.tsx`（車庫與等待室）、`tests/worker/room-host.test.ts`（`set_look`）。
 
+### 4.19 路線圖外：被打中的回饋、道具音效、換車再來（2026-11-17，`feat/kart-hit-feedback`）
+
+- **`src/kart/hitFx.ts`（純函式，沒有 three.js、沒有 WebAudio）**：`effectsOf(event)` 把房間的一個道具事件變成效果：投射物命中（`hit: true`、沒被擋）＝那台車 `spin`，長度就是暈的時間（`SHOT_TUNING.stunMs`）；被泡泡擋下（命中或逆風、調包的 `blocked`）＝`pop`。`cuesOf(event, seat)` 決定這個車手聽到什麼（自己用的道具、被打、打中別人、泡泡破；觀戰 `seat = null` 沒有聲音）。`spinPose(經過, 長度)`：偏航角先快後慢、結束剛好整數圈（`SPIN_TURNS` 2），三下越跳越低的彈跳（`HOP_HEIGHT` 0.9 m），一點左右晃；`shakeOffset` 鏡頭晃動隨時間衰減。`spinsAt`／`shakeAt`／`crossed`／`hitFrameOf` 把一串效果在某個時刻變成「每台車的轉角、要噴的粒子、鏡頭晃動」。`createHitFeed(seat, 起始事件號)` 給即時畫面：每個事件只讀一次，舊效果丟掉。
+- **畫**：`Scene.ts` 多一個 `hits(frame)`（在 `others`／`draw` 之前呼叫）：轉角、高度、側傾**只加在畫出來的模型群組上**（`rotation` 順序 YXZ），車的位置、朝向、物理都不動；自己的車用 `OWN_KART`（−1）。晃動加在車後攝影機的位置上，`prefers-reduced-motion` 時不加。粒子在 `src/kart/art/hitArt.ts`：池化 96 個四角星精靈＋6 個閃光，第一次有命中才建立；顏色 `kartScene.hitStar`、`hitFlash`、`popShard`。
+- **誰算**：車手由 `netRace.ts` 的 `fx(pose)`（`SpikeNet` 新的選用欄位）讀房間的 `events`，時間用對好的伺服器錶；觀戰（`SpectateView`）用同一個 `createHitFeed`；重播（`ReplayView`）從錄到的事件一次算出所有效果，播放時看時間點，只有「正常往前播」經過命中那一刻才噴粒子（拖時間軸不噴）。重播事件多記 `hit`（`shared/kart/replay.ts`，選用欄位，格式版本不變）。
+- **HUD**：`src/kart/race/HitHud.tsx`：自己被打時畫面邊緣紅光＋「被打得團團轉！」，持續暈的時間（`RaceView` 從事件判斷）。原本的道具提示照舊。
+- **音效**：`src/kart/itemSounds.ts` 是配方（音高滑動的振盪器或掃濾波器的噪音，各幾毫秒到 0.7 秒），`kartAudio.ts` 的 `cue()` 照配方合成，接在卡丁車的總音量上，網站靜音時不出聲。拿到道具由 `netRace` 看自己手上從空變有。造型都是自己的簡單音形（叮、掃頻、呼嘯、悶響），不模仿任何遊戲。
+- **換車再來**：`RoomParts` 多一個選用的 `onSetLook`（`RoomPage` 傳 `room.setLook`）；`KartScreen` 結束後結果面板多「換車或換角色」，在下面 lazy 載入等待室同一份 `RoomGarage`（存瀏覽器、`set_look` 同步；伺服器本來就允許任何狀態改 `look`）。再來一局時 `RaceView` 掛載才讀瀏覽器的選擇，所以用的是新車。單機 `RaceCenter` 多一個選用的 `onGarage`，`SpikePage` 打開車庫面板；選了車場景照舊重建並重新起跑。
+- **測試**：`tests/kart/hitFx.test.ts`（轉角單調、結束整圈、彈跳範圍與衰減、晃動、事件→效果、事件→音效、每個音效都有且短、時刻的效果、即時事件流）、`tests/kart/replay.test.ts`（錄 `hit`）、`tests/kart/race.test.tsx`（完賽畫面的換車按鈕）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
