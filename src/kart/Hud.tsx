@@ -129,9 +129,15 @@ const Box = styled.div`
   gap: ${space.md}px;
   pointer-events: none;
 
-  @media (max-width: 760px) {
+  /* A phone held upright: one panel over the other, on the right */
+  @media (max-width: 760px) and (min-height: 501px) {
     flex-direction: column;
     align-items: flex-end;
+    gap: ${space.sm}px;
+  }
+
+  /* A short screen (a phone held sideways): side by side and small, keeping the road in view */
+  @media (max-height: 500px) {
     gap: ${space.sm}px;
   }
 `
@@ -153,7 +159,7 @@ const SpeedNumber = styled.span`
   min-width: 3.1ch;
   text-align: end;
 
-  @media (max-width: 760px) {
+  @media (max-width: 760px), (max-height: 500px) {
     font-size: 44px;
   }
 `
@@ -193,7 +199,7 @@ const Segments = styled.div`
   gap: 4px;
   padding-inline: 4px;
 
-  @media (max-width: 760px) {
+  @media (max-width: 760px), (max-height: 500px) {
     gap: 3px;
   }
 `
@@ -205,7 +211,7 @@ const Segment = styled.i<{ $on: boolean }>`
   background: ${({ $on }) => ($on ? color.accent : color.raised)};
   box-shadow: ${({ $on }) => ($on ? `0 0 8px ${color.accent}` : `inset 0 0 0 1px ${color.line}`)};
 
-  @media (max-width: 760px) {
+  @media (max-width: 760px), (max-height: 500px) {
     width: 8px;
     height: 18px;
   }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { setSoundOn, useSoundOn } from '../lib/sound.ts'
 import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
 import { KART_BODIES, loadBody, loadDriver, saveBody, saveDriver, type KartBody } from './bodies.ts'
@@ -38,7 +38,7 @@ import {
   type SpikeStats,
   type SpikeTrial,
 } from './spikeLoop.ts'
-import { NARROW_PANEL_TOP, NARROW_TOP } from './layout.ts'
+import { KART_COMPACT } from './layout.ts'
 import { TuningPanel } from './TuningPanel.tsx'
 import { BotSetupPanel } from './bots/BotSetupPanel.tsx'
 import type { BotSetup } from './bots/setup.ts'
@@ -58,6 +58,12 @@ const EMPTY_HUD: SpikeHud = {
 
 /** How long a callout stays up; its animation fades it out by then */
 const CALLOUT_MS = 900
+
+/** What the garage panel has picked, applied when it closes */
+interface GaragePick {
+  body?: KartBody
+  driver?: DriverId
+}
 
 type Open = 'controls' | 'tuning' | 'garage' | 'bots' | undefined
 
@@ -124,6 +130,14 @@ export function SpikePage({
   )
   // Read once: this page does not need useMediaQuery, whose chunk the room would then have to share
   const [coarsePointer] = useState(() => window.matchMedia?.('(pointer: coarse)').matches ?? false)
+  // On a small screen the controls fold into a menu, and the long how-to-drive text starts folded
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const topRow = useRef<HTMLDivElement>(null)
+  const menuId = useId()
+  const [helpOpen, setHelpOpen] = useState(
+    () => !(window.matchMedia?.(KART_COMPACT).matches ?? false),
+  )
 
   useEffect(() => {
     if (!stage.current) return
@@ -178,6 +192,32 @@ export function SpikePage({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  // The menu closes on Escape and on a press anywhere outside the top row
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setMenuOpen(false)
+      menuButton.current?.focus()
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Node) || !topRow.current?.contains(event.target)) {
+        setMenuOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [menuOpen])
+  /** Opens a panel; the menu, if that is where the button was, closes */
+  const openPanel = (panel: Open) => {
+    setMenuOpen(false)
+    setOpen(panel)
+  }
+
   const changeBindings = useCallback((next: Bindings) => {
     setBindings(next)
     return saveBindings(next)
@@ -190,32 +230,61 @@ export function SpikePage({
     setTuning(next)
     return saveTuning(next)
   }, [])
+  /** Back to the button that opened a panel, or to the menu button when the menu holds it */
+  const focusOpener = (opener: HTMLButtonElement | null) => {
+    if (opener && opener.offsetParent !== null) opener.focus()
+    else menuButton.current?.focus()
+  }
   const closeControls = useCallback(() => {
     setOpen(undefined)
     // Back where the keyboard was before the panel opened
-    queueMicrotask(() => controlsOpener.current?.focus())
+    queueMicrotask(() => focusOpener(controlsOpener.current))
   }, [])
   const closeTuning = useCallback(() => {
     setOpen(undefined)
-    queueMicrotask(() => tuningOpener.current?.focus())
+    queueMicrotask(() => focusOpener(tuningOpener.current))
   }, [])
+  // A pick in the garage waits for the panel to close: a new kart or driver restarts the race, and
+  // the countdown should not run behind the open panel (PR #86's known limit)
+  const [garagePick, setGaragePick] = useState<GaragePick>({})
+  const pending = useRef<GaragePick>({})
+  const racing = useRef({ body, driver })
+  useEffect(() => {
+    racing.current = { body, driver }
+  }, [body, driver])
   const closeGarage = useCallback(() => {
     setOpen(undefined)
-    queueMicrotask(() => garageOpener.current?.focus())
+    const pick = pending.current
+    pending.current = {}
+    setGaragePick({})
+    const now = racing.current
+    const nextBody = pick.body ?? now.body
+    const nextDriver = pick.driver ?? now.driver
+    if (nextBody !== now.body || nextDriver !== now.driver) {
+      setTrial(undefined)
+      setBody(nextBody)
+      setDriver(nextDriver)
+    }
+    queueMicrotask(() => focusOpener(garageOpener.current))
   }, [])
   const closeBots = useCallback(() => {
     setOpen(undefined)
-    queueMicrotask(() => botsOpener.current?.focus())
+    queueMicrotask(() => focusOpener(botsOpener.current))
   }, [])
   const pickBody = (next: KartBody) => {
     saveBody(next)
     setTrial(undefined)
     setBody(next)
   }
-  const pickDriver = (next: DriverId) => {
+  const pickGarageBody = (next: KartBody) => {
+    saveBody(next)
+    pending.current = { ...pending.current, body: next }
+    setGaragePick(pending.current)
+  }
+  const pickGarageDriver = (next: DriverId) => {
     saveDriver(next)
-    setTrial(undefined)
-    setDriver(next)
+    pending.current = { ...pending.current, driver: next }
+    setGaragePick(pending.current)
   }
 
   /** The first control of an action, for the hint: a key, else a gamepad control */
@@ -242,17 +311,28 @@ export function SpikePage({
   return (
     <Page>
       <Stage ref={stage} role="img" aria-label={t('kart.spike.canvas')} />
-      <TopRow>
+      <TopRow ref={topRow}>
         <Panel>
           <Link to="/">{t('kart.spike.back')}</Link>
         </Panel>
-        <Buttons>
+        <MenuButton
+          ref={menuButton}
+          $variant="primary"
+          $size="sm"
+          aria-expanded={menuOpen}
+          aria-controls={menuId}
+          onClick={() => setMenuOpen((shown) => !shown)}
+          data-testid="kart-menu"
+        >
+          {t('kart.spike.menu')}
+        </MenuButton>
+        <Buttons id={menuId} $open={menuOpen}>
           {onBotRace && (
             <Button
               ref={botsOpener}
               $size="sm"
               aria-expanded={open === 'bots'}
-              onClick={() => (open === 'bots' ? closeBots() : setOpen('bots'))}
+              onClick={() => (open === 'bots' ? closeBots() : openPanel('bots'))}
               data-testid="kart-bots-open"
             >
               {t('kart.bots.open')}
@@ -263,7 +343,7 @@ export function SpikePage({
             $variant="secondary"
             $size="sm"
             aria-expanded={controlsOpen}
-            onClick={() => (controlsOpen ? closeControls() : setOpen('controls'))}
+            onClick={() => (controlsOpen ? closeControls() : openPanel('controls'))}
           >
             {t('kart.controls.open')}
           </Button>
@@ -273,7 +353,7 @@ export function SpikePage({
               $variant="secondary"
               $size="sm"
               aria-expanded={open === 'tuning'}
-              onClick={() => (open === 'tuning' ? closeTuning() : setOpen('tuning'))}
+              onClick={() => (open === 'tuning' ? closeTuning() : openPanel('tuning'))}
             >
               {t('kart.tuning.open')}
             </Button>
@@ -283,7 +363,7 @@ export function SpikePage({
             $variant="secondary"
             $size="sm"
             aria-expanded={open === 'garage'}
-            onClick={() => (open === 'garage' ? closeGarage() : setOpen('garage'))}
+            onClick={() => (open === 'garage' ? closeGarage() : openPanel('garage'))}
             data-testid="kart-garage-open"
           >
             {t('kart.roster.open')}
@@ -397,7 +477,18 @@ export function SpikePage({
         <Hud t={t} hud={hud} maxStored={tuning.maxStoredBoosts} />
         <Hint>
           <HintTitle>{t(play ? 'kart.play.title' : 'kart.spike.title')}</HintTitle>
-          {coarsePointer ? t('kart.spike.noTouch') : t('kart.spike.keys', hintKeys)}
+          {coarsePointer ? (
+            t('kart.spike.noTouch')
+          ) : (
+            <details
+              open={helpOpen}
+              onToggle={(event) => setHelpOpen(event.currentTarget.open)}
+              data-testid="kart-help"
+            >
+              <summary>{t('kart.spike.howTo')}</summary>
+              {t('kart.spike.keys', hintKeys)}
+            </details>
+          )}
         </Hint>
       </Bottom>
       {open === 'tuning' && (
@@ -406,10 +497,10 @@ export function SpikePage({
       {open === 'garage' && (
         <GaragePanel
           t={t}
-          kart={body}
-          driver={driver}
-          onKart={pickBody}
-          onDriver={pickDriver}
+          kart={garagePick.body ?? body}
+          driver={garagePick.driver ?? driver}
+          onKart={pickGarageBody}
+          onDriver={pickGarageDriver}
           onClose={closeGarage}
         />
       )}
@@ -464,8 +555,10 @@ const Panel = styled.div`
   font-size: ${fontSize.sm}px;
 `
 
+// Above the map corner and the overlays, so that the open menu is never covered
 const TopRow = styled.div`
   position: absolute;
+  z-index: 1;
   top: ${space.sm}px;
   left: ${space.sm}px;
   right: ${space.sm}px;
@@ -484,9 +577,6 @@ const Numbers = styled(Panel).attrs({ as: 'dl' })`
   top: 64px;
   left: ${space.sm}px;
 
-  @media ${NARROW_TOP} {
-    top: ${NARROW_PANEL_TOP}px;
-  }
   max-width: calc(100% - ${2 * space.sm}px);
   margin: 0;
   display: grid;
@@ -503,11 +593,55 @@ const Numbers = styled(Panel).attrs({ as: 'dl' })`
   }
 `
 
-const Buttons = styled.div`
+const MenuButton = styled(Button)`
+  display: none;
+
+  @media ${KART_COMPACT} {
+    display: inline-flex;
+  }
+`
+
+const Buttons = styled.div<{ $open: boolean }>`
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: ${space.sm}px;
+
+  @media ${KART_COMPACT} {
+    /* A drop-down under the menu button, scrolling when the screen is short */
+    display: ${({ $open }) => ($open ? 'flex' : 'none')};
+    position: absolute;
+    top: calc(100% + ${space.xs}px);
+    right: 0;
+    width: min(320px, 100%);
+    max-height: calc(100dvh - 64px);
+    overflow-y: auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: stretch;
+    padding: ${space.sm}px;
+    border-radius: ${radius.component}px;
+    background: ${color.surface};
+
+    & > * {
+      flex-shrink: 0;
+    }
+
+    & > label {
+      justify-content: space-between;
+    }
+
+    @media (pointer: coarse) {
+      & > label {
+        min-height: 44px;
+      }
+
+      & select {
+        min-height: 40px;
+      }
+    }
+  }
 `
 
 // Under the top row, on the right: where the eye goes for the course, away from the HUD
@@ -550,7 +684,16 @@ const Bottom = styled.div`
   gap: ${space.sm}px;
 `
 
-const Hint = styled(Panel)``
+const Hint = styled(Panel)`
+  /* Never taller than half the screen: on a phone held sideways the text scrolls */
+  max-height: 45dvh;
+  overflow-y: auto;
+
+  summary {
+    cursor: pointer;
+    color: ${color.muted};
+  }
+`
 
 const HintTitle = styled.h1`
   margin: 0;

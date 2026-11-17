@@ -9,7 +9,6 @@ import { RACE_TRACK_IDS, type RaceTrackId } from '../../../shared/kart/tracks/li
 import { Button } from '../../components/Button.tsx'
 import type { MessageParams } from '../../i18n/t.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
-import { NARROW_PANEL_TOP, NARROW_TOP } from '../layout.ts'
 import { MAX_BOTS } from './roster.ts'
 import { loadBotSetup, saveBotSetup, type BotSetup } from './setup.ts'
 import { DIFFICULTIES, type Difficulty } from './skill.ts'
@@ -134,9 +133,6 @@ const Panel = styled.section`
   top: 56px;
   right: ${space.sm}px;
 
-  @media ${NARROW_TOP} {
-    top: ${NARROW_PANEL_TOP}px;
-  }
   max-height: calc(100% - 56px - ${space.sm}px);
   width: min(360px, calc(100% - ${2 * space.sm}px));
   overflow-y: auto;

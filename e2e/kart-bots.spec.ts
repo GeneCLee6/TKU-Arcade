@@ -28,6 +28,8 @@ test('one person races a computer kart in an item race, from the menu to the res
     localStorage.setItem('tku-arcade.language', 'en')
   })
   await page.goto('/kart?autopilot')
+  // Below 1180 px the top row's controls are in its menu
+  await page.getByTestId('kart-menu').click()
   await page.getByTestId('kart-bots-open').click()
   const setup = page.getByTestId('kart-bots-setup')
   await expect(setup).toBeVisible()
