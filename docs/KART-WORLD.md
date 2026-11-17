@@ -96,6 +96,17 @@
 
 測試場（`arena`）、測試橢圓（`oval`）是開發用的，不用命名。
 
+### 6.1 大獎賽的盃（`feat/kart-grand-prix`，2026-11-17）
+
+盃名照世界觀「河口」取，**暫名**；id 不改（每盃最佳成績用 id 存）。字串在 `shared/kart/i18n.cup.ts` 的 `kart.cup.name.<id>`。沒有用任何賽車遊戲的盃名（蘑菇、花、星、香蕉……之類一個都沒有），積分表與頒獎台也是自己的（`ARCHITECTURE.md` §4.22）。
+
+| id | 暫名 zh-TW | 暫名 en | 賽道 | 理由 |
+| --- | --- | --- | --- | --- |
+| `ebb` | 退潮盃 | Ebb Tide Cup | 河畔 → 漁港 | 水邊的兩張；退潮露出河口的泥灘 |
+| `hill` | 山崗盃 | Hilltop Cup | 淡江 → 老街 | 爬上五虎崗、再鑽進老街 |
+| `rivermouth` | 河口盃 | Rivermouth Cup | 河畔 → 漁港 → 淡江 → 老街 | 世界觀的「河口盃懸浮車大賽」本身，四張全跑 |
+| `sprint` | 測試短盃 | Test Sprint | 河畔 | 只給測試（`?autopilot` 才看得到），不用命名 |
+
 ## 7. 拍板後怎麼改（給實作的人）
 
 - **字串**：車名 `shared/kart/i18n.roster.ts` 的 `kart.body.<id>`；車手 `kart.driver.<id>`；一句話介紹 `kart.blurb.<id>`、`kart.driverBlurb.<id>`；賽道 `shared/kart/i18n.ts` 的 `kart.course.<id>` 與 `shared/games/kart/i18n.ts` 的 `games.kart.track.<id>`（多人房的選項）；道具 `shared/games/kart/i18n.screen.ts` 的 `games.kart.item.<id>`；各賽道檔的 `name`。en 是來源，zh-TW 同步，`npm run check-i18n` 會擋。
@@ -111,4 +122,5 @@
 - [ ] 車：渡輪、阿給兩個改名要不要？其他四個維持？
 - [ ] 道具：牽罟繩、東北季風、洗牌要不要？投射型三個：浪花、雷陣雨、泥灘（提案）還是維持冰雹、雷雲、泥水坑？
 - [ ] 賽道：金色水岸、漁人碼頭、五虎崗要不要？第四張維持「燈籠老街」還是改「老街夜市」？用「淡江」二字當賽道名可以嗎？
-- [ ] 數值：極速差 3% 夠不夠「有感」？要不要分車記錄計時賽紀錄？
+- [ ] 數值：極速差 3% 夠不夠「有感」？（分車記錄計時賽紀錄：`feat/kart-grand-prix` 已做）
+- [ ] 大獎賽的盃名（§6.1）：退潮盃、山崗盃、河口盃可以嗎？

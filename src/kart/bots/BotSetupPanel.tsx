@@ -17,12 +17,14 @@ export interface BotSetupPanelProps {
   t: (key: KartMessageKey, params?: MessageParams) => string
   onStart(setup: BotSetup): void
   onClose(): void
+  /** 2026-11-17: opens the Grand Prix's panel instead (src/kart/cup/, docs/ARCHITECTURE.md §4.22) */
+  onGrandPrix?: () => void
 }
 
 const COUNTS = Array.from({ length: MAX_BOTS }, (_, i) => i + 1)
 const LAPS = Array.from({ length: MAX_LAPS }, (_, i) => i + 1)
 
-export function BotSetupPanel({ t, onStart, onClose }: BotSetupPanelProps) {
+export function BotSetupPanel({ t, onStart, onClose, onGrandPrix }: BotSetupPanelProps) {
   const ids = useId()
   const title = useRef<HTMLHeadingElement>(null)
   const [setup, setSetup] = useState<BotSetup>(loadBotSetup)
@@ -51,6 +53,16 @@ export function BotSetupPanel({ t, onStart, onClose }: BotSetupPanelProps) {
           {t('kart.bots.close')}
         </Button>
       </Header>
+      {onGrandPrix && (
+        <Button
+          type="button"
+          $variant="secondary"
+          onClick={onGrandPrix}
+          data-testid="kart-cup-open"
+        >
+          {t('kart.cup.open')}
+        </Button>
+      )}
       <Fields>
         <Field>
           <span>{t('kart.bots.track')}</span>

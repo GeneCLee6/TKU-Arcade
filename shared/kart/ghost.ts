@@ -2,6 +2,7 @@
 // a sample every GHOST_STEPS physics steps, as plain numbers small enough to keep in localStorage
 // (a 3-minute run is about 3,600 numbers). Pure: recording, playing back, and checking what comes
 // back out of storage, which anyone can edit.
+import { isKartId, type KartId } from './karts.ts'
 import { STEP_SECONDS } from './physics.ts'
 
 /** A sample every this many steps of 1/60 s: 20 a second */
@@ -18,6 +19,11 @@ export interface Ghost {
   readonly laps: readonly number[]
   /** x, z, heading, repeated: one sample every GHOST_STEPS steps from GO */
   readonly samples: readonly number[]
+  /**
+   * The kart it was driven in (2026-11-17, docs/ARCHITECTURE.md §4.22). Ghosts kept before then
+   * have none: the kart they were driven in is not known (src/kart/records.ts)
+   */
+  readonly kart?: KartId
 }
 
 export interface GhostRecorder {
@@ -99,6 +105,8 @@ export function parseGhost(value: unknown, track: string): Ghost | null {
     total: total as number,
     laps: laps as number[],
     samples: samples as number[],
+    // A kart it does not know (a hand edit, a kart since removed) is as good as none
+    ...(isKartId(ghost.kart) ? { kart: ghost.kart } : {}),
   }
 }
 

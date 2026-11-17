@@ -59,8 +59,23 @@ export const RaceClock = forwardRef<RaceClockHandle, { t: KartT; trial: SpikeTri
         )}
         {record !== null && (
           <Row>
-            <Label>{t('kart.race.record')}</Label>
+            <Label data-testid="kart-record-kart">
+              {trial.recordKart
+                ? t('kart.race.recordIn', {
+                    kart:
+                      trial.recordKart === 'unknown'
+                        ? t('kart.race.unknownKart')
+                        : t(`kart.body.${trial.recordKart}`),
+                  })
+                : t('kart.race.record')}
+            </Label>
             <Time data-testid="kart-record">{formatTime(record)}</Time>
+          </Row>
+        )}
+        {trial.kartBestRun !== null && (
+          <Row>
+            <Label>{t('kart.race.kartRecord')}</Label>
+            <Time data-testid="kart-kart-record">{formatTime(trial.kartBestRun)}</Time>
           </Row>
         )}
       </Clock>
@@ -93,9 +108,15 @@ export function RaceCenter({
       <Results role="dialog" aria-labelledby="kart-results-title" data-testid="kart-results">
         <Title id="kart-results-title">{t('kart.race.finished')}</Title>
         <Total>{formatTime(trial.total)}</Total>
-        {(trial.newBestRun || trial.newBestLap) && (
+        {(trial.newBestRun || trial.newBestLap || trial.newKartBestRun) && (
           <News role="status" data-testid="kart-new-record">
-            {t(trial.newBestRun ? 'kart.race.newRecord' : 'kart.race.newBestLap')}
+            {t(
+              trial.newBestRun
+                ? 'kart.race.newRecord'
+                : trial.newKartBestRun
+                  ? 'kart.race.newKartRecord'
+                  : 'kart.race.newBestLap',
+            )}
           </News>
         )}
         {trial.bestRun !== null && !trial.newBestRun && (
