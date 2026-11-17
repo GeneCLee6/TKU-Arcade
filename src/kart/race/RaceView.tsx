@@ -26,7 +26,7 @@ import { supportsWebGL2 } from '../Scene.ts'
 import { startSpikeLoop, type SpikeCourse, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
 import { autopilot } from './autopilot.ts'
 import { ItemNote, ItemSlot } from './ItemHud.tsx'
-import { effectsOf } from '../hitFx.ts'
+import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
 import { StunHud } from './HitHud.tsx'
 import { createRaceNet, type NameTag, type RaceNet } from './netRace.ts'
 
@@ -158,6 +158,8 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
   const [stun, setStun] = useState<{ ms: number; id: number }>()
   const seenEvents = useRef(view.used)
   const pressed = useRef<{ item: ItemId; at: number } | null>(null)
+  /** #86: when this browser last foresaw a hit on its kart (performance.now), shown at once */
+  const foreseenAt = useRef(-Infinity)
   const minimap = useRef<MinimapHandle>(null)
   const clock = useRef<RaceClockHandle>(null)
   const tagLayer = useRef<HTMLDivElement>(null)
@@ -205,6 +207,10 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       view: () => latest.current,
       onItemPress: (item) => {
         pressed.current = TARGETED_ITEMS.has(item) ? { item, at: performance.now() } : null
+      },
+      onForeseenHit: (_, ms) => {
+        foreseenAt.current = performance.now()
+        setStun((last) => ({ ms, id: (last?.id ?? 0) + 1 }))
       },
     })
     raceNet.current = net
@@ -276,7 +282,10 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       if (next) setNote((last) => ({ ...next, id: (last?.id ?? 0) + 1 }))
       // 2026-11-17: hit by a shot: the HUD says so while the kart spins
       const spin = effectsOf(event).find((one) => one.kind === 'spin' && one.seat === seat)
-      if (spin?.kind === 'spin') setStun((last) => ({ ms: spin.ms, id: (last?.id ?? 0) + 1 }))
+      // (already up if this browser foresaw it, #86)
+      if (spin?.kind === 'spin' && performance.now() - foreseenAt.current > FORESEEN_LATE_MS) {
+        setStun((last) => ({ ms: spin.ms, id: (last?.id ?? 0) + 1 }))
+      }
     }
   }, [view.events, seat])
 

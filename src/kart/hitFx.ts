@@ -166,35 +166,128 @@ export const crossed = (effects: readonly HitEffect[], from: number, to: number)
 export const stillShowing = (effects: readonly HitEffect[], now: number): HitEffect[] =>
   effects.filter((effect) => now - effect.at < (effect.kind === 'spin' ? effect.ms : 0) + 1_000)
 
+// ── Live: when an effect starts (#86, 2026-11-17) ─────────────────────────────────────────────
+
+/**
+ * How far behind its newest frame another kart is drawn, ms (race/remotes.ts's INTERP_DELAY): a hit
+ * on it is shown that much after this browser hears of it, when the drawn kart gets there
+ */
+export const DRAWN_BEHIND_MS = 100
+
+/**
+ * When a live browser starts showing an effect of an event at `at` (server clock) that it first read
+ * at `seenAt`. The room's patch comes about half a round trip after the hit, so starting at `at`
+ * would skip the start of the spin: its own kart starts at once, from the beginning; another kart
+ * once it is drawn where it was hit (`behind` later). Never before the event itself
+ */
+export function liveStart(
+  at: number,
+  seenAt: number,
+  seat: number,
+  own: number | null,
+  behind = DRAWN_BEHIND_MS,
+): number {
+  return Math.max(at, seat === own ? seenAt : seenAt + behind)
+}
+
+/** A hit this browser foresaw on its own kart before the room said so (netRace.ts) */
+export interface Foreseen {
+  readonly item: ShotItem
+  /** When, by the server's clock */
+  readonly at: number
+}
+
+/** How far the room's hit may be from the one foreseen and still be the same, ms */
+export const FORESEEN_EARLY_MS = 300
+export const FORESEEN_LATE_MS = 1_500
+
+/**
+ * The foreseen hit (index into `foreseen`) that the room's hit `event` on `own` confirms, or -1: the
+ * same item, the room's time a little after (it judges the kart's frame when it arrives)
+ */
+export function confirmsForeseen(
+  event: FxEvent,
+  own: number | null,
+  foreseen: readonly Foreseen[],
+): number {
+  if (!event.hit || own === null || event.targets[0] !== own) return -1
+  return foreseen.findIndex(
+    (one) =>
+      one.item === event.item &&
+      event.at - one.at >= -FORESEEN_EARLY_MS &&
+      event.at - one.at <= FORESEEN_LATE_MS,
+  )
+}
+
 /**
  * A live race's effects (a racer or a spectator): reads the room's events as they come, each once,
  * and keeps the effects still showing. `start` is the first event number not yet seen
  */
 export interface HitFeed {
-  /** The events now in the room; returns what began with the ones new since the last call */
+  /**
+   * The events now in the room, read at `now` (server clock). Returns the effects that start by
+   * `now` (a burst each) and the sounds of the events new since the last call
+   */
   read(events: readonly (FxEvent & { readonly n: number })[], now: number): {
     effects: HitEffect[]
     cues: ItemCue[]
   }
-  /** The effects still showing */
+  /**
+   * This browser's own kart was hit by `item` at `at` before the room said so (#86): it spins now,
+   * the hit sounds on the next read, and the room's hit, when it comes, does not start it again
+   */
+  foresee(item: ShotItem, at: number): void
+  /** The effects showing or about to */
   readonly effects: readonly HitEffect[]
 }
 
-export function createHitFeed(seat: number | null, start: number): HitFeed {
+export function createHitFeed(
+  seat: number | null,
+  start: number,
+  behind = DRAWN_BEHIND_MS,
+): HitFeed {
   let next = start
   let kept: HitEffect[] = []
+  /** Effects whose burst has not started yet */
+  let waiting: HitEffect[] = []
+  let foreseen: Foreseen[] = []
+  let queued: ItemCue[] = []
+  const add = (effect: HitEffect) => {
+    kept.push(effect)
+    waiting.push(effect)
+  }
   return {
     read(events, now) {
-      const effects: HitEffect[] = []
-      const cues: ItemCue[] = []
+      const cues: ItemCue[] = queued
+      queued = []
       for (const event of events) {
         if (event.n < next) continue
         next = event.n + 1
-        effects.push(...effectsOf(event))
+        const confirmed = confirmsForeseen(event, seat, foreseen)
+        if (confirmed >= 0) {
+          // Already spinning, and already heard: a shield up after all still pops
+          foreseen = foreseen.filter((_, i) => i !== confirmed)
+          for (const effect of effectsOf(event)) {
+            if (effect.kind === 'pop') add({ ...effect, at: now })
+          }
+          continue
+        }
+        for (const effect of effectsOf(event)) {
+          add({ ...effect, at: liveStart(effect.at, now, effect.seat, seat, behind) })
+        }
         cues.push(...cuesOf(event, seat))
       }
-      kept = stillShowing([...kept, ...effects], now)
+      foreseen = foreseen.filter((one) => now - one.at <= FORESEEN_LATE_MS)
+      kept = stillShowing(kept, now)
+      const effects = waiting.filter((effect) => effect.at <= now)
+      waiting = waiting.filter((effect) => effect.at > now)
       return { effects, cues }
+    },
+    foresee(item, at) {
+      if (seat === null) return
+      foreseen.push({ item, at })
+      add({ kind: 'spin', seat, at, ms: SHOT_TUNING.stunMs[item], item })
+      queued.push({ kind: 'hit' })
     },
     get effects() {
       return kept

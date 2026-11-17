@@ -7,6 +7,8 @@ import { INITIAL_KART, KART_TUNING } from '../../shared/kart/physics.ts'
 import {
   closestApproach,
   dropPuddle,
+  foreseeHit,
+  FORESEE_SLACK,
   isShot,
   keepShots,
   rayToWall,
@@ -233,5 +235,53 @@ describe('shots kept and a hit kart', () => {
     expect(TARGETED_ITEMS.has('cloud')).toBe(true)
     // The back of the field gets the chasing cloud more often than the middle
     expect(ITEM_TABLE.back.cloud ?? 0).toBeGreaterThan(ITEM_TABLE.middle.cloud ?? 0)
+  })
+})
+
+describe('a hit foreseen by the kart it hits (#86)', () => {
+  const hail = throwHail(4, { ...thrower, vz: 0 }, AT, [])
+  const reach = KART_RADIUS + SHOT_TUNING.hailRadius
+
+  it('sees a hail dead on, as the room will', () => {
+    const from = { x: 0, z: -40, at: AT + 400 }
+    const to = { x: 0, z: -40, at: AT + 500 }
+    expect(foreseeHit([hail], 1, from, to, 0)).toBe(hail)
+    expect(shotHits(hail, 1, from, to)).toBe(true)
+  })
+
+  it('leaves a graze to the room: only well inside the edge counts', () => {
+    const grazing = { x: reach - FORESEE_SLACK.hail / 2, z: -40 }
+    const from = { ...grazing, at: AT + 400 }
+    const to = { ...grazing, at: AT + 500 }
+    expect(shotHits(hail, 1, from, to)).toBe(true)
+    expect(foreseeHit([hail], 1, from, to, 0)).toBeNull()
+  })
+
+  it('not with a bubble up, nor a shot already foreseen, nor its own hail', () => {
+    const from = { x: 0, z: -40, at: AT + 400 }
+    const to = { x: 0, z: -40, at: AT + 500 }
+    expect(foreseeHit([hail], 1, from, to, AT + 1_000)).toBeNull()
+    expect(foreseeHit([hail], 1, from, to, 0, new Set([hail.n]))).toBeNull()
+    expect(foreseeHit([hail], 0, from, to, 0)).toBeNull()
+  })
+
+  it('a cloud strikes the kart it chases when its time is up, and no other', () => {
+    const cloud = sendCloud(6, thrower, 2, 190, AT)
+    const before = { x: 0, z: -190, at: cloud.until - 16 }
+    const after = { x: 0, z: -191, at: cloud.until + 1 }
+    expect(foreseeHit([cloud], 2, { ...before, at: before.at - 16 }, before, 0)).toBeNull()
+    expect(foreseeHit([cloud], 2, before, after, 0)).toBe(cloud)
+    expect(foreseeHit([cloud], 1, before, after, 0)).toBeNull()
+  })
+
+  it('a puddle driven through the middle, not one only grazed', () => {
+    const puddle = dropPuddle(7, thrower, AT)
+    const from = { x: puddle.x, z: puddle.z - 5, at: AT + 2_000 }
+    const to = { x: puddle.x, z: puddle.z + 5, at: AT + 2_100 }
+    expect(foreseeHit([puddle], 1, from, to, 0)).toBe(puddle)
+    const edge = KART_RADIUS + SHOT_TUNING.puddleRadius - FORESEE_SLACK.puddle / 2
+    const side = { from: { ...from, x: puddle.x + edge }, to: { ...to, x: puddle.x + edge } }
+    expect(shotHits(puddle, 1, side.from, side.to)).toBe(true)
+    expect(foreseeHit([puddle], 1, side.from, side.to, 0)).toBeNull()
   })
 })

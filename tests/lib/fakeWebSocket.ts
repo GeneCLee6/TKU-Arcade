@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { RoomMember, WelcomeMessage } from '../../shared/protocol.ts'
+import { PROTOCOL_VERSION, type RoomMember, type WelcomeMessage } from '../../shared/protocol.ts'
 
 /** Stands in for the browser's WebSocket: tests play the server's side of each socket */
 export class FakeWebSocket {
@@ -95,7 +95,7 @@ export function welcome(
   }
   const message: WelcomeMessage = {
     t: 'welcome',
-    v: 1,
+    v: PROTOCOL_VERSION,
     you: member.id,
     token,
     rev: 0,
