@@ -52,6 +52,43 @@ describe('the HUD', () => {
     expect(screen.getByRole('img', { name: '可用噴射：0／3' })).toBeInTheDocument()
   })
 
+  // 2026-11-18, owner: "it should take a big drift to boost"
+  it('shows how deep the drift is until the instant boost is earned, then the gold prompt', () => {
+    const { rerender } = render(<Hud t={en} hud={HUD} maxStored={2} />)
+    expect(screen.queryByTestId('kart-depth')).toBeNull()
+    rerender(<Hud t={en} hud={{ ...HUD, depth: 9 }} maxStored={2} />)
+    const meter = screen.getByRole('meter', { name: 'Drift deeper' })
+    expect(meter).toHaveAttribute('aria-valuenow', '45')
+    expect(screen.queryByTestId('kart-dash')).toBeNull()
+    // Earned: the meter gives way to the prompt
+    rerender(<Hud t={zh} hud={{ ...HUD, depth: 20, dash: 1 }} maxStored={2} />)
+    expect(screen.queryByTestId('kart-depth')).toBeNull()
+    expect(screen.getByTestId('kart-dash')).toHaveTextContent('瞬間加速 已備妥')
+  })
+
+  // 2026-11-18, owner: "normally one has to end before the next"
+  it('shows the running boost running down, and the charges locked until it ends', () => {
+    const boosting = { ...HUD, storedBoosts: 1, boosting: true, boostLeft: 12, boostLocked: true }
+    const { rerender } = render(<Hud t={en} hud={boosting} maxStored={2} />)
+    expect(screen.getByRole('meter', { name: 'Boost time left' })).toHaveAttribute(
+      'aria-valuenow',
+      '60',
+    )
+    expect(
+      screen.getByRole('img', { name: 'Boosts ready: 1 of 2, once this boost ends' }),
+    ).toHaveAttribute('data-locked')
+    // Over: no bar, and the charge can be fired
+    rerender(<Hud t={en} hud={{ ...HUD, storedBoosts: 1 }} maxStored={2} />)
+    expect(screen.queryByTestId('kart-boost-left')).toBeNull()
+    expect(screen.getByRole('img', { name: 'Boosts ready: 1 of 2' })).not.toHaveAttribute(
+      'data-locked',
+    )
+    rerender(<Hud t={zh} hud={boosting} maxStored={2} />)
+    expect(
+      screen.getByRole('img', { name: '可用噴射：1／2（這次噴完才能再噴）' }),
+    ).toBeInTheDocument()
+  })
+
   it('shows a callout with the words for it, hidden from screen readers', () => {
     render(<CalloutText t={en} callout={{ kind: 'chain', count: 2 }} />)
     const callout = screen.getByTestId('kart-callout')

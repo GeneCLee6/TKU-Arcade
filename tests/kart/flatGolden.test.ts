@@ -142,11 +142,14 @@ const GOLDEN_ARENA = '72389793'
 // Taken when the classic feel came in (2026-11-17), by this file's own functions. When the classic
 // feel is changed on purpose, take them again (and raise the built-in tracks' revisions). Taken
 // again the same day: the instant boost fires only on a fresh press of the throttle and pulls
-// harder, and the start boost lifts the top speed (the yard's script fires neither: unchanged)
+// harder, and the start boost lifts the top speed (the yard's script fires neither: unchanged).
+// Taken again 2026-11-18 (owner: "it should take a big drift to boost ... one boost has to end before
+// the next"): the drift is looser, the instant boost takes a deep and long drift, a boost cannot be
+// fired while one runs, and the hard bot drifts deep and no longer taps down the straights
 const CLASSIC_GOLDEN: Record<string, { hash: string; steps: number }> = {
-  riverside: { hash: 'dde528f3', steps: 6291 },
-  harbour: { hash: '00815ec9', steps: 7049 },
-  tamkang: { hash: 'd0d222a6', steps: 6776 },
-  oldstreet: { hash: '2e98ab28', steps: 6147 },
+  riverside: { hash: '0acf0140', steps: 6129 },
+  harbour: { hash: 'a9bcf104', steps: 7069 },
+  tamkang: { hash: 'd65550a9', steps: 7052 },
+  oldstreet: { hash: '437d5977', steps: 6644 },
 }
-const CLASSIC_GOLDEN_ARENA = 'ddd6236c'
+const CLASSIC_GOLDEN_ARENA = '5359be40'

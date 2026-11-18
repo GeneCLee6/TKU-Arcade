@@ -1,6 +1,9 @@
 // e9-t05, e9-t06a, e9-t06b: the item race's HUD. The slot shows the item held, its name and the key that uses
 // it; the note under the place says what an item just did to this kart or for it. Icons are our own,
 // drawn here in a few strokes; colours come from the tokens.
+// 2026-11-18 (owner: "the items could be at the top of the screen, in the middle, where they stand
+// out"): the slot is big, at the top centre of the race, of a race being watched and of a replay
+// alike, and an item arriving drops into it with a flash.
 import { memo } from 'react'
 import styled, { css, keyframes } from 'styled-components'
 import type { ItemId } from '../../../shared/kart/items.ts'
@@ -32,7 +35,7 @@ const ICON_PATHS: Record<ItemId, string> = {
 
 export const ItemIcon = memo(function ItemIcon({ item }: { item: ItemId }) {
   return (
-    <svg viewBox="0 0 32 32" width="36" height="36" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 32 32" width="100%" height="100%" aria-hidden="true" focusable="false">
       <path
         d={ICON_PATHS[item]}
         fill="none"
@@ -48,20 +51,31 @@ export const ItemIcon = memo(function ItemIcon({ item }: { item: ItemId }) {
 export interface ItemSlotProps {
   t: T
   item: ItemId | null
-  /** The key that uses it, as the player sees it */
-  keyName: string
+  /** The key that uses it, as the player sees it; left out when watching (nothing to press) */
+  keyName?: string
 }
 
-/** What this kart holds: an empty slot, or the item with its name and key */
+/**
+ * What this kart holds, at the top centre of the screen: an empty slot, or the item with its name
+ * and key. The page it is on must be the positioned box it sits in (the race, the watch page)
+ */
 export const ItemSlot = memo(function ItemSlot({ t, item, keyName }: ItemSlotProps) {
+  const full = item !== null
   return (
-    <Slot data-testid="kart-item" data-item={item ?? ''} $full={item !== null}>
-      <Frame $full={item !== null}>{item && <ItemIcon item={item} />}</Frame>
-      <Words>
-        <Name>{item ? t(`games.kart.item.${item}`) : t('games.kart.item.empty')}</Name>
-        {item && <Key>{t('games.kart.item.press', { key: keyName })}</Key>}
-      </Words>
-    </Slot>
+    <Dock>
+      {/* Keyed by the item: each one arriving plays the drop again */}
+      <Slot key={item ?? 'empty'} data-testid="kart-item" data-item={item ?? ''} $full={full}>
+        <Frame $full={full}>{item && <ItemIcon item={item} />}</Frame>
+        <Words>
+          <Name $full={full}>
+            {item ? t(`games.kart.item.${item}`) : t('games.kart.item.empty')}
+          </Name>
+          {item && keyName !== undefined && (
+            <Key>{t('games.kart.item.press', { key: keyName })}</Key>
+          )}
+        </Words>
+      </Slot>
+    </Dock>
   )
 })
 
@@ -79,18 +93,63 @@ const pop = keyframes`
   to { transform: scale(1); opacity: 1; }
 `
 
+/** An item arriving: it drops in from above, overshoots and settles */
+const drop = keyframes`
+  0% { transform: translateY(-140%) scale(0.6); opacity: 0; }
+  55% { transform: translateY(6%) scale(1.18); opacity: 1; }
+  78% { transform: translateY(-3%) scale(0.96); }
+  100% { transform: none; }
+`
+
+/** ... and its frame flashes */
+const flash = keyframes`
+  0% { box-shadow: 0 0 0 0 ${color.accent}, 0 0 0 0 color-mix(in srgb, ${color.accent} 60%, transparent); }
+  45% { box-shadow: 0 0 26px 6px ${color.accent}, 0 0 0 14px color-mix(in srgb, ${color.accent} 0%, transparent); }
+  100% { box-shadow: 0 0 14px 0 color-mix(in srgb, ${color.accent} 70%, transparent), 0 0 0 0 transparent; }
+`
+
+/** Where the slot starts on a phone held upright: under the place and whatever is said beside it */
+export const ITEM_SLOT_PORTRAIT_TOP = 92
+
+/** Top centre of the race, clear of the place (top left) and the map (top right) */
+const Dock = styled.div`
+  position: absolute;
+  top: ${space.sm}px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 1;
+  pointer-events: none;
+
+  /*
+   * A phone held upright has no room between the place and the clock: under that row, in the middle
+   * of what the map (132 px, top right) leaves free
+   */
+  @media (max-width: 560px) and (orientation: portrait) {
+    top: ${ITEM_SLOT_PORTRAIT_TOP}px;
+    left: calc((100% - 140px) / 2);
+  }
+`
+
 const Slot = styled.div<{ $full: boolean }>`
   ${glass}
   display: flex;
   align-items: center;
-  gap: ${space.sm}px;
-  padding: ${space.xs}px ${space.sm}px;
-  pointer-events: none;
+  gap: ${space.md}px;
+  padding: ${space.sm}px ${space.lg}px ${space.sm}px ${space.sm}px;
   ${({ $full }) =>
-    $full &&
-    css`
-      animation: ${pop} 0.18s ease-out;
-    `}
+    $full
+      ? css`
+          animation: ${drop} 0.42s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+        `
+      : css`
+          opacity: 0.7;
+        `}
+
+  /* A narrow or a short screen (a phone, either way up): smaller, and the frame over the words */
+  @media (max-width: 760px), (max-height: 500px) {
+    gap: ${space.sm}px;
+    padding: ${space.xs}px ${space.md}px ${space.xs}px ${space.xs}px;
+  }
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
@@ -100,12 +159,33 @@ const Slot = styled.div<{ $full: boolean }>`
 const Frame = styled.div<{ $full: boolean }>`
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 2px solid ${({ $full }) => ($full ? color.accent : color.border)};
+  flex: none;
+  width: 72px;
+  height: 72px;
+  padding: 10px;
+  border: 3px ${({ $full }) => ($full ? 'solid' : 'dashed')}
+    ${({ $full }) => ($full ? color.accent : color.border)};
   border-radius: ${radius.component}px;
   color: ${color.accent};
   background: ${color.sunken};
+  ${({ $full }) =>
+    $full &&
+    css`
+      animation: ${flash} 0.6s ease-out both;
+    `}
+
+  @media (max-width: 760px), (max-height: 500px) {
+    width: 48px;
+    height: 48px;
+    padding: 6px;
+    border-width: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    box-shadow: ${({ $full }) =>
+      $full ? `0 0 14px 0 color-mix(in srgb, ${color.accent} 70%, transparent)` : 'none'};
+  }
 `
 
 const Words = styled.div`
@@ -113,15 +193,27 @@ const Words = styled.div`
   gap: 2px;
 `
 
-const Name = styled.span`
+const Name = styled.span<{ $full: boolean }>`
   ${displayType}
-  color: ${color.text};
-  font-size: ${fontSize.md}px;
+  color: ${({ $full }) => ($full ? color.text : color.muted)};
+  font-size: ${({ $full }) => ($full ? fontSize.xl : fontSize.md)}px;
+  line-height: 1.1;
+  white-space: nowrap;
+
+  @media (max-width: 760px), (max-height: 500px) {
+    font-size: ${({ $full }) => ($full ? fontSize.lg : fontSize.sm)}px;
+  }
 `
 
 const Key = styled.span`
   color: ${color.muted};
   font-size: ${fontSize.sm}px;
+  white-space: nowrap;
+
+  /* No room on a short screen, and a phone's button says ITEM itself */
+  @media (max-height: 500px) {
+    display: none;
+  }
 `
 
 const Note = styled.p<{ $bad: boolean }>`
