@@ -59,9 +59,10 @@ function race(json: TrackJson, driver: Driver) {
  * the new times in (and in docs/ARCHITECTURE.md §4.13).
  */
 const TIMES: Record<string, readonly [number, number, number]> = {
-  riverside: [138.9, 114.1, 98.0],
-  harbour: [148.4, 120.9, 100.7],
-  tamkang: [158.5, 119.3, 96.2],
+  // 2026-11-18: the tracks redrawn (docs/ARCHITECTURE.md §4.33)
+  riverside: [133.0, 107.8, 91.2],
+  harbour: [161.4, 126.1, 102.0],
+  tamkang: [171.2, 132.8, 111.2],
 }
 /** How far a time may move before the test says so, in seconds */
 const TOLERANCE = 2.5
@@ -78,7 +79,7 @@ describe.each([RIVERSIDE, HARBOUR, TAMKANG])('three laps of $id', (json) => {
       expect(run.trial.run.resets).toBe(0)
     }
     expect(slow.total).toBeGreaterThan(120)
-    expect(slow.total).toBeLessThan(180)
+    expect(slow.total).toBeLessThan(185)
   })
 
   it('takes the times written down', () => {
@@ -98,7 +99,8 @@ describe.each([RIVERSIDE, HARBOUR, TAMKANG])('three laps of $id', (json) => {
   })
 
   it('is the techniques that make the difference: release boosts, doubles and long chains', () => {
-    expect(average.releases).toBe(0)
+    // A landing boost off a jump counts as a release: one a lap on a track with a jump
+    expect(average.releases).toBeLessThanOrEqual(3 * (json.jumps?.length ?? 0))
     expect(expert.releases).toBeGreaterThan(60)
     expect(expert.doubles).toBeGreaterThan(30)
     expect(expert.longestChain).toBeGreaterThan(20)

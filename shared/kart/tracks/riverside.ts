@@ -11,92 +11,85 @@
 // switchbacks through the middle and a long last right onto the straight. Written in code as control points smoothed by a closed Catmull-Rom
 // spline, then sampled about every SAMPLE metres; build-track.ts will make the same JSON from the
 // Blender scene.
-import { gatesAlong, padsAlong, headingOf, TRACK_FORMAT, type TrackJson } from '../track.ts'
-import { splineRoad, type ControlPoint } from './spline.ts'
+//
+// 2026-11-18, owner: "more fun, not so many straights ... technical, like the classic maps"
+// (revision 10; docs/KART-FEEL.md §10). The beginner's track, so everything flows, and no corner
+// here wants the brake. A short main straight; a fast right sweeper; four esses, each a little quicker
+// than the last; a long double-apex right (two corners joined by a breath of straight: clip both
+// kerbs); the levee chicane; an open left hairpin; a climb over the levee with a small jump on its
+// crest, down into a right-hand sweeper that tightens as it goes; and a last flick before the right
+// onto the straight. The first of the hand-drawn tracks with a hill.
+import { TRACK_FORMAT, type TrackJson } from '../track.ts'
+import { circuit, type CircuitPoint } from './circuit.ts'
 
-/** Metres between road points */
-const SAMPLE = 6
-
-/** [x, z, width]: the line through the middle of the road, in driving order */
-const CONTROL: readonly ControlPoint[] = [
-  // The main straight, up to the line and beyond (towards -z)
-  [0, 230, 38],
-  [0, 60, 38],
-  [0, -70, 38],
-  // Turn 1: a tight right, eastwards
-  [5, -105, 32],
-  [28, -128, 30],
-  [62, -134, 30],
-  // The first esses: left, then right
-  [100, -134, 30],
-  [135, -150, 29],
-  [165, -185, 29],
-  [200, -200, 29],
-  [245, -196, 30],
-  // Hairpin 1, right, back westwards
-  [290, -196, 28],
-  [318, -172, 28],
-  [312, -140, 28],
-  [282, -126, 28],
-  // Hairpin 2, left, eastwards again: a switchback
-  [240, -122, 28],
-  [212, -108, 28],
-  [204, -80, 28],
-  [222, -56, 28],
-  [255, -50, 30],
-  // A short run east and a right onto the far side, southwards
-  [330, -48, 32],
-  [365, -36, 30],
-  [380, -5, 30],
-  // The far side: a left-right-left flick
-  [380, 40, 30],
-  [360, 85, 29],
-  [385, 130, 29],
-  [380, 175, 30],
-  // Hairpin 3, right, back northwards
-  [378, 215, 28],
-  [358, 245, 28],
-  [325, 248, 28],
-  [305, 222, 28],
-  [305, 180, 30],
-  // North, and a left westwards
-  [305, 120, 32],
-  [300, 75, 30],
-  [280, 50, 30],
-  [245, 45, 30],
-  [170, 45, 32],
-  // Hairpin 4, left, eastwards: the first of two switchbacks in the middle
-  [95, 45, 28],
-  [68, 58, 28],
-  [60, 85, 28],
-  [75, 110, 28],
-  [105, 115, 30],
-  [215, 115, 32],
-  // Hairpin 5, right, westwards
-  [240, 120, 28],
-  [262, 142, 28],
-  [256, 172, 28],
-  [228, 185, 28],
-  [135, 185, 32],
-  // A left southwards, then the long last right onto the straight
-  [100, 191, 30],
-  [78, 212, 30],
-  [72, 245, 30],
-  [62, 282, 32],
-  [36, 300, 36],
-  [10, 288, 38],
-  [0, 262, 38],
+/** [x, z, width, height]: the line through the middle of the road, in driving order */
+const CONTROL: readonly CircuitPoint[] = [
+  // The main straight, up to the line and beyond (towards -z), the river on the left
+  [0, 170, 38, 0],
+  [0, 90, 38, 0],
+  [0, 0, 38, 0],
+  // Turn 1: a right, eastwards
+  [0, -74, 34, 0],
+  [11, -101, 32, 0],
+  [38, -112, 32, 0],
+  // The esses: left, right, left, right
+  [105, -110, 30, 0],
+  [170, -92, 30, 0],
+  [250, -136, 30, 0],
+  [330, -92, 30, 0],
+  [405, -134, 30, 0],
+  // The double apex: two rights with a breath of straight between, round to the west
+  [455, -118, 31, 0],
+  [492, -92, 32, 0],
+  [506, -50, 32, 0],
+  [506, -5, 32, 0],
+  [492, 36, 32, 0],
+  [455, 52, 32, 0],
+  // The levee chicane: right, then left
+  [395, 52, 30, 0],
+  [330, 26, 28, 0],
+  [262, 72, 28, 0],
+  [200, 50, 30, 0],
+  [150, 50, 32, 0],
+  // The open hairpin, left, round to the east
+  [105, 52, 30, 0],
+  [80, 62, 30, 0],
+  [69, 88, 30, 0],
+  [80, 114, 30, 0],
+  [105, 124, 30, 0],
+  // Over the levee: a climb, the jump on its crest, and down
+  [150, 130, 32, 1],
+  [215, 152, 34, 6],
+  [265, 164, 34, 7],
+  [330, 168, 34, 3],
+  // The tightening right: opens wide, closes tight, round to the west
+  [385, 178, 32, 0],
+  [432, 206, 30, 0],
+  [452, 248, 29, 0],
+  [438, 286, 28, 0],
+  [400, 300, 28, 0],
+  // Home along the bank, a left-right flick, and the right onto the straight
+  [335, 296, 32, 0],
+  [270, 300, 34, 0],
+  [205, 318, 32, 0],
+  [140, 272, 32, 0],
+  [80, 256, 34, 0],
+  [36, 254, 36, 0],
+  [11, 243, 38, 0],
+  [0, 218, 38, 0],
 ]
 
-const road = splineRoad(CONTROL, SAMPLE)
-
-/** The start and finish line: on the main straight, the road point at z = 60 */
-const FINISH = road.findIndex((point) => point.x === 0 && point.z <= 60)
-
-// The road starts at the line, so that gate 0 is the finish
-const fromLine = [...road.slice(FINISH), ...road.slice(0, FINISH)]
-const { gates, respawns } = gatesAlong(fromLine, 7)
-const up = { dx: 0, dz: -1 }
+const made = circuit({
+  control: CONTROL,
+  line: [0, 90],
+  jumps: [[265, 164, 1.6]],
+  // Off the middle: taking one is a choice of line
+  pads: [
+    [0, 20, 8],
+    [150, 50, -8],
+    [270, 300, 8],
+  ],
+})
 
 export const RIVERSIDE: TrackJson = {
   format: TRACK_FORMAT,
@@ -111,25 +104,17 @@ export const RIVERSIDE: TrackJson = {
   // 2026-11-14, last (owner: "the maps are still too simple"; the slide-out and the counter-steer):
   // redrawn with esses, five hairpins and short straights; old records are set aside
   // 7: the classic feel (2026-11-17): the physics changed, so the old times are set aside
-  revision: 10,
+  // 10: redrawn as a flowing beginner's circuit with a hill and a jump (2026-11-18)
+  // 11: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
+  revision: 11,
   laps: 3,
-  road: fromLine,
-  gates,
-  respawns,
-  // Two by two behind the line, 7 m apart, staggered
-  grid: [0, 1, 2, 3, 4, 5].map((slot) => ({
-    x: slot % 2 === 0 ? -4 : 4,
-    z: fromLine[0]!.z + 10 + Math.floor(slot / 2) * 7 + (slot % 2) * 3.5,
-    heading: headingOf(up),
-  })),
+  road: made.road,
+  gates: made.gates,
+  respawns: made.respawns,
+  grid: made.grid,
   walls: [],
-  // Off the middle of the straights: taking one is a choice of line
-  boostPads: padsAlong(fromLine, [
-    [14, 8],
-    [255, -8],
-    [298, 8],
-    [400, -8],
-  ]),
+  boostPads: made.boostPads,
   itemBoxes: [],
   decor: [],
+  jumps: made.jumps,
 }

@@ -17,6 +17,13 @@ export interface BotSkill {
    * slow sway, different for every bot. Bigger is sloppier (and takes longer corners)
    */
   readonly lineNoise: number
+  /**
+   * The racing line (2026-11-18): how far towards the inside kerb it goes through a corner, as a
+   * share of the room there is (0 or left out: the middle of the road; 1: clips every apex)
+   */
+  readonly apex?: number
+  /** Past an island that splits the road, takes the lane inside the bend: the shortcut (2026-11-18) */
+  readonly shortcuts?: boolean
   /** Steps between seeing the road and the hands answering (1/60 s each) */
   readonly reactionSteps: number
   /**
@@ -68,6 +75,7 @@ export const BOT_SKILLS: Readonly<Record<Difficulty, BotSkill>> = {
   },
   normal: {
     lineNoise: 0.2,
+    apex: 0.3,
     reactionSteps: 5,
     topSpeedShare: 0.95,
     driftAt: 1,
@@ -81,6 +89,8 @@ export const BOT_SKILLS: Readonly<Record<Difficulty, BotSkill>> = {
   },
   hard: {
     lineNoise: 0.1,
+    apex: 0.3,
+    shortcuts: true,
     reactionSteps: 2,
     topSpeedShare: 1,
     driftAt: 0.9,

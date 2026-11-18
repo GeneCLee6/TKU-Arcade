@@ -67,6 +67,19 @@ const SWAY_METRES = 160
 const JUMP_CLEAR = 18
 const JUMP_SECONDS = 0.9
 
+/** The racing line: the road's curvature is averaged over this far either way, metres ... */
+const LINE_WINDOW = 28
+/** ... a bend of this radius or tighter takes the line all the way to the inside ... */
+const LINE_RADIUS = 60
+/** ... which is this far in from the kerb, metres ... */
+const LINE_KERB = 5
+/** Past an island the line keeps this far from it at the most, metres ... */
+const LANE_REACH = 12
+/** ... from this many road points before it to this many after */
+const LANE_LEAD = 6
+/** ... but a bend this tight or tighter, metres, is taken down the middle, and one twice as wide in full */
+const LINE_TIGHT = 35
+
 type Move =
   | { readonly kind: 'none' }
   | { readonly kind: 'tap'; readonly direction: -1 | 1; readonly steps: number }
@@ -123,6 +136,12 @@ export function createBotBrain(
   seed: number,
   /** The track's jump lips (road point indices), if it has any */
   jumps: readonly number[] = [],
+  /**
+   * The track's own walls, on the road (2026-11-18): an island that splits it into two lanes. The
+   * line keeps to one lane all the way past it: by skill (`shortcuts`) the one on the inside of the
+   * bend, the shorter and tighter; otherwise the other
+   */
+  walls: readonly { ax: number; az: number; bx: number; bz: number }[] = [],
 ): BotBrain {
   const t = tuning
   const rng = createRng(seed)
@@ -160,11 +179,93 @@ export function createBotBrain(
   /** The hands' answers, oldest first: the reaction time */
   const queue: KartInput[] = []
 
+  // The racing line (2026-11-18, the technical tracks): how far towards the inside kerb each road
+  // point is taken, -1 (hard left) to 1 (hard right): the road's curvature there, averaged over
+  // LINE_WINDOW metres either way, so that the line clips each apex, crosses over between two esses
+  // and straightens a chicane, but leaves a hairpin alone. By skill (`apex`): an easy bot stays in the middle of the road
+  const inside: number[] = []
+  if ((skill.apex ?? 0) > 0) {
+    const count = road.length
+    const headingAt = (index: number) => {
+      const a = road[((index % count) + count) % count]!
+      const b = road[(((index + 1) % count) + count) % count]!
+      return Math.atan2(b.x - a.x, -(b.z - a.z))
+    }
+    const turned = road.map((_, index) => wrap(headingAt(index) - headingAt(index - 1)))
+    for (let index = 0; index < count; index++) {
+      let sum = 0
+      let run = 0
+      for (let near = index; run < LINE_WINDOW; near++) {
+        sum += turned[near % count]!
+        run += (along[(near + 1) % count]! - along[near % count]! + total) % total || 1
+      }
+      let back = 0
+      for (let near = index - 1; back < LINE_WINDOW; near--) {
+        const k = ((near % count) + count) % count
+        sum += turned[k]!
+        back += (along[(k + 1) % count]! - along[k]! + total) % total || 1
+      }
+      const curve = sum / (run + back)
+      // A hairpin is taken down the middle: the slide of a drift needs the room on both sides
+      const open = clamp(2 - Math.abs(curve) * LINE_TIGHT * 2, 0, 1)
+      inside.push(clamp(curve * LINE_RADIUS, -1, 1) * open)
+    }
+  }
+
+  // Islands: at each road point beside one, the lane the line keeps to, as an offset from the middle
+  const lane = new Map<number, number>()
+  if (walls.length > 0) {
+    const count = road.length
+    const band = new Map<number, { low: number; high: number }>()
+    for (const wall of walls) {
+      const index = nearestRoadPoint(road, wall.ax, wall.az)
+      const { dx, dz } = roadDirection(road, index)
+      const point = road[index]!
+      // Metres to the right of the middle: the road's right is (-dz, dx)
+      const across = (wall.ax - point.x) * -dz + (wall.az - point.z) * dx
+      const known = band.get(index)
+      band.set(index, {
+        low: Math.min(known?.low ?? across, across),
+        high: Math.max(known?.high ?? across, across),
+      })
+    }
+    const indices = [...band.keys()].sort((a, b) => a - b)
+    // Which way the road bends past the island, as a whole
+    let bend = 0
+    for (const index of indices) {
+      const a = roadDirection(road, index)
+      const b = roadDirection(road, (index + 1) % count)
+      bend += a.dx * b.dz - a.dz * b.dx
+    }
+    const inner = bend >= 0 ? 1 : -1
+    const side = skill.shortcuts ? inner : -inner
+    for (const index of indices) {
+      const { low, high } = band.get(index)!
+      const half = road[index]!.width / 2
+      // The middle of the lane on that side, but no further from the island than LANE_REACH
+      const edge = side > 0 ? high : low
+      const middle = (edge + side * half) / 2
+      const target =
+        side > 0 ? Math.min(middle, edge + LANE_REACH) : Math.max(middle, edge - LANE_REACH)
+      for (let near = index - LANE_LEAD; near <= index + LANE_LEAD; near++) {
+        const k = ((near % count) + count) % count
+        if (!band.has(k) || k === index) lane.set(k, lane.get(k) ?? target)
+      }
+      lane.set(index, target)
+    }
+  }
+
   /** The line's offset from the middle at road point `index`, metres (+ is to the right) */
   const offsetAt = (index: number): number => {
+    const kept = lane.get(index)
+    if (kept !== undefined) return kept
     const half = road[index]!.width / 2
     const sway = Math.sin(swayPhase + (along[index]! / SWAY_METRES) * Math.PI)
-    return half * Math.max(-0.6, Math.min(0.6, lineBase * skill.lineNoise + sway * skill.lineNoise))
+    const wander =
+      half * Math.max(-0.6, Math.min(0.6, lineBase * skill.lineNoise + sway * skill.lineNoise))
+    if (inside.length === 0) return wander
+    const room = Math.max(0, half - LINE_KERB)
+    return clamp(wander + inside[index]! * (skill.apex ?? 0) * room, -room, room)
   }
 
   /** The turn rate (rad/s, signed) that brings a car along `heading` onto the line `metres` ahead */
@@ -299,7 +400,8 @@ export function createBotBrain(
       // Through a long bend the drift is held, steering out of it, not let go and begun again
       const over =
         Math.sign(want) !== dir ||
-        (Math.abs(want) < gripTurn * CLASSIC_END_NOW && Math.abs(later) < gripTurn * CLASSIC_END_LATER)
+        (Math.abs(want) < gripTurn * CLASSIC_END_NOW &&
+          Math.abs(later) < gripTurn * CLASSIC_END_LATER)
       const done = kart.driftSeconds > 0.15 && over && !earning
       if (done) {
         // Out of the corner: let go, counter-steer and lift, then press afresh for the dash; or

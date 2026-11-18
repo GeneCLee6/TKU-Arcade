@@ -12,95 +12,112 @@
 // left-right flick. Then "the maps are still too simple" (revision 6): the long fast arc home is
 // gone; the top leg runs on westwards into two more switchbacks down towards the sea, and the flick
 // along the shore stays.
-import {
-  gatesAlong,
-  padsAlong,
-  headingOf,
-  roadDirection,
-  TRACK_FORMAT,
-  type TrackJson,
-} from '../track.ts'
-import { splineRoad, type ControlPoint } from './spline.ts'
+//
+// 2026-11-18, owner: "more fun, not so many straights ... technical, like the classic maps"
+// (revision 10; docs/KART-FEEL.md §10). Redrawn as the hairpin track its name promises: the seafront
+// straight (the one place to pass and to fire a boost); a right at the end of the quay that keeps
+// tightening; esses down the east side; then the hillside switchbacks, four hairpins one after
+// another with the legs between them short, the third leg kinked by a chicane; a run west under
+// the hill; a fast right along the beach; the beach chicane through its narrow gate; and the right
+// onto the seafront. Written in metres now (the scenery still places itself in drawn units).
+import { TRACK_FORMAT, type TrackJson } from '../track.ts'
+import { circuit, type CircuitPoint } from './circuit.ts'
 
-/** Metres between road points */
-const SAMPLE = 6
-
-/** The layout below, and the scenery placed round it, are drawn this many times smaller than real */
+/** The scenery (harbourArt.ts) is placed in drawn units, this many metres each */
 export const HARBOUR_SCALE = 1.6
 
-/** [x, z, width]: x and z in drawn units (times HARBOUR_SCALE for metres), the width in metres */
-const DRAWN: readonly ControlPoint[] = [
+/** [x, z, width]: the line through the middle of the road, in driving order, metres */
+const CONTROL: readonly CircuitPoint[] = [
   // The seafront straight, eastwards (+x), the sea on the left
-  [-130, -112, 36],
-  [-40, -112, 36],
-  [60, -112, 36],
-  // A tight right at the end of the quay
-  [140, -112, 31],
-  [178, -106, 31],
-  [193, -80, 31],
-  [195, -8, 29],
-  // A short, tight right onto the first switchback leg, westwards
-  [192, 44, 29],
-  [174, 62, 29],
-  [140, 64, 29],
-  [95, 62, 29],
-  [42, 60, 29],
-  // Hairpin 1: left, round to the east
-  [10, 66, 29],
-  [-2, 87, 29],
-  [12, 106, 29],
-  [52, 110, 29],
-  [95, 108, 29],
-  // Hairpin 2: right, round to the west
-  [127, 114, 29],
-  [139, 134, 29],
-  [125, 154, 29],
-  // The chicane on the top leg
-  [86, 158, 28],
-  [56, 145, 28],
-  [24, 167, 28],
-  [-14, 158, 29],
-  // The west side (revision 6): on westwards, then two more switchbacks down towards the sea
-  [-80, 160, 30],
-  [-150, 160, 29],
-  // Hairpin 3: right, round to the east
-  [-183, 151, 28],
-  [-196, 129, 28],
-  [-184, 107, 28],
-  [-150, 100, 29],
-  [-98, 100, 29],
-  // Hairpin 4: left, round to the west
-  [-76, 92, 28],
-  [-66, 70, 28],
-  [-78, 50, 28],
-  [-104, 44, 29],
-  [-160, 42, 29],
-  // A right down the shore, a sharp right-left flick, and the right onto the straight
-  [-186, 26, 29],
-  [-194, -4, 29],
-  [-178, -34, 29],
-  [-194, -66, 30],
-  [-176, -98, 36],
+  [-200, -180, 36],
+  [-110, -180, 36],
+  [-40, -180, 36],
+  // The fish-market kink: right, then left, onto the quay's end
+  [25, -176, 34],
+  [88, -150, 32],
+  [150, -148, 34],
+  // The quay's end: a right that keeps tightening, round to the south
+  [215, -144, 32],
+  [268, -138, 30],
+  [291, -129, 29],
+  [300, -106, 29],
+  // Esses down the east side: left, right, left
+  [300, -50, 29],
+  [316, -5, 28],
+  [284, 55, 28],
+  [314, 115, 28],
+  [302, 148, 29],
+  // Hairpin 1: right, round to the north
+  [300, 170, 29],
+  [288, 200, 29],
+  [258, 212, 29],
+  [228, 200, 29],
+  [216, 170, 29],
+  [216, 120, 30],
+  [216, 80, 30],
+  // Hairpin 2: left, round to the south
+  [216, 45, 29],
+  [204, 15, 29],
+  [174, 3, 29],
+  [144, 15, 29],
+  [132, 45, 29],
+  [132, 100, 30],
+  [132, 150, 30],
+  // Hairpin 3: right, round to the north
+  [132, 175, 29],
+  [120, 205, 29],
+  [90, 217, 29],
+  [60, 205, 29],
+  [48, 175, 29],
+  // The third leg's chicane: left, then right
+  [48, 125, 30],
+  [32, 78, 28],
+  [64, 18, 28],
+  [48, -30, 29],
+  // Hairpin 4: left, round to the south
+  [48, -55, 29],
+  [36, -85, 29],
+  [6, -97, 29],
+  [-24, -85, 29],
+  [-36, -55, 29],
+  // Down past the net lofts: a long S
+  [-36, 0, 30],
+  [-56, 55, 29],
+  [-34, 110, 30],
+  // A right under the hill, and the run west
+  [-36, 172, 30],
+  [-45, 195, 30],
+  [-68, 204, 30],
+  [-120, 205, 31],
+  [-170, 206, 32],
+  [-215, 204, 32],
+  // A fast right along the beach, northwards
+  [-268, 204, 30],
+  [-291, 193, 30],
+  [-300, 170, 30],
+  [-300, 125, 30],
+  // The beach chicane, through its narrow gate
+  [-300, 70, 30],
+  [-276, 15, 28],
+  [-316, -45, 28],
+  [-300, -95, 30],
+  // The right onto the seafront
+  [-300, -150, 30],
+  [-291, -171, 32],
+  [-270, -180, 34],
 ]
 
-const CONTROL: readonly ControlPoint[] = DRAWN.map(([x, z, width]) => [
-  x * HARBOUR_SCALE,
-  z * HARBOUR_SCALE,
-  width,
-])
-
-const road = splineRoad(CONTROL, SAMPLE)
-
-/** The start and finish line: the first road point on the straight past x = -70 (drawn) */
-const FINISH = road.findIndex(
-  (point) => point.z < -100 * HARBOUR_SCALE && point.x >= -70 * HARBOUR_SCALE,
-)
-
-// The road starts at the line, so that gate 0 is the finish
-const fromLine = [...road.slice(FINISH), ...road.slice(0, FINISH)]
-const { gates, respawns } = gatesAlong(fromLine, 7)
-const along = roadDirection(fromLine, 0)
-const side = { dx: -along.dz, dz: along.dx }
+const made = circuit({
+  control: CONTROL,
+  line: [-110, -180],
+  // Off the middle: taking one is a choice of line
+  pads: [
+    [-40, -180, -8],
+    [216, 100, 6],
+    [132, 120, -6],
+    [-180, 205, 8],
+  ],
+})
 
 export const HARBOUR: TrackJson = {
   format: TRACK_FORMAT,
@@ -115,30 +132,16 @@ export const HARBOUR: TrackJson = {
   // 2026-11-14, last (owner: "the maps are still too simple"; the slide-out and the counter-steer):
   // two more switchbacks down the west side, where the long fast arc was; old records are set aside
   // 7: the classic feel (2026-11-17): the physics changed, so the old times are set aside
-  revision: 10,
+  // 10: redrawn round four switchback hairpins (2026-11-18)
+  // 11: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
+  revision: 11,
   laps: 3,
-  road: fromLine,
-  gates,
-  respawns,
-  // Two by two behind the line, 7 m apart, staggered, facing along the straight
-  grid: [0, 1, 2, 3, 4, 5].map((slot) => {
-    const back = 10 + Math.floor(slot / 2) * 7 + (slot % 2) * 3.5
-    const across = slot % 2 === 0 ? -4 : 4
-    return {
-      x: Math.round((fromLine[0]!.x - along.dx * back + side.dx * across) * 100) / 100,
-      z: Math.round((fromLine[0]!.z - along.dz * back + side.dz * across) * 100) / 100,
-      heading: headingOf(along),
-    }
-  }),
+  road: made.road,
+  gates: made.gates,
+  respawns: made.respawns,
+  grid: made.grid,
   walls: [],
-  // Off the middle of the straights: taking one is a choice of line
-  boostPads: padsAlong(fromLine, [
-    [20, -8],
-    [45, 8],
-    [89, 8],
-    [131, -8],
-    [271, 8],
-  ]),
+  boostPads: made.boostPads,
   itemBoxes: [],
   decor: [],
 }

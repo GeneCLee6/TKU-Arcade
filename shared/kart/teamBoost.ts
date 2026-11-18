@@ -1,6 +1,6 @@
 // The blue boost's numbers (2026-11-18, owner: "a team race can have a blue N2O that burns longer and
 // faster"; then "in a team race everyone still collects their own N2O, and there is a red one and a
-// blue one": shared/kart/team.ts, docs/ARCHITECTURE.md §4.31 and §4.33). A blue boost is a charge of
+// blue one": shared/kart/team.ts, docs/ARCHITECTURE.md §4.31 and §4.34). A blue boost is a charge of
 // the kart's own that its team's full gauge has turned blue. On their own, with no imports, so that
 // the physics (physics.ts, classic.ts) can read them without a circle. Not on the tuning panel: a
 // blue boost is the same for everyone in the race.

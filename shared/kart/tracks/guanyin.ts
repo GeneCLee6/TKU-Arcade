@@ -9,33 +9,57 @@ import { buildSpec } from '../editor/build.ts'
 import { jump, slope, straight, turn, type Piece } from '../editor/spec.ts'
 import type { TrackJson } from '../track.ts'
 
-const W = 34
+const W = 32
 
-/** The pieces, from the start line; checked by tests/kart/terrain.test.ts to make a legal track */
+/**
+ * The pieces, from the start line; checked by tests/kart/terrain.test.ts to make a legal track.
+ * 2026-11-18 (owner: "more fun, not so many straights ... technical"; docs/KART-FEEL.md §10), the
+ * jump track: a short start straight; a right onto the climb; a deep S over the shoulder; the
+ * first jump on the hilltop, into a right that wants the car lined up again at once; a long fall
+ * with a boost pad into the omega (right, a left hairpin through a 28 m gate, right: three drifts
+ * on end); an S; the run of boxes along the foot of the hill; two chicanes back to back; a right
+ * that tightens; a last fall, an S, and the second jump, which lands on the start straight.
+ */
 export const GUANYIN_PIECES: readonly Piece[] = [
-  straight(150, 38, { boxes: true }),
-  turn(90, 60, 36),
-  slope(160, 16, W),
-  turn(-70, 85, W),
-  turn(70, 85, W),
-  straight(40, W),
-  jump(150, 2.5, W),
-  turn(160, 50, W),
-  slope(160, -10, W, { pad: 'left' }),
-  turn(-90, 70, W),
-  straight(80, W, { boxes: true }),
-  turn(90, 60, W),
-  jump(140, 3, W),
-  turn(46.4, 100, W),
-  slope(168.6, -6, W),
-  turn(63.6, 45, W),
+  straight(95, 38, { boxes: true }),
+  turn(90, 45, 34),
+  slope(170, 14, W),
+  turn(-70, 45, W),
+  turn(70, 45, W),
+  jump(110, 3, 34),
+  turn(90, 40, W),
+  slope(160, -8, W, { pad: 'left' }),
+  turn(90, 36, 30),
+  turn(-180, 36, 28),
+  turn(90, 36, 30),
+  turn(45, 50, W),
+  turn(-45, 50, W),
+  straight(45, W),
+  turn(90, 50, W),
+  straight(89.2, 34, { boxes: true }),
+  turn(-60, 45, 30),
+  turn(60, 45, 30),
+  turn(60, 45, 30),
+  turn(-60, 45, 30),
+  straight(40, W, { pad: 'right' }),
+  turn(50, 60, W),
+  turn(40, 30, W),
+  slope(100, -6, W),
+  turn(-45, 55, W),
+  turn(45, 55, W),
+  jump(92, 3.5, 34),
 ]
+
+/** Its own revision: the layout's, on top of the physics' (editor/build.ts CUSTOM_REVISION) */
+export const GUANYIN_REVISION = 6
 
 const built = buildSpec({ name: '', theme: 'day', pieces: GUANYIN_PIECES })
 
 export const GUANYIN: TrackJson = {
   ...built.track,
   id: 'guanyin',
+  // One more than a custom track's (the physics' version): redrawn 2026-11-18
+  revision: GUANYIN_REVISION,
   // A working name (2026-11-17): the owner may rename it
   name: { en: 'Guanyin Hill Road', 'zh-TW': '觀音山坡道' },
   theme: 'day',

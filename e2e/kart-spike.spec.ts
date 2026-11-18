@@ -801,7 +801,7 @@ test('drives the test oval: a countdown, then the minimap follows and the line i
   // That the car is held still during it is tests/kart/timeTrial.test.ts's: here the countdown can
   // be over before the key goes down, on a slow software renderer
   await expect(page.getByTestId('kart-countdown')).toHaveCount(0, { timeout: 6000 })
-  // The car's marker: the last group (the one before it holds the other karts' dots, a race only)
+  // The last group: the car's (the first holds the other karts' dots, since the team race)
   const marker = minimap.locator('g').last()
   const before = await marker.getAttribute('transform')
   const crossings = () =>
