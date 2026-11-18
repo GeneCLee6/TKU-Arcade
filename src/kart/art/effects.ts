@@ -12,23 +12,35 @@
 // away to the outside; a boost leaves a trail of fire behind the thrusters all the while it runs, and
 // the moment it fires a ring of light bursts out on the road under the kart, the bigger the harder
 // it kicks.
+// 2026-11-18 (owner: "the boost's effects need designing again"; boostFx.ts): every boost is one
+// effect at four sizes and in four colours (an instant boost, a full one, a team boost in blue, a
+// perfect start). The flame is a shaded jet with a pale heart, coloured tips and shock diamonds,
+// riding on the thruster (so it follows the kart's change of shape); the thrusters flash when it
+// lights; a full boost leaves ribbons of light behind the thrusters and throws sparks all the while;
+// and when it fires a ring of light stands up behind the kart as well as the one on the road. What
+// runs is read from the kart's model (kartModel.ts's `boost`), which works it out for a kart whose
+// look only says that it boosts: another racer's kart gets all of it too, from smaller pools.
 import {
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
   Color,
-  ConeGeometry,
+  DoubleSide,
   DynamicDrawUsage,
-  Group,
+  LatheGeometry,
   Mesh,
   MeshBasicMaterial,
   RingGeometry,
+  ShaderMaterial,
   Sprite,
   SpriteMaterial,
+  Vector2,
+  Vector3,
   type Object3D,
 } from 'three'
 import { kartHover, kartScene } from '../../styles/kartTokens.ts'
+import { BOOST_FX } from '../boostFx.ts'
 import type { KartLook, KartModel } from './kartModel.ts'
 
 /** Dust puffs alive at once, at most */
@@ -46,12 +58,26 @@ const BURST_SPARKS = 36
 const BURST_SECONDS = 0.45
 /** Pieces of the fire a boost leaves behind the thrusters, alive at once at most ... */
 const FULL_JETS = 160
-const JET_LIFE = 0.32
+const JET_LIFE = 0.22
 /** ... this many a second from each thruster */
 const JET_RATE = 100
 /** The ring of light on the road when a boost fires: how long it lasts and how wide it gets, metres */
 const RING_SECONDS = 0.42
-const RING_REACH = 4.6
+/** The ring that stands up behind the kart when a full boost fires: how long it lasts */
+const WAVE_SECONDS = 0.34
+/** The flash at the thrusters when a boost lights */
+const FLASH_SECONDS = 0.16
+/** A full boost's flame, metres long and metres across at its widest, before the kart's own size */
+const FLAME_LENGTH = 2.8
+const FLAME_GIRTH = 0.27
+/** The points of a ribbon of light behind a thruster, at most; one is laid every RIBBON_STEP metres */
+const FULL_RIBBON = 30
+const RIBBON_STEP = 0.3
+/** A ribbon's point fades out over this many seconds */
+const RIBBON_FADE = 0.3
+const RIBBON_WIDTH = 0.2
+/** Sparks a second out of the thrusters while a full boost runs */
+const BOOST_SPARK_RATE = 46
 /** Trail pieces kept: about two seconds of a drift, both corners; the oldest are laid over again */
 const FULL_MARKS = 260
 const MARK_WIDTH = 0.18
@@ -89,8 +115,80 @@ export interface KartEffects {
   ): void
   /** Forgets the trails, as after a reset: the next drift does not join up with the last */
   lift(): void
+  /**
+   * Where the air shimmers behind the thrusters, in the world, and how strongly, 0 to 1 (post.ts
+   * bends the picture there); null while nothing burns
+   */
+  heat(): HeatSpot | null
   dispose(): void
 }
+
+export interface HeatSpot {
+  readonly x: number
+  readonly y: number
+  readonly z: number
+  readonly strength: number
+}
+
+const FLAME_VERTEX = /* glsl */ `
+uniform float time;
+varying float vAlong;
+varying vec3 vNormal;
+varying vec3 vSeen;
+void main() {
+  vAlong = uv.y;
+  vec3 moved = position;
+  // The jet wavers more the further from the thruster
+  moved.x += sin(time * 37.0 + uv.y * 9.0) * 0.035 * uv.y;
+  moved.y += cos(time * 29.0 + uv.y * 11.0) * 0.035 * uv.y;
+  vec4 seen = modelViewMatrix * vec4(moved, 1.0);
+  vNormal = normalMatrix * normal;
+  vSeen = -seen.xyz;
+  gl_Position = projectionMatrix * seen;
+}`
+
+const FLAME_FRAGMENT = /* glsl */ `
+uniform float time;
+uniform float gain;
+uniform float lit;
+uniform vec3 core;
+uniform vec3 flame;
+uniform vec3 tip;
+varying float vAlong;
+varying vec3 vNormal;
+varying vec3 vSeen;
+void main() {
+  // (Clamped: at a smoothed edge the values are guessed past their ends)
+  float along = clamp(vAlong, 0.0, 1.0);
+  // Seen through its middle the jet is thick and pale; at its rim thin and coloured
+  float facing = abs(dot(normalize(vNormal), normalize(vSeen)));
+  float thick = pow(clamp(facing, 0.0, 1.0), 1.2);
+  vec3 colour = mix(tip, flame, (1.0 - smoothstep(0.2, 0.9, along)));
+  // The pale heart: white-hot out of the thruster, gone by half way down
+  float heart = thick * thick * (1.0 - smoothstep(0.0, 0.6, along));
+  colour = mix(colour, core, heart) * (1.0 + 1.6 * heart * gain);
+  // Shock diamonds running down it
+  float diamonds = 1.0 + 0.45 * sin(along * 30.0 - time * 34.0) * (1.0 - smoothstep(0.05, 0.75, along));
+  float flicker = 0.86 + 0.14 * sin(time * 53.0 + along * 17.0);
+  float alpha = (0.1 + 0.5 * thick) * (1.0 - smoothstep(0.3, 1.0, along)) * flicker * lit;
+  gl_FragColor = vec4(colour * diamonds, alpha);
+}`
+
+/** A jet of unit length along +z from the origin, unit radius at its widest: a flame's shape */
+function flameGeometry(): LatheGeometry {
+  const points: Vector2[] = []
+  for (let step = 0; step <= 12; step++) {
+    const along = step / 12
+    // Out of the mouth, a belly, then a long taper to a point
+    const radius = along < 0.14 ? 0.72 + 0.28 * (along / 0.14) : (1 - (along - 0.14) / 0.86) ** 1.25
+    points.push(new Vector2(Math.max(0.001, radius), along))
+  }
+  const geometry = new LatheGeometry(points, 24)
+  geometry.rotateX(Math.PI / 2)
+  return geometry
+}
+
+const WHITE = new Color(1, 1, 1)
 
 function softTexture(): CanvasTexture {
   const canvas = document.createElement('canvas')
@@ -112,12 +210,19 @@ function softTexture(): CanvasTexture {
  * `lite` is for another racer's kart (2026-11-17): the same marks, smoke, sparks and flames from
  * smaller pools, so that a full grid costs little; its marks stay about a fifth as long
  */
-export function createKartEffects(world: Object3D, kart: KartModel, lite = false): KartEffects {
+export function createKartEffects(
+  world: Object3D,
+  kart: KartModel,
+  lite = false,
+  /** How much brighter than white the fire may be drawn (post.ts's glow); 1 draws it plain */
+  glow = 1,
+): KartEffects {
   const PUFFS = lite ? 36 : FULL_PUFFS
   const SPARKS = lite ? 50 : FULL_SPARKS
   const MARKS = lite ? 120 : FULL_MARKS
   const JETS = lite ? 48 : FULL_JETS
   const SKIDS = lite ? 1200 : FULL_SKIDS
+  const RIBBON = lite ? 16 : FULL_RIBBON
   const texture = softTexture()
   let clock = 0
 
@@ -247,39 +352,93 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
   let nextSkid = 0
   let skidsShowing = false
 
-  // ── The boost flames, on the kart, one at each thruster ──
-  const outerMaterial = new MeshBasicMaterial({
-    color: kartScene.flame,
+  // ── The boost flames: a shaded jet riding on each thruster ──
+  const flameUniforms = {
+    time: { value: 0 },
+    gain: { value: glow },
+    lit: { value: 0 },
+    core: { value: new Color(kartScene.flameCore) },
+    flame: { value: new Color(kartScene.flame) },
+    tip: { value: new Color(kartScene.flame) },
+  }
+  const flameMaterial = new ShaderMaterial({
+    uniforms: flameUniforms,
+    vertexShader: FLAME_VERTEX,
+    fragmentShader: FLAME_FRAGMENT,
     transparent: true,
-    opacity: 0.85,
-    blending: AdditiveBlending,
     depthWrite: false,
+    blending: AdditiveBlending,
+    side: DoubleSide,
+    toneMapped: false,
   })
-  const innerMaterial = new MeshBasicMaterial({
+  const flameShape = flameGeometry()
+  // One big thruster gets a bigger flame than each of two small ones
+  const flameSize = kart.nozzles.length > 1 ? 0.85 : 1.3
+  const flames = kart.nozzles.map((nozzle) => {
+    const flame = new Mesh(flameShape, flameMaterial)
+    flame.visible = false
+    flame.frustumCulled = false
+    nozzle.add(flame)
+    return flame
+  })
+  // The flash at the thrusters when a boost lights: one soft burst, riding on the kart
+  const flashMaterial = new SpriteMaterial({
+    map: texture,
     color: kartScene.flameCore,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0,
+    depthWrite: false,
+    blending: AdditiveBlending,
+  })
+  const flash = new Sprite(flashMaterial)
+  flash.visible = false
+  const mouths = Math.max(1, kart.thrusters.length)
+  const rear = [0, 1, 2].map(
+    (axis) => kart.thrusters.reduce((sum, thruster) => sum + thruster[axis]!, 0) / mouths,
+  )
+  flash.position.set(rear[0]!, rear[1]!, rear[2]! + 0.15)
+  kart.group.add(flash)
+  let flashAge = FLASH_SECONDS
+
+  // ── The ribbons of light a full boost leaves behind each thruster (two at most) ──
+  const ribbonMaterial = new MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
     blending: AdditiveBlending,
     depthWrite: false,
+    side: DoubleSide,
+    toneMapped: false,
   })
-  // One big thruster gets a bigger flame than each of two small ones
-  const flameSize = kart.thrusters.length > 1 ? 0.8 : 1.25
-  const outerGeometry = new ConeGeometry(0.16 * flameSize, 0.95 * flameSize, 10)
-  const innerGeometry = new ConeGeometry(0.08 * flameSize, 0.6 * flameSize, 8)
-  const flames = kart.thrusters.map((thruster) => {
-    const group = new Group()
-    const outer = new Mesh(outerGeometry, outerMaterial)
-    const inner = new Mesh(innerGeometry, innerMaterial)
-    // Cones point up: laid back along +z, out of the thruster
-    for (const cone of [outer, inner]) cone.rotation.x = Math.PI / 2
-    outer.position.z = 0.48 * flameSize
-    inner.position.z = 0.32 * flameSize
-    group.add(outer, inner)
-    group.position.set(...thruster)
-    group.visible = false
-    kart.group.add(group)
-    return { group, outer, inner }
+  const ribbons = kart.nozzles.slice(0, 2).map(() => {
+    const ribbonPositions = new Float32Array(RIBBON * 2 * 3)
+    const ribbonColours = new Float32Array(RIBBON * 2 * 3)
+    const ribbonIndices = new Uint16Array((RIBBON - 1) * 6)
+    for (let piece = 0; piece < RIBBON - 1; piece++) {
+      const at = piece * 2
+      ribbonIndices.set([at, at + 2, at + 1, at + 2, at + 3, at + 1], piece * 6)
+    }
+    const geometry = new BufferGeometry()
+    const position = new BufferAttribute(ribbonPositions, 3).setUsage(DynamicDrawUsage)
+    const colour = new BufferAttribute(ribbonColours, 3).setUsage(DynamicDrawUsage)
+    geometry.setAttribute('position', position)
+    geometry.setAttribute('color', colour)
+    geometry.setIndex(new BufferAttribute(ribbonIndices, 1))
+    const mesh = new Mesh(geometry, ribbonMaterial)
+    mesh.frustumCulled = false
+    mesh.visible = false
+    world.add(mesh)
+    return {
+      mesh,
+      geometry,
+      position,
+      colour,
+      /** The points, newest first: x, y, z and the moment each was laid */
+      points: new Float32Array(RIBBON * 4).fill(-Infinity),
+      /** Whether the newest point is still riding on the thruster */
+      open: false,
+    }
   })
+  const ribbonColour = new Color()
   // ── The fire a boost leaves behind: small bright puffs out of each thruster, left in the world ──
   const jetMaterials = [kartScene.flameCore, kartScene.flame].map(
     (color) =>
@@ -287,7 +446,7 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
         map: texture,
         color,
         transparent: true,
-        opacity: 0.55,
+        opacity: 0.4,
         depthWrite: false,
         blending: AdditiveBlending,
       }),
@@ -322,8 +481,28 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
   world.add(ring)
   let ringAge = RING_SECONDS
   let ringPower = 0
+  let ringReach: number = BOOST_FX.n2o.ring
+  // The same, standing up behind the kart and facing along the road: a full boost's shock wave
+  const waveMaterial = new MeshBasicMaterial({
+    color: kartScene.flameCore,
+    transparent: true,
+    opacity: 0,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+    toneMapped: false,
+  })
+  const wave = new Mesh(ringGeometry, waveMaterial)
+  wave.visible = false
+  world.add(wave)
+  let waveAge = WAVE_SECONDS
+  let waveReach = 1
+  let heat: HeatSpot | null = null
+  const spot = new Vector3()
+  const styleColour = new Color()
 
   let flicker = 0
+  let boostSparkDue = 0
   let bursts = 0
   let burstPower = 0
   let burstAge = BURST_SECONDS
@@ -486,7 +665,7 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
         const corner = corners[nextPuff % corners.length]!
         const puff = puffs[nextPuff]!
         puff.age = 0
-        puff.thick = smoking ? 0.45 + 0.55 * skid : 0.5
+        puff.thick = smoking ? 0.45 + 0.55 * skid : 0.3
         // Out to the side the kart slides towards (the outside of the drift), and up
         const outward = -Math.sign(look.drift) * (smoking ? 1.2 + Math.random() * 2.2 : 0)
         puff.vx = outward * cos + (Math.random() - 0.5) * 0.8
@@ -549,17 +728,35 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
         const material = charge === 1 ? sparkMaterials[2]! : sparkMaterials[nextSpark % 2]!
         throwSpark(corner, outward, 3 + Math.random() * 4, material)
       }
-      // A boost fired: a fan of sparks out of the back, a ring of light on the road, and the
-      // flames stretch, all by how hard it kicks
-      if ((look.bursts ?? 0) > bursts) {
+      // The boost as the model reads it (boostFx.ts): which kind runs, what fired
+      const boost = kart.boost()
+      const style = BOOST_FX[boost.kind ?? boost.last]
+      const burning = boost.kind !== null
+      // A boost fired: a fan of sparks out of the back, a ring of light on the road, a flash at
+      // the thrusters and the flames stretched, all by how hard it kicks and in its own colour; a
+      // full boost stands a ring up behind the kart too
+      if (boost.fired > bursts) {
         burstAge = 0
-        burstPower = look.burstPower ?? 0.6
+        burstPower = boost.power
+        styleColour.set(style.flame)
         if (!flying) {
           ringAge = 0
           ringPower = burstPower
+          ringReach = style.ring
+          ringMaterial.color.copy(styleColour).lerp(WHITE, 0.45)
           const behind = toWorld(pose, 0, 0.9)
           ring.position.set(behind.x, MARK_HEIGHT + 0.02 + floor, behind.z)
         }
+        if (style.shockwave) {
+          waveAge = 0
+          waveReach = style.ring * 0.42
+          waveMaterial.color.copy(styleColour).lerp(WHITE, 0.3)
+          const behind = toWorld(pose, 0, 1.5)
+          wave.position.set(behind.x, 0.7 + floor, behind.z)
+          wave.rotation.set(0, -pose.heading, 0)
+        }
+        flashAge = 0
+        flashMaterial.color.set(style.core)
         jetDue += 24 * burstPower
         for (let index = 0; index < Math.round(BURST_SPARKS * (0.5 + burstPower)); index++) {
           const corner = corners[index % corners.length]!
@@ -567,8 +764,17 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
           throwSpark(corner, fan, 8 + Math.random() * 9, sparkMaterials[index % 2 === 0 ? 1 : 3]!)
         }
       }
-      bursts = look.bursts ?? 0
+      bursts = boost.fired
       burstAge = Math.min(BURST_SECONDS, burstAge + seconds)
+      // A full boost throws sparks out of the back all the while
+      if (burning && style.ribbons && !flying) {
+        boostSparkDue += BOOST_SPARK_RATE * (lite ? 0.4 : 1) * seconds
+        while (boostSparkDue >= 1) {
+          boostSparkDue -= 1
+          const corner = corners[nextSpark % corners.length]!
+          throwSpark(corner, (Math.random() - 0.5) * 5, 5 + Math.random() * 8, sparkMaterials[0]!)
+        }
+      }
       for (const spark of sparks) {
         if (spark.age >= SPARK_LIFE) continue
         spark.age += seconds
@@ -577,7 +783,7 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
         position.x += spark.vx * seconds
         position.z += spark.vz * seconds
         position.y = Math.max(0.12 + floor, position.y + spark.vy * seconds)
-        const size = 0.3 * (1 - Math.min(1, spark.age / SPARK_LIFE)) + 0.05
+        const size = 0.17 * (1 - Math.min(1, spark.age / SPARK_LIFE)) + 0.04
         spark.sprite.scale.set(size, size, 1)
         if (spark.age >= SPARK_LIFE) spark.sprite.visible = false
       }
@@ -586,14 +792,38 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
       if (ringAge < RING_SECONDS) {
         ringAge += seconds
         const share = Math.min(1, ringAge / RING_SECONDS)
-        const reach = 1 + (RING_REACH * (0.4 + 0.6 * ringPower) - 1) * (1 - (1 - share) ** 2)
+        const reach = 1 + (ringReach * (0.4 + 0.6 * ringPower) - 1) * (1 - (1 - share) ** 2)
         ring.scale.set(reach, reach, 1)
         ringMaterial.opacity = 0.7 * ringPower * (1 - share)
         ring.visible = share < 1
       }
 
-      // The fire left behind the thrusters while a boost runs
-      if (look.boosting) jetDue += JET_RATE * kart.thrusters.length * seconds
+      if (waveAge < WAVE_SECONDS) {
+        waveAge += seconds
+        const share = Math.min(1, waveAge / WAVE_SECONDS)
+        const reach = 0.5 + (waveReach - 0.5) * (1 - (1 - share) ** 3)
+        wave.scale.set(reach, reach, 1)
+        waveMaterial.opacity = 0.75 * ringPower * (1 - share) ** 1.5
+        wave.visible = share < 1
+      }
+      if (flashAge < FLASH_SECONDS) {
+        flashAge += seconds
+        const share = Math.min(1, flashAge / FLASH_SECONDS)
+        const size = (1.2 + 3.4 * burstPower) * (0.4 + 0.6 * share)
+        flash.scale.set(size, size, 1)
+        flashMaterial.opacity = 0.9 * (1 - share) ** 2
+        flash.visible = share < 1
+      }
+
+      // The fire left behind the thrusters while a boost runs, in the boost's colours
+      jetMaterials[0]!.color.set(style.core)
+      jetMaterials[1]!.color.set(style.flame)
+      if (look.boosting)
+        jetDue +=
+          JET_RATE *
+          (style.ribbons ? 0.3 : 0.5 + 0.5 * style.length) *
+          kart.thrusters.length *
+          seconds
       else jetDue = Math.min(jetDue, 1)
       let mouth = 0
       while (jetDue >= 1) {
@@ -608,7 +838,8 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
         jet.vx = spread * cos - back * sin
         jet.vz = spread * sin + back * cos
         jet.vy = (Math.random() - 0.3) * 1.2
-        jet.size = (0.4 + Math.random() * 0.4) * (1 + 0.8 * (1 - burstAge / BURST_SECONDS))
+        jet.size =
+          (0.22 + Math.random() * 0.26) * style.girth * (1 + 0.8 * (1 - burstAge / BURST_SECONDS))
         jet.sprite.position.set(from.x, ty + 0.34 + floor, from.z)
         jet.sprite.visible = true
         nextJet = (nextJet + 1) % JETS
@@ -621,27 +852,105 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
         position.x += jet.vx * seconds
         position.y += jet.vy * seconds
         position.z += jet.vz * seconds
-        const size = jet.size * (1 - share * 0.75)
+        const size = jet.size * (1 - share * 0.85)
         jet.sprite.scale.set(size, size, 1)
         if (share >= 1) jet.sprite.visible = false
       }
 
-      for (const flame of flames) flame.group.visible = look.boosting
-      if (look.boosting) {
-        flicker += seconds * 40
+      // The flames: lit fast, dying away; long and fat just after a boost fires, settling back
+      const lit = boost.heat
+      for (const flame of flames) flame.visible = lit > 0
+      heat = null
+      if (lit > 0) {
+        flicker += seconds
+        flameUniforms.time.value = flicker % 100
+        flameUniforms.lit.value = lit
+        flameUniforms.core.value.set(style.core)
+        flameUniforms.flame.value.set(style.flame)
+        flameUniforms.tip.value.set(style.tip)
+        const burst = 1 + (0.5 + 0.7 * burstPower) * (1 - burstAge / BURST_SECONDS)
+        const length = FLAME_LENGTH * flameSize * style.length * burst * (0.4 + 0.6 * lit)
+        const girth = FLAME_GIRTH * flameSize * style.girth * (1 + (burst - 1) * 0.4)
         for (const flame of flames) {
-          // Long and fat just after a boost fires, settling back
-          const burst = 1.25 + (1.2 + 1.6 * burstPower) * (1 - burstAge / BURST_SECONDS)
-          const stretch = (0.85 + Math.sin(flicker) * 0.15 + Math.random() * 0.1) * burst
-          const fat = 1 + (burst - 1) * 0.35
-          flame.outer.scale.set(fat, stretch, fat)
-          flame.inner.scale.set(fat, (0.8 + Math.random() * 0.3) * burst, fat)
+          flame.scale.set(girth, girth, length * (0.94 + Math.random() * 0.12))
+        }
+        // Where the air shimmers: a little behind the thrusters
+        const behind = toWorld(pose, 0, 1.9)
+        heat = {
+          x: behind.x,
+          y: 0.45 + floor,
+          z: behind.z,
+          strength: lit * (0.4 + 0.6 * Math.min(1, style.length)),
         }
       }
+
+      // The ribbons: a point laid behind each thruster every so often while a full boost runs, the
+      // newest riding on the thruster; each fades with its age
+      const trailing = burning && style.ribbons
+      if (trailing) ribbonColour.set(style.trail).multiplyScalar(1 + (glow - 1) * 0.35)
+      ribbons.forEach((ribbon, index) => {
+        const { points } = ribbon
+        if (!trailing && !ribbon.mesh.visible) {
+          ribbon.open = false
+          return
+        }
+        if (trailing) {
+          kart.nozzles[index]!.getWorldPosition(spot)
+          if (!ribbon.open) {
+            // A new ribbon: nothing joins it to the last one
+            points.fill(-Infinity)
+            ribbon.open = true
+            points.set([spot.x, spot.y, spot.z, clock], 4)
+          }
+          const moved = Math.hypot(points[4]! - spot.x, points[6]! - spot.z)
+          if (moved >= RIBBON_STEP) points.copyWithin(4, 0, (RIBBON - 1) * 4)
+          points.set([spot.x, spot.y, spot.z, clock], 0)
+        } else ribbon.open = false
+        let showing = false
+        const positions = ribbon.position.array as Float32Array
+        const colours = ribbon.colour.array as Float32Array
+        for (let point = 0; point < RIBBON; point++) {
+          const at = point * 4
+          const born = points[at + 3]!
+          const fade = born === -Infinity ? 0 : Math.max(0, 1 - (clock - born) / RIBBON_FADE)
+          if (fade > 0) showing = true
+          // Across the ribbon: square to the way it runs, flat on the road's plane
+          const next = Math.min(RIBBON - 1, point + 1) * 4
+          const previous = Math.max(0, point - 1) * 4
+          let dx = points[previous]! - points[next]!
+          let dz = points[previous + 2]! - points[next + 2]!
+          if (!Number.isFinite(dx) || !Number.isFinite(dz)) dx = dz = 0
+          const length = Math.hypot(dx, dz) || 1
+          const half = (RIBBON_WIDTH / 2) * style.girth * (0.35 + 0.65 * fade)
+          const nx = (-dz / length) * half
+          const nz = (dx / length) * half
+          // A point that has faded sits on the one before it, so its piece has no size
+          const from = fade > 0 ? at : Math.max(0, point - 1) * 4
+          const x = Number.isFinite(points[from]!) ? points[from]! : 0
+          const y = Number.isFinite(points[from + 1]!) ? points[from + 1]! : 0
+          const z = Number.isFinite(points[from + 2]!) ? points[from + 2]! : 0
+          positions.set([x + nx, y, z + nz, x - nx, y, z - nz], point * 6)
+          const strength = fade * fade
+          for (const side of [0, 3]) {
+            colours[point * 6 + side] = ribbonColour.r * strength
+            colours[point * 6 + side + 1] = ribbonColour.g * strength
+            colours[point * 6 + side + 2] = ribbonColour.b * strength
+          }
+        }
+        ribbon.position.needsUpdate = true
+        ribbon.colour.needsUpdate = true
+        ribbon.mesh.visible = showing
+      })
     },
     lift() {
       lastCorners = null
+      for (const ribbon of ribbons) {
+        ribbon.open = false
+        ribbon.points.fill(-Infinity)
+        ribbon.mesh.visible = false
+      }
     },
+    heat: () => heat,
     dispose() {
       for (const puff of puffs) {
         puff.material.dispose()
@@ -661,10 +970,18 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
       skidGeometry.dispose()
       skidMaterial.dispose()
       world.remove(skids)
-      outerGeometry.dispose()
-      innerGeometry.dispose()
-      outerMaterial.dispose()
-      innerMaterial.dispose()
+      for (const flame of flames) flame.removeFromParent()
+      flameShape.dispose()
+      flameMaterial.dispose()
+      flash.removeFromParent()
+      flashMaterial.dispose()
+      for (const ribbon of ribbons) {
+        ribbon.geometry.dispose()
+        world.remove(ribbon.mesh)
+      }
+      ribbonMaterial.dispose()
+      waveMaterial.dispose()
+      world.remove(wave)
     },
   }
 }

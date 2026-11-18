@@ -67,6 +67,7 @@ import {
 } from '../../shared/kart/physics.ts'
 import { calloutAtStart, calloutBetween, louder, type Callout } from './callouts.ts'
 import { BURST_POWER, burstBetween, skidStrength } from './feelFx.ts'
+import { BOOST_FX, boostFx, boostKindOf, type BoostKind } from './boostFx.ts'
 import { readGamepad } from './devices.ts'
 import {
   createKartScene,
@@ -252,6 +253,13 @@ export interface SpikeDebug {
   /** On a track: finish line crossings and the next gate (e8-t04) */
   crossings: number
   nextGate: number
+  /**
+   * 2026-11-18, for looking at the effects (a screenshot, a curious owner): draws the kart as if a
+   * boost of this kind ran, whatever the physics says. Looks only; null or left out, nothing
+   */
+  fx?: BoostKind | null
+  /** The same, for the camera: turned this many radians round the kart, this far back, this high */
+  view?: { orbit?: number; back?: number; up?: number } | null
 }
 
 declare global {
@@ -458,6 +466,11 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let bursts = 0
   /** How hard the last boost kicked (feelFx.ts) */
   let burstPower = 0
+  // What the start boost counts as (boostFx.ts): a perfect one, or a small one
+  let launchKind: BoostKind = 'start'
+  // Whether the kart's shape is open (a full boost runs): its sound when it changes
+  let shapeOpen = false
+  let forced: BoostKind | null = null
   // A hill track (2026-11-17): landings, for the dust and the thump
   let landings = 0
 
@@ -589,6 +602,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         const was = before.kart
         const fired = burstBetween(was, kart, tuning.startBoostDuration)
         if (fired) {
+          if (fired === 'start' || fired === 'quick') launchKind = fired === 'start' ? 'start' : 'mini'
           bursts++
           burstPower = BURST_POWER[fired]
           audio.burst(burstPower)
@@ -621,7 +635,24 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     debug.tuning = tuning
     debug.crossings = run.crossings
     debug.nextGate = run.nextGate
-    const boosting = kartBoosting(current)
+    // Which boost runs (boostFx.ts): the flames' size and colour, and whether the kart changes shape
+    const wanted = debug.fx ?? null
+    if (wanted !== forced) {
+      forced = wanted
+      if (wanted) {
+        bursts++
+        burstPower = BOOST_FX[wanted].power
+        audio.burst(burstPower)
+      }
+    }
+    const boostKind = forced ?? boostKindOf(current, launchKind)
+    const boosting = boostKind !== null || kartBoosting(current)
+    const open = boostKind !== null && BOOST_FX[boostKind].transforms
+    if (open !== shapeOpen) {
+      shapeOpen = open
+      audio.morph(open)
+    }
+    scene.view(debug.view ?? null)
     const skidding = kartSkidding(current)
     // Let go, the car slides on until the grip is back: the nose is still turned the drift's way
     const slideWay = current.driftDirection || (skidding ? -Math.sign(kartSlip(current)) : 0)
@@ -636,7 +667,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       speed: forward,
       steer: debug.input.steer,
       drift: slideWay,
-      boosting,
+      ...boostFx(boostKind ?? (boosting ? 'mini' : null)),
       // The sparks say where the release boost stands: gold once the drift has earned one and all
       // through the slide-out (counter-steer now), blue once it is caught (the throttle now)
       charge:

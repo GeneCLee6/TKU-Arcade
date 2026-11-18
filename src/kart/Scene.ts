@@ -21,8 +21,15 @@ import { groundAt, heightGuess, pitchOf, terrainOf } from '../../shared/kart/ter
 import { buildTrackArt, themeOf, type TrackArt } from './art/trackArt.ts'
 import { QUALITY, type Quality } from './quality.ts'
 import { createKartEffects, type KartEffects } from './art/effects.ts'
+import { buildKartEnvironment } from './art/kartParts.ts'
+import { createPost, type PostFrame } from './post.ts'
 import { createSpeedLines } from './art/speedLines.ts'
-import { buildKartModel, type KartLook, type KartModel } from './art/kartModel.ts'
+import {
+  buildKartModel,
+  type KartFinish,
+  type KartLook,
+  type KartModel,
+} from './art/kartModel.ts'
 import type { DriverId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { createItemArt, type ItemArt, type ItemBoxLook, type ShotLook } from './art/itemArt.ts'
@@ -30,6 +37,9 @@ import { createHitArt, type HitArt, type HitBurst } from './art/hitArt.ts'
 import { OWN_KART, type SpinPose } from './hitFx.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
+/** How far the heat shimmer behind a thruster reaches, as a share of the screen's height */
+const HEAT_REACH = 0.17
+const NO_HEAT: PostFrame['heat'] = []
 const FLAT = { y: 0, pitch: 0 }
 import { kartScene, kartThemes } from '../styles/kartTokens.ts'
 import {
@@ -126,6 +136,11 @@ export interface KartScene {
    * `others`) from behind, or from high above it with `overhead`
    */
   watch(pose: Pose, chased: Chased, frameSeconds: number, overhead: boolean): void
+  /**
+   * For looking at a kart (2026-11-18, spikeLoop.ts's debug `view`): the chase camera turned `orbit`
+   * radians round the kart, `back` metres away and `up` metres high; null puts it back
+   */
+  view(view: { orbit?: number; back?: number; up?: number } | null): void
   /** Puts the camera straight behind the car at once, as after a reset */
   snapCamera(heading: number, y?: number): void
   /** Where the best run's ghost is now (e8-t11), or null to hide it */
@@ -163,10 +178,13 @@ export function createKartScene(
 ): KartScene {
   const settings = QUALITY[quality]
   const renderer = new WebGLRenderer({
-    antialias: settings.antialias,
+    // Developed afterwards (post.ts), the scene is smoothed in its own buffer, not on the canvas
+    antialias: settings.antialias && settings.post === 'off',
     powerPreference: 'high-performance',
   })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO, settings.pixelRatio))
+  // 2026-11-18: bloom, a tone curve and (high) a vignette, heat shimmer and a boost's streak
+  const post = createPost(renderer, settings.post, settings.antialias ? 4 : 0)
   // A track's art casts shadows near the car when the quality allows (e8-t06)
   const shadows = track !== undefined && settings.shadowMap > 0
   renderer.shadowMap.enabled = shadows
@@ -235,11 +253,14 @@ export function createKartScene(
     scene.add(ground, grid)
   }
 
+  // What every kart's paint reflects (2026-11-18): the track's own sky, with bright panels in it
+  const environment = buildKartEnvironment(renderer, theme.skyTop, theme.skyHorizon)
+  const finish: KartFinish = { environment, glow: post?.glow ?? 1 }
   // The hover kart and its driver (e8-t07, 2026-11-14), with its sparks, trails and boost flames
-  const kart = buildKartModel(shadows, false, body, driver)
+  const kart = buildKartModel(shadows, false, body, driver, finish)
   const car = kart.group
   scene.add(car)
-  const effects = createKartEffects(scene, kart)
+  const effects = createKartEffects(scene, kart, false, finish.glow)
   // Made the first time there is a ghost to show
   let ghostKart: KartModel | null = null
   // The other racers' karts, by id, made when each first appears
@@ -273,7 +294,35 @@ export function createKartScene(
     return { y, pitch: pitchOf(terrain, pose.x, pose.z, pose.heading, speed, y) }
   }
   let cameraY = 0
+  let looking: { orbit?: number; back?: number; up?: number } | null = null
   const projected = new Vector3()
+  /** Stunned by a hit (hitFx.ts): the driver sways for as long as the kart spins */
+  const dazedBy = (spin: SpinPose | undefined) => (spin && (spin.yaw !== 0 || spin.lift !== 0) ? 1 : 0)
+  let time = 0
+  /** Draws the frame: developed (post.ts) where the quality has it, else straight to the screen */
+  const present = (boost: number, frameSeconds: number, shimmer: boolean) => {
+    if (!post) {
+      renderer.render(scene, camera)
+      return
+    }
+    time += frameSeconds
+    let heat = NO_HEAT
+    const spot = shimmer ? effects.heat() : null
+    if (spot) {
+      projected.set(spot.x, spot.y, spot.z).project(camera)
+      if (projected.z < 1) {
+        heat = [
+          {
+            x: (projected.x + 1) / 2,
+            y: (projected.y + 1) / 2,
+            reach: HEAT_REACH,
+            strength: spot.strength,
+          },
+        ]
+      }
+    }
+    post.render(scene, camera, { boost, heat, time })
+  }
 
   // One box per wall, along its centre line: the test yard's. A track's art draws its own barriers
   const wallGeometry = new BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS)
@@ -303,6 +352,7 @@ export function createKartScene(
     const { clientWidth: width, clientHeight: height } = container
     if (width === 0 || height === 0) return
     renderer.setSize(width, height)
+    post?.resize()
     camera.aspect = width / height
     // Held upright, a fixed vertical angle leaves almost nothing to the sides
     baseFov = camera.aspect < 1 ? 80 : 60
@@ -325,7 +375,7 @@ export function createKartScene(
       const lift = liftOf(pose, Math.abs(look.speed))
       car.position.set(x, 0, z)
       spinModel(car, heading, spins.get(OWN_KART), lift)
-      kart.update(look, frameSeconds)
+      kart.update(look, frameSeconds, dazedBy(spins.get(OWN_KART)))
       effects.update(terrain ? { x, z, heading, y: lift.y } : { x, z, heading }, look, frameSeconds)
       if (terrain) cameraY += (lift.y - cameraY) * (1 - Math.exp(-CAMERA_RISE * frameSeconds))
 
@@ -361,10 +411,11 @@ export function createKartScene(
       // Only a touch further back at speed (2026-11-17: less than before, so the road rushes by);
       // a boost leaves the camera behind for a moment, so the kart is seen to leap away
       const back =
-        CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * CAMERA_PULL + cameraPull(rig) : 0)
-      const sin = Math.sin(rig.heading)
-      const cos = Math.cos(rig.heading)
-      camera.position.set(x - sin * back, CAMERA_UP + cameraY, z + cos * back)
+        (looking?.back ?? CAMERA_BACK) +
+        (motion ? Math.min(1.5, rig.pace) * CAMERA_PULL + cameraPull(rig) : 0)
+      const sin = Math.sin(rig.heading + (looking?.orbit ?? 0))
+      const cos = Math.cos(rig.heading + (looking?.orbit ?? 0))
+      camera.position.set(x - sin * back, (looking?.up ?? CAMERA_UP) + cameraY, z + cos * back)
       if (motion) {
         const jolt = cameraShake(rig)
         camera.position.add(
@@ -375,13 +426,15 @@ export function createKartScene(
           ),
         )
       }
-      camera.lookAt(
+      if (looking) camera.lookAt(x, 0.6 + cameraY, z)
+      else
+        camera.lookAt(
           x + sin * CAMERA_LOOK_AHEAD,
           CAMERA_LOOK_UP + cameraY,
           z - cos * CAMERA_LOOK_AHEAD,
         )
 
-      renderer.render(scene, camera)
+      present(motion ? Math.min(1, rig.boost + (rig.kick ?? 0) * 0.6) : 0, frameSeconds, motion)
     },
     watch(pose, chased, frameSeconds, overhead) {
       const { x, z } = pose
@@ -418,7 +471,10 @@ export function createKartScene(
           z - cos * CAMERA_LOOK_AHEAD,
         )
       }
-      renderer.render(scene, camera)
+      present(motion ? rig.boost : 0, frameSeconds, false)
+    },
+    view(view) {
+      looking = view
     },
     snapCamera(heading, y) {
       rig = startRig(heading)
@@ -431,7 +487,7 @@ export function createKartScene(
         if (ghostKart) ghostKart.group.visible = false
         return
       }
-      ghostKart ??= buildKartModel(false, true, body, driver)
+      ghostKart ??= buildKartModel(false, true, body, driver, finish)
       if (!ghostKart.group.parent) scene.add(ghostKart.group)
       ghostKart.group.visible = true
       ghostKart.group.position.set(pose.x, 0, pose.z)
@@ -452,15 +508,15 @@ export function createKartScene(
           model = undefined
         }
         if (!model) {
-          model = buildKartModel(false, false, other.body, other.driver)
+          model = buildKartModel(false, false, other.body, other.driver, finish)
           otherKarts.set(other.id, model)
           scene.add(model.group)
-          otherEffects.set(other.id, createKartEffects(scene, model, true))
+          otherEffects.set(other.id, createKartEffects(scene, model, true, finish.glow))
         }
         model.group.position.set(other.x, 0, other.z)
         const lift = liftOf(other, Math.abs(other.look.speed))
         spinModel(model.group, other.heading, spins.get(other.id), lift)
-        model.update(other.look, frameSeconds)
+        model.update(other.look, frameSeconds, dazedBy(spins.get(other.id)))
         otherEffects
           .get(other.id)
           ?.update(
@@ -517,6 +573,8 @@ export function createKartScene(
       itemArt?.dispose()
       hitArt?.dispose()
       art?.dispose()
+      environment.dispose()
+      post?.dispose()
       grid.material.dispose()
       renderer.dispose()
       // Browsers allow a handful of live contexts: don't wait for the collector to free this one

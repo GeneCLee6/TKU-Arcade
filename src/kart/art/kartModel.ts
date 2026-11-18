@@ -1,46 +1,65 @@
 // The karts (e8-t07; owner 2026-11-14: "no tyres, hugging the floor"): hover karts of our own, made
 // in code. No wheels: each body rides about a third of a metre above the road on its thrusters, with
 // a soft bob, a glow on the road beneath it and glowing thruster mouths at the back. Six bodies
-// (e10-t05a), all our own shapes and colours (kartBodies), with working names until KART-WORLD.md
-// (e10-t01):
-//
-// - `tide`, a catamaran: two long pontoons joined by a deck, a thruster at the back of each;
-// - `comet`, a rounded pod with a skirt round it and one big ring thruster;
-// - `ray`, a wide, flat delta with twin tail fins;
-// - `crab`, `heron` and `flyfish` in rosterBodies.ts.
-//
-// The driver (driverModel.ts, e10-t05b) is chibi, one of four, mounted at the body's seat: any
-// driver in any kart, the karts small beside the tracks' oversized scenery. A kart's numbers are in
-// shared/kart/karts.ts; the model is looks only. The footprint matches the physics: about 1.5 m wide
-// and 2.6 m long (KART_RADIUS 1.2).
+// (e10-t05a), all our own shapes and colours (kartBodies), drawn again on 2026-11-18 (owner: "more
+// and more real, more striking; some karts change shape when they fire a boost"): kartBodies.ts has
+// the six shapes, kartParts.ts what they are built from, and this file what they share: the paint
+// (metallic, catching an environment map), the lamps, the thrusters, the driver, and how it all
+// moves.
 //
 // It moves like a hover kart: it bobs, banks into a drift and a fast turn, dips under braking, lifts
-// its nose pulling away, and the thrusters glow brighter with speed and flare in a boost.
+// its nose pulling away, and the thrusters glow brighter with speed and flare in a boost. While a
+// full boost runs (boostFx.ts) the kart changes shape: every body has parts that open, slide and
+// spread, over about a quarter of a second, and close again when it ends. The look says which boost
+// runs; where it only says that one does (another racer's kart, a bot's, a replay's), the kind is
+// worked out from how long it has run, so everyone's kart is seen to change.
+//
+// The driver (driverModel.ts, e10-t05b) is chibi, one of four, mounted at the body's seat: any
+// driver in any kart. They lean into a turn, are thrown back by a boost, and sway when a hit stuns
+// them. A kart's numbers are in shared/kart/karts.ts; the model is looks only. The footprint matches
+// the physics: about 1.5 m wide and 2.6 m long (KART_RADIUS 1.2).
 import {
   AdditiveBlending,
   BoxGeometry,
   CanvasTexture,
   CapsuleGeometry,
   CircleGeometry,
+  Color,
   CylinderGeometry,
-  ExtrudeGeometry,
   Group,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  Object3D,
   PlaneGeometry,
-  Shape,
-  SphereGeometry,
-  TorusGeometry,
+  Vector3,
   type BufferGeometry,
   type Material,
   type Texture,
 } from 'three'
 import type { DriverId } from '../../../shared/kart/karts.ts'
-import { kartBodies, kartHover, kartScene } from '../../styles/kartTokens.ts'
+import { kartBodies, kartHover, kartParts, kartScene } from '../../styles/kartTokens.ts'
 import type { KartBody } from '../bodies.ts'
-import { buildDriver, type ModelKit } from './driverModel.ts'
-import { buildRosterBody, isRosterBody } from './rosterBodies.ts'
+import {
+  BOOST_FX,
+  morphEase,
+  NO_BOOST,
+  readBoost,
+  type BoostKind,
+  type BoostReading,
+} from '../boostFx.ts'
+import { buildDriver } from './driverModel.ts'
+import { buildKartBody } from './kartBodies.ts'
+import {
+  bell,
+  carbonTexture,
+  flatten,
+  hinge,
+  hoop,
+  morphOf,
+  type BodyKit,
+  type Morph,
+} from './kartParts.ts'
 
 /** What the model shows each frame, besides where it is */
 export interface KartLook {
@@ -51,6 +70,11 @@ export interface KartLook {
   /** -1 left, 1 right, 0 not drifting */
   readonly drift: number
   readonly boosting: boolean
+  /**
+   * Which boost runs (2026-11-18, boostFx.ts: spread `boostFx(kind)` into the look). Left out
+   * (another racer's kart, a replay: the wire has one bit), it is worked out from how long it runs
+   */
+  readonly boostKind?: BoostKind
   /**
    * The release boost's state, for the sparks: 1 when the drift has gone on long enough to earn
    * one, 2 while its window is open (press the throttle now), 0 or left out otherwise
@@ -81,14 +105,32 @@ export interface KartModel {
   readonly glow: string
   /** Under the back corners, in the kart's own frame (x, z): where the drift trails and sparks start */
   readonly rearContacts: readonly (readonly [number, number])[]
-  /** The thruster mouths, in the kart's own frame (x, y, z), pointing back (+z): the boost flames */
+  /** The thruster mouths, in the kart's own frame (x, y, z), pointing back (+z), the shape closed */
   readonly thrusters: readonly (readonly [number, number, number])[]
-  update(look: KartLook, frameSeconds: number): void
+  /** The same as things on the chassis, pointing back (+z): the flames ride on them, shape and all */
+  readonly nozzles: readonly Object3D[]
+  /** The boost as last read from the look (boostFx.ts): its kind, the shape's change, what fired */
+  boost(): BoostReading
+  /** `dazed`, 0 to 1: the driver sways, stunned by a hit */
+  update(look: KartLook, frameSeconds: number, dazed?: number): void
   dispose(): void
 }
 
 /** How high the body floats over the road, metres */
 const HOVER = 0.34
+/** How much lower it rides with its shape open */
+const MORPH_DROP = 0.07
+
+/** What the scene lends a kart's paint (Scene.ts): the environment to reflect, and how bright to glow */
+export interface KartFinish {
+  /** kartParts.ts's environment map; none, and the paint is plain */
+  readonly environment?: Texture | null
+  /**
+   * How much brighter than white the lit parts are drawn: above 1 only where the picture is
+   * developed afterwards (post.ts), which turns the excess into a glow
+   */
+  readonly glow?: number
+}
 
 /** A soft round glow, white in the middle: tinted by its material */
 function glowTexture(): CanvasTexture {
@@ -108,44 +150,6 @@ function glowTexture(): CanvasTexture {
 }
 
 /**
- * A flat outline in the kart's plane, (x, z) with -z forward, extruded `height` up with rounded
- * edges: the delta body
- */
-function slab(outline: readonly (readonly [number, number])[], height: number): BufferGeometry {
-  const shape = new Shape()
-  outline.forEach(([x, z], index) => (index === 0 ? shape.moveTo(x, z) : shape.lineTo(x, z)))
-  shape.closePath()
-  const bevel = Math.min(0.08, height / 3)
-  const geometry = new ExtrudeGeometry(shape, {
-    depth: height - bevel * 2,
-    bevelEnabled: true,
-    bevelThickness: bevel,
-    bevelSize: bevel,
-    bevelSegments: 2,
-    curveSegments: 4,
-  })
-  // The shape's y is the kart's z; the depth goes up
-  geometry.rotateX(Math.PI / 2)
-  geometry.translate(0, height - bevel, 0)
-  return geometry
-}
-
-/** A swept tail fin, `length` along the kart and `height` up, thin across: its root at the origin */
-function fin(length: number, height: number): BufferGeometry {
-  const shape = new Shape()
-  shape.moveTo(-length / 2, 0)
-  shape.lineTo(length / 2, 0)
-  shape.lineTo(length / 2, height * 0.35)
-  shape.lineTo(length * 0.3, height)
-  shape.closePath()
-  const geometry = new ExtrudeGeometry(shape, { depth: 0.05, bevelEnabled: false })
-  // The shape's x runs along the kart (+z back), its y up; the depth across
-  geometry.rotateY(-Math.PI / 2)
-  geometry.translate(0.025, 0, 0)
-  return geometry
-}
-
-/**
  * `ghost`: see-through and one colour, as a ghost of the best run (e8-t11), with no glow on the
  * road. Shadows only when the scene draws them
  */
@@ -154,57 +158,84 @@ export function buildKartModel(
   ghost = false,
   body: KartBody = 'tide',
   driverId: DriverId = 'spade',
+  finish: KartFinish = {},
 ): KartModel {
   const colours = kartBodies[body]
+  const environment = finish.environment ?? null
+  const bright = finish.glow ?? 1
   const geometries: BufferGeometry[] = []
   const materials: Material[] = []
   const textures: Texture[] = []
   const keep = <T extends BufferGeometry>(geometry: T) => (geometries.push(geometry), geometry)
-  const paint = (color: string, roughness = 0.45, metalness = 0.15) => {
-    const material = ghost
-      ? new MeshStandardMaterial({
+  const own = <T extends Material>(material: T) => (materials.push(material), material)
+
+  // A ghost is one see-through material all over, so it merges into a mesh or two
+  const ghostPaint = ghost
+    ? own(
+        new MeshStandardMaterial({
           color: kartScene.ghost,
           transparent: true,
           opacity: 0.38,
           depthWrite: false,
           roughness: 0.4,
-          flatShading: true,
-        })
-      : new MeshStandardMaterial({ color, roughness, metalness, flatShading: true })
-    materials.push(material)
-    return material
+        }),
+      )
+    : null
+  const colour = (color: string, roughness = 0.35, metalness = 0.55): Material =>
+    ghostPaint ??
+    own(
+      new MeshStandardMaterial({
+        color,
+        roughness,
+        metalness,
+        envMap: environment,
+        envMapIntensity: 1.15,
+      }),
+    )
+  /** Lit from within: a plain colour, brighter than white by `gain` of what the scene's glow allows */
+  const lit = (color: string, gain = 1) =>
+    own(
+      new MeshBasicMaterial({
+        color: ghost ? kartScene.ghost : new Color(color).multiplyScalar(1 + (bright - 1) * gain),
+        transparent: ghost,
+        opacity: ghost ? 0.3 : 1,
+        depthWrite: !ghost,
+        toneMapped: false,
+      }),
+    )
+  let carbon: Material | null = ghostPaint
+  if (!carbon) {
+    const weave = carbonTexture()
+    textures.push(weave)
+    carbon = own(
+      new MeshStandardMaterial({
+        color: kartParts.metal,
+        map: weave,
+        roughness: 0.42,
+        metalness: 0.5,
+        envMap: environment,
+        envMapIntensity: 0.9,
+      }),
+    )
   }
-  const shine = (color: string, opacity = 1) => {
-    const material = new MeshBasicMaterial({
-      color: ghost ? kartScene.ghost : color,
-      transparent: true,
-      opacity: ghost ? 0.3 : opacity,
-      blending: AdditiveBlending,
-      depthWrite: false,
-    })
-    materials.push(material)
-    return material
+  const glowColour = new Color(colours.glow)
+  const core = lit(colours.glow)
+  const mouth = lit(colours.glow)
+  const tailLamp = lit(kartParts.tailLamp)
+  const tailColour = new Color(kartParts.tailLamp)
+  const paint = {
+    main: colour(colours.main, 0.3, 0.6),
+    second: colour(colours.second, 0.36, 0.5),
+    accent: colour(colours.accent, 0.3, 0.65),
+    carbon,
+    metal: colour(kartParts.metal, 0.22, 1),
+    glass: colour(kartHover.glass, 0.06, 0.9),
+    dark: colour(kartParts.dark, 0.7, 0.2),
+    glow: lit(colours.glow, 0.8),
+    core,
+    headLamp: lit(kartParts.headLamp),
+    tailLamp,
   }
-  const part = (geometry: BufferGeometry, material: Material, x = 0, y = 0, z = 0) => {
-    const mesh = new Mesh(keep(geometry), material)
-    mesh.position.set(x, y, z)
-    mesh.castShadow = shadows
-    return mesh
-  }
-
-  const main = paint(colours.main)
-  const second = paint(colours.second)
-  const accent = paint(colours.accent)
-  const housing = paint(kartHover.housing, 0.5, 0.5)
-  const glass = paint(kartHover.glass, 0.1, 0.6)
-  const kit: ModelKit = {
-    part,
-    paint,
-    smooth: (material) => {
-      if (material instanceof MeshStandardMaterial) material.flatShading = false
-    },
-  }
-  const mouth = shine(colours.glow, 0.95)
 
   const group = new Group()
   // Everything that floats: it bobs, banks and dips above the road; the glow beneath stays put
@@ -212,190 +243,110 @@ export function buildKartModel(
   chassis.position.y = HOVER
   group.add(chassis)
 
-  const discs: Mesh[] = []
-  const thrusters: [number, number, number][] = []
-  /** A thruster: a housing pointing back, its mouth glowing */
-  const thrusterAt = (x: number, y: number, z: number, radius: number) => {
-    const shell = part(new CylinderGeometry(radius, radius * 1.15, 0.42, 12), housing, x, y, z)
-    shell.rotation.x = Math.PI / 2
-    chassis.add(shell)
-    const disc = new Mesh(keep(new CircleGeometry(radius * 0.78, 14)), mouth)
-    disc.position.set(x, y, z + 0.215)
-    chassis.add(disc)
-    discs.push(disc)
-    thrusters.push([x, HOVER + y, z + 0.22])
+  const morphs: Morph[] = []
+  const nozzles: Object3D[] = []
+  const put: BodyKit['put'] = (parent, geometry, material, x = 0, y = 0, z = 0) => {
+    const mesh = new Mesh(keep(geometry), material)
+    mesh.position.set(x, y, z)
+    mesh.castShadow = shadows
+    parent.add(mesh)
+    return mesh
   }
-  /** Where the driver sits, on the chassis */
-  let seat = { y: 0.2, z: 0.25 }
-  let rearContacts: [number, number][] = [
-    [-0.55, 1.0],
-    [0.55, 1.0],
-  ]
+  const kit: BodyKit = {
+    paint,
+    put,
+    colour,
+    morph: (object, to) => morphs.push(morphOf(object, to, morphEase)),
+    nozzle(parent, x, y, z, radius) {
+      put(parent, bell(radius, 0.44), paint.metal, x, y, z)
+      put(parent, hoop(radius * 0.96, 0.02), paint.glow, x, y, z)
+      put(parent, new CircleGeometry(radius * 0.7, 16), mouth, x, y, z - 0.1)
+      // A collar round the bell: it slides back and widens while a full boost runs
+      const collar = hinge(parent, x, y, z - 0.16)
+      put(collar, bell(radius * 1.12, 0.2, 0.86), paint.carbon)
+      kit.morph(collar, { z: z + 0.02, s: 1.3, from: 0.3 })
+      const anchor = new Object3D()
+      anchor.position.set(x, y, z)
+      parent.add(anchor)
+      nozzles.push(anchor)
+    },
+    strip(parent, x, y, z, length, turn = 0, material = paint.glow) {
+      const mesh = put(parent, new BoxGeometry(0.03, 0.022, length), material, x, y, z)
+      mesh.rotation.y = turn
+      return mesh
+    },
+  }
 
-  if (body === 'tide') {
-    // Two pontoons, a deck across them, a nose fairing and a low screen
-    for (const side of [-1, 1]) {
-      const pontoon = part(new CapsuleGeometry(0.24, 1.85, 4, 12), main, side * 0.56, 0.02, 0.02)
-      pontoon.rotation.x = Math.PI / 2
-      chassis.add(pontoon)
-      // A stripe along the top of each
-      chassis.add(part(new BoxGeometry(0.1, 0.04, 1.5), second, side * 0.56, 0.25, 0.05))
-      chassis.add(part(fin(0.5, 0.34), accent, side * 0.56, 0.2, 0.86))
-      thrusterAt(side * 0.56, 0.04, 1.2, 0.17)
-    }
-    chassis.add(part(new BoxGeometry(0.92, 0.12, 1.55), second, 0, 0.12, 0.18))
-    const nose = part(new BoxGeometry(1.0, 0.14, 0.42), accent, 0, 0.12, -0.78)
-    nose.rotation.x = 0.12
-    chassis.add(nose)
-    const screen = part(new BoxGeometry(0.62, 0.26, 0.05), glass, 0, 0.32, -0.42)
-    screen.rotation.x = -0.6
-    chassis.add(screen)
-    seat = { y: 0.18, z: 0.28 }
-    rearContacts = [
-      [-0.56, 1.05],
-      [0.56, 1.05],
-    ]
-  } else if (body === 'comet') {
-    // A rounded pod, a skirt round its waist, stubby wings and one big ring thruster
-    const pod = part(new SphereGeometry(1, 18, 12), main, 0, 0.12, 0.05)
-    pod.scale.set(0.7, 0.36, 1.28)
-    chassis.add(pod)
-    const skirt = part(new TorusGeometry(1, 0.085, 6, 32), accent, 0, 0.04, 0.05)
-    skirt.rotation.x = Math.PI / 2
-    skirt.scale.set(0.76, 1.26, 1)
-    chassis.add(skirt)
-    // A pale cap over the nose
-    const band = part(new SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.32), second)
-    band.position.set(0, 0.06, -0.42)
-    band.scale.set(0.5, 0.36, 0.86)
-    chassis.add(band)
-    // A small fin on the back, a stripe along it
-    chassis.add(part(fin(0.6, 0.36), second, 0, 0.36, 0.72))
-    // One wide, short nozzle at the back: a bell, not a tube
-    const bell = part(new CylinderGeometry(0.26, 0.32, 0.3, 16), second, 0, 0.16, 1.22)
-    bell.rotation.x = Math.PI / 2
-    chassis.add(bell)
-    const disc = new Mesh(keep(new CircleGeometry(0.24, 18)), mouth)
-    disc.position.set(0, 0.16, 1.375)
-    chassis.add(disc)
-    discs.push(disc)
-    thrusters.push([0, HOVER + 0.16, 1.4])
-    seat = { y: 0.26, z: 0.18 }
-    rearContacts = [
-      [-0.5, 1.1],
-      [0.5, 1.1],
-    ]
-  } else if (isRosterBody(body)) {
-    const fit = buildRosterBody(body, kit, chassis, { main, second, accent, glass }, thrusterAt)
-    seat = fit.seat
-    rearContacts = fit.rearContacts
-  } else {
-    // A wide, flat delta, a hump for the cockpit, twin tail fins and two thrusters
-    chassis.add(
-      part(
-        slab(
-          [
-            [0, -1.32],
-            [0.32, -0.95],
-            [0.78, 0.55],
-            [0.74, 1.12],
-            [-0.74, 1.12],
-            [-0.78, 0.55],
-            [-0.32, -0.95],
-          ],
-          0.2,
-        ),
-        main,
-        0,
-        -0.04,
-        0,
-      ),
-    )
-    // A dark inlay down the middle
-    chassis.add(
-      part(
-        slab(
-          [
-            [0, -1.05],
-            [0.2, -0.75],
-            [0.34, 0.9],
-            [-0.34, 0.9],
-            [-0.2, -0.75],
-          ],
-          0.06,
-        ),
-        second,
-        0,
-        0.15,
-        0,
-      ),
-    )
-    for (const side of [-1, 1]) {
-      // Gold wing tips and the tail fins
-      chassis.add(part(new BoxGeometry(0.1, 0.1, 0.6), accent, side * 0.74, 0.08, 0.78))
-      const tail = part(fin(0.55, 0.42), accent, side * 0.5, 0.18, 0.82)
-      tail.rotation.z = side * -0.2
-      chassis.add(tail)
-      thrusterAt(side * 0.32, 0.1, 1.18, 0.15)
-    }
-    const hump = part(new SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), glass)
-    hump.position.set(0, 0.16, -0.42)
-    hump.scale.set(0.3, 0.2, 0.45)
-    chassis.add(hump)
-    seat = { y: 0.2, z: 0.3 }
-    rearContacts = [
-      [-0.7, 1.05],
-      [0.7, 1.05],
-    ]
-  }
+  const { seat, rearContacts } = buildKartBody(body, kit, chassis)
 
   // A handlebar in front of the driver: a hover kart steers with one
-  const bar = new Group()
-  bar.position.set(0, seat.y + 0.3, seat.z - 0.42)
-  bar.add(part(new CylinderGeometry(0.025, 0.025, 0.24, 6), housing, 0, -0.12, 0))
-  const grip = part(new CapsuleGeometry(0.03, 0.42, 2, 6), housing)
-  grip.rotation.z = Math.PI / 2
-  bar.add(grip)
-  chassis.add(bar)
+  const bar = hinge(chassis, 0, seat.y + 0.3, seat.z - 0.42)
+  put(bar, new CylinderGeometry(0.025, 0.03, 0.26, 8), paint.metal, 0, -0.13, 0)
+  put(bar, new CapsuleGeometry(0.03, 0.42, 2, 8), paint.dark).rotation.z = Math.PI / 2
+  put(bar, new BoxGeometry(0.1, 0.05, 0.03), paint.glow, 0, 0.02, -0.02)
 
   // The driver (driverModel.ts), mounted at the seat
-  const { group: driver, head } = buildDriver(kit, driverId)
-  driver.position.set(0, seat.y, seat.z)
-  chassis.add(driver)
+  const driver = buildDriver(kit, driverId)
+  driver.group.position.set(0, seat.y, seat.z)
+  chassis.add(driver.group)
 
-  // The glow on the road beneath: not on a ghost
+  // Where the thruster mouths are with the shape closed, in the kart's own frame
+  group.updateMatrixWorld(true)
+  const spot = new Vector3()
+  const thrusters = nozzles.map((nozzle): [number, number, number] => {
+    group.worldToLocal(nozzle.getWorldPosition(spot))
+    return [spot.x, spot.y, spot.z]
+  })
+  // Everything built: one mesh for each material in each moving part
+  flatten(chassis, keep, shadows)
+
+  // The glow on the road beneath, and the pool of the head lamps ahead: not on a ghost
   let under: Mesh | null = null
   let underMaterial: MeshBasicMaterial | null = null
   if (!ghost) {
     const texture = glowTexture()
     textures.push(texture)
-    underMaterial = new MeshBasicMaterial({
-      map: texture,
-      color: colours.glow,
-      transparent: true,
-      opacity: 0.6,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3,
-    })
-    materials.push(underMaterial)
+    const pool = (color: string, opacity: number) =>
+      own(
+        new MeshBasicMaterial({
+          map: texture,
+          color,
+          transparent: true,
+          opacity,
+          blending: AdditiveBlending,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -3,
+          polygonOffsetUnits: -3,
+        }),
+      )
+    underMaterial = pool(colours.glow, 0.6)
     under = new Mesh(keep(new PlaneGeometry(2.2, 3.4)), underMaterial)
     under.rotation.x = -Math.PI / 2
     // Above the road, kerbs and lines (trackArt.ts LIFT), under the body
     under.position.y = 0.1
     group.add(under)
+    const beam = new Mesh(keep(new PlaneGeometry(2.6, 4.4)), pool(kartParts.headLamp, 0.14))
+    beam.rotation.x = -Math.PI / 2
+    beam.position.set(0, 0.1, -3.1)
+    group.add(beam)
   }
 
   let roll = 0
   let pitch = 0
   /** The nose thrown up by a boost that fired, radians, dying away; and the boosts seen so far */
   let rear = 0
-  let burstsSeen = 0
+  let firedSeen = 0
   let lastSpeed = 0
   let bob = 0
-  let flare = 0
+  let lean = 0
+  let thrown = 0
+  let braking = 0
+  let sway = 0
+  let reading: BoostReading = NO_BOOST
+  let shaped = -1
+  const tint = new Color()
+  const flameColour = new Color()
   const ease = (from: number, to: number, rate: number, seconds: number) =>
     from + (to - from) * (1 - Math.exp(-rate * seconds))
 
@@ -406,7 +357,10 @@ export function buildKartModel(
     glow: colours.glow,
     rearContacts,
     thrusters,
-    update(look, seconds) {
+    nozzles,
+    boost: () => reading,
+    update(look, seconds, dazed = 0) {
+      reading = readBoost(reading, look, seconds)
       const speedShare = Math.min(1, Math.abs(look.speed) / 30)
       // Banking into a drift, a little into a fast turn: - about z leans the top towards +x, into a right turn
       // (2026-11-17: deeper, by how hard it slides, so that the weight is seen to go over)
@@ -419,32 +373,69 @@ export function buildKartModel(
       lastSpeed = look.speed
       // + about x lifts the nose: up pulling away and in a boost, down under braking
       // A boost that fires throws the nose up (2026-11-17), settling to a lift while it lasts
-      if ((look.bursts ?? 0) > burstsSeen) rear = 0.1 + 0.12 * (look.burstPower ?? 0.6)
-      burstsSeen = look.bursts ?? 0
+      if (reading.fired > firedSeen) rear = 0.1 + 0.12 * reading.power
+      firedSeen = reading.fired
       rear = ease(rear, 0, 5, seconds)
       const targetPitch =
         Math.max(-0.08, Math.min(0.07, accel * 0.004)) + (look.boosting ? 0.05 : 0) + rear
       pitch = ease(pitch, targetPitch, 9, seconds)
       bob += seconds * (2.3 + speedShare * 3)
+
+      // The change of shape: every part to its place, the body lower
+      const open = morphEase(reading.morph)
+      if (reading.morph !== shaped) {
+        shaped = reading.morph
+        for (const morph of morphs) morph(reading.morph)
+      }
       chassis.rotation.z = roll
       chassis.rotation.x = pitch
       chassis.position.y =
-        HOVER +
+        HOVER -
+        MORPH_DROP * open +
         Math.sin(bob) * (0.045 - speedShare * 0.02) +
         Math.sin(bob * 7.3) * 0.006 * speedShare
-      // The driver leans with the kart and looks where they steer
-      driver.rotation.z = roll * 0.8 - look.steer * 0.05
+
+      // The driver: into the turn, thrown back by a boost and by pulling away, forward under
+      // braking; the head looks where they steer; stunned, they sway and the head lolls
+      const heat = reading.heat
+      lean = ease(lean, -look.steer * 0.16 - look.drift * 0.12, 8, seconds)
+      thrown = ease(
+        thrown,
+        Math.max(-0.16, Math.min(0.12, accel * 0.006)) + heat * 0.24 + rear * 0.8,
+        10,
+        seconds,
+      )
+      sway += seconds * (dazed > 0 ? 9 : 0)
+      const { torso, head, arms } = driver
+      torso.rotation.z = lean + Math.sin(sway) * 0.3 * dazed
+      torso.rotation.x = thrown + Math.cos(sway * 0.7) * 0.12 * dazed
       head.rotation.y = -look.steer * 0.3 - look.drift * 0.15
+      head.rotation.z = Math.sin(sway * 1.3 + 1) * 0.35 * dazed
+      head.rotation.x = -thrown * 0.5 + Math.cos(sway * 1.1) * 0.2 * dazed
       bar.rotation.y = -look.steer * 0.45
-      // The thrusters glow with speed and flare in a boost
-      flare = ease(flare, look.boosting ? 1 : 0, 10, seconds)
-      const size = 0.75 + speedShare * 0.3 + flare * 0.35
-      for (const disc of discs) disc.scale.set(size, size, 1)
+      // The arms stay on the bar: they reach as the torso goes back, and follow the bar round
+      for (const arm of arms) arm.rotation.set(-thrown * 0.9 - 0.3 * dazed, -look.steer * 0.3, 0)
+
+      // The lit parts: the thruster mouths by the speed, white-hot in the boost's own colour; the
+      // core by how far the shape has opened; the tail lamps brighter under braking
+      if (!ghost) {
+        flameColour.set(BOOST_FX[reading.last].flame)
+        tint.copy(glowColour).lerp(flameColour, heat)
+        mouth.color.copy(tint).multiplyScalar((0.55 + speedShare * 0.45 + heat * 1.4) * bright)
+        const pulse = 1 + Math.sin(bob * 5) * 0.12 * open
+        core.color
+          .copy(glowColour)
+          .lerp(flameColour, heat * 0.35)
+          .multiplyScalar((0.1 + 0.9 * Math.min(1, open)) * pulse * (1 + (bright - 1) * 1.3))
+        braking = ease(braking, accel < -8 ? 1 : 0, 14, seconds)
+        tailLamp.color.copy(tailColour).multiplyScalar((0.55 + braking * 0.9) * bright)
+      }
       if (under && underMaterial) {
-        // The glow spreads and dims as the body rises on its bob
+        // The glow spreads and dims as the body rises on its bob, and takes the boost's colour
         const lift = chassis.position.y - HOVER
-        under.scale.set(1 + lift * 2, 1 + lift * 2, 1)
-        underMaterial.opacity = 0.7 - lift * 2 + flare * 0.25
+        under.scale.set(1 + lift * 2 + open * 0.25, 1 + lift * 2 + open * 0.2, 1)
+        underMaterial.opacity = 0.7 - lift * 2 + heat * 0.15
+        underMaterial.color.copy(glowColour).lerp(flameColour, heat * 0.4)
       }
     },
     dispose() {

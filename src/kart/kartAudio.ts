@@ -31,6 +31,11 @@ export interface KartAudio {
   hit(strength: number): void
   /** A boost fired, `power` hard (feelFx.ts's BURST_POWER): the bang and the whoosh */
   burst(power: number): void
+  /**
+   * The kart's shape changing (2026-11-18, boostFx.ts): a servo's whirr rising and a latch as it
+   * opens, falling as it closes
+   */
+  morph(open: boolean): void
   /** An item race's sound (2026-11-17, itemSounds.ts), `volume` 0 to 1 */
   cue(cue: ItemCue, volume?: number): void
   dispose(): void
@@ -347,6 +352,42 @@ export function createKartAudio(): KartAudio {
     whine.stop(now + 0.4)
   }
 
+  /** The whirr of the kart's parts moving and the click of them locking: made here, like the rest */
+  const morph = (open: boolean) => {
+    if (!audio || !nodes || !isSoundOn() || audio.state !== 'running') return
+    const now = audio.currentTime
+    const length = open ? 0.25 : 0.3
+    const [from, to] = open ? [190, 620] : [540, 170]
+    const servo = audio.createOscillator()
+    servo.type = 'sawtooth'
+    servo.frequency.setValueAtTime(from, now)
+    servo.frequency.exponentialRampToValueAtTime(to, now + length)
+    const tone = audio.createBiquadFilter()
+    tone.type = 'bandpass'
+    tone.Q.value = 3
+    tone.frequency.setValueAtTime(from * 3, now)
+    tone.frequency.exponentialRampToValueAtTime(to * 3, now + length)
+    const servoGain = audio.createGain()
+    servoGain.gain.setValueAtTime(0.0001, now)
+    servoGain.gain.exponentialRampToValueAtTime(0.16, now + 0.03)
+    servoGain.gain.exponentialRampToValueAtTime(0.0001, now + length + 0.05)
+    servo.connect(tone).connect(servoGain).connect(nodes.master)
+    servo.start(now)
+    servo.stop(now + length + 0.1)
+    // The latch: a short, bright knock as the parts lock home
+    const latch = audio.createOscillator()
+    latch.type = 'square'
+    latch.frequency.setValueAtTime(open ? 1500 : 900, now + length)
+    latch.frequency.exponentialRampToValueAtTime(open ? 420 : 260, now + length + 0.05)
+    const latchGain = audio.createGain()
+    latchGain.gain.setValueAtTime(0.0001, now + length)
+    latchGain.gain.exponentialRampToValueAtTime(0.2, now + length + 0.005)
+    latchGain.gain.exponentialRampToValueAtTime(0.0001, now + length + 0.09)
+    latch.connect(latchGain).connect(nodes.master)
+    latch.start(now + length)
+    latch.stop(now + length + 0.12)
+  }
+
   return {
     unlock() {
       if (typeof window.AudioContext !== 'function') return
@@ -403,6 +444,7 @@ export function createKartAudio(): KartAudio {
       source.start(now)
       source.stop(now + 0.4)
     },
+    morph,
     burst(power) {
       if (audio) lastBurst = audio.currentTime
       burst(power)

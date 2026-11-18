@@ -674,6 +674,44 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **測試**：`tests/kart/cornerSigns.test.ts`（體育場形的路：兩個右彎、反向是左彎、大半徑不算彎；板子在路外、在外側、箭頭方向、入彎前就開始、間距、低畫質變少；五張內建賽道每個彎至少 2 塊、沒有一塊在路上、同一條路給同一組板子）。
 - **限制**：箭頭板可能和樹、旗桿、看台重疊（都在護欄外，沒有逐一避開）；觀戰與重播的車沒有特效；別人的車沒有點火的光環與鏡頭效果（frame 裡沒有「哪一種噴射」）。
 
+### 4.30 路線圖外：車款重畫、噴射特效一套系統、噴氮氣變身、後處理（2026-11-18，`feat/kart-visual-overhaul`）
+
+擁有者 2026-11-18：「車子的設計還有噴氮氣的特效要再設計過……要越來越逼真，越帥，比如跑跑有些車子噴氮氣還會變身」。造型、變身與特效全部原創（規則 1），全部程式產生（`ASSETS.md`），物理、協定、HUD 版面都沒動。
+
+**特效 API（`src/kart/boostFx.ts`，純函式，Node 測）**
+
+- `type BoostKind = 'mini' | 'n2o' | 'team' | 'start'`：瞬間加速（小）、N2O（大）、團隊 N2O（藍色）、完美起跑（金色）。`BOOST_FX[kind]` 是一張表：火焰的心、身、尖與光帶的顏色（`kartTokens.ts` 的 `kartBoost`）、長度與粗細、會不會變身（`transforms`，只有 `mini` 不會）、有沒有光帶與持續火花（`ribbons`）、點火力道（`power`，與 `feelFx.ts` 的 `BURST_POWER` 同一把尺）、地上光環的半徑、有沒有立起來的衝擊波環。
+- **呼叫方式：`boostFx(kind)`**。回傳 `{ boosting: true, boostKind: kind }`（`boostFx(null)` 是 `{ boosting: false }`），攤進車的 `KartLook`：`{ ...look, ...boostFx('team') }`。之後火焰、光帶、火花、光環、變身、鏡頭、後處理全部跟著走，呼叫的人不用碰別的。團隊賽要藍色團隊 N2O，就在組 `look` 的地方（`spikeLoop.ts` 的 `boostKind`，現在是 `boostKindOf(kart, launchKind)`）改成回 `'team'`。
+- `boostKindOf(state, launch)`：自己的車從物理狀態讀種類（`boostSeconds > 0` → `n2o`；`launchSeconds > 0` → 完美起跑 `start`、小起跑 `mini`；`miniSeconds > 0` → `mini`）。
+- `readBoost(before, look, seconds)`：每幀把 `look` 讀成 `BoostReading`（`kind`、`last`、`morph` 0–1、`heat` 0–1、`fired` 計數、`power`、`age`）。`kartModel.ts` 每台車各存一份，`effects.ts` 讀同一份（`model.boost()`）。
+- **別人的車、電腦車、觀戰、重播**：frame 只有一個「在噴」的 bit，沒有種類，協定不動。`look.boostKind` 沒給時 `readBoost` 自己推：開始噴先當 `mini`，連續噴滿 `DERIVE_FULL_SECONDS`（0.75 秒；瞬間加速 0.5–0.7 秒、N2O 約 3 秒）就升成 `n2o`，升級時再點一次火（`fired` +1）並開始變身。所以別人的變身比實際晚 0.75 秒，別人的團隊 N2O 目前看起來是橘色（要藍色得讓 frame 帶種類，或由團隊賽從房間狀態在 `others()` 填 `boostKind`）。
+- 變身的時間：開 `MORPH_IN_SECONDS` 0.25 秒、收 `MORPH_OUT_SECONDS` 0.3 秒；`morphEase` 是帶一點過衝的 ease-out-back。
+- 除錯：`window.__kartSpike.fx = 'n2o' | 'team' | …`（只影響畫面，物理不變）、`window.__kartSpike.view = { orbit, back, up }`（鏡頭繞車）；`scripts/kart-shots.mjs` 用這兩個截圖。
+
+**車（`src/kart/art/kartParts.ts`、`kartBodies.ts`、`kartModel.ts`、`driverModel.ts`）**
+
+- `kartParts.ts`：`loft(sections)`（沿車長過一串超橢圓截面拉出的蒙皮，車身的線條靠它）、`plate`、`blade`、`bell`（噴口）、`hoop`；`buildKartEnvironment(renderer, sky, horizon)` 用 `PMREMGenerator` 從一個小場景（賽道自己的天空色漸層、暗地板、四塊亮板）做環境貼圖，每個 `Scene` 一張；`carbonTexture()` 是 32 px 的 canvas 碳纖編織；`flatten(root)` 把每個 group 裡同材質的 mesh 併成一個（一台車約 15–25 個 draw call，不併是 100 以上）；`morphOf(object, to, ease)` 記住零件現在的位置與變身後的位置（`from`／`until` 可以錯開時間）。
+- `kartModel.ts`：材質是 `MeshStandardMaterial`（金屬漆 metalness 0.6、碳纖、金屬、玻璃）＋環境貼圖，發光件是 `MeshBasicMaterial`（發光條、噴口、核心、頭燈、尾燈；有後處理時顏色乘到 1 以上讓 bloom 抓）。`BodyKit`（`put`、`colour`、`morph`、`nozzle`、`strip`）借給車身與車手。每幀：`readBoost` → 變身（`morph` 變了才動零件）、車身降 7 cm、噴口亮度跟速度與噴射、核心亮度跟變身、煞車時尾燈變亮、地上多一塊頭燈光。幽靈車整台一個半透明材質。
+- 六台車的造型與變身在 `KART-WORLD.md` §4.2。
+- 車手：坐姿（腿、手握把手）、轉向與甩尾時上半身往彎內傾、噴射與起步時後仰（煞車前傾）、手跟著把手、被打中時（`Scene` 從 `hitFx` 的打轉得知）上半身搖晃、頭亂晃。`update(look, seconds, dazed)`。
+
+**噴射特效（`src/kart/art/effects.ts`）**
+
+- 火焰：每個噴口一個 `ShaderMaterial` 的噴流（lathe 幾何，掛在噴口的 anchor 上，所以跟著變身後的噴口走）；fragment 用視線與法線的夾角算厚度（中間白熱的心、邊緣是顏色）、沿長度從身的顏色到尖的顏色、往後跑的馬赫環、抖動。長度與粗細照 `BOOST_FX`，點火瞬間拉長。
+- 點火：噴口一團閃光（0.16 秒）、地上光環（顏色與半徑照種類）、`n2o`／`team`／`start` 多一個立在車後、面向前進方向的衝擊波環（0.34 秒）、一把火花；持續噴的時候 `ribbons` 的種類每個噴口（最多兩個）拖一條世界座標的光帶（每 0.3 m 一個點、0.3 秒淡出、最多 30 點）並持續噴火花。
+- 別人的車（`lite`）同一套，池子小一號（光帶 16 點、火花 40%）。
+- 鏡頭沿用 §4.28 的 `kickRig`／`cameraPull`／FOV；自己的車變身開、收各有一聲（`kartAudio.morph`：鋸齒波掃頻的伺服聲＋一下扣上的聲音，合成）。
+
+**後處理（`src/kart/post.ts`）與畫質（`quality.ts` 的 `post`）**
+
+- 自己寫的一條鏈（沒有用 three.js examples 的 `EffectComposer`，省 bundle）：場景畫進 `HalfFloat` 的 render target（MSAA 4×，canvas 自己不開 antialias）→ 亮部（> 1.45，軟膝）降到 1/2 → 逐級減半 → 逐級用 tent 濾鏡加回去（bloom）→ 最後一個 pass：加 bloom、Khronos PBR Neutral 色調映射（0.76 以下的顏色不變，只壓高光）、sRGB、抖色。瀏覽器不能畫到浮點 target 時退回 8 bit（門檻 0.9）。
+- 三級：`low` = `off`（直接畫到畫面，和以前一樣，沒有 bloom，發光件不超過 1）；`medium` = `bloom`（4 級 bloom＋色調映射）；`high` = `full`（5 級，另加輕微暈影、噴口後方的熱擾動（把自己的車的噴口後方投影到螢幕，在那一圈扭 UV）、噴射時往畫面邊緣的放射狀拖影）。`prefers-reduced-motion` 時不做拖影與熱擾動。
+- 手機預設仍是 `medium`、桌機 `high`（`loadQuality`，沒變）；`/stats` 的 fps 遙測照舊分畫質記。
+
+**測試**：`tests/kart/boostFx.test.ts`（每種的樣式、`boostFx`、`boostKindOf`、變身開 0.25 秒收 0.3 秒、`mini` 不變身、有 `bursts` 時照呼叫者的計數點火、只有 `boosting` 時先 `mini` 後 `n2o` 並再點一次、`morphEase`）。模型、特效、後處理要 WebGL，靠 `scripts/kart-shots.mjs`（真 GPU 截圖）與卡丁車 e2e。
+
+**限制**：別人的車變身晚 0.75 秒、別人的團隊 N2O 不是藍色（見上）；熱擾動只做自己的車；車還是程式拼的幾何（沒有 UV 貼圖、沒有法線貼圖、沒有骨架動畫）；`medium` 在舊手機上多一次全螢幕 pass 加 bloom 鏈，掉幀就切 `low`。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
