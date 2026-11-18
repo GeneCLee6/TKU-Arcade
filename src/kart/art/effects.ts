@@ -323,6 +323,21 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
   let ringAge = RING_SECONDS
   let ringPower = 0
 
+  // A team boost (2026-11-18) burns blue: the same flames, fire and ring, in other colours. Changed
+  // only while a boost runs, so that the fire left behind keeps the colour it was thrown in
+  let tint: KartLook['tint']
+  const paint = (next: KartLook['tint']) => {
+    if (next === tint) return
+    tint = next
+    const flame = next === 'team' ? kartScene.teamFlame : kartScene.flame
+    const core = next === 'team' ? kartScene.teamFlameCore : kartScene.flameCore
+    outerMaterial.color.set(flame)
+    innerMaterial.color.set(core)
+    jetMaterials[0]!.color.set(core)
+    jetMaterials[1]!.color.set(flame)
+    ringMaterial.color.set(core)
+  }
+
   let flicker = 0
   let bursts = 0
   let burstPower = 0
@@ -434,6 +449,7 @@ export function createKartEffects(world: Object3D, kart: KartModel, lite = false
   return {
     update(pose, look, seconds) {
       clock += seconds
+      if (look.boosting) paint(look.tint)
       floor = pose.y ?? 0
       // In the air (a hill track) nothing touches the road: no marks, no dust, no sparks
       const flying = look.airborne ?? false

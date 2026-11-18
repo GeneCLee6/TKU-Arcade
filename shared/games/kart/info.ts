@@ -44,5 +44,15 @@ export const kartInfo: GameInfo<KartOptions> = {
       ],
       default: 'items',
     },
+    // 2026-11-18: two teams (shared/kart/team.ts), in either mode
+    teams: {
+      kind: 'select',
+      labelKey: 'games.kart.option.teams',
+      choices: [
+        { value: 'solo', labelKey: 'games.kart.teams.solo' },
+        { value: 'teams', labelKey: 'games.kart.teams.teams' },
+      ],
+      default: 'solo',
+    },
   },
 }

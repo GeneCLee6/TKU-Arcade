@@ -8,7 +8,7 @@
 // Abandoning is dropping the run (store.ts `clearCupRun`). The computer karts are drawn once, at the
 // start: the same names, karts and drivers race every race of the cup. Seats: the bots from 0, the
 // player last (as a race against the computer has them).
-import type { KartMode } from '../../../shared/games/kart/types.ts'
+import type { KartMode, KartTeams } from '../../../shared/games/kart/types.ts'
 import { MAX_LAPS } from '../../../shared/games/kart/info.ts'
 import { DRIVER_IDS, KART_IDS } from '../../../shared/kart/karts.ts'
 import type { RaceTrackId } from '../../../shared/kart/tracks/list.ts'
@@ -23,6 +23,8 @@ export interface CupSetup {
   readonly difficulty: Difficulty
   readonly mode: KartMode
   readonly laps: number
+  /** 2026-11-18: every race of the cup a team race; the cup's own points stay each kart's */
+  readonly teams?: KartTeams
 }
 
 export const DEFAULT_CUP_SETUP: CupSetup = {
@@ -143,6 +145,7 @@ export function parseCupSetup(value: unknown): CupSetup | null {
     difficulty: given.difficulty,
     mode: given.mode,
     laps: given.laps,
+    ...(given.teams === 'teams' ? { teams: 'teams' as const } : {}),
   }
 }
 

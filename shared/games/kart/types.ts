@@ -4,6 +4,7 @@
 // who has loaded, the start time, every lap and finish the server judged, and who dropped out.
 import type { ItemId, Warp } from '../../kart/items.ts'
 import type { KartShot } from '../../kart/shots.ts'
+import type { TeamId } from '../../kart/team.ts'
 import type { SeatId } from '../types.ts'
 
 /** A plain race, or one with item boxes on the road (e9-t05) */
@@ -16,7 +17,11 @@ export type KartOptions = {
   custom?: string
   laps: number
   mode: KartMode
+  /** 2026-11-18: everyone for themselves, or two teams (shared/kart/team.ts); either mode can be either */
+  teams?: KartTeams
 }
+
+export type KartTeams = 'solo' | 'teams'
 
 export type KartPhase = 'loading' | 'countdown' | 'racing' | 'finished'
 
@@ -34,6 +39,20 @@ export type KartRacer = {
   item: ItemId | null
   /** Its shield is up until then, by the server's clock (ms since the epoch); 0 for none */
   shieldUntil: number
+  /**
+   * A team race only (2026-11-18, shared/kart/team.ts): its team, the team boosts it holds, those
+   * it has fired so far, and until when (the server's clock) the one it fired last burns
+   */
+  team?: TeamId
+  teamBoosts?: number
+  teamUsed?: number
+  teamUntil?: number
+}
+
+/** A team race's shared state: each team's gauge (in steps, team.ts) and how often it has filled */
+export type KartTeamState = {
+  gauge: [number, number]
+  fills: [number, number]
 }
 
 /**
@@ -80,6 +99,8 @@ export type KartState = {
   used: number
   /** Shots on the road (e9-t06b, shared/kart/shots.ts), oldest first */
   shots: KartShot[]
+  /** A team race only (2026-11-18): the teams' gauges; a race of everyone for themselves has none */
+  teams?: KartTeamState
 }
 
 export type KartAction =
@@ -113,6 +134,12 @@ export type KartAction =
     }
   /** System: shot `shot` hit `seat` at server time `at`; a shield up then stops it (e9-t06b) */
   | { t: 'hit'; seat: SeatId; shot: number; at: number }
+  /** System (a team race): `team`'s gauge stands at `gauge`, as its karts' frames have filled it */
+  | { t: 'tgauge'; team: TeamId; gauge: number }
+  /** System: `team`'s gauge is full: each of its karts still racing gets a team boost */
+  | { t: 'tfill'; team: TeamId }
+  /** System: `seat` fired a team boost it held, at server time `at` */
+  | { t: 'tfire'; seat: SeatId; at: number }
 
 /** Nothing is hidden in a race: every viewer sees the state, and whose seat they are */
 export type KartView = KartState & { you: SeatId | null }

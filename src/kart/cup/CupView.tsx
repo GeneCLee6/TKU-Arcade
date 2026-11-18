@@ -69,6 +69,7 @@ export default function CupView({ run: first, onMenu }: CupViewProps) {
           difficulty: run.setup.difficulty,
           mode: run.setup.mode,
           laps: run.setup.laps,
+          teams: run.setup.teams ?? 'solo',
         }}
         cup={{
           entries: run.entries,

@@ -1,6 +1,7 @@
 // A careful driver for testing a race room alone (`?autopilot` on the room's address): steers at
 // the road a little ahead, eases off for the bends, never drifts. In an item race it taps the item
-// key every second, so whatever it picks up is used. For the browser tests and for
+// key every second, so whatever it picks up is used, and in a team race the boost key while it
+// holds a team boost. For the browser tests and for
 // trying a room with a second tab nobody drives; not a racing opponent.
 import { NO_INPUT, type KartInput } from '../../../shared/kart/physics.ts'
 import { nearestRoadPoint, type Trial } from '../../../shared/kart/timeTrial.ts'
@@ -22,5 +23,7 @@ export function autopilot(trial: Trial, road: readonly RoadPoint[]): KartInput {
     brake: sharp && speed > 32,
     steer: Math.max(-1, Math.min(1, turn * 3)),
     item: Math.floor(trial.steps / 30) % 2 === 1,
+    // A team race: a team boost held is fired, the same way
+    boost: (kart.teamBoosts ?? 0) > 0 && Math.floor(trial.steps / 30) % 2 === 1,
   }
 }

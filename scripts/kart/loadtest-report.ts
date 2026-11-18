@@ -253,6 +253,17 @@ export interface RunInfo {
   events: ItemEventLike[]
   /** The room was dissolved at the end (no room left behind) */
   dissolved: boolean
+  /**
+   * A team race (`--teams`, 2026-11-18): how often each side's gauge filled, the team boosts fired
+   * and still held at the end, each side's score and who won
+   */
+  teams?: {
+    fills: [number, number]
+    fired: number
+    held: number
+    score: [number, number]
+    winner: string | null
+  }
 }
 
 export interface BotReport {
@@ -434,5 +445,11 @@ export function formatReport(report: Report): string {
     `- Items used: ${counts(summary.items.used)}; reached ${summary.items.reached}; shot hits: ${counts(summary.items.hits)}; blocked ${summary.items.blocked}` +
       (summary.items.missing ? `; ${summary.items.missing} events not seen` : ''),
   )
+  if (run.teams) {
+    lines.push(
+      `- Team race: gauges filled red ${run.teams.fills[0]}, blue ${run.teams.fills[1]}; team boosts fired ${run.teams.fired}, still held ${run.teams.held}; ` +
+        `score red ${run.teams.score[0]}, blue ${run.teams.score[1]}; winner ${run.teams.winner ?? 'none'}`,
+    )
+  }
   return lines.join('\n')
 }

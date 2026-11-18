@@ -46,16 +46,27 @@ export interface LocalRoom {
 
 export interface LocalRoomOptions {
   readonly seats: number
+  /** A team race: the side a seat has chosen, by seat (as `Seat.team`); the rest are split evenly */
+  readonly sides?: readonly (number | undefined)[]
   readonly options: KartOptions
   readonly seed: number
   /** The room's clock, ms since the epoch */
   readonly now: () => number
 }
 
-export function createLocalRoom({ seats, options, seed, now }: LocalRoomOptions): LocalRoom {
+export function createLocalRoom({
+  seats,
+  sides,
+  options,
+  seed,
+  now,
+}: LocalRoomOptions): LocalRoom {
   const rng = createRng(seed)
   let state = kart.init(
-    Array.from({ length: seats }, (_, id) => ({ id })),
+    Array.from({ length: seats }, (_, id) => {
+      const team = sides?.[id]
+      return team === undefined ? { id } : { id, team }
+    }),
     options,
     rng,
   )

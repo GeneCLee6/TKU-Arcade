@@ -68,6 +68,10 @@
 //    everything else about them is judged as for anyone. When the host's socket closes or the host
 //    changes during a game, the game is told nobody will move the computer seats any more
 //    (`RealtimeModule.abandon`: the kart retires them).
+// 15. Teams (2026-11-18, the kart's team race). `set_team` puts a member on a side (0 or 1) or, with
+//    null, leaves it to the game: one's own, or anyone's from the host (`member`), in any status
+//    but `playing`. It is `RoomMember.team`, and each seat's goes to the game when it starts
+//    (`Seat.team`); a game without teams ignores it. Nothing else about the room reads it.
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
@@ -175,6 +179,8 @@ export type RoomMember = {
    * only checks its shape (LOOK_PATTERN); the game reads it. Absent until set
    */
   look?: string
+  /** The side this member is on in a game with teams (15. above): 0 or 1; absent until set */
+  team?: number
   /**
    * A computer member (14. above): its level (`GameModule.bots.levels`) and its name's id
    * (`bots.names`), which the browser shows through the game's strings; `name` is only a fallback
@@ -405,6 +411,12 @@ export const LOOK_PATTERN = /^[a-z0-9-]{1,16}(?:\.[a-z0-9-]{1,16})?$/
 /** Show the others a cosmetic choice (RoomMember.look), or take it away with null. Any status */
 export type SetLookMessage = { t: 'set_look'; look: string | null }
 
+/**
+ * Put a member on a side (15. above), or with null leave it to the game. Without `member` it is the
+ * sender's own; with it, the host's choice for that member (a computer member too)
+ */
+export type SetTeamMessage = { t: 'set_team'; team: 0 | 1 | null; member?: string }
+
 export type ClientMessage =
   | JoinMessage
   | ResyncMessage
@@ -423,6 +435,7 @@ export type ClientMessage =
   | SetOptionsMessage
   | SetPasswordMessage
   | SetLookMessage
+  | SetTeamMessage
   | ReactMessage
   | AddBotMessage
 
@@ -681,6 +694,13 @@ export function parseClientMessage(raw: string): ClientMessage | null {
         (typeof value.look === 'string' && LOOK_PATTERN.test(value.look))
         ? { t: 'set_look', look: value.look as string | null }
         : null
+    case 'set_team': {
+      if (value.team !== null && value.team !== 0 && value.team !== 1) return null
+      if (value.member === undefined) return { t: 'set_team', team: value.team }
+      return typeof value.member === 'string' && value.member !== ''
+        ? { t: 'set_team', team: value.team, member: value.member }
+        : null
+    }
     case 'set_password': {
       if (value.password === null) return { t: 'set_password', password: null }
       const password = normalizePassword(value.password)

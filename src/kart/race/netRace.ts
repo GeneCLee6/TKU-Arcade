@@ -35,6 +35,8 @@ import {
   type ShotItem,
 } from '../../../shared/kart/shots.ts'
 import { gridSpot, raceProgress } from '../../../shared/kart/race.ts'
+import { foeShots } from '../../../shared/kart/team.ts'
+import { createTeamRider } from '../../../shared/kart/teamRider.ts'
 import type { Trial } from '../../../shared/kart/timeTrial.ts'
 import type { Track } from '../../../shared/kart/track.ts'
 import type { KartRacer, KartView } from '../../../shared/games/kart/types.ts'
@@ -76,6 +78,9 @@ const TAG_HEIGHT = 2.4
 export interface NameTag {
   readonly seat: number
   readonly at: ScreenPoint
+  /** Where the kart is on the track, for the minimap (2026-11-18) */
+  readonly x: number
+  readonly z: number
 }
 
 export interface RaceNetStatus {
@@ -145,6 +150,8 @@ export interface RaceDebug {
   /** Item frames sent: pickups and uses */
   pickups: number
   uses: number
+  /** A team race: team boosts fired here and told to the room */
+  teamFires: number
   /** #86: hits on this kart foreseen here, and of those the ones the room confirmed */
   foreseen: number
   confirmed: number
@@ -184,6 +191,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     nextGate: 0,
     pickups: 0,
     uses: 0,
+    teamFires: 0,
     foreseen: 0,
     confirmed: 0,
   }
@@ -211,6 +219,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   let lastResets = -1
   const foreseenShots = new Set<number>()
   let foreseen: Foreseen[] = []
+  // 2026-11-18, a team race: the team boosts this kart may fire, kept in step with the room
+  const rider = createTeamRider(options.view().racers.find((racer) => racer.seat === seat))
 
   const pingClock = () => {
     const ping = new Uint8Array(CLOCK_PING_BYTES)
@@ -300,8 +310,19 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   const sendItem = (frame: Parameters<typeof encodeItemFrame>[0]) =>
     realtime.send(encodeItemFrame(frame))
 
-  const adjust = (run: Run, input: KartInput): Run => {
+  /** A team race: a team boost just fired goes to the room, and the kart hears how many it has left */
+  const teamStep = (run: Run, view: KartView): Run => {
+    const held = rider.step(
+      run.kart,
+      view.racers.find((racer) => racer.seat === seat),
+    )
+    if (held.fired && sendItem({ op: 'team', tick })) debug.teamFires++
+    return held.kart === run.kart ? run : { ...run, kart: held.kart }
+  }
+
+  const adjust = (start: Run, input: KartInput): Run => {
     const view = options.view()
+    const run = view.teams ? teamStep(start, view) : start
     if (view.mode !== 'items') return run
     let next = applyEvents(run)
     const now = performance.now()
@@ -345,7 +366,10 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       lastFix = to
       lastResets = next.resets
       const shot = foreseeHit(
-        view.shots ?? [],
+        // A team race: a team-mate's shot passes this kart by, as the room judges it
+        foeShots(view.shots ?? [], seat, (one) =>
+          view.teams ? view.racers.find((racer) => racer.seat === one)?.team : undefined,
+        ),
         seat,
         from,
         to,
@@ -435,6 +459,16 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     others() {
       poses = remotes.poses(performance.now() / 1000)
       debug.others = poses.filter((pose) => !pose.stale).length
+      const view = options.view()
+      const at = roughNow()
+      // A team race: whose team boost burns now, by the room's word (their flames are blue)
+      const burning = view.teams
+        ? new Set(
+            view.racers
+              .filter((racer) => (racer.teamUntil ?? 0) > at)
+              .map((racer) => racer.seat),
+          )
+        : null
       return poses.map((pose): OtherKart => {
         const { kart, driver } = loadoutOfByte(pose.frame.body)
         const forward = pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading)
@@ -453,6 +487,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
             steer: pose.frame.steer,
             drift: pose.frame.driftDirection,
             boosting: pose.frame.boosting,
+            ...(pose.frame.boosting && burning?.has(pose.seat) ? { tint: 'team' as const } : {}),
             // How hard its tyres slide (2026-11-17, feelFx.ts): its skid marks and smoke
             skid: skidStrength(
               Math.atan2(side, forward),
@@ -510,7 +545,14 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     drawn(scene) {
       if (!tagListener) return
       const points = scene.project(poses.map((pose) => [pose.x, TAG_HEIGHT, pose.z] as const))
-      tagListener(poses.map((pose, index) => ({ seat: pose.seat, at: points[index] ?? null })))
+      tagListener(
+        poses.map((pose, index) => ({
+          seat: pose.seat,
+          at: points[index] ?? null,
+          x: pose.x,
+          z: pose.z,
+        })),
+      )
     },
   }
 

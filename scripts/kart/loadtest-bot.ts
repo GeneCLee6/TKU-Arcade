@@ -35,6 +35,7 @@ import {
   type KartTuning,
 } from '../../shared/kart/physics.ts'
 import { encodeItemFrame, ITEM_TUNING, itemBoxes, type ItemFrame } from '../../shared/kart/items.ts'
+import { createTeamRider } from '../../shared/kart/teamRider.ts'
 import {
   boostKart,
   headwindStep,
@@ -78,6 +79,9 @@ const STUCK_SPEED = 1.5
 /** A box this close ahead, and no more than this far off the nose, is worth steering for */
 const SEEK_BOX_REACH = 30
 const SEEK_BOX_ANGLE = 0.5
+/** A team race: a bend steered this hard at this speed or more (m/s) is drifted through */
+const TEAM_DRIFT_STEER = 0.45
+const TEAM_DRIFT_SPEED = 24
 
 const wrapAngle = (angle: number) => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI))
 
@@ -163,6 +167,8 @@ export class Bot {
   private towSeat: number | null = null
   private headwindUntil = 0
   private stunUntil = 0
+  // A team race: the team boosts this kart may fire, as netRace.ts
+  private readonly teamRider = createTeamRider()
   private pickups = 0
   private uses = 0
   private got = 0
@@ -408,7 +414,7 @@ export class Bot {
   private step(game: KartView): void {
     const course = this.course!
     let trial = this.trial!
-    const input = this.seekBox(trial, autopilot(trial, course.road), game)
+    const input = this.teamDrift(this.seekBox(trial, autopilot(trial, course.road), game), trial, game)
     if (trial.phase === 'countdown') {
       const server = this.serverNow()
       const left = game.goAt === null || server === null ? null : (game.goAt - server) / 1000
@@ -517,9 +523,34 @@ export class Bot {
     if (judged) this.sentKeys.push(id)
   }
 
+  /**
+   * A team race: the autopilot never drifts, and a team gauge fills from drifting, so here it holds
+   * the drift key through the bends it takes at speed. Not a good racing line, only a kart that
+   * slides like a person's
+   */
+  private teamDrift(input: KartInput, trial: Trial, game: KartView): KartInput {
+    if (!game.teams || trial.phase !== 'racing') return input
+    const { kart } = trial.run
+    const speed = Math.hypot(kart.vx, kart.vz)
+    return Math.abs(input.steer) > TEAM_DRIFT_STEER && speed > TEAM_DRIFT_SPEED
+      ? { ...input, drift: true, throttle: true, brake: false }
+      : input
+  }
+
   /** Items, as netRace.ts's `adjust`: events applied, boxes taken, the held item used */
   private adjust(trial: Trial, input: KartInput, game: KartView) {
     let run = trial.run
+    if (game.teams) {
+      // A team boost just fired goes to the room, and the kart hears how many it has left
+      const held = this.teamRider.step(
+        run.kart,
+        game.racers.find((one) => one.seat === this.seat),
+      )
+      if (held.fired) {
+        this.sendBinary(encodeItemFrame({ op: 'team', tick: trial.steps }), this.up.item)
+      }
+      if (held.kart !== run.kart) run = { ...run, kart: held.kart }
+    }
     if (game.mode !== 'items' || !this.track) return run
     for (const event of game.events) {
       if (event.n < this.seen) continue

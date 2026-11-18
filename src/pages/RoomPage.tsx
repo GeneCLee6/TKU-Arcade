@@ -252,6 +252,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
             onSetPassword={room.setPassword}
             onSetLook={room.setLook}
             onAddBot={room.addBot}
+            onSetTeam={room.setTeam}
             aside={!compact && <RoomChatPanel room={parts} />}
           />
           {/* On a phone the chat is a drawer, its bar stuck to the bottom of the whole page */}

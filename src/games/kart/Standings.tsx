@@ -1,5 +1,6 @@
 import styled from 'styled-components'
 import type { KartView } from '../../../shared/games/kart/types.ts'
+import { isTeamId, pointsForPlace, TEAM_NAMES } from '../../../shared/kart/team.ts'
 import { useT } from '../../i18n/useT.ts'
 import { raceTime } from './raceTime.ts'
 import { monoType } from '../../styles/esports.ts'
@@ -19,6 +20,11 @@ export function Standings({
   nameOf: (seat: number) => string
 }) {
   const t = useT()
+  // A team race (2026-11-18): each kart's side, and its points once it has finished
+  const finished = view.racers
+    .filter((racer) => racer.finishMs !== null)
+    .sort((a, b) => (a.finishMs as number) - (b.finishMs as number) || a.seat - b.seat)
+    .map((racer) => racer.seat)
   return (
     <List aria-label={t('games.kart.race.standings')} data-testid="kart-standings">
       {order.map((seat, index) => {
@@ -33,14 +39,33 @@ export function Standings({
                   lap: Math.min(racer.lapMs.length + 1, view.laps),
                   laps: view.laps,
                 })
+        const team = view.teams && isTeamId(racer.team) ? racer.team : null
+        const placed = finished.indexOf(seat)
         return (
-          <Row key={seat} $you={seat === view.you} data-seat={seat}>
+          <Row
+            key={seat}
+            $you={seat === view.you}
+            data-seat={seat}
+            data-team={team === null ? undefined : TEAM_NAMES[team]}
+          >
             <Place>{index + 1}</Place>
             <Name>
+              {team !== null && (
+                <TeamMark
+                  $team={team}
+                  role="img"
+                  aria-label={t(`games.kart.team.${TEAM_NAMES[team]}`)}
+                />
+              )}
               {nameOf(seat)}
               {seat === view.you && ` (${t('games.kart.race.you')})`}
             </Name>
-            <Detail>{detail}</Detail>
+            <Detail>
+              {detail}
+              {team !== null &&
+                placed >= 0 &&
+                ` · ${t('games.kart.team.points', { points: pointsForPlace(placed + 1) })}`}
+            </Detail>
           </Row>
         )
       })}
@@ -74,6 +99,14 @@ const Name = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+`
+
+const TeamMark = styled.i<{ $team: 0 | 1 }>`
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: ${space.xs}px;
+  background: ${(p) => (p.$team === 0 ? color.teamRed : color.teamBlue)};
 `
 
 const Detail = styled.span`

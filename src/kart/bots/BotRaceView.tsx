@@ -13,7 +13,7 @@ import type { JsonValue } from '../../../shared/patch.ts'
 import { Button } from '../../components/Button.tsx'
 import '../../games/kart/messages.ts'
 import { Standings } from '../../games/kart/Standings.tsx'
-import { registerMessages } from '../../i18n/t.ts'
+import { registerMessages, type TextKey } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { readNickname } from '../../lib/nickname.ts'
 import { displayType, glass } from '../../styles/esports.ts'
@@ -75,7 +75,17 @@ function BotRound({
     const playerSeat = entries.length
     const room = createLocalRoom({
       seats: entries.length + 1,
-      options: { track: setup.track, custom: setup.custom, laps: setup.laps, mode: setup.mode },
+      options: {
+        track: setup.track,
+        custom: setup.custom,
+        laps: setup.laps,
+        mode: setup.mode,
+        teams: setup.teams ?? 'solo',
+      },
+      // A team race: the player is red, and the computer karts are split so that the sides are even
+      sides: Array.from({ length: entries.length + 1 }, (_, seat) =>
+        seat === playerSeat ? 0 : undefined,
+      ),
       seed,
       now: () => Date.now(),
     })
@@ -125,7 +135,8 @@ function BotRound({
   )
 
   if (view.phase === 'finished') {
-    const standings = kart.result(game.room.state()).standings
+    const result = kart.result(game.room.state())
+    const { standings } = result
     const order = standings.map((line) => line.seat)
     const me = view.racers.find((racer) => racer.seat === game.playerSeat)
     const place = order.indexOf(game.playerSeat) + 1
@@ -138,6 +149,11 @@ function BotRound({
               ? t('kart.bots.place', { place, total: order.length })
               : t('kart.bots.notFinished')}
           </Place>
+          {view.teams && (
+            <TeamLine data-testid="kart-bots-team-result">
+              {t(result.summary.key as TextKey, result.summary.params)}
+            </TeamLine>
+          )}
           <Standings view={view} order={order} nameOf={nameOf} />
           <Actions>
             {cup ? (
@@ -232,6 +248,11 @@ const Heading = styled.h1`
   margin: 0;
   color: ${color.text};
   font-size: ${fontSize.xl}px;
+`
+
+const TeamLine = styled.p`
+  margin: 0;
+  font-weight: 700;
 `
 
 const Place = styled.p`

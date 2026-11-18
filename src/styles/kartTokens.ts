@@ -73,6 +73,9 @@ export const kartScene = {
   signEdge: '#16171A',
   flame: '#FFB020',
   flameCore: '#FFF3C4',
+  // A team boost (2026-11-18, a team race): the same flames, blue
+  teamFlame: '#2F8BFF',
+  teamFlameCore: '#C8F1FF',
   lightSky: '#FFFFFF',
   lightGround: '#6B7280',
 } as const

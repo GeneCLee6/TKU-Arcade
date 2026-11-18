@@ -43,6 +43,8 @@ export type RoomHandle = {
   setLook(look: string | null): void
   /** 2026-11-17: the host adds a computer member (shared/protocol.ts 14.) */
   addBot(level: string, look?: string): void
+  /** 2026-11-18: a side in a game with teams (shared/protocol.ts 15.); `member` from the host */
+  setTeam(team: 0 | 1 | null, member?: string): void
   /**
    * The host's browser acting for a computer seat; quiet when offline (the race loop asks often).
    * False when it could not go out
@@ -210,6 +212,12 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     (look: string | null) => void connection.current?.send({ t: 'set_look', look }),
     [],
   )
+  // 2026-11-18: a side in a game with teams; `member` is the host's choice for someone else
+  const setTeam = useCallback(
+    (team: 0 | 1 | null, member?: string) =>
+      send(member === undefined ? { t: 'set_team', team } : { t: 'set_team', team, member }),
+    [send],
+  )
   const addBot = useCallback(
     (level: string, look?: string) =>
       send(look === undefined ? { t: 'add_bot', level } : { t: 'add_bot', level, look }),
@@ -250,6 +258,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     setPassword,
     setLook,
     addBot,
+    setTeam,
     actFor,
     reactions,
     react,
