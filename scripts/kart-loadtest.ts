@@ -1,5 +1,5 @@
 // e9-t11: `npm run kart:loadtest -- [--url <site>] [--bots 6] [--track oldstreet] [--laps 3]
-// [--mode items|race] [--json <file>]`. Opens a kart room on a site (the local dev server by
+// [--mode items|race] [--teams] [--json <file>]`. Opens a kart room on a site (the local dev server by
 // default), lets N bots (`bot-1`, `bot-2`, ...) join it over the real protocol, sit, pick karts and
 // race it to the end with the game's physics and the autopilot (scripts/kart/loadtest-bot.ts), then
 // dissolves the room and prints what they measured: bytes a second each way, how long a frame took
@@ -11,17 +11,25 @@
 import { writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { DRIVER_IDS, KART_IDS } from '../shared/kart/karts.ts'
+import { teamScore } from '../shared/games/kart/rules.ts'
+import type { KartView } from '../shared/games/kart/types.ts'
 import { MAX_RACERS } from '../shared/kart/race.ts'
+import { TEAM_NAMES } from '../shared/kart/team.ts'
 import { RACE_TRACK_IDS } from '../shared/kart/tracks/list.ts'
 import type { CreateRoomResponse } from '../shared/protocol.ts'
 import { Bot, newLedger } from './kart/loadtest-bot.ts'
-import { buildReport, formatReport, type ItemEventLike } from './kart/loadtest-report.ts'
+import {
+  buildReport,
+  formatReport,
+  type ItemEventLike,
+  type RunInfo,
+} from './kart/loadtest-report.ts'
 
 const PRODUCTION_HOST = 'tku-arcade.genelee-pro.workers.dev'
 /** Frames sent this close before the race was seen to end may reach a room that has stopped judging */
 const CLOSE_MARGIN_MS = 1_000
 
-const USAGE = `Usage: npm run kart:loadtest -- [--url http://localhost:5175] [--bots 6] [--track oldstreet] [--laps 3] [--mode items|race] [--json out.json] [--quiet]`
+const USAGE = `Usage: npm run kart:loadtest -- [--url http://localhost:5175] [--bots 6] [--track oldstreet] [--laps 3] [--mode items|race] [--teams] [--json out.json] [--quiet]`
 
 function usage(problem: string): never {
   console.error(`${problem}\n${USAGE}`)
@@ -35,6 +43,9 @@ const { values } = parseArgs({
     track: { type: 'string', default: 'oldstreet' },
     laps: { type: 'string', default: '3' },
     mode: { type: 'string', default: 'items' },
+    // 2026-11-18: a team race (shared/kart/team.ts); the bots then drift through the bends, so that
+    // the team gauges fill, and fire the team boosts they get
+    teams: { type: 'boolean', default: false },
     json: { type: 'string' },
     quiet: { type: 'boolean', default: false },
     'allow-production': { type: 'boolean', default: false },
@@ -71,10 +82,26 @@ async function createRoom(): Promise<CreateRoomResponse> {
   const response = await fetch(new URL('/api/rooms', url), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ gameId: 'kart', options: { track, laps, mode }, public: false }),
+    body: JSON.stringify({
+      gameId: 'kart',
+      options: { track, laps, mode, teams: values.teams ? 'teams' : 'solo' },
+      public: false,
+    }),
   })
   if (response.status !== 201) throw new Error(`POST /api/rooms: ${response.status} ${await response.text()}`)
   return (await response.json()) as CreateRoomResponse
+}
+
+/** A team race as it ended: how often each gauge filled, the team boosts fired, and the score */
+function teamRun(game: KartView): NonNullable<RunInfo['teams']> {
+  const score = teamScore(game)
+  return {
+    fills: game.teams?.fills ?? [0, 0],
+    fired: game.racers.reduce((sum, racer) => sum + (racer.teamUsed ?? 0), 0),
+    held: game.racers.reduce((sum, racer) => sum + (racer.teamBoosts ?? 0), 0),
+    score: [score.totals[0], score.totals[1]],
+    winner: score.winner === null ? null : TEAM_NAMES[score.winner],
+  }
 }
 
 async function main(): Promise<number> {
@@ -150,6 +177,7 @@ async function main(): Promise<number> {
   const raceEnd = endedAt ?? performance.now()
   const raceSeconds = goSeenAt === null ? 0 : (raceEnd - goSeenAt) / 1000
   for (const bot of racers) bot.forgetAfter(raceEnd - CLOSE_MARGIN_MS)
+  const lastGame = racers[0]?.game() ?? null
   const report = buildReport(
     {
       url: url.origin,
@@ -164,6 +192,7 @@ async function main(): Promise<number> {
       phase: racers[0]?.game()?.phase ?? 'none',
       events: [...events.values()].sort((a, b) => a.n - b.n),
       dissolved,
+      ...(lastGame?.teams ? { teams: teamRun(lastGame) } : {}),
     },
     racers.map((bot) => bot.tally()),
   )

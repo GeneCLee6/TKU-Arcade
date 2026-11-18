@@ -674,6 +674,23 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **測試**：`tests/kart/cornerSigns.test.ts`（體育場形的路：兩個右彎、反向是左彎、大半徑不算彎；板子在路外、在外側、箭頭方向、入彎前就開始、間距、低畫質變少；五張內建賽道每個彎至少 2 塊、沒有一塊在路上、同一條路給同一組板子）。
 - **限制**：箭頭板可能和樹、旗桿、看台重疊（都在護欄外，沒有逐一避開）；觀戰與重播的車沒有特效；別人的車沒有點火的光環與鏡頭效果（frame 裡沒有「哪一種噴射」）。
 
+### 4.30 路線圖外：團隊賽與團隊噴射（2026-11-18，`feat/kart-team-race`）
+
+擁有者 2026-11-18：「團隊賽可以跟跑跑一樣，有藍色的 N2O，噴比較久比較快」。玩法可學、表達不抄：名稱（團隊噴射／Team boost、團隊加速條／Team gauge，都是暫名，`KART-WORLD.md` §5.1）、積分表、HUD 造型都是自己的。線上格式在 `KART-NETCODE.md` §17。
+
+- **選項**：`KartOptions.teams`（`solo`／`teams`，預設 `solo`），和 `mode`（道具／競速）互相獨立，四種組合都可以。
+- **`shared/kart/team.ts`**（純函式，Worker 與瀏覽器共用）：`assignTeams(seats)`（自己選的照舊，沒選的依座位順序補到人少的那一隊，紅隊先；兩台以上時不會有一隊是空的）、`scoreTeams(placed, teamOf, sizes)`（名次 10、8、6、5、4、3、2、1；每隊取最好的 K 台，K＝人少那隊的人數；同分看第一名是哪一隊）、`teamGain(trace, frame, now, teamSize, burning)`（一個 frame 幫隊伍賺多少）、`gaugeStep`、`teamBoostsLeft`。`shared/kart/teamBoost.ts` 只有數字（`TEAM_BOOST`），沒有 import，物理才能讀它而不成環。
+- **分隊怎麼進遊戲**：等待室的選擇存在成員上（`RoomMember.team`，新訊息 `set_team`），開賽時跟著座位進 `init`（`Seat.team`，其他遊戲不讀）。`KartRacer` 多 `team`／`teamBoosts`／`teamUsed`／`teamUntil`，`KartState` 多 `teams: { gauge, fills }`；都是選用欄位，個人賽的 state 一個欄位都沒多。
+- **團隊加速條由房間裁定**（`rules.ts` 的 `fillTeamGauge`）：不信任瀏覽器回報的集氣量，直接從**已經通過合理性檢查的 frame** 推算：frame 的甩尾旗標＋速度（每秒 `driftRate` 14 點 × 速度／68 m/s，最多 1.25 倍）× 距上一個 frame 的時間（最多算 100 ms）；噴射旗標在甩尾後 1.5 秒內由 0 變 1 算一次瞬間加速（5 點）；全部除以隊伍人數；自己的團隊噴射燃燒中不算。小數留在 DO 記憶體（frame 不寫 storage，§4.14 的原則），每跨過 4 點才送一個 `tgauge` system 動作（HUD 用），滿 100 送 `tfill`：那一隊還在跑的每台車 `teamBoosts` +1（上限 2），加速條歸零。DO 被趕出記憶體後從 state 的那一格接著算。
+- **團隊噴射在物理裡**（`classic.ts`）：`KartState` 多兩個選用欄位 `teamBoosts`（可以噴幾個）、`teamSeconds`（還剩幾秒）。按噴射鍵時**先噴團隊的**，而且要等其他噴射噴完（`boostSeconds === 0 && teamSeconds === 0`）；燃燒中自己的存量不會噴、個人加速條不累積。`TEAM_BOOST`：4.35 秒（一般 2.9 秒的 1.5 倍）、極速 × 1.36（一般 1.28）、引擎推力 × 1.65（一般 1.5）。逆風與被打中會把它一起吹熄。「街機（舊）」手感沒有更快的噴射，團隊噴射在那裡是一個 4.35 秒的一般噴射（`stepArcadeTeam`）。沒有這兩個欄位的車（個人賽、計時賽）每一步的結果和以前 bit-for-bit 相同。
+- **誰算數**：`teamBoosts` 的發放與扣除都在房間。瀏覽器看到自己被發了就可以**馬上**在本機噴（不等來回），同時送一個 8 bytes 的 `OP_TEAM` frame；房間確認手上有才扣（`tfire`）並記 `teamUntil`。`shared/kart/teamRider.ts` 讓兩邊對得起來：本機可噴數＝房間說的持有數 −（本機已噴 − 房間已記）；5 秒沒被記到的就當作沒送到。車手（`netRace.ts`）、電腦車（`botRace.ts`）、壓測機器人共用。
+- **藍色**：`KartLook.tint: 'team'`；`effects.ts` 的 `paint` 把尾焰、噴出的火與地上的光環換成 `kartScene.teamFlame`／`teamFlameCore`（只在噴射中換色，留在空中的火保持原色）。自己的車看 `kartTeamBoosting`；別人的車看房間的 `teamUntil`＋frame 的噴射旗標，所以 frame 格式沒動。
+- **畫面**：等待室 `src/kart/team/RoomTeams.tsx`（lazy，只在團隊賽的卡丁車房間）；比賽 `src/kart/race/TeamHud.tsx`：右下角藍色團隊加速條與持有數（在個人加速條上方靠右，不占畫面正上方）、名次下方兩隊即時總分（照目前名次試算）、燃燒時畫面邊緣一圈藍光；名牌底下一條隊色、小地圖上其他車是隊色圓點（`Minimap` 的 `dots`／`others`）；`Standings` 與結果面板顯示隊伍與得分。
+- **單機**：「對戰電腦」與大獎賽的設定多一個「分隊」（`BotSetup.teams`、`CupSetup.teams`）；`localRoom.ts` 收 `sides`，玩家固定紅隊、電腦車平均分。電腦車的腦（`brain.ts`）在直線上、沒有其他噴射時噴團隊噴射。大獎賽的積分仍照個人名次。
+- **電腦車在多人房**：房主代跑的電腦車（§4.21）照常用代送的 frame 累積團隊加速條、代送 `OP_TEAM`。
+- **測試**：`tests/kart/team.test.ts`（分隊、計分、frame 賺多少、物理的時長與速度、先後順序、個人賽不變、房間的累積／發放／使用／權限／結果、六台電腦車跑完一場團隊賽）、`tests/worker/room-teams.test.ts`（`set_team` 的解析與權限、隊伍進遊戲、休眠後還在）、`tests/kart/teamUi.test.tsx`、`e2e/kart-team.spec.ts`（兩人各一隊＋電腦車跑一圈）。
+- **限制**：觀戰與重播的車沒有藍色尾焰與團隊 HUD（重播沒有錄 `teamUntil`）；比賽中不能換隊；團隊加速條的 HUD 以 4 點為一格；不甩尾的自動駕駛（`?autopilot`）集不到氣，壓測要加 `--teams` 讓機器人在彎道甩尾。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

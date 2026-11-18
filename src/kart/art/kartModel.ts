@@ -52,6 +52,11 @@ export interface KartLook {
   readonly drift: number
   readonly boosting: boolean
   /**
+   * The colours the boost burns in: 'team' for a team boost (2026-11-18, a team race), blue. Left
+   * out, the usual flame
+   */
+  readonly tint?: 'team'
+  /**
    * The release boost's state, for the sparks: 1 when the drift has gone on long enough to earn
    * one, 2 while its window is open (press the throttle now), 0 or left out otherwise
    */

@@ -24,6 +24,8 @@ const WITH_RULES: Record<RulesEdition, readonly string[]> = {
     'misery',
     'word-bridge',
     'clue-clash',
+    // 2026-11-18: the race room, with the team race
+    'kart',
   ],
   // A game with a second edition (promotion's full one, C7) has a second pair, `rulesFull.*.md`
   full: ['promotion'],

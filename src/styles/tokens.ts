@@ -59,6 +59,11 @@ const light = {
   seat4: '#0F766E',
   seat5: '#BE185D',
   onSeat: '#FFFFFF',
+  // The kart's team race (2026-11-18): the two sides, and the team gauge's and team boost's blue.
+  // The same in both themes; onSeat reads on the two sides
+  teamRed: '#C81E3A',
+  teamBlue: '#1D5FD8',
+  teamBoost: '#1E9BF0',
   // Silent Table: the same in both themes, as a table and a deck of cards are
   feltPlain: '#14532D',
   feltDiving: '#0C4A6E',
@@ -125,6 +130,11 @@ const dark: Record<ColorName, string> = {
   seat4: '#0F766E',
   seat5: '#BE185D',
   onSeat: '#FFFFFF',
+  // The kart's team race (2026-11-18): the two sides, and the team gauge's and team boost's blue.
+  // The same in both themes; onSeat reads on the two sides
+  teamRed: '#C81E3A',
+  teamBlue: '#1D5FD8',
+  teamBoost: '#1E9BF0',
   feltPlain: '#14532D',
   feltDiving: '#0C4A6E',
   feltClimbing: '#44403C',

@@ -39,7 +39,11 @@ import type { JsonValue } from '../patch.ts'
  */
 export type SeatId = number
 
-export type Seat = { id: SeatId }
+/**
+ * `team` (2026-11-18): the side its member chose in the waiting room (`RoomMember.team`), for a game
+ * with teams (the kart's team race); absent when none was chosen, and any other game ignores it
+ */
+export type Seat = { id: SeatId; team?: number }
 
 /** Who a view is for. A spectator is anyone without a seat */
 export type Viewer = SeatId | 'spectator'

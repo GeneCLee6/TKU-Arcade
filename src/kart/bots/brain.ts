@@ -199,15 +199,22 @@ export function createBotBrain(
   ): KartInput => {
     wasDrifting = kart.drifting
     const straight = Math.abs(later) < gripTurn * 0.4 && Math.abs(want) < gripTurn * 0.4
+    // A team boost held (a team race) is fired like a charge, once nothing else burns
+    const teamReady = (kart.teamBoosts ?? 0) > 0 && kart.boostSeconds === 0
     const fire =
       !boostPressed &&
-      kart.storedBoosts > 0 &&
+      (kart.teamSeconds ?? 0) === 0 &&
       straight &&
       !kart.drifting &&
-      (kart.boostSeconds === 0 || (skill.stackBoosts && kart.boostSeconds < 0.4))
+      (teamReady ||
+        (kart.storedBoosts > 0 &&
+          (kart.boostSeconds === 0 || (skill.stackBoosts && kart.boostSeconds < 0.4))))
     boostPressed = fire
     const calm =
-      kart.boostSeconds === 0 && kart.miniSeconds === 0 && (kart.launchSeconds ?? 0) === 0
+      kart.boostSeconds === 0 &&
+      kart.miniSeconds === 0 &&
+      (kart.launchSeconds ?? 0) === 0 &&
+      (kart.teamSeconds ?? 0) === 0
     const cruising = calm && speed > t.topSpeed * Math.min(1, sense.speedShare)
     const gripSteer = clampSteer(noseWant / gripTurn)
     const base = { ...NO_INPUT, throttle: !cruising, boost: fire }

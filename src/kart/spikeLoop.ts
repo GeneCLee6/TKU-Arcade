@@ -53,6 +53,7 @@ import { mergeInputs } from '../../shared/kart/touch.ts'
 import {
   isClassic,
   kartBoosting,
+  kartTeamBoosting,
   kartBurstWaiting,
   kartSkidding,
   kartSlip,
@@ -133,6 +134,12 @@ export interface SpikeHud {
    * otherwise
    */
   readonly dash?: 0 | 1 | 2
+  /**
+   * A team race only (2026-11-18): the team boosts this kart may fire, and whether one burns. Left
+   * out in any other race
+   */
+  readonly teamBoosts?: number
+  readonly teamBoosting?: boolean
 }
 
 /**
@@ -350,6 +357,8 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
   a.gauge === b.gauge &&
   a.hits === b.hits &&
   a.storedBoosts === b.storedBoosts &&
+  a.teamBoosts === b.teamBoosts &&
+  a.teamBoosting === b.teamBoosting &&
   a.boosting === b.boosting &&
   a.chain === b.chain &&
   (a.dash ?? 0) === (b.dash ?? 0)
@@ -652,6 +661,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       burstPower,
       skid,
       ...(trialCourse?.terrain ? { airborne, landings } : {}),
+      // A team boost (a team race) burns blue
+      ...(kartTeamBoosting(current) ? { tint: 'team' as const } : {}),
     }
     const pose = poseBetween(previous, current, clock.alpha)
     const hitFrame = net?.fx?.(pose)
@@ -685,6 +696,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       chain: boosting ? current.chain : 0,
       hits,
       dash: !rules.chainBoosts ? 0 : waiting ? 2 : current.drifting && current.burstReady ? 1 : 0,
+      ...(current.teamBoosts !== undefined
+        ? { teamBoosts: current.teamBoosts, teamBoosting: kartTeamBoosting(current) }
+        : {}),
     }
     options.onPose?.(current.x, current.z, current.heading, run.nextGate)
     if (trial && track) {

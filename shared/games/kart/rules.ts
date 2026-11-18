@@ -44,6 +44,20 @@ import {
   startTracking,
   type Tracked,
 } from '../../kart/race.ts'
+import {
+  assignTeams,
+  foeShots,
+  gaugeStep,
+  isTeamId,
+  NO_TRACE,
+  scoreTeams,
+  TEAM_BOOST_MS,
+  TEAM_GAUGE,
+  TEAM_NAMES,
+  teamGain,
+  type TeamTrace,
+} from '../../kart/team.ts'
+import { TEAM_BOOST } from '../../kart/teamBoost.ts'
 import { courseOf, type Track } from '../../kart/track.ts'
 import { formatTime } from '../../kart/timeTrial.ts'
 import { CUSTOM_PREFIX, isCustomId, isTrackCode } from '../../kart/editor/custom.ts'
@@ -109,11 +123,67 @@ const isWarp = (value: unknown): value is Warp =>
   Number.isInteger(value.nextGate) &&
   Number.isInteger(value.crossings)
 
-type Memory = { tracked: Map<SeatId, Tracked> }
+type Memory = {
+  tracked: Map<SeatId, Tracked>
+  /**
+   * A team race (team.ts): what each kart's last frame showed, and each team's gauge to the
+   * fraction (the state has it in steps); null until first read, then started from the state
+   */
+  traces: Map<SeatId, TeamTrace>
+  gauge: [number, number] | null
+}
 
 const memoryOf = (memory: RealtimeMemory): Memory => {
   if (!(memory.tracked instanceof Map)) memory.tracked = new Map<SeatId, Tracked>()
+  if (!(memory.traces instanceof Map)) memory.traces = new Map<SeatId, TeamTrace>()
+  if (!Array.isArray(memory.gauge)) memory.gauge = null
   return memory as unknown as Memory
+}
+
+/** A kart's side in a team race; undefined in any other race */
+const teamOfSeat = (state: KartState, seat: SeatId) =>
+  state.teams ? state.racers.find((racer) => racer.seat === seat)?.team : undefined
+
+/** How many karts each team has, dropped out or not */
+const teamSizes = (state: KartState): [number, number] => [
+  state.racers.filter((racer) => racer.team === 0).length,
+  state.racers.filter((racer) => racer.team === 1).length,
+]
+
+/** A team race's score so far: the karts that have finished, in the order they did */
+export function teamScore(state: KartState) {
+  const finished = state.racers
+    .filter((racer) => racer.finishMs !== null)
+    .sort((a, b) => (a.finishMs as number) - (b.finishMs as number) || a.seat - b.seat)
+    .map((racer) => racer.seat)
+  const teamOf = (seat: SeatId) => state.racers.find((racer) => racer.seat === seat)?.team ?? null
+  return scoreTeams(finished, teamOf, teamSizes(state))
+}
+
+/** A team race's result: everyone in finishing order with their points and team, and who won */
+function teamResult(state: KartState): GameResult {
+  const score = teamScore(state)
+  const lines = standings(state).map((line): Standing => {
+    const racer = state.racers.find((one) => one.seat === line.seat)
+    const side = TEAM_NAMES[racer?.team ?? 0]
+    const done = racer?.finishMs != null
+    return {
+      ...line,
+      score: score.points.get(line.seat) ?? 0,
+      note: {
+        key: done ? `games.kart.note.${side}Time` : `games.kart.note.${side}Out`,
+        params: line.note.params ?? {},
+      },
+    }
+  })
+  const [red, blue] = score.totals
+  return {
+    summary:
+      score.winner === null
+        ? { key: 'games.kart.result.teamDraw' }
+        : { key: `games.kart.result.${TEAM_NAMES[score.winner]}Won`, params: { red, blue } },
+    standings: lines,
+  }
 }
 
 function standings(state: KartState): Standing[] {
@@ -177,7 +247,10 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
     const track = raceTrackId(options)
     const laps = Math.max(1, Math.min(MAX_LAPS, Math.round(options.laps)))
     const mode = options.mode === 'race' ? 'race' : 'items'
+    // 2026-11-18: a team race, each seat on the side it chose or the smaller one (team.ts)
+    const teams = options.teams === 'teams' ? assignTeams(seats) : null
     return {
+      ...(teams ? { teams: { gauge: [0, 0], fills: [0, 0] } } : {}),
       mode,
       seed: rng.int(2 ** 31),
       boxes: mode === 'items' ? itemBoxes(raceTrack(track)!).map(() => 0) : [],
@@ -189,7 +262,7 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
       laps,
       phase: 'loading',
       goAt: null,
-      racers: seats.map((seat) => ({
+      racers: seats.map((seat, index) => ({
         seat: seat.id,
         loaded: false,
         lapMs: [],
@@ -197,6 +270,7 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         out: false,
         item: null,
         shieldUntil: 0,
+        ...(teams ? { team: teams[index]!, teamBoosts: 0, teamUsed: 0, teamUntil: 0 } : {}),
       })),
     }
   },
@@ -360,6 +434,56 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
           ),
         }
       }
+      case 'tgauge': {
+        const { team, gauge } = a
+        if (state.phase !== 'racing' || !state.teams) return gameError(PHASE)
+        if (!isTeamId(team) || !isTime(gauge) || gauge < 0 || gauge >= TEAM_GAUGE.full) {
+          return gameError(BAD)
+        }
+        const next: [number, number] = [...state.teams.gauge]
+        next[team] = gauge
+        return { ...state, teams: { ...state.teams, gauge: next } }
+      }
+      case 'tfill': {
+        const { team } = a
+        if (state.phase !== 'racing' || !state.teams) return gameError(PHASE)
+        if (!isTeamId(team)) return gameError(BAD)
+        const gauge: [number, number] = [...state.teams.gauge]
+        const fills: [number, number] = [...state.teams.fills]
+        gauge[team] = 0
+        fills[team]++
+        return {
+          ...state,
+          teams: { gauge, fills },
+          // One each for those still racing; a kart holding all it can gets no more
+          racers: state.racers.map((one) =>
+            one.team === team && !done(one)
+              ? { ...one, teamBoosts: Math.min(TEAM_BOOST.maxHeld, (one.teamBoosts ?? 0) + 1) }
+              : one,
+          ),
+        }
+      }
+      case 'tfire': {
+        if (state.phase !== 'racing' || !state.teams) return gameError(PHASE)
+        const racer = state.racers.find((one) => one.seat === a.seat)
+        const at = a.at
+        if (!racer || done(racer) || !isTime(at) || (racer.teamBoosts ?? 0) <= 0) {
+          return gameError(BAD)
+        }
+        return {
+          ...state,
+          racers: state.racers.map((one) =>
+            one === racer
+              ? {
+                  ...one,
+                  teamBoosts: (one.teamBoosts ?? 0) - 1,
+                  teamUsed: (one.teamUsed ?? 0) + 1,
+                  teamUntil: at + TEAM_BOOST_MS,
+                }
+              : one,
+          ),
+        }
+      }
       case 'close':
         if (state.phase === 'finished') return gameError(PHASE)
         return {
@@ -384,6 +508,7 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
   isOver: (state) => state.phase === 'finished',
 
   result(state): GameResult {
+    if (state.teams) return teamResult(state)
     return { summary: { key: 'games.kart.result.won' }, standings: standings(state) }
   },
 
@@ -431,7 +556,11 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
     frame(state, memory, seat, data, now) {
       const itemFrame = decodeItemFrame(data)
       if (itemFrame) {
-        return { relay: null, actions: judgeItem(state, memoryOf(memory), seat, itemFrame, now) }
+        const actions =
+          itemFrame.op === 'team'
+            ? judgeTeamFire(state, seat, now)
+            : judgeItem(state, memoryOf(memory), seat, itemFrame, now)
+        return { relay: null, actions }
       }
       const frame = decodeFrame(data)
       const racer = state.racers.find((one) => one.seat === seat)
@@ -468,8 +597,14 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
           last && !frame.reset && now - before.lastAt <= PATH_GAP_MS
             ? { x: last.x, z: last.z, at: before.lastAt }
             : null
-        const hit = shotHitting(state.shots ?? [], seat, from, { x: frame.x, z: frame.z, at: now })
+        const shots = foeShots(state.shots ?? [], seat, (one) => teamOfSeat(state, one))
+        const hit = shotHitting(shots, seat, from, { x: frame.x, z: frame.z, at: now })
         if (hit) actions.push({ t: 'hit', seat, shot: hit.n, at: now })
+      }
+      // 2026-11-18, a team race: what this frame earns the kart's team (team.ts)
+      if (state.phase === 'racing' && state.teams && isTeamId(racer.team) && !finishing) {
+        const filled = fillTeamGauge(state, memoryOf(memory), racer, frame, now)
+        if (filled) actions.push(filled)
       }
       // Anyone gone quiet too long drops out; judged whenever someone else's frame comes in
       if (state.phase === 'racing' && state.goAt !== null) {
@@ -497,6 +632,50 @@ export function shotHitting(
   to: Fix,
 ): KartShot | null {
   return shots.find((shot) => shotHits(shot, seat, from, to)) ?? null
+}
+
+// ── The team race (2026-11-18, shared/kart/team.ts) ──────────────────────────────────────────────────
+
+/**
+ * A frame the room has taken, added to its kart's team's gauge. The gauge is kept to the fraction
+ * in memory (frames never write the state); an action comes of it only when the gauge fills, or
+ * moves on a step for the browsers to show. Should the memory be lost, it starts again from the
+ * state's step
+ */
+function fillTeamGauge(
+  state: KartState,
+  memory: Memory,
+  racer: KartRacer,
+  frame: { vx: number; vz: number; drifting: boolean; boosting: boolean },
+  now: number,
+): KartAction | null {
+  const team = racer.team
+  if (!state.teams || !isTeamId(team)) return null
+  memory.gauge ??= [...state.teams.gauge]
+  const size = state.racers.filter((one) => one.team === team).length
+  const burning = (racer.teamUntil ?? 0) > now
+  const earned = teamGain(memory.traces.get(racer.seat) ?? NO_TRACE, frame, now, size, burning)
+  memory.traces.set(racer.seat, earned.trace)
+  if (earned.gain <= 0) return null
+  memory.gauge[team] += earned.gain
+  if (memory.gauge[team] >= TEAM_GAUGE.full) {
+    memory.gauge[team] = 0
+    return { t: 'tfill', team }
+  }
+  const step = gaugeStep(memory.gauge[team])
+  return step !== state.teams.gauge[team] ? { t: 'tgauge', team, gauge: step } : null
+}
+
+/**
+ * A kart says it has fired a team boost: taken when the room knows it to hold one. That one fires
+ * only once the last has burnt out is the kart's own physics' to keep (classic.ts): the room's
+ * clock and the kart's are never quite the same, and a headwind or a hit ends a boost early
+ */
+function judgeTeamFire(state: KartState, seat: SeatId, now: number): KartAction[] {
+  const racer = state.racers.find((one) => one.seat === seat)
+  if (state.phase !== 'racing' || !state.teams || !racer || done(racer)) return []
+  if ((racer.teamBoosts ?? 0) <= 0) return []
+  return [{ t: 'tfire', seat, at: now }]
 }
 
 // ── Items (e9-t05, e9-t06a, e9-t06b) ──────────────────────────────────────────────────────────────────
@@ -540,7 +719,7 @@ function judgeItem(
   state: KartState,
   memory: Memory,
   seat: SeatId,
-  frame: ItemFrame,
+  frame: Exclude<ItemFrame, { op: 'team' }>,
   now: number,
 ): KartAction[] {
   const racer = state.racers.find((one) => one.seat === seat)
@@ -606,7 +785,16 @@ function judgeItem(
     vz: last.vz,
   }
   const ahead = racing.slice(0, place)
-  const next = ahead[ahead.length - 1]
+  // The kart right ahead, whoever it is: a tow pulls towards a team-mate as well as anyone
+  const towed = ahead[ahead.length - 1]
+  const towedAt = towed?.tracked?.last
+  const towedDistance = towedAt ? Math.hypot(towedAt.x - last.x, towedAt.z - last.z) : Infinity
+  // 2026-11-18, a team race: what harms passes team-mates by. A headwind slows only the other side,
+  // and a swap or a cloud goes for the nearest of the other side ahead
+  const foes = state.teams
+    ? ahead.filter((one) => teamOfSeat(state, one.seat) !== racer.team)
+    : ahead
+  const next = foes[foes.length - 1]
   const there = next?.tracked?.last
   const distance = there ? Math.hypot(there.x - last.x, there.z - last.z) : Infinity
   switch (item) {
@@ -614,9 +802,9 @@ function judgeItem(
     case 'shield':
       return applied([])
     case 'tow':
-      return next && distance <= ITEM_TUNING.towReach ? applied([next.seat]) : []
+      return towed && towedDistance <= ITEM_TUNING.towReach ? applied([towed.seat]) : []
     case 'headwind':
-      return ahead.length > 0 ? applied(ahead.map((one) => one.seat)) : []
+      return foes.length > 0 ? applied(foes.map((one) => one.seat)) : []
     case 'swap': {
       const other = next?.tracked
       if (!next || !other || !there || distance > ITEM_TUNING.swapReach) return []

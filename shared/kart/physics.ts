@@ -25,6 +25,7 @@
 // clockwise, so a positive steer turns right.
 
 import { stepClassic } from './classic.ts'
+import { TEAM_BOOST } from './teamBoost.ts'
 
 /** The simulation's one fixed step: 60 Hz, whatever the display does */
 export const STEP_SECONDS = 1 / 60
@@ -141,6 +142,13 @@ export interface KartState {
   readonly driftKey?: boolean
   readonly driftLatch?: boolean
   readonly launchSeconds?: number
+  /**
+   * A team race only (2026-11-18, teamBoost.ts; shared/kart/team.ts): the team boosts the kart may
+   * fire (set by its browser from what the room says it holds) and the seconds of team boost left.
+   * Any other kart never has them
+   */
+  readonly teamBoosts?: number
+  readonly teamSeconds?: number
 }
 
 export const INITIAL_KART: KartState = {
@@ -592,6 +600,38 @@ function align(forward: number, side: number, fraction: number) {
 }
 
 /**
+ * The arcade (old) feel in a team race: it has no faster boost of its own, so a team boost fired is
+ * a boost of the team boost's length (it still shows blue). Fired like the classic feel's: before a
+ * charge, and only once whatever burns has burnt out
+ */
+function stepArcadeTeam(
+  state: KartState,
+  input: KartInput,
+  tuning: KartTuning,
+  rules: KartRules,
+  limitScale: number,
+): KartState {
+  const { teamBoosts: held = 0, teamSeconds: left = 0, ...plain } = state
+  let teamBoosts = held
+  let teamSeconds = left
+  let from: KartState = plain
+  if (
+    input.boost &&
+    !state.boostHeld &&
+    teamBoosts > 0 &&
+    state.boostSeconds === 0 &&
+    teamSeconds === 0
+  ) {
+    teamBoosts--
+    teamSeconds = TEAM_BOOST.seconds
+    // The key counts as held, so that this press does not fire a charge as well
+    from = { ...plain, boostSeconds: TEAM_BOOST.seconds, boostHeld: true }
+  }
+  const next = stepKart(from, input, tuning, rules, limitScale)
+  return { ...next, teamBoosts, teamSeconds: Math.max(0, teamSeconds - STEP_SECONDS) }
+}
+
+/**
  * One step of 1/60 s. Pure: the same state, input, tuning and rules always give the same result.
  */
 export function stepKart(
@@ -607,6 +647,9 @@ export function stepKart(
 ): KartState {
   // The classic feel (2026-11-17) is a step of its own; what follows is the arcade feel, unchanged
   if (tuning.model === MODEL_CLASSIC) return stepClassic(state, input, tuning, rules, limitScale)
+  if (state.teamBoosts !== undefined || state.teamSeconds !== undefined) {
+    return stepArcadeTeam(state, input, tuning, rules, limitScale)
+  }
   const dt = STEP_SECONDS
   const steer = clamp(input.steer, -1, 1)
 
@@ -869,7 +912,13 @@ export const kartSkidding = (state: KartState): boolean => state.drifting || sta
 
 /** Whether any boost (from the gauge, the start or a release) is running */
 export const kartBoosting = (state: KartState): boolean =>
-  state.boostSeconds > 0 || state.miniSeconds > 0 || (state.launchSeconds ?? 0) > 0
+  state.boostSeconds > 0 ||
+  state.miniSeconds > 0 ||
+  (state.launchSeconds ?? 0) > 0 ||
+  (state.teamSeconds ?? 0) > 0
+
+/** Whether a team boost (a team race, teamBoost.ts) is burning: the blue one */
+export const kartTeamBoosting = (state: KartState): boolean => (state.teamSeconds ?? 0) > 0
 
 /**
  * Whether a release boost (the arcade feel) or a dash (the classic feel) waits for a fresh press of

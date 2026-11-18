@@ -5,6 +5,7 @@
 import { passGates, type Spot } from './course.ts'
 import { applyKart, KART_IDS, type KartId } from './karts.ts'
 import { ARCADE_TUNING, KART_TUNING, type KartState } from './physics.ts'
+import { TEAM_BOOST } from './teamBoost.ts'
 import { courseOf, type Track } from './track.ts'
 import { KART_RADIUS } from './walls.ts'
 import type { KartFrame } from './net.ts'
@@ -91,7 +92,13 @@ export function speedCapFor(kart: KartId): number {
       const tuning = applyKart(base, kart)
       const dash =
         tuning.miniTopSpeedFactor + tuning.chainSpeedStep * Math.max(0, tuning.chainSpeedLinks)
-      const most = Math.max(tuning.boostTopSpeedFactor, tuning.boostStackFactor, dash)
+      const most = Math.max(
+        tuning.boostTopSpeedFactor,
+        tuning.boostStackFactor,
+        dash,
+        // A team race's team boost (teamBoost.ts)
+        TEAM_BOOST.topSpeedFactor,
+      )
       return tuning.topSpeed * most * 1.5
     }),
   )

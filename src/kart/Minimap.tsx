@@ -10,6 +10,8 @@ import { kartScene } from '../styles/kartTokens.ts'
 /** Moves the car's marker without a React render: the loop calls it every frame */
 export interface MinimapHandle {
   place(x: number, z: number, heading: number, nextGate: number): void
+  /** 2026-11-18: where the other karts are (those in `dots`), every frame */
+  others?(karts: readonly { readonly seat: number; readonly x: number; readonly z: number }[]): void
 }
 
 interface MinimapProps {
@@ -18,6 +20,11 @@ interface MinimapProps {
   gates: readonly Gate[]
   /** Walls on the road beyond its kerbs (N2: the old street's stall island), drawn over it */
   walls?: readonly Wall[]
+  /**
+   * 2026-11-18, a team race: a dot for each other kart, in its team's colour, moved by the handle's
+   * `others`. Left out, only this kart is on the map
+   */
+  dots?: readonly { readonly seat: number; readonly fill: string }[]
 }
 
 /** Room around the road, metres */
@@ -29,12 +36,13 @@ const MARGIN = 6
  * own coordinates; it does not turn with the car.
  */
 export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
-  { t, road, gates, walls = [] },
+  { t, road, gates, walls = [], dots = [] },
   ref,
 ) {
   const box = useMemo(() => trackBounds({ road }), [road])
   const car = useRef<SVGGElement>(null)
   const next = useRef<SVGLineElement>(null)
+  const dotLayer = useRef<SVGGElement>(null)
   const path = useMemo(
     () => `M${road.map((point) => `${point.x.toFixed(1)} ${point.z.toFixed(1)}`).join('L')}Z`,
     [road],
@@ -55,6 +63,17 @@ export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
           next.current.setAttribute('y1', String(gate.az))
           next.current.setAttribute('x2', String(gate.bx))
           next.current.setAttribute('y2', String(gate.bz))
+        }
+      },
+      others(karts) {
+        const layer = dotLayer.current
+        if (!layer) return
+        for (const kart of karts) {
+          const dot = layer.querySelector(`[data-dot="${kart.seat}"]`)
+          if (!dot) continue
+          dot.setAttribute('cx', kart.x.toFixed(1))
+          dot.setAttribute('cy', kart.z.toFixed(1))
+          dot.setAttribute('visibility', 'visible')
         }
       },
     }),
@@ -108,6 +127,19 @@ export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
           />
         )}
         <line ref={next} stroke={kartScene.nextGate} strokeWidth={2.5} />
+        <g ref={dotLayer}>
+          {dots.map((dot) => (
+            <circle
+              key={dot.seat}
+              data-dot={dot.seat}
+              r={5}
+              fill={dot.fill}
+              stroke={kartScene.nose}
+              strokeWidth={1}
+              visibility="hidden"
+            />
+          ))}
+        </g>
         <g ref={car}>
           {/* An arrow pointing -z (heading 0) */}
           <path

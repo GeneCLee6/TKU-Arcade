@@ -102,6 +102,8 @@ export type MemberRecord = {
   account?: string
   /** A game's cosmetic choice, shown to everyone (e10-t05, RoomMember.look) */
   look?: string
+  /** The side chosen for a game with teams (2026-11-18, RoomMember.team): 0 or 1 */
+  team?: number
   /**
    * A computer member (2026-11-17, shared/protocol.ts 14.): never has a socket, is never offline,
    * and its moves come from the host's browser. Its `name` is its name's id
@@ -444,6 +446,9 @@ export class RoomHost {
         return
       case 'set_look':
         this.setLook(member, message.look)
+        return
+      case 'set_team':
+        this.setTeam(conn, member, message.team, message.member ?? null)
         return
       case 'react':
         this.react(member, message.reaction)
@@ -824,6 +829,29 @@ export class RoomHost {
   }
 
   /**
+   * 2026-11-18 (shared/protocol.ts 15.): a side for a game with teams. One's own, or from the host
+   * anyone's; not while a game is played, which has its sides already
+   */
+  private setTeam(
+    conn: string,
+    member: MemberRecord,
+    team: number | null,
+    targetId: string | null,
+  ): void {
+    const room = this.requireRoom()
+    const target = targetId === null ? member : this.members.get(targetId)
+    if (!target) return this.refuse(conn, 'bad_member')
+    if (target !== member && member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    if (room.status === 'playing') return this.refuse(conn, 'wrong_status')
+    if ((target.team ?? null) === team) return
+    this.change(() => {
+      if (team === null) delete target.team
+      else target.team = team
+      this.saveMembers()
+    })
+  }
+
+  /**
    * 2026-11-17 (shared/protocol.ts 14.): a computer member in the lowest free seat, for a game that
    * has them, named by the room with the first of the game's names no other computer member has
    */
@@ -896,7 +924,8 @@ export class RoomHost {
       module &&
       beginGame(
         module,
-        seated.map((_, id) => ({ id })),
+        // Each seat with the side its member chose, if any (shared/protocol.ts 15.)
+        seated.map((other, id) => (other.team === undefined ? { id } : { id, team: other.team })),
         // Checked again: a room made before a game's options changed may hold values it no longer has
         parseOptions(module.options, room.options),
         this.deps.newSeed(),
@@ -1353,6 +1382,7 @@ export class RoomHost {
         online: member.conn !== null || member.bot !== undefined,
         absent: member.absent,
         ...(member.look !== undefined ? { look: member.look } : {}),
+        ...(member.team !== undefined ? { team: member.team } : {}),
         ...(member.bot ? { bot: { ...member.bot } } : {}),
       }
     }

@@ -25,6 +25,7 @@
 //
 // Speeds come from an engine against drag, so 0 to the top speed is quick at first and eases in.
 import type { KartInput, KartRules, KartState, KartTuning } from './physics.ts'
+import { TEAM_BOOST } from './teamBoost.ts'
 
 const DT = 1 / 60
 const GAUGE_FULL = 100
@@ -106,9 +107,19 @@ export function stepClassic(
 
   // The boost (N2O): fired again while one runs it starts over, with a short extra push
   let { gauge, storedBoosts, boostSeconds, stackSeconds } = state
+  // The team boost (a team race, teamBoost.ts): the boost key fires it before a charge of the
+  // kart's own, and only once whatever burns has burnt out; while it burns no charge fires
+  let teamBoosts = state.teamBoosts ?? 0
+  let teamSeconds = state.teamSeconds ?? 0
+  const pressed = input.boost && !state.boostHeld
+  if (pressed && teamBoosts > 0 && boostSeconds === 0 && teamSeconds === 0) {
+    teamBoosts--
+    teamSeconds = TEAM_BOOST.seconds
+  }
   const fire =
     storedBoosts > 0 &&
-    ((input.boost && !state.boostHeld) || (rules.autoBoost && boostSeconds === 0))
+    teamSeconds === 0 &&
+    (pressed || (rules.autoBoost && boostSeconds === 0))
   if (fire) {
     storedBoosts--
     if (boostSeconds > 0) stackSeconds = t.boostStackSeconds
@@ -215,6 +226,10 @@ export function stepClassic(
   if (full) {
     factor = Math.max(factor, t.boostAccelFactor)
     capFactor = Math.max(capFactor, stacked ? t.boostStackFactor : t.boostTopSpeedFactor)
+  }
+  if (teamSeconds > 0) {
+    factor = Math.max(factor, TEAM_BOOST.accelFactor)
+    capFactor = Math.max(capFactor, TEAM_BOOST.topSpeedFactor)
   }
   if (launchSeconds > 0 || (state.launchSeconds ?? 0) > 0) {
     factor = Math.max(factor, t.startAccelFactor)
@@ -351,6 +366,7 @@ export function stepClassic(
   const pace = Math.hypot(vx, vz)
   if (
     !full &&
+    teamSeconds === 0 &&
     (drifting || slideDir !== 0) &&
     pace >= t.driftMinSpeed &&
     storedBoosts < t.maxStoredBoosts
@@ -369,6 +385,7 @@ export function stepClassic(
   if (boostSeconds > 0) boostSeconds = Math.max(0, boostSeconds - DT)
   stackSeconds = boostSeconds > 0 ? Math.max(0, stackSeconds - DT) : 0
   if (miniSeconds > 0) miniSeconds = Math.max(0, miniSeconds - DT)
+  if (teamSeconds > 0) teamSeconds = Math.max(0, teamSeconds - DT)
   if (releaseWindow > 0 && !opened) releaseWindow = Math.max(0, releaseWindow - DT)
   if (releaseWindow === 0 && !burstReady) doubleArmed = false
   if (doubleWindow > 0 && doubleWindow === state.doubleWindow) {
@@ -411,5 +428,9 @@ export function stepClassic(
     driftKey: input.drift,
     driftLatch,
     launchSeconds,
+    // Only ever there in a team race: any other kart's state is what it always was
+    ...(state.teamBoosts !== undefined || state.teamSeconds !== undefined
+      ? { teamBoosts, teamSeconds }
+      : {}),
   }
 }

@@ -82,15 +82,24 @@ export const BURST_POWER: Readonly<Record<BurstKind, number>> = {
 }
 
 /** Which boost began between two steps, the strongest first; null for none */
+interface BurstClocks {
+  readonly boostSeconds: number
+  readonly miniSeconds: number
+  readonly launchSeconds?: number
+  readonly teamSeconds?: number
+}
+
 export function burstBetween(
-  before: { boostSeconds: number; miniSeconds: number; launchSeconds?: number },
-  after: { boostSeconds: number; miniSeconds: number; launchSeconds?: number },
+  before: BurstClocks,
+  after: BurstClocks,
   /** How long a full start boost lasts (tuning.startBoostDuration): a shorter one is the small one */
   fullStart: number,
 ): BurstKind | null {
   const launch = after.launchSeconds ?? 0
   if (launch > (before.launchSeconds ?? 0)) return launch >= fullStart * 0.75 ? 'start' : 'quick'
   if (after.boostSeconds > before.boostSeconds) return 'boost'
+  // A team boost (a team race) kicks like a charge
+  if ((after.teamSeconds ?? 0) > (before.teamSeconds ?? 0)) return 'boost'
   if (after.miniSeconds > before.miniSeconds) return 'dash'
   return null
 }
