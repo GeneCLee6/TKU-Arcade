@@ -1,6 +1,9 @@
 // e8-t06 (AC-8.1): the graphics quality option. Low is for an old phone or a laptop on battery; high
 // draws everything. Kept in this browser; a change restarts the scene (antialiasing is chosen when
-// the WebGL context is made).
+// the WebGL context is made). 2026-11-18: how the picture is developed (post.ts) goes by it too: low
+// draws straight to the screen as before, medium adds bloom and a tone curve, high the vignette,
+// the heat shimmer behind the thrusters and a boost's streak as well.
+import type { PostLevel } from './post.ts'
 import { readStored, writeStored } from '../lib/storage.ts'
 
 export type Quality = 'low' | 'medium' | 'high'
@@ -17,10 +20,12 @@ export interface QualitySettings {
   readonly anisotropy: number
   /** Where the fog closes in, metres */
   readonly fogFar: number
+  /** How the picture is developed after the scene is drawn (post.ts) */
+  readonly post: PostLevel
 }
 
 export const QUALITY: Record<Quality, QualitySettings> = {
-  low: { pixelRatio: 1, antialias: false, shadowMap: 0, density: 0.35, anisotropy: 1, fogFar: 520 },
+  low: { pixelRatio: 1, antialias: false, shadowMap: 0, density: 0.35, anisotropy: 1, fogFar: 520, post: 'off' },
   medium: {
     pixelRatio: 1.5,
     antialias: true,
@@ -28,6 +33,7 @@ export const QUALITY: Record<Quality, QualitySettings> = {
     density: 0.7,
     anisotropy: 4,
     fogFar: 760,
+    post: 'bloom',
   },
   high: {
     pixelRatio: 2,
@@ -36,6 +42,7 @@ export const QUALITY: Record<Quality, QualitySettings> = {
     density: 1,
     anisotropy: 8,
     fogFar: 1000,
+    post: 'full',
   },
 }
 

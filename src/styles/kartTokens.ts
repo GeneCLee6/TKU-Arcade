@@ -73,9 +73,6 @@ export const kartScene = {
   signEdge: '#16171A',
   flame: '#FFB020',
   flameCore: '#FFF3C4',
-  // A team boost (2026-11-18, a team race): the same flames, blue
-  teamFlame: '#2F8BFF',
-  teamFlameCore: '#C8F1FF',
   lightSky: '#FFFFFF',
   lightGround: '#6B7280',
 } as const
@@ -260,6 +257,37 @@ export const kartFestival = {
   balloons: ['#FF3B6B', '#FFD23F', '#2EC4F1', '#7CE36B', '#FF8A3D', '#B26BFF'],
   basket: '#8B5A2B',
   skyline: ['#9FB4CC', '#B7C6D8', '#8AA3BF', '#C9D4E2', '#A7B9CF'],
+} as const
+
+/**
+ * A boost's fire (2026-11-18, boostFx.ts), by what fired it: the pale heart of the flame, its body
+ * and its tips, and the ribbon of light it leaves. An instant boost is a short amber puff, a full
+ * boost from the gauge a white-hot jet with crimson tips, a team boost the same in blue, a perfect
+ * start gold. Our own palette
+ */
+export const kartBoost = {
+  mini: { core: '#FFF3C4', flame: '#FFB020', tip: '#FF7A1A', trail: '#FFA63D' },
+  n2o: { core: '#FFF6D8', flame: '#FF8E14', tip: '#FF3A1F', trail: '#FF6A2B' },
+  team: { core: '#F0FCFF', flame: '#35B6FF', tip: '#3B4CFF', trail: '#4AA8FF' },
+  start: { core: '#FFFFFF', flame: '#FFD23F', tip: '#FF8A1F', trail: '#FFC233' },
+} as const
+
+/**
+ * What every kart is built from besides its own paint (2026-11-18, kartParts.ts): the carbon
+ * weave's two threads, bare metal, the head lamps and the tail lamps, and the light the env map is
+ * lit by (a pale sky over a dark floor, with three bright panels for the paint to catch)
+ */
+export const kartParts = {
+  carbon: '#15171C',
+  carbonThread: '#2B2F38',
+  metal: '#C9CED6',
+  dark: '#0B0C10',
+  headLamp: '#F4FAFF',
+  tailLamp: '#FF2A3C',
+  envSky: '#BFD8F2',
+  envHorizon: '#F6F1E6',
+  envFloor: '#23262E',
+  envPanel: '#FFFFFF',
 } as const
 
 export const kartHover = {

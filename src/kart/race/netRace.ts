@@ -487,7 +487,10 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
             steer: pose.frame.steer,
             drift: pose.frame.driftDirection,
             boosting: pose.frame.boosting,
-            ...(pose.frame.boosting && burning?.has(pose.seat) ? { tint: 'team' as const } : {}),
+            // (boostFx.ts: a team boost, blue; any other is worked out from how long it runs)
+            ...(pose.frame.boosting && burning?.has(pose.seat)
+              ? { boostKind: 'team' as const }
+              : {}),
             // How hard its tyres slide (2026-11-17, feelFx.ts): its skid marks and smoke
             skid: skidStrength(
               Math.atan2(side, forward),

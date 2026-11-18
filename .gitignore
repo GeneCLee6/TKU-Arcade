@@ -48,3 +48,6 @@ playwright-report/
 *.wav
 *.mp3
 *.ogg
+
+# Screenshots from scripts/kart-shots.mjs
+kart-shots/
