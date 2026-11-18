@@ -8,7 +8,8 @@ import { memo } from 'react'
 import styled, { css, keyframes } from 'styled-components'
 import type { ItemId } from '../../../shared/kart/items.ts'
 import type { Translate } from '../../i18n/t.ts'
-import { displayType, glass } from '../../styles/esports.ts'
+import { displayType } from '../../styles/esports.ts'
+import { broadcast } from '../ui/broadcast.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
 
 type T = Translate
@@ -131,7 +132,7 @@ const Dock = styled.div`
 `
 
 const Slot = styled.div<{ $full: boolean }>`
-  ${glass}
+  ${broadcast}
   display: flex;
   align-items: center;
   gap: ${space.md}px;
@@ -165,7 +166,7 @@ const Frame = styled.div<{ $full: boolean }>`
   padding: 10px;
   border: 3px ${({ $full }) => ($full ? 'solid' : 'dashed')}
     ${({ $full }) => ($full ? color.accent : color.border)};
-  border-radius: ${radius.component}px;
+  border-radius: 2px;
   color: ${color.accent};
   background: ${color.sunken};
   ${({ $full }) =>

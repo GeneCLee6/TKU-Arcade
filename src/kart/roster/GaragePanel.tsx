@@ -4,7 +4,9 @@ import { useEffect, useId, useRef } from 'react'
 import styled from 'styled-components'
 import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
 import { Button } from '../../components/Button.tsx'
-import { color, fontSize, radius, space } from '../../styles/tokens.ts'
+import { displayType } from '../../styles/esports.ts'
+import { color, fontSize, space } from '../../styles/tokens.ts'
+import { broadcastSolid } from '../ui/broadcast.ts'
 import { RosterPicker, type RosterT } from './RosterPicker.tsx'
 
 export interface GaragePanelProps {
@@ -44,6 +46,7 @@ export function GaragePanel({ t, kart, driver, onKart, onDriver, onClose }: Gara
 }
 
 const Panel = styled.section`
+  ${broadcastSolid}
   position: absolute;
   top: 56px;
   right: ${space.sm}px;
@@ -55,9 +58,6 @@ const Panel = styled.section`
   align-content: start;
   gap: ${space.md}px;
   padding: ${space.md}px;
-  border: 1px solid ${color.border};
-  border-radius: ${radius.card}px;
-  background: ${color.surface};
   color: ${color.text};
   font-size: ${fontSize.sm}px;
 `
@@ -70,6 +70,8 @@ const Header = styled.div`
 `
 
 const Title = styled.h2`
+  ${displayType}
   margin: 0;
-  font-size: ${fontSize.md}px;
+  font-size: ${fontSize.lg}px;
+  text-transform: uppercase;
 `

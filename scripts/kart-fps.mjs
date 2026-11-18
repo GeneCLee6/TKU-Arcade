@@ -39,6 +39,8 @@ for (const quality of qualities) {
     localStorage.setItem('tku-arcade.language', 'en')
   }, quality)
   await page.goto(`${base}/kart?autopilot`)
+  // The top row is there once the page has loaded: only then is it known whether it is a menu
+  await page.getByTestId('kart-hud').waitFor({ timeout: 60_000 })
   if (await page.getByTestId('kart-menu').isVisible()) await page.getByTestId('kart-menu').click()
   await page.getByTestId('kart-bots-open').click()
   const setup = page.getByTestId('kart-bots-setup')

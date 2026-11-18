@@ -12,8 +12,9 @@ import { Button } from '../../components/Button.tsx'
 import { registerMessages } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
-import { displayType, glass, monoType } from '../../styles/esports.ts'
-import { color, fontSize, radius, space } from '../../styles/tokens.ts'
+import { displayType, monoType } from '../../styles/esports.ts'
+import { broadcast, ticker } from '../ui/broadcast.ts'
+import { color, fontSize, space } from '../../styles/tokens.ts'
 import { applyKart } from '../../../shared/kart/karts.ts'
 import { isTeamId, scoreTeams, type TeamId } from '../../../shared/kart/team.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
@@ -556,9 +557,9 @@ const Tag = styled.span<{ $team: TeamId | null }>`
   max-width: 12em;
   padding: 2px ${space.sm}px;
   overflow: hidden;
-  border-radius: ${radius.component}px;
+  border-left: 3px solid ${color.accent};
   color: ${color.text};
-  background: color-mix(in srgb, ${color.bg} 70%, transparent);
+  background: color-mix(in srgb, ${color.bg} 78%, transparent);
   font-size: ${fontSize.sm}px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -575,8 +576,10 @@ const TopLeft = styled.div`
   pointer-events: none;
 `
 
+// The place, as a broadcast's position tag: leaning, on a panel with the accent's bar. No wider
+// than it was: the button that leaves a race against the computer stands right beside it
 const PlacePanel = styled.div`
-  ${glass}
+  ${broadcast}
   padding: ${space.xs}px ${space.md}px;
 `
 
@@ -592,11 +595,10 @@ const pulse = keyframes`
 `
 
 const Unstable = styled.p`
+  ${ticker(color.danger, 6)}
   margin: 0;
-  padding: ${space.xs}px ${space.sm}px;
-  border-radius: ${radius.component}px;
+  padding: ${space.xs}px ${space.md}px;
   color: ${color.onAccent};
-  background: ${color.danger};
   font-size: ${fontSize.sm}px;
   font-weight: 700;
   animation: ${pulse} 0.8s ease-in-out infinite alternate;
@@ -629,7 +631,7 @@ const MapCorner = styled.div<{ $touch: 'left' | 'right' | null }>`
 `
 
 const Center = styled.p`
-  ${glass}
+  ${broadcast}
   position: absolute;
   top: 30%;
   left: 50%;
@@ -643,7 +645,7 @@ const Center = styled.p`
 `
 
 const Finish = styled.section`
-  ${glass}
+  ${broadcast}
   position: absolute;
   top: 50%;
   left: 50%;
@@ -658,7 +660,8 @@ const FinishTitle = styled.h2`
   ${displayType}
   margin: 0;
   color: ${color.success};
-  font-size: ${fontSize.xl}px;
+  font-size: ${fontSize.xxl}px;
+  text-transform: uppercase;
 `
 
 const Muted = styled.p`

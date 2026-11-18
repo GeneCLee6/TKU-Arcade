@@ -200,6 +200,119 @@ export function loft(sections: readonly Section[], around = 20): BufferGeometry 
   return geometry
 }
 
+/** One cross-section of a faceted hull, looking along the kart: a crest, shoulders, a belt line, a keel */
+export interface Facet {
+  /** Where along the kart, metres: -z is forward */
+  readonly z: number
+  /** Half its width at the belt line, its widest */
+  readonly w: number
+  /** How far the crest rises above the belt line, and how far the keel hangs below */
+  readonly top: number
+  readonly bottom: number
+  /** The belt line's height; 0 when left out */
+  readonly y?: number
+  /** The shoulders: their share of the half width (0.6) and of the height (0.8) */
+  readonly sw?: number
+  readonly sh?: number
+  /** The keel's edges: their share of the half width (0.7) */
+  readonly kw?: number
+}
+
+/**
+ * 2026-11-18 (owner: "more esports ... it looks like a child's toy"): a hull of flat faces through
+ * `sections`, front to back, closed at both ends. Eight edges run its length (the crest, a shoulder
+ * and a belt line each side, two keel edges and the belly), and every face is flat, so the light
+ * breaks on it as on a machine cut from sheet, not blown like a balloon
+ */
+export function hull(sections: readonly Facet[]): BufferGeometry {
+  const rings = sections.map((s) => {
+    const y = s.y ?? 0
+    const sw = s.w * (s.sw ?? 0.6)
+    const sy = y + s.top * (s.sh ?? 0.8)
+    const kw = s.w * (s.kw ?? 0.7)
+    return [
+      [0, y + s.top, s.z],
+      [sw, sy, s.z],
+      [s.w, y, s.z],
+      [kw, y - s.bottom, s.z],
+      [0, y - s.bottom, s.z],
+      [-kw, y - s.bottom, s.z],
+      [-s.w, y, s.z],
+      [-sw, sy, s.z],
+    ] as const
+  })
+  const positions: number[] = []
+  const uvs: number[] = []
+  const corner = (ring: number, step: number) => {
+    const point = rings[ring]![step % 8]!
+    positions.push(point[0], point[1], point[2])
+    uvs.push(point[0] * 3 + point[1] * 3, point[2] * 3)
+  }
+  for (let ring = 0; ring < rings.length - 1; ring++) {
+    for (let step = 0; step < 8; step++) {
+      // Two triangles a face, each with corners of its own: flat
+      corner(ring, step)
+      corner(ring + 1, step)
+      corner(ring, step + 1)
+      corner(ring, step + 1)
+      corner(ring + 1, step)
+      corner(ring + 1, step + 1)
+    }
+  }
+  for (const [ring, flip] of [
+    [0, false],
+    [rings.length - 1, true],
+  ] as const) {
+    for (let step = 1; step < 7; step++) {
+      corner(ring, 0)
+      corner(ring, flip ? step + 1 : step)
+      corner(ring, flip ? step : step + 1)
+    }
+  }
+  const geometry = new BufferGeometry()
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3))
+  geometry.setAttribute('uv', new BufferAttribute(new Float32Array(uvs), 2))
+  geometry.computeVertexNormals()
+  return geometry
+}
+
+/**
+ * A wedge: `w` across and `l` long, `h0` high at the front (-z) and `h1` at the back, its underside
+ * on y = 0 and its middle at the origin. Splitters, ramps, intakes, a helmet's spoiler
+ */
+export function wedge(w: number, l: number, h0: number, h1: number): BufferGeometry {
+  const geometry = blade(
+    [
+      [-l / 2, 0],
+      [l / 2, 0],
+      [l / 2, h1],
+      [-l / 2, Math.max(h0, 0.004)],
+    ],
+    w,
+  )
+  return geometry
+}
+
+/**
+ * A livery mark as a texture, see-through round what `draw` paints: a racing number, a team's
+ * abstract sign. `draw` is given a canvas `width` by `height` to paint on
+ */
+export function decalTexture(
+  width: number,
+  height: number,
+  draw: (context: CanvasRenderingContext2D, width: number, height: number) => void,
+): CanvasTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (context) draw(context, width, height)
+  const texture = new CanvasTexture(canvas)
+  texture.colorSpace = SRGBColorSpace
+  texture.anisotropy = 4
+  return texture
+}
+
 /**
  * A flat outline in the kart's plane, (x, z) with -z forward, `height` thick with its underside on
  * y = 0; `bevel` rounds its edges
@@ -432,6 +545,11 @@ export interface BodyPaint {
   readonly tailLamp: Material
 }
 
+/** The livery's marks: the driver's racing number, and the kart's own abstract team sign */
+export type DecalKind = 'number' | 'mark'
+/** Which way a mark faces: up from a deck, out from a side, back from a tail */
+export type DecalFace = 'up' | 'left' | 'right' | 'back'
+
 /** What kartModel.ts lends a body (kartBodies.ts) and the driver to build with */
 export interface BodyKit {
   readonly paint: BodyPaint
@@ -444,8 +562,11 @@ export interface BodyKit {
     y?: number,
     z?: number,
   ): Mesh
-  /** A paint of the kit's kind (metallic, catching the environment) in another colour */
-  colour(color: string, roughness?: number, metalness?: number): Material
+  /**
+   * A paint of the kit's kind (metallic, catching the environment) in another colour; `emissive`
+   * above 0 lights it a little from within (a neon panel)
+   */
+  colour(color: string, roughness?: number, metalness?: number, emissive?: number): Material
   /** `object` moves to `to` while a full boost runs */
   morph(object: Object3D, to: MorphTo): void
   /** A thruster pointing back, its mouth at this place: bell, lit lip, and where its flame starts */
@@ -460,6 +581,22 @@ export interface BodyKit {
     turn?: number,
     material?: Material,
   ): Mesh
+  /**
+   * A livery mark, `w` wide and `l` tall as read: lying flat (its top forward) or standing, facing
+   * a side or the back. None on a ghost
+   */
+  decal(
+    parent: Object3D,
+    kind: DecalKind,
+    w: number,
+    l: number,
+    x: number,
+    y: number,
+    z: number,
+    face?: DecalFace,
+    /** Tipped this far about the kart's width, radians: a mark on a sloping nose */
+    tilt?: number,
+  ): Mesh | null
 }
 
 export interface BodyFit {

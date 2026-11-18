@@ -115,17 +115,20 @@ export interface KartTheme {
 }
 
 export const kartThemes = {
+  // 2026-11-18 (owner: "more esports"): every theme has more contrast, as a race under lights is
+  // filmed. Less light from the sky all round and more from the sun, so that shadows are dark and
+  // the karts' lit lines read. Day is a late afternoon: a deeper sky, a low warm sun, long shadows
   day: {
-    skyTop: kartScene.skyTop,
-    skyMiddle: '#8DBBE6',
-    skyHorizon: kartScene.skyHorizon,
-    fog: kartScene.skyHorizon,
-    hemisphereSky: kartScene.lightSky,
-    hemisphereGround: kartScene.lightGround,
-    hemisphereIntensity: 2,
-    sun: kartScene.lightSky,
-    sunIntensity: 1.5,
-    sunDirection: [30, 60, 20],
+    skyTop: '#2A62B8',
+    skyMiddle: '#6FA3DC',
+    skyHorizon: '#FFD9A8',
+    fog: '#EBD3B6',
+    hemisphereSky: '#DCE8FF',
+    hemisphereGround: '#59606E',
+    hemisphereIntensity: 1.45,
+    sun: '#FFE2B8',
+    sunIntensity: 2.3,
+    sunDirection: [42, 36, 24],
     sunDisc: null,
     sunGlow: null,
   },
@@ -136,9 +139,9 @@ export const kartThemes = {
     fog: '#F4A47E',
     hemisphereSky: '#FFD6BA',
     hemisphereGround: '#4E4466',
-    hemisphereIntensity: 1.55,
+    hemisphereIntensity: 1.3,
     sun: '#FFB878',
-    sunIntensity: 2.6,
+    sunIntensity: 2.9,
     sunDirection: [-62, 22, -80],
     sunDisc: '#FFF1C9',
     sunGlow: '#FFC27A',
@@ -151,10 +154,10 @@ export const kartThemes = {
     fog: '#D4E7F2',
     hemisphereSky: '#FFFFFF',
     hemisphereGround: '#6E7A6A',
-    hemisphereIntensity: 1.9,
-    sun: '#FFF3DD',
-    sunIntensity: 1.8,
-    sunDirection: [-45, 70, 35],
+    hemisphereIntensity: 1.5,
+    sun: '#FFEFD2',
+    sunIntensity: 2.3,
+    sunDirection: [-45, 52, 35],
     sunDisc: null,
     sunGlow: null,
   },
@@ -167,9 +170,9 @@ export const kartThemes = {
     fog: '#2C2552',
     hemisphereSky: '#A7B2FF',
     hemisphereGround: '#5A4466',
-    hemisphereIntensity: 1.6,
+    hemisphereIntensity: 1.35,
     sun: '#C9D5FF',
-    sunIntensity: 1.25,
+    sunIntensity: 1.5,
     sunDirection: [-55, 40, -45],
     sunDisc: '#F6F2DC',
     sunGlow: '#8EA2E8',
@@ -210,30 +213,38 @@ export const harbourScene = {
 
 /**
  * The hover karts (owner, 2026-11-14: karts with no tyres, hugging the floor; e10-t05a: six): our
- * own bodies and their colours. `glow` is the underglow, the thrusters and the drift sparks. The
- * drivers' colours are kartDrivers, below: any driver sits in any kart
+ * own bodies and their colours. 2026-11-18 (owner: "more esports"): a race team's look. `main` is
+ * the satin black the body is cut from (a breath of the kart's hue in it), `second` its paler
+ * panels, `accent` the kart's one neon colour (panels, the garage's swatch), `glow` the same as
+ * light: the lit lines, the underglow, the thrusters and the drift sparks. The drivers' colours are
+ * kartDrivers, below: any driver sits in any kart
  */
 export const kartBodies = {
-  tide: { main: '#14A3A8', second: '#F4F7F6', accent: '#FFC53D', glow: '#5CF2FF' },
-  comet: { main: '#F2623B', second: '#FFE8C7', accent: '#2B2D42', glow: '#FFB547' },
-  ray: { main: '#6D4AFF', second: '#1F1B3A', accent: '#F5C542', glow: '#C18BFF' },
-  // A mangrove green with one big orange claw
-  crab: { main: '#2F9C67', second: '#1E3A2F', accent: '#FF7F3F', glow: '#8CFF9E' },
-  // An egret's white with a dark crown and a yellow bill
-  heron: { main: '#EEF3F8', second: '#1B2A41', accent: '#FFB000', glow: '#9FE7FF' },
-  // Deep sea blue with pink fins
-  flyfish: { main: '#1F4E9C', second: '#C9E6FF', accent: '#FF5D8F', glow: '#FF8FC1' },
+  tide: { main: '#11181C', second: '#2A3740', accent: '#12D8F2', glow: '#4DEBFF' },
+  comet: { main: '#1B1512', second: '#3D302A', accent: '#FF5A1F', glow: '#FF8A3D' },
+  ray: { main: '#15121F', second: '#2F2A45', accent: '#8F4DFF', glow: '#B58CFF' },
+  crab: { main: '#111A14', second: '#2A3B30', accent: '#35E85C', glow: '#7CFF8E' },
+  heron: { main: '#1A1A14', second: '#3A3A2E', accent: '#FFD60A', glow: '#FFE75C' },
+  flyfish: { main: '#1C1218', second: '#3F2A36', accent: '#FF2E88', glow: '#FF7AB8' },
 } as const
 
 /**
- * The four drivers (e10-t05b), card suits made people (club as in our bridge club): a suit, a
- * glossy helmet and the suit's crest on top of it
+ * The four drivers (e10-t05b), card suits made people (club as in our bridge club). 2026-11-18: in
+ * race kit. `suit` is the race suit's dark base, `panel` its colour blocks, `helmet` the shell,
+ * `visor` the mirror's tint, `crest` the suit's sign (the team's logo) and the number's bar, `trim`
+ * the gloves, the boots and the piping
  */
 export const kartDrivers = {
-  spade: { suit: '#1F2433', helmet: '#F4F7F6', crest: '#2B3247', trim: '#9AA6C4' },
-  heart: { suit: '#B3123E', helmet: '#FFE3EA', crest: '#E8174B', trim: '#FFFFFF' },
-  diamond: { suit: '#B8540C', helmet: '#FFF1D6', crest: '#F28C28', trim: '#FFE07A' },
-  club: { suit: '#1E6B3A', helmet: '#E9F7EC', crest: '#2E9C55', trim: '#F5C542' },
+  spade: { suit: '#15181E', panel: '#DDE4F0', helmet: '#EEF2F8', visor: '#6F8CFF', crest: '#AFC2FF', trim: '#8793B0' },
+  heart: { suit: '#1A1216', panel: '#E0143F', helmet: '#1B1D24', visor: '#FF4F6E', crest: '#FF2E5C', trim: '#F4F4F6' },
+  diamond: { suit: '#1A1510', panel: '#F2811D', helmet: '#F4EFE6', visor: '#FFB53D', crest: '#FF9A1F', trim: '#2A2C33' },
+  club: { suit: '#101A14', panel: '#17A650', helmet: '#1B1D24', visor: '#55F59B', crest: '#3DFF86', trim: '#F5C542' },
+} as const
+
+/** The livery's marks (kartModel.ts): the number's white ink, and a cut through a mark's middle */
+export const kartLivery = {
+  ink: '#F4F7FA',
+  cut: '#0B0C10',
 } as const
 
 /** The hover parts every body shares: thruster housings, the cockpit glass, the sparks */

@@ -834,6 +834,24 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **測試**：`tests/kart/classic.test.ts`（真的甩出去就有、置中甩也有、點甩沒有、直線硬甩不划算、量表）、`tests/kart/feel.test.ts`（高手三圈 8–48 次）、`tests/kart/team.test.ts`（只有甩尾算、需求量約兩倍、藍色扣存量與先後順序、沒有存量就沒有藍色、rider 的各種情況：手上 2／1／0 個、之後集到的是紅的、撞掉存量、房間沒記到；房間的 `tkeep`：只往下、只認目前這次滿、玩家不能自己送動作）、`tests/kart/replay.test.ts`（錄到隊伍、藍色噴射、加速條）、`tests/kart/hud.test.tsx`（紅藍存量格）、`tests/kart/teamUi.test.tsx`（面板文字、觀戰用的兩隊加速條）、`e2e/kart-team.spec.ts`。
 - **測試用的自動駕駛**：`?autopilot=drift`（`src/kart/race/autopilot.ts` 的 `driftingAutopilot`）＝原本的 `?autopilot` 加上「高速的彎道按住甩尾、留一個存量等變藍、多的噴掉」，給截圖與手動檢查團隊賽用；原本的 `?autopilot` 不變。
 - **限制**：改過的瀏覽器可以每次滿都拿 2 個藍色額度（見上）；`fills` 只送低 8 位（一場比賽滿不到 256 次）；`?autopilot` 不甩尾，所以它永遠沒有存量、也就沒有藍色；電腦車一有存量就在直線上噴掉，所以團隊條滿的時候它們手上常常是空的（真人會學著留）。六台電腦車 3 圈（3 對 3，重畫後的賽道）：困難在河畔兩隊各滿 5 次（約 22 秒一次）、每台噴到 0–2 個藍的；普通在淡江各滿 6–7 次、每台 0–1 個；簡單在漁港各滿 5–6 次、每台 0–3 個。
+### 4.35 路線圖外：卡丁車電競畫風（2026-11-18，`feat/kart-esports-art`）
+
+擁有者試完 §4.32 的車款與變身：「畫風跟人物跟車子要再更電競感，現在像個小朋友玩的一樣。」車款、車手、卡丁車介面、光照與後處理改成職業賽事轉播的樣子。**全部原創、全部程式產生**；車款 id、四位角色的身分、變身機制、`boostFx.ts` 的 API、賽道路線都沒動。風格規則在 `DESIGN.md` §3.6，造型描述在 `KART-WORLD.md` §3、§4.2。
+
+**程式**
+
+- `src/kart/art/kartParts.ts`：新增 `hull`（切面船身：每個截面是頂、兩肩、兩腰、兩龍骨、底共八點，面與面之間不共用頂點所以每一面都是平的；注意三角形的繞向要朝外）、`wedge`、`decalTexture`；`BodyKit` 新增 `decal(parent, kind, w, l, x, y, z, face?, tilt?)`（`kind` 是 `number` 或 `mark`，`face` 是朝上／左／右／後，幽靈車不畫）與 `colour` 的第四個參數（自發光，霓虹面板在陰影與夜裡不會變黑）。
+- `src/kart/art/kartBodies.ts`：六台車重寫，共用 `cockpit`（風擋、邊框、整流罩）、`rearWing`（後掠主翼、霓虹唇、發光後緣、有號碼的端板、跟著翼一起動的支柱）、`skirt`、`thruster`（八角渦輪殼＋肋環＋原本的 `kit.nozzle`）、`slit`（細縫燈）、`coreHatch`。每個 `kit.morph` 的目標沿用 §4.32。座位改成 `y: 0`：車手的髖在車身裡，腰以上露出來。
+- `src/kart/art/kartModel.ts`：離地高度 0.34 → 0.27 m；漆改霧面（粗糙度 0.46）；`accent` 帶 0.32 的自發光；貼花材質（`alphaTest` 0.45、`polygonOffset`，每台車號碼與標誌各一張 canvas：128×64、64×64）；發光條的材質每格依速度與噴射熱度改顏色；把手換成方向軛。`KartModel`、`KartLook` 的介面沒變。
+- `src/kart/art/driverModel.ts`：重寫成正常比例的坐姿車手；`DriverModel`（`group`、`torso`、`head`、`arms`）不變，所以 `kartModel.ts` 的傾身、後仰、被打中的搖晃照舊。四肢是兩點之間的六角柱（`limb`），軀幹與安全帽是 `hull`。賽車號碼 `DRIVER_NUMBERS` 在 `shared/kart/karts.ts`（等待室的車庫也顯示，不能從 three.js 的檔案拿）。
+- `src/styles/kartTokens.ts`：`kartBodies`、`kartDrivers`（新增 `panel`、`visor`）改色，新增 `kartLivery`；`kartThemes` 四個主題降天光、升太陽光，`day` 改成傍晚。
+- `src/kart/post.ts`：`grade`（色調曲線前的對比 ×1.1、飽和 ×1.14）；bloom 門檻 1.45 → 1.3、強度 0.55 → 0.48、擴散 1 → 0.85；暗角 0.3 → 0.36。層數與 pass 數沒變，成本相同。
+- `src/kart/ui/broadcast.ts`（新）：`broadcast`、`broadcastSolid`、`ticker`、`digits`、`slam`、`streak`、`splitShadow`。卡丁車畫面裡原本用 `glass` 的十三處改用 `broadcast`；`RaceOverlay.tsx`（圈數 ticker、計時 digits、倒數大字、提示、成績）、`RaceView.tsx`（名次、名牌、警告）、`Standings.tsx`（名次表）、`RosterPicker.tsx`／`GaragePanel.tsx`（車庫）、`Hud.tsx`（喊話的砸入與橫掃光）照新樣式。DOM 結構、`data-testid`、ARIA、版面位置都沒變，所以既有的 e2e 不用改。
+- `scripts/kart-ui-shots.mjs`（新）：用真 GPU 截卡丁車介面（倒數、計時賽、車庫、電腦賽設定、比賽中、成績）在桌機、手機橫、手機直與中英文的圖，跟 `kart-shots.mjs` 一樣只給人看、不比對。
+
+**效能**：卡丁車 chunk 353.0 kB gzip（改動前約 347 kB）（預算 600 kB）。每台車的 draw call 與 §4.32 同級（同材質合併；多了兩張小貼花貼圖與一到兩個貼花 mesh）；切面船身每段 16 個三角形，比原本 20–24 邊的蒙皮少。後處理的 pass 數沒變。
+
+**沒做**：車庫的 3D 轉台（`/kart` 的車庫選了要關掉面板才換車，預覽得另開一個 WebGL context，手機記憶體不划算；先用色條與號碼）；等待室的車庫（`RoomGarage.tsx`）只跟著 `RosterPicker` 換樣式。
 
 ## 5. i18n
 

@@ -7,7 +7,8 @@ import type { ItemId } from '../../../shared/kart/items.ts'
 import type { WatchCommand } from '../../../shared/kart/watch.ts'
 import type { Translate } from '../../i18n/t.ts'
 import { Button } from '../../components/Button.tsx'
-import { displayType, glass, monoType } from '../../styles/esports.ts'
+import { displayType, monoType } from '../../styles/esports.ts'
+import { broadcast } from '../ui/broadcast.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
 import { ItemSlot } from '../race/ItemHud.tsx'
 
@@ -145,7 +146,7 @@ export const MapCorner = styled.div`
 `
 
 export const Note = styled.p`
-  ${glass}
+  ${broadcast}
   margin: 0;
   padding: ${space.xs}px ${space.sm}px;
   color: ${color.text};
@@ -165,7 +166,7 @@ export const Fallback = styled.section`
 `
 
 const Panel = styled.div`
-  ${glass}
+  ${broadcast}
   display: grid;
   gap: ${space.xs}px;
   padding: ${space.xs}px ${space.md}px;
@@ -200,7 +201,7 @@ const Detail = styled.span`
 `
 
 const Controls = styled.section`
-  ${glass}
+  ${broadcast}
   position: absolute;
   bottom: ${space.sm}px;
   left: 50%;

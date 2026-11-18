@@ -4,7 +4,7 @@
 import styled from 'styled-components'
 import type { KartMessageKey } from '../../shared/kart/i18n.ts'
 import type { MessageParams } from '../i18n/t.ts'
-import { glass } from '../styles/esports.ts'
+import { broadcast } from './ui/broadcast.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
 import { GHOST_PICKS, type GhostPick } from './records.ts'
 
@@ -37,7 +37,7 @@ export function GhostPicker({
 }
 
 const Group = styled.div`
-  ${glass}
+  ${broadcast}
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
