@@ -12,7 +12,7 @@ A 3D kart race in the browser for 1 to 8 karts: friends in one room, computer ka
 ## Driving
 
 - **Drift**: hold the drift key while steering. A drift fills your **boost gauge**; a full gauge becomes a stored boost (up to two), fired with the boost key. One boost burns at a time: while it does, the key does nothing.
-- **Instant boost**: a drift that is deep and long enough earns a short burst. Let the drift go and press forward again, while the kart is still sliding or just after it straightens.
+- **Instant boost**: a real drift, with the tail out for a moment, earns a short burst; a tap and let go does not. Let the drift go and press forward again, while the kart is still sliding or just after it straightens. A drifting kart slides and loses a little speed, so drifting down a straight for it does not pay.
 - **Reset**: puts the kart back on the road at the last checkpoint.
 
 The controls panel on the Kart page lists the keys, the gamepad buttons and the touch buttons, and lets you change them.
@@ -29,8 +29,8 @@ The eight items: Tailwind (a boost), Bubble (stops one hit), Tow Line (pulls you
 Set **Sides** to **Team race** and the karts race as two teams, **Red** and **Blue**. Either mode can be a team race.
 
 - **Sides**: in the waiting room everyone picks Red or Blue. Anyone who has not is put on the smaller team when the race starts. The host can move anyone, computer karts included, and **Balance the teams** takes every choice back so that the split is even. Two against two, three against three and four against four are the usual sizes.
-- **Team gauge**: each team shares one gauge, shown in blue beside your own. Every drift by anyone on the team fills it a little, and so does every instant boost out of a drift. It fills more slowly than your own gauge, and a bigger team fills it no faster than a smaller one.
-- **Team boost**: when the team gauge is full, every kart on the team still racing gets one team boost, and the gauge starts over. A kart holds two at most. The boost key fires a team boost before your own stored boosts. It burns **blue**, for about half as long again as a normal boost, and goes faster. It fires only when no other boost is burning, and your own stored boosts wait until it has burnt out.
+- **Your gauge is your own**: as in any race, your drifts fill your own boost gauge, and a full gauge is a stored boost of your own (up to two). An ordinary boost burns **red**.
+- **Team gauge and blue boosts**: each team also shares one team gauge, shown in blue beside your own. Only drifting fills it, anyone's on the team; it takes about as much as everyone on the team filling their own gauge twice, so a bigger team fills it no faster. The moment it is full, every stored boost the team's karts **are holding** turns **blue**; a kart holding none gets nothing this time. A blue boost burns blue, for about half as long again as a red one, and goes faster. Blue ones are first in the row and fire first. One boost burns at a time. Blue is the colour of that boost, not of the Blue team: both teams' are blue.
 - **Scoring**: places score **10, 8, 6, 5, 4, 3, 2, 1** points; a kart that does not finish scores 0. Each team counts its best karts, as many as the smaller team has, so three against two is still fair. The higher total wins. If the totals are level, the team of the kart that finished first wins.
 
 The results show which team won, the two totals, and every kart's side, time and points.
