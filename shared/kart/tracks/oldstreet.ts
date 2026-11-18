@@ -13,6 +13,13 @@
 //
 // Flat, like every track so far: the physics is on a plane (stepKart has no height), so there is
 // no jump or ramp. The layout is ours; no other game's track was looked at.
+//
+// 2026-11-18, owner: "more fun, not so many straights ... technical" (revision 5; docs/KART-FEEL.md
+// §10). The straights are broken up and the back lanes made to matter, the fork left as it was: the
+// promenade now ends in the ferry alley (29 m: right, left, right) onto the market street; the back
+// lanes' esses swing 20 m either way where they swung 8; the shophouse row kinks round the well; the
+// old street home runs through one last alley. The boxes are placed again: the rows where the road
+// is wide, a pair on the line through the ferry alley and through the back lanes.
 import {
   gatesAlong,
   padsAlong,
@@ -40,14 +47,17 @@ const ISLAND_FROM = 82
 const CONTROL: readonly ControlPoint[] = [
   // The riverside promenade, northwards (-z), the river on the left
   [0, 236, 38],
-  [0, 80, 40],
-  [0, -110, 40],
-  // A right at the top, onto the market street
-  [0, -210, 34],
-  [16, -258, 32],
-  [64, -284, 36],
+  [0, 100, 40],
+  [0, -50, 40],
+  // The ferry alley (2026-11-18): right, left and right again through a 29 m lane, onto the market
+  // street
+  [8, -112, 32],
+  [46, -160, 29],
+  [50, -212, 29],
+  [70, -260, 30],
+  [108, -286, 36],
   // The market street, eastwards: lanterns overhead, stalls on both sides
-  [140, -290, 44],
+  [160, -290, 44],
   [230, -290, 44],
   // The temple fork: the road opens out, the stall island splits it, and it sweeps right round the
   // temple square back to the west
@@ -63,28 +73,31 @@ const CONTROL: readonly ControlPoint[] = [
   [230, -86, 42],
   [170, -86, 40],
   // A left into the back lanes, southwards, and the esses: right, left, right
-  [128, -76, 30],
-  [112, -40, 29],
-  [124, 0, 29],
-  [106, 40, 29],
-  [122, 80, 29],
-  [106, 120, 30],
-  [110, 165, 30],
+  [140, -78, 30],
+  [120, -52, 29],
+  [126, -8, 28],
+  [98, 45, 28],
+  [140, 100, 28],
+  [104, 155, 29],
   // A left onto the shophouse row, eastwards
-  [130, 205, 32],
-  [180, 222, 36],
-  [260, 222, 40],
-  [320, 222, 36],
+  [128, 204, 32],
+  [176, 222, 36],
+  // ... which kinks round the well: left, then right
+  [238, 204, 30],
+  [298, 234, 32],
+  [334, 226, 34],
   // The ferry-pier hairpin: right, round to the west
   [362, 230, 30],
   [380, 262, 29],
   [366, 296, 29],
   [326, 310, 34],
   // The old street home, westwards, and the right onto the promenade
-  [240, 312, 42],
-  [140, 314, 42],
-  [86, 316, 38],
-  [44, 312, 34],
+  [262, 312, 42],
+  [200, 312, 40],
+  // ... through the last alley: right, then left
+  [140, 292, 30],
+  [84, 322, 30],
+  [44, 310, 34],
   [16, 296, 34],
   [3, 268, 36],
 ]
@@ -92,7 +105,7 @@ const CONTROL: readonly ControlPoint[] = [
 const road = splineRoad(CONTROL, SAMPLE)
 
 /** The start and finish line: the first road point on the promenade at or past z = 120 */
-const FINISH = road.findIndex((point) => point.x === 0 && point.z <= 120)
+const FINISH = road.findIndex((point) => point.x === 0 && point.z <= 110)
 
 // The road starts at the line, so that gate 0 is the finish
 const fromLine = [...road.slice(FINISH), ...road.slice(0, FINISH)]
@@ -175,13 +188,14 @@ export const OLDSTREET: TrackJson = {
   id: 'oldstreet',
   name: { en: 'Lantern Old Street', 'zh-TW': '燈籠老街' },
   // 2: the classic feel (2026-11-17): the physics changed, so the old times are set aside
-  revision: 4,
+  // 5: the straights broken up by alleys, the back lanes' esses made real (2026-11-18)
+  revision: 5,
   laps: 3,
   road: fromLine,
   gates,
   respawns,
   // Two by two behind the line, 7 m apart, staggered, facing up the promenade
-  grid: [0, 1, 2, 3, 4, 5].map((slot) => {
+  grid: [0, 1, 2, 3, 4, 5, 6, 7].map((slot) => {
     const back = 10 + Math.floor(slot / 2) * 7 + (slot % 2) * 3.5
     const across = slot % 2 === 0 ? -4 : 4
     return {
@@ -194,16 +208,16 @@ export const OLDSTREET: TrackJson = {
   // Off the middle of the straights: taking one is a choice of line
   boostPads: padsAlong(fromLine, [
     [12, 10],
-    [nearestIndex(250, 222), -10],
-    [nearestIndex(200, 313), 10],
+    [nearestIndex(176, 222), -8],
+    [nearestIndex(240, 312), 10],
   ]),
   // The item race reads these (shared/kart/items.ts): rows across the wide parts, a row in the
   // fork's safe lane, two on the hairpin's inside kerb
   itemBoxes: [
     // The promenade, past the line
-    ...row(0, -40, [-15, -9, -3, 3, 9, 15]),
+    ...row(0, 0, [-15, -9, -3, 3, 9, 15]),
     // The market street
-    ...row(190, -290, [-17, -10, -3, 4, 11, 18]),
+    ...row(200, -290, [-17, -10, -3, 4, 11, 18]),
     // The fork's outside lane, at the sweep's apex (the inside lane, the shortcut, has none)
     ...[-34, -26, -18, -10, -2].map((offset) => across(fromLine, apex, offset)),
     // The lantern lane, back west
@@ -211,7 +225,10 @@ export const OLDSTREET: TrackJson = {
     // The hairpin's inside kerb: the tight line
     ...row(378, 262, [6, 10.5]),
     // The old street home
-    ...row(190, 313, [-15, -9, -3, 3, 9, 15]),
+    ...row(240, 312, [-15, -9, -3, 3, 9, 15]),
+    // The ferry alley's middle and the back lanes: a pair each, on the racing line
+    ...row(50, -190, [-4, 4]),
+    ...row(118, 62, [-4, 4]),
   ],
   decor: [],
 }

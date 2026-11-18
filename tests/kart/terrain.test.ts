@@ -32,7 +32,6 @@ import { startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeT
 import { courseOf, parseTrack, type RoadPoint } from '../../shared/kart/track.ts'
 import { GUANYIN, GUANYIN_PIECES } from '../../shared/kart/tracks/guanyin.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
-import { RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
 import { BOT_SKILLS } from '../../src/kart/bots/skill.ts'
 
@@ -83,7 +82,8 @@ describe('the ground', () => {
   })
 
   it('a flat track has no terrain, and its course and road are as they were', () => {
-    for (const id of RACE_TRACK_IDS.filter((one) => one !== 'guanyin')) {
+    // 2026-11-18: Riverside and the campus were redrawn with a hill and a jump each
+    for (const id of ['harbour', 'oldstreet'] as const) {
       const track = raceTrack(id)!
       expect(terrainOf(track)).toBeNull()
       expect('terrain' in courseOf(track)).toBe(false)

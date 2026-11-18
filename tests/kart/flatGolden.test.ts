@@ -103,10 +103,12 @@ function arenaHash(tuning: KartTuning): string {
   return hash.value
 }
 
+// 2026-11-18: every built-in track was redrawn (docs/ARCHITECTURE.md §4.33) and the hard bot given
+// a racing line, so the track hashes were taken again; the physics was not touched, which the test
+// yard's hash, the same as ever, still shows. Riverside and the campus now have a hill and a jump,
+// so the flat tracks left are the harbour and the old street
 const TRACKS = [
-  ['riverside', 1],
   ['harbour', 2],
-  ['tamkang', 3],
   ['oldstreet', 4],
 ] as const
 
@@ -130,12 +132,11 @@ describe('the classic feel is locked too', () => {
   })
 })
 
-// Taken at 7f53e13 (before the terrain), by this file's own functions
+// Taken at 7f53e13 (before the terrain), by this file's own functions; the tracks' taken again
+// 2026-11-18 when they were redrawn (the yard's is the one from 7f53e13 still)
 const GOLDEN: Record<string, { hash: string; steps: number }> = {
-  riverside: { hash: 'a317934d', steps: 6289 },
-  harbour: { hash: '21ae7039', steps: 6160 },
-  tamkang: { hash: '2f242f4e', steps: 6442 },
-  oldstreet: { hash: '03b2e55f', steps: 5285 },
+  harbour: { hash: '1343d752', steps: 7058 },
+  oldstreet: { hash: 'fe2840d4', steps: 6097 },
 }
 const GOLDEN_ARENA = '72389793'
 
@@ -147,9 +148,7 @@ const GOLDEN_ARENA = '72389793'
 // the next"): the drift is looser, the instant boost takes a deep and long drift, a boost cannot be
 // fired while one runs, and the hard bot drifts deep and no longer taps down the straights
 const CLASSIC_GOLDEN: Record<string, { hash: string; steps: number }> = {
-  riverside: { hash: '0acf0140', steps: 6129 },
-  harbour: { hash: 'a9bcf104', steps: 7069 },
-  tamkang: { hash: 'd65550a9', steps: 7052 },
-  oldstreet: { hash: '437d5977', steps: 6644 },
+  harbour: { hash: 'cb21cc53', steps: 7296 },
+  oldstreet: { hash: '953a9287', steps: 6688 },
 }
 const CLASSIC_GOLDEN_ARENA = '5359be40'

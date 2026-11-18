@@ -47,7 +47,7 @@ import {
   tamkangGround,
   tamkangTreeFits,
 } from './tamkangArt.ts'
-import { buildCornerSigns } from './cornerArt.ts'
+import { buildCornerDressing, buildCornerSigns } from './cornerArt.ts'
 import { buildFestival } from './festival.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { buildOldStreet, inOldStreetRiver, oldStreetTreeFits } from './oldStreetArt.ts'
@@ -304,9 +304,14 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   const own = <T extends Material>(material: T) => (materials.push(material), material)
   const ownTexture = <T extends Texture>(texture: T) => (extraTextures.push(texture), texture)
   // 2026-11-17: a track with slopes and jumps (hillArt.ts): its ground follows the road
-  const hillAt = hillGround(track)
+  const hillAt = hillGround(track, tamkang ? { near: 22, fade: 46 } : undefined)
   /** How high the ground is: flat but for the harbour's hillside, the campus and a hill track */
-  const groundAt = harbour ? harbourGround : tamkang ? tamkangGround : (hillAt ?? (() => 0))
+  // (2026-11-18: the campus track climbs a hill of its own, an embankment standing on the campus)
+  const groundAt = harbour
+    ? harbourGround
+    : tamkang
+      ? (x: number, z: number) => tamkangGround(x, z) + Math.max(0, hillAt?.(x, z) ?? 0)
+      : (hillAt ?? (() => 0))
   /** The road's height at each point: none on a flat track */
   const roadHeights = hillAt ? track.road.map((point) => point.y ?? 0) : null
   const lifted = (lift: number) => (roadHeights ? roadHeights.map((height) => height + lift) : lift)
@@ -357,7 +362,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   ground.position.set(groundWest + groundWidth / 2, 0, groundNorth + groundDepth / 2)
   // The campus brings its own ground, with the hillside in it; a hill track its height field, over
   // a plain a little lower
-  if (roadHeights) ground.position.y = Math.min(0, ...roadHeights) - 0.6
+  if (roadHeights && !tamkang) ground.position.y = Math.min(0, ...roadHeights) - 0.6
   if (!tamkang) group.add(shadowed(ground, false))
   const dome = sky(theme)
   keep(dome.geometry)
@@ -718,6 +723,11 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
 
   // ── The arrow boards along the outside of every corner (2026-11-17, cornerArt.ts) ──
   buildCornerSigns(
+    { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
+    (index) => roadHeights?.[index] ?? 0,
+  )
+  // ... and the rest of a corner's dressing (2026-11-18): apex kerbs, countdown boards, gate posts
+  buildCornerDressing(
     { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
     (index) => roadHeights?.[index] ?? 0,
   )

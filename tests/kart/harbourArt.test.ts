@@ -32,8 +32,8 @@ describe('the harbour scenery', () => {
   it('grows no shared trees on the quay, in the sea or on the road', () => {
     expect(harbourTreeFits(0, HARBOUR_COAST + 10)).toBe(false)
     expect(harbourTreeFits(HARBOUR_SHORE - 10, 0)).toBe(false)
-    // Between two of the west side's switchback legs
-    expect(roadClearance(HARBOUR.road, -120 * S, 130 * S)).toBeGreaterThan(7)
-    expect(harbourTreeFits(-120 * S, 130 * S)).toBe(true)
+    // Between two of the switchbacks' legs (redrawn 2026-11-18)
+    expect(roadClearance(HARBOUR.road, 174, 110)).toBeGreaterThan(7)
+    expect(harbourTreeFits(174, 110)).toBe(true)
   })
 })

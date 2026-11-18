@@ -121,7 +121,7 @@ export function cornerSigns(road: readonly RoadPoint[], share = 1): CornerSign[]
     const turn: -1 | 1 = corner.turn > 0 ? 1 : -1
     // Walk back LEAD metres from where the corner begins
     let first = corner.from
-    for (let back = 0; back < LEAD; ) {
+    for (let back = 0; back < LEAD;) {
       const a = at(first - 1)
       const b = at(first)
       back += Math.hypot(b.x - a.x, b.z - a.z)
@@ -152,4 +152,132 @@ export function cornerSigns(road: readonly RoadPoint[], share = 1): CornerSign[]
     }
   }
   return signs
+}
+
+// ── 2026-11-18 (owner: "more fun ... technical"; docs/ARCHITECTURE.md §4.33): the rest of a corner's
+// dressing, worked out from the road alone like the boards: a wide painted kerb along the inside of
+// every corner, widest at its apex (the place to aim for); countdown boards (three bars, two, one)
+// along the outside of the run up to a sharp corner; and a pair of posts where the road narrows to
+// a gate ──
+
+/** The apex kerb runs over this share of a corner, about its middle */
+const APEX_SHARE = 0.7
+/** ... and is this wide at the apex, metres, tapering to nothing at its ends */
+export const APEX_WIDTH = 3.4
+
+export interface ApexKerb {
+  /** The road points it runs along, in order (indices into the road) */
+  readonly points: readonly number[]
+  /** The inside of the corner: -1 the road's left, 1 its right */
+  readonly side: -1 | 1
+  /** How wide it is at each of `points`, metres */
+  readonly widths: readonly number[]
+}
+
+/** The painted kerb inside each corner of the road */
+export function apexKerbs(road: readonly RoadPoint[]): ApexKerb[] {
+  const n = road.length
+  return roadCorners(road).flatMap((corner) => {
+    const length = Math.max(3, Math.round(corner.points * APEX_SHARE))
+    const first = corner.from + Math.floor((corner.points - length) / 2)
+    const points: number[] = []
+    const widths: number[] = []
+    for (let step = 0; step < length; step++) {
+      points.push((((first + step) % n) + n) % n)
+      widths.push(Math.round(APEX_WIDTH * Math.sin((Math.PI * step) / (length - 1)) * 100) / 100)
+    }
+    return [{ points, side: corner.turn > 0 ? 1 : -1, widths }]
+  })
+}
+
+/** A corner turning at least this far gets countdown boards, radians (about 75°) */
+export const BRAKE_TURN = (75 * Math.PI) / 180
+/** The boards stand this far before the corner begins, metres: three bars, two, one */
+export const BRAKE_DISTANCES = [90, 60, 30] as const
+
+export interface BrakeBoard {
+  readonly x: number
+  readonly z: number
+  readonly index: number
+  readonly heading: number
+  /** How many bars it shows: 3 furthest from the corner, 1 nearest */
+  readonly bars: 1 | 2 | 3
+}
+
+/** The countdown boards before every sharp corner, on its outside, where the road runs straight up to it */
+export function brakeBoards(road: readonly RoadPoint[]): BrakeBoard[] {
+  const n = road.length
+  const at = (index: number) => road[((index % n) + n) % n]!
+  const corners = roadCorners(road)
+  const inCorner = new Set<number>()
+  for (const corner of corners) {
+    for (let step = 0; step < corner.points; step++) inCorner.add((corner.from + step) % n)
+  }
+  const boards: BrakeBoard[] = []
+  for (const corner of corners) {
+    if (Math.abs(corner.turn) < BRAKE_TURN) continue
+    const out = corner.turn > 0 ? -1 : 1
+    let back = 0
+    let index = corner.from
+    let next = 0
+    while (next < BRAKE_DISTANCES.length) {
+      const a = at(index - 1)
+      const b = at(index)
+      back += Math.hypot(b.x - a.x, b.z - a.z)
+      index--
+      // Another corner in the way: the countdown starts after it
+      if (inCorner.has(((index % n) + n) % n)) break
+      const wanted = BRAKE_DISTANCES[BRAKE_DISTANCES.length - 1 - next]!
+      if (back < wanted) continue
+      const here = at(index)
+      const ahead = at(index + 1)
+      const heading = Math.atan2(ahead.x - here.x, -(ahead.z - here.z))
+      const reach = here.width / 2 + SIGN_OFFSET
+      const x = here.x + Math.cos(heading) * out * reach
+      const z = here.z + Math.sin(heading) * out * reach
+      if (roadClearance(road, x, z) >= SIGN_OFFSET * 0.6) {
+        boards.push({ x, z, index: ((index % n) + n) % n, heading, bars: (next + 1) as 1 | 2 | 3 })
+      }
+      next++
+    }
+  }
+  return boards
+}
+
+/** A stretch this narrow, metres, between wider road is a gate ... */
+export const GATE_WIDTH = 28.5
+/** ... when the road is at least this much wider within GATE_REACH road points on either side */
+const GATE_WIDER = 1.4
+const GATE_REACH = 12
+
+export interface GatePost {
+  readonly x: number
+  readonly z: number
+  readonly index: number
+}
+
+/** A pair of posts, one at each kerb, where the road narrows to a gate and where it opens again */
+export function gatePosts(road: readonly RoadPoint[]): GatePost[] {
+  const n = road.length
+  const at = (index: number) => road[((index % n) + n) % n]!
+  const narrow = (index: number) => at(index).width <= GATE_WIDTH
+  const posts: GatePost[] = []
+  for (let index = 0; index < n; index++) {
+    if (!narrow(index)) continue
+    const enters =
+      !narrow(index - 1) && at(index - GATE_REACH).width >= at(index).width + GATE_WIDER
+    const leaves =
+      !narrow(index + 1) && at(index + GATE_REACH).width >= at(index).width + GATE_WIDER
+    if (!enters && !leaves) continue
+    const here = at(index)
+    const ahead = at(index + 1)
+    const heading = Math.atan2(ahead.x - here.x, -(ahead.z - here.z))
+    for (const side of [-1, 1]) {
+      const reach = here.width / 2 + SIGN_OFFSET * 0.7
+      const x = here.x + Math.cos(heading) * side * reach
+      const z = here.z + Math.sin(heading) * side * reach
+      if (roadClearance(road, x, z) >= SIGN_OFFSET * 0.4) posts.push({ x, z, index })
+    }
+  }
+  return posts
 }
