@@ -79,7 +79,8 @@ export function buildKartEnvironment(
     room.add(mesh)
   }
   const generator = new PMREMGenerator(renderer)
-  const target = generator.fromScene(room, 0.04)
+  // Small: a kart is a few hundred pixels across, and the blur of its paint hides the rest
+  const target = generator.fromScene(room, 0.04, 0.1, 100, { size: 64 })
   generator.dispose()
   dome.dispose()
   domeMaterial.dispose()

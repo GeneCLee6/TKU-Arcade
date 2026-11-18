@@ -167,6 +167,21 @@ export function supportsWebGL2(): boolean {
   return true
 }
 
+/**
+ * Whether WebGL here is drawn by the processor rather than a graphics card (a browser with its
+ * hardware acceleration off, a virtual machine, the browser tests): the picture is then drawn
+ * straight to the screen whatever the quality and the karts' paint reflects nothing, since
+ * developing the picture (post.ts) and making the environment map cost such a renderer dearly
+ */
+export function softwareRenderer(): boolean {
+  const probe = document.createElement('canvas').getContext('webgl2')
+  if (!probe) return false
+  const info = probe.getExtension('WEBGL_debug_renderer_info')
+  const name = info ? String(probe.getParameter(info.UNMASKED_RENDERER_WEBGL)) : ''
+  probe.getExtension('WEBGL_lose_context')?.loseContext()
+  return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name)
+}
+
 /** Builds the scene inside `container`, with `walls` and, for a track, its art. Throws when three.js cannot start. */
 export function createKartScene(
   container: HTMLElement,
@@ -177,14 +192,16 @@ export function createKartScene(
   driver: DriverId = 'spade',
 ): KartScene {
   const settings = QUALITY[quality]
+  const software = softwareRenderer()
+  const postLevel = software ? 'off' : settings.post
   const renderer = new WebGLRenderer({
     // Developed afterwards (post.ts), the scene is smoothed in its own buffer, not on the canvas
-    antialias: settings.antialias && settings.post === 'off',
+    antialias: settings.antialias && postLevel === 'off',
     powerPreference: 'high-performance',
   })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO, settings.pixelRatio))
   // 2026-11-18: bloom, a tone curve and (high) a vignette, heat shimmer and a boost's streak
-  const post = createPost(renderer, settings.post, settings.antialias ? 4 : 0)
+  const post = createPost(renderer, postLevel, settings.antialias ? 4 : 0)
   // A track's art casts shadows near the car when the quality allows (e8-t06)
   const shadows = track !== undefined && settings.shadowMap > 0
   renderer.shadowMap.enabled = shadows
@@ -254,7 +271,10 @@ export function createKartScene(
   }
 
   // What every kart's paint reflects (2026-11-18): the track's own sky, with bright panels in it
-  const environment = buildKartEnvironment(renderer, theme.skyTop, theme.skyHorizon)
+  // (not where the processor draws: making the map alone takes it seconds, and the paint is plain)
+  const environment = software
+    ? null
+    : buildKartEnvironment(renderer, theme.skyTop, theme.skyHorizon)
   const finish: KartFinish = { environment, glow: post?.glow ?? 1 }
   // The hover kart and its driver (e8-t07, 2026-11-14), with its sparks, trails and boost flames
   const kart = buildKartModel(shadows, false, body, driver, finish)
@@ -573,7 +593,7 @@ export function createKartScene(
       itemArt?.dispose()
       hitArt?.dispose()
       art?.dispose()
-      environment.dispose()
+      environment?.dispose()
       post?.dispose()
       grid.material.dispose()
       renderer.dispose()

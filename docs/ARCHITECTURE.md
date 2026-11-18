@@ -707,8 +707,9 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - 自己寫的一條鏈（沒有用 three.js examples 的 `EffectComposer`，省 bundle）：場景畫進 `HalfFloat` 的 render target（MSAA 4×，canvas 自己不開 antialias）→ 亮部（> 1.45，軟膝）降到 1/2 → 逐級減半 → 逐級用 tent 濾鏡加回去（bloom）→ 最後一個 pass：加 bloom、Khronos PBR Neutral 色調映射（0.76 以下的顏色不變，只壓高光）、sRGB、抖色。瀏覽器不能畫到浮點 target 時退回 8 bit（門檻 0.9）。
 - 三級：`low` = `off`（直接畫到畫面，和以前一樣，沒有 bloom，發光件不超過 1）；`medium` = `bloom`（4 級 bloom＋色調映射）；`high` = `full`（5 級，另加輕微暈影、噴口後方的熱擾動（把自己的車的噴口後方投影到螢幕，在那一圈扭 UV）、噴射時往畫面邊緣的放射狀拖影）。`prefers-reduced-motion` 時不做拖影與熱擾動。
 - 手機預設仍是 `medium`、桌機 `high`（`loadQuality`，沒變）；`/stats` 的 fps 遙測照舊分畫質記。
+- **軟體繪圖時自動關掉**：`Scene.ts` 的 `softwareRenderer()` 開一個丟棄用的 context 讀 `UNMASKED_RENDERER_WEBGL`，是 SwiftShader、llvmpipe 之類（瀏覽器關了硬體加速、虛擬機、Playwright 的 headless Chromium）就不管畫質一律不做後處理，也不做環境貼圖（車漆沒有反射）。原因：軟體繪圖下 PMREM 一張就要好幾秒（兩個人的房間 e2e 會等不到畫面），後處理讓每幀慢好幾倍。環境貼圖是 64 px 的 cube（車在畫面上只有幾百像素）。
 
-**測試**：`tests/kart/boostFx.test.ts`（每種的樣式、`boostFx`、`boostKindOf`、變身開 0.25 秒收 0.3 秒、`mini` 不變身、有 `bursts` 時照呼叫者的計數點火、只有 `boosting` 時先 `mini` 後 `n2o` 並再點一次、`morphEase`）。模型、特效、後處理要 WebGL，靠 `scripts/kart-shots.mjs`（真 GPU 截圖）與卡丁車 e2e。
+**測試**：`tests/kart/boostFx.test.ts`（每種的樣式、`boostFx`、`boostKindOf`、變身開 0.25 秒收 0.3 秒、`mini` 不變身、有 `bursts` 時照呼叫者的計數點火、只有 `boosting` 時先 `mini` 後 `n2o` 並再點一次、`morphEase`）。模型、特效、後處理要 WebGL，靠 `scripts/kart-shots.mjs`（真 GPU 截圖）、`scripts/kart-fps.mjs`（真 GPU、不鎖幀的 fps，拿來和另一個分支比）與卡丁車 e2e（軟體繪圖，所以走的是沒有後處理的那條路）。
 
 **限制**：別人的車變身晚 0.75 秒、別人的團隊 N2O 不是藍色（見上）；熱擾動只做自己的車；車還是程式拼的幾何（沒有 UV 貼圖、沒有法線貼圖、沒有骨架動畫）；`medium` 在舊手機上多一次全螢幕 pass 加 bloom 鏈，掉幀就切 `low`。
 
