@@ -25,7 +25,7 @@ import { loadQuality } from '../quality.ts'
 import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
 import { supportsWebGL2 } from '../Scene.ts'
 import { startSpikeLoop, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
-import { autopilot } from './autopilot.ts'
+import { autopilot, driftingAutopilot } from './autopilot.ts'
 import { ITEM_SLOT_PORTRAIT_TOP, ItemNote, ItemSlot } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
 import { StunHud } from './HitHud.tsx'
@@ -191,6 +191,10 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
   })
   // Testing a room alone: a second tab can drive itself
   const [autopiloted] = useState(() => new URLSearchParams(window.location.search).has('autopilot'))
+  // `?autopilot=drift`: the same driver, drifting through the bends (a team race's gauges fill)
+  const [drifts] = useState(
+    () => new URLSearchParams(window.location.search).get('autopilot') === 'drift',
+  )
   // e10-t05: the kart and driver picked on /kart or in the waiting room; the kart's numbers go
   // into the tuning
   const [loadout] = useState(() => ({ body: loadBody(), driver: loadDriver() }))
@@ -247,7 +251,10 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
         onClock: (total, lap) => clock.current?.set(total, lap),
         touch: touchSource,
         net: autopiloted
-          ? { ...net.net, autopilot: (trial) => autopilot(trial, track.road) }
+          ? {
+              ...net.net,
+              autopilot: (trial) => (drifts ? driftingAutopilot : autopilot)(trial, track.road),
+            }
           : net.net,
       })
     } catch {
@@ -263,7 +270,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       net.stop()
       raceNet.current = null
     }
-  }, [realtime, track, seat, slot, failure, settings, autopiloted, loadout, touchSource])
+  }, [realtime, track, seat, slot, failure, settings, autopiloted, drifts, loadout, touchSource])
 
   useEffect(() => {
     const timer = setInterval(() => {
