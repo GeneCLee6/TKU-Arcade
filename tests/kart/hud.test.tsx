@@ -34,7 +34,10 @@ describe('the HUD', () => {
     const stored = screen.getByRole('img', { name: 'Boosts ready: 1 red and 1 blue, of 2' })
     expect(stored).toHaveAttribute('data-red', '1')
     expect(stored).toHaveAttribute('data-blue', '1')
-    expect([...stored.querySelectorAll('i')].map((one) => one.dataset.kind)).toEqual(['blue', 'red'])
+    expect([...stored.querySelectorAll('i')].map((one) => one.dataset.kind)).toEqual([
+      'blue',
+      'red',
+    ])
     unmount()
     // None blue yet: both red. And in a race without sides there is neither
     const red = render(<Hud t={zh} hud={{ ...hud, teamBoosts: 0 }} maxStored={2} />)
@@ -111,13 +114,68 @@ describe('the HUD', () => {
   it('shows a callout with the words for it, hidden from screen readers', () => {
     render(<CalloutText t={en} callout={{ kind: 'chain', count: 2 }} />)
     const callout = screen.getByTestId('kart-callout')
-    expect(callout).toHaveTextContent('Chain ×2')
+    expect(callout).toHaveTextContent('Combo ×2')
     expect(callout).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  // 2026-11-18: the gauge by the quality of the drift (docs/KART-FEEL.md §3.5)
+  it('shows the combo from two in a row, and what an exit has just added to the gauge', () => {
+    const { rerender } = render(<Hud t={en} hud={{ ...HUD, combo: 0, gains: 0 }} maxStored={2} />)
+    expect(screen.queryByTestId('kart-combo')).toBeNull()
+    expect(screen.queryByTestId('kart-gain')).toBeNull()
+    rerender(<Hud t={en} hud={{ ...HUD, combo: 3, gains: 4, gain: 38, grade: 3 }} maxStored={2} />)
+    expect(screen.getByTestId('kart-combo')).toHaveTextContent('Combo ×3')
+    const gain = screen.getByTestId('kart-gain')
+    expect(gain).toHaveTextContent('+38')
+    expect(gain).toHaveAttribute('data-grade', '3')
+    expect(gain).toHaveAccessibleName('Gauge up 38')
+    // An exit that added nothing (a wall touched in the drift) shows no number
+    rerender(<Hud t={en} hud={{ ...HUD, combo: 3, gains: 5, gain: 0, grade: 2 }} maxStored={2} />)
+    expect(screen.queryByTestId('kart-gain')).toBeNull()
+    rerender(<Hud t={zh} hud={{ ...HUD, combo: 2, gains: 6, gain: 12, grade: 2 }} maxStored={2} />)
+    expect(screen.getByTestId('kart-combo')).toHaveTextContent('連段 ×2')
+    expect(screen.getByTestId('kart-gain')).toHaveAccessibleName('加速條增加 12')
+  })
+
+  it('says when the drift has lasted long enough for a perfect exit', () => {
+    const { rerender } = render(<Hud t={en} hud={{ ...HUD, dash: 1 }} maxStored={2} />)
+    expect(screen.getByTestId('kart-dash')).toHaveTextContent('Instant boost earned')
+    expect(screen.getByTestId('kart-dash')).not.toHaveAttribute('data-perfect')
+    rerender(<Hud t={en} hud={{ ...HUD, dash: 1, perfectReady: true }} maxStored={2} />)
+    expect(screen.getByTestId('kart-dash')).toHaveTextContent('Perfect ready: let go and tap!')
+    expect(screen.getByTestId('kart-dash')).toHaveAttribute('data-perfect')
+    // Let go: the prompt to press forward, as ever
+    rerender(<Hud t={en} hud={{ ...HUD, dash: 2, perfectReady: false }} maxStored={2} />)
+    expect(screen.getByTestId('kart-dash')).toHaveTextContent('Let go, then tap forward!')
+  })
+
+  it('a perfect exit is called out, with the combo it has reached; a late one too', () => {
+    const { rerender } = render(<CalloutText t={en} callout={{ kind: 'perfect', count: 1 }} />)
+    expect(screen.getByTestId('kart-callout')).toHaveTextContent('Perfect!')
+    rerender(<CalloutText t={zh} callout={{ kind: 'perfect', count: 4 }} />)
+    expect(screen.getByTestId('kart-callout')).toHaveTextContent('完美！連段 ×4')
+    rerender(<CalloutText t={en} callout={{ kind: 'late', count: 0 }} />)
+    expect(screen.getByTestId('kart-callout')).toHaveTextContent('Late')
   })
 })
 
 describe('callouts', () => {
   const drifting: KartState = { ...INITIAL_KART, drifting: true, driftDirection: 1 }
+
+  it('calls out the timing of an instant boost in the classic feel: perfect, late, or nothing more', () => {
+    const before: KartState = { ...INITIAL_KART, dashCount: 2, chain: 2 }
+    const fired = (grade: number, chain: number): KartState => ({
+      ...before,
+      dashCount: 3,
+      dashGrade: grade,
+      chain,
+      miniSeconds: 0.7,
+    })
+    expect(calloutBetween(before, fired(3, 3))).toEqual({ kind: 'perfect', count: 3 })
+    expect(calloutBetween(before, fired(1, 2))).toEqual({ kind: 'late', count: 0 })
+    // A good one is the combo's callout, as an instant boost always was
+    expect(calloutBetween(before, fired(2, 3))).toEqual({ kind: 'chain', count: 3 })
+  })
 
   it('calls out a drift starting, a boost fired and a chain', () => {
     expect(calloutBetween(INITIAL_KART, drifting)).toEqual({ kind: 'drift', count: 0 })

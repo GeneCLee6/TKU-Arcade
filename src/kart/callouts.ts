@@ -22,6 +22,9 @@ export type CalloutKind =
   | 'start'
   | 'quick'
   | 'stall'
+  // 2026-11-18, the timing of the instant boost (docs/KART-FEEL.md §3.2): perfect, or late
+  | 'perfect'
+  | 'late'
 
 export interface Callout {
   readonly kind: CalloutKind
@@ -33,6 +36,12 @@ export interface Callout {
 export function calloutBetween(before: KartState, after: KartState): Callout | undefined {
   // The double says so itself; any other release boost is a chain from the second in a row
   if (after.doubles > before.doubles) return { kind: 'double', count: 0 }
+  // The classic feel grades the press: a perfect one says so (and the combo it has reached), a
+  // late one too; a good one is an instant boost like any
+  if ((after.dashCount ?? 0) > (before.dashCount ?? 0)) {
+    if (after.dashGrade === 3) return { kind: 'perfect', count: after.chain }
+    if (after.dashGrade === 1) return { kind: 'late', count: 0 }
+  }
   if (after.miniSeconds > before.miniSeconds) {
     return after.chain >= 2 ? { kind: 'chain', count: after.chain } : { kind: 'release', count: 0 }
   }
@@ -78,6 +87,8 @@ const RANK: Record<CalloutKind, number> = {
   start: 7,
   quick: 7,
   stall: 7,
+  perfect: 5,
+  late: 3,
 }
 
 /** Of two callouts in the same frame, the one to show */

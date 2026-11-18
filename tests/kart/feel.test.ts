@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { KART_TUNING } from '../../shared/kart/physics.ts'
 import { FEEL_DRIVERS, feelRace } from '../../scripts/kart/feel.ts'
-import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 
 // The classic feel (2026-11-17, docs/KART-FEEL.md §5): what its techniques are worth. A novice, an
-// average driver and an expert (scripts/kart/feel.ts) race three laps; the full table, all five
-// tracks and the arcade (old) preset too, is `npm run kart:feel` and docs/ARCHITECTURE.md §4.27.
+// average driver and an expert race three laps; the full table, all five tracks and the arcade
+// (old) preset too, is `npm run kart:feel`.
+//
+// 2026-11-18 (owner: "the N2O fills too slowly: an expert should be able to boost all the way round
+// and a novice not"): the drivers are people, mistakes and all (scripts/kart/drivers.ts), not the
+// computer opponents, and what is pinned is the boost cover: the share of the race spent in any
+// boost. The owner's targets: the expert 70% or more, the novice 15% or less, the average between
+// (about 30 to 45%), and the expert's time a quarter or more under the novice's.
 
-describe.each(['riverside', 'tamkang', 'oldstreet'])('the classic feel on %s', (id) => {
+describe.each(['riverside', 'tamkang', 'guanyin'])('the classic feel on %s', (id) => {
   const novice = feelRace(id, FEEL_DRIVERS.novice, KART_TUNING)
   const average = feelRace(id, FEEL_DRIVERS.average, KART_TUNING)
   const expert = feelRace(id, FEEL_DRIVERS.expert, KART_TUNING)
@@ -16,25 +21,52 @@ describe.each(['riverside', 'tamkang', 'oldstreet'])('the classic feel on %s', (
     for (const result of [novice, average, expert]) expect(result.finished).toBe(true)
   })
 
-  it('pays for skill: the expert well ahead of the novice, the average between', () => {
+  it('pays for skill: the expert a quarter or more under the novice, the average between', () => {
     expect(expert.seconds).toBeLessThan(average.seconds)
     expect(average.seconds).toBeLessThan(novice.seconds)
-    // 2026-11-18, the tracks redrawn: 0.84 to 0.86 (docs/KART-FEEL.md §10 has the table)
-    expect(expert.seconds).toBeLessThan(novice.seconds * 0.87)
+    expect(expert.seconds).toBeLessThan(novice.seconds * 0.75)
   })
 
-  // 2026-11-18, owner: "a player can drift a little and boost, drift a little and boost, all lap
-  // long ... it should take a big drift to boost". Before: 87 to 122 instant boosts in three laps.
-  // With the marks at 32° and 0.45 s: 10 to 30, and "now it drifts too big again: a drift that
-  // really slid should boost". Now every drift through a corner earns one
-  it('the expert fires an instant boost out of the corners it drifts; the others next to none', () => {
-    expect(expert.dashes).toBeGreaterThanOrEqual(8)
-    // Not all lap long: about fifteen a lap at the very most
-    expect(expert.dashes).toBeLessThanOrEqual(48)
-    // A landing boost off a jump counts here too: one a lap for everyone on a track with a jump
-    const landings = 3 * (raceTrack(id)?.jumps?.length ?? 0)
-    expect(expert.dashes - landings).toBeGreaterThanOrEqual((average.dashes - landings) * 3)
-    // By chance only (the brake let go in a slide is a fresh press of the throttle)
-    expect(novice.dashes - landings).toBeLessThanOrEqual(9)
+  it('the expert boosts nearly all the way round, the novice hardly ever, the average between', () => {
+    expect(expert.cover).toBeGreaterThanOrEqual(0.7)
+    expect(novice.cover).toBeLessThanOrEqual(0.15)
+    expect(average.cover).toBeGreaterThan(novice.cover + 0.05)
+    expect(average.cover).toBeLessThan(0.5)
+    expect(average.cover).toBeLessThan(expert.cover - 0.25)
+  })
+
+  it('the expert fires charge after charge; the novice a charge now and then at the most', () => {
+    // Five a lap or more against one a lap at the very most
+    expect(expert.fired).toBeGreaterThanOrEqual(15)
+    expect(novice.fired).toBeLessThanOrEqual(3)
+    expect(average.fired).toBeLessThan(expert.fired * 0.6)
+  })
+
+  it('the expert times the press: perfect nearly every time, and one after another', () => {
+    expect(expert.dashes).toBeGreaterThanOrEqual(20)
+    expect(expert.perfect).toBeGreaterThanOrEqual(expert.dashes * 0.85)
+    expect(expert.combo).toBeGreaterThanOrEqual(4)
+    // The novice never means to: what fires, fires by chance (a foot lifted for a corner coming
+    // back down in a slide), and next to never on time
+    expect(novice.perfect).toBeLessThanOrEqual(3)
+    expect(novice.combo).toBeLessThanOrEqual(4)
+  })
+
+  it('the novice makes a novice of it: into the walls', () => {
+    expect(novice.crashes).toBeGreaterThanOrEqual(5)
+  })
+})
+
+// The old street is the item track: wide, with few corners that take a drift (docs/KART-FEEL.md
+// §5). The expert's cover there is short of the target, and says so
+describe('the classic feel on oldstreet, the item track', () => {
+  const novice = feelRace('oldstreet', FEEL_DRIVERS.novice, KART_TUNING)
+  const expert = feelRace('oldstreet', FEEL_DRIVERS.expert, KART_TUNING)
+
+  it('still tells the two apart, with less room to', () => {
+    expect(expert.finished && novice.finished).toBe(true)
+    expect(expert.seconds).toBeLessThan(novice.seconds * 0.75)
+    expect(expert.cover).toBeGreaterThanOrEqual(0.35)
+    expect(novice.cover).toBeLessThanOrEqual(0.15)
   })
 })

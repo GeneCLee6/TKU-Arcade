@@ -62,9 +62,13 @@ const GAUGE_SPEED_MAX = 1.25
 /** The exit's bonus counts the drift's depth against driftSlip, from this share up to this */
 const BONUS_DEPTH_MIN = 0.6
 const BONUS_DEPTH_MAX = 1.25
-/** ... and its length past dashMinSeconds against this many seconds, never under this share */
-const BONUS_SECONDS = 0.3
-const BONUS_SECONDS_MIN = 0.1
+/**
+ * ... and its length: nothing until this long past dashMinSeconds (a drift only just long enough to
+ * earn the instant boost is worth nothing to the gauge: weaving down a straight must not pay), all
+ * of it this much later
+ */
+const BONUS_FROM = 0.08
+const BONUS_SECONDS = 0.22
 /** The throttle pressed afresh in a drift this soon before it is let go: too early for a perfect one */
 const EARLY_SECONDS = 0.2
 /** The grades of an instant boost's timing (KartState.dashGrade) */
@@ -93,12 +97,12 @@ const sideOf = (vx: number, vz: number, heading: number): number =>
   vx * Math.cos(heading) + vz * Math.sin(heading)
 
 /**
- * What a drift is worth to the exit's bonus, 0 to about 1.25: how deep it got and how long it
- * lasted. A drift only just long enough to earn the instant boost is worth a tenth of a full one
+ * What a drift is worth to the exit's bonus, 0 to 1.25: how deep it got and how long it lasted
+ * (all of it from about half a second)
  */
 export function driftWorthOf(peak: number, seconds: number, t: KartTuning): number {
   const depth = clamp(peak / Math.max(1e-3, t.driftSlip), BONUS_DEPTH_MIN, BONUS_DEPTH_MAX)
-  const long = clamp((seconds - t.dashMinSeconds) / BONUS_SECONDS, BONUS_SECONDS_MIN, 1)
+  const long = clamp((seconds - t.dashMinSeconds - BONUS_FROM) / BONUS_SECONDS, 0, 1)
   return depth * long
 }
 

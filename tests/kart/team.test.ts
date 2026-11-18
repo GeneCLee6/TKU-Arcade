@@ -64,16 +64,29 @@ describe('the sides', () => {
     ])
     expect(teams).toEqual([1, 1, 0, 0, 0])
     // A computer kart on either side, as the host chose
-    expect(assignTeams([{ id: 0, team: 0 }, { id: 1, team: 0 }, { id: 2, team: 1 }])).toEqual([
-      0, 0, 1,
-    ])
+    expect(
+      assignTeams([
+        { id: 0, team: 0 },
+        { id: 1, team: 0 },
+        { id: 2, team: 1 },
+      ]),
+    ).toEqual([0, 0, 1])
   })
 
   it('leaves no side empty with two karts or more, and ignores a side that is not one', () => {
-    expect(assignTeams([{ id: 0, team: 0 }, { id: 1, team: 0 }])).toEqual([0, 1])
-    expect(assignTeams([{ id: 0, team: 1 }, { id: 1, team: 1 }, { id: 2, team: 1 }])).toEqual([
-      1, 1, 0,
-    ])
+    expect(
+      assignTeams([
+        { id: 0, team: 0 },
+        { id: 1, team: 0 },
+      ]),
+    ).toEqual([0, 1])
+    expect(
+      assignTeams([
+        { id: 0, team: 1 },
+        { id: 1, team: 1 },
+        { id: 2, team: 1 },
+      ]),
+    ).toEqual([1, 1, 0])
     expect(assignTeams([{ id: 0, team: 7 }, { id: 1 }])).toEqual([0, 1])
     expect(assignTeams([{ id: 0, team: 1 }])).toEqual([1])
   })
@@ -160,12 +173,14 @@ describe('what a frame earns the team gauge', () => {
     expect(teamGain(first.trace, drift, 1_050, 1, true).gain).toBe(0)
   })
 
-  it('is full about when every kart of the side has filled its own gauge twice', () => {
-    // A kart's own gauge at its fastest fills at gaugeFillRate; the side's, at driftRate a kart
-    const own = 100 / KART_TUNING.gaugeFillRate
+  // 2026-11-18: a kart's own gauge now goes by the quality of its drifts (classic.ts); the side's
+  // still counts only the time spent drifting, at speed, whoever drifts and however well. Full after
+  // three to four seconds of drifting a kart of the side: for a good driver about every other
+  // charge of their own, for a side of beginners the one boost they can count on
+  it('is full after a few seconds of drifting a kart, whatever the quality of the drifts', () => {
     const side = TEAM_GAUGE.full / TEAM_GAUGE.driftRate
-    expect(side / own).toBeGreaterThan(1.8)
-    expect(side / own).toBeLessThan(3)
+    expect(side).toBeGreaterThan(3)
+    expect(side).toBeLessThan(4)
   })
 
   it('is told to the browsers in steps', () => {
@@ -267,14 +282,16 @@ describe('the blue boost in the physics', () => {
     expect(second.storedBoosts).toBe(1)
   })
 
-  it('fills none of the kart gauge while it burns, and a headwind or a hit blows it out', () => {
+  // 2026-11-18: the gauge fills in a boost too (boostGaugeShare), a blue one like a red one
+  it('fills the kart gauge while it burns, as any boost does; a headwind or a hit blows it out', () => {
     const team = run(cruising({ storedBoosts: 1, teamBoosts: 1, teamSeconds: 0 }), 1, true)
     let drifting = team
     for (let step = 0; step < 60; step++) {
       drifting = stepKart(drifting, { ...GO, steer: 1, drift: true })
     }
     expect(drifting.drifting).toBe(true)
-    expect(drifting.gauge).toBe(0)
+    expect(kartTeamBoosting(drifting)).toBe(true)
+    expect(drifting.gauge).toBeGreaterThan(5)
     expect(kartTeamBoosting(headwindStep(team, 1 / 60))).toBe(false)
     expect(kartTeamBoosting(stunStep(team, 1 / 60))).toBe(false)
   })
@@ -447,7 +464,11 @@ describe('a team race in the room', () => {
         true,
       )
     }
-    const solo = kart.init(makeSeats(4), { track: 'riverside', laps: 3, mode: 'race' }, createRng(1))
+    const solo = kart.init(
+      makeSeats(4),
+      { track: 'riverside', laps: 3, mode: 'race' },
+      createRng(1),
+    )
     expect(solo.teams).toBeUndefined()
     expect(solo.racers.every((racer) => racer.team === undefined)).toBe(true)
     // The sides chosen in the waiting room come in with the seats
@@ -530,7 +551,8 @@ describe('a team race in the room', () => {
   it('takes a kart at its word that it held fewer charges, only downwards, only for that fill', () => {
     let state = act(teamRace(4), { t: 'tfill', team: 0 })
     const memory = kart.realtime!.memory()
-    const keep = (held: number, fill: number) => encodeItemFrame({ op: 'keep', held, fill, tick: 9 })
+    const keep = (held: number, fill: number) =>
+      encodeItemFrame({ op: 'keep', held, fill, tick: 9 })
     expect(decodeItemFrame(keep(1, 1))).toEqual({ op: 'keep', held: 1, fill: 1, tick: 9 })
     // About a fill that is not the one standing: ignored
     expect(feed(state, memory, 0, keep(0, 0), GO_AT + 1_000).actions).toEqual([])
@@ -628,7 +650,10 @@ describe('a team race in the room', () => {
     state = act(state, { t: 'close' })
     const result = kart.result(state)
     // Blue: first (10) and not home (0); red: second and third (8 + 6)
-    expect(result.summary).toEqual({ key: 'games.kart.result.redWon', params: { red: 14, blue: 10 } })
+    expect(result.summary).toEqual({
+      key: 'games.kart.result.redWon',
+      params: { red: 14, blue: 10 },
+    })
     expect(result.standings.map((line) => [line.seat, line.rank, line.score])).toEqual([
       [1, 1, 10],
       [0, 2, 8],

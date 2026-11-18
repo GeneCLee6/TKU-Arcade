@@ -101,7 +101,7 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
     step: 1,
     unit: 'metresPerSecondSquared',
   },
-  chainGrace: { group: 'technique', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
+  chainGrace: { group: 'technique', min: 0, max: 5, step: 0.05, unit: 'seconds' },
   chainMinDrift: { group: 'technique', min: 0, max: 1.5, step: 0.05, unit: 'seconds' },
   slideBoostDrain: { group: 'technique', min: 0.1, max: 1, step: 0.05, unit: 'factor' },
   slideScrub: { group: 'technique', min: 0, max: 1, step: 0.05, unit: 'share' },

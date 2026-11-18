@@ -310,7 +310,7 @@ export function createBotBrain(
   const drawn = (range: readonly [number, number] | undefined, fallback: number): number =>
     range ? Math.round(range[0] + (range[1] - range[0]) * rng.float()) : fallback
   /** The lift that fires a dash, timed by skill: at once for two steps, or later and longer */
-  const liftMove = (counter?: number): Move => ({
+  const liftMove = (counter?: number): Extract<Move, { kind: 'lift' }> => ({
     kind: 'lift',
     steps: drawn(skill.liftSteps, LIFT_STEPS) - 1,
     double: false,
@@ -446,8 +446,9 @@ export function createBotBrain(
         // Out of the corner: let go, counter-steer and lift, then press afresh for the dash; or
         // just let go
         if (dashPlan && kart.burstReady) {
-          move = liftMove(-dir)
-          const waits = move.kind === 'lift' && (move.wait ?? 0) > 0
+          const lift = liftMove(-dir)
+          move = lift
+          const waits = (lift.wait ?? 0) > 0
           return { ...base, throttle: waits ? kart.throttleHeld : false, steer: -dir }
         }
         return { ...base, steer: gripSteer }
