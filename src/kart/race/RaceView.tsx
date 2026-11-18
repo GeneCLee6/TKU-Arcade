@@ -567,22 +567,17 @@ const TopLeft = styled.div`
   pointer-events: none;
 `
 
-// The place, as a broadcast's position tag: big, leaning, on a panel with the accent's bar
+// The place, as a broadcast's position tag: leaning, on a panel with the accent's bar. No wider
+// than it was: the button that leaves a race against the computer stands right beside it
 const PlacePanel = styled.div`
   ${broadcast}
-  padding: ${space.xs}px ${space.lg}px ${space.xs}px ${space.md}px;
+  padding: ${space.xs}px ${space.md}px;
 `
 
 const PlaceNumber = styled.span`
   ${displayType}
   color: ${color.text};
-  font-size: ${fontSize.xxl}px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.05;
-
-  @media (max-width: 760px), (max-height: 500px) {
-    font-size: ${fontSize.xl}px;
-  }
+  font-size: ${fontSize.xl}px;
 `
 
 const pulse = keyframes`
