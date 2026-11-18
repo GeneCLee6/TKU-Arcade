@@ -40,8 +40,9 @@ export type KartRacer = {
   /** Its shield is up until then, by the server's clock (ms since the epoch); 0 for none */
   shieldUntil: number
   /**
-   * A team race only (2026-11-18, shared/kart/team.ts): its team, the team boosts it holds, those
-   * it has fired so far, and until when (the server's clock) the one it fired last burns
+   * A team race only (2026-11-18, shared/kart/team.ts): its team, how many of its charges may be
+   * blue (all it can hold when its team's gauge fills; fewer once it says it held fewer, or fires
+   * one), the blue ones it has fired so far, and until when (the server's clock) the last burns
    */
   team?: TeamId
   teamBoosts?: number
@@ -136,10 +137,12 @@ export type KartAction =
   | { t: 'hit'; seat: SeatId; shot: number; at: number }
   /** System (a team race): `team`'s gauge stands at `gauge`, as its karts' frames have filled it */
   | { t: 'tgauge'; team: TeamId; gauge: number }
-  /** System: `team`'s gauge is full: each of its karts still racing gets a team boost */
+  /** System: `team`'s gauge is full: the charges its karts still racing hold turn blue */
   | { t: 'tfill'; team: TeamId }
-  /** System: `seat` fired a team boost it held, at server time `at` */
+  /** System: `seat` fired a blue boost it held, at server time `at` */
   | { t: 'tfire'; seat: SeatId; at: number }
+  /** System: `seat` held only `held` charges when its gauge filled, so it holds that many blue */
+  | { t: 'tkeep'; seat: SeatId; held: number }
 
 /** Nothing is hidden in a race: every viewer sees the state, and whose seat they are */
 export type KartView = KartState & { you: SeatId | null }

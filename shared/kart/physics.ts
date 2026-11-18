@@ -143,9 +143,9 @@ export interface KartState {
   readonly driftLatch?: boolean
   readonly launchSeconds?: number
   /**
-   * A team race only (2026-11-18, teamBoost.ts; shared/kart/team.ts): the team boosts the kart may
-   * fire (set by its browser from what the room says it holds) and the seconds of team boost left.
-   * Any other kart never has them
+   * A team race only (2026-11-18, teamBoost.ts; shared/kart/team.ts): how many of the charges the
+   * kart holds are blue (set by its browser, teamRider.ts) and the seconds of blue boost left. Any
+   * other kart never has them
    */
   readonly teamBoosts?: number
   readonly teamSeconds?: number
@@ -370,7 +370,11 @@ const DEG = Math.PI / 180
  * the step. 2026-11-18 (owner: "the drift still grips too well ... it should take a big drift to
  * boost"): the slip builds slower and only steering into the drift takes it deep, the car turns
  * little until it is (`driftLoose`), the dash wants depth and length both, the double is off, and a
- * boost has to run out before the next can be fired.
+ * boost has to run out before the next can be fired. Later the same day (owner: "now it drifts too
+ * big again: a drift that really slid should boost, only the grip need not be so good"): the marks
+ * are down to a real drift (`dashMinSlip` 18°, `dashMinSeconds` 0.22 s: a tap still earns nothing),
+ * the drift stays loose and scrubs a little more, and the dash itself is a little milder so that
+ * weaving down a straight for it does not pay.
  */
 export const KART_TUNING = {
   ...ARCADE_NUMBERS,
@@ -420,7 +424,7 @@ export const KART_TUNING = {
   driftLoose: 0.6,
   driftMaxSlip: 50 * DEG,
   /** Sliding scrubs this much a second at the top speed, fully sideways (by the sine of the slip) */
-  driftScrub: 18,
+  driftScrub: 22,
   /** Let go, the slip straightens at this many radians a second (63°/s); counter-steering, twice */
   driftRecoverRate: 1.1,
   /** The drift's turn still carried while sliding out, as a share, the less the straighter */
@@ -464,18 +468,22 @@ export const KART_TUNING = {
   startLate: 0.1,
 
   // The dash (the instant boost out of a drift) and its chain
-  /** The deepest slip angle a drift must reach to earn a dash ... */
-  dashMinSlip: 32 * DEG,
-  /** ... and how long the drift must have lasted */
-  dashMinSeconds: 0.45,
+  /**
+   * The deepest slip angle a drift must reach to earn a dash: the tail visibly out (32° until
+   * 2026-11-18, which took the stick all the way in; 20° before that, with a slip that swung out at
+   * once, so a tap earned it) ...
+   */
+  dashMinSlip: 18 * DEG,
+  /** ... and how long the drift must have lasted: a tap and let go is shorter (0.45 s until then) */
+  dashMinSeconds: 0.22,
   /** After the car straightens, a fresh press of the throttle within this long fires a waiting dash */
   releaseWindow: 0.5,
-  /** How long a dash lasts ... (longer and harder since 2026-11-18: rarer, so worth more) */
-  chainDuration: 0.8,
+  /** How long a dash lasts ... (0.5 s at first, 0.8 s while it took a deep drift) */
+  chainDuration: 0.7,
   /** ... multiplying the engine's pull by this ... */
-  dashAccelFactor: 1.8,
+  dashAccelFactor: 1.7,
   /** ... with the top speed this much higher */
-  miniTopSpeedFactor: 1.1,
+  miniTopSpeedFactor: 1.08,
   /** Dashes in a row within this long of each other chain ... */
   chainGrace: 1,
   /** ... each link after the first adding this to the dash's top speed factor ... */
@@ -486,7 +494,7 @@ export const KART_TUNING = {
   chainSpeedLinks: 3,
   /**
    * After a dash, a drift begun within this long earns the next however short (the double). 0: off
-   * since 2026-11-18, every dash takes a deep drift
+   * since 2026-11-18, every dash takes a drift of its own (a tap must never earn one)
    */
   doubleWindow: 0,
   /** The cut: a fresh drift press while counter-steering a slide straightens it in this long */
@@ -614,9 +622,9 @@ function align(forward: number, side: number, fraction: number) {
 }
 
 /**
- * The arcade (old) feel in a team race: it has no faster boost of its own, so a team boost fired is
- * a boost of the team boost's length (it still shows blue). Fired like the classic feel's: before a
- * charge, and only once whatever burns has burnt out
+ * The arcade (old) feel in a team race: it has no faster boost of its own, so a blue charge fired is
+ * a boost of the team boost's length (it still shows blue). Fired like the classic feel's: a charge
+ * of the stock, the blue ones first, and only once whatever burns has burnt out
  */
 function stepArcadeTeam(
   state: KartState,
@@ -626,7 +634,7 @@ function stepArcadeTeam(
   limitScale: number,
 ): KartState {
   const { teamBoosts: held = 0, teamSeconds: left = 0, ...plain } = state
-  let teamBoosts = held
+  let teamBoosts = Math.min(held, state.storedBoosts)
   let teamSeconds = left
   let from: KartState = plain
   if (
@@ -638,8 +646,13 @@ function stepArcadeTeam(
   ) {
     teamBoosts--
     teamSeconds = TEAM_BOOST.seconds
-    // The key counts as held, so that this press does not fire a charge as well
-    from = { ...plain, boostSeconds: TEAM_BOOST.seconds, boostHeld: true }
+    // The key counts as held, so that this press does not fire a second charge as well
+    from = {
+      ...plain,
+      storedBoosts: state.storedBoosts - 1,
+      boostSeconds: TEAM_BOOST.seconds,
+      boostHeld: true,
+    }
   }
   const next = stepKart(from, input, tuning, rules, limitScale)
   return { ...next, teamBoosts, teamSeconds: Math.max(0, teamSeconds - STEP_SECONDS) }

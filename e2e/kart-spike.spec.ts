@@ -384,7 +384,16 @@ test.describe('the boost gauge', () => {
     await releaseWindowOpen(page)
     await page.keyboard.down('ArrowUp')
     await page.keyboard.up('ArrowLeft')
-    await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
+    // (The yard is small: the wall may come within a moment of the boost and end the chain, so
+    // the boost still running counts as well as the chain's first link)
+    await page.waitForFunction(
+      () => {
+        const { state } = (window as unknown as { __kartSpike: KartReading }).__kartSpike
+        return state.chain === 1 || state.miniSeconds > 0
+      },
+      undefined,
+      { polling: 'raf', timeout: 10_000 },
+    )
     await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'release')
     // The HUD says so too. (The speed is not read here: the yard is small, and the wall may come
     // before the next reading)

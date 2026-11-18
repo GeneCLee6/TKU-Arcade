@@ -8,6 +8,7 @@ import type { KartView } from '../../../shared/games/kart/types.ts'
 import { itemBoxes } from '../../../shared/kart/items.ts'
 import { readRelayed, type KartFrame } from '../../../shared/kart/net.ts'
 import { shotLive, shotPosition } from '../../../shared/kart/shots.ts'
+import { runningScore } from '../../../shared/kart/team.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import { cycleSeat, watchOrder, type WatchCommand } from '../../../shared/kart/watch.ts'
 import '../../games/kart/messages.ts'
@@ -37,6 +38,7 @@ import {
 } from './WatchParts.tsx'
 import { placeTags, TAG_HEIGHT, useWatchKeys } from './watchDom.ts'
 import { Button } from '../../components/Button.tsx'
+import { TeamGauges, TeamScore } from '../race/TeamHud.tsx'
 
 /** The kart and driver a frame's body byte names (e10-t05) */
 function kartOfByte(byte: number) {
@@ -111,6 +113,15 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
         quality: loadQuality(),
         frame() {
           const poses = remotes.poses(performance.now() / 1000)
+          // A team race: whose blue boost burns now, by the room's word (their flames are blue)
+          const teamNow = latest.current.teams ? clock.now() : 0
+          const burning = new Set(
+            latest.current.teams
+              ? latest.current.racers
+                  .filter((racer) => (racer.teamUntil ?? 0) > teamNow)
+                  .map((racer) => racer.seat)
+              : [],
+          )
           const karts = poses.map((pose): WatchedKart => ({
             id: pose.seat,
             x: pose.x,
@@ -127,6 +138,10 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
               steer: pose.frame.steer,
               drift: pose.frame.driftDirection,
               boosting: pose.frame.boosting,
+              // (boostFx.ts: a blue boost; any other is worked out from how long it runs)
+              ...(pose.frame.boosting && burning.has(pose.seat)
+                ? { boostKind: 'team' as const }
+                : {}),
             },
           }))
           const room = latest.current
@@ -258,6 +273,12 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
           total={view.racers.length}
           detail={detail}
         />
+        {view.teams && (
+          <>
+            <TeamScore t={t} totals={runningScore(order, view.racers).totals} mine={null} />
+            <TeamGauges t={t} gauge={view.teams.gauge} />
+          </>
+        )}
       </TopLeft>
       <WatchedItem
         t={t}

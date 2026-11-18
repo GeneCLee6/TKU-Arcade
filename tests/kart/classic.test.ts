@@ -121,7 +121,7 @@ describe('steering', () => {
     expect(kartSpeed(slow)).toBeGreaterThan(T.driftMinSpeed)
     const before = Math.atan2(slow.vx, -slow.vz)
     const after = run(slow, DRIFT_RIGHT, 0.5)
-    const fast = drifted(EARNED)
+    const fast = drifted(0.5)
     const fastTurn = Math.atan2(fast.vx, -fast.vz) - Math.atan2(atSpeed().vx, -atSpeed().vz)
     expect(Math.atan2(after.vx, -after.vz) - before).toBeLessThan(fastTurn)
   })
@@ -164,7 +164,7 @@ describe('steering', () => {
 describe('the instant boost (the dash)', () => {
   const dashed = (before: KartState, after: KartState) => after.miniSeconds > before.miniSeconds
 
-  it('is earned by a drift deep enough and long enough, and only then', () => {
+  it('is earned by a drift with the tail out far enough for long enough, and only then', () => {
     expect(drifted(EARNED).burstReady).toBe(true)
     // Steering out of it all along: a shallow drift (8°) earns nothing, however long
     const shallow = stepKart(atSpeed(), { ...GAS, steer: 0.0001, drift: true })
@@ -178,9 +178,10 @@ describe('the instant boost (the dash)', () => {
   })
 
   // 2026-11-18, owner: "a player can mindlessly drift a little and boost, drift a little and boost,
-  // all lap long; it should take a big drift to boost"
-  it('a tapped drift earns nothing: not deep, not long', () => {
-    for (const seconds of [0.1, 0.2, 0.3]) {
+  // all lap long; it should take a big drift to boost". Then, with the marks at 32° and 0.45 s: "now
+  // it drifts too big again: a drift that really slid should boost"
+  it('a tapped drift earns nothing: not long enough, however the stick goes', () => {
+    for (const seconds of [0.05, 0.1, 0.2]) {
       const tap = drifted(seconds)
       expect(tap.burstReady).toBe(false)
       // Let go, counter-steer, a fresh press of forward: no dash, sliding out or straight again
@@ -194,16 +195,20 @@ describe('the instant boost (the dash)', () => {
     }
   })
 
-  it('a drift with the stick centred never gets deep enough, however long it is held', () => {
+  it('a real drift earns it: a third of a second with the tail out, the stick not all the way in', () => {
+    expect(drifted(0.3).burstReady).toBe(true)
+    // The stick centred after the turn-in: a little later, once the slip has come out
     const entered = stepKart(atSpeed(), DRIFT_RIGHT)
-    const centred = run(entered, { ...GAS, drift: true }, 3)
-    expect(centred.drifting).toBe(true)
-    expect(Math.abs(kartSlip(centred)) / DEG).toBeCloseTo(T.driftSlip / DEG, 0)
-    expect(centred.burstReady).toBe(false)
+    const centred = (seconds: number) => run(entered, { ...GAS, drift: true }, seconds)
+    expect(centred(0.2).burstReady).toBe(false)
+    expect(centred(0.4).burstReady).toBe(true)
+    expect(Math.abs(kartSlip(centred(3))) / DEG).toBeCloseTo(T.driftSlip / DEG, 0)
+    // Half way in is plenty (it took the stick all the way in while the mark was 32°)
+    expect(run(atSpeed(), { ...DRIFT_RIGHT, steer: 0.5 }, 0.35).burstReady).toBe(true)
   })
 
-  it('a deep drift let go too soon earns nothing; held on, it does', () => {
-    // Deep enough before it is long enough: the length is what is missing
+  it('a drift let go too soon earns nothing; held on, it does', () => {
+    // Out far enough before it is long enough: the length is what is missing
     let state = atSpeed()
     let steps = 0
     while ((state.driftPeak ?? 0) < T.dashMinSlip && steps < 120) {
@@ -211,19 +216,65 @@ describe('the instant boost (the dash)', () => {
       steps++
     }
     expect(steps * STEP_SECONDS).toBeLessThan(T.dashMinSeconds)
-    expect(steps * STEP_SECONDS).toBeGreaterThan(0.25)
+    expect(steps * STEP_SECONDS).toBeGreaterThan(0.08)
     expect(state.burstReady).toBe(false)
     const held = run(state, DRIFT_RIGHT, T.dashMinSeconds - steps * STEP_SECONDS + STEP_SECONDS)
     expect(held.burstReady).toBe(true)
-    // By then the car has come well round: a dash takes a real corner
+    // The tail is well out by then (a real drift), though the car has hardly come round yet
+    expect(Math.abs(kartSlip(held)) / DEG).toBeGreaterThan(20)
     const turned = Math.atan2(held.vx, -held.vz) - Math.atan2(atSpeed().vx, -atSpeed().vz)
-    expect(turned / DEG).toBeGreaterThan(40)
+    expect(turned / DEG).toBeLessThan(30)
+  })
+
+  // "Only the grip need not be so good": what keeps the dash from being fired all lap long is what
+  // a drift costs. Weaving down a straight, a drift each way just long enough and a dash out of
+  // each, gets no further than driving straight, and swings wider than a road is
+  it('weaving down a straight for dash after dash does not pay', () => {
+    const from = atSpeed()
+    const plain = run(from, GAS, 12)
+    let kart = from
+    let phase: 'drift' | 'lift' | 'tap' | 'recover' = 'drift'
+    let dir = 1
+    let lift = 0
+    let dashes = 0
+    let widest = 0
+    for (let step = 0; step < 12 * 60; step++) {
+      let input: KartInput = GAS
+      if (phase === 'drift') {
+        input = { ...GAS, drift: true, steer: dir }
+        if (kart.burstReady) {
+          phase = 'lift'
+          lift = 2
+        }
+      } else if (phase === 'lift') {
+        input = { ...NO_INPUT, steer: -dir }
+        if (--lift <= 0) phase = 'tap'
+      } else if (phase === 'tap') {
+        input = { ...TAP, steer: -dir }
+        phase = 'recover'
+      } else {
+        input = { ...GAS, steer: Math.max(-1, Math.min(1, -kart.heading * 6)) }
+        const travel = Math.atan2(kart.vx, -kart.vz)
+        const settled = kart.slideDirection === 0 && Math.abs(travel) < 3 * DEG
+        if (settled && kart.miniSeconds < 0.05) {
+          dir = kart.x - from.x > 0 ? -1 : 1
+          phase = 'drift'
+        }
+      }
+      const next = stepKart(kart, input)
+      if (dashed(kart, next)) dashes++
+      kart = next
+      widest = Math.max(widest, Math.abs(kart.x - from.x))
+    }
+    expect(dashes).toBeGreaterThanOrEqual(8)
+    expect(from.z - kart.z).toBeLessThan((from.z - plain.z) * 1.01)
+    expect(widest).toBeGreaterThan(20)
   })
 
   it('the depth meter rises with the drift and is full only once the dash is earned', () => {
     expect(kartDashDepth(atSpeed(), T)).toBe(0)
-    const early = drifted(0.15)
-    const later = drifted(0.3)
+    const early = drifted(0.08)
+    const later = drifted(0.16)
     expect(kartDashDepth(early, T)).toBeGreaterThan(0.1)
     expect(kartDashDepth(later, T)).toBeGreaterThan(kartDashDepth(early, T))
     expect(kartDashDepth(later, T)).toBeLessThan(1)
@@ -655,7 +706,7 @@ describe('touch, with the automatic throttle', () => {
     )
     expect(stepKart(lifted, tap).miniSeconds).toBeGreaterThan(0)
     // A slide-out that earned nothing keeps the engine running
-    const shallow = run(drifted(0.25), GAS, 0.05)
+    const shallow = run(drifted(0.15), GAS, 0.05)
     expect(shallow.slideDirection).not.toBe(0)
     expect(kartBurstWaiting(shallow, T)).toBe(false)
   })

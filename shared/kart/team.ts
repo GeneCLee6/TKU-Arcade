@@ -1,7 +1,14 @@
 // The team race (2026-11-18; docs/ARCHITECTURE.md §4.31, docs/KART-NETCODE.md §17, docs/KART-WORLD.md).
 // Two teams, red and blue. Pure and shared: the room splits the seats, fills each team's gauge from
-// its karts' frames, hands out team boosts and scores the finish with these; the browser shows the
+// its karts' frames, says when it is full and scores the finish with these; the browser shows the
 // same split in the waiting room and the same score while the race runs.
+//
+// The N2O (2026-11-18, owner, after the first version handed everyone a separate team boost: "it is
+// a team race, but everyone collects their own N2O, and there is a red one and a blue one"). Every
+// kart fills its own gauge and holds its own charges, as in any race: red. Drifting fills the team's
+// gauge too (only drifting). When that is full, every charge the team's karts hold at that moment
+// turns blue (longer and faster, teamBoost.ts); a kart holding none gets nothing. Blue is the team
+// boost's colour for both sides: it has nothing to do with the blue team.
 //
 // Scoring is our own table: the finishing places score 10, 8, 6, 5, 4, 3, 2, 1 and a kart that does
 // not finish scores nothing. Each team counts its best K karts, K the size of the smaller team, so
@@ -83,6 +90,37 @@ export function scoreTeams(
 }
 
 /**
+ * The score as a race stands, for a screen: the running `order` less those dropped out, by
+ * everyone's side
+ */
+export function runningScore(
+  order: readonly SeatId[],
+  racers: readonly {
+    readonly seat: SeatId
+    readonly team?: number
+    readonly finishMs: number | null
+    readonly out: boolean
+  }[],
+): TeamScore {
+  const of = (seat: SeatId) => racers.find((racer) => racer.seat === seat)
+  const teamOf = (seat: SeatId): TeamId | null => {
+    const side = of(seat)?.team
+    return isTeamId(side) ? side : null
+  }
+  return scoreTeams(
+    order.filter((seat) => {
+      const racer = of(seat)
+      return racer !== undefined && (racer.finishMs !== null || !racer.out)
+    }),
+    teamOf,
+    [
+      racers.filter((racer) => racer.team === 0).length,
+      racers.filter((racer) => racer.team === 1).length,
+    ],
+  )
+}
+
+/**
  * The shots that can hit kart `seat`: in a team race a team-mate's pass it by (its own puddle still
  * catches it, as in any race). `teamOf` gives undefined for every seat in a race without sides
  */
@@ -99,22 +137,19 @@ export function foeShots<S extends { readonly by: SeatId }>(
 // ── The team gauge ────────────────────────────────────────────────────────────────────────────────
 
 export const TEAM_GAUGE = {
-  /** A full gauge: every kart of the team still racing gets a team boost, and it starts over */
+  /** A full gauge: the charges its karts still racing hold turn blue, and it starts over */
   full: 100,
   /**
    * Points a second one kart earns its team while it drifts at the top speed (in proportion to its
-   * speed), before the share below. A kart's own gauge fills at 60: the team's is the slow one
+   * speed), before the share below. A kart's own gauge fills at 70 (less in a shallow or a long
+   * drift), so the team's is full about when every kart of the team has filled its own twice
    */
-  driftRate: 14,
+  driftRate: 30,
   /** The speed counts as a share of this, m/s (the standard kart's top speed), up to `speedMax` */
   topSpeed: 68,
   speedMax: 1.25,
   /** Slower than this, a slide earns nothing, m/s (the physics' driftMinSpeed) */
   minSpeed: 12,
-  /** Points for a boost that comes on straight out of a drift (an instant boost) ... */
-  dashPoints: 5,
-  /** ... within this long of the kart's last drifting frame, ms */
-  dashWindowMs: 1_500,
   /** Two frames further apart than this count as this far apart, ms: a gap earns no more */
   maxGapMs: 100,
   /** The room tells the browsers the gauge in steps of this many points, not every frame */
@@ -124,18 +159,15 @@ export const TEAM_GAUGE = {
 /** What the room remembers of a kart between two of its frames, for the team gauge */
 export interface TeamTrace {
   readonly at: number
-  readonly boosting: boolean
-  /** When it was last seen drifting; -Infinity for never */
-  readonly driftAt: number
 }
 
-export const NO_TRACE: TeamTrace = { at: 0, boosting: false, driftAt: -Infinity }
+export const NO_TRACE: TeamTrace = { at: 0 }
 
 /**
  * What one frame earns its team: the frame as the room took it at `now`, what the room remembered
  * of the kart, how many karts the team has (the points are shared, so that a team of four fills no
- * faster than a team of two) and whether its own team boost is burning (which earns nothing, and
- * is no dash)
+ * faster than a team of two) and whether its own blue boost is burning (which earns nothing, as
+ * no boost fills a kart's own gauge). Only drifting earns
  */
 export function teamGain(
   trace: TeamTrace,
@@ -143,7 +175,6 @@ export function teamGain(
     readonly vx: number
     readonly vz: number
     readonly drifting: boolean
-    readonly boosting: boolean
   },
   now: number,
   teamSize: number,
@@ -157,34 +188,22 @@ export function teamGain(
     const share = Math.min(TEAM_GAUGE.speedMax, speed / TEAM_GAUGE.topSpeed)
     gain += TEAM_GAUGE.driftRate * share * (gap / 1000)
   }
-  const driftAt = drifting ? now : trace.driftAt
-  if (
-    frame.boosting &&
-    !trace.boosting &&
-    !burning &&
-    trace.at > 0 &&
-    now - driftAt <= TEAM_GAUGE.dashWindowMs
-  ) {
-    gain += TEAM_GAUGE.dashPoints
-  }
-  return {
-    gain: gain / Math.max(1, teamSize),
-    trace: { at: now, boosting: frame.boosting, driftAt },
-  }
+  return { gain: gain / Math.max(1, teamSize), trace: { at: now } }
 }
 
 /** The gauge as the room tells it: down to a step */
 export const gaugeStep = (gauge: number): number =>
   Math.max(0, Math.min(TEAM_GAUGE.full, Math.floor(gauge / TEAM_GAUGE.step) * TEAM_GAUGE.step))
 
-// ── A kart's team boosts, in its own browser ──────────────────────────────────────────────────────
+// ── A kart's blue boosts, in its own browser ──────────────────────────────────────────────────────
 
-/** How long a team boost burns, ms: what the room counts a fired one by */
+/** How long a blue boost burns, ms: what the room counts a fired one by */
 export const TEAM_BOOST_MS = TEAM_BOOST.seconds * 1000
 
 /**
- * The team boosts a kart may fire now: what the room says it holds, less those this browser has
- * fired that the room has not counted yet (`fired` here against `used` there)
+ * The blue boosts the room allows a kart now: what the room says it holds, less those this browser
+ * has fired that the room has not counted yet (`fired` here against `used` there). teamRider.ts
+ * caps it by the charges the kart really holds
  */
 export const teamBoostsLeft = (held: number, used: number, fired: number): number =>
   Math.max(0, held - Math.max(0, fired - used))

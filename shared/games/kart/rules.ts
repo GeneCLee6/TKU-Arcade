@@ -455,11 +455,10 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         return {
           ...state,
           teams: { gauge, fills },
-          // One each for those still racing; a kart holding all it can gets no more
+          // The charges held by those still racing turn blue: all a kart can hold, until it says it
+          // held fewer (`tkeep`). The room never hears how many charges a kart holds
           racers: state.racers.map((one) =>
-            one.team === team && !done(one)
-              ? { ...one, teamBoosts: Math.min(TEAM_BOOST.maxHeld, (one.teamBoosts ?? 0) + 1) }
-              : one,
+            one.team === team && !done(one) ? { ...one, teamBoosts: TEAM_BOOST.maxHeld } : one,
           ),
         }
       }
@@ -482,6 +481,18 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
                 }
               : one,
           ),
+        }
+      }
+      case 'tkeep': {
+        if (state.phase !== 'racing' || !state.teams) return gameError(PHASE)
+        const racer = state.racers.find((one) => one.seat === a.seat)
+        const held = a.held
+        // Only ever down: a kart cannot talk itself into more
+        if (!racer || typeof held !== 'number' || !Number.isInteger(held)) return gameError(BAD)
+        if (held < 0 || held >= (racer.teamBoosts ?? 0)) return gameError(BAD)
+        return {
+          ...state,
+          racers: state.racers.map((one) => (one === racer ? { ...one, teamBoosts: held } : one)),
         }
       }
       case 'close':
@@ -559,7 +570,9 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         const actions =
           itemFrame.op === 'team'
             ? judgeTeamFire(state, seat, now)
-            : judgeItem(state, memoryOf(memory), seat, itemFrame, now)
+            : itemFrame.op === 'keep'
+              ? judgeTeamKeep(state, seat, itemFrame.held, itemFrame.fill)
+              : judgeItem(state, memoryOf(memory), seat, itemFrame, now)
         return { relay: null, actions }
       }
       const frame = decodeFrame(data)
@@ -646,7 +659,7 @@ function fillTeamGauge(
   state: KartState,
   memory: Memory,
   racer: KartRacer,
-  frame: { vx: number; vz: number; drifting: boolean; boosting: boolean },
+  frame: { vx: number; vz: number; drifting: boolean },
   now: number,
 ): KartAction | null {
   const team = racer.team
@@ -667,7 +680,20 @@ function fillTeamGauge(
 }
 
 /**
- * A kart says it has fired a team boost: taken when the room knows it to hold one. That one fires
+ * A kart says that when its team's gauge filled for the `fill`th time it held only `held` charges:
+ * so many of its charges are blue, and no more. Taken only downwards, and only for the fill that
+ * stands (one that crossed a newer fill on the way is about the charges of before)
+ */
+function judgeTeamKeep(state: KartState, seat: SeatId, held: number, fill: number): KartAction[] {
+  const racer = state.racers.find((one) => one.seat === seat)
+  if (state.phase !== 'racing' || !state.teams || !racer || done(racer)) return []
+  if (!isTeamId(racer.team) || (state.teams.fills[racer.team] & 0xff) !== fill) return []
+  if (held >= (racer.teamBoosts ?? 0)) return []
+  return [{ t: 'tkeep', seat, held }]
+}
+
+/**
+ * A kart says it has fired a blue boost: taken when the room knows it to hold one. That one fires
  * only once the last has burnt out is the kart's own physics' to keep (classic.ts): the room's
  * clock and the kart's are never quite the same, and a headwind or a hit ends a boost early
  */
@@ -719,7 +745,7 @@ function judgeItem(
   state: KartState,
   memory: Memory,
   seat: SeatId,
-  frame: Exclude<ItemFrame, { op: 'team' }>,
+  frame: Exclude<ItemFrame, { op: 'team' | 'keep' }>,
   now: number,
 ): KartAction[] {
   const racer = state.racers.find((one) => one.seat === seat)

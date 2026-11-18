@@ -447,7 +447,7 @@ export function formatReport(report: Report): string {
   )
   if (run.teams) {
     lines.push(
-      `- Team race: gauges filled red ${run.teams.fills[0]}, blue ${run.teams.fills[1]}; team boosts fired ${run.teams.fired}, still held ${run.teams.held}; ` +
+      `- Team race: gauges filled red ${run.teams.fills[0]}, blue ${run.teams.fills[1]}; blue boosts fired ${run.teams.fired}, still held ${run.teams.held}; ` +
         `score red ${run.teams.score[0]}, blue ${run.teams.score[1]}; winner ${run.teams.winner ?? 'none'}`,
     )
   }

@@ -35,6 +35,13 @@ const TAP_STEPS = Math.ceil(ARCADE_TUNING.chainMinDrift * 60) + 2
  * turns at least this share of what the grip gives
  */
 const CLASSIC_DEEP_MARGIN = (3 * Math.PI) / 180
+/**
+ * The hands' own mark (2026-11-18, later: the dash is earned by any real drift, well short of this):
+ * through a corner that goes on they still drift this deep and this long, which is the line that
+ * holds the road. Radians, seconds
+ */
+const CLASSIC_HOLD_SLIP = (32 * Math.PI) / 180
+const CLASSIC_HOLD_SECONDS = 0.45
 const CLASSIC_DEEP_CORNER = 0.5
 /** A drift this near the dash's length and depth (seconds, radians) is held on for it */
 const CLASSIC_NEARLY_SECONDS = 0.2
@@ -327,7 +334,11 @@ export function createBotBrain(
       (kart.teamSeconds ?? 0) === 0
     const cruising = calm && speed > t.topSpeed * Math.min(1, sense.speedShare)
     const gripSteer = clampSteer(noseWant / gripTurn)
-    const base = { ...NO_INPUT, throttle: !cruising, boost: fire }
+    // Hands that do not mean to fire a dash that waits never press the throttle afresh by chance
+    // (easing off at their own top speed and coming back on): the throttle stays as it was
+    const waiting = kart.burstReady || kart.releaseWindow > 0
+    const gas = waiting && !dashPlan ? kart.throttleHeld : !cruising
+    const base = { ...NO_INPUT, throttle: gas, boost: fire }
 
     if (move.kind === 'tap' || move.kind === 'double') move = NONE
     if (move.kind === 'lift') {
@@ -358,9 +369,11 @@ export function createBotBrain(
     }
 
     const turnMost = t.driftTurnRate * (1 + t.driftSteerShare)
+    const holdSlip = Math.max(t.dashMinSlip, CLASSIC_HOLD_SLIP)
+    const holdSeconds = Math.max(t.dashMinSeconds, CLASSIC_HOLD_SECONDS)
     /** How far into a drift the stick must be for the slip to pass dashMinSlip, with a margin */
     const deepInto = clamp(
-      (t.dashMinSlip + CLASSIC_DEEP_MARGIN - t.driftSlip) / Math.max(1e-3, t.driftSlipSteer),
+      (holdSlip + CLASSIC_DEEP_MARGIN - t.driftSlip) / Math.max(1e-3, t.driftSlipSteer),
       0,
       1,
     )
@@ -378,10 +391,11 @@ export function createBotBrain(
       const goesOn = Math.sign(later) === dir && Math.abs(later) > gripTurn * CLASSIC_DEEP_CORNER
       // ... or the drift is nearly there: a little longer, a little deeper
       const nearly =
-        kart.driftSeconds >= t.dashMinSeconds - CLASSIC_NEARLY_SECONDS &&
-        (kart.driftPeak ?? 0) >= t.dashMinSlip - CLASSIC_NEARLY_SLIP
-      const earning = dashPlan && !kart.burstReady && (goesOn || nearly)
-      if (earning && (kart.driftPeak ?? 0) < t.dashMinSlip) into = Math.max(into, deepInto)
+        kart.driftSeconds >= holdSeconds - CLASSIC_NEARLY_SECONDS &&
+        (kart.driftPeak ?? 0) >= holdSlip - CLASSIC_NEARLY_SLIP
+      const held = (kart.driftPeak ?? 0) >= holdSlip && kart.driftSeconds >= holdSeconds
+      const earning = dashPlan && !held && (goesOn || nearly)
+      if (earning && (kart.driftPeak ?? 0) < holdSlip) into = Math.max(into, deepInto)
       // The corner is over (or the car has come round too far) and no dash is about to be earned.
       // Through a long bend the drift is held, steering out of it, not let go and begun again
       const over =

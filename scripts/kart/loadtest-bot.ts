@@ -541,13 +541,17 @@ export class Bot {
   private adjust(trial: Trial, input: KartInput, game: KartView) {
     let run = trial.run
     if (game.teams) {
-      // A team boost just fired goes to the room, and the kart hears how many it has left
-      const held = this.teamRider.step(
-        run.kart,
-        game.racers.find((one) => one.seat === this.seat),
-      )
+      // A blue boost just fired goes to the room, and the kart hears how many of its charges are blue
+      const racer = game.racers.find((one) => one.seat === this.seat)
+      const held = this.teamRider.step(run.kart, racer, game.teams.fills[racer?.team ?? 0])
       if (held.fired) {
         this.sendBinary(encodeItemFrame({ op: 'team', tick: trial.steps }), this.up.item)
+      }
+      if (held.keep) {
+        this.sendBinary(
+          encodeItemFrame({ op: 'keep', ...held.keep, tick: trial.steps }),
+          this.up.item,
+        )
       }
       if (held.kart !== run.kart) run = { ...run, kart: held.kart }
     }
