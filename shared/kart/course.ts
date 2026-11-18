@@ -58,8 +58,24 @@ export function onPad(pad: BoostPad, x: number, z: number): boolean {
 }
 
 /** After the walls: a hard hit breaks the chain, and a boost pad boosts */
-function afterWalls(kart: KartState, hitSpeed: number, course: Course, tuning: KartTuning) {
+function afterWalls(
+  kart: KartState,
+  hitSpeed: number,
+  touching: boolean,
+  course: Course,
+  tuning: KartTuning,
+) {
   let next = kart
+  // The classic feel (2026-11-18): a wall touched in a drift, or sliding out of one, takes the
+  // exit's gauge bonus away (classic.ts)
+  if (
+    touching &&
+    tuning.model === MODEL_CLASSIC &&
+    !next.driftDirty &&
+    (next.drifting || next.burstReady || next.releaseWindow > 0)
+  ) {
+    next = { ...next, driftDirty: true }
+  }
   if (hitSpeed >= tuning.wallBreakSpeed && tuning.model === MODEL_CLASSIC) {
     // The classic feel (2026-11-17): a hard crash also ends the drift and its dash, and keeps only
     // `wallGaugeKeep` of the gauge; the drift key must come up before the next drift
@@ -79,7 +95,16 @@ function afterWalls(kart: KartState, hitSpeed: number, course: Course, tuning: K
       traction: 1,
       driftPeak: 0,
       driftLatch: next.driftKey ?? false,
-      gauge: next.gauge * tuning.wallGaugeKeep,
+      driftDirty: false,
+      sinceRelease: 0,
+      driftWorth: 0,
+      driftHeld: 0,
+      // The harder the hit the more of the gauge goes: all of the share at three times the mark
+      gauge:
+        next.gauge *
+        (1 -
+          (1 - tuning.wallGaugeKeep) *
+            Math.min(1, hitSpeed / Math.max(1e-3, tuning.wallBreakSpeed * 3))),
     }
   } else if (hitSpeed >= tuning.wallBreakSpeed) {
     next = {
@@ -238,7 +263,7 @@ export function stepRun(
     hitSpeed,
     touching,
   } = collideWalls(run.kart, moved, course.walls, tuning)
-  let kart = afterWalls(walled, hitSpeed, course, tuning)
+  let kart = afterWalls(walled, hitSpeed, touching, course, tuning)
   // On a track with terrain: take off, land, or sit on the ground
   let terrainEvent: TerrainEvent | undefined
   if (terrain) {
