@@ -14,15 +14,19 @@
 // runs; where it only says that one does (another racer's kart, a bot's, a replay's), the kind is
 // worked out from how long it has run, so everyone's kart is seen to change.
 //
-// The driver (driverModel.ts, e10-t05b) is chibi, one of four, mounted at the body's seat: any
-// driver in any kart. They lean into a turn, are thrown back by a boost, and sway when a hit stuns
+// 2026-11-18, later the same day (owner: "more esports ... it looks like a child's toy"): the look
+// is a race team's. Satin black and carbon with one neon colour a kart, a livery (the driver's
+// racing number and the kart's own abstract sign, drawn here on a canvas: no real brand), and lit
+// lines that brighten with the speed and blaze in a boost.
+//
+// The driver (driverModel.ts, e10-t05b) is a racer of a person's proportions, one of four, mounted
+// at the body's seat: any driver in any kart. They lean into a turn, are thrown back by a boost, and sway when a hit stuns
 // them. A kart's numbers are in shared/kart/karts.ts; the model is looks only. The footprint matches
 // the physics: about 1.5 m wide and 2.6 m long (KART_RADIUS 1.2).
 import {
   AdditiveBlending,
   BoxGeometry,
   CanvasTexture,
-  CapsuleGeometry,
   CircleGeometry,
   Color,
   CylinderGeometry,
@@ -38,7 +42,14 @@ import {
   type Texture,
 } from 'three'
 import type { DriverId } from '../../../shared/kart/karts.ts'
-import { kartBodies, kartHover, kartParts, kartScene } from '../../styles/kartTokens.ts'
+import {
+  kartBodies,
+  kartDrivers,
+  kartHover,
+  kartLivery,
+  kartParts,
+  kartScene,
+} from '../../styles/kartTokens.ts'
 import type { KartBody } from '../bodies.ts'
 import {
   BOOST_FX,
@@ -48,16 +59,18 @@ import {
   type BoostKind,
   type BoostReading,
 } from '../boostFx.ts'
-import { buildDriver } from './driverModel.ts'
+import { buildDriver, DRIVER_NUMBERS } from './driverModel.ts'
 import { buildKartBody } from './kartBodies.ts'
 import {
   bell,
   carbonTexture,
+  decalTexture,
   flatten,
   hinge,
   hoop,
   morphOf,
   type BodyKit,
+  type DecalKind,
   type Morph,
 } from './kartParts.ts'
 
@@ -118,7 +131,7 @@ export interface KartModel {
 }
 
 /** How high the body floats over the road, metres */
-const HOVER = 0.34
+const HOVER = 0.27
 /** How much lower it rides with its shape open */
 const MORPH_DROP = 0.07
 
@@ -131,6 +144,76 @@ export interface KartFinish {
    * developed afterwards (post.ts), which turns the excess into a glow
    */
   readonly glow?: number
+}
+
+/** The racing number, slanted, with a bar under it: white over the driver's colour */
+function paintNumber(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  text: string,
+  accent: string,
+): void {
+  context.setTransform(1, 0, -0.22, 1, height * 0.2, 0)
+  context.fillStyle = accent
+  context.fillRect(width * 0.04, height * 0.84, width * 0.8, height * 0.1)
+  context.fillStyle = kartLivery.ink
+  context.font = `900 ${Math.round(height * 0.86)}px "Saira", "Arial Black", "Arial", sans-serif`
+  context.textAlign = 'center'
+  context.textBaseline = 'alphabetic'
+  context.fillText(text, width * 0.44, height * 0.78, width * 0.8)
+}
+
+type Outline = readonly (readonly [number, number])[]
+
+/**
+ * Each kart's own abstract sign, on a 16 by 16 grid: a few slanted bars and cuts, all ours. `tide`
+ * three rising chevrons, `comet` a head and its streaks, `ray` a delta, `crab` two pincers, `heron`
+ * a long stroke and a short one, `flyfish` a fan. Each bar is an outline and whether it is in the
+ * kart's colour (the rest are white, or a cut)
+ */
+const MARKS: Readonly<Record<KartBody, readonly (readonly [Outline, 'accent' | 'ink' | 'cut'])[]>> = {
+  tide: [
+    [[[1, 5], [8, 2], [15, 5], [15, 7], [8, 4], [1, 7]], 'ink'],
+    [[[1, 9], [8, 6], [15, 9], [15, 11], [8, 8], [1, 11]], 'accent'],
+    [[[1, 13], [8, 10], [15, 13], [15, 15], [8, 12], [1, 15]], 'accent'],
+  ],
+  comet: [
+    [[[9, 3], [15, 8], [9, 13], [7, 8]], 'accent'],
+    [[[1, 6], [6, 6], [5, 7.4], [1, 7.4]], 'ink'],
+    [[[2, 8.6], [5.6, 8.6], [6, 10], [2, 10]], 'ink'],
+  ],
+  ray: [
+    [[[8, 1], [15, 14], [1, 14]], 'accent'],
+    [[[8, 6], [11.4, 12.4], [4.6, 12.4]], 'cut'],
+    [[[7.4, 12.4], [8.6, 12.4], [8.6, 15.5], [7.4, 15.5]], 'ink'],
+  ],
+  crab: [
+    [[[7, 1], [2, 8], [7, 15], [7, 12], [4.6, 8], [7, 4]], 'accent'],
+    [[[9, 1], [14, 8], [9, 15], [9, 12], [11.4, 8], [9, 4]], 'ink'],
+  ],
+  heron: [
+    [[[11, 1], [14, 1], [6, 15], [3, 15]], 'accent'],
+    [[[5, 1], [7.4, 1], [3.6, 8], [1.2, 8]], 'ink'],
+  ],
+  flyfish: [
+    [[[1, 13], [3, 15], [15, 4], [15, 1]], 'accent'],
+    [[[1, 9], [1, 11.4], [11, 1], [8, 1]], 'ink'],
+    [[[6, 15], [9, 15], [15, 9.4], [15, 7]], 'ink'],
+  ],
+}
+
+function paintMark(context: CanvasRenderingContext2D, size: number, body: KartBody, accent: string): void {
+  const unit = size / 16
+  for (const [outline, fill] of MARKS[body]) {
+    context.beginPath()
+    outline.forEach(([x, y], index) =>
+      index === 0 ? context.moveTo(x * unit, y * unit) : context.lineTo(x * unit, y * unit),
+    )
+    context.closePath()
+    context.fillStyle = fill === 'accent' ? accent : kartLivery[fill]
+    context.fill()
+  }
 }
 
 /** A soft round glow, white in the middle: tinted by its material */
@@ -182,7 +265,7 @@ export function buildKartModel(
         }),
       )
     : null
-  const colour = (color: string, roughness = 0.35, metalness = 0.55): Material =>
+  const colour = (color: string, roughness = 0.35, metalness = 0.55, emissive = 0): Material =>
     ghostPaint ??
     own(
       new MeshStandardMaterial({
@@ -191,6 +274,9 @@ export function buildKartModel(
         metalness,
         envMap: environment,
         envMapIntensity: 1.15,
+        // A neon panel: it keeps its colour in a shadow and at night, short of glowing
+        emissive: emissive > 0 ? color : kartParts.dark,
+        emissiveIntensity: emissive,
       }),
     )
   /** Lit from within: a plain colour, brighter than white by `gain` of what the scene's glow allows */
@@ -224,15 +310,17 @@ export function buildKartModel(
   const mouth = lit(colours.glow)
   const tailLamp = lit(kartParts.tailLamp)
   const tailColour = new Color(kartParts.tailLamp)
+  const strip = lit(colours.glow, 0.8)
+  // Satin black, a paler satin panel, and the one neon colour
   const paint = {
-    main: colour(colours.main, 0.3, 0.6),
-    second: colour(colours.second, 0.36, 0.5),
-    accent: colour(colours.accent, 0.3, 0.65),
+    main: colour(colours.main, 0.46, 0.55),
+    second: colour(colours.second, 0.5, 0.45),
+    accent: colour(colours.accent, 0.32, 0.35, 0.32),
     carbon,
     metal: colour(kartParts.metal, 0.22, 1),
     glass: colour(kartHover.glass, 0.06, 0.9),
     dark: colour(kartParts.dark, 0.7, 0.2),
-    glow: lit(colours.glow, 0.8),
+    glow: strip,
     core,
     headLamp: lit(kartParts.headLamp),
     tailLamp,
@@ -243,6 +331,36 @@ export function buildKartModel(
   const chassis = new Group()
   chassis.position.y = HOVER
   group.add(chassis)
+
+  // The livery: the driver's number and the kart's sign, each drawn once and shared by its marks
+  const decals = new Map<DecalKind, Material>()
+  const decalPaint = (kind: DecalKind): Material => {
+    const made = decals.get(kind)
+    if (made) return made
+    const map =
+      kind === 'number'
+        ? decalTexture(128, 64, (context, width, height) =>
+            paintNumber(context, width, height, DRIVER_NUMBERS[driverId], kartDrivers[driverId].crest),
+          )
+        : decalTexture(64, 64, (context, size) => paintMark(context, size, body, colours.accent))
+    textures.push(map)
+    const material = own(
+      new MeshStandardMaterial({
+        map,
+        alphaTest: 0.45,
+        roughness: 0.5,
+        metalness: 0.1,
+        emissive: kartLivery.ink,
+        emissiveMap: map,
+        emissiveIntensity: 0.3,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+      }),
+    )
+    decals.set(kind, material)
+    return material
+  }
 
   const morphs: Morph[] = []
   const nozzles: Object3D[] = []
@@ -276,15 +394,29 @@ export function buildKartModel(
       mesh.rotation.y = turn
       return mesh
     },
+    decal(parent, kind, w, l, x, y, z, face = 'up', tilt = 0) {
+      if (ghost) return null
+      const geometry = new PlaneGeometry(w, l)
+      if (face === 'up') geometry.rotateX(-Math.PI / 2)
+      else if (face === 'right') geometry.rotateY(Math.PI / 2)
+      else if (face === 'left') geometry.rotateY(-Math.PI / 2)
+      const mesh = put(parent, geometry, decalPaint(kind), x, y, z)
+      mesh.castShadow = false
+      mesh.rotation.x = tilt
+      return mesh
+    },
   }
 
   const { seat, rearContacts } = buildKartBody(body, kit, chassis)
 
-  // A handlebar in front of the driver: a hover kart steers with one
-  const bar = hinge(chassis, 0, seat.y + 0.3, seat.z - 0.42)
-  put(bar, new CylinderGeometry(0.025, 0.03, 0.26, 8), paint.metal, 0, -0.13, 0)
-  put(bar, new CapsuleGeometry(0.03, 0.42, 2, 8), paint.dark).rotation.z = Math.PI / 2
-  put(bar, new BoxGeometry(0.1, 0.05, 0.03), paint.glow, 0, 0.02, -0.02)
+  // A yoke in front of the driver, on a column: two grips and a lit read-out between them
+  const bar = hinge(chassis, 0, seat.y + 0.4, seat.z - 0.46)
+  put(bar, new CylinderGeometry(0.02, 0.026, 0.3, 6), paint.metal, 0, -0.1, -0.1).rotation.x = -0.8
+  put(bar, new BoxGeometry(0.2, 0.07, 0.03), paint.carbon)
+  put(bar, new BoxGeometry(0.11, 0.035, 0.012), paint.glow, 0, 0.005, 0.02)
+  for (const side of [-1, 1]) {
+    put(bar, new BoxGeometry(0.035, 0.12, 0.04), paint.dark, side * 0.115, 0, 0)
+  }
 
   // The driver (driverModel.ts), mounted at the seat
   const driver = buildDriver(kit, driverId)
@@ -423,6 +555,11 @@ export function buildKartModel(
         flameColour.set(BOOST_FX[reading.last].flame)
         tint.copy(glowColour).lerp(flameColour, heat)
         mouth.color.copy(tint).multiplyScalar((0.55 + speedShare * 0.45 + heat * 1.4) * bright)
+        // The lit lines: dim standing still, brighter with the speed, blazing in a boost
+        strip.color
+          .copy(glowColour)
+          .lerp(flameColour, heat * 0.25)
+          .multiplyScalar((0.4 + speedShare * 0.6 + heat * 0.9) * (1 + (bright - 1) * 0.8))
         const pulse = 1 + Math.sin(bob * 5) * 0.12 * open
         core.color
           .copy(glowColour)
