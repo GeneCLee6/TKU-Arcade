@@ -30,7 +30,11 @@ function stadium(straight: number, radius: number, spacing = 6): RoadPoint[] {
   const arc = Math.max(4, Math.round((Math.PI * radius) / spacing))
   for (let step = 0; step < arc; step++) {
     const angle = Math.PI - (step / arc) * Math.PI
-    road.push({ x: Math.cos(angle) * radius, z: -straight - Math.sin(angle) * radius, width: WIDTH })
+    road.push({
+      x: Math.cos(angle) * radius,
+      z: -straight - Math.sin(angle) * radius,
+      width: WIDTH,
+    })
   }
   for (let along = 0; along < straight; along += spacing) {
     road.push({ x: radius, z: -straight + along, width: WIDTH })
@@ -126,37 +130,43 @@ describe('the arrow boards', () => {
   )
 })
 
-// 2026-11-18: the rest of a corner's dressing (docs/ARCHITECTURE.md §4.31)
+// 2026-11-18: the rest of a corner's dressing (docs/ARCHITECTURE.md §4.33)
 describe('the apex kerbs, the countdown boards and the gate posts', () => {
   const tracks = ['riverside', 'harbour', 'tamkang', 'oldstreet', 'guanyin'] as const
 
-  it.each(tracks)('%s: a painted kerb inside every corner, widest in its middle, on the road', (id) => {
-    const { road } = raceTrack(id)!
-    const kerbs = apexKerbs(road)
-    expect(kerbs).toHaveLength(roadCorners(road).length)
-    expect(kerbs.length).toBeGreaterThanOrEqual(8)
-    for (const kerb of kerbs) {
-      expect(kerb.widths[0]).toBe(0)
-      expect(kerb.widths.at(-1)).toBeCloseTo(0, 5)
-      expect(Math.max(...kerb.widths)).toBeGreaterThan(APEX_WIDTH * 0.8)
-      expect(Math.max(...kerb.widths)).toBeLessThanOrEqual(APEX_WIDTH)
-      // On the inside: the side the road turns towards
-      const corner = roadCorners(road).find((one) => kerb.points.includes(one.from + 1))
-      if (corner) expect(Math.sign(corner.turn)).toBe(kerb.side)
-    }
-  })
+  it.each(tracks)(
+    '%s: a painted kerb inside every corner, widest in its middle, on the road',
+    (id) => {
+      const { road } = raceTrack(id)!
+      const kerbs = apexKerbs(road)
+      expect(kerbs).toHaveLength(roadCorners(road).length)
+      expect(kerbs.length).toBeGreaterThanOrEqual(8)
+      for (const kerb of kerbs) {
+        expect(kerb.widths[0]).toBe(0)
+        expect(kerb.widths.at(-1)).toBeCloseTo(0, 5)
+        expect(Math.max(...kerb.widths)).toBeGreaterThan(APEX_WIDTH * 0.8)
+        expect(Math.max(...kerb.widths)).toBeLessThanOrEqual(APEX_WIDTH)
+        // On the inside: the side the road turns towards
+        const corner = roadCorners(road).find((one) => kerb.points.includes(one.from + 1))
+        if (corner) expect(Math.sign(corner.turn)).toBe(kerb.side)
+      }
+    },
+  )
 
-  it.each(tracks)('%s: countdown boards before its sharp corners, off the road, three two one', (id) => {
-    const { road } = raceTrack(id)!
-    const boards = brakeBoards(road)
-    expect(boards.length).toBeGreaterThanOrEqual(3)
-    for (const board of boards) {
-      expect(roadClearance(road, board.x, board.z)).toBeGreaterThan(1)
-      expect([1, 2, 3]).toContain(board.bars)
-    }
-    // The nearest board to a corner shows one bar
-    expect(boards.some((board) => board.bars === 1)).toBe(true)
-  })
+  it.each(tracks)(
+    '%s: countdown boards before its sharp corners, off the road, three two one',
+    (id) => {
+      const { road } = raceTrack(id)!
+      const boards = brakeBoards(road)
+      expect(boards.length).toBeGreaterThanOrEqual(3)
+      for (const board of boards) {
+        expect(roadClearance(road, board.x, board.z)).toBeGreaterThan(1)
+        expect([1, 2, 3]).toContain(board.bars)
+      }
+      // The nearest board to a corner shows one bar
+      expect(boards.some((board) => board.bars === 1)).toBe(true)
+    },
+  )
 
   it('posts stand in pairs at the kerbs of a narrow gate, and nowhere on a road of one width', () => {
     const gates = gatePosts(raceTrack('tamkang')!.road)

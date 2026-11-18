@@ -86,7 +86,7 @@ describe('the wide tracks', () => {
   it('has corners sharp enough to want a drift at the new speed', () => {
     // At 40 m/s the grip alone turns no tighter than about 30 m: these swing round by more than
     // 75 degrees within 60 m
-    // 2026-11-18 (redrawn, docs/KART-FEEL.md §9): the harbour is the hairpin track, the campus
+    // 2026-11-18 (redrawn, docs/KART-FEEL.md §10): the harbour is the hairpin track, the campus
     // has its share, and Riverside, the beginner's, flows: fewer square corners, more esses
     expect(sharpCorners(HARBOUR.road, 60, 75)).toBeGreaterThanOrEqual(10)
     expect(sharpCorners(TAMKANG.road, 60, 75)).toBeGreaterThanOrEqual(6)

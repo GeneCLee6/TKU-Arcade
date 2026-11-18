@@ -1,5 +1,5 @@
 // 2026-11-18 (owner: "the maps should be more fun, not so many straights ... technical, like the
-// classic maps"; docs/KART-FEEL.md §9, docs/ARCHITECTURE.md §4.31): all five built-in tracks redrawn.
+// classic maps"; docs/KART-FEEL.md §10, docs/ARCHITECTURE.md §4.33): all five built-in tracks redrawn.
 // Each is checked the way the old street was (oldstreet.test.ts): a legal track that never runs
 // into itself, whose kerbs never fold, wide enough everywhere, its gates in order and close enough
 // that none can be missed, its respawns and its grid of eight on the road; the computer karts of
@@ -23,7 +23,14 @@ const PLAN: Record<
   RaceTrackId,
   { key: string; straight: number; was: number; longest: number; jumps: number; hilly: boolean }
 > = {
-  riverside: { key: 'riverside@10', straight: 0.35, was: 0.36, longest: 285, jumps: 1, hilly: true },
+  riverside: {
+    key: 'riverside@10',
+    straight: 0.35,
+    was: 0.36,
+    longest: 285,
+    jumps: 1,
+    hilly: true,
+  },
   harbour: { key: 'harbour@10', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
   tamkang: { key: 'tamkang@9', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
   oldstreet: { key: 'oldstreet@5', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
@@ -114,7 +121,9 @@ describe.each(RACE_TRACK_IDS)('the redrawn %s', (id) => {
       }
       expect(gateCrossing(line, place.x, place.z, far.x, far.z)).toBe(1)
       for (const other of track.grid.slice(index + 1)) {
-        expect(Math.hypot(other.x - place.x, other.z - place.z)).toBeGreaterThan(2 * KART_RADIUS + 1)
+        expect(Math.hypot(other.x - place.x, other.z - place.z)).toBeGreaterThan(
+          2 * KART_RADIUS + 1,
+        )
       }
     })
   })
@@ -140,29 +149,33 @@ describe.each(RACE_TRACK_IDS)('the redrawn %s', (id) => {
     }
   })
 
-  it.each(DIFFICULTIES)('a %s computer kart drives three laps, never the wrong way', (level) => {
-    const plain = courseOf(track)
-    const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road }
-    const skill = BOT_SKILLS[level]
-    for (const seed of [7, 3]) {
-      const brain = createBotBrain(skill, road, KART_TUNING, seed, track.jumps, track.walls)
-      let trial = startTrial(course)
-      let wrong = 0
-      let resets = 0
-      for (let step = 0; trial.phase !== 'finished' && step < 300 * 60; step++) {
-        const input = brain(trial, { speedShare: skill.topSpeedShare })
-        if (input.reset) resets++
-        const before = trial.wrongWay
-        trial = stepTrial(trial, input, course, KART_TUNING)
-        if (trial.wrongWay && !before) wrong++
+  it.each(DIFFICULTIES)(
+    'a %s computer kart drives three laps, never the wrong way',
+    (level) => {
+      const plain = courseOf(track)
+      const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road }
+      const skill = BOT_SKILLS[level]
+      for (const seed of [7, 3]) {
+        const brain = createBotBrain(skill, road, KART_TUNING, seed, track.jumps, track.walls)
+        let trial = startTrial(course)
+        let wrong = 0
+        let resets = 0
+        for (let step = 0; trial.phase !== 'finished' && step < 300 * 60; step++) {
+          const input = brain(trial, { speedShare: skill.topSpeedShare })
+          if (input.reset) resets++
+          const before = trial.wrongWay
+          trial = stepTrial(trial, input, course, KART_TUNING)
+          if (trial.wrongWay && !before) wrong++
+        }
+        expect(trial.phase, `seed ${seed}`).toBe('finished')
+        expect(wrong, `seed ${seed}`).toBe(0)
+        // Never stuck against a wall for long enough to be put back on the road
+        expect(resets, `seed ${seed}`).toBe(0)
+        expect(seconds(trial.steps)).toBeLessThan(200)
       }
-      expect(trial.phase, `seed ${seed}`).toBe('finished')
-      expect(wrong, `seed ${seed}`).toBe(0)
-      // Never stuck against a wall for long enough to be put back on the road
-      expect(resets, `seed ${seed}`).toBe(0)
-      expect(seconds(trial.steps)).toBeLessThan(200)
-    }
-  }, 60_000)
+    },
+    60_000,
+  )
 })
 
 describe('the computer karts on the technical tracks', () => {

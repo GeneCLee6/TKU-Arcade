@@ -1,5 +1,5 @@
 // 2026-11-18 (owner: "the maps should be more fun, not so many straights ... technical"): how much
-// of a lap is straight, measured on the road itself (docs/KART-FEEL.md §9). A stretch counts as
+// of a lap is straight, measured on the road itself (docs/KART-FEEL.md §10). A stretch counts as
 // straight where the centre line's radius, smoothed over five road points, is wider than
 // STRAIGHT_RADIUS (at racing speed the grip alone holds that line with the stick barely moved) for
 // STRAIGHT_RUN metres or more: the moment between two esses where the road stops turning one way

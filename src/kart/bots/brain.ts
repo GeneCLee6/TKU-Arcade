@@ -238,7 +238,8 @@ export function createBotBrain(
       // The middle of the lane on that side, but no further from the island than LANE_REACH
       const edge = side > 0 ? high : low
       const middle = (edge + side * half) / 2
-      const target = side > 0 ? Math.min(middle, edge + LANE_REACH) : Math.max(middle, edge - LANE_REACH)
+      const target =
+        side > 0 ? Math.min(middle, edge + LANE_REACH) : Math.max(middle, edge - LANE_REACH)
       for (let near = index - LANE_LEAD; near <= index + LANE_LEAD; near++) {
         const k = ((near % count) + count) % count
         if (!band.has(k) || k === index) lane.set(k, lane.get(k) ?? target)
@@ -385,7 +386,8 @@ export function createBotBrain(
       // Through a long bend the drift is held, steering out of it, not let go and begun again
       const over =
         Math.sign(want) !== dir ||
-        (Math.abs(want) < gripTurn * CLASSIC_END_NOW && Math.abs(later) < gripTurn * CLASSIC_END_LATER)
+        (Math.abs(want) < gripTurn * CLASSIC_END_NOW &&
+          Math.abs(later) < gripTurn * CLASSIC_END_LATER)
       const done = kart.driftSeconds > 0.15 && over && !earning
       if (done) {
         // Out of the corner: let go, counter-steer and lift, then press afresh for the dash; or

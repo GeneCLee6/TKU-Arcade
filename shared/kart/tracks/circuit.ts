@@ -1,5 +1,5 @@
 // 2026-11-18 (owner: "the maps should be more fun, not so many straights ... technical"): what the
-// hand-drawn tracks share, now that all of them are redrawn (docs/ARCHITECTURE.md §4.31). A circuit
+// hand-drawn tracks share, now that all of them are redrawn (docs/ARCHITECTURE.md §4.33). A circuit
 // is its control points (spline.ts), each with a width and, on a track with hills, a height; from
 // them come the road from the line on, the gates and respawns, a grid of eight, the jumps' ramps,
 // rows of item boxes and the boost pads. Pure.

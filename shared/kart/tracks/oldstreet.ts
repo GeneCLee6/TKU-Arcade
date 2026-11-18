@@ -13,6 +13,13 @@
 //
 // Flat, like every track so far: the physics is on a plane (stepKart has no height), so there is
 // no jump or ramp. The layout is ours; no other game's track was looked at.
+//
+// 2026-11-18, owner: "more fun, not so many straights ... technical" (revision 5; docs/KART-FEEL.md
+// §10). The straights are broken up and the back lanes made to matter, the fork left as it was: the
+// promenade now ends in the ferry alley (29 m: right, left, right) onto the market street; the back
+// lanes' esses swing 20 m either way where they swung 8; the shophouse row kinks round the well; the
+// old street home runs through one last alley. The boxes are placed again: the rows where the road
+// is wide, a pair on the line through the ferry alley and through the back lanes.
 import {
   gatesAlong,
   padsAlong,

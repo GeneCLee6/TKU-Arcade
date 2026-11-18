@@ -13,7 +13,7 @@ const W = 32
 
 /**
  * The pieces, from the start line; checked by tests/kart/terrain.test.ts to make a legal track.
- * 2026-11-18 (owner: "more fun, not so many straights ... technical"; docs/KART-FEEL.md §9), the
+ * 2026-11-18 (owner: "more fun, not so many straights ... technical"; docs/KART-FEEL.md §10), the
  * jump track: a short start straight; a right onto the climb; a deep S over the shoulder; the
  * first jump on the hilltop, into a right that wants the car lined up again at once; a long fall
  * with a boost pad into the omega (right, a left hairpin through a 28 m gate, right: three drifts

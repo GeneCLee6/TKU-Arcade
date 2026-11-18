@@ -121,7 +121,7 @@ export function cornerSigns(road: readonly RoadPoint[], share = 1): CornerSign[]
     const turn: -1 | 1 = corner.turn > 0 ? 1 : -1
     // Walk back LEAD metres from where the corner begins
     let first = corner.from
-    for (let back = 0; back < LEAD; ) {
+    for (let back = 0; back < LEAD;) {
       const a = at(first - 1)
       const b = at(first)
       back += Math.hypot(b.x - a.x, b.z - a.z)
@@ -154,7 +154,7 @@ export function cornerSigns(road: readonly RoadPoint[], share = 1): CornerSign[]
   return signs
 }
 
-// ── 2026-11-18 (owner: "more fun ... technical"; docs/ARCHITECTURE.md §4.31): the rest of a corner's
+// ── 2026-11-18 (owner: "more fun ... technical"; docs/ARCHITECTURE.md §4.33): the rest of a corner's
 // dressing, worked out from the road alone like the boards: a wide painted kerb along the inside of
 // every corner, widest at its apex (the place to aim for); countdown boards (three bars, two, one)
 // along the outside of the run up to a sharp corner; and a pair of posts where the road narrows to
@@ -264,8 +264,10 @@ export function gatePosts(road: readonly RoadPoint[]): GatePost[] {
   const posts: GatePost[] = []
   for (let index = 0; index < n; index++) {
     if (!narrow(index)) continue
-    const enters = !narrow(index - 1) && at(index - GATE_REACH).width >= at(index).width + GATE_WIDER
-    const leaves = !narrow(index + 1) && at(index + GATE_REACH).width >= at(index).width + GATE_WIDER
+    const enters =
+      !narrow(index - 1) && at(index - GATE_REACH).width >= at(index).width + GATE_WIDER
+    const leaves =
+      !narrow(index + 1) && at(index + GATE_REACH).width >= at(index).width + GATE_WIDER
     if (!enters && !leaves) continue
     const here = at(index)
     const ahead = at(index + 1)

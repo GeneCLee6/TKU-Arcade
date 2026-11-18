@@ -19,7 +19,7 @@ describe.each(['riverside', 'tamkang', 'oldstreet'])('the classic feel on %s', (
   it('pays for skill: the expert well ahead of the novice, the average between', () => {
     expect(expert.seconds).toBeLessThan(average.seconds)
     expect(average.seconds).toBeLessThan(novice.seconds)
-    // 2026-11-18, the tracks redrawn: 0.84 to 0.86 (docs/KART-FEEL.md §9 has the table)
+    // 2026-11-18, the tracks redrawn: 0.84 to 0.86 (docs/KART-FEEL.md §10 has the table)
     expect(expert.seconds).toBeLessThan(novice.seconds * 0.87)
   })
 

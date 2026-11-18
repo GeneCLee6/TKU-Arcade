@@ -14,7 +14,7 @@
 // along the shore stays.
 //
 // 2026-11-18, owner: "more fun, not so many straights ... technical, like the classic maps"
-// (revision 10; docs/KART-FEEL.md §9). Redrawn as the hairpin track its name promises: the seafront
+// (revision 10; docs/KART-FEEL.md §10). Redrawn as the hairpin track its name promises: the seafront
 // straight (the one place to pass and to fire a boost); a right at the end of the quay that keeps
 // tightening; esses down the east side; then the hillside switchbacks, four hairpins one after
 // another with the legs between them short, the third leg kinked by a chicane; a run west under

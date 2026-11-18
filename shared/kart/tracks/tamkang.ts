@@ -14,7 +14,7 @@
 // beside the lawn, and the run down past the business tower made four esses.
 //
 // 2026-11-18, owner: "more fun, not so many straights ... technical, like the classic maps"
-// (revision 9; docs/KART-FEEL.md §9). The hill track: the campus stands on a hill, and now the road
+// (revision 9; docs/KART-FEEL.md §10). The hill track: the campus stands on a hill, and now the road
 // climbs it. Up the lantern avenue (the one long straight), then RIGHT at the top, east of the
 // avenue where no road ran before: a climb to the hilltop, a hairpin round it, and a jump off its
 // crest with the road falling away underneath, down past the memorial tower. Round the scroll plaza,

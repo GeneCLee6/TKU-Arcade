@@ -59,7 +59,7 @@ function race(json: TrackJson, driver: Driver) {
  * the new times in (and in docs/ARCHITECTURE.md §4.13).
  */
 const TIMES: Record<string, readonly [number, number, number]> = {
-  // 2026-11-18: the tracks redrawn (docs/ARCHITECTURE.md §4.31)
+  // 2026-11-18: the tracks redrawn (docs/ARCHITECTURE.md §4.33)
   riverside: [133.0, 107.8, 91.2],
   harbour: [161.4, 126.1, 102.0],
   tamkang: [171.2, 132.8, 111.2],

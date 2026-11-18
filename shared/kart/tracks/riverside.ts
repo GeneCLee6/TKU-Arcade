@@ -13,7 +13,7 @@
 // Blender scene.
 //
 // 2026-11-18, owner: "more fun, not so many straights ... technical, like the classic maps"
-// (revision 10; docs/KART-FEEL.md §9). The beginner's track, so everything flows, and no corner
+// (revision 10; docs/KART-FEEL.md §10). The beginner's track, so everything flows, and no corner
 // here wants the brake. A short main straight; a fast right sweeper; four esses, each a little quicker
 // than the last; a long double-apex right (two corners joined by a breath of straight: clip both
 // kerbs); the levee chicane; an open left hairpin; a climb over the levee with a small jump on its

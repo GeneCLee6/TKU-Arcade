@@ -103,7 +103,7 @@ function arenaHash(tuning: KartTuning): string {
   return hash.value
 }
 
-// 2026-11-18: every built-in track was redrawn (docs/ARCHITECTURE.md §4.31) and the hard bot given
+// 2026-11-18: every built-in track was redrawn (docs/ARCHITECTURE.md §4.33) and the hard bot given
 // a racing line, so the track hashes were taken again; the physics was not touched, which the test
 // yard's hash, the same as ever, still shows. Riverside and the campus now have a hill and a jump,
 // so the flat tracks left are the harbour and the old street
