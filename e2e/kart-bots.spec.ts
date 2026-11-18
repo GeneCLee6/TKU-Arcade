@@ -47,6 +47,16 @@ test('one person races a computer kart in an item race, from the menu to the res
   // The bot's kart, drawn from the frames it sends the room
   await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 30_000 }).toBe(1)
   await expect(page.getByTestId('kart-item')).toBeVisible()
+  // The item slot is at the top of the screen, in the middle (owner 2026-11-18), clear of the place
+  // and of the button that leaves the race
+  const slot = (await page.getByTestId('kart-item').boundingBox())!
+  expect(Math.abs(slot.x + slot.width / 2 - 480)).toBeLessThan(8)
+  expect(slot.y + slot.height).toBeLessThan(150)
+  expect(slot.width).toBeGreaterThan(120)
+  const place = (await page.getByTestId('kart-place').boundingBox())!
+  const quit = (await page.getByRole('button', { name: 'Quit the race' }).boundingBox())!
+  expect(place.x + place.width).toBeLessThanOrEqual(quit.x)
+  expect(quit.x + quit.width).toBeLessThan(slot.x)
   await expect
     .poll(async () => (await race(page))?.pickups ?? 0, { timeout: 90_000 })
     .toBeGreaterThan(0)

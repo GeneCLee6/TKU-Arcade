@@ -54,6 +54,7 @@ import {
   isClassic,
   kartBoosting,
   kartBurstWaiting,
+  kartDashDepth,
   kartSkidding,
   kartSlip,
   kartSpeed,
@@ -134,7 +135,22 @@ export interface SpikeHud {
    * otherwise
    */
   readonly dash?: 0 | 1 | 2
+  /**
+   * The drift under way, on its way to earning the instant boost (2026-11-18: deep and long, both),
+   * in twentieths: 0 out of a drift, 20 once it is earned. The HUD's depth meter
+   */
+  readonly depth?: number
+  /** How much of the running boost is left, in twentieths of a full one; 0 or left out with none */
+  readonly boostLeft?: number
+  /**
+   * A boost is running and the boost key does nothing until it ends (the classic feel, 2026-11-18):
+   * the HUD shows the charges locked
+   */
+  readonly boostLocked?: boolean
 }
+
+/** The HUD's meters move in twentieths, so that the HUD is drawn again only when one moves */
+export const HUD_STEPS = 20
 
 /**
  * What /kart/spike drives on: the walled yard of J3, J4's test oval, J5's first track, N1's second or
@@ -360,7 +376,10 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
   a.storedBoosts === b.storedBoosts &&
   a.boosting === b.boosting &&
   a.chain === b.chain &&
-  (a.dash ?? 0) === (b.dash ?? 0)
+  (a.dash ?? 0) === (b.dash ?? 0) &&
+  (a.depth ?? 0) === (b.depth ?? 0) &&
+  (a.boostLeft ?? 0) === (b.boostLeft ?? 0) &&
+  (a.boostLocked ?? false) === (b.boostLocked ?? false)
 
 /**
  * The game loop, outside React (docs/ARCHITECTURE.md §4): rendering follows the display, the physics
@@ -716,6 +735,12 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       chain: boosting ? current.chain : 0,
       hits,
       dash: !rules.chainBoosts ? 0 : waiting ? 2 : current.drifting && current.burstReady ? 1 : 0,
+      depth: rules.chainBoosts ? Math.floor(kartDashDepth(current, tuning) * HUD_STEPS + 1e-9) : 0,
+      boostLeft: Math.min(
+        HUD_STEPS,
+        Math.ceil((current.boostSeconds / Math.max(0.1, tuning.boostDuration)) * HUD_STEPS - 1e-9),
+      ),
+      boostLocked: isClassic(tuning) && current.boostSeconds > 0,
     }
     options.onPose?.(current.x, current.z, current.heading, run.nextGate)
     if (trial && track) {

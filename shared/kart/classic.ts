@@ -13,15 +13,24 @@
 // - slide-out: the drift key let go, the slip straightens at `driftRecoverRate` (twice as fast
 //   counter-steering; a fresh drift press while counter-steering is the cut, `cutSeconds`).
 //
-// The dash (the instant boost): a drift whose slip has reached `dashMinSlip` earns one (`burstReady`).
+// The dash (the instant boost): a drift whose slip has reached `dashMinSlip` and that has lasted
+// `dashMinSeconds` earns one (`burstReady`). Deep and long, both (2026-11-18, owner: "the drift still
+// grips too well: a player can mindlessly drift a little and boost, drift a little and boost, all lap
+// long; it should take a big drift to boost"): the slip builds slowly (`driftSlipIn`), only steering
+// into the drift takes it past the mark, and until the slip is there the car hardly turns
+// (`driftLoose`: the tail is out but the momentum carries on). A tapped drift fills the gauge only.
 // Only a fresh press of the throttle fires it (let go and pressed again; the page's tap latch counts
 // a press shorter than a step): (a) while the car slides out, the drift key up; (b) while the drift
 // key is still held, with the stick against the drift; (c) once the car has straightened, within
 // `releaseWindow`. Owner, 2026-11-17: "after the counter-steer it must not boost by itself: only when
 // the player presses forward does the car pull straight and boost". The counter-steer alone only
 // straightens the car faster. A new drift before it fires forfeits it, except the double: a drift
-// begun within `doubleWindow` of a dash earns the next however short. A dash multiplies the engine's
-// pull and lifts the top speed a little.
+// begun within `doubleWindow` of a dash earns the next however short (off since 2026-11-18:
+// `doubleWindow` is 0). A dash multiplies the engine's pull and lifts the top speed a little.
+//
+// The boost (N2O) runs out before the next can be fired (2026-11-18, owner: "normally one has to end
+// before the next"): while any boost runs (a charge, a pad's, an item's) the boost key does nothing
+// and the charge stays in stock.
 //
 // Speeds come from an engine against drag, so 0 to the top speed is quick at first and eases in.
 import type { KartInput, KartRules, KartState, KartTuning } from './physics.ts'
@@ -104,14 +113,13 @@ export function stepClassic(
   const slew = t.steerResponse * DT
   const steerNow = wheels + clamp(steer - wheels, -slew, slew)
 
-  // The boost (N2O): fired again while one runs it starts over, with a short extra push
-  let { gauge, storedBoosts, boostSeconds, stackSeconds } = state
+  // The boost (N2O): one at a time. While any boost runs the key does nothing: no restart, no
+  // stacking, no extra push, and the charge stays in stock
+  let { gauge, storedBoosts, boostSeconds } = state
   const fire =
-    storedBoosts > 0 &&
-    ((input.boost && !state.boostHeld) || (rules.autoBoost && boostSeconds === 0))
+    storedBoosts > 0 && boostSeconds === 0 && ((input.boost && !state.boostHeld) || rules.autoBoost)
   if (fire) {
     storedBoosts--
-    if (boostSeconds > 0) stackSeconds = t.boostStackSeconds
     boostSeconds = t.boostDuration
   }
 
@@ -204,7 +212,6 @@ export function stepClassic(
   const top = t.topSpeed * limitScale
   const links = clamp(chain - 1, 0, t.chainSpeedLinks)
   const full = boostSeconds > 0
-  const stacked = full && stackSeconds > 0
   const mini = miniSeconds > 0
   let factor = 1
   let capFactor = 1
@@ -214,20 +221,18 @@ export function stepClassic(
   }
   if (full) {
     factor = Math.max(factor, t.boostAccelFactor)
-    capFactor = Math.max(capFactor, stacked ? t.boostStackFactor : t.boostTopSpeedFactor)
+    capFactor = Math.max(capFactor, t.boostTopSpeedFactor)
   }
   if (launchSeconds > 0 || (state.launchSeconds ?? 0) > 0) {
     factor = Math.max(factor, t.startAccelFactor)
     capFactor = Math.max(capFactor, t.startTopSpeedFactor)
   }
-  const push = stacked ? t.stackPush : 0
   const engine = (speed: number, pull: number) =>
     classicAcceleration(speed, t, {
       top,
       throttle: input.throttle,
       brake: input.brake,
       factor,
-      push,
       pull,
     })
 
@@ -243,7 +248,7 @@ export function stepClassic(
         forward > 0
           ? Math.max(0, forward - t.braking * DT)
           : Math.max(-t.reverseSpeed, forward - t.acceleration * 0.5 * DT)
-    } else if (input.throttle || factor > 1 || push > 0) {
+    } else if (input.throttle || factor > 1) {
       forward =
         forward < 0 ? Math.min(0, forward + t.braking * DT) : forward + engine(forward, 1) * DT
     } else {
@@ -288,7 +293,10 @@ export function stepClassic(
     const ramp = Math.min(1, speed / Math.max(1, t.driftFullSpeed))
     if (drifting) {
       const into = clamp(steer * dir, -1, 1)
-      travel += dir * t.driftTurnRate * ramp * (1 + t.driftSteerShare * into) * DT
+      // The tail is out before the car comes round: the turn bites only as the slip builds
+      const bite =
+        1 - t.driftLoose * (1 - Math.min(1, Math.abs(slip) / Math.max(1e-3, t.driftSlip)))
+      travel += dir * t.driftTurnRate * ramp * bite * (1 + t.driftSteerShare * into) * DT
       const target = dir * (t.driftSlip + t.driftSlipSteer * into)
       slip += (target - slip) * (1 - Math.exp((-SWING * DT) / Math.max(DT, t.driftSlipIn)))
       slip = clamp(slip, -t.driftMaxSlip, t.driftMaxSlip)
@@ -321,9 +329,11 @@ export function stepClassic(
     }
   }
 
-  // Deep enough (or the double's tap, two steps at least): the drift has earned a dash
+  // Deep enough and long enough (or the double's tap, two steps at least): the drift has earned a
+  // dash
   if (drifting && !burstReady) {
-    if (driftPeak >= t.dashMinSlip - 1e-9 || (doubleDrift && driftSeconds > DT * 1.5)) {
+    const deep = driftPeak >= t.dashMinSlip - 1e-9 && driftSeconds >= t.dashMinSeconds - 1e-9
+    if (deep || (doubleDrift && driftSeconds > DT * 1.5)) {
       burstReady = true
       doubleArmed = doubleDrift
     }
@@ -347,7 +357,8 @@ export function stepClassic(
       ? Math.min(0.99, 1 - Math.min(1, Math.abs(slip) / Math.max(1e-3, t.driftSlip)))
       : 1
 
-  // The gauge: while sliding, by the speed; the longer one drift, the slower; never in a boost
+  // The gauge: while sliding, by the speed and by how deep; the longer one drift, the slower; never
+  // in a boost
   const pace = Math.hypot(vx, vz)
   if (
     !full &&
@@ -355,8 +366,11 @@ export function stepClassic(
     pace >= t.driftMinSpeed &&
     storedBoosts < t.maxStoredBoosts
   ) {
+    const depth =
+      t.gaugeShallow +
+      (1 - t.gaugeShallow) * Math.min(1, Math.abs(slip) / Math.max(1e-3, t.driftSlip))
     const share = drifting
-      ? 1 / (1 + driftSeconds / Math.max(0.05, t.gaugeFade))
+      ? depth / (1 + driftSeconds / Math.max(0.05, t.gaugeFade))
       : SLIDE_GAUGE * (1 - traction)
     gauge += t.gaugeFillRate * Math.min(GAUGE_SPEED_MAX, pace / t.topSpeed) * share * DT
   }
@@ -367,7 +381,6 @@ export function stepClassic(
 
   // The clocks
   if (boostSeconds > 0) boostSeconds = Math.max(0, boostSeconds - DT)
-  stackSeconds = boostSeconds > 0 ? Math.max(0, stackSeconds - DT) : 0
   if (miniSeconds > 0) miniSeconds = Math.max(0, miniSeconds - DT)
   if (releaseWindow > 0 && !opened) releaseWindow = Math.max(0, releaseWindow - DT)
   if (releaseWindow === 0 && !burstReady) doubleArmed = false
@@ -397,7 +410,7 @@ export function stepClassic(
     miniSeconds,
     sliding: false,
     stallSeconds: 0,
-    stackSeconds,
+    stackSeconds: 0,
     catchSeconds: Math.max(0, cutLeft - DT),
     traction,
     doubleWindow,

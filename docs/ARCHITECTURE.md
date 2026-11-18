@@ -610,7 +610,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 擁有者：「手感不對，當甩尾的時候，只要還沒拉回來，還在甩，反打再往前都可以加速，然後倒數的時候按往前應該要噴加速……跟跑跑設計以及手感還是差非常多，速度也怪怪的。」規格、原作研究（只當量級）、參數表、給擁有者試的清單：**`docs/KART-FEEL.md`**。玩法與手感可以學，名稱、美術、程式不抄。
 
-- **兩套物理並存**（`physics.ts`）：`KartTuning` 多一個 `model`（`MODEL_ARCADE` 0／`MODEL_CLASSIC` 1）。`stepKart` 看到 1 就交給 `shared/kart/classic.ts` 的 `stepClassic`，否則是原本的程式，一行都沒動。`KART_TUNING` 是經典（預設）；`ARCADE_TUNING` 是舊的全部數字。兩組有同一套 key（經典多 23 個：`dragShare`、`steerResponse`、`gripScrub`、`driftSlip`、`dashMinSlip`、`dashAccelFactor`、`boostAccelFactor`、`stackPush`、`startAccelFactor`、`wallGaugeKeep`……），調參面板只顯示該手感讀的那些（`shownKeys`）。`KartState` 只**多選填**欄位（`steerNow`、`driftPeak`、`driftKey`、`driftLatch`、`launchSeconds`，只有經典會設），`KartInput` 多選填 `throttleTap`（前進鍵的 tap 鎖存，`input.ts`／`touch.ts`／`spikeLoop.ts` 跟噴射鍵一樣記「這一步之前按過」）。
+- **兩套物理並存**（`physics.ts`）：`KartTuning` 多一個 `model`（`MODEL_ARCADE` 0／`MODEL_CLASSIC` 1）。`stepKart` 看到 1 就交給 `shared/kart/classic.ts` 的 `stepClassic`，否則是原本的程式，一行都沒動。`KART_TUNING` 是經典（預設）；`ARCADE_TUNING` 是舊的全部數字。兩組有同一套 key（經典多 23 個：`dragShare`、`steerResponse`、`gripScrub`、`driftSlip`、`dashMinSlip`、`dashAccelFactor`、`boostAccelFactor`、`stackPush`（§4.30 已刪）、`startAccelFactor`、`wallGaugeKeep`……），調參面板只顯示該手感讀的那些（`shownKeys`）。`KartState` 只**多選填**欄位（`steerNow`、`driftPeak`、`driftKey`、`driftLatch`、`launchSeconds`，只有經典會設），`KartInput` 多選填 `throttleTap`（前進鍵的 tap 鎖存，`input.ts`／`touch.ts`／`spikeLoop.ts` 跟噴射鍵一樣記「這一步之前按過」）。
 - **黃金測試**（`tests/kart/flatGolden.test.ts`）：`7f53e13` 的雜湊現在擋 `ARCADE_TUNING`（困難電腦車四張平面賽道＋測試場，每一步、連 state 的 key），全過，所以舊手感逐位元不變；另一組新雜湊擋經典手感。
 - **經典的步驟**（`classic.ts`）：抓地／甩尾／滑出三種狀態；甩尾時「行進方向」轉、車頭＝行進方向＋側滑角（0.22 秒甩到 30° ± 12°）；回正 75°/s、反打 ×2、斷位 0.1 秒；推力減阻力 `a = 34 × 倍率 − 34 × (0.3u + 0.7u²)`；瞬間加速（`burstReady` 由深度 ≥ 20° 給、還在甩／滑時反打＋前進或新按前進、回正後 0.5 秒內新按）沿用 `miniSeconds`／`chain`／`doubleWindow`／`releaseWindow` 欄位，所以 HUD、大字提示、火花、frame 旗標、重播不用改；N2O 再按重新計時＋`stackSeconds` 內多推。起跑在 `timeTrial.ts`（`TrialStart` 多 `'quick'`：太早按住的小加速；經典不熄火；GO 後 `startLate` 內新按也算，大字提示在那一步出）。重撞牆（`course.ts`）：經典另外結束甩尾、取消瞬間加速資格、加速條 ×0.5。
 - **畫面**：速度表 `SPEEDOMETER_SCALE` 1.45 → **1**（誠實）；鏡頭（`camera.ts`）改臨界阻尼彈簧（0.15 秒，側滑時 0.2 秒、往車頭只偏 15%），FOV 速度 +15°（60° → 75°）、噴射 +8°，高速後拉 1.2 → 0.4 m／單位 pace（`Scene.ts`）；倒數時一行提示「GO 前最後一刻按前進：完美起跑」（`RaceOverlay.tsx`）；大字提示多「起跑加速」（`quick`），文字改成「瞬間加速／反打＋前進！／按前進！／雙收尾！／完美起跑！」；說明文字兩語重寫。
@@ -674,7 +674,34 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **測試**：`tests/kart/cornerSigns.test.ts`（體育場形的路：兩個右彎、反向是左彎、大半徑不算彎；板子在路外、在外側、箭頭方向、入彎前就開始、間距、低畫質變少；五張內建賽道每個彎至少 2 塊、沒有一塊在路上、同一條路給同一組板子）。
 - **限制**：箭頭板可能和樹、旗桿、看台重疊（都在護欄外，沒有逐一避開）；觀戰與重播的車沒有特效；別人的車沒有點火的光環與鏡頭效果（frame 裡沒有「哪一種噴射」）。
 
-### 4.30 路線圖外：車款重畫、噴射特效一套系統、噴氮氣變身、後處理（2026-11-18，`feat/kart-visual-overhaul`）
+### 4.30 路線圖外：甩大才噴、N2O 噴完才能再噴、道具欄在正上方（2026-11-18，`feat/kart-drift-depth`）
+
+擁有者（針對 §4.28、§4.29 上線的版本）：「甩尾抓地力還是太好，玩家可以很無腦的甩一點點噴甩一點點噴，就會變成整路都一直噴，跑跑的設計是需要甩大一點才能噴…道具目前有哪些? 可以出現在畫面正上方，比較顯眼，疊噴有什麼意義嗎? 是直接把時間疊上去嗎? 因為正常來說噴完一次才能再噴一次」。規格、數字、試玩清單：`docs/KART-FEEL.md` §3.1、§3.2、§3.5、§5、§6（a–i）、§7、§9。
+
+- **甩尾變滑**（`classic.ts`、`KART_TUNING`）：`driftSlip` 30° → 24°、`driftSlipSteer` 12° → 16°（置中 24°、往內 40°、往外 8°）、`driftSlipIn` 0.22 → 0.45 秒、`driftRecoverRate` 1.3 → 1.1 rad/s。新 `driftLoose` 0.6：甩尾中行進方向的轉速乘 `bite = 1 − driftLoose × (1 − min(1, |slip| / driftSlip))`，剛甩的時候只有 40%，側滑角到 `driftSlip` 才是全部（車尾先出去、車才轉過來）。
+- **瞬間加速的資格**：`driftPeak ≥ dashMinSlip`（20° → **32°**）**且** `driftSeconds ≥ dashMinSeconds`（新，**0.45 秒**）。極速、方向打滿：0.32 秒過 32°、0.45 秒達標，行進方向已轉約 56°。置中甩（24°）與往外打（8°）永遠不達標。`doubleWindow` 0.5 → **0**（雙收尾關掉：它讓瞬間加速後的任何淺甩都有資格；程式與 `doubles` 欄位留著，調參面板調回來就有）。效果加大：`chainDuration` 0.5 → 0.8 秒、`dashAccelFactor` 1.6 → 1.8、`miniTopSpeedFactor` 1.07 → 1.10。
+- **`kartDashDepth(state, tuning)`**（`physics.ts`）：0–1，`min(driftPeak / dashMinSlip, driftSeconds / dashMinSeconds)`，達標後 1，不在甩尾 0。HUD 的深度條用。
+- **集氣**：甩尾中的填充多乘深度 `gaugeShallow + (1 − gaugeShallow) × min(1, |slip| / driftSlip)`（新 `gaugeShallow` 0.5）；`gaugeFillRate` 60 → 70。點甩照樣集氣，約深甩的一半。
+- **N2O 一次一個**（`classic.ts`）：`fire = storedBoosts > 0 && boostSeconds === 0 && (新按 || autoBoost)`。噴射中按鍵那一步與沒按逐位元相同（測試比 `boostSeconds`、速度、位置、存量）。`stackSeconds` 在經典手感恆為 0；`stackPush` 從 `KartTuning` 刪掉，`boostStackSeconds`／`boostStackFactor` 移進 `ARCADE_ONLY`（調參面板在經典手感不顯示）。**加速帶**（`course.ts`：`boostSeconds < padBoostSeconds` 才設成它）與**道具順風**（`itemEffects.ts` `boostKart`：`max`）本來就是「取較長的、不相加」，沒改；它們噴的也是 `boostSeconds`，所以期間 N2O 鍵同樣無效、存量留著。瞬間加速（`miniSeconds`）、起跑加速（`launchSeconds`）與 N2O 並行時推力與上限各取最大，不相乘。街機（`physics.ts` 的舊路徑）完全沒動：`flatGolden` 的 `7f53e13` 雜湊照過。
+- **HUD**（`Hud.tsx`、`spikeLoop.ts`）：`SpikeHud` 多 `depth`、`boostLeft`（都是 `HUD_STEPS` 20 分之幾，量化後才比 `sameHud`，不會每幀重畫）與 `boostLocked`。`DashSlot` 裡：`dash === 0 && depth > 0` 畫 `role="meter"` 的「甩深一點」量表（`kart-depth`），達標換成原本的金色提示。加速條面板底下 `kart-boost-left`（洋紅色、隨 `boostSeconds / boostDuration` 縮短）；`boostLocked` 時存量格空心、`aria-label` 換成 `kart.hud.storedLocked`。火花顏色沒動：`look.charge` 本來就在 `burstReady` 時變金，現在等於「達標才變金」。
+- **道具欄**（`src/kart/race/ItemHud.tsx`）：`ItemSlot` 自己定位（`Dock`：`position: absolute; top; left: 50%`），是比賽頁（`RaceView` 的 `Page`）的直接子元素，不再放在左下的 `Bottom` 裡。72 px 框、`fontSize.xl` 的名稱；`key={item}` 讓每次拿到新道具都重播 `drop`（掉進來＋彈）與 `flash`（框的光）；`(max-width: 760px), (max-height: 500px)` 縮成 48 px，矮螢幕藏按鍵提示；`(max-width: 560px) and (orientation: portrait)` 放到 `ITEM_SLOT_PORTRAIT_TOP` 92 px、地圖左邊空位的中間。大字提示（`CalloutBox`）的 `top` 改成 `max(13%, var(--kart-callout-clear, 0px))`（`CALLOUT_CLEAR`），`RaceView` 在道具賽（`data-items`）設 104／72／156 px。`BotRaceView` 的「離開比賽」從正上方移到名次旁（`QuitCorner`）。**觀戰與重播**：`WatchParts.tsx` 新 `WatchedItem`（同一個 `ItemSlot`、沒有按鍵提示），`WatchedPanel` 不再帶道具那一行。
+- **電腦車**（`brain.ts` `classicHands`）：轉速估計帶 `bite`；有打算噴（`dashPlan`）而且前面的彎還在繼續（`later` 同向且 > 抓地的 0.5 倍）時，往彎內至少打到 `(dashMinSlip + 3° − driftSlip) / driftSlipSteer`（約 0.69）直到 `driftPeak` 過門檻；差一點就達標（時間差 ≤ 0.2 秒、深度差 ≤ 5°）也撐著；長彎不再「放掉再甩」而是往外打（最多到 −1）維持；決定進甩尾後按住到真的進去（`entering`，否則反應延遲會讓它在門檻邊一步按一步放）；直線點甩與雙收尾在經典手感拿掉；N2O 只在沒在噴時按。街機那條路與亂數順序沒動。
+- **紀錄**：`riverside@9`、`harbour@9`、`tamkang@8`、`oldstreet@4`，`CUSTOM_REVISION` 3 → 4（自訂賽道與觀音山）；調參存檔 key `.4` → `.5`。`flatGolden` 的經典雜湊（四張賽道＋測試場）重取，街機的不變。
+- **多人**：協定、frame、伺服器都沒動。`speedCapFor` 仍取經典與街機兩組的最大值（街機的 `boostStackFactor` 1.6 最大），瞬間加速 1.10 ＋ 3 環 0.03 遠低於它。
+- **技巧差距**（`npm run kart:feel`，三圈秒數）：
+
+  | 賽道 | 新手 | 一般 | 高手 | 高手比新手 | 高手三圈瞬間加速（§4.28 → 現在） |
+  | --- | --- | --- | --- | --- | --- |
+  | 河畔 | 119.2 | 109.3 | **98.3** | 少 18% | 101 → 30 |
+  | 漁港 | 138.8 | 123.5 | **114.3** | 少 18% | 109 → 24 |
+  | 淡江 | 138.4 | 121.9 | **114.8** | 少 17% | 122 → 24 |
+  | 老街 | 129.7 | 111.4 | **106.7** | 少 18% | 87 → 10 |
+  | 觀音山 | 96.3 | 85.8 | **83.2** | 少 14% | 66 → 12（6 次是落地加速） |
+
+  直線上左右硬甩來噴（腳本）：10 秒 543 m（還得有 120 m 寬的路），直直開 680 m，所以「無腦一直噴」現在是虧的。`tests/kart/feel.test.ts`：高手 < 一般 < 新手、高手至少比新手少 15%（三張圖）、高手三圈 6–36 次且是一般的三倍以上、新手 ≤ 2 次。
+- **測試**：`tests/kart/classic.test.ts`（點甩 0.1／0.2／0.3 秒怎麼按都不噴；置中甩 3 秒不達標；夠深但不夠久不給、撐到 0.45 秒才給且已轉 > 40°；`kartDashDepth` 單調、達標才 1；剛甩的 0.1 秒轉得比甩深後少 35% 以上；雙收尾預設沒有、`doubleWindow` 調回來就有；N2O 噴射中按鍵與沒按逐位元相同、連按 2 秒也一樣、噴完按著不放不發、重按才發；加速帶噴射中按鍵與自動噴射都不發）、`tests/kart/hud.test.tsx`（深度條→金色提示；剩餘條與鎖住的存量）、`tests/kart/itemHud.test.tsx`（空欄、圖示＋名稱＋按鍵、換道具是新元素、觀戰版沒有按鍵提示）、`e2e/kart-bots.spec.ts`（道具欄在畫面上方正中、不壓到名次與離開按鈕）、`e2e/kart-spike.spec.ts`（噴射中看得到剩餘條）。
+- **限制**：門檻與「滑」的程度是起始值，沒有人用實機調過；手機直拿時道具欄不在正中間；觸控的噴射按鈕在噴射中沒有變樣子；高手比新手的差距比 §4.28 小（少了直線點甩那一塊），之後要拉開得靠路線與 N2O 的用法，不是再把瞬間加速放寬。
+### 4.31 路線圖外：車款重畫、噴射特效一套系統、噴氮氣變身、後處理（2026-11-18，`feat/kart-visual-overhaul`）
 
 擁有者 2026-11-18：「車子的設計還有噴氮氣的特效要再設計過……要越來越逼真，越帥，比如跑跑有些車子噴氮氣還會變身」。造型、變身與特效全部原創（規則 1），全部程式產生（`ASSETS.md`），物理、協定、HUD 版面都沒動。
 
