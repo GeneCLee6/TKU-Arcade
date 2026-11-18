@@ -52,6 +52,7 @@ import {
   TagLayer,
   TopLeft,
   WatchControls,
+  WatchedItem,
   WatchedPanel,
   WatchPage,
   WatchStage,
@@ -335,11 +336,6 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
           place={follow === null ? 0 : order.indexOf(follow) + 1}
           total={replay.racers.length}
           detail={detail}
-          item={
-            replay.mode === 'items' && follow !== null
-              ? heldAt(replay.held, follow, tick)
-              : undefined
-          }
         />
         {reel.start > 0 && <Note>{t('games.kart.replay.partial')}</Note>}
         {recent.map((event) => (
@@ -351,6 +347,12 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
           </Note>
         ))}
       </TopLeft>
+      <WatchedItem
+        t={t}
+        item={
+          replay.mode === 'items' && follow !== null ? heldAt(replay.held, follow, tick) : undefined
+        }
+      />
       <MapCorner>
         <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
       </MapCorner>

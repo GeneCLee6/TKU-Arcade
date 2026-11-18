@@ -1,5 +1,5 @@
 // e9-t10: what watching a race and its replay share: the page over the scene, the panel on the kart
-// being watched (its name, place, lap and item), the buttons to change kart and view, the keys, and
+// being watched (its name, place and lap; its item in the race's own slot), the buttons to change kart and view, the keys, and
 // the name tags over the other karts.
 import type { ReactNode } from 'react'
 import styled from 'styled-components'
@@ -9,7 +9,7 @@ import type { Translate } from '../../i18n/t.ts'
 import { Button } from '../../components/Button.tsx'
 import { displayType, glass, monoType } from '../../styles/esports.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
-import { ItemIcon } from '../race/ItemHud.tsx'
+import { ItemSlot } from '../race/ItemHud.tsx'
 
 export interface WatchedPanelProps {
   t: Translate
@@ -18,12 +18,10 @@ export interface WatchedPanelProps {
   total: number
   /** "Lap 2 / 3", "Finished" or "out", as worked out by the view */
   detail: string
-  /** Shown in an item race only */
-  item?: ItemId | null
 }
 
-/** The kart being watched: whose, its place, how far, and its item */
-export function WatchedPanel({ t, name, place, total, detail, item }: WatchedPanelProps) {
+/** The kart being watched: whose, its place and how far (what it holds is WatchedItem's) */
+export function WatchedPanel({ t, name, place, total, detail }: WatchedPanelProps) {
   return (
     <Panel data-testid="kart-watched">
       <Following>
@@ -35,15 +33,22 @@ export function WatchedPanel({ t, name, place, total, detail, item }: WatchedPan
             {t('games.kart.race.place', { place, total })}
           </PlaceNumber>
           <Detail>{detail}</Detail>
-          {item !== undefined && (
-            <Held aria-label={t('games.kart.watch.item')} data-item={item ?? ''}>
-              {item ? <ItemIcon item={item} /> : null}
-              <span>{item ? t(`games.kart.item.${item}`) : t('games.kart.item.empty')}</span>
-            </Held>
-          )}
         </Line>
       )}
     </Panel>
+  )
+}
+
+/**
+ * The watched kart's item, in an item race (undefined otherwise): the race's own slot, top centre,
+ * with no key to press (2026-11-18). A child of the watch page, not of a corner
+ */
+export function WatchedItem({ t, item }: { t: Translate; item: ItemId | null | undefined }) {
+  if (item === undefined) return null
+  return (
+    <div role="group" aria-label={t('games.kart.watch.item')}>
+      <ItemSlot t={t} item={item} />
+    </div>
   )
 }
 
@@ -192,19 +197,6 @@ const Detail = styled.span`
   ${monoType}
   color: ${color.muted};
   font-size: ${fontSize.sm}px;
-`
-
-const Held = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: ${space.xs}px;
-  color: ${color.text};
-  font-size: ${fontSize.sm}px;
-
-  svg {
-    width: 24px;
-    height: 24px;
-  }
 `
 
 const Controls = styled.section`

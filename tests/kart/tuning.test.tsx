@@ -51,7 +51,7 @@ describe('the tuning panel', () => {
     expect(top).toHaveAttribute('aria-valuetext', '68.0 m/s')
     expect(screen.getByRole('slider', { name: 'Drift angle cap' })).toHaveValue('50')
     expect(screen.getByTestId('kart-slips')).toHaveTextContent(
-      'A drift settles at 42° steering into it, 30° centred and 18° steering out.',
+      'A drift settles at 40° steering into it, 24° centred and 8° steering out.',
     )
   })
 
@@ -73,7 +73,7 @@ describe('the tuning panel', () => {
     })
     expect(current).toBe(PRESETS.loose)
     expect(status()).toHaveTextContent('Preset: Classic, loose.')
-    expect(screen.getByTestId('kart-slips')).toHaveTextContent('50° steering into it')
+    expect(screen.getByTestId('kart-slips')).toHaveTextContent('48° steering into it')
     fireEvent.change(screen.getByRole('combobox', { name: 'Preset' }), {
       target: { value: 'arcade' },
     })
@@ -144,7 +144,7 @@ describe('storing the tuning', () => {
   })
 
   it('falls back to the standard preset when what is stored is broken', () => {
-    localStorage.setItem('tku-arcade.kart.tuning.4', '{"grip": "lots"}')
+    localStorage.setItem('tku-arcade.kart.tuning.5', '{"grip": "lots"}')
     expect(loadTuning()).toEqual({ tuning: KART_TUNING, preset: 'standard' })
   })
 

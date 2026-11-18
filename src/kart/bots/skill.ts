@@ -31,13 +31,20 @@ export interface BotSkill {
   readonly driftAt: number
   /** The chance a drift ends in the counter-steer and the release boost (0 never, 1 always) */
   readonly releaseBoosts: number
-  /** After a release boost, the double's tap */
+  /** After a release boost, the double's tap (the arcade feel only: the classic feel has none) */
   readonly doubles: boolean
-  /** Tapped drifts down the straights, each for a release boost */
+  /**
+   * Tapped drifts down the straights, each for a release boost (the arcade feel only: since
+   * 2026-11-18 the classic feel's instant boost takes a deep, long drift, which a straight has no
+   * room for)
+   */
   readonly taps: boolean
   /** The chance of a start boost (the throttle pressed just before GO); otherwise a jump start */
   readonly startBoost: number
-  /** Fires the second charge while a boost runs, to stack it */
+  /**
+   * Fires the second charge while a boost runs, to stack it (the arcade feel only: in the classic
+   * feel a boost runs out before the next can be fired)
+   */
   readonly stackBoosts: boolean
   /** How long an item is held at least before it is used, ms: [shortest, longest] */
   readonly itemDelayMs: readonly [number, number]

@@ -6,7 +6,7 @@ import type { MessageParams } from '../i18n/t.ts'
 import { clippedFill, displayType, monoType, SLANT } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import type { Callout } from './callouts.ts'
-import type { SpikeHud } from './spikeLoop.ts'
+import { HUD_STEPS, type SpikeHud } from './spikeLoop.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -30,9 +30,17 @@ interface HudProps {
  * trial (e8-t10, J5). 2026-11-17 (docs/KART-FEEL.md §7): the two panels stand apart, either side of
  * the kart, so that the kart, its skid marks and its flames are never behind the HUD; and between
  * them, under the kart, a prompt says when the instant boost is earned and when to tap forward.
+ * 2026-11-18 (owner: "it should take a big drift to boost ... one boost has to end before the
+ * next"): in the same place, while a drift has not earned it yet, a meter shows how far it has to go
+ * (deep and long, both); and while a boost runs, a bar runs down with it and the charges show
+ * locked.
  */
 export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudProps) {
   const lit = Math.floor((hud.gauge / GAUGE_FULL) * GAUGE_SEGMENTS)
+  const dash = hud.dash ?? 0
+  const depth = Math.min(HUD_STEPS, hud.depth ?? 0)
+  const boostLeft = Math.min(HUD_STEPS, hud.boostLeft ?? 0)
+  const locked = (hud.boostLocked ?? false) && boostLeft > 0
   return (
     <Box
       data-testid="kart-hud"
@@ -40,16 +48,28 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
       aria-label={t('kart.hud.title')}
       role="group"
     >
-      {(hud.dash ?? 0) > 0 && (
+      {dash > 0 && (
         <DashSlot>
-          <DashPrompt
-            $now={hud.dash === 2}
-            data-testid="kart-dash"
-            data-state={hud.dash}
-            role="status"
-          >
-            {t(hud.dash === 2 ? 'kart.hud.dashNow' : 'kart.hud.dashEarned')}
+          <DashPrompt $now={dash === 2} data-testid="kart-dash" data-state={dash} role="status">
+            {t(dash === 2 ? 'kart.hud.dashNow' : 'kart.hud.dashEarned')}
           </DashPrompt>
+        </DashSlot>
+      )}
+      {dash === 0 && depth > 0 && (
+        <DashSlot>
+          <Depth
+            role="meter"
+            aria-label={t('kart.hud.depth')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={(depth / HUD_STEPS) * 100}
+            data-testid="kart-depth"
+          >
+            <DepthLabel aria-hidden="true">{t('kart.hud.depth')}</DepthLabel>
+            <DepthTrack>
+              <DepthFill $share={depth / HUD_STEPS} />
+            </DepthTrack>
+          </Depth>
         </DashSlot>
       )}
       <SpeedPanel $boosting={hud.boosting}>
@@ -82,12 +102,16 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
         <LabelRow>
           <Charges
             role="img"
-            aria-label={t('kart.hud.stored', { count: hud.storedBoosts, max: maxStored })}
+            aria-label={t(locked ? 'kart.hud.storedLocked' : 'kart.hud.stored', {
+              count: hud.storedBoosts,
+              max: maxStored,
+            })}
             data-testid="kart-stored"
+            data-locked={locked || undefined}
           >
             <Label aria-hidden="true">{t('kart.hud.charges')}</Label>
             {Array.from({ length: maxStored }, (_, index) => (
-              <Charge key={index} $on={index < hud.storedBoosts} />
+              <Charge key={index} $on={index < hud.storedBoosts} $locked={locked} />
             ))}
           </Charges>
           {hud.boosting && (
@@ -96,6 +120,18 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
             </Tag>
           )}
         </LabelRow>
+        {boostLeft > 0 && (
+          <BoostLeft
+            role="meter"
+            aria-label={t('kart.hud.boostLeft')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={(boostLeft / HUD_STEPS) * 100}
+            data-testid="kart-boost-left"
+          >
+            <BoostLeftFill $share={boostLeft / HUD_STEPS} />
+          </BoostLeft>
+        )}
       </BoostPanel>
     </Box>
   )
@@ -287,7 +323,8 @@ const Charges = styled.span`
   gap: 6px;
 `
 
-const Charge = styled.i<{ $on: boolean }>`
+/** Locked while a boost runs (the next fires only once it has ended): an outline, no glow */
+const Charge = styled.i<{ $on: boolean; $locked: boolean }>`
   width: 26px;
   height: 14px;
 
@@ -297,9 +334,38 @@ const Charge = styled.i<{ $on: boolean }>`
   }
 
   transform: skewX(${SLANT});
-  background: ${({ $on }) => ($on ? color.magenta : 'transparent')};
-  box-shadow: ${({ $on }) =>
-    $on ? `0 0 12px ${color.magenta}` : `inset 0 0 0 1px ${color.border}`};
+  background: ${({ $on, $locked }) =>
+    !$on
+      ? 'transparent'
+      : $locked
+        ? `color-mix(in srgb, ${color.magenta} 30%, transparent)`
+        : color.magenta};
+  box-shadow: ${({ $on, $locked }) =>
+    $on && !$locked
+      ? `0 0 12px ${color.magenta}`
+      : `inset 0 0 0 1px ${$on ? color.magenta : color.border}`};
+`
+
+/** The running boost, running down: under the charges, as wide as the panel */
+const BoostLeft = styled.div`
+  height: 6px;
+  margin-inline: 4px;
+  transform: skewX(${SLANT});
+  background: ${color.raised};
+  box-shadow: inset 0 0 0 1px ${color.line};
+
+  ${DENSE} {
+    height: 4px;
+  }
+`
+
+const BoostLeftFill = styled.i.attrs<{ $share: number }>(({ $share }) => ({
+  style: { width: `${Math.round($share * 100)}%` },
+}))`
+  display: block;
+  height: 100%;
+  background: ${color.magenta};
+  box-shadow: 0 0 10px ${color.magenta};
 `
 
 const tagClip = 'polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%)'
@@ -355,6 +421,51 @@ const DashPrompt = styled.span<{ $now: boolean }>`
   }
 `
 
+/**
+ * Where the prompt will be, while a drift has not earned the instant boost yet: how far it has to
+ * go. Plain until it is full; then the gold prompt takes its place
+ */
+const Depth = styled.div`
+  ${clippedFill(tagClip, color.panel)}
+  display: flex;
+  align-items: center;
+  gap: ${space.sm}px;
+  padding: ${space.xs}px ${space.lg}px;
+
+  &::before {
+    box-shadow: inset 0 0 0 1px ${color.line};
+  }
+`
+
+const DepthLabel = styled.span`
+  ${monoType}
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: ${color.text};
+`
+
+const DepthTrack = styled.div`
+  position: relative;
+  width: clamp(72px, 12vw, 132px);
+  height: 10px;
+  transform: skewX(${SLANT});
+  background: ${color.raised};
+  box-shadow:
+    inset 0 0 0 1px ${color.line},
+    3px 0 0 0 ${color.warning};
+`
+
+const DepthFill = styled.i.attrs<{ $share: number }>(({ $share }) => ({
+  style: { width: `${Math.round($share * 100)}%` },
+}))`
+  display: block;
+  height: 100%;
+  background: ${color.accent};
+`
+
 const veilIn = keyframes`
   from { opacity: 1; }
   to { opacity: 0.55; }
@@ -381,9 +492,15 @@ const pop = keyframes`
   100% { transform: translateY(-18px); opacity: 0; }
 `
 
+/**
+ * A page with something at its top centre (the item slot of an item race) sets this to how far down
+ * that reaches: the big words then start under it
+ */
+export const CALLOUT_CLEAR = '--kart-callout-clear'
+
 const CalloutBox = styled.div`
   position: absolute;
-  top: 13%;
+  top: max(13%, var(${CALLOUT_CLEAR}, 0px));
   left: 0;
   right: 0;
   display: flex;

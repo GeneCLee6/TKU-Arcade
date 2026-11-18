@@ -84,8 +84,9 @@ describe('the presets', () => {
     const planted = steadySlips(PRESETS.planted)
     const loose = steadySlips(PRESETS.loose)
     // The measured angles, rounded (2026-11-14, the drift as a real slide; they were 33°, 23°, 13°;
-    // then the classic feel, 2026-11-17, whose drift swings to the angle it is told)
-    expect(standard).toEqual({ into: 42, centred: 30, out: 18 })
+    // then the classic feel, 2026-11-17, whose drift swings to the angle it is told; 2026-11-18, only
+    // steering into it takes it deep: they were 42°, 30°, 18°)
+    expect(standard).toEqual({ into: 40, centred: 24, out: 8 })
     expect(steadySlips(PRESETS.arcade)).toEqual({ into: 50, centred: 38, out: 21 })
     expect(planted.into).toBeLessThan(standard.into)
     expect(planted.centred).toBeLessThan(standard.centred)

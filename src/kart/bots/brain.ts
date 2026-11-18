@@ -30,15 +30,18 @@ const BRAKE_AT = 0.8
 /** Steps a tapped drift is held: just past chainMinDrift, so that it earns a release boost */
 const TAP_STEPS = Math.ceil(ARCADE_TUNING.chainMinDrift * 60) + 2
 /**
- * The classic feel (2026-11-17, docs/KART-FEEL.md): steps a tapped drift is held, steering into it,
- * before it is let go for the instant boost (counter-steer, the throttle up for a moment and pressed
- * afresh: only a fresh press fires one): enough for the slip to reach dashMinSlip
+ * The classic feel (2026-11-18, docs/KART-FEEL.md): a dash takes a drift past dashMinSlip. The hands
+ * steer into a drift for this much more slip than the mark, radians, while the corner ahead still
+ * turns at least this share of what the grip gives
  */
-const CLASSIC_TAP_STEPS = 7
-/** How hard a tapped drift steers into itself: little, so the tap swerves little */
-const CLASSIC_TAP_STEER = 0.3
-/** The classic feel: the counter-steer short of firing a dash, while a drift still turns */
-const CLASSIC_OUT_MOST = -0.25
+const CLASSIC_DEEP_MARGIN = (3 * Math.PI) / 180
+const CLASSIC_DEEP_CORNER = 0.5
+/** A drift this near the dash's length and depth (seconds, radians) is held on for it */
+const CLASSIC_NEARLY_SECONDS = 0.2
+const CLASSIC_NEARLY_SLIP = (5 * Math.PI) / 180
+/** The classic feel: a drift is let go once the turn wanted now and further on are under these shares of the grip's */
+const CLASSIC_END_NOW = 0.6
+const CLASSIC_END_LATER = 0.8
 const DOUBLE_STEPS = 3
 const LIFT_STEPS = 2
 const TAP_BEFORE_END = 0.1
@@ -180,12 +183,17 @@ export function createBotBrain(
   const classic = t.model === MODEL_CLASSIC
   /** Whether this drift is to end in an instant boost: decided once a drift, by skill */
   let dashPlan: boolean | null = null
+  /** The classic feel: a drift decided on, pressed for this many more steps until it has begun */
+  const NOT_ENTERING = { direction: 0, steps: 0 }
+  let entering = NOT_ENTERING
 
   /**
    * The classic feel's hands (2026-11-17): drift where the grip is not enough, and by skill end it
    * with the counter-steer and a fresh press of the throttle (the instant boost: let go for
-   * LIFT_STEPS, then press) once it is deep enough; tap short drifts down the straights for more;
-   * fire the boost on a straight, and again near its end
+   * LIFT_STEPS, then press) once it is deep and long enough. 2026-11-18: by skill the hands steer
+   * into a drift through a corner big enough until it has earned the boost, hold a drift through a
+   * long bend, and no longer tap down the straights (a tap earns nothing); the boost is fired on a
+   * straight, one at a time
    */
   const classicHands = (
     kart: Trial['run']['kart'],
@@ -196,6 +204,7 @@ export function createBotBrain(
     later: number,
     gripTurn: number,
     jumpNear: boolean,
+    slip: number,
   ): KartInput => {
     wasDrifting = kart.drifting
     const straight = Math.abs(later) < gripTurn * 0.4 && Math.abs(want) < gripTurn * 0.4
@@ -204,7 +213,8 @@ export function createBotBrain(
       kart.storedBoosts > 0 &&
       straight &&
       !kart.drifting &&
-      (kart.boostSeconds === 0 || (skill.stackBoosts && kart.boostSeconds < 0.4))
+      // One boost at a time (2026-11-18): the key does nothing while a boost runs
+      kart.boostSeconds === 0
     boostPressed = fire
     const calm =
       kart.boostSeconds === 0 && kart.miniSeconds === 0 && (kart.launchSeconds ?? 0) === 0
@@ -212,20 +222,7 @@ export function createBotBrain(
     const gripSteer = clampSteer(noseWant / gripTurn)
     const base = { ...NO_INPUT, throttle: !cruising, boost: fire }
 
-    if (move.kind === 'tap') {
-      const { direction, steps } = move
-      if (steps > 0 && (kart.drifting || steps === CLASSIC_TAP_STEPS)) {
-        move = { kind: 'tap', direction, steps: steps - 1 }
-        return { ...base, drift: true, steer: direction * CLASSIC_TAP_STEER }
-      }
-      // The tap is over: counter-steer with the throttle up, then press it afresh for the dash
-      if (!kart.burstReady) {
-        move = NONE
-        return { ...base, steer: gripSteer }
-      }
-      move = { kind: 'lift', steps: LIFT_STEPS - 1, double: false, counter: -direction }
-      return { ...base, throttle: false, steer: -direction }
-    }
+    if (move.kind === 'tap' || move.kind === 'double') move = NONE
     if (move.kind === 'lift') {
       // A dash waiting (the car still sliding, or just straightened): lift, then press afresh
       const { steps, double, counter } = move
@@ -248,18 +245,42 @@ export function createBotBrain(
       return { ...base, throttle: false, steer: counter }
     }
 
-    if (jumpNear) return { ...base, steer: gripSteer }
+    if (jumpNear) {
+      entering = NOT_ENTERING
+      return { ...base, steer: gripSteer }
+    }
 
     const turnMost = t.driftTurnRate * (1 + t.driftSteerShare)
+    /** How far into a drift the stick must be for the slip to pass dashMinSlip, with a margin */
+    const deepInto = clamp(
+      (t.dashMinSlip + CLASSIC_DEEP_MARGIN - t.driftSlip) / Math.max(1e-3, t.driftSlipSteer),
+      0,
+      1,
+    )
     if (kart.drifting) {
+      entering = NOT_ENTERING
       const dir = kart.driftDirection
       if (dashPlan === null) dashPlan = rng.float() < skill.releaseBoosts
       const ramp = Math.min(1, speed / Math.max(1, t.driftFullSpeed))
-      const turn = t.driftTurnRate * Math.max(0.2, ramp)
-      const into = (Math.abs(want) / turn - 1) / Math.max(0.05, t.driftSteerShare)
-      const done =
-        kart.driftSeconds > 0.15 &&
-        (Math.sign(want) !== dir || Math.abs(want) < Math.max(gripTurn * 0.7, turn * 0.8))
+      // The turn bites only as the slip builds (driftLoose)
+      const bite = 1 - t.driftLoose * (1 - Math.min(1, slip / Math.max(1e-3, t.driftSlip)))
+      const turn = t.driftTurnRate * Math.max(0.2, ramp) * bite
+      let into = (Math.abs(want) / turn - 1) / Math.max(0.05, t.driftSteerShare)
+      // A dash takes a deep drift (2026-11-18): while the corner still goes on, steer into it at
+      // least far enough for the slip to pass dashMinSlip
+      const goesOn = Math.sign(later) === dir && Math.abs(later) > gripTurn * CLASSIC_DEEP_CORNER
+      // ... or the drift is nearly there: a little longer, a little deeper
+      const nearly =
+        kart.driftSeconds >= t.dashMinSeconds - CLASSIC_NEARLY_SECONDS &&
+        (kart.driftPeak ?? 0) >= t.dashMinSlip - CLASSIC_NEARLY_SLIP
+      const earning = dashPlan && !kart.burstReady && (goesOn || nearly)
+      if (earning && (kart.driftPeak ?? 0) < t.dashMinSlip) into = Math.max(into, deepInto)
+      // The corner is over (or the car has come round too far) and no dash is about to be earned.
+      // Through a long bend the drift is held, steering out of it, not let go and begun again
+      const over =
+        Math.sign(want) !== dir ||
+        (Math.abs(want) < gripTurn * CLASSIC_END_NOW && Math.abs(later) < gripTurn * CLASSIC_END_LATER)
+      const done = kart.driftSeconds > 0.15 && over && !earning
       if (done) {
         // Out of the corner: let go, counter-steer and lift, then press afresh for the dash; or
         // just let go
@@ -276,31 +297,22 @@ export function createBotBrain(
         throttle: base.throttle && !tooTight,
         brake: tooTight,
         drift: true,
-        steer: dir * clamp(into, CLASSIC_OUT_MOST, 1),
+        steer: dir * clamp(into, -1, 1),
       }
     }
     if (kart.slideDirection === 0) dashPlan = null
+    // A drift decided on is pressed until it has begun: the hands answer late, and a turn that
+    // hovers about the mark must not press and let go step by step
+    if (entering.steps > 0) {
+      entering = { ...entering, steps: entering.steps - 1 }
+      return { ...base, drift: true, steer: entering.direction }
+    }
     if (speed > t.driftMinSpeed + 4 && Math.abs(want) > gripTurn * skill.driftAt) {
+      entering = { direction: Math.sign(want), steps: skill.reactionSteps + 1 }
       return { ...base, drift: true, steer: Math.sign(want) }
     }
-    if (
-      skill.taps &&
-      straight &&
-      Math.abs(later) < gripTurn * 0.25 &&
-      Math.abs(noseWant) < gripTurn * 0.25 &&
-      kart.slideDirection === 0 &&
-      kart.boostSeconds === 0 &&
-      kart.miniSeconds < TAP_BEFORE_END &&
-      speed > t.topSpeed * 0.6
-    ) {
-      // A tap down the straight, towards the next bend, else the other way from the last
-      const towards: -1 | 1 = later > 0 ? 1 : -1
-      const direction: -1 | 1 = Math.abs(later) > 0.05 ? towards : lastTap === 1 ? -1 : 1
-      lastTap = direction
-      dashPlan = true
-      move = { kind: 'tap', direction, steps: CLASSIC_TAP_STEPS - 1 }
-      return { ...base, drift: true, steer: direction * CLASSIC_TAP_STEER }
-    }
+    // No taps down the straights (2026-11-18): a tapped drift earns no dash any more, and one deep
+    // enough to earn it turns the car half round
     // A corner coming that even a drift cannot take at this speed: slow down before it
     const brake =
       (Math.abs(want) > turnMost * BRAKE_AT || Math.abs(later) > turnMost * (speed / t.topSpeed)) &&
@@ -352,7 +364,7 @@ export function createBotBrain(
     const gripTurn = t.turnRate * (1 - t.turnLossAtTopSpeed * Math.min(1, speed / t.topSpeed))
     const slip = Math.abs(wrap(kart.heading - travel))
     if (classic) {
-      return classicHands(kart, sense, speed, want, noseWant, later, gripTurn, jumpNear)
+      return classicHands(kart, sense, speed, want, noseWant, later, gripTurn, jumpNear, slip)
     }
 
     const letGo = wasDrifting && !kart.drifting && (kart.burstReady || kart.releaseWindow > 0)
