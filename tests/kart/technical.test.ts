@@ -23,7 +23,7 @@ const PLAN: Record<
   RaceTrackId,
   { key: string; straight: number; was: number; longest: number; jumps: number; hilly: boolean }
 > = {
-  riverside: { key: 'riverside@10', straight: 0.32, was: 0.36, longest: 270, jumps: 1, hilly: true },
+  riverside: { key: 'riverside@10', straight: 0.35, was: 0.36, longest: 285, jumps: 1, hilly: true },
   harbour: { key: 'harbour@10', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
   tamkang: { key: 'tamkang@9', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
   oldstreet: { key: 'oldstreet@5', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },

@@ -13,8 +13,8 @@
 // Blender scene.
 //
 // 2026-11-18, owner: "more fun, not so many straights ... technical, like the classic maps"
-// (revision 10; docs/KART-FEEL.md §9). The beginner's track, so everything flows: no corner here
-// wants the brake. A short main straight; a fast right sweeper; four esses, each a little quicker
+// (revision 10; docs/KART-FEEL.md §9). The beginner's track, so everything flows, and no corner
+// here wants the brake. A short main straight; a fast right sweeper; four esses, each a little quicker
 // than the last; a long double-apex right (two corners joined by a breath of straight: clip both
 // kerbs); the levee chicane; an open left hairpin; a climb over the levee with a small jump on its
 // crest, down into a right-hand sweeper that tightens as it goes; and a last flick before the right
@@ -29,9 +29,9 @@ const CONTROL: readonly CircuitPoint[] = [
   [0, 90, 38, 0],
   [0, 0, 38, 0],
   // Turn 1: a right, eastwards
-  [0, -62, 34, 0],
-  [15, -98, 32, 0],
-  [50, -112, 32, 0],
+  [0, -74, 34, 0],
+  [11, -101, 32, 0],
+  [38, -112, 32, 0],
   // The esses: left, right, left, right
   [105, -110, 30, 0],
   [170, -92, 30, 0],
@@ -52,31 +52,31 @@ const CONTROL: readonly CircuitPoint[] = [
   [200, 50, 30, 0],
   [150, 50, 32, 0],
   // The open hairpin, left, round to the east
-  [105, 50, 30, 0],
-  [73, 63, 30, 0],
-  [60, 95, 30, 0],
-  [73, 127, 30, 0],
-  [105, 140, 30, 0],
+  [105, 52, 30, 0],
+  [80, 62, 30, 0],
+  [69, 88, 30, 0],
+  [80, 114, 30, 0],
+  [105, 124, 30, 0],
   // Over the levee: a climb, the jump on its crest, and down
-  [150, 144, 32, 1],
-  [215, 158, 34, 6],
+  [150, 130, 32, 1],
+  [215, 152, 34, 6],
   [265, 164, 34, 7],
   [330, 168, 34, 3],
   // The tightening right: opens wide, closes tight, round to the west
   [385, 178, 32, 0],
   [432, 206, 30, 0],
-  [450, 250, 29, 0],
-  [432, 290, 28, 0],
-  [392, 302, 28, 0],
+  [452, 248, 29, 0],
+  [438, 286, 28, 0],
+  [400, 300, 28, 0],
   // Home along the bank, a left-right flick, and the right onto the straight
   [335, 296, 32, 0],
   [270, 300, 34, 0],
   [205, 318, 32, 0],
   [140, 272, 32, 0],
-  [85, 258, 34, 0],
-  [45, 252, 36, 0],
-  [14, 236, 38, 0],
-  [0, 204, 38, 0],
+  [80, 256, 34, 0],
+  [36, 254, 36, 0],
+  [11, 243, 38, 0],
+  [0, 218, 38, 0],
 ]
 
 const made = circuit({
