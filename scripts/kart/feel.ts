@@ -12,7 +12,18 @@ import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
 import { BOT_SKILLS, type BotSkill } from '../../src/kart/bots/skill.ts'
 
-export const FEEL_TRACKS = ['riverside', 'harbour', 'tamkang', 'oldstreet', 'guanyin'] as const
+export const FEEL_TRACKS = [
+  'riverside',
+  'harbour',
+  'tamkang',
+  'oldstreet',
+  'guanyin',
+  // 2026-11-18: the four technical tracks (docs/KART-FEEL.md §10.1)
+  'mangrove',
+  'fort',
+  'danhai',
+  'datun',
+] as const
 
 export const FEEL_DRIVERS: Readonly<Record<'novice' | 'average' | 'expert', BotSkill>> = {
   novice: { ...BOT_SKILLS.easy },

@@ -112,7 +112,17 @@ describe('the arrow boards', () => {
     expect(fewer.length).toBeGreaterThan(signs.length * 0.3)
   })
 
-  it.each(['riverside', 'harbour', 'tamkang', 'oldstreet', 'guanyin'])(
+  it.each([
+    'riverside',
+    'harbour',
+    'tamkang',
+    'oldstreet',
+    'guanyin',
+    'mangrove',
+    'fort',
+    'danhai',
+    'datun',
+  ])(
     '%s: every corner sharp enough has boards, none of them on the road',
     (id) => {
       const track = raceTrack(id)!
@@ -132,7 +142,17 @@ describe('the arrow boards', () => {
 
 // 2026-11-18: the rest of a corner's dressing (docs/ARCHITECTURE.md §4.33)
 describe('the apex kerbs, the countdown boards and the gate posts', () => {
-  const tracks = ['riverside', 'harbour', 'tamkang', 'oldstreet', 'guanyin'] as const
+  const tracks = [
+    'riverside',
+    'harbour',
+    'tamkang',
+    'oldstreet',
+    'guanyin',
+    'mangrove',
+    'fort',
+    'danhai',
+    'datun',
+  ] as const
 
   it.each(tracks)(
     '%s: a painted kerb inside every corner, widest in its middle, on the road',

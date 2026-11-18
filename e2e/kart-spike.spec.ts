@@ -921,6 +921,11 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
     'Tamkang Campus',
     'Lantern Old Street',
     'Guanyin Hill Road',
+    // 2026-11-18: the four technical tracks
+    'Mangrove Channel',
+    'Hobe Fort Hill',
+    'Danhai Night Circuit',
+    'Datun Ridgeline',
   ])
   await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
   await expect(page.getByText('Time trial')).toBeVisible()

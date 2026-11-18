@@ -384,3 +384,44 @@ export const oldStreetScene = {
   facade: '#F2F2F2',
   unlit: '#000000',
 } as const
+
+/**
+ * The four technical tracks' own scenery (2026-11-18, src/kart/art/localArt.ts): our own palette.
+ * The mangrove flats (tidal pools, dark green mangroves, a grey boardwalk, white egrets); the red
+ * brick fort on its hill; the new town at night (dark towers, warm windows, three neons: the kart's
+ * own cyan and magenta and an amber); the volcano's upper slopes (straw silver grass, dark rock, a
+ * white weather dome, steam).
+ */
+export const localScene = {
+  tidePool: '#3F8FA6',
+  mangroveRoot: '#4A3A2C',
+  mangroveLeaf: '#2F6B3F',
+  mangroveLeafLight: '#4F8F4A',
+  egret: '#F7F7F2',
+  egretLeg: '#3B3B3B',
+  boardwalk: '#8C8478',
+  boardwalkRail: '#5E584F',
+  fortBrick: '#A8452F',
+  fortBrickDark: '#7C3222',
+  fortStone: '#C9BBA2',
+  fortRoof: '#3F3A38',
+  fortGate: '#2A1E1A',
+  cannon: '#2B2D31',
+  fortFlag: '#F2C230',
+  towerWall: '#1B2030',
+  towerRoof: '#10131C',
+  towerWindow: '#0D1018',
+  towerWindowLit: '#FFD79A',
+  towerWindowCool: '#9FD8FF',
+  neons: ['#22E6FF', '#FF3DC8', '#FFB02E'],
+  ringBase: '#2A2F3E',
+  silverGrass: '#E3D9B4',
+  silverGrassStem: '#A9A070',
+  rock: '#5C5F66',
+  domeTower: '#B9BCC2',
+  dome: '#F4F6F8',
+  ventMound: '#6E6A5C',
+  steam: '#FFFFFF',
+  // Unlit white: what an instance's own colour or a glow map multiplies
+  glow: '#FFFFFF',
+} as const

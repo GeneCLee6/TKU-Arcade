@@ -4,6 +4,7 @@
 // them come the road from the line on, the gates and respawns, a grid of eight, the jumps' ramps,
 // rows of item boxes and the boost pads. Pure.
 import type { Spot } from '../course.ts'
+import type { Wall } from '../walls.ts'
 import {
   gatesAlong,
   headingOf,
@@ -32,6 +33,12 @@ export interface CircuitPlan {
   readonly pads?: readonly (readonly [x: number, z: number, across: number])[]
   /** Rows of item boxes: across the road at the point nearest each place, metres right of the middle */
   readonly boxes?: readonly (readonly [x: number, z: number, offsets: readonly number[]])[]
+  /**
+   * An island of walls down the one stretch of road that is `from` metres wide or wider, between
+   * `inner` and `outer` metres right of the middle (negative: left): two lanes, one of them a
+   * shortcut (2026-11-18, as the old street's stall island is; walls.ts)
+   */
+  readonly island?: { readonly from: number; readonly inner: number; readonly outer: number }
 }
 
 export interface Circuit {
@@ -42,6 +49,8 @@ export interface Circuit {
   readonly jumps: number[]
   readonly boostPads: BoostPad[]
   readonly itemBoxes: { x: number; z: number }[]
+  /** The island's walls, a closed loop; none without one */
+  readonly walls: Wall[]
   /** The road point nearest (x, z) */
   nearest(x: number, z: number): number
   /** The place `across` metres right of road point `index` (negative: left) */
@@ -154,6 +163,35 @@ export function circuit(plan: CircuitPlan): Circuit {
     }
   }
 
+  // The island: along both its edges, closed by a pointed nose one road point beyond each end,
+  // in the middle of it, so that a kart meeting it head-on glances off into a lane
+  const walls: Wall[] = []
+  if (plan.island) {
+    const { from, inner, outer } = plan.island
+    const first = road.findIndex((point) => point.width >= from)
+    if (first > 0) {
+      let last = first
+      while (last + 1 < count && road[last + 1]!.width >= from) last++
+      const near: { x: number; z: number }[] = []
+      const far: { x: number; z: number }[] = []
+      for (let index = first; index <= last; index++) {
+        near.push(across(index, inner))
+        far.push(across(index, outer))
+      }
+      const middle = (inner + outer) / 2
+      const outline = [
+        across(first - 1, middle),
+        ...near,
+        across(last + 1, middle),
+        ...far.reverse(),
+      ]
+      outline.forEach((a, index) => {
+        const b = outline[(index + 1) % outline.length]!
+        walls.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z })
+      })
+    }
+  }
+
   const { gates, respawns } = gatesAlong(road, GATE_EVERY)
   return {
     road,
@@ -169,6 +207,7 @@ export function circuit(plan: CircuitPlan): Circuit {
       const index = nearest(x, z)
       return offsets.map((offset) => across(index, offset))
     }),
+    walls,
     nearest,
     across,
   }
