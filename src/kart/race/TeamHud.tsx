@@ -1,7 +1,8 @@
 // 2026-11-18: the team race's HUD (shared/kart/team.ts). The team's gauge, blue, beside the kart's
-// own; the team boosts held; the two teams' running score under the place; and a blue edge on the
-// screen while a team boost burns. Its own file, apart from the race HUD (Hud.tsx), which every race
-// shows. Colours come from the tokens.
+// own, and what it does when full (the charges held turn blue: those are drawn on the kart's own
+// panel, Hud.tsx, red and blue); the two teams' running score under the place; a blue edge on the
+// screen while a blue boost burns; and, for someone watching, both teams' gauges. Its own file,
+// apart from the race HUD (Hud.tsx), which every race shows. Colours come from the tokens.
 import { memo } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { TEAM_GAUGE, TEAM_NAMES, type TeamId } from '../../../shared/kart/team.ts'
@@ -17,14 +18,11 @@ export interface TeamPanelProps {
   readonly t: Translate
   /** The team's gauge, 0 to 100, as the room tells it */
   readonly gauge: number
-  /** Team boosts this kart may fire, of `max` */
-  readonly held: number
-  readonly max: number
   readonly burning: boolean
 }
 
-/** The team's gauge and this kart's team boosts */
-export const TeamPanel = memo(function TeamPanel({ t, gauge, held, max, burning }: TeamPanelProps) {
+/** The team's gauge, and what a full one does */
+export const TeamPanel = memo(function TeamPanel({ t, gauge, burning }: TeamPanelProps) {
   const lit = Math.floor((gauge / TEAM_GAUGE.full) * SEGMENTS)
   return (
     <Panel data-testid="kart-team-panel" role="group" aria-label={t('games.kart.team.gauge')}>
@@ -45,19 +43,46 @@ export const TeamPanel = memo(function TeamPanel({ t, gauge, held, max, burning 
         ))}
       </Segments>
       <LabelRow>
-        <Charges
-          role="img"
-          aria-label={t('games.kart.team.held', { count: held, max })}
-          data-testid="kart-team-held"
-          data-held={held}
-        >
-          <Label aria-hidden="true">{t('games.kart.team.boosts')}</Label>
-          {Array.from({ length: max }, (_, index) => (
-            <Charge key={index} $on={index < held} />
-          ))}
-        </Charges>
-        {burning && <Burning data-testid="kart-team-burning">{t('games.kart.team.burning')}</Burning>}
+        {burning ? (
+          <Burning data-testid="kart-team-burning">{t('games.kart.team.burning')}</Burning>
+        ) : (
+          <Label data-testid="kart-team-turns">{t('games.kart.team.turns')}</Label>
+        )}
       </LabelRow>
+    </Panel>
+  )
+})
+
+export interface TeamGaugesProps {
+  readonly t: Translate
+  /** Both teams' gauges, 0 to 100 */
+  readonly gauge: readonly [number, number]
+}
+
+/** Both teams' gauges, for someone watching (the spectator's view and a replay) */
+export const TeamGauges = memo(function TeamGauges({ t, gauge }: TeamGaugesProps) {
+  return (
+    <Panel data-testid="kart-team-gauges" role="group" aria-label={t('games.kart.team.gauges')}>
+      {([0, 1] as const).map((team) => {
+        const name = t('games.kart.team.gaugeOf', { team: t(`games.kart.team.${TEAM_NAMES[team]}`) })
+        const lit = Math.floor((gauge[team] / TEAM_GAUGE.full) * SEGMENTS)
+        return (
+          <LabelRow key={team} data-team={TEAM_NAMES[team]}>
+            <Dot $team={team} aria-hidden="true" />
+            <Segments
+              role="meter"
+              aria-label={name}
+              aria-valuemin={0}
+              aria-valuemax={TEAM_GAUGE.full}
+              aria-valuenow={gauge[team]}
+            >
+              {Array.from({ length: SEGMENTS }, (_, index) => (
+                <Segment key={index} $on={index < lit} />
+              ))}
+            </Segments>
+          </LabelRow>
+        )
+      })}
     </Panel>
   )
 })
@@ -143,24 +168,13 @@ const Segment = styled.i<{ $on: boolean }>`
   }
 `
 
-const Charges = styled.span`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-`
-
-const Charge = styled.i<{ $on: boolean }>`
-  width: 22px;
-  height: 12px;
+/** Whose gauge it is: the side's colour (the gauge itself is the blue boost's blue for both) */
+const Dot = styled.i<{ $team: TeamId }>`
+  flex: none;
+  width: 10px;
+  height: 14px;
   transform: skewX(${SLANT});
-  background: ${({ $on }) => ($on ? color.teamBoost : 'transparent')};
-  box-shadow: ${({ $on }) =>
-    $on ? `0 0 10px ${color.teamBoost}` : `inset 0 0 0 1px ${color.border}`};
-
-  @media (max-height: 500px) {
-    width: 14px;
-    height: 9px;
-  }
+  background: ${({ $team }) => teamColor($team)};
 `
 
 const Burning = styled.span`

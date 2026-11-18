@@ -174,7 +174,11 @@ export function createBotRace(options: BotRaceOptions): BotRace {
       course,
       brain: createBotBrain(skill, track.road, tuning, options.seed * 31 + seat, track.jumps),
       rider: createItemRider(seat, track, room.state().used),
-      team: createTeamRider(room.state().racers.find((racer) => racer.seat === seat)),
+      team: (() => {
+        const state = room.state()
+        const racer = state.racers.find((one) => one.seat === seat)
+        return createTeamRider(racer, state.teams?.fills[racer?.team ?? 0] ?? 0)
+      })(),
       mass: kartMass(entry.kart),
       body: loadoutByte(entry.kart, entry.driver),
       rng: flips(options.seed * 17 + seat),
@@ -404,14 +408,16 @@ export function createBotRace(options: BotRaceOptions): BotRace {
       )
       if (run !== trial.run) trial = { ...trial, run }
     }
-    // A team race: a team boost it has just fired goes to the room, and it hears how many are left
+    // A team race: a blue boost it has just fired goes to the room, and it hears how many of its
+    // charges are blue (teamRider.ts)
     if (state.teams && trial.phase === 'racing') {
-      const held = bot.team.step(
-        trial.run.kart,
-        state.racers.find((racer) => racer.seat === bot.seat),
-      )
+      const racer = state.racers.find((one) => one.seat === bot.seat)
+      const held = bot.team.step(trial.run.kart, racer, state.teams.fills[racer?.team ?? 0])
       if (held.fired) {
         room.frame(bot.seat, encodeItemFrame({ op: 'team', tick: trial.steps }), at)
+      }
+      if (held.keep) {
+        room.frame(bot.seat, encodeItemFrame({ op: 'keep', ...held.keep, tick: trial.steps }), at)
       }
       if (held.kart !== trial.run.kart) trial = { ...trial, run: { ...trial.run, kart: held.kart } }
     }

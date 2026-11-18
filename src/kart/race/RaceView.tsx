@@ -16,7 +16,6 @@ import { displayType, glass, monoType } from '../../styles/esports.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
 import { applyKart } from '../../../shared/kart/karts.ts'
 import { isTeamId, scoreTeams, type TeamId } from '../../../shared/kart/team.ts'
-import { TEAM_BOOST } from '../../../shared/kart/teamBoost.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
 import type { Callout } from '../callouts.ts'
 import { keyLabel, loadBindings, loadRules, loadTuning } from '../devices.ts'
@@ -307,14 +306,19 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
     }
   }, [view.events, seat, touchSource])
 
-  // 2026-11-18, a team race: the team's gauge filled, and everyone on it got a team boost
+  // 2026-11-18, a team race: the team's gauge filled, and the charges this kart holds turned blue
   const myTeam = view.racers.find((racer) => racer.seat === seat)?.team
   const fills = view.teams && isTeamId(myTeam) ? view.teams.fills[myTeam] : 0
   const seenFills = useRef(fills)
+  const chargesRef = useRef(0)
+  useEffect(() => {
+    chargesRef.current = hud.storedBoosts
+  }, [hud.storedBoosts])
   useEffect(() => {
     if (fills > seenFills.current) {
+      const key = chargesRef.current > 0 ? 'granted' : 'grantedNone'
       setNote((last) => ({
-        text: tRef.current('games.kart.team.granted'),
+        text: tRef.current(`games.kart.team.${key}`),
         bad: false,
         id: (last?.id ?? 0) + 1,
       }))
@@ -471,8 +475,6 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
             <TeamPanel
               t={t}
               gauge={view.teams.gauge[mySide]}
-              held={hud.teamBoosts ?? me?.teamBoosts ?? 0}
-              max={TEAM_BOOST.maxHeld}
               burning={hud.teamBoosting ?? false}
             />
           </TeamCorner>

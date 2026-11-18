@@ -108,7 +108,7 @@ export const TAMKANG: TrackJson = {
   // 2026-11-14, last (owner: "the maps are still too simple"; the slide-out and the counter-steer):
   // a flick on the run up beside the lawn and esses down past the business tower; old records are set aside
   // 6: the classic feel (2026-11-17): the physics changed, so the old times are set aside
-  revision: 8,
+  revision: 9,
   laps: 3,
   road: fromLine,
   gates,

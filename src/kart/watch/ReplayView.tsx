@@ -16,12 +16,15 @@ import {
   shieldsAt,
   shotsAt,
   stepSpeed,
+  teamBurnsAt,
+  teamGaugesAt,
   TICKS_PER_SECOND,
   togglePlayhead,
   type Playhead,
   type Replay,
   type ReplayReel,
 } from '../../../shared/kart/replay.ts'
+import { runningScore } from '../../../shared/kart/team.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import type { Track } from '../../../shared/kart/track.ts'
 import {
@@ -42,6 +45,7 @@ import { supportsWebGL2 } from '../Scene.ts'
 import { crossed, effectsOf, hitFrameOf } from '../hitFx.ts'
 import { createCuePlayer } from '../kartAudio.ts'
 import { replayCues } from '../watchSounds.ts'
+import { TeamGauges, TeamScore } from '../race/TeamHud.tsx'
 import { startWatchLoop, type WatchedKart } from './watchLoop.ts'
 import {
   Fallback,
@@ -82,6 +86,8 @@ export interface ReplayViewProps {
 /** Every kart at `tick` */
 function kartsAt(reel: ReplayReel, tick: number): WatchedKart[] {
   const karts: WatchedKart[] = []
+  // A team race: whose blue boost burns at this moment (their flames are blue)
+  const burning = teamBurnsAt(reel.replay.teams, tick)
   for (const [seat, samples] of reel.samples) {
     const one = sampleAt(samples, tick)
     if (!one) continue
@@ -100,6 +106,7 @@ function kartsAt(reel: ReplayReel, tick: number): WatchedKart[] {
         steer: one.steer,
         drift: one.driftDirection,
         boosting: one.boosting,
+        ...(one.boosting && burning.has(seat) ? { boostKind: 'team' as const } : {}),
       },
     })
   }
@@ -313,6 +320,19 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
     (event) => event.tick <= tick && tick - event.tick < NOTE_TICKS,
   )
   const ms = (ticks: number) => (Math.max(0, ticks) * 1000) / TICKS_PER_SECOND
+  // A team race: the gauges and the score as they stood at this moment
+  const teamGauge = teamGaugesAt(replay.teams, tick)
+  const teamTotals = teamGauge
+    ? runningScore(
+        order,
+        replay.racers.map((one) => ({
+          seat: one.seat,
+          ...(one.team !== undefined ? { team: one.team } : {}),
+          finishMs: one.finishMs !== null && msToTicks(one.finishMs) <= tick ? one.finishMs : null,
+          out: false,
+        })),
+      ).totals
+    : null
 
   return (
     <WatchPage data-testid="kart-replay">
@@ -337,6 +357,12 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
           total={replay.racers.length}
           detail={detail}
         />
+        {teamGauge && teamTotals && (
+          <>
+            <TeamScore t={t} totals={teamTotals} mine={null} />
+            <TeamGauges t={t} gauge={teamGauge} />
+          </>
+        )}
         {reel.start > 0 && <Note>{t('games.kart.replay.partial')}</Note>}
         {recent.map((event) => (
           <Note key={`${event.tick}-${event.by}-${event.item}`}>

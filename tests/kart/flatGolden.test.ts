@@ -145,11 +145,12 @@ const GOLDEN_ARENA = '72389793'
 // harder, and the start boost lifts the top speed (the yard's script fires neither: unchanged).
 // Taken again 2026-11-18 (owner: "it should take a big drift to boost ... one boost has to end before
 // the next"): the drift is looser, the instant boost takes a deep and long drift, a boost cannot be
-// fired while one runs, and the hard bot drifts deep and no longer taps down the straights
+// fired while one runs, and the hard bot drifts deep and no longer taps down the straights. And again
+// later that day (owner: "a drift that really slid should boost"): lower marks, a milder dash
 const CLASSIC_GOLDEN: Record<string, { hash: string; steps: number }> = {
-  riverside: { hash: '0acf0140', steps: 6129 },
-  harbour: { hash: 'a9bcf104', steps: 7069 },
-  tamkang: { hash: 'd65550a9', steps: 7052 },
-  oldstreet: { hash: '437d5977', steps: 6644 },
+  riverside: { hash: 'f8d96f91', steps: 6437 },
+  harbour: { hash: 'd9c2e636', steps: 7113 },
+  tamkang: { hash: 'b6c5cfc8', steps: 7104 },
+  oldstreet: { hash: '7740b725', steps: 6681 },
 }
-const CLASSIC_GOLDEN_ARENA = '5359be40'
+const CLASSIC_GOLDEN_ARENA = 'ad74f6db'

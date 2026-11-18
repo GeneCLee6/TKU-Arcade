@@ -32,8 +32,10 @@ interface HudProps {
  * them, under the kart, a prompt says when the instant boost is earned and when to tap forward.
  * 2026-11-18 (owner: "it should take a big drift to boost ... one boost has to end before the
  * next"): in the same place, while a drift has not earned it yet, a meter shows how far it has to go
- * (deep and long, both); and while a boost runs, a bar runs down with it and the charges show
- * locked.
+ * (far enough out, for long enough); and while a boost runs, a bar runs down with it and the
+ * charges show locked. Later that day (owner: "in a team race everyone collects their own N2O, and
+ * there is a red one and a blue one"): in a team race the charges the team's full gauge has turned
+ * blue are drawn blue, first in the row since they fire first, and the rest in the team race's red.
  */
 export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudProps) {
   const lit = Math.floor((hud.gauge / GAUGE_FULL) * GAUGE_SEGMENTS)
@@ -41,6 +43,9 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
   const depth = Math.min(HUD_STEPS, hud.depth ?? 0)
   const boostLeft = Math.min(HUD_STEPS, hud.boostLeft ?? 0)
   const locked = (hud.boostLocked ?? false) && boostLeft > 0
+  // A team race: how many of the charges are blue; any other race has no such field
+  const team = hud.teamBoosts !== undefined
+  const blue = Math.min(hud.teamBoosts ?? 0, hud.storedBoosts)
   return (
     <Box
       data-testid="kart-hud"
@@ -102,16 +107,34 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
         <LabelRow>
           <Charges
             role="img"
-            aria-label={t(locked ? 'kart.hud.storedLocked' : 'kart.hud.stored', {
-              count: hud.storedBoosts,
-              max: maxStored,
-            })}
+            aria-label={
+              team
+                ? t(locked ? 'kart.hud.storedTeamLocked' : 'kart.hud.storedTeam', {
+                    red: hud.storedBoosts - blue,
+                    blue,
+                    max: maxStored,
+                  })
+                : t(locked ? 'kart.hud.storedLocked' : 'kart.hud.stored', {
+                    count: hud.storedBoosts,
+                    max: maxStored,
+                  })
+            }
             data-testid="kart-stored"
             data-locked={locked || undefined}
+            data-red={team ? hud.storedBoosts - blue : undefined}
+            data-blue={team ? blue : undefined}
           >
             <Label aria-hidden="true">{t('kart.hud.charges')}</Label>
             {Array.from({ length: maxStored }, (_, index) => (
-              <Charge key={index} $on={index < hud.storedBoosts} $locked={locked} />
+              <Charge
+                key={index}
+                $on={index < hud.storedBoosts}
+                $locked={locked}
+                $tone={!team ? color.magenta : index < blue ? color.teamBoost : color.teamRed}
+                data-kind={
+                  !team || index >= hud.storedBoosts ? undefined : index < blue ? 'blue' : 'red'
+                }
+              />
             ))}
           </Charges>
           {hud.boosting && (
@@ -324,7 +347,7 @@ const Charges = styled.span`
 `
 
 /** Locked while a boost runs (the next fires only once it has ended): an outline, no glow */
-const Charge = styled.i<{ $on: boolean; $locked: boolean }>`
+const Charge = styled.i<{ $on: boolean; $locked: boolean; $tone: string }>`
   width: 26px;
   height: 14px;
 
@@ -334,16 +357,10 @@ const Charge = styled.i<{ $on: boolean; $locked: boolean }>`
   }
 
   transform: skewX(${SLANT});
-  background: ${({ $on, $locked }) =>
-    !$on
-      ? 'transparent'
-      : $locked
-        ? `color-mix(in srgb, ${color.magenta} 30%, transparent)`
-        : color.magenta};
-  box-shadow: ${({ $on, $locked }) =>
-    $on && !$locked
-      ? `0 0 12px ${color.magenta}`
-      : `inset 0 0 0 1px ${$on ? color.magenta : color.border}`};
+  background: ${({ $on, $locked, $tone }) =>
+    !$on ? 'transparent' : $locked ? `color-mix(in srgb, ${$tone} 30%, transparent)` : $tone};
+  box-shadow: ${({ $on, $locked, $tone }) =>
+    $on && !$locked ? `0 0 12px ${$tone}` : `inset 0 0 0 1px ${$on ? $tone : color.border}`};
 `
 
 /** The running boost, running down: under the charges, as wide as the panel */

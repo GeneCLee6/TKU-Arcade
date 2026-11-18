@@ -77,9 +77,12 @@ const en = {
   'kart.hud.chain': 'Chain ×{count}',
   'kart.hud.dashEarned': 'Instant boost earned',
   'kart.hud.dashNow': 'Let go, then tap forward!',
-  'kart.hud.depth': 'Drift deeper',
+  'kart.hud.depth': 'Hold the drift',
   'kart.hud.boostLeft': 'Boost time left',
   'kart.hud.storedLocked': 'Boosts ready: {count} of {max}, once this boost ends',
+  'kart.hud.storedTeam': 'Boosts ready: {red} red and {blue} blue, of {max}',
+  'kart.hud.storedTeamLocked':
+    'Boosts ready: {red} red and {blue} blue, of {max}, once this boost ends',
 
   'kart.hud.title': 'Dashboard',
   'kart.hud.speedValue': '{speed} km/h',
@@ -371,9 +374,11 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.hud.chain': '連噴 ×{count}',
   'kart.hud.dashEarned': '瞬間加速 已備妥',
   'kart.hud.dashNow': '放開前進再按！',
-  'kart.hud.depth': '甩深一點',
+  'kart.hud.depth': '再甩一下',
   'kart.hud.boostLeft': '噴射剩餘時間',
   'kart.hud.storedLocked': '可用噴射：{count}／{max}（這次噴完才能再噴）',
+  'kart.hud.storedTeam': '可用噴射：紅 {red}、藍 {blue}（最多 {max}）',
+  'kart.hud.storedTeamLocked': '可用噴射：紅 {red}、藍 {blue}（最多 {max}；這次噴完才能再噴）',
 
   'kart.hud.title': '儀表',
   'kart.hud.speedValue': '時速 {speed} 公里',

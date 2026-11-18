@@ -20,6 +20,8 @@ import {
   shieldsAt,
   shotsAt,
   stepSpeed,
+  teamBurnsAt,
+  teamGaugesAt,
   togglePlayhead,
   type RecordedView,
   type ReplaySample,
@@ -255,6 +257,36 @@ describe('recording a race', () => {
       ],
     })
     expect(recorder.replay().events.map((event) => event.hit)).toEqual([undefined, true])
+  })
+
+  // 2026-11-18: a replay showed a blue boost in the plain colour, and no team HUD
+  it('keeps a team race: the sides, the blue boosts fired and the gauges as they moved', () => {
+    const racers = VIEW.racers.map((racer, team) => ({ ...racer, team, teamUntil: 0 }))
+    const view = { ...VIEW, racers, teams: { gauge: [0, 0] as const } }
+    const recorder = createReplayRecorder(view)
+    recorder.frame(0, frame(60))
+    recorder.view({ ...view, teams: { gauge: [40, 8] } })
+    recorder.frame(0, frame(180))
+    // Seat 1 fired a blue boost at GO + 2 s: it burns 4.35 s
+    recorder.view({
+      ...view,
+      teams: { gauge: [40, 8] },
+      racers: [racers[0]!, { ...racers[1]!, teamUntil: view.goAt! + 2_000 + 4_350 }],
+    })
+    const replay = decodeReplay(encodeReplay(recorder.replay()))!
+    expect(replay.racers.map((racer) => racer.team)).toEqual([0, 1])
+    expect(replay.teams!.burns).toEqual([{ seat: 1, tick: 120, until: 381 }])
+    expect([...teamBurnsAt(replay.teams, 119)]).toEqual([])
+    expect([...teamBurnsAt(replay.teams, 200)]).toEqual([1])
+    expect([...teamBurnsAt(replay.teams, 381)]).toEqual([])
+    expect(teamGaugesAt(replay.teams, 0)).toEqual([0, 0])
+    expect(teamGaugesAt(replay.teams, 59)).toEqual([0, 0])
+    expect(teamGaugesAt(replay.teams, 60)).toEqual([40, 8])
+    // A race without sides keeps none of it
+    const solo = createReplayRecorder(VIEW).replay()
+    expect(solo.teams).toBeUndefined()
+    expect(teamGaugesAt(solo.teams, 10)).toBeNull()
+    expect(teamBurnsAt(solo.teams, 10).size).toBe(0)
   })
 
   it('does not replay items used before it started listening', () => {
