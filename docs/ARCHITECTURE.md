@@ -787,6 +787,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **HUD**：個人加速條面板的存量格在團隊賽裡分顏色（`Hud.tsx`）：藍的排前面（先噴）、其餘是隊伍賽的紅（`color.teamBoost`、`color.teamRed`），`aria-label` 是「可用噴射：紅 1、藍 1（最多 2）」，`data-red`／`data-blue` 給測試。個人賽照舊（洋紅、沒有紅藍）。團隊加速條面板（`TeamHud.tsx` 的 `TeamPanel`）拿掉原本的「團隊噴射持有數」，改成一行說明「滿了：手上的噴射變藍色」，燃燒中顯示「藍色噴射」。滿的時候畫面上方的提示分兩種：手上有存量「你手上的噴射變成藍色！」、沒有「可是你手上沒有噴射可以變藍」。只動內容，面板的樣式（`glass`、斜角、字體）沿用 §4.32 的電競風格。
 - **觀戰與重播**（#99 回報的「團隊噴射是橘色」）：觀戰 `SpectateView.tsx` 照 `netRace.ts` 的 `others()` 用 `teamUntil` 填 `look.boostKind = 'team'`。重播的錄影（`shared/kart/replay.ts`）多一塊選用的 `teams`（每一次藍色噴射的起訖 tick、加速條每次變動），`ReplayRacer.team` 記隊伍；`teamBurnsAt`、`teamGaugesAt` 給播放用。兩個畫面左上角都多了兩隊即時總分（`runningScore`）與兩隊的團隊加速條（`TeamGauges`）。舊的重播檔沒有這一塊，照樣能播（沒有藍色、沒有團隊 HUD）。
 - **測試**：`tests/kart/classic.test.ts`（真的甩出去就有、置中甩也有、點甩沒有、直線硬甩不划算、量表）、`tests/kart/feel.test.ts`（高手三圈 8–48 次）、`tests/kart/team.test.ts`（只有甩尾算、需求量約兩倍、藍色扣存量與先後順序、沒有存量就沒有藍色、rider 的各種情況：手上 2／1／0 個、之後集到的是紅的、撞掉存量、房間沒記到；房間的 `tkeep`：只往下、只認目前這次滿、玩家不能自己送動作）、`tests/kart/replay.test.ts`（錄到隊伍、藍色噴射、加速條）、`tests/kart/hud.test.tsx`（紅藍存量格）、`tests/kart/teamUi.test.tsx`（面板文字、觀戰用的兩隊加速條）、`e2e/kart-team.spec.ts`。
+- **測試用的自動駕駛**：`?autopilot=drift`（`src/kart/race/autopilot.ts` 的 `driftingAutopilot`）＝原本的 `?autopilot` 加上「高速的彎道按住甩尾、留一個存量等變藍、多的噴掉」，給截圖與手動檢查團隊賽用；原本的 `?autopilot` 不變。
 - **限制**：改過的瀏覽器可以每次滿都拿 2 個藍色額度（見上）；`fills` 只送低 8 位（一場比賽滿不到 256 次）；`?autopilot` 不甩尾，所以它永遠沒有存量、也就沒有藍色；電腦車一有存量就在直線上噴掉，所以團隊條滿的時候它們手上常常是空的（真人會學著留）。六台電腦車 3 圈（3 對 3）：困難在河畔兩隊各滿 9–10 次（約 11 秒一次，困難電腦車有四成時間在甩尾）、每台噴到 1–6 個藍的；普通在淡江各滿 6 次、每台 0–3 個；簡單在漁港各滿 5 次、每台 0–1 個。
 
 ## 5. i18n
