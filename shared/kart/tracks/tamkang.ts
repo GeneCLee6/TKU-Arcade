@@ -12,88 +12,102 @@
 // 22), the fast left at the top tightened round the tower and the western esses made three sharp
 // flicks. Then "the maps are still too simple" (revision 5): a right-left flick on the run up
 // beside the lawn, and the run down past the business tower made four esses.
-import {
-  gatesAlong,
-  padsAlong,
-  headingOf,
-  roadDirection,
-  TRACK_FORMAT,
-  type TrackJson,
-} from '../track.ts'
-import { splineRoad, type ControlPoint } from './spline.ts'
+//
+// 2026-11-18, owner: "more fun, not so many straights ... technical, like the classic maps"
+// (revision 9; docs/KART-FEEL.md §10). The hill track: the campus stands on a hill, and now the road
+// climbs it. Up the lantern avenue (the one long straight), then RIGHT at the top, east of the
+// avenue where no road ran before: a climb to the hilltop, a hairpin round it, and a jump off its
+// crest with the road falling away underneath, down past the memorial tower. Round the scroll plaza,
+// three fast esses along the western edge, the museum hairpin, the narrow gate between the lawn and
+// the business tower, a chicane, the top hairpin, four tight esses down behind the classrooms and
+// the last hairpin onto the avenue. Written in metres now (the campus still places itself in drawn
+// units).
+import { TRACK_FORMAT, type TrackJson } from '../track.ts'
+import { circuit, type CircuitPoint } from './circuit.ts'
 
-/** Metres between road points */
-const SAMPLE = 6
-
-/** The layout below, and the campus placed round it, are drawn this many times smaller than real */
+/** The campus (tamkangArt.ts) is placed in drawn units, this many metres each */
 export const TAMKANG_SCALE = 1.5
 
-/** [x, z, width]: x and z in drawn units (times TAMKANG_SCALE for metres), the width in metres */
-const DRAWN: readonly ControlPoint[] = [
+/** [x, z, width, height]: the line through the middle of the road, in driving order, metres */
+const CONTROL: readonly CircuitPoint[] = [
   // The lantern avenue, northwards (-z), up to the line and beyond
-  [0, 150, 38],
-  [0, 40, 38],
-  [0, -90, 38],
-  // A tight left at the top, round the memorial tower, westwards past the library
-  [0, -165, 33],
-  [-7, -191, 31],
-  [-30, -201, 31],
-  [-120, -203, 31],
-  // A kink round the scroll plaza
-  [-160, -195, 29],
-  [-185, -215, 29],
-  [-215, -205, 29],
-  // Left, onto the western edge, and its three sharp flicks southwards
-  [-248, -165, 31],
-  [-258, -110, 31],
-  [-232, -70, 29],
-  [-262, -25, 29],
-  [-232, 20, 29],
-  [-252, 60, 29],
-  // The museum hairpin: right, round to the north
-  [-232, 110, 28],
-  [-210, 150, 28],
-  [-175, 155, 28],
-  [-155, 120, 28],
-  // Up beside the lawn, past the business tower, and a right-left flick (revision 5)
-  [-152, 60, 29],
-  [-150, 12, 29],
-  [-128, -22, 28],
-  [-150, -56, 28],
-  // The top hairpin: left, round to the south
-  [-140, -88, 28],
-  [-112, -112, 28],
-  [-86, -90, 28],
-  // Down past the business tower: esses, left-right-left-right (revision 5)
-  [-84, -52, 28],
-  [-62, -16, 28],
-  [-84, 24, 28],
-  [-62, 64, 28],
-  [-84, 104, 29],
-  [-84, 145, 31],
+  [0, 230, 38, 0],
+  [0, 60, 38, 0],
+  [0, -80, 38, 0],
+  // A right at the top, eastwards, and the climb
+  [0, -125, 34, 0],
+  [10, -150, 32, 0],
+  [35, -160, 32, 0],
+  [80, -162, 32, 2],
+  [130, -166, 32, 6],
+  [170, -172, 32, 8.5],
+  // The hilltop hairpin: left, round to the west
+  [212, -190, 30, 9],
+  [226, -225, 30, 9],
+  [212, -260, 30, 9],
+  [176, -276, 30, 9],
+  // The jump off the crest, and down past the memorial tower
+  [130, -278, 32, 9],
+  [60, -278, 32, 5],
+  [10, -272, 32, 2.5],
+  // Downhill esses past the memorial tower: left, right
+  [-40, -258, 30, 1],
+  [-100, -298, 30, 0],
+  [-160, -264, 30, 0],
+  // Round the scroll plaza: right, then left
+  [-212, -290, 30, 0],
+  [-258, -312, 29, 0],
+  [-312, -300, 29, 0],
+  // Left, onto the western edge, and its three fast esses southwards
+  [-360, -270, 30, 0],
+  [-392, -225, 30, 0],
+  [-398, -170, 30, 0],
+  [-354, -80, 29, 0],
+  [-396, 10, 29, 0],
+  [-356, 100, 29, 0],
+  // The museum hairpin: left, round to the north
+  [-345, 160, 29, 0],
+  [-318, 225, 28, 0],
+  [-272, 258, 28, 0],
+  [-232, 232, 28, 0],
+  [-236, 196, 28, 0],
+  // A flick below the lawn, and the narrow gate between the lawn and the business tower
+  [-254, 150, 28, 0],
+  [-231, 96, 28, 0],
+  [-228, 40, 28, 0],
+  [-226, -10, 28, 0],
+  // A chicane: right, then left
+  [-198, -70, 28, 0],
+  // The top hairpin: right, round to the south
+  [-225, -135, 29, 0],
+  [-211, -174, 29, 0],
+  [-175, -190, 29, 0],
+  [-139, -174, 29, 0],
+  [-125, -135, 29, 0],
+  // Down behind the classrooms: four tight esses
+  [-122, -95, 29, 0],
+  [-84, -30, 28, 0],
+  [-124, 45, 28, 0],
+  [-84, 120, 28, 0],
+  [-118, 190, 29, 0],
   // The last hairpin, left, onto the avenue
-  [-74, 200, 33],
-  [-44, 230, 38],
-  [-10, 222, 38],
-  [2, 190, 38],
+  [-112, 245, 31, 0],
+  [-88, 292, 33, 0],
+  [-45, 310, 36, 0],
+  [-8, 288, 38, 0],
 ]
 
-const CONTROL: readonly ControlPoint[] = DRAWN.map(([x, z, width]) => [
-  x * TAMKANG_SCALE,
-  z * TAMKANG_SCALE,
-  width,
-])
-
-const road = splineRoad(CONTROL, SAMPLE)
-
-/** The start and finish line: on the avenue, the road point at z = 40 (drawn) */
-const FINISH = road.findIndex((point) => point.x === 0 && point.z <= 40 * TAMKANG_SCALE)
-
-// The road starts at the line, so that gate 0 is the finish
-const fromLine = [...road.slice(FINISH), ...road.slice(0, FINISH)]
-const { gates, respawns } = gatesAlong(fromLine, 7)
-const along = roadDirection(fromLine, 0)
-const side = { dx: -along.dz, dz: along.dx }
+const made = circuit({
+  control: CONTROL,
+  line: [0, 60],
+  jumps: [[125, -278, 2]],
+  // Off the middle: taking one is a choice of line
+  pads: [
+    [0, -20, 8],
+    [80, -162, -6],
+    [-228, 40, 0],
+  ],
+})
 
 export const TAMKANG: TrackJson = {
   format: TRACK_FORMAT,
@@ -108,29 +122,16 @@ export const TAMKANG: TrackJson = {
   // 2026-11-14, last (owner: "the maps are still too simple"; the slide-out and the counter-steer):
   // a flick on the run up beside the lawn and esses down past the business tower; old records are set aside
   // 6: the classic feel (2026-11-17): the physics changed, so the old times are set aside
-  revision: 8,
+  // 9: redrawn over the hill east of the avenue, with a jump (2026-11-18)
+  revision: 9,
   laps: 3,
-  road: fromLine,
-  gates,
-  respawns,
-  // Two by two behind the line, 7 m apart, staggered, facing up the avenue
-  grid: [0, 1, 2, 3, 4, 5].map((slot) => {
-    const back = 10 + Math.floor(slot / 2) * 7 + (slot % 2) * 3.5
-    const across = slot % 2 === 0 ? -4 : 4
-    return {
-      x: Math.round((fromLine[0]!.x - along.dx * back + side.dx * across) * 100) / 100,
-      z: Math.round((fromLine[0]!.z - along.dz * back + side.dz * across) * 100) / 100,
-      heading: headingOf(along),
-    }
-  }),
+  road: made.road,
+  gates: made.gates,
+  respawns: made.respawns,
+  grid: made.grid,
   walls: [],
-  // Off the middle of the straights: taking one is a choice of line
-  boostPads: padsAlong(fromLine, [
-    [20, 8],
-    [77, -8],
-    [249, -8],
-    [440, 8],
-  ]),
+  boostPads: made.boostPads,
   itemBoxes: [],
   decor: [],
+  jumps: made.jumps,
 }

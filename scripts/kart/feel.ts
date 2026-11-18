@@ -43,7 +43,7 @@ export function feelRace(
   const track = raceTrack(trackId)!
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
-  const brain = createBotBrain(skill, track.road, tuning, seed, track.jumps)
+  const brain = createBotBrain(skill, track.road, tuning, seed, track.jumps, track.walls)
   let trial = startTrial(course)
   let dashes = 0
   for (let step = 0; trial.phase !== 'finished' && step < 400 * 60; step++) {

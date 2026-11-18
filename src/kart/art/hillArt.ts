@@ -46,13 +46,17 @@ function groundTerrain(terrain: Terrain): Terrain {
  * How high the ground is at (x, z) on a track with terrain; null for a flat track (whose ground is
  * at 0 everywhere, as it always was)
  */
-export function hillGround(track: Track): ((x: number, z: number) => number) | null {
+export function hillGround(
+  track: Track,
+  /** How far the ground keeps the road's height, and over how far it then fades (an embankment: short) */
+  reach: { near: number; fade: number } = { near: NEAR, fade: FADE },
+): ((x: number, z: number) => number) | null {
   const terrain = terrainOf(track)
   if (!terrain) return null
   const ground = groundTerrain(terrain)
   return (x, z) => {
     const near = groundAt(ground, x, z)
-    const t = Math.max(0, Math.min(1, (near.distance - NEAR) / FADE))
+    const t = Math.max(0, Math.min(1, (near.distance - reach.near) / reach.fade))
     const fade = 1 - t * t * (3 - 2 * t)
     return (near.y - SINK) * fade
   }

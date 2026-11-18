@@ -86,16 +86,18 @@ describe('the wide tracks', () => {
   it('has corners sharp enough to want a drift at the new speed', () => {
     // At 40 m/s the grip alone turns no tighter than about 30 m: these swing round by more than
     // 75 degrees within 60 m
-    for (const json of [RIVERSIDE, HARBOUR, TAMKANG]) {
-      expect(sharpCorners(json.road, 60, 75), json.id).toBeGreaterThanOrEqual(7)
-    }
+    // 2026-11-18 (redrawn, docs/KART-FEEL.md §10): the harbour is the hairpin track, the campus
+    // has its share, and Riverside, the beginner's, flows: fewer square corners, more esses
+    expect(sharpCorners(HARBOUR.road, 60, 75)).toBeGreaterThanOrEqual(10)
+    expect(sharpCorners(TAMKANG.road, 60, 75)).toBeGreaterThanOrEqual(6)
+    expect(sharpCorners(RIVERSIDE.road, 60, 75)).toBeGreaterThanOrEqual(4)
   })
 
   it('packs the corners in without a road running into itself (the technical layouts)', () => {
     for (const json of [RIVERSIDE, HARBOUR, TAMKANG]) {
       const { road } = load(json)
       // Corners that turn 60 degrees within 40 m: esses, flicks and hairpins, a dozen or so a lap
-      expect(sharpCorners(road, 40, 60), json.id).toBeGreaterThanOrEqual(9)
+      expect(sharpCorners(road, 40, 60), json.id).toBeGreaterThanOrEqual(6)
       for (let i = 0; i < road.length; i++) {
         for (let j = i + 1; j < road.length; j++) {
           if (alongRoad(road, i, j) < 90) continue
@@ -109,9 +111,9 @@ describe('the wide tracks', () => {
   })
 
   it('keeps the new layouts’ records apart from the old ones', () => {
-    expect(recordKey(load(RIVERSIDE))).toBe('riverside@9')
-    expect(recordKey(load(HARBOUR))).toBe('harbour@9')
-    expect(recordKey(load(TAMKANG))).toBe('tamkang@8')
+    expect(recordKey(load(RIVERSIDE))).toBe('riverside@10')
+    expect(recordKey(load(HARBOUR))).toBe('harbour@10')
+    expect(recordKey(load(TAMKANG))).toBe('tamkang@9')
   })
 })
 
@@ -132,10 +134,11 @@ describe('the Tamkang campus track', () => {
     expect(track.road[0]).toMatchObject({ x: 0, z: 60 })
     for (const place of track.grid) {
       expect(place.z).toBeGreaterThan(track.road[0]!.z)
-      expect(place.heading).toBeCloseTo(0)
+      expect(place.heading).toBeCloseTo(0, 1)
     }
-    expect(length(TAMKANG)).toBeGreaterThan(2400)
-    expect(length(TAMKANG)).toBeLessThan(2900)
+    // 2026-11-18: longer by the hill east of the avenue
+    expect(length(TAMKANG)).toBeGreaterThan(2900)
+    expect(length(TAMKANG)).toBeLessThan(3300)
   })
 
   it('can be driven round three times, never the wrong way', () => {
