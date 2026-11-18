@@ -47,6 +47,9 @@ describe('the boost effects (2026-11-18)', () => {
     expect(boostKindOf({ boostSeconds: 2, miniSeconds: 0.3 })).toBe('n2o')
     expect(boostKindOf({ boostSeconds: 0, miniSeconds: 0.3, launchSeconds: 1 })).toBe('start')
     expect(boostKindOf({ boostSeconds: 0, miniSeconds: 0, launchSeconds: 1 }, 'mini')).toBe('mini')
+    // A team race's team boost, whatever else runs
+    expect(boostKindOf({ boostSeconds: 2, miniSeconds: 0, teamSeconds: 1 })).toBe('team')
+    expect(boostKindOf({ boostSeconds: 0, miniSeconds: 0, teamSeconds: 0 })).toBeNull()
   })
 
   it('opens the shape in a quarter of a second for a full boost, and closes it after', () => {

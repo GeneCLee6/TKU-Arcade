@@ -15,7 +15,11 @@ export function boostKart(kart: KartState): KartState {
 /** A headwind's step: every boost blown out, and the speed brought down to the headwind's top */
 export function headwindStep(kart: KartState, seconds: number): KartState {
   const speed = Math.hypot(kart.vx, kart.vz)
-  const calm = kart.boostSeconds === 0 && kart.miniSeconds === 0 && kart.stackSeconds === 0
+  const calm =
+    kart.boostSeconds === 0 &&
+    kart.miniSeconds === 0 &&
+    kart.stackSeconds === 0 &&
+    (kart.teamSeconds ?? 0) === 0
   if (speed <= HEADWIND_TOP_SPEED && calm) return kart
   const share =
     speed > HEADWIND_TOP_SPEED
@@ -28,6 +32,8 @@ export function headwindStep(kart: KartState, seconds: number): KartState {
     boostSeconds: 0,
     miniSeconds: 0,
     stackSeconds: 0,
+    // A team boost (a team race) is blown out with the rest
+    ...(kart.teamSeconds ? { teamSeconds: 0 } : {}),
   }
 }
 
@@ -90,7 +96,11 @@ export const STUN_TOP_SPEED = KART_TUNING.topSpeed * SHOT_TUNING.stunTopFactor
  */
 export function stunStep(kart: KartState, seconds: number): KartState {
   const speed = Math.hypot(kart.vx, kart.vz)
-  const calm = kart.boostSeconds === 0 && kart.miniSeconds === 0 && kart.stackSeconds === 0
+  const calm =
+    kart.boostSeconds === 0 &&
+    kart.miniSeconds === 0 &&
+    kart.stackSeconds === 0 &&
+    (kart.teamSeconds ?? 0) === 0
   if (speed <= STUN_TOP_SPEED && calm) return kart
   const share =
     speed > STUN_TOP_SPEED
@@ -103,5 +113,7 @@ export function stunStep(kart: KartState, seconds: number): KartState {
     boostSeconds: 0,
     miniSeconds: 0,
     stackSeconds: 0,
+    // A team boost (a team race) is blown out with the rest
+    ...(kart.teamSeconds ? { teamSeconds: 0 } : {}),
   }
 }

@@ -71,8 +71,9 @@ export interface KartLook {
   readonly drift: number
   readonly boosting: boolean
   /**
-   * Which boost runs (2026-11-18, boostFx.ts: spread `boostFx(kind)` into the look). Left out
-   * (another racer's kart, a replay: the wire has one bit), it is worked out from how long it runs
+   * Which boost runs (2026-11-18, boostFx.ts: spread `boostFx(kind)` into the look): 'team' is a
+   * team race's team boost, blue. Left out (another racer's kart, a replay: the wire has one bit),
+   * it is worked out from how long it runs
    */
   readonly boostKind?: BoostKind
   /**

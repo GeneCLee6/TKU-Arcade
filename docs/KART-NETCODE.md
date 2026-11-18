@@ -14,6 +14,7 @@
 | §14 | 多人房的電腦車（房主代跑） |
 | §15 | patch 只送陣列的差異（協定 v2）、被打從頭轉與本機預測、觀戰與重播的音效（`feat/kart-net-deltas`） |
 | §16 | 高低差與跳台：frame 的「在空中」旗標（`feat/kart-jumps`） |
+| §17 | 團隊賽：分隊、團隊加速條、團隊噴射（`feat/kart-team-race`） |
 
 ## 1. 模型一句話
 
@@ -291,3 +292,32 @@ JSON patch 少約 **73–76%**（本機 1.52 → 0.36、預覽站 1.46 → 0.40 
 - **觀戰**照 frame 的旗標畫；**重播**的樣本沒地方放這個 bit（第 7 bit 已經是「絕對樣本」），一律用 `heightGuess`；幽靈車也一樣（速度從前後兩個樣本算）。
 - **電腦車**（本機的對戰電腦與多人房的房主代跑）與 `npm run kart:loadtest` 的機器人送 frame 時也照實設這個 bit。
 - **實測**（2026-11-17，PR #94 預覽站，`npm run kart:loadtest -- --track guanyin --bots 6`，3 圈道具賽、機器人照常飛過兩個跳台）：裁定 11,715 個 frame、丟 0、轉送後遺失 0；六台完賽、圈數和房間一致（最大差 17 ms）；每人上行 0.77、下行 3.63 kB/s；轉送 p50／p95／p99 38.7／52.3／72.2 ms；對時來回 38／51 ms。和 §15 的老街數字同一級（frame 數因為賽道短、比賽 96 秒而少）。
+
+## 17. 團隊賽：分隊、團隊加速條、團隊噴射（2026-11-18，`feat/kart-team-race`）
+
+規則與程式在 [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.31。`PROTOCOL_VERSION` 維持 2：全部是新增（新訊息、選用欄位、道具 frame 的新 op），舊頁面不會送、收到多的欄位也不看。
+
+| 方向 | 格式 | 內容 |
+| --- | --- | --- |
+| 瀏覽器 → 房間 | JSON `{ t: 'set_team', team: 0 \| 1 \| null, member? }` | 等待中或結束後（`playing` 回 `wrong_status`）。沒有 `member`＝自己；有＝房主幫那個成員（含電腦車）選，其他人回 `forbidden`，找不到人回 `bad_member`。`null` 交給房間自動分 |
+| 房間 → 大家 | `RoomMember.team`（0 紅、1 藍，沒選就沒有這個欄位） | 等待室畫分隊；開賽時每個座位的 `team` 進 `init`（`Seat.team`），沒選的由 `assignTeams` 補到人少的那一隊 |
+| 房間 → 大家 | JSON patch：`game.teams = { gauge: [紅, 藍], fills: [紅, 藍] }`、每台車的 `team`／`teamBoosts`／`teamUsed`／`teamUntil` | 只有團隊賽才有。`gauge` 以 4 點為一格（0–96），`fills` 是滿過幾次 |
+| 瀏覽器 → 房間 | 二進位 8 bytes：kind 2、**op 3（`OP_TEAM`）**、0、0、int32 tick（同 §10 的道具 frame） | 「我剛噴了一個團隊噴射」。兩種模式都收（團隊賽不一定有道具）。**不轉送**；房主替電腦車送時照 §14 包 `PROXY_FRAME` |
+
+- **累積（房間裁定）**：瀏覽器**不回報**集了多少。房間在 `realtime.frame` 收下一個 frame（§4 的合理性檢查都過了）之後，用 frame 自己的甩尾旗標、噴射旗標與速度算（`shared/kart/team.ts` 的 `teamGain`）：甩尾中每秒 14 點 × 速度／68 m/s（上限 1.25 倍，低於 12 m/s 不算）× 距上一個 frame 的時間（上限 100 ms，掉線回來不會補一大段）；噴射旗標在最近一次甩尾後 1.5 秒內由 0 變 1 算一次瞬間加速，5 點；再除以隊伍人數。自己的團隊噴射燃燒中（`teamUntil` 還沒到）不算。要灌水只能送假的甩尾旗標，而且一個 frame 最多算 100 ms：朋友圈夠用（§1：擋 bug，不是反作弊）。
+- **不每個 frame 寫 state**：小數留在 DO 記憶體，跨過一格才送 `tgauge { team, gauge }`（一條加速條從 0 到滿最多 24 個 patch，每個約 60 bytes），滿了送 `tfill { team }`。DO 休眠醒來從 state 的那一格接著算（最多少算 4 點）。
+- **發放**：`tfill` 讓那一隊**還在跑**的每台車 `teamBoosts` +1（上限 2，滿的就沒有），加速條歸零、`fills` +1。完賽與退賽的車不發。
+- **使用**：瀏覽器看到自己的 `teamBoosts` 就能在本機馬上噴（物理裡先於個人存量、要等其他噴射噴完），同時送 `OP_TEAM`。房間只檢查「比賽中、這台車還在跑、手上有」，通過就 `tfire { seat, at }`：`teamBoosts` −1、`teamUsed` +1、`teamUntil = at + 4350 ms`。「噴完才能再噴」由車自己的物理把關，房間不再擋一次：兩邊的錶不會完全一樣，逆風或被打中也會讓它提早結束。
+- **對帳**：本機可噴的數量＝`teamBoosts` −（本機噴過的次數 − `teamUsed`），所以 patch 還在路上時不會多噴一次；本機噴了但 5 秒內房間沒記到（frame 沒送到）就當沒發生，數量回到房間說的。中途重新整理的頁面從 `teamUsed` 起算。
+- **別人看到藍色**：frame 格式沒動（旗標 byte 已經滿了）。別人的車在 `teamUntil` 還沒到而且 frame 的噴射旗標是 1 時畫藍色尾焰，否則照舊。延遲約一個來回（先看到一般顏色的火，再變藍）。
+- **結果**：`GameResult.summary` 是 `games.kart.result.redWon`／`blueWon`（帶兩隊總分）或 `teamDraw`（沒人完賽）；`standings` 仍照個人名次，`score` 是那台車的得分，`note` 帶隊伍。
+- **流量**：團隊賽比個人賽多的只有 JSON patch：每條加速條滿一次約 24 個 `tgauge`＋1 個 `tfill`（改每個隊員一格）＋每人一個 `tfire`，每個幾十 bytes；滿一次要幾十秒，所以每人下行只多幾十 B/s（實測見下）。上行每噴一次多 8 bytes。
+- **壓測**：`npm run kart:loadtest -- --teams`（房間開成團隊賽；機器人在高速的彎道按住甩尾好讓加速條會動，拿到團隊噴射就噴）。報告多一行：兩隊各滿幾次、噴了幾個、還留幾個、兩隊總分與贏家。
+- **實測**（2026-11-18，`npm run kart:loadtest -- --teams --bots 6 --track riverside --laps 2 --mode items`，3 對 3）：
+
+  | 環境 | 比賽 | 每人上行／下行（線上） | 下行組成（payload） | 丟 frame | 圈數一致 | 完賽 | 加速條滿（紅／藍） | 團隊噴射噴出／發出 | 總分（紅：藍） |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | 本機 `wrangler dev`（build 後） | 97 s | 0.77／3.90 kB/s | frame 3.30、JSON 0.38 kB/s | 0／11,491 | 是（19 ms） | 6／6 | 2／2 | 12／12 | 19：17 |
+  | PR #101 預覽站（真的 Cloudflare，台灣家用網路；轉送 p50／p95 51.9／64.8 ms） | 90 s | 0.77／3.89 kB/s | frame 3.30、JSON 0.37 kB/s | 0／10,766 | 是（18 ms） | 6／6 | 2／2 | 12／12 | 16：20 |
+  JSON 那一欄是道具賽＋團隊賽合計（§15 的道具賽單獨約 0.36–0.40 kB/s），團隊賽多出來的量在雜訊範圍內。上行的 `item` 從 0 變成約 2 B/s（道具與團隊噴射的 8 bytes frame）。
+- **測試**：`tests/kart/team.test.ts`、`tests/worker/room-teams.test.ts`、`e2e/kart-team.spec.ts`（§4.31）。

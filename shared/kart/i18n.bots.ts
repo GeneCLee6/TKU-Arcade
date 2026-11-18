@@ -15,6 +15,10 @@ const en = {
   'kart.bots.mode': 'Race type',
   'kart.bots.mode.items': 'Item race',
   'kart.bots.mode.race': 'Speed race',
+  // 2026-11-18: a team race (shared/kart/team.ts)
+  'kart.bots.teams': 'Sides',
+  'kart.bots.teams.solo': 'Everyone for themselves',
+  'kart.bots.teams.teams': 'Team race (you and computer team-mates)',
   'kart.bots.laps': 'Laps',
   'kart.bots.start': 'Start',
   'kart.bots.note':
@@ -54,6 +58,9 @@ const zhTW: Record<KartBotsKey, string> = {
   'kart.bots.mode': '賽制',
   'kart.bots.mode.items': '道具賽',
   'kart.bots.mode.race': '純競速',
+  'kart.bots.teams': '分隊',
+  'kart.bots.teams.solo': '個人賽',
+  'kart.bots.teams.teams': '團隊賽（你和電腦隊友）',
   'kart.bots.laps': '圈數',
   'kart.bots.start': '開始',
   'kart.bots.note':

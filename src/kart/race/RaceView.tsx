@@ -15,6 +15,8 @@ import type { RoomRealtime } from '../../lib/useRoom.ts'
 import { displayType, glass, monoType } from '../../styles/esports.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
 import { applyKart } from '../../../shared/kart/karts.ts'
+import { isTeamId, scoreTeams, type TeamId } from '../../../shared/kart/team.ts'
+import { TEAM_BOOST } from '../../../shared/kart/teamBoost.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
 import type { Callout } from '../callouts.ts'
 import { keyLabel, loadBindings, loadRules, loadTuning } from '../devices.ts'
@@ -29,6 +31,8 @@ import { ITEM_SLOT_PORTRAIT_TOP, ItemNote, ItemSlot } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
 import { StunHud } from './HitHud.tsx'
 import { createRaceNet, type NameTag, type RaceNet } from './netRace.ts'
+import { teamColor } from '../team/teamColor.ts'
+import { TeamPanel, TeamScore, TeamVeil } from './TeamHud.tsx'
 import { TouchControls } from '../touch/TouchControls.tsx'
 import { useTouchControls } from '../touch/useTouchControls.ts'
 import { touchBottom, touchCorner, touchSpace } from '../touch/touchLayout.ts'
@@ -223,7 +227,10 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       },
     })
     raceNet.current = net
-    net.onTags((tags) => placeTags(tagLayer.current, tags))
+    net.onTags((tags) => {
+      placeTags(tagLayer.current, tags)
+      minimap.current?.others?.(tags)
+    })
     let stop: (() => void) | undefined
     try {
       stop = startSpikeLoop(stage.current, {
@@ -300,6 +307,21 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
     }
   }, [view.events, seat, touchSource])
 
+  // 2026-11-18, a team race: the team's gauge filled, and everyone on it got a team boost
+  const myTeam = view.racers.find((racer) => racer.seat === seat)?.team
+  const fills = view.teams && isTeamId(myTeam) ? view.teams.fills[myTeam] : 0
+  const seenFills = useRef(fills)
+  useEffect(() => {
+    if (fills > seenFills.current) {
+      setNote((last) => ({
+        text: tRef.current('games.kart.team.granted'),
+        bad: false,
+        id: (last?.id ?? 0) + 1,
+      }))
+    }
+    seenFills.current = fills
+  }, [fills])
+
   useEffect(() => {
     if (!note) return
     const timer = window.setTimeout(() => setNote(undefined), NOTE_MS)
@@ -339,6 +361,26 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       ? keyLabel(firstItemKey, t)
       : t('kart.controls.none')
   const counting = view.phase === 'countdown' && view.goAt !== null && trial?.phase === 'countdown'
+  // A team race: everyone's side, and the score as the race stands (the running order, less those out)
+  const teamOf = (one: number): TeamId | null => {
+    const side = view.racers.find((racer) => racer.seat === one)?.team
+    return view.teams && isTeamId(side) ? side : null
+  }
+  const mySide = teamOf(seat)
+  const score = view.teams
+    ? scoreTeams(
+        order.filter((one) => {
+          const racer = view.racers.find((other) => other.seat === one)
+          return racer !== undefined && (racer.finishMs !== null || !racer.out)
+        }),
+        teamOf,
+        [
+          view.racers.filter((racer) => racer.team === 0).length,
+          view.racers.filter((racer) => racer.team === 1).length,
+        ],
+      )
+    : null
+  const others = view.racers.filter((racer) => racer.seat !== seat)
 
   return (
     <Page
@@ -348,19 +390,23 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
     >
       <Stage ref={stage} role="img" aria-label={t('games.kart.race.canvas')} />
       <Tags ref={tagLayer} aria-hidden="true">
-        {view.racers
-          .filter((racer) => racer.seat !== seat)
-          .map((racer) => (
-            <Tag key={racer.seat} data-tag={racer.seat} style={{ display: 'none' }}>
-              {nameOf(racer.seat)}
-            </Tag>
-          ))}
+        {others.map((racer) => (
+          <Tag
+            key={racer.seat}
+            data-tag={racer.seat}
+            $team={teamOf(racer.seat)}
+            style={{ display: 'none' }}
+          >
+            {nameOf(racer.seat)}
+          </Tag>
+        ))}
       </Tags>
       <TouchControls t={t} touch={touch} items={view.mode === 'items'} />
       <TopLeft>
         <PlacePanel data-testid="kart-place" aria-label={t('games.kart.race.position')}>
           <PlaceNumber>{t('games.kart.race.place', { place: place || 1, total })}</PlaceNumber>
         </PlacePanel>
+        {score && <TeamScore t={t} totals={score.totals} mine={mySide} />}
         {note && <ItemNote key={`note-${note.id}`} text={note.text} bad={note.bad} />}
         {unstable && (
           <Unstable role="status" data-testid="kart-unstable">
@@ -371,10 +417,25 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       {view.mode === 'items' && <ItemSlot t={t} item={me?.item ?? null} keyName={itemKey} />}
       {stun && <StunHud key={`stun-${stun.id}`} t={t} ms={stun.ms} />}
       {hud.boosting && <BoostVeil aria-hidden="true" data-testid="kart-boost-veil" />}
+      {hud.teamBoosting && <TeamVeil aria-hidden="true" data-testid="kart-team-veil" />}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       <MapCorner $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}>
         {trial && <RaceClock ref={clock} t={t} trial={trial} />}
-        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} walls={track.walls} />
+        <Minimap
+          ref={minimap}
+          t={t}
+          road={track.road}
+          gates={track.gates}
+          walls={track.walls}
+          dots={
+            view.teams
+              ? others.map((racer) => {
+                  const side = teamOf(racer.seat)
+                  return { seat: racer.seat, fill: side === null ? color.muted : teamColor(side) }
+                })
+              : undefined
+          }
+        />
       </MapCorner>
       {view.phase === 'loading' && (
         <Center role="status" data-testid="kart-waiting">
@@ -405,6 +466,17 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
         </Finish>
       )}
       <Bottom $touch={touch.shown}>
+        {view.teams && mySide !== null && (
+          <TeamCorner>
+            <TeamPanel
+              t={t}
+              gauge={view.teams.gauge[mySide]}
+              held={hud.teamBoosts ?? me?.teamBoosts ?? 0}
+              max={TEAM_BOOST.maxHeld}
+              burning={hud.teamBoosting ?? false}
+            />
+          </TeamCorner>
+        )}
         <Hud t={t} hud={hud} maxStored={settings.tuning.maxStoredBoosts} dense={touch.shown} />
       </Bottom>
     </Page>
@@ -462,7 +534,13 @@ const Tags = styled.div`
   overflow: hidden;
 `
 
-const Tag = styled.span`
+const Tag = styled.span<{ $team: TeamId | null }>`
+  /* A team race: the name over a bar of its side's colour */
+  ${({ $team }) =>
+    $team !== null &&
+    css`
+      border-bottom: 3px solid ${teamColor($team)};
+    `}
   position: absolute;
   top: 0;
   left: 0;
@@ -588,6 +666,15 @@ const Bottom = styled.div<{ $touch: boolean }>`
   right: ${space.sm}px;
 
   ${({ $touch }) => $touch && touchBottom}
+`
+
+// The team's gauge (a team race): over the HUD's row, on the right, clear of the middle of the
+// screen (the item slot has the top centre)
+const TeamCorner = styled.div`
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: ${space.xs}px;
 `
 
 const Fallback = styled.section`

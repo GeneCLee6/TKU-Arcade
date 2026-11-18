@@ -32,6 +32,8 @@ export interface WaitingRoomProps {
   onSetLook?(look: string | null): void
   /** 2026-11-17: the host adds a computer member (the kart room's computer karts) */
   onAddBot?(level: string, look?: string): void
+  /** 2026-11-18: a side in the kart room's team race, one's own or (the host) anyone's */
+  onSetTeam?(team: 0 | 1 | null, member?: string): void
   /** Below the setup in the right-hand column of a wide screen: the room's chat */
   aside?: ReactNode
 }
@@ -42,6 +44,8 @@ const RoomPasswordSetting = lazy(() => import('./RoomPasswordSetting.tsx'))
 const RoomGarage = lazy(() => import('../kart/roster/RoomGarage.tsx'))
 // 2026-11-17: the host's computer karts, the same way
 const RoomBots = lazy(() => import('../kart/bots/RoomBots.tsx'))
+// 2026-11-18: the sides of a team race, the same way, only when the room is set to one
+const RoomTeams = lazy(() => import('../kart/team/RoomTeams.tsx'))
 
 export function WaitingRoom({
   roomId,
@@ -58,6 +62,7 @@ export function WaitingRoom({
   onSetPassword,
   onSetLook,
   onAddBot,
+  onSetTeam,
   aside,
 }: WaitingRoomProps) {
   const t = useT()
@@ -140,6 +145,11 @@ export function WaitingRoom({
         </StartBar>
 
         {/* Below the start bar, so that on a phone it does not push Start out of reach */}
+        {view.room.gameId === 'kart' && view.room.options.teams === 'teams' && me && onSetTeam && (
+          <Suspense>
+            <RoomTeams members={view.members} you={you} onSetTeam={onSetTeam} />
+          </Suspense>
+        )}
         {view.room.gameId === 'kart' && me && onSetLook && (
           <Suspense>
             <RoomGarage members={view.members} you={you} onSetLook={onSetLook} />

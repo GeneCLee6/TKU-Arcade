@@ -96,13 +96,21 @@ export const boostFx = (kind: BoostKind | null): BoostLook =>
   kind ? { boosting: true, boostKind: kind } : { boosting: false }
 
 /**
- * Which boost a kart's own state says is running, the strongest first; null for none. `launch` is
+ * Which boost a kart's own state says is running, a team boost first, then the strongest; null
+ * for none. `launch` is
  * what the start boost counts as: a perfect one `start`, a small one `mini`
  */
 export function boostKindOf(
-  state: { boostSeconds: number; miniSeconds: number; launchSeconds?: number },
+  state: {
+    boostSeconds: number
+    miniSeconds: number
+    launchSeconds?: number
+    /** A team race's team boost (shared/kart/teamBoost.ts) */
+    teamSeconds?: number
+  },
   launch: BoostKind = 'start',
 ): BoostKind | null {
+  if ((state.teamSeconds ?? 0) > 0) return 'team'
   if (state.boostSeconds > 0) return 'n2o'
   if ((state.launchSeconds ?? 0) > 0) return launch
   if (state.miniSeconds > 0) return 'mini'

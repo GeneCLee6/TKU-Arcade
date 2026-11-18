@@ -119,8 +119,8 @@ export function itemBoxes(
 // ── Item frames on the wire ──────────────────────────────────────────────────────────────────
 //
 //   0  u8   kind (ITEM_FRAME_KIND)
-//   1  u8   op (OP_PICKUP or OP_USE)
-//   2  u8   the box (pickup) or the item's index in ITEM_IDS (use)
+//   1  u8   op (OP_PICKUP, OP_USE or OP_TEAM)
+//   2  u8   the box (pickup) or the item's index in ITEM_IDS (use); 0 for OP_TEAM
 //   3  u8   0
 //   4  i32  race tick
 //
@@ -130,17 +130,26 @@ export const ITEM_FRAME_KIND = 2
 export const ITEM_FRAME_BYTES = 8
 export const OP_PICKUP = 1
 export const OP_USE = 2
+/**
+ * 2026-11-18, a team race (team.ts): this kart has just fired a team boost. In either mode, since a
+ * team race need not have items; a room from before, or one that is no team race, ignores it
+ */
+export const OP_TEAM = 3
 
 export type ItemFrame =
   | { readonly op: 'pickup'; readonly box: number; readonly tick: number }
   | { readonly op: 'use'; readonly item: ItemId; readonly tick: number }
+  | { readonly op: 'team'; readonly tick: number }
 
 export function encodeItemFrame(frame: ItemFrame): Uint8Array {
   const bytes = new Uint8Array(ITEM_FRAME_BYTES)
   const view = new DataView(bytes.buffer)
   view.setUint8(0, ITEM_FRAME_KIND)
-  view.setUint8(1, frame.op === 'pickup' ? OP_PICKUP : OP_USE)
-  view.setUint8(2, frame.op === 'pickup' ? frame.box : ITEM_IDS.indexOf(frame.item))
+  view.setUint8(1, frame.op === 'pickup' ? OP_PICKUP : frame.op === 'use' ? OP_USE : OP_TEAM)
+  view.setUint8(
+    2,
+    frame.op === 'pickup' ? frame.box : frame.op === 'use' ? ITEM_IDS.indexOf(frame.item) : 0,
+  )
   view.setInt32(4, Math.round(frame.tick), true)
   return bytes
 }
@@ -157,6 +166,7 @@ export function decodeItemFrame(bytes: Uint8Array): ItemFrame | null {
     const item = ITEM_IDS[value]
     return item ? { op: 'use', item, tick } : null
   }
+  if (op === OP_TEAM) return { op: 'team', tick }
   return null
 }
 

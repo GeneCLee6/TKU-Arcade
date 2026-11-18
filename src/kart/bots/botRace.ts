@@ -27,6 +27,7 @@ import {
 } from '../../../shared/kart/physics.ts'
 import { bumpKart, gridSpot, lapsDone, raceProgress } from '../../../shared/kart/race.ts'
 import { shotLive, shotPosition } from '../../../shared/kart/shots.ts'
+import { createTeamRider, type TeamRider } from '../../../shared/kart/teamRider.ts'
 import {
   COUNTDOWN_SECONDS,
   nearestRoadPoint,
@@ -63,6 +64,8 @@ interface Bot {
   readonly course: TrialCourse
   readonly brain: BotBrain
   readonly rider: ItemRider
+  /** A team race (2026-11-18): the team boosts it may fire, kept in step with the room */
+  readonly team: TeamRider
   readonly mass: number
   readonly body: number
   readonly rng: () => number
@@ -171,6 +174,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
       course,
       brain: createBotBrain(skill, track.road, tuning, options.seed * 31 + seat, track.jumps),
       rider: createItemRider(seat, track, room.state().used),
+      team: createTeamRider(room.state().racers.find((racer) => racer.seat === seat)),
       mass: kartMass(entry.kart),
       body: loadoutByte(entry.kart, entry.driver),
       rng: flips(options.seed * 17 + seat),
@@ -399,6 +403,17 @@ export function createBotRace(options: BotRaceOptions): BotRace {
         (seat) => others.find((one) => one.seat === seat) ?? null,
       )
       if (run !== trial.run) trial = { ...trial, run }
+    }
+    // A team race: a team boost it has just fired goes to the room, and it hears how many are left
+    if (state.teams && trial.phase === 'racing') {
+      const held = bot.team.step(
+        trial.run.kart,
+        state.racers.find((racer) => racer.seat === bot.seat),
+      )
+      if (held.fired) {
+        room.frame(bot.seat, encodeItemFrame({ op: 'team', tick: trial.steps }), at)
+      }
+      if (held.kart !== trial.run.kart) trial = { ...trial, run: { ...trial.run, kart: held.kart } }
     }
     bot.trial = trial
     bot.steps++

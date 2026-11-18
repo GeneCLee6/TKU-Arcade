@@ -8,6 +8,10 @@ const en = {
   'games.kart.option.mode': 'Mode',
   'games.kart.mode.items': 'Item race',
   'games.kart.mode.race': 'Speed race (no items)',
+  // 2026-11-18: a team race (shared/kart/team.ts)
+  'games.kart.option.teams': 'Sides',
+  'games.kart.teams.solo': 'Everyone for themselves',
+  'games.kart.teams.teams': 'Team race (red v blue)',
   // Working titles, as on the time trial's course menu
   'games.kart.track.riverside': 'Riverside',
   'games.kart.track.harbour': 'Harbour Hairpins',
@@ -59,6 +63,9 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.option.mode': '模式',
   'games.kart.mode.items': '道具賽',
   'games.kart.mode.race': '競速賽（沒有道具）',
+  'games.kart.option.teams': '賽制',
+  'games.kart.teams.solo': '個人賽',
+  'games.kart.teams.teams': '團隊賽（紅隊對藍隊）',
   'games.kart.track.riverside': '河畔',
   'games.kart.track.harbour': '漁港髮夾彎',
   'games.kart.track.tamkang': '淡江校園',

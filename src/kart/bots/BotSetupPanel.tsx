@@ -130,6 +130,19 @@ export function BotSetupPanel({ t, onStart, onClose, custom, onGrandPrix }: BotS
           </select>
         </Field>
         <Field>
+          <span>{t('kart.bots.teams')}</span>
+          <select
+            value={setup.teams ?? 'solo'}
+            onChange={(event) =>
+              change({ teams: event.target.value === 'teams' ? 'teams' : 'solo' })
+            }
+            data-testid="kart-bots-teams"
+          >
+            <option value="solo">{t('kart.bots.teams.solo')}</option>
+            <option value="teams">{t('kart.bots.teams.teams')}</option>
+          </select>
+        </Field>
+        <Field>
           <span>{t('kart.bots.laps')}</span>
           <select
             value={setup.laps}

@@ -701,18 +701,34 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
   直線上左右硬甩來噴（腳本）：10 秒 543 m（還得有 120 m 寬的路），直直開 680 m，所以「無腦一直噴」現在是虧的。`tests/kart/feel.test.ts`：高手 < 一般 < 新手、高手至少比新手少 15%（三張圖）、高手三圈 6–36 次且是一般的三倍以上、新手 ≤ 2 次。
 - **測試**：`tests/kart/classic.test.ts`（點甩 0.1／0.2／0.3 秒怎麼按都不噴；置中甩 3 秒不達標；夠深但不夠久不給、撐到 0.45 秒才給且已轉 > 40°；`kartDashDepth` 單調、達標才 1；剛甩的 0.1 秒轉得比甩深後少 35% 以上；雙收尾預設沒有、`doubleWindow` 調回來就有；N2O 噴射中按鍵與沒按逐位元相同、連按 2 秒也一樣、噴完按著不放不發、重按才發；加速帶噴射中按鍵與自動噴射都不發）、`tests/kart/hud.test.tsx`（深度條→金色提示；剩餘條與鎖住的存量）、`tests/kart/itemHud.test.tsx`（空欄、圖示＋名稱＋按鍵、換道具是新元素、觀戰版沒有按鍵提示）、`e2e/kart-bots.spec.ts`（道具欄在畫面上方正中、不壓到名次與離開按鈕）、`e2e/kart-spike.spec.ts`（噴射中看得到剩餘條）。
 - **限制**：門檻與「滑」的程度是起始值，沒有人用實機調過；手機直拿時道具欄不在正中間；觸控的噴射按鈕在噴射中沒有變樣子；高手比新手的差距比 §4.28 小（少了直線點甩那一塊），之後要拉開得靠路線與 N2O 的用法，不是再把瞬間加速放寬。
+### 4.31 路線圖外：團隊賽與團隊噴射（2026-11-18，`feat/kart-team-race`）
 
-### 4.31 路線圖外：車款重畫、噴射特效一套系統、噴氮氣變身、後處理（2026-11-18，`feat/kart-visual-overhaul`）
+擁有者 2026-11-18：「團隊賽可以跟跑跑一樣，有藍色的 N2O，噴比較久比較快」。玩法可學、表達不抄：名稱（團隊噴射／Team boost、團隊加速條／Team gauge，都是暫名，`KART-WORLD.md` §5.1）、積分表、HUD 造型都是自己的。線上格式在 `KART-NETCODE.md` §17。
+
+- **選項**：`KartOptions.teams`（`solo`／`teams`，預設 `solo`），和 `mode`（道具／競速）互相獨立，四種組合都可以。
+- **`shared/kart/team.ts`**（純函式，Worker 與瀏覽器共用）：`assignTeams(seats)`（自己選的照舊，沒選的依座位順序補到人少的那一隊，紅隊先；兩台以上時不會有一隊是空的）、`scoreTeams(placed, teamOf, sizes)`（名次 10、8、6、5、4、3、2、1；每隊取最好的 K 台，K＝人少那隊的人數；同分看第一名是哪一隊）、`teamGain(trace, frame, now, teamSize, burning)`（一個 frame 幫隊伍賺多少）、`gaugeStep`、`teamBoostsLeft`。`shared/kart/teamBoost.ts` 只有數字（`TEAM_BOOST`），沒有 import，物理才能讀它而不成環。
+- **分隊怎麼進遊戲**：等待室的選擇存在成員上（`RoomMember.team`，新訊息 `set_team`），開賽時跟著座位進 `init`（`Seat.team`，其他遊戲不讀）。`KartRacer` 多 `team`／`teamBoosts`／`teamUsed`／`teamUntil`，`KartState` 多 `teams: { gauge, fills }`；都是選用欄位，個人賽的 state 一個欄位都沒多。
+- **團隊加速條由房間裁定**（`rules.ts` 的 `fillTeamGauge`）：不信任瀏覽器回報的集氣量，直接從**已經通過合理性檢查的 frame** 推算：frame 的甩尾旗標＋速度（每秒 `driftRate` 14 點 × 速度／68 m/s，最多 1.25 倍）× 距上一個 frame 的時間（最多算 100 ms）；噴射旗標在甩尾後 1.5 秒內由 0 變 1 算一次瞬間加速（5 點）；全部除以隊伍人數；自己的團隊噴射燃燒中不算。小數留在 DO 記憶體（frame 不寫 storage，§4.14 的原則），每跨過 4 點才送一個 `tgauge` system 動作（HUD 用），滿 100 送 `tfill`：那一隊還在跑的每台車 `teamBoosts` +1（上限 2），加速條歸零。DO 被趕出記憶體後從 state 的那一格接著算。
+- **團隊噴射在物理裡**（`classic.ts`）：`KartState` 多兩個選用欄位 `teamBoosts`（可以噴幾個）、`teamSeconds`（還剩幾秒）。按噴射鍵時**先噴團隊的**，而且要等其他噴射噴完（`boostSeconds === 0 && teamSeconds === 0`）；燃燒中自己的存量不會噴、個人加速條不累積。`TEAM_BOOST`：4.35 秒（一般 2.9 秒的 1.5 倍）、極速 × 1.36（一般 1.28）、引擎推力 × 1.65（一般 1.5）。逆風與被打中會把它一起吹熄。「街機（舊）」手感沒有更快的噴射，團隊噴射在那裡是一個 4.35 秒的一般噴射（`stepArcadeTeam`）。沒有這兩個欄位的車（個人賽、計時賽）每一步的結果和以前 bit-for-bit 相同。
+- **誰算數**：`teamBoosts` 的發放與扣除都在房間。瀏覽器看到自己被發了就可以**馬上**在本機噴（不等來回），同時送一個 8 bytes 的 `OP_TEAM` frame；房間確認手上有才扣（`tfire`）並記 `teamUntil`。`shared/kart/teamRider.ts` 讓兩邊對得起來：本機可噴數＝房間說的持有數 −（本機已噴 − 房間已記）；5 秒沒被記到的就當作沒送到。車手（`netRace.ts`）、電腦車（`botRace.ts`）、壓測機器人共用。
+- **藍色**：走 §4.32 的 `boostFx.ts`（合併 `feat/kart-visual-overhaul` 時整合，原本暫用的 `KartLook.tint` 與 `effects.ts` 的 `paint` 拿掉了）。自己的車：`boostKindOf` 看到 `teamSeconds > 0` 就回 `'team'`；別人的車：`netRace.ts` 的 `others()` 從房間狀態（`teamUntil`）知道誰的團隊噴射在燒，填 `look.boostKind = 'team'`。藍色的火焰、光帶、光環、衝擊波環與變身都由 `BOOST_FX.team` 決定（顏色在 `kartTokens.ts` 的 `kartBoost.team`）。
+- **畫面**：等待室 `src/kart/team/RoomTeams.tsx`（lazy，只在團隊賽的卡丁車房間）；比賽 `src/kart/race/TeamHud.tsx`：右下角藍色團隊加速條與持有數（在個人加速條上方靠右，不占畫面正上方）、名次下方兩隊即時總分（照目前名次試算）、燃燒時畫面邊緣一圈藍光；名牌底下一條隊色、小地圖上其他車是隊色圓點（`Minimap` 的 `dots`／`others`）；`Standings` 與結果面板顯示隊伍與得分。
+- **單機**：「對戰電腦」與大獎賽的設定多一個「分隊」（`BotSetup.teams`、`CupSetup.teams`）；`localRoom.ts` 收 `sides`，玩家固定紅隊、電腦車平均分。電腦車的腦（`brain.ts`）在直線上、沒有其他噴射時噴團隊噴射。大獎賽的積分仍照個人名次。
+- **電腦車在多人房**：房主代跑的電腦車（§4.21）照常用代送的 frame 累積團隊加速條、代送 `OP_TEAM`。
+- **測試**：`tests/kart/team.test.ts`（分隊、計分、frame 賺多少、物理的時長與速度、先後順序、個人賽不變、房間的累積／發放／使用／權限／結果、六台電腦車跑完一場團隊賽）、`tests/worker/room-teams.test.ts`（`set_team` 的解析與權限、隊伍進遊戲、休眠後還在）、`tests/kart/teamUi.test.tsx`、`e2e/kart-team.spec.ts`（兩人各一隊＋電腦車跑一圈）。
+- **限制**：觀戰與重播的車沒有藍色尾焰與團隊 HUD（重播沒有錄 `teamUntil`）；比賽中不能換隊；團隊加速條的 HUD 以 4 點為一格；不甩尾的自動駕駛（`?autopilot`）集不到氣，壓測要加 `--teams` 讓機器人在彎道甩尾。
+
+### 4.32 路線圖外：車款重畫、噴射特效一套系統、噴氮氣變身、後處理（2026-11-18，`feat/kart-visual-overhaul`）
 
 擁有者 2026-11-18：「車子的設計還有噴氮氣的特效要再設計過……要越來越逼真，越帥，比如跑跑有些車子噴氮氣還會變身」。造型、變身與特效全部原創（規則 1），全部程式產生（`ASSETS.md`），物理、協定、HUD 版面都沒動。
 
 **特效 API（`src/kart/boostFx.ts`，純函式，Node 測）**
 
 - `type BoostKind = 'mini' | 'n2o' | 'team' | 'start'`：瞬間加速（小）、N2O（大）、團隊 N2O（藍色）、完美起跑（金色）。`BOOST_FX[kind]` 是一張表：火焰的心、身、尖與光帶的顏色（`kartTokens.ts` 的 `kartBoost`）、長度與粗細、會不會變身（`transforms`，只有 `mini` 不會）、有沒有光帶與持續火花（`ribbons`）、點火力道（`power`，與 `feelFx.ts` 的 `BURST_POWER` 同一把尺）、地上光環的半徑、有沒有立起來的衝擊波環。
-- **呼叫方式：`boostFx(kind)`**。回傳 `{ boosting: true, boostKind: kind }`（`boostFx(null)` 是 `{ boosting: false }`），攤進車的 `KartLook`：`{ ...look, ...boostFx('team') }`。之後火焰、光帶、火花、光環、變身、鏡頭、後處理全部跟著走，呼叫的人不用碰別的。團隊賽要藍色團隊 N2O，就在組 `look` 的地方（`spikeLoop.ts` 的 `boostKind`，現在是 `boostKindOf(kart, launchKind)`）改成回 `'team'`。
-- `boostKindOf(state, launch)`：自己的車從物理狀態讀種類（`boostSeconds > 0` → `n2o`；`launchSeconds > 0` → 完美起跑 `start`、小起跑 `mini`；`miniSeconds > 0` → `mini`）。
+- **呼叫方式：`boostFx(kind)`**。回傳 `{ boosting: true, boostKind: kind }`（`boostFx(null)` 是 `{ boosting: false }`），攤進車的 `KartLook`：`{ ...look, ...boostFx('team') }`。之後火焰、光帶、火花、光環、變身、鏡頭、後處理全部跟著走，呼叫的人不用碰別的。團隊賽的藍色團隊噴射就是這樣接的：`boostKindOf` 看到 `teamSeconds > 0` 回 `'team'`。
+- `boostKindOf(state, launch)`：自己的車從物理狀態讀種類（`teamSeconds > 0` → `team`；`boostSeconds > 0` → `n2o`；`launchSeconds > 0` → 完美起跑 `start`、小起跑 `mini`；`miniSeconds > 0` → `mini`）。
 - `readBoost(before, look, seconds)`：每幀把 `look` 讀成 `BoostReading`（`kind`、`last`、`morph` 0–1、`heat` 0–1、`fired` 計數、`power`、`age`）。`kartModel.ts` 每台車各存一份，`effects.ts` 讀同一份（`model.boost()`）。
-- **別人的車、電腦車、觀戰、重播**：frame 只有一個「在噴」的 bit，沒有種類，協定不動。`look.boostKind` 沒給時 `readBoost` 自己推：開始噴先當 `mini`，連續噴滿 `DERIVE_FULL_SECONDS`（0.75 秒；瞬間加速 0.5–0.7 秒、N2O 約 3 秒）就升成 `n2o`，升級時再點一次火（`fired` +1）並開始變身。所以別人的變身比實際晚 0.75 秒，別人的團隊 N2O 目前看起來是橘色（要藍色得讓 frame 帶種類，或由團隊賽從房間狀態在 `others()` 填 `boostKind`）。
+- **別人的車、電腦車、觀戰、重播**：frame 只有一個「在噴」的 bit，沒有種類，協定不動。`look.boostKind` 沒給時 `readBoost` 自己推：開始噴先當 `mini`，連續噴滿 `DERIVE_FULL_SECONDS`（0.75 秒；瞬間加速 0.5–0.7 秒、N2O 約 3 秒）就升成 `n2o`，升級時再點一次火（`fired` +1）並開始變身。所以別人的 N2O 變身比實際晚 0.75 秒。**團隊噴射例外**：`netRace.ts` 的 `others()` 從房間狀態（`teamUntil`，§4.31 團隊賽）知道誰在燒，直接填 `boostKind: 'team'`，所以別人的團隊噴射是藍色、立刻變身；觀戰與重播沒有填，看到的是橘色。
 - 變身的時間：開 `MORPH_IN_SECONDS` 0.25 秒、收 `MORPH_OUT_SECONDS` 0.3 秒；`morphEase` 是帶一點過衝的 ease-out-back。
 - 除錯：`window.__kartSpike.fx = 'n2o' | 'team' | …`（只影響畫面，物理不變）、`window.__kartSpike.view = { orbit, back, up }`（鏡頭繞車）；`scripts/kart-shots.mjs` 用這兩個截圖。
 
@@ -739,7 +755,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **測試**：`tests/kart/boostFx.test.ts`（每種的樣式、`boostFx`、`boostKindOf`、變身開 0.25 秒收 0.3 秒、`mini` 不變身、有 `bursts` 時照呼叫者的計數點火、只有 `boosting` 時先 `mini` 後 `n2o` 並再點一次、`morphEase`）。模型、特效、後處理要 WebGL，靠 `scripts/kart-shots.mjs`（真 GPU 截圖）、`scripts/kart-fps.mjs`（真 GPU、不鎖幀的 fps，拿來和另一個分支比）與卡丁車 e2e（軟體繪圖，所以走的是沒有後處理的那條路）。
 
-**限制**：別人的車變身晚 0.75 秒、別人的團隊 N2O 不是藍色（見上）；熱擾動只做自己的車；車還是程式拼的幾何（沒有 UV 貼圖、沒有法線貼圖、沒有骨架動畫）；`medium` 在舊手機上多一次全螢幕 pass 加 bloom 鏈，掉幀就切 `low`。
+**限制**：別人的車 N2O 變身晚 0.75 秒；觀戰與重播的團隊噴射是橘色（見上）；熱擾動只做自己的車；車還是程式拼的幾何（沒有 UV 貼圖、沒有法線貼圖、沒有骨架動畫）；`medium` 在舊手機上多一次全螢幕 pass 加 bloom 鏈，掉幀就切 `low`。
 
 ## 5. i18n
 

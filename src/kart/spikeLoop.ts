@@ -53,6 +53,7 @@ import { mergeInputs } from '../../shared/kart/touch.ts'
 import {
   isClassic,
   kartBoosting,
+  kartTeamBoosting,
   kartBurstWaiting,
   kartDashDepth,
   kartSkidding,
@@ -66,6 +67,7 @@ import {
   type KartState,
   type KartTuning,
 } from '../../shared/kart/physics.ts'
+import { TEAM_BOOST } from '../../shared/kart/teamBoost.ts'
 import { calloutAtStart, calloutBetween, louder, type Callout } from './callouts.ts'
 import { BURST_POWER, burstBetween, skidStrength } from './feelFx.ts'
 import { BOOST_FX, boostFx, boostKindOf, type BoostKind } from './boostFx.ts'
@@ -135,6 +137,12 @@ export interface SpikeHud {
    * otherwise
    */
   readonly dash?: 0 | 1 | 2
+  /**
+   * A team race only (2026-11-18): the team boosts this kart may fire, and whether one burns. Left
+   * out in any other race
+   */
+  readonly teamBoosts?: number
+  readonly teamBoosting?: boolean
   /**
    * The drift under way, on its way to earning the instant boost (2026-11-18: deep and long, both),
    * in twentieths: 0 out of a drift, 20 once it is earned. The HUD's depth meter
@@ -374,6 +382,8 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
   a.gauge === b.gauge &&
   a.hits === b.hits &&
   a.storedBoosts === b.storedBoosts &&
+  a.teamBoosts === b.teamBoosts &&
+  a.teamBoosting === b.teamBoosting &&
   a.boosting === b.boosting &&
   a.chain === b.chain &&
   (a.dash ?? 0) === (b.dash ?? 0) &&
@@ -735,12 +745,23 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       chain: boosting ? current.chain : 0,
       hits,
       dash: !rules.chainBoosts ? 0 : waiting ? 2 : current.drifting && current.burstReady ? 1 : 0,
+      ...(current.teamBoosts !== undefined
+        ? { teamBoosts: current.teamBoosts, teamBoosting: kartTeamBoosting(current) }
+        : {}),
       depth: rules.chainBoosts ? Math.floor(kartDashDepth(current, tuning) * HUD_STEPS + 1e-9) : 0,
+      // A team boost (a team race) shows on the same meter, and locks the charges like any boost
       boostLeft: Math.min(
         HUD_STEPS,
-        Math.ceil((current.boostSeconds / Math.max(0.1, tuning.boostDuration)) * HUD_STEPS - 1e-9),
+        Math.ceil(
+          Math.max(
+            current.boostSeconds / Math.max(0.1, tuning.boostDuration),
+            (current.teamSeconds ?? 0) / TEAM_BOOST.seconds,
+          ) *
+            HUD_STEPS -
+            1e-9,
+        ),
       ),
-      boostLocked: isClassic(tuning) && current.boostSeconds > 0,
+      boostLocked: isClassic(tuning) && (current.boostSeconds > 0 || kartTeamBoosting(current)),
     }
     options.onPose?.(current.x, current.z, current.heading, run.nextGate)
     if (trial && track) {

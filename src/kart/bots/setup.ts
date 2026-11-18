@@ -1,6 +1,6 @@
 // A race against the computer's settings (docs/ARCHITECTURE.md §4.20), kept in this browser so that
 // the menu opens with the last ones (storage.ts never throws).
-import type { KartMode } from '../../../shared/games/kart/types.ts'
+import type { KartMode, KartTeams } from '../../../shared/games/kart/types.ts'
 import { MAX_LAPS } from '../../../shared/games/kart/info.ts'
 import { CUSTOM_PREFIX } from '../../../shared/kart/editor/custom.ts'
 import { RACE_TRACK_IDS, type RaceTrackId } from '../../../shared/kart/tracks/list.ts'
@@ -17,6 +17,8 @@ export interface BotSetup {
   readonly difficulty: Difficulty
   readonly mode: KartMode
   readonly laps: number
+  /** 2026-11-18: a team race, the player with computer team-mates against a computer team */
+  readonly teams?: KartTeams
 }
 
 export const DEFAULT_BOT_SETUP: BotSetup = {
@@ -45,6 +47,7 @@ export function parseBotSetup(value: unknown): BotSetup {
     difficulty: isDifficulty(given.difficulty) ? given.difficulty : d.difficulty,
     mode: given.mode === 'race' || given.mode === 'items' ? given.mode : d.mode,
     laps: clampInt(given.laps, 1, MAX_LAPS, d.laps),
+    teams: given.teams === 'teams' ? 'teams' : 'solo',
   }
 }
 
