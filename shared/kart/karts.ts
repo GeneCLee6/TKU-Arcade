@@ -95,6 +95,17 @@ export const KARTS: readonly KartSpec[] = [
 export const DEFAULT_KART: KartId = 'tide'
 export const DEFAULT_DRIVER: DriverId = 'spade'
 
+/**
+ * Each driver's racing number (2026-11-18): on their back, on whatever kart they drive, and beside
+ * their name in the garage. Looks only
+ */
+export const DRIVER_NUMBERS: { readonly [D in DriverId]: string } = {
+  spade: '11',
+  heart: '23',
+  diamond: '47',
+  club: '88',
+}
+
 export const isKartId = (value: unknown): value is KartId =>
   KART_IDS.some((id) => id === value)
 

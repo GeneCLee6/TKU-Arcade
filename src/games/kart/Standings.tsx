@@ -4,6 +4,7 @@ import { isTeamId, pointsForPlace, TEAM_NAMES } from '../../../shared/kart/team.
 import { useT } from '../../i18n/useT.ts'
 import { raceTime } from './raceTime.ts'
 import { monoType } from '../../styles/esports.ts'
+import { digits, ticker } from '../../kart/ui/broadcast.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 
 /**
@@ -48,7 +49,7 @@ export function Standings({
             data-seat={seat}
             data-team={team === null ? undefined : TEAM_NAMES[team]}
           >
-            <Place>{index + 1}</Place>
+            <Place $you={seat === view.you}>{index + 1}</Place>
             <Name>
               {team !== null && (
                 <TeamMark
@@ -81,18 +82,28 @@ const List = styled.ol`
   list-style: none;
 `
 
+// A broadcast's timing tower: each row a place on a slanted chip, a name, a time in even digits
 const Row = styled.li<{ $you: boolean }>`
   display: grid;
-  grid-template-columns: 2ch minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: ${space.sm}px;
-  align-items: baseline;
-  color: ${(p) => (p.$you ? color.accent : color.text)};
+  align-items: center;
+  padding: 3px ${space.sm}px 3px 0;
+  border-bottom: 1px solid ${color.line};
+  color: ${color.text};
+  background: ${(p) =>
+    p.$you ? `linear-gradient(90deg, color-mix(in srgb, ${color.accent} 22%, transparent), transparent)` : 'none'};
   font-weight: ${(p) => (p.$you ? 700 : 400)};
 `
 
-const Place = styled.span`
+const Place = styled.span<{ $you: boolean }>`
   ${monoType}
-  color: ${color.muted};
+  ${(p) => ticker(p.$you ? color.accent : color.raised, 6)}
+  min-width: 2.6ch;
+  padding: 1px ${space.sm}px;
+  color: ${(p) => (p.$you ? color.onAccent : color.text)};
+  font-weight: 700;
+  text-align: center;
 `
 
 const Name = styled.span`
@@ -110,6 +121,6 @@ const TeamMark = styled.i<{ $team: 0 | 1 }>`
 `
 
 const Detail = styled.span`
-  ${monoType}
+  ${digits}
   font-size: ${fontSize.sm}px;
 `

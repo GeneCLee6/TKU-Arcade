@@ -41,7 +41,7 @@ import {
   type Material,
   type Texture,
 } from 'three'
-import type { DriverId } from '../../../shared/kart/karts.ts'
+import { DRIVER_NUMBERS, type DriverId } from '../../../shared/kart/karts.ts'
 import {
   kartBodies,
   kartDrivers,
@@ -59,7 +59,7 @@ import {
   type BoostKind,
   type BoostReading,
 } from '../boostFx.ts'
-import { buildDriver, DRIVER_NUMBERS } from './driverModel.ts'
+import { buildDriver } from './driverModel.ts'
 import { buildKartBody } from './kartBodies.ts'
 import {
   bell,

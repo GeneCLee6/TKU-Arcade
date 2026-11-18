@@ -30,14 +30,6 @@ export interface DriverModel {
   readonly arms: readonly [Group, Group]
 }
 
-/** Each driver's racing number: on their back, and on whatever kart they drive */
-export const DRIVER_NUMBERS: Readonly<Record<DriverId, string>> = {
-  spade: '11',
-  heart: '23',
-  diamond: '47',
-  club: '88',
-}
-
 /** The suit's sign, flat in x (across) and y (up), about 0.27 tall, its foot at the origin */
 function crestShapes(driver: DriverId): Shape[] {
   const shape = new Shape()

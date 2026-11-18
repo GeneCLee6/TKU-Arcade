@@ -121,6 +121,14 @@ uniform vec4 heatA;
 uniform vec4 heatB;
 varying vec2 vUv;
 
+// 2026-11-18 (owner: "more esports"): a broadcast's grade before the curve. A little more contrast
+// about a mid grey and a little more colour, so that blacks are black and the neon is neon
+vec3 grade(vec3 c) {
+  float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  c = mix(vec3(luma), c, 1.14);
+  return max((c - 0.2) * 1.1 + 0.2, vec3(0.0));
+}
+
 // A neutral tone curve: colours below the shoulder are left as they are, highlights roll off
 vec3 develop(vec3 c) {
   const float shoulder = 0.76;
@@ -168,7 +176,7 @@ void main() {
   }
 #endif
   colour += texture2D(bloom, uv).rgb * strength;
-  colour = develop(colour);
+  colour = develop(grade(colour));
 #ifdef FULL
   vec2 edge = (vUv - 0.5) * vec2(1.0, 1.15);
   colour *= 1.0 - vignette * smoothstep(0.18, 0.75, dot(edge, edge) * 1.6);
@@ -182,9 +190,10 @@ void main() {
 
 /** How many times the glow is halved, and how strong it is added back */
 const LEVELS: Record<Exclude<PostLevel, 'off'>, number> = { bloom: 4, full: 5 }
-const STRENGTH = 0.55
+// 2026-11-18: a tighter glow, from a little dimmer up: lit lines read as lines, not as fog
+const STRENGTH = 0.48
 /** How much of the light at the corners the vignette takes */
-const VIGNETTE = 0.3
+const VIGNETTE = 0.36
 
 /**
  * The chain for `renderer`, or null where `level` is off. `samples` smooths the scene's edges (the
@@ -232,14 +241,14 @@ export function createPost(renderer: WebGLRenderer, level: PostLevel, samples: n
   const bright = pass(BRIGHT, {
     map: { value: null },
     texel: { value: new Vector2() },
-    threshold: { value: hdr ? 1.45 : 0.9 },
+    threshold: { value: hdr ? 1.3 : 0.9 },
   })
   const down = pass(DOWN, { map: { value: null }, texel: { value: new Vector2() } })
   const up = pass(UP, {
     map: { value: null },
     above: { value: null },
     texel: { value: new Vector2() },
-    spread: { value: 1 },
+    spread: { value: 0.85 },
   })
   const final = pass(
     FINAL,

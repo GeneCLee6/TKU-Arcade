@@ -3,7 +3,8 @@
 import { memo } from 'react'
 import styled, { keyframes } from 'styled-components'
 import type { Translate } from '../../i18n/t.ts'
-import { displayType, glass } from '../../styles/esports.ts'
+import { displayType } from '../../styles/esports.ts'
+import { broadcast } from '../ui/broadcast.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 
 export interface StunHudProps {
@@ -48,7 +49,7 @@ const Edges = styled.div`
 `
 
 const Banner = styled.p`
-  ${glass}
+  ${broadcast}
   ${displayType}
   position: absolute;
   top: 22%;

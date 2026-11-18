@@ -6,6 +6,7 @@ import type { MessageParams } from '../i18n/t.ts'
 import { clippedFill, displayType, monoType, SLANT } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import type { Callout } from './callouts.ts'
+import { streak } from './ui/broadcast.ts'
 import { HUD_STEPS, type SpikeHud } from './spikeLoop.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
@@ -486,8 +487,9 @@ export const BoostVeil = styled.div`
 `
 
 const pop = keyframes`
-  0% { transform: scale(1.4); opacity: 0; }
-  15% { transform: scale(1); opacity: 1; }
+  0% { transform: scale(2) skewX(-14deg); opacity: 0; }
+  12% { transform: scale(0.96) skewX(-14deg); opacity: 1; }
+  20% { transform: scale(1); opacity: 1; }
   75% { transform: translateY(0); opacity: 1; }
   100% { transform: translateY(-18px); opacity: 0; }
 `
@@ -506,7 +508,18 @@ const CalloutBox = styled.div`
   display: flex;
   justify-content: center;
   pointer-events: none;
+  isolation: isolate;
   animation: ${pop} 0.9s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+
+  /* The big ones (a perfect start, a boost, a chain) cross the screen with a streak of light */
+  &[data-kind='start'],
+  &[data-kind='quick'],
+  &[data-kind='boost'],
+  &[data-kind='chain'],
+  &[data-kind='double'],
+  &[data-kind='stack'] {
+    ${streak(color.accent)}
+  }
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;

@@ -1,11 +1,12 @@
 import { forwardRef, useImperativeHandle, useRef } from 'react'
-import styled, { keyframes } from 'styled-components'
+import styled from 'styled-components'
 import type { KartMessageKey } from '../../shared/kart/i18n.ts'
 import { formatTime } from '../../shared/kart/timeTrial.ts'
 import { Button } from '../components/Button.tsx'
 import type { MessageParams } from '../i18n/t.ts'
-import { displayType, glass, monoType } from '../styles/esports.ts'
-import { color, fontSize, radius, space } from '../styles/tokens.ts'
+import { displayType } from '../styles/esports.ts'
+import { broadcast, digits, slam, splitShadow, ticker } from './ui/broadcast.ts'
+import { color, fontSize, space } from '../styles/tokens.ts'
 import type { SpikeTrial } from './spikeLoop.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
@@ -98,7 +99,12 @@ export function RaceCenter({
   if (trial.phase === 'countdown') {
     return (
       <>
-        <Big key={`countdown-${trial.countdown}`} role="status" data-testid="kart-countdown">
+        <Big
+          key={`countdown-${trial.countdown}`}
+          role="status"
+          data-testid="kart-countdown"
+          data-go={trial.countdown > 0 ? undefined : true}
+        >
           {trial.countdown > 0 ? String(trial.countdown) : t('kart.race.go')}
         </Big>
         {/* 2026-11-17 (the classic feel): how to launch */}
@@ -159,17 +165,23 @@ export function RaceCenter({
 }
 
 const Clock = styled.div`
-  ${glass}
+  ${broadcast}
   display: grid;
   gap: 2px;
   min-width: 132px;
   padding: ${space.xs}px ${space.sm}px;
 `
 
+// The lap on a ticker of the accent, as a broadcast's lap counter
 const LapLine = styled.p`
-  margin: 0;
+  ${ticker(color.accent)}
+  justify-self: start;
+  margin: 0 0 2px;
+  padding: 0 ${space.md}px;
+  color: ${color.onAccent};
   ${displayType}
   font-size: ${fontSize.lg}px;
+  text-transform: uppercase;
 `
 
 const Row = styled.p`
@@ -185,49 +197,54 @@ const Label = styled.span`
 `
 
 const Time = styled.span`
-  ${monoType}
+  ${digits}
   font-size: ${fontSize.sm}px;
 `
 
-const pop = keyframes`
-  from {
-    opacity: 0;
-    transform: scale(1.6);
-  }
-`
+/** The count's height: a quarter of a wide screen's height, less on a narrow one */
+const BIG = 'clamp(88px, min(24vh, 30vw), 200px)'
 
+// 3, 2, 1, GO: as tall as a fifth of the screen, the two brand colours split either side of it,
+// slammed in; GO in green
 const Big = styled.p`
   position: absolute;
-  top: 30%;
+  top: 24%;
   left: 50%;
   margin: 0;
   translate: -50% 0;
   color: ${color.text};
   ${displayType}
-  font-size: 96px;
-  text-shadow: 0 0 24px ${color.accent};
-  animation: ${pop} 300ms ease-out;
+  font-size: ${BIG};
+  line-height: 1;
+  text-shadow: ${splitShadow};
+  text-transform: uppercase;
   pointer-events: none;
+  ${slam(360)}
 
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
+  &[data-go] {
+    color: ${color.success};
   }
 `
 
+// How to launch: a lower third under the count
 const StartHint = styled.p`
+  ${ticker(color.surface, 12)}
   position: absolute;
-  top: calc(30% + 120px);
+  top: calc(24% + ${BIG} + ${space.md}px);
   left: 50%;
   margin: 0;
-  padding: ${space.xs}px ${space.md}px;
+  padding: ${space.xs}px ${space.xl}px;
   translate: -50% 0;
   max-width: calc(100% - ${space.lg * 2}px);
   color: ${color.text};
-  background: ${color.surface};
-  border-radius: ${radius.component}px;
   font-size: ${fontSize.md}px;
+  font-weight: 600;
   text-align: center;
   pointer-events: none;
+
+  &::before {
+    box-shadow: inset 0 -2px 0 0 ${color.accent};
+  }
 `
 
 const Warning = styled.p`
@@ -238,14 +255,16 @@ const Warning = styled.p`
   padding: ${space.sm}px ${space.lg}px;
   translate: -50% 0;
   color: ${color.onAccent};
-  background: ${color.danger};
+  ${ticker(color.danger, 14)}
+  position: absolute;
   ${displayType}
   font-size: ${fontSize.xl}px;
+  text-transform: uppercase;
   pointer-events: none;
 `
 
 const Results = styled.section`
-  ${glass}
+  ${broadcast}
   position: absolute;
   top: 50%;
   left: 50%;
@@ -260,13 +279,13 @@ const Title = styled.h2`
   margin: 0;
   ${displayType}
   font-size: ${fontSize.xl}px;
+  text-transform: uppercase;
 `
 
 const Total = styled.p`
   margin: 0;
-  ${monoType}
+  ${digits}
   font-size: ${fontSize.xxl}px;
-  font-weight: 700;
 `
 
 const News = styled.p`
@@ -293,10 +312,12 @@ const Laps = styled.ol`
     display: flex;
     justify-content: space-between;
     gap: ${space.md}px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid ${color.line};
   }
 `
 
 const TimeCell = styled.span<{ $best: boolean }>`
-  ${monoType}
+  ${digits}
   color: ${(p) => (p.$best ? color.success : color.text)};
 `

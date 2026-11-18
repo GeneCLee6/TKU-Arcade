@@ -16,7 +16,8 @@ import { Standings } from '../../games/kart/Standings.tsx'
 import { registerMessages, type TextKey } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { readNickname } from '../../lib/nickname.ts'
-import { displayType, glass } from '../../styles/esports.ts'
+import { displayType } from '../../styles/esports.ts'
+import { broadcast } from '../ui/broadcast.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import RaceView from '../race/RaceView.tsx'
 import { botSeats, createBotRace } from './botRace.ts'
@@ -236,7 +237,7 @@ const Results = styled.main`
 `
 
 const Card = styled.section`
-  ${glass}
+  ${broadcast}
   display: grid;
   gap: ${space.md}px;
   width: min(420px, 100%);
@@ -247,7 +248,8 @@ const Heading = styled.h1`
   ${displayType}
   margin: 0;
   color: ${color.text};
-  font-size: ${fontSize.xl}px;
+  font-size: ${fontSize.xxl}px;
+  text-transform: uppercase;
 `
 
 const TeamLine = styled.p`

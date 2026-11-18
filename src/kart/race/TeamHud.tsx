@@ -6,7 +6,8 @@ import { memo } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { TEAM_GAUGE, TEAM_NAMES, type TeamId } from '../../../shared/kart/team.ts'
 import type { Translate } from '../../i18n/t.ts'
-import { displayType, glass, monoType, SLANT } from '../../styles/esports.ts'
+import { displayType, monoType, SLANT } from '../../styles/esports.ts'
+import { broadcast } from '../ui/broadcast.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { teamColor } from '../team/teamColor.ts'
 
@@ -88,7 +89,7 @@ export const TeamScore = memo(function TeamScore({ t, totals, mine }: TeamScoreP
 })
 
 const Panel = styled.div`
-  ${glass}
+  ${broadcast}
   display: grid;
   gap: ${space.xs}px;
   padding: ${space.sm}px ${space.lg}px ${space.sm}px ${space.md}px;
