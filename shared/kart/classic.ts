@@ -14,11 +14,13 @@
 //   counter-steering; a fresh drift press while counter-steering is the cut, `cutSeconds`).
 //
 // The dash (the instant boost): a drift whose slip has reached `dashMinSlip` and that has lasted
-// `dashMinSeconds` earns one (`burstReady`). Deep and long, both (2026-11-18, owner: "the drift still
-// grips too well: a player can mindlessly drift a little and boost, drift a little and boost, all lap
-// long; it should take a big drift to boost"): the slip builds slowly (`driftSlipIn`), only steering
-// into the drift takes it past the mark, and until the slip is there the car hardly turns
-// (`driftLoose`: the tail is out but the momentum carries on). A tapped drift fills the gauge only.
+// `dashMinSeconds` earns one (`burstReady`). Both marks are a real drift's, not a deep one's
+// (2026-11-18, owner, after a day of 32° and 0.45 s: "now it drifts too big again: a drift that
+// really slid should boost, only the grip need not be so good"): the tail visibly out, for longer
+// than a tap. What keeps it from being fired all lap long (owner, earlier that day: "a player can
+// mindlessly drift a little and boost, drift a little and boost") is the loose drift: the slip
+// builds slowly (`driftSlipIn`), until it is there the car hardly turns (`driftLoose`: the tail is
+// out but the momentum carries on), and sliding scrubs speed. A tapped drift fills the gauge only.
 // Only a fresh press of the throttle fires it (let go and pressed again; the page's tap latch counts
 // a press shorter than a step): (a) while the car slides out, the drift key up; (b) while the drift
 // key is still held, with the stick against the drift; (c) once the car has straightened, within
@@ -117,20 +119,22 @@ export function stepClassic(
   // The boost (N2O): one at a time. While any boost runs the key does nothing: no restart, no
   // stacking, no extra push, and the charge stays in stock
   let { gauge, storedBoosts, boostSeconds } = state
-  // The team boost (a team race, teamBoost.ts): one at a time like any boost. The boost key fires
-  // it before a charge of the kart's own, and while it burns no charge fires
-  let teamBoosts = state.teamBoosts ?? 0
+  // A team race (teamBoost.ts): `teamBoosts` of the charges held are blue (the team's gauge filled
+  // while the kart held them). A blue one is fired first, burns as a team boost, and is a charge
+  // like any other: one at a time, and it leaves the stock
+  let teamBoosts = Math.min(state.teamBoosts ?? 0, storedBoosts)
   let teamSeconds = state.teamSeconds ?? 0
   const pressed = input.boost && !state.boostHeld
-  if (pressed && teamBoosts > 0 && boostSeconds === 0 && teamSeconds === 0) {
-    teamBoosts--
-    teamSeconds = TEAM_BOOST.seconds
-  }
   const fire =
     storedBoosts > 0 && boostSeconds === 0 && teamSeconds === 0 && (pressed || rules.autoBoost)
   if (fire) {
     storedBoosts--
-    boostSeconds = t.boostDuration
+    if (teamBoosts > 0) {
+      teamBoosts--
+      teamSeconds = TEAM_BOOST.seconds
+    } else {
+      boostSeconds = t.boostDuration
+    }
   }
 
   const speed0 = Math.hypot(state.vx, state.vz)
@@ -343,8 +347,8 @@ export function stepClassic(
     }
   }
 
-  // Deep enough and long enough (or the double's tap, two steps at least): the drift has earned a
-  // dash
+  // The tail out far enough, for long enough (or the double's tap, two steps at least): the drift
+  // has earned a dash
   if (drifting && !burstReady) {
     const deep = driftPeak >= t.dashMinSlip - 1e-9 && driftSeconds >= t.dashMinSeconds - 1e-9
     if (deep || (doubleDrift && driftSeconds > DT * 1.5)) {

@@ -189,7 +189,8 @@ export const OLDSTREET: TrackJson = {
   name: { en: 'Lantern Old Street', 'zh-TW': '燈籠老街' },
   // 2: the classic feel (2026-11-17): the physics changed, so the old times are set aside
   // 5: the straights broken up by alleys, the back lanes' esses made real (2026-11-18)
-  revision: 5,
+  // 6: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
+  revision: 6,
   laps: 3,
   road: fromLine,
   gates,

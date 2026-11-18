@@ -219,8 +219,12 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   let lastResets = -1
   const foreseenShots = new Set<number>()
   let foreseen: Foreseen[] = []
-  // 2026-11-18, a team race: the team boosts this kart may fire, kept in step with the room
-  const rider = createTeamRider(options.view().racers.find((racer) => racer.seat === seat))
+  // 2026-11-18, a team race: which of this kart's charges are blue, kept in step with the room
+  const rider = (() => {
+    const view = options.view()
+    const me = view.racers.find((racer) => racer.seat === seat)
+    return createTeamRider(me, view.teams?.fills[me?.team ?? 0] ?? 0)
+  })()
 
   const pingClock = () => {
     const ping = new Uint8Array(CLOCK_PING_BYTES)
@@ -310,13 +314,15 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   const sendItem = (frame: Parameters<typeof encodeItemFrame>[0]) =>
     realtime.send(encodeItemFrame(frame))
 
-  /** A team race: a team boost just fired goes to the room, and the kart hears how many it has left */
+  /**
+   * A team race: a blue boost just fired goes to the room, the kart hears how many of its charges
+   * are blue, and the room hears when that is fewer than it allows (teamRider.ts)
+   */
   const teamStep = (run: Run, view: KartView): Run => {
-    const held = rider.step(
-      run.kart,
-      view.racers.find((racer) => racer.seat === seat),
-    )
+    const me = view.racers.find((racer) => racer.seat === seat)
+    const held = rider.step(run.kart, me, view.teams?.fills[me?.team ?? 0] ?? 0)
     if (held.fired && sendItem({ op: 'team', tick })) debug.teamFires++
+    if (held.keep) sendItem({ op: 'keep', ...held.keep, tick })
     return held.kart === run.kart ? run : { ...run, kart: held.kart }
   }
 

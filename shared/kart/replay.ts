@@ -20,6 +20,7 @@ import type { ItemId } from './items.ts'
 import { FLAG_BOOSTING, FLAG_DRIFTING, FLAG_FINISHED, FLAG_RESET, FLAG_SKIDDING } from './net.ts'
 import type { KartFrame } from './net.ts'
 import { shotPosition, type KartShot, type ShotItem } from './shots.ts'
+import { TEAM_BOOST_MS } from './team.ts'
 
 /** Physics steps a second: a frame's tick counts these from GO */
 export const TICKS_PER_SECOND = 60
@@ -82,6 +83,17 @@ export interface ReplayRacer {
   readonly lapMs: readonly number[]
   readonly finishMs: number | null
   readonly out: boolean
+  /** A team race: its side (0 red, 1 blue) */
+  readonly team?: number
+}
+
+/**
+ * A team race (2026-11-18, team.ts), kept so that a replay shows the blue boosts blue and the
+ * teams' gauges: every blue boost fired (`tick` to `until`), and the gauges each time they moved
+ */
+export interface ReplayTeams {
+  readonly burns: readonly { readonly seat: number; readonly tick: number; readonly until: number }[]
+  readonly gauges: readonly { readonly tick: number; readonly gauge: readonly [number, number] }[]
 }
 
 /** A recorded race: what the recorder hands over, and what encodeReplay packs */
@@ -96,6 +108,8 @@ export interface Replay {
   readonly held: readonly HeldChange[]
   /** The shots thrown (e9-t06b), their times in ms from GO; absent in a race without them */
   readonly shots?: readonly KartShot[]
+  /** A team race only; absent in any other, and in a replay from before */
+  readonly teams?: ReplayTeams
 }
 
 // ── Coding one kart's samples ────────────────────────────────────────────────────────────────
@@ -340,6 +354,29 @@ export function shieldsAt(
   return [...until].filter(([, end]) => end > tick).map(([seat]) => seat)
 }
 
+/** The karts whose blue boost burns at `tick` (a team race) */
+export function teamBurnsAt(teams: ReplayTeams | undefined, tick: number): Set<number> {
+  const seats = new Set<number>()
+  for (const burn of teams?.burns ?? []) {
+    if (burn.tick <= tick && tick < burn.until) seats.add(burn.seat)
+  }
+  return seats
+}
+
+/** The teams' gauges at `tick` (a team race); null in any other race */
+export function teamGaugesAt(
+  teams: ReplayTeams | undefined,
+  tick: number,
+): readonly [number, number] | null {
+  if (!teams) return null
+  let gauge: readonly [number, number] = [0, 0]
+  for (const one of teams.gauges) {
+    if (one.tick > tick) break
+    gauge = one.gauge
+  }
+  return gauge
+}
+
 // ── Recording ────────────────────────────────────────────────────────────────────────────────
 
 /** The parts of the room's view the recorder reads (shared/games/kart/types.ts's KartView) */
@@ -354,7 +391,12 @@ export interface RecordedView {
     readonly lapMs: readonly number[]
     readonly finishMs: number | null
     readonly out: boolean
+    /** A team race: its side, and until when (the server's clock) its last blue boost burns */
+    readonly team?: number
+    readonly teamUntil?: number
   }[]
+  /** A team race: the teams' gauges */
+  readonly teams?: { readonly gauge: readonly [number, number] }
   readonly events: readonly {
     readonly n: number
     readonly item: ItemId
@@ -391,6 +433,10 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
   let now: number | null = null
   // Shots by number, times from GO; one gone from the view before its time hit something then
   const shots = new Map<number, KartShot>()
+  // A team race: the blue boosts fired (each kart's `teamUntil` as it moves on) and the gauges
+  const burns: { seat: number; tick: number; until: number }[] = []
+  const burnUntil = new Map<number, number>()
+  const gauges: { tick: number; gauge: readonly [number, number] }[] = []
 
   const recorder: ReplayRecorder = {
     frame(seat, frame) {
@@ -437,6 +483,25 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
           shots.set(n, { ...shot, until: nowMs })
         }
       }
+      if (view.teams) {
+        for (const racer of view.racers) {
+          const until = racer.teamUntil ?? 0
+          const seen = burnUntil.get(racer.seat)
+          burnUntil.set(racer.seat, until)
+          // The first view only marks where each stands (as the items used do)
+          if (seen === undefined || until === seen || until <= 0 || goAt === null) continue
+          burns.push({
+            seat: racer.seat,
+            tick: Math.round(msToTicks(until - TEAM_BOOST_MS - goAt)),
+            until: Math.round(msToTicks(until - goAt)),
+          })
+        }
+        const last = gauges.at(-1)?.gauge
+        const [red, blue] = view.teams.gauge
+        if (!last || last[0] !== red || last[1] !== blue) {
+          gauges.push({ tick: Math.max(0, now ?? 0), gauge: [red, blue] })
+        }
+      }
       // Items held: the room does not say when one was taken, so "now" is as near as it gets
       for (const racer of view.racers) {
         const item = racer.item ?? null
@@ -459,11 +524,13 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
           lapMs: [...racer.lapMs],
           finishMs: racer.finishMs,
           out: racer.out,
+          ...(racer.team !== undefined ? { team: racer.team } : {}),
         })),
         karts: [...tapes].map(([seat, tape]) => ({ seat, bytes: tape.bytes() })),
         events: [...events],
         held: [...held].sort((a, b) => a.tick - b.tick),
         ...(shots.size > 0 ? { shots: [...shots.values()] } : {}),
+        ...(latest.teams ? { teams: { burns: [...burns], gauges: [...gauges] } } : {}),
       }
     },
   }

@@ -8,7 +8,7 @@ import type { KartView } from '../../shared/games/kart/types.ts'
 import type { RoomMember } from '../../shared/protocol.ts'
 import { Standings } from '../../src/games/kart/Standings.tsx'
 import { registerMessages, translate } from '../../src/i18n/t.ts'
-import { TeamPanel, TeamScore } from '../../src/kart/race/TeamHud.tsx'
+import { TeamGauges, TeamPanel, TeamScore } from '../../src/kart/race/TeamHud.tsx'
 import RoomTeams from '../../src/kart/team/RoomTeams.tsx'
 
 registerMessages(kartScreenMessages)
@@ -67,21 +67,35 @@ describe('the sides in the waiting room', () => {
 })
 
 describe('the team HUD', () => {
-  it('shows the team gauge as a meter and the team boosts held', () => {
-    render(<TeamPanel t={en} gauge={48} held={1} max={2} burning={false} />)
+  it('shows the team gauge as a meter, and what a full one does', () => {
+    render(<TeamPanel t={en} gauge={48} burning={false} />)
     expect(screen.getByRole('meter', { name: 'Team gauge' })).toHaveAttribute('aria-valuenow', '48')
     expect(screen.getByText('48%')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: '1 of 2 team boosts held' })).toBeInTheDocument()
+    expect(screen.getByTestId('kart-team-turns')).toHaveTextContent(
+      'Full: the boosts you hold turn blue',
+    )
     expect(screen.queryByTestId('kart-team-burning')).toBeNull()
   })
 
-  it('says so while a team boost burns, in either language', () => {
-    const { unmount } = render(<TeamPanel t={en} gauge={0} held={0} max={2} burning />)
-    expect(screen.getByTestId('kart-team-burning')).toHaveTextContent('Team boost')
+  it('says so while a blue boost burns, in either language', () => {
+    const { unmount } = render(<TeamPanel t={en} gauge={0} burning />)
+    expect(screen.getByTestId('kart-team-burning')).toHaveTextContent('Blue boost')
     unmount()
-    render(<TeamPanel t={zh} gauge={0} held={2} max={2} burning />)
-    expect(screen.getByTestId('kart-team-burning')).toHaveTextContent('團隊噴射')
+    render(<TeamPanel t={zh} gauge={0} burning />)
+    expect(screen.getByTestId('kart-team-burning')).toHaveTextContent('藍色噴射')
     expect(screen.getByRole('meter', { name: '團隊加速條' })).toBeInTheDocument()
+  })
+
+  it('shows someone watching both sides\u2019 gauges', () => {
+    render(<TeamGauges t={en} gauge={[40, 96]} />)
+    expect(screen.getByRole('meter', { name: 'Red team gauge' })).toHaveAttribute(
+      'aria-valuenow',
+      '40',
+    )
+    expect(screen.getByRole('meter', { name: 'Blue team gauge' })).toHaveAttribute(
+      'aria-valuenow',
+      '96',
+    )
   })
 
   it('shows both sides and their score', () => {

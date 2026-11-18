@@ -1,7 +1,7 @@
 // The team race (2026-11-18; shared/kart/team.ts, docs/KART-NETCODE.md §17): the sides, the score,
-// the team gauge as the room fills it from frames, the team boosts it hands out, the team boost in
-// the physics (longer and faster than a boost from the gauge) and a whole team race of computer
-// karts in a room run here.
+// the team gauge as the room fills it from frames, the charges it turns blue (owner: "everyone
+// collects their own N2O, and there is a red one and a blue one"), the blue boost in the physics
+// (longer and faster than a red one) and a whole team race of computer karts in a room run here.
 import { describe, expect, it } from 'vitest'
 import { makeSeats } from '../../shared/games/match.ts'
 import { createRng } from '../../shared/games/rng.ts'
@@ -30,6 +30,7 @@ import {
   gaugeStep,
   NO_TRACE,
   pointsForPlace,
+  runningScore,
   scoreTeams,
   TEAM_BOOST_MS,
   TEAM_GAUGE,
@@ -106,6 +107,13 @@ describe('the score', () => {
     expect(level.winner).toBeNull()
   })
 
+  it('stands as the race runs: the running order, less those dropped out', () => {
+    const racer = (seat: number, team: number, out = false) => ({ seat, team, finishMs: null, out })
+    const racers = [racer(0, 0), racer(1, 1), racer(2, 0, true), racer(3, 1)]
+    // Seat 2 dropped out: seat 3 is third, not fourth
+    expect(runningScore([1, 0, 2, 3], racers).totals).toEqual([8, 16])
+  })
+
   it('counts only as many karts a side as the smaller side has', () => {
     // Three reds against one blue: only the best red counts
     const score = scoreTeams([3, 0, 1, 2], teamOf([0, 0, 0, 1]), [3, 1])
@@ -116,7 +124,7 @@ describe('the score', () => {
 })
 
 describe('what a frame earns the team gauge', () => {
-  const drift = { vx: 0, vz: -TEAM_GAUGE.topSpeed, drifting: true, boosting: false }
+  const drift = { vx: 0, vz: -TEAM_GAUGE.topSpeed, drifting: true }
   const straight = { ...drift, drifting: false }
 
   it('fills by the time drifting and the speed, shared by the size of the team', () => {
@@ -141,22 +149,23 @@ describe('what a frame earns the team gauge', () => {
     )
   })
 
-  it('a boost straight out of a drift earns the dash points, once', () => {
+  it('only drifting earns: a boost out of a drift, or any other, earns nothing', () => {
     let trace = teamGain(NO_TRACE, drift, 1_000, 2, false).trace
     trace = teamGain(trace, straight, 1_050, 2, false).trace
-    const dash = teamGain(trace, { ...straight, boosting: true }, 1_100, 2, false)
-    expect(dash.gain).toBeCloseTo(TEAM_GAUGE.dashPoints / 2, 9)
-    // Still boosting: nothing more
-    expect(teamGain(dash.trace, { ...straight, boosting: true }, 1_150, 2, false).gain).toBe(0)
-    // A boost long after any drift is no dash
-    const late = teamGain(trace, { ...straight, boosting: true }, 9_000, 2, false)
-    expect(late.gain).toBe(0)
+    expect(teamGain(trace, straight, 1_100, 2, false).gain).toBe(0)
   })
 
-  it('earns nothing while the kart burns its own team boost', () => {
+  it('earns nothing while the kart burns its own blue boost', () => {
     const first = teamGain(NO_TRACE, drift, 1_000, 1, true)
     expect(teamGain(first.trace, drift, 1_050, 1, true).gain).toBe(0)
-    expect(teamGain(first.trace, { ...straight, boosting: true }, 1_050, 1, true).gain).toBe(0)
+  })
+
+  it('is full about when every kart of the side has filled its own gauge twice', () => {
+    // A kart's own gauge at its fastest fills at gaugeFillRate; the side's, at driftRate a kart
+    const own = 100 / KART_TUNING.gaugeFillRate
+    const side = TEAM_GAUGE.full / TEAM_GAUGE.driftRate
+    expect(side / own).toBeGreaterThan(1.8)
+    expect(side / own).toBeLessThan(3)
   })
 
   it('is told to the browsers in steps', () => {
@@ -184,13 +193,14 @@ const cruising = (extra: Partial<Kart> = {}): Kart => ({
   ...extra,
 })
 
-describe('the team boost in the physics', () => {
-  it('burns half as long again as a boost from the gauge, and goes faster', () => {
+describe('the blue boost in the physics', () => {
+  it('burns half as long again as a red one, and goes faster', () => {
     expect(TEAM_BOOST.seconds).toBeCloseTo(KART_TUNING.boostDuration * 1.5, 9)
     expect(TEAM_BOOST.topSpeedFactor).toBeGreaterThan(KART_TUNING.boostTopSpeedFactor)
     expect(TEAM_BOOST.accelFactor).toBeGreaterThan(KART_TUNING.boostAccelFactor)
+    expect(TEAM_BOOST.maxHeld).toBe(KART_TUNING.maxStoredBoosts)
 
-    const team = run(cruising({ teamBoosts: 1, teamSeconds: 0 }), 1, true)
+    const team = run(cruising({ storedBoosts: 1, teamBoosts: 1, teamSeconds: 0 }), 1, true)
     expect(team.teamBoosts).toBe(0)
     expect(kartTeamBoosting(team)).toBe(true)
     expect(kartBoosting(team)).toBe(true)
@@ -203,7 +213,7 @@ describe('the team boost in the physics', () => {
     const ownSteps = Math.round(KART_TUNING.boostDuration * 60)
     expect(run(own, ownSteps + 1).boostSeconds).toBe(0)
 
-    // Three seconds in, the team boost has the kart well over a plain boost's top speed
+    // Three seconds in, the blue boost has the kart well over a red one's top speed
     const fast = kartSpeed(run(team, 180))
     const plain = kartSpeed(run(own, 150))
     expect(plain).toBeLessThanOrEqual(KART_TUNING.topSpeed * KART_TUNING.boostTopSpeedFactor + 1e-6)
@@ -216,39 +226,49 @@ describe('the team boost in the physics', () => {
     }
   })
 
-  it('fires before a charge of the kart, and no charge fires while it burns', () => {
+  // Owner, 2026-11-18: "everyone collects their own N2O, and there is a red one and a blue one"
+  it('is a charge of the kart turned blue: firing it takes the charge, the blue ones first', () => {
     const both = cruising({ teamBoosts: 1, teamSeconds: 0, storedBoosts: 2 })
     const fired = run(both, 1, true)
     expect(fired.teamBoosts).toBe(0)
-    expect(fired.storedBoosts).toBe(2)
+    expect(fired.storedBoosts).toBe(1)
+    expect(kartTeamBoosting(fired)).toBe(true)
     expect(fired.boostSeconds).toBe(0)
-    // Let go, then pressed again mid-burn: nothing fires
+    // Let go, then pressed again mid-burn: nothing fires (one boost at a time)
     const again = run(run(fired, 30), 1, true)
-    expect(again.storedBoosts).toBe(2)
+    expect(again.storedBoosts).toBe(1)
     expect(again.boostSeconds).toBe(0)
-    // Burnt out: the next press fires the charge
+    // Burnt out: the next press fires the charge left, a red one
     const after = run(run(fired, 270), 1, true)
     expect(kartTeamBoosting(after)).toBe(false)
-    expect(after.storedBoosts).toBe(1)
+    expect(after.storedBoosts).toBe(0)
     expect(after.boostSeconds).toBeGreaterThan(0)
   })
 
+  it('there is no blue boost without a charge to be blue', () => {
+    const none = run(cruising({ teamBoosts: 2, teamSeconds: 0, storedBoosts: 0 }), 1, true)
+    expect(kartTeamBoosting(none)).toBe(false)
+    expect(none.boostSeconds).toBe(0)
+    expect(none.teamBoosts).toBe(0)
+  })
+
   it('does not fire while a boost of the kart burns: only once it has burnt out', () => {
-    const boosting = run(cruising({ teamBoosts: 2, teamSeconds: 0, storedBoosts: 1 }), 1, false)
-    const own = run({ ...boosting, teamBoosts: 0 }, 1, true)
-    expect(own.boostSeconds).toBeGreaterThan(0)
-    // A second team boost while the first burns stays held
-    const first = run(cruising({ teamBoosts: 2, teamSeconds: 0 }), 1, true)
+    const red = run(cruising({ teamBoosts: 0, teamSeconds: 0, storedBoosts: 2 }), 1, true)
+    expect(red.boostSeconds).toBeGreaterThan(0)
+    // The charge left turns blue while the red one burns: a press leaves it held
+    const during = run(run({ ...red, teamBoosts: 1 }, 20), 1, true)
+    expect(during.teamBoosts).toBe(1)
+    expect(during.storedBoosts).toBe(1)
+    expect(kartTeamBoosting(during)).toBe(false)
+    // A second blue one while the first burns stays held
+    const first = run(cruising({ teamBoosts: 2, teamSeconds: 0, storedBoosts: 2 }), 1, true)
     const second = run(run(first, 20), 1, true)
     expect(second.teamBoosts).toBe(1)
-    // A press while the charge burns leaves the team boost held
-    const during = run(run({ ...own, teamBoosts: 1 }, 20), 1, true)
-    expect(during.teamBoosts).toBe(1)
-    expect(kartTeamBoosting(during)).toBe(false)
+    expect(second.storedBoosts).toBe(1)
   })
 
   it('fills none of the kart gauge while it burns, and a headwind or a hit blows it out', () => {
-    const team = run(cruising({ teamBoosts: 1, teamSeconds: 0 }), 1, true)
+    const team = run(cruising({ storedBoosts: 1, teamBoosts: 1, teamSeconds: 0 }), 1, true)
     let drifting = team
     for (let step = 0; step < 60; step++) {
       drifting = stepKart(drifting, { ...GO, steer: 1, drift: true })
@@ -266,8 +286,14 @@ describe('the team boost in the physics', () => {
     expect('teamSeconds' in headwindStep(solo, 1 / 60)).toBe(false)
   })
 
-  it('in the arcade (old) feel is a boost of the team boost length, fired the same way', () => {
-    const start: Kart = { ...INITIAL_KART, vz: -ARCADE_TUNING.topSpeed, teamBoosts: 1, teamSeconds: 0, storedBoosts: 1 }
+  it('in the arcade (old) feel is a boost of the blue boost length, fired the same way', () => {
+    const start: Kart = {
+      ...INITIAL_KART,
+      vz: -ARCADE_TUNING.topSpeed,
+      teamBoosts: 1,
+      teamSeconds: 0,
+      storedBoosts: 2,
+    }
     const fired = run(start, 1, true, ARCADE_TUNING)
     expect(fired.teamBoosts).toBe(0)
     expect(fired.storedBoosts).toBe(1)
@@ -277,54 +303,99 @@ describe('the team boost in the physics', () => {
   })
 })
 
-describe('a kart and the room keep count of its team boosts', () => {
-  it('holds what the room says less those fired that the room has not counted', () => {
+describe('a kart and the room keep count of its blue boosts', () => {
+  it('the room allows what it says less those fired that it has not counted', () => {
     expect(teamBoostsLeft(2, 0, 0)).toBe(2)
     expect(teamBoostsLeft(2, 0, 1)).toBe(1)
     expect(teamBoostsLeft(1, 1, 1)).toBe(1)
     expect(teamBoostsLeft(0, 3, 5)).toBe(0)
   })
 
-  it('says when one was fired, once, and gives the kart the rest', () => {
+  it('turns the charges held when the gauge fills blue, says when one was fired, once', () => {
     const rider = createTeamRider({ teamBoosts: 0, teamUsed: 0 })
-    let kart = cruising()
-    // Nothing held: the kart is told so (a team race's kart always has the fields)
-    let out = rider.step(kart, { teamBoosts: 0, teamUsed: 0 })
+    let kart = cruising({ storedBoosts: 2 })
+    // Nothing blue yet: the kart is told so (a team race's kart always has the fields)
+    let out = rider.step(kart, { teamBoosts: 0, teamUsed: 0 }, 0)
     expect(out.fired).toBe(false)
     expect(out.kart.teamBoosts).toBe(0)
-    // The room hands out two
-    out = rider.step(out.kart, { teamBoosts: 2, teamUsed: 0 })
+    expect(out.keep).toBeNull()
+    // The gauge fills: both charges are blue, and there is nothing to tell the room
+    out = rider.step(out.kart, { teamBoosts: 2, teamUsed: 0 }, 1)
     expect(out.kart.teamBoosts).toBe(2)
+    expect(out.keep).toBeNull()
     kart = stepKart(out.kart, { ...GO, boost: true })
-    out = rider.step(kart, { teamBoosts: 2, teamUsed: 0 })
+    expect(kart.storedBoosts).toBe(1)
+    out = rider.step(kart, { teamBoosts: 2, teamUsed: 0 }, 1)
     expect(out.fired).toBe(true)
     // The room has not heard yet: one left, not two
     expect(out.kart.teamBoosts).toBe(1)
     kart = stepKart(out.kart, GO)
-    out = rider.step(kart, { teamBoosts: 2, teamUsed: 0 })
+    out = rider.step(kart, { teamBoosts: 2, teamUsed: 0 }, 1)
     expect(out.fired).toBe(false)
     expect(out.kart.teamBoosts).toBe(1)
     // The room counted it
-    out = rider.step(stepKart(out.kart, GO), { teamBoosts: 1, teamUsed: 1 })
+    out = rider.step(stepKart(out.kart, GO), { teamBoosts: 1, teamUsed: 1 }, 1)
     expect(out.kart.teamBoosts).toBe(1)
+    expect(out.keep).toBeNull()
   })
 
-  it('forgets a fire the room never heard of, after a while', () => {
-    const rider = createTeamRider({ teamBoosts: 1, teamUsed: 0 })
-    let out = rider.step(cruising(), { teamBoosts: 1, teamUsed: 0 })
+  it('a kart holding one charge gets one blue, one holding none gets none, and the room is told', () => {
+    const one = createTeamRider({ teamBoosts: 0, teamUsed: 0 })
+    let out = one.step(cruising({ storedBoosts: 1 }), { teamBoosts: 2, teamUsed: 0 }, 1)
+    expect(out.kart.teamBoosts).toBe(1)
+    expect(out.keep).toEqual({ held: 1, fill: 1 })
+    // Told once; the room's answer settles it
+    out = one.step(out.kart, { teamBoosts: 2, teamUsed: 0 }, 1)
+    expect(out.keep).toBeNull()
+    out = one.step(out.kart, { teamBoosts: 1, teamUsed: 0 }, 1)
+    expect(out.kart.teamBoosts).toBe(1)
+    expect(out.keep).toBeNull()
+    // A charge earned afterwards is red: still one blue of two
+    out = one.step({ ...out.kart, storedBoosts: 2 }, { teamBoosts: 1, teamUsed: 0 }, 1)
+    expect(out.kart.teamBoosts).toBe(1)
+    expect(out.kart.storedBoosts).toBe(2)
+
+    const none = createTeamRider({ teamBoosts: 0, teamUsed: 0 })
+    out = none.step(cruising(), { teamBoosts: 2, teamUsed: 0 }, 1)
+    expect(out.kart.teamBoosts).toBe(0)
+    expect(out.keep).toEqual({ held: 0, fill: 1 })
+    // Charges earned later stay red, even before the room has answered
+    out = none.step({ ...out.kart, storedBoosts: 2 }, { teamBoosts: 2, teamUsed: 0 }, 1)
+    expect(out.kart.teamBoosts).toBe(0)
+    // ... until the gauge fills again
+    out = none.step(out.kart, { teamBoosts: 2, teamUsed: 0 }, 2)
+    expect(out.kart.teamBoosts).toBe(2)
+    expect(out.keep).toBeNull()
+  })
+
+  it('a blue charge lost (a crash) is lost, and the room is told', () => {
+    const rider = createTeamRider({ teamBoosts: 0, teamUsed: 0 })
+    let out = rider.step(cruising({ storedBoosts: 2 }), { teamBoosts: 2, teamUsed: 0 }, 1)
+    expect(out.kart.teamBoosts).toBe(2)
+    out = rider.step({ ...out.kart, storedBoosts: 1 }, { teamBoosts: 2, teamUsed: 0 }, 1)
+    expect(out.kart.teamBoosts).toBe(1)
+    expect(out.keep).toEqual({ held: 1, fill: 1 })
+  })
+
+  it('a fire the room never heard of is still a charge burnt', () => {
+    const rider = createTeamRider({ teamBoosts: 0, teamUsed: 0 })
+    let out = rider.step(cruising({ storedBoosts: 1 }), { teamBoosts: 1, teamUsed: 0 }, 1)
     let kart = stepKart(out.kart, { ...GO, boost: true })
-    out = rider.step(kart, { teamBoosts: 1, teamUsed: 0 })
+    out = rider.step(kart, { teamBoosts: 1, teamUsed: 0 }, 1)
+    expect(out.fired).toBe(true)
     expect(out.kart.teamBoosts).toBe(0)
     for (let step = 0; step < 301; step++) {
       kart = stepKart(out.kart, GO)
-      out = rider.step(kart, { teamBoosts: 1, teamUsed: 0 })
+      out = rider.step(kart, { teamBoosts: 1, teamUsed: 0 }, 1)
     }
-    expect(out.kart.teamBoosts).toBe(1)
+    expect(out.kart.teamBoosts).toBe(0)
   })
 
   it('starts from the count of the room for a page that comes back mid-race', () => {
-    const rider = createTeamRider({ teamBoosts: 1, teamUsed: 3 })
-    expect(rider.step(cruising(), { teamBoosts: 1, teamUsed: 3 }).kart.teamBoosts).toBe(1)
+    const rider = createTeamRider({ teamBoosts: 1, teamUsed: 3 }, 4)
+    const back = rider.step(cruising({ storedBoosts: 1 }), { teamBoosts: 1, teamUsed: 3 }, 4)
+    expect(back.kart.teamBoosts).toBe(1)
+    expect(back.fired).toBe(false)
   })
 })
 
@@ -402,21 +473,21 @@ describe('a team race in the room', () => {
       state = out.state
       for (const action of out.actions) if (action.t === 'tgauge') told.push(action.gauge)
     }
-    // 39 gaps of 50 ms at 50 m/s for a side of two: 14 × (50 / 68) × 1.95 / 2, about 10 points
-    expect(state.teams!.gauge[0]).toBe(8)
+    // 39 gaps of 50 ms at 50 m/s for a side of two: 30 × (50 / 68) × 1.95 / 2, about 21 points
+    expect(state.teams!.gauge[0]).toBe(20)
     expect(state.teams!.gauge[1]).toBe(0)
     // Told only when it moves on a step, not every frame
-    expect(told).toEqual([4, 8])
+    expect(told).toEqual([4, 8, 12, 16, 20])
     // A kart that does not drift fills nothing
     const others = driveFrames(track, 1)
     for (let i = 0; i < 40; i++) {
       now += 50
       state = feed(state, memory, 1, bytes(others.next().value!), now).state
     }
-    expect(state.teams!.gauge).toEqual([8, 0])
+    expect(state.teams!.gauge).toEqual([20, 0])
   })
 
-  it('hands every kart of the side a team boost when the gauge fills, up to two', () => {
+  it('lets every kart of the side turn the charges it holds blue when the gauge fills', () => {
     const track = raceTrack('riverside')!
     let state = teamRace(4)
     const memory = kart.realtime!.memory()
@@ -435,7 +506,7 @@ describe('a team race in the room', () => {
       state = out.state
       if (out.actions.some((action) => action.t === 'tfill')) {
         fills++
-        const held = Math.min(TEAM_BOOST.maxHeld, fills)
+        const held = TEAM_BOOST.maxHeld
         expect(state.racers.map((racer) => racer.teamBoosts)).toEqual([held, 0, held, 0])
         expect(state.teams!.gauge[0]).toBe(0)
         expect(state.teams!.fills).toEqual([fills, 0])
@@ -449,13 +520,40 @@ describe('a team race in the room', () => {
     let state = teamRace(4, 'race', 1)
     state = act(state, { t: 'lap', seat: 2, ms: 30_000 })
     state = act(state, { t: 'tfill', team: 0 })
-    expect(state.racers.map((racer) => racer.teamBoosts)).toEqual([1, 0, 0, 0])
+    expect(state.racers.map((racer) => racer.teamBoosts)).toEqual([2, 0, 0, 0])
     state = act(state, { t: 'retire', seat: 1 })
     state = act(state, { t: 'tfill', team: 1 })
-    expect(state.racers.map((racer) => racer.teamBoosts)).toEqual([1, 0, 0, 1])
+    expect(state.racers.map((racer) => racer.teamBoosts)).toEqual([2, 0, 0, 2])
   })
 
-  it('takes a team boost fired by a kart that holds one, and no other', () => {
+  // The room never hears how many charges a kart holds: the kart says when it held fewer
+  it('takes a kart at its word that it held fewer charges, only downwards, only for that fill', () => {
+    let state = act(teamRace(4), { t: 'tfill', team: 0 })
+    const memory = kart.realtime!.memory()
+    const keep = (held: number, fill: number) => encodeItemFrame({ op: 'keep', held, fill, tick: 9 })
+    expect(decodeItemFrame(keep(1, 1))).toEqual({ op: 'keep', held: 1, fill: 1, tick: 9 })
+    // About a fill that is not the one standing: ignored
+    expect(feed(state, memory, 0, keep(0, 0), GO_AT + 1_000).actions).toEqual([])
+    // More than, or as many as, the room allows: ignored
+    expect(feed(state, memory, 0, keep(2, 1), GO_AT + 1_000).actions).toEqual([])
+    expect(feed(state, memory, 0, keep(7, 1), GO_AT + 1_000).actions).toEqual([])
+    // The other side's gauge has not filled
+    expect(feed(state, memory, 1, keep(0, 0), GO_AT + 1_000).actions).toEqual([])
+    const out = feed(state, memory, 0, keep(1, 1), GO_AT + 1_000)
+    expect(out.actions).toEqual([{ t: 'tkeep', seat: 0, held: 1 }])
+    state = out.state
+    expect(state.racers.map((racer) => racer.teamBoosts)).toEqual([1, 0, 2, 0])
+    // Never back up
+    expect(feed(state, memory, 0, keep(2, 1), GO_AT + 2_000).actions).toEqual([])
+    expect(refused(state, { t: 'tkeep', seat: 0, held: 2 })).toBe(true)
+    expect(refused(state, { t: 'tkeep', seat: 0, held: -1 })).toBe(true)
+    expect(refused(state, { t: 'tkeep', seat: 0, held: 0 }, 0)).toBe(true)
+    // The next fill allows all again
+    state = act(state, { t: 'tfill', team: 0 })
+    expect(state.racers[0]!.teamBoosts).toBe(2)
+  })
+
+  it('takes a blue boost fired by a kart that holds one, and no other', () => {
     let state = act(teamRace(4), { t: 'tfill', team: 0 })
     const memory = kart.realtime!.memory()
     const fire = encodeItemFrame({ op: 'team', tick: 100 })
@@ -467,14 +565,16 @@ describe('a team race in the room', () => {
     expect(out.actions).toEqual([{ t: 'tfire', seat: 0, at: GO_AT + 5_000 }])
     state = out.state
     expect(state.racers[0]).toMatchObject({
-      teamBoosts: 0,
+      teamBoosts: 1,
       teamUsed: 1,
       teamUntil: GO_AT + 5_000 + TEAM_BOOST_MS,
     })
     // Its team-mate still has its own
-    expect(state.racers[2]!.teamBoosts).toBe(1)
-    // None left: a second is not taken
-    expect(feed(state, memory, 0, fire, GO_AT + 6_000).actions).toEqual([])
+    expect(state.racers[2]!.teamBoosts).toBe(2)
+    // None left: a third is not taken
+    state = feed(state, memory, 0, fire, GO_AT + 10_000).state
+    expect(state.racers[0]!.teamBoosts).toBe(0)
+    expect(feed(state, memory, 0, fire, GO_AT + 16_000).actions).toEqual([])
   })
 
   it('takes none of it from a player, in a race without sides, or once the race is over', () => {
@@ -618,7 +718,7 @@ describe('items in a team race pass team-mates by', () => {
 })
 
 describe('a team race of computer karts in a room run here', () => {
-  it('fills the gauges, hands out team boosts that the karts fire, and ends with a side winning', () => {
+  it('fills the gauges, turns charges blue that the karts fire, and ends with a side winning', () => {
     let now = 1_000_000
     const track = raceTrack('riverside')!
     const room = createLocalRoom({
@@ -650,11 +750,10 @@ describe('a team race of computer karts in a room run here', () => {
     expect(state.teams!.fills[1]).toBeGreaterThan(0)
     const used = state.racers.reduce((sum, racer) => sum + (racer.teamUsed ?? 0), 0)
     expect(used).toBeGreaterThan(0)
-    // Never more held than the room handed out
+    // Never more than two a fill, and never more held than a kart can hold charges
     for (const racer of state.racers) {
-      expect((racer.teamUsed ?? 0) + (racer.teamBoosts ?? 0)).toBeLessThanOrEqual(
-        state.teams!.fills[racer.team!],
-      )
+      expect(racer.teamUsed ?? 0).toBeLessThanOrEqual(2 * state.teams!.fills[racer.team!])
+      expect(racer.teamBoosts ?? 0).toBeLessThanOrEqual(TEAM_BOOST.maxHeld)
     }
     const result = kart.result(state)
     expect(result.summary.key).toMatch(/^games\.kart\.result\.(red|blue)Won$/)

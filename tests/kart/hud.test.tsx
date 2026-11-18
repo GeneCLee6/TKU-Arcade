@@ -27,6 +27,25 @@ const HUD: SpikeHud = { speed: 0, gauge: 0, storedBoosts: 0, boosting: false, ch
 const DEGREE = Math.PI / 180
 
 describe('the HUD', () => {
+  // Owner, 2026-11-18: "everyone collects their own N2O, and there is a red one and a blue one"
+  it('draws the charges a kart holds red and blue on its own panel, the blue ones first', () => {
+    const hud = { ...HUD, storedBoosts: 2, teamBoosts: 1 }
+    const { unmount } = render(<Hud t={en} hud={hud} maxStored={2} />)
+    const stored = screen.getByRole('img', { name: 'Boosts ready: 1 red and 1 blue, of 2' })
+    expect(stored).toHaveAttribute('data-red', '1')
+    expect(stored).toHaveAttribute('data-blue', '1')
+    expect([...stored.querySelectorAll('i')].map((one) => one.dataset.kind)).toEqual(['blue', 'red'])
+    unmount()
+    // None blue yet: both red. And in a race without sides there is neither
+    const red = render(<Hud t={zh} hud={{ ...hud, teamBoosts: 0 }} maxStored={2} />)
+    expect(screen.getByRole('img', { name: '可用噴射：紅 2、藍 0（最多 2）' })).toBeInTheDocument()
+    red.unmount()
+    render(<Hud t={en} hud={{ ...HUD, storedBoosts: 2 }} maxStored={2} />)
+    const plain = screen.getByRole('img', { name: 'Boosts ready: 2 of 2' })
+    expect(plain).not.toHaveAttribute('data-blue')
+    expect(plain.querySelector('[data-kind]')).toBeNull()
+  })
+
   it('shows the speed, the gauge in segments and the stored boosts', () => {
     render(<Hud t={en} hud={{ ...HUD, speed: 108, gauge: 47, storedBoosts: 1 }} maxStored={2} />)
     expect(screen.getByTestId('kart-speed')).toHaveTextContent('108')
@@ -57,7 +76,7 @@ describe('the HUD', () => {
     const { rerender } = render(<Hud t={en} hud={HUD} maxStored={2} />)
     expect(screen.queryByTestId('kart-depth')).toBeNull()
     rerender(<Hud t={en} hud={{ ...HUD, depth: 9 }} maxStored={2} />)
-    const meter = screen.getByRole('meter', { name: 'Drift deeper' })
+    const meter = screen.getByRole('meter', { name: 'Hold the drift' })
     expect(meter).toHaveAttribute('aria-valuenow', '45')
     expect(screen.queryByTestId('kart-dash')).toBeNull()
     // Earned: the meter gives way to the prompt
