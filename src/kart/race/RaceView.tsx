@@ -20,14 +20,14 @@ import { TEAM_BOOST } from '../../../shared/kart/teamBoost.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
 import type { Callout } from '../callouts.ts'
 import { keyLabel, loadBindings, loadRules, loadTuning } from '../devices.ts'
-import { BoostVeil, CalloutText, Hud } from '../Hud.tsx'
+import { BoostVeil, CALLOUT_CLEAR, CalloutText, Hud } from '../Hud.tsx'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
 import { supportsWebGL2 } from '../Scene.ts'
 import { startSpikeLoop, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
 import { autopilot } from './autopilot.ts'
-import { ItemNote, ItemSlot } from './ItemHud.tsx'
+import { ITEM_SLOT_PORTRAIT_TOP, ItemNote, ItemSlot } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
 import { StunHud } from './HitHud.tsx'
 import { createRaceNet, type NameTag, type RaceNet } from './netRace.ts'
@@ -383,7 +383,11 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
   const others = view.racers.filter((racer) => racer.seat !== seat)
 
   return (
-    <Page data-testid="kart-race" style={touch.shown ? touchSpace(touch.settings) : undefined}>
+    <Page
+      data-testid="kart-race"
+      data-items={view.mode === 'items' || undefined}
+      style={touch.shown ? touchSpace(touch.settings) : undefined}
+    >
       <Stage ref={stage} role="img" aria-label={t('games.kart.race.canvas')} />
       <Tags ref={tagLayer} aria-hidden="true">
         {others.map((racer) => (
@@ -410,6 +414,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
           </Unstable>
         )}
       </TopLeft>
+      {view.mode === 'items' && <ItemSlot t={t} item={me?.item ?? null} keyName={itemKey} />}
       {stun && <StunHud key={`stun-${stun.id}`} t={t} ms={stun.ms} />}
       {hud.boosting && <BoostVeil aria-hidden="true" data-testid="kart-boost-veil" />}
       {hud.teamBoosting && <TeamVeil aria-hidden="true" data-testid="kart-team-veil" />}
@@ -472,11 +477,6 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
             />
           </TeamCorner>
         )}
-        {view.mode === 'items' && (
-          <SlotCorner>
-            <ItemSlot t={t} item={me?.item ?? null} keyName={itemKey} />
-          </SlotCorner>
-        )}
         <Hud t={t} hud={hud} maxStored={settings.tuning.maxStoredBoosts} dense={touch.shown} />
       </Bottom>
     </Page>
@@ -506,6 +506,19 @@ const Page = styled.main`
   z-index: 20;
   overflow: hidden;
   background: ${color.bg};
+
+  /* An item race has the item slot at the top centre: the big words go under it */
+  &[data-items] {
+    ${CALLOUT_CLEAR}: 104px;
+
+    @media (max-width: 760px), (max-height: 500px) {
+      ${CALLOUT_CLEAR}: 72px;
+    }
+
+    @media (max-width: 560px) and (orientation: portrait) {
+      ${CALLOUT_CLEAR}: ${ITEM_SLOT_PORTRAIT_TOP + 64}px;
+    }
+  }
 `
 
 const Stage = styled.div`
@@ -655,18 +668,12 @@ const Bottom = styled.div<{ $touch: boolean }>`
   ${({ $touch }) => $touch && touchBottom}
 `
 
-// The team's gauge (a team race): over the HUD's row, on the right, clear of the item slot on the
-// left and of the middle of the screen
+// The team's gauge (a team race): over the HUD's row, on the right, clear of the middle of the
+// screen (the item slot has the top centre)
 const TeamCorner = styled.div`
   position: absolute;
   right: 0;
   bottom: 100%;
-  margin-bottom: ${space.xs}px;
-`
-
-const SlotCorner = styled.div`
-  display: flex;
-  justify-content: flex-start;
   margin-bottom: ${space.xs}px;
 `
 

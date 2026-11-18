@@ -188,11 +188,11 @@ function BotRound({
   return (
     <>
       <RaceView view={view} realtime={game.realtime} act={act} nameOf={nameOf} />
-      <TopCenter>
+      <QuitCorner>
         <Button type="button" $variant="secondary" $size="sm" onClick={onMenu}>
           {t('kart.bots.quit')}
         </Button>
-      </TopCenter>
+      </QuitCorner>
       {me?.finishMs != null && (
         <BottomCenter>
           <Button
@@ -208,13 +208,13 @@ function BotRound({
   )
 }
 
-// Over the race screen (RaceView's page sits at z-index 20)
-const TopCenter = styled.div`
+// Over the race screen (RaceView's page sits at z-index 20). Beside the place, top left: the top
+// centre is the item slot's (2026-11-18)
+const QuitCorner = styled.div`
   position: fixed;
   top: ${space.sm}px;
-  left: 50%;
+  left: ${space.sm + 100}px;
   z-index: 21;
-  translate: -50% 0;
 `
 
 const BottomCenter = styled.div`

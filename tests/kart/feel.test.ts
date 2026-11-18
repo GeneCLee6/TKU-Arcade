@@ -21,10 +21,13 @@ describe.each(['riverside', 'tamkang', 'oldstreet'])('the classic feel on %s', (
     expect(expert.seconds).toBeLessThan(novice.seconds * 0.85)
   })
 
-  it('the expert fires instant boosts all lap long; the average driver only by chance', () => {
-    // The average driver never means to, but steering out of a drift with the throttle down is the
-    // counter-steer, so a few come anyway (the owner's rule: counter-steer and forward boosts)
-    expect(expert.dashes).toBeGreaterThan(30)
+  // 2026-11-18, owner: "a player can drift a little and boost, drift a little and boost, all lap
+  // long ... it should take a big drift to boost". Before: 87 to 122 instant boosts in three laps
+  it('the expert fires instant boosts out of the big corners only; the others next to none', () => {
+    expect(expert.dashes).toBeGreaterThanOrEqual(6)
+    // Not all lap long: a dozen a lap at the very most
+    expect(expert.dashes).toBeLessThanOrEqual(36)
     expect(expert.dashes).toBeGreaterThan(average.dashes * 3)
+    expect(novice.dashes).toBeLessThanOrEqual(2)
   })
 })

@@ -364,9 +364,13 @@ const DEG = Math.PI / 180
  * The engine pushes against drag (a = acceleration × (1 − dragShare·u − (1 − dragShare)·u²), u the
  * speed over the top speed), so it pulls hard from a standstill and eases into the top speed instead
  * of hitting a wall. The drift is a slip angle the car swings to in `driftSlipIn` and lets go of at
- * `driftRecoverRate` (twice as fast counter-steering); a drift at least `dashMinSlip` deep earns an
- * instant boost (the dash), fired only by a fresh press of the throttle: while the car still slides,
- * or up to `releaseWindow` after it straightens. classic.ts has the step.
+ * `driftRecoverRate` (twice as fast counter-steering); a drift at least `dashMinSlip` deep and
+ * `dashMinSeconds` long earns an instant boost (the dash), fired only by a fresh press of the
+ * throttle: while the car still slides, or up to `releaseWindow` after it straightens. classic.ts has
+ * the step. 2026-11-18 (owner: "the drift still grips too well ... it should take a big drift to
+ * boost"): the slip builds slower and only steering into the drift takes it deep, the car turns
+ * little until it is (`driftLoose`), the dash wants depth and length both, the double is off, and a
+ * boost has to run out before the next can be fired.
  */
 export const KART_TUNING = {
   ...ARCADE_NUMBERS,
@@ -404,16 +408,21 @@ export const KART_TUNING = {
   /** Below this speed a drift turns proportionally less, so the car does not spin on the spot */
   driftFullSpeed: 20,
   /** The slip angle a drift swings to, stick centred ... */
-  driftSlip: 30 * DEG,
-  /** ... plus this much steering into it, minus this much steering out (42 and 18 degrees) */
-  driftSlipSteer: 12 * DEG,
+  driftSlip: 24 * DEG,
+  /** ... plus this much steering into it, minus this much steering out (40 and 8 degrees) */
+  driftSlipSteer: 16 * DEG,
   /** How long the swing to that angle takes (90% of it) */
-  driftSlipIn: 0.22,
+  driftSlipIn: 0.45,
+  /**
+   * The share of a drift's turn that comes only with the slip: at the start of a drift the tail is
+   * out but the car carries straight on, and it turns in full once the slip reaches driftSlip
+   */
+  driftLoose: 0.6,
   driftMaxSlip: 50 * DEG,
   /** Sliding scrubs this much a second at the top speed, fully sideways (by the sine of the slip) */
   driftScrub: 18,
-  /** Let go, the slip straightens at this many radians a second (75°/s); counter-steering, twice */
-  driftRecoverRate: 1.3,
+  /** Let go, the slip straightens at this many radians a second (63°/s); counter-steering, twice */
+  driftRecoverRate: 1.1,
   /** The drift's turn still carried while sliding out, as a share, the less the straighter */
   slideCarry: 0.45,
   /** The share of the engine's pull in a drift, and while sliding out of one */
@@ -422,7 +431,12 @@ export const KART_TUNING = {
 
   // The boost gauge and the boost (N2O)
   /** Gauge points a second drifting at the top speed (in proportion to the speed) ... */
-  gaugeFillRate: 60,
+  gaugeFillRate: 70,
+  /**
+   * ... as deep as driftSlip or deeper; a drift with no slip yet fills at this share of it, in
+   * proportion between: a tapped drift fills about half as fast as a deep one
+   */
+  gaugeShallow: 0.5,
   /** ... at the start of a drift; after this many seconds of the same drift, half that, and so on */
   gaugeFade: 1,
   maxStoredBoosts: 2,
@@ -432,13 +446,8 @@ export const KART_TUNING = {
   /** ... and lets the car go this much over the top speed */
   boostTopSpeedFactor: 1.28,
   overSpeedDrag: 9,
-  /**
-   * A boost fired while one runs starts it over (it does not add up) and, for boostStackSeconds,
-   * pushes this much harder (m/s²) with the top speed at boostStackFactor
-   */
-  stackPush: 12,
-  boostStackSeconds: 0.4,
-  boostStackFactor: 1.32,
+  // One boost at a time: the boost key does nothing while a boost runs (classic.ts). The arcade
+  // feel's stacking numbers (boostStackSeconds, boostStackFactor) are not read
   padBoostSeconds: 1.2,
 
   // The start boost (timeTrial.ts)
@@ -455,16 +464,18 @@ export const KART_TUNING = {
   startLate: 0.1,
 
   // The dash (the instant boost out of a drift) and its chain
-  /** The deepest slip angle a drift must reach to earn a dash */
-  dashMinSlip: 20 * DEG,
+  /** The deepest slip angle a drift must reach to earn a dash ... */
+  dashMinSlip: 32 * DEG,
+  /** ... and how long the drift must have lasted */
+  dashMinSeconds: 0.45,
   /** After the car straightens, a fresh press of the throttle within this long fires a waiting dash */
   releaseWindow: 0.5,
-  /** How long a dash lasts ... */
-  chainDuration: 0.5,
+  /** How long a dash lasts ... (longer and harder since 2026-11-18: rarer, so worth more) */
+  chainDuration: 0.8,
   /** ... multiplying the engine's pull by this ... */
-  dashAccelFactor: 1.6,
+  dashAccelFactor: 1.8,
   /** ... with the top speed this much higher */
-  miniTopSpeedFactor: 1.07,
+  miniTopSpeedFactor: 1.1,
   /** Dashes in a row within this long of each other chain ... */
   chainGrace: 1,
   /** ... each link after the first adding this to the dash's top speed factor ... */
@@ -473,8 +484,11 @@ export const KART_TUNING = {
   chainAccelStep: 0.05,
   /** ... for up to this many links */
   chainSpeedLinks: 3,
-  /** After a dash, a drift begun within this long earns the next however short (the double) */
-  doubleWindow: 0.5,
+  /**
+   * After a dash, a drift begun within this long earns the next however short (the double). 0: off
+   * since 2026-11-18, every dash takes a deep drift
+   */
+  doubleWindow: 0,
   /** The cut: a fresh drift press while counter-steering a slide straightens it in this long */
   cutSeconds: 0.1,
 
@@ -931,6 +945,19 @@ export const kartBurstWaiting = (state: KartState, tuning: KartTuning): boolean 
     ? !state.drifting &&
       (state.releaseWindow > 0 || (state.burstReady && state.slideDirection !== 0))
     : state.burstReady || state.releaseWindow > 0
+
+/**
+ * How near the drift under way is to earning a dash (the classic feel), 0 to 1: the lesser of how
+ * deep it has slid against `dashMinSlip` and how long it has lasted against `dashMinSeconds`. 1 once
+ * it is earned; 0 out of a drift. The HUD's depth meter
+ */
+export function kartDashDepth(state: KartState, tuning: KartTuning): number {
+  if (tuning.model !== MODEL_CLASSIC || !state.drifting) return 0
+  if (state.burstReady) return 1
+  const deep = (state.driftPeak ?? 0) / Math.max(1e-3, tuning.dashMinSlip)
+  const long = state.driftSeconds / Math.max(STEP_SECONDS, tuning.dashMinSeconds)
+  return Math.max(0, Math.min(1, deep, long))
+}
 
 export const kartSpeed = (state: KartState): number => Math.hypot(state.vx, state.vz)
 

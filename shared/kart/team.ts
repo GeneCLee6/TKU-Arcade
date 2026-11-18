@@ -1,4 +1,4 @@
-// The team race (2026-11-18; docs/ARCHITECTURE.md §4.30, docs/KART-NETCODE.md §17, docs/KART-WORLD.md).
+// The team race (2026-11-18; docs/ARCHITECTURE.md §4.31, docs/KART-NETCODE.md §17, docs/KART-WORLD.md).
 // Two teams, red and blue. Pure and shared: the room splits the seats, fills each team's gauge from
 // its karts' frames, hands out team boosts and scores the finish with these; the browser shows the
 // same split in the waiting room and the same score while the race runs.

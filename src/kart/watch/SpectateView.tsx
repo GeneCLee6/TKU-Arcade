@@ -30,6 +30,7 @@ import {
   TagLayer,
   TopLeft,
   WatchControls,
+  WatchedItem,
   WatchedPanel,
   WatchPage,
   WatchStage,
@@ -256,9 +257,12 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
           place={follow === null ? 0 : order.indexOf(follow) + 1}
           total={view.racers.length}
           detail={detail}
-          item={view.mode === 'items' ? (racer?.item ?? null) : undefined}
         />
       </TopLeft>
+      <WatchedItem
+        t={t}
+        item={view.mode === 'items' && follow !== null ? (racer?.item ?? null) : undefined}
+      />
       <MapCorner>
         <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
       </MapCorner>

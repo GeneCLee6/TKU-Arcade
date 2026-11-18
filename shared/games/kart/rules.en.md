@@ -11,8 +11,8 @@ A 3D kart race in the browser for 1 to 8 karts: friends in one room, computer ka
 
 ## Driving
 
-- **Drift**: hold the drift key while steering. A drift fills your **boost gauge**; a full gauge becomes a stored boost (up to two), fired with the boost key.
-- **Instant boost**: a drift that is deep enough earns a short burst. Let the drift go and press forward again, while the kart is still sliding or just after it straightens.
+- **Drift**: hold the drift key while steering. A drift fills your **boost gauge**; a full gauge becomes a stored boost (up to two), fired with the boost key. One boost burns at a time: while it does, the key does nothing.
+- **Instant boost**: a drift that is deep and long enough earns a short burst. Let the drift go and press forward again, while the kart is still sliding or just after it straightens.
 - **Reset**: puts the kart back on the road at the last checkpoint.
 
 The controls panel on the Kart page lists the keys, the gamepad buttons and the touch buttons, and lets you change them.

@@ -55,6 +55,7 @@ import {
   kartBoosting,
   kartTeamBoosting,
   kartBurstWaiting,
+  kartDashDepth,
   kartSkidding,
   kartSlip,
   kartSpeed,
@@ -66,6 +67,7 @@ import {
   type KartState,
   type KartTuning,
 } from '../../shared/kart/physics.ts'
+import { TEAM_BOOST } from '../../shared/kart/teamBoost.ts'
 import { calloutAtStart, calloutBetween, louder, type Callout } from './callouts.ts'
 import { BURST_POWER, burstBetween, skidStrength } from './feelFx.ts'
 import { readGamepad } from './devices.ts'
@@ -140,7 +142,22 @@ export interface SpikeHud {
    */
   readonly teamBoosts?: number
   readonly teamBoosting?: boolean
+  /**
+   * The drift under way, on its way to earning the instant boost (2026-11-18: deep and long, both),
+   * in twentieths: 0 out of a drift, 20 once it is earned. The HUD's depth meter
+   */
+  readonly depth?: number
+  /** How much of the running boost is left, in twentieths of a full one; 0 or left out with none */
+  readonly boostLeft?: number
+  /**
+   * A boost is running and the boost key does nothing until it ends (the classic feel, 2026-11-18):
+   * the HUD shows the charges locked
+   */
+  readonly boostLocked?: boolean
 }
+
+/** The HUD's meters move in twentieths, so that the HUD is drawn again only when one moves */
+export const HUD_STEPS = 20
 
 /**
  * What /kart/spike drives on: the walled yard of J3, J4's test oval, J5's first track, N1's second or
@@ -361,7 +378,10 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
   a.teamBoosting === b.teamBoosting &&
   a.boosting === b.boosting &&
   a.chain === b.chain &&
-  (a.dash ?? 0) === (b.dash ?? 0)
+  (a.dash ?? 0) === (b.dash ?? 0) &&
+  (a.depth ?? 0) === (b.depth ?? 0) &&
+  (a.boostLeft ?? 0) === (b.boostLeft ?? 0) &&
+  (a.boostLocked ?? false) === (b.boostLocked ?? false)
 
 /**
  * The game loop, outside React (docs/ARCHITECTURE.md §4): rendering follows the display, the physics
@@ -699,6 +719,20 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       ...(current.teamBoosts !== undefined
         ? { teamBoosts: current.teamBoosts, teamBoosting: kartTeamBoosting(current) }
         : {}),
+      depth: rules.chainBoosts ? Math.floor(kartDashDepth(current, tuning) * HUD_STEPS + 1e-9) : 0,
+      // A team boost (a team race) shows on the same meter, and locks the charges like any boost
+      boostLeft: Math.min(
+        HUD_STEPS,
+        Math.ceil(
+          Math.max(
+            current.boostSeconds / Math.max(0.1, tuning.boostDuration),
+            (current.teamSeconds ?? 0) / TEAM_BOOST.seconds,
+          ) *
+            HUD_STEPS -
+            1e-9,
+        ),
+      ),
+      boostLocked: isClassic(tuning) && (current.boostSeconds > 0 || kartTeamBoosting(current)),
     }
     options.onPose?.(current.x, current.z, current.heading, run.nextGate)
     if (trial && track) {

@@ -295,7 +295,7 @@ JSON patch 少約 **73–76%**（本機 1.52 → 0.36、預覽站 1.46 → 0.40 
 
 ## 17. 團隊賽：分隊、團隊加速條、團隊噴射（2026-11-18，`feat/kart-team-race`）
 
-規則與程式在 [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.30。`PROTOCOL_VERSION` 維持 2：全部是新增（新訊息、選用欄位、道具 frame 的新 op），舊頁面不會送、收到多的欄位也不看。
+規則與程式在 [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.31。`PROTOCOL_VERSION` 維持 2：全部是新增（新訊息、選用欄位、道具 frame 的新 op），舊頁面不會送、收到多的欄位也不看。
 
 | 方向 | 格式 | 內容 |
 | --- | --- | --- |
@@ -320,4 +320,4 @@ JSON patch 少約 **73–76%**（本機 1.52 → 0.36、預覽站 1.46 → 0.40 
   | 本機 `wrangler dev`（build 後） | 97 s | 0.77／3.90 kB/s | frame 3.30、JSON 0.38 kB/s | 0／11,491 | 是（19 ms） | 6／6 | 2／2 | 12／12 | 19：17 |
 PREVIEW_ROW
   JSON 那一欄是道具賽＋團隊賽合計（§15 的道具賽單獨約 0.36–0.40 kB/s），團隊賽多出來的量在雜訊範圍內。上行的 `item` 從 0 變成約 2 B/s（道具與團隊噴射的 8 bytes frame）。
-- **測試**：`tests/kart/team.test.ts`、`tests/worker/room-teams.test.ts`、`e2e/kart-team.spec.ts`（§4.30）。
+- **測試**：`tests/kart/team.test.ts`、`tests/worker/room-teams.test.ts`、`e2e/kart-team.spec.ts`（§4.31）。

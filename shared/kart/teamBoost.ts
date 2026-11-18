@@ -1,5 +1,5 @@
 // The team boost's numbers (2026-11-18, owner: "a team race can have a blue N2O that burns longer and
-// faster"; shared/kart/team.ts, docs/ARCHITECTURE.md §4.30). On their own, with no imports, so that
+// faster"; shared/kart/team.ts, docs/ARCHITECTURE.md §4.31). On their own, with no imports, so that
 // the physics (physics.ts, classic.ts) can read them without a circle. Not on the tuning panel: a
 // team boost is the same for everyone in the race.
 

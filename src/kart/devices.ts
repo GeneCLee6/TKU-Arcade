@@ -21,7 +21,9 @@ const RULES_KEY = 'tku-arcade.kart.rules'
 // .3 since the classic feel (2026-11-17): numbers kept for the arcade feel are not carried over
 // .4 the same day: the instant boost fires only on a fresh press, and the standard numbers moved
 // (the start boost, the instant boost's pull), so numbers kept before are not today's standard
-const TUNING_KEY = 'tku-arcade.kart.tuning.4'
+// .5 since 2026-11-18: the drift is looser and the instant boost takes a deep, long drift (new
+// numbers, and the standard ones moved again)
+const TUNING_KEY = 'tku-arcade.kart.tuning.5'
 
 // localStorage can be missing, blocked or full: the page then keeps everything in memory
 function read(key: string): string | null {
