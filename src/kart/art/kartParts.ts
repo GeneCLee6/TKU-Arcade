@@ -252,11 +252,11 @@ export function hull(sections: readonly Facet[]): BufferGeometry {
     for (let step = 0; step < 8; step++) {
       // Two triangles a face, each with corners of its own: flat
       corner(ring, step)
-      corner(ring, step + 1)
       corner(ring + 1, step)
       corner(ring, step + 1)
+      corner(ring, step + 1)
+      corner(ring + 1, step)
       corner(ring + 1, step + 1)
-      corner(ring + 1, step)
     }
   }
   for (const [ring, flip] of [
@@ -265,8 +265,8 @@ export function hull(sections: readonly Facet[]): BufferGeometry {
   ] as const) {
     for (let step = 1; step < 7; step++) {
       corner(ring, 0)
-      corner(ring, flip ? step : step + 1)
       corner(ring, flip ? step + 1 : step)
+      corner(ring, flip ? step : step + 1)
     }
   }
   const geometry = new BufferGeometry()
