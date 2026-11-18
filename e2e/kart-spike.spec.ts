@@ -59,6 +59,24 @@ const releaseWindowOpen = (page: Page) =>
     { polling: 'raf', timeout: 5000 },
   )
 
+/**
+ * 2026-11-18: the gauge goes by the quality of the drift, and at the yard's speeds (it is 140 m
+ * across) a drift in circles fills next to nothing. For the tests that only want a charge to fire,
+ * the page starts with numbers of its own, as the tuning panel would store them: a gauge that fills
+ * from the first moment of a drift, and quickly
+ */
+const quickGauge = (page: Page) =>
+  page.addInitScript(() => {
+    localStorage.setItem(
+      'tku-arcade.kart.tuning.7',
+      JSON.stringify({
+        kind: 'tku-arcade.kart.tuning',
+        version: 2,
+        tuning: { gaugeFillRate: 60, gaugeLead: 0, gaugeFade: 5 },
+      }),
+    )
+  })
+
 /** Fails the test on anything red in the console or any uncaught error */
 function watchConsole(page: Page): string[] {
   const errors: string[] = []
@@ -346,6 +364,7 @@ test.describe('the boost gauge', () => {
     page,
   }) => {
     const errors = watchConsole(page)
+    await quickGauge(page)
     await openSpike(page)
     const stored = page.getByTestId('kart-stored')
     await expect(stored).toHaveAttribute('aria-label', 'Boosts ready: 0 of 2')
@@ -358,7 +377,7 @@ test.describe('the boost gauge', () => {
     await expect.poll(async () => (await reading(page)).state.gauge, LONG).toBeGreaterThan(20)
     await expect(page.getByTestId('kart-gauge')).not.toHaveAttribute('aria-valuenow', '0')
 
-    // 1.5 s of drifting fills the gauge into a stored boost
+    // A few seconds of drifting fill the gauge into a stored boost
     await expect.poll(async () => (await reading(page)).state.storedBoosts, LONG).toBe(1)
     await expect(stored).toHaveAttribute('aria-label', 'Boosts ready: 1 of 2')
 
@@ -394,7 +413,9 @@ test.describe('the boost gauge', () => {
       undefined,
       { polling: 'raf', timeout: 10_000 },
     )
-    await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'release')
+    // (2026-11-18: pressed once the car has straightened, the instant boost is a late one, and the
+    // callout says so)
+    await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'late')
     // The HUD says so too. (The speed is not read here: the yard is small, and the wall may come
     // before the next reading)
     await expect(page.getByTestId('kart-boosting')).toBeVisible()
@@ -454,6 +475,7 @@ test.describe('a gamepad (simulated: a real pad cannot be tested headless)', () 
   }) => {
     const errors = watchConsole(page)
     await fakeGamepad(page)
+    await quickGauge(page)
     await openSpike(page)
     await expect(page.getByTestId('kart-gamepad')).toHaveText('Test gamepad (STANDARD GAMEPAD)')
 

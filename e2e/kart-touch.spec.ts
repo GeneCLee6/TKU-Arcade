@@ -327,7 +327,12 @@ test.describe('the drift by touch, the settings and the keyboard', () => {
     await fingers.move(2, left)
     await fingers.tap(4, gas)
     await expect.poll(async () => (await reading(page)).state.miniSeconds).toBeGreaterThan(0)
-    await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'release')
+    // 2026-11-18: the callout goes by the timing of the tap: good (an instant boost), or perfect if
+    // the fingers were quick, or late if the kart had straightened first
+    await expect(page.getByTestId('kart-callout')).toHaveAttribute(
+      'data-kind',
+      /^(release|perfect|late)$/,
+    )
     await fingers.up(2)
   })
 
