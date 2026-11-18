@@ -172,7 +172,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
       entry,
       skill,
       course,
-      brain: createBotBrain(skill, track.road, tuning, options.seed * 31 + seat, track.jumps),
+      brain: createBotBrain(skill, track.road, tuning, options.seed * 31 + seat, track.jumps, track.walls),
       rider: createItemRider(seat, track, room.state().used),
       team: createTeamRider(room.state().racers.find((racer) => racer.seat === seat)),
       mass: kartMass(entry.kart),
