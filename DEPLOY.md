@@ -150,6 +150,10 @@ npx wrangler rollback <version-id> --message "rollback: <原因>"
 | `AUTH_SHARED_SECRET` | F1 | 與淡江牌桌（Overtrick）共用的登入簽章金鑰，至少 32 字；步驟見 §11。牌桌的網址是 var `AUTH_BRIDGE_URL`（`wrangler.jsonc` 頂層），不是 secret |
 | `ANTHROPIC_API_KEY` | H2 | 題目草稿 |
 | `LONGTALK_URL` | 選用 | LongTalk 語音房的網址 |
+| `STATS_KEY` | I4 | 擁有者頁 `/stats` 的金鑰（每日指標、遊戲開關、成本儀表板）；§12 |
+| `CF_ANALYTICS_TOKEN` | P1 | 成本儀表板讀 Cloudflare 用量的 API token（只要 Account Analytics 讀取）；§13 |
+| `CF_ACCOUNT_ID` | P1 | 同上，Cloudflare 帳號 id；§13 |
+| `ALERT_WEBHOOK_URL` | 選用（P1） | 用量超過 80% 時另外 POST 到這個網址（Discord／Slack webhook）；§13 |
 
 只用 `wrangler secret put` 放在 Worker，**不進前端、不進 repo**：
 
@@ -265,3 +269,70 @@ echo "$KEY"   # 自己記下來，在 /stats 貼上一次，那個瀏覽器會�
 ```
 
 沒設 `STATS_KEY` 時 `GET /api/stats` 回 404，頁面說「沒有開指標」。換金鑰就重新 `secret put`；不要了就 `npx wrangler secret delete STATS_KEY --name tku-arcade`（計數照樣寫，只是看不到）。D1 的表由 `migrations/0003_daily_metrics.sql` 建，部署時自動套用（§6）。
+
+擁有者頁還有兩塊也用同一把金鑰：**遊戲開關**（§14）與**成本儀表板**（§13）。沒有 `STATS_KEY` 時這兩塊的 API（`/api/admin/*`）也是 404。
+
+## 13. 成本儀表板與 80% 警示（P1，`e12-t15`）
+
+`/stats` 最下面的「Cloudflare 用量」：整個 Cloudflare 帳號（帳號上所有 Worker，包括預覽、牌桌、LongTalk——免費額度是帳號共用的）對照方案額度的比例。資料來自 Cloudflare 的 GraphQL Analytics API；**本站不自己計數**。每天 19:00 UTC（台北 03:00，和 D1 備份同一條 cron）檢查一次，超過 80% 的寫進 D1 `cost_alerts`（每個指標每天或每月只記一次），儀表板最上面紅字列出最近 60 天的警示。
+
+| 指標 | 免費方案額度 | 期間 |
+| --- | --- | --- |
+| Workers 請求 | 100,000 | 每天（UTC） |
+| Durable Object 請求 | 100,000 | 每天 |
+| Durable Object 時長 | 13,000 GB-s | 每天 |
+| D1 讀取列數 | 5,000,000 | 每天 |
+| D1 寫入列數 | 100,000 | 每天 |
+| D1 儲存 | 5 GB | 目前 |
+| R2 儲存 | 10 GB | 目前 |
+| R2 Class A（寫入類） | 1,000,000 | 每月 |
+| R2 Class B（讀取類） | 10,000,000 | 每月 |
+
+每天的額度取「昨天」與「今天到目前」較高的那天（cron 在 UTC 19:00 跑，今天才過八成）。改用付費方案時設 var `COST_PLAN=paid`（`wrangler.jsonc` 頂層 `vars`，或 `--var COST_PLAN:paid`），改對照每月內含量。額度數字在 `shared/usage.ts`，Cloudflare 改價時改那裡。
+
+### 13.1 打開（擁有者，一次）
+
+1. Cloudflare 儀表板 → My Profile → API Tokens → Create Token → Custom token：權限只要 **Account → Account Analytics → Read**，Account Resources 選這個帳號。**不要**重用部署用的 `CLOUDFLARE_API_TOKEN`（那把能部署）。
+2. 帳號 id：Workers & Pages 總覽右側的 Account ID（和 GitHub secret `CLOUDFLARE_ACCOUNT_ID` 同一個值）。
+3. 設成正式站的 Worker secret（值不進 repo、不進前端）：
+
+```sh
+npx wrangler secret put CF_ANALYTICS_TOKEN --name tku-arcade   # 貼上 token
+npx wrangler secret put CF_ACCOUNT_ID --name tku-arcade        # 貼上帳號 id
+```
+
+4. 打開 `/stats`，最下面應該出現用量表。某一列寫「沒有回應」代表那個資料集查不到（token 權限不夠或 Cloudflare 改了欄位名稱），Worker 日誌會有 `usage query failed` 與原因；其他列不受影響。
+
+沒設這兩個 secret 時，用量表寫「未設定」，每日檢查什麼都不做。
+
+### 13.2 警示要送到哪裡（選用）
+
+預設只有 D1＋儀表板紅字＋Worker 日誌一行 `cost_alert`。要即時收到，設一個 webhook（Discord 頻道的 Webhook URL 或 Slack Incoming Webhook 都直接可用；送出的 JSON 有 `content`（Discord）、`text`（Slack）與 `alerts`）：
+
+```sh
+npx wrangler secret put ALERT_WEBHOOK_URL --name tku-arcade
+```
+
+Email 沒有接（Cloudflare Email Routing 要先驗證收件地址、加 `send_email` 綁定），要的話在 `worker/usage.ts` 的 `checkUsage` 加一個送出方式；見 `docs/NEXT.md` §2。
+
+## 14. 遊戲開關（P1，`e12-t11`）
+
+`/stats` 的「遊戲：開放或暫停」列出伺服器上的每一款遊戲（卡丁車與路線圖外的遊戲都在），按「暫停」就關掉那一款，**不用重新部署**（存在 D1 `game_flags`，`migrations/0004_game_flags.sql`）。
+
+暫停後：
+
+- 大廳那張卡片標「維護中暫停開放」，「建立房間」按不下去；那款遊戲的公開房不出現在列表。
+- `POST /api/rooms` 拒絕（403 `game_disabled`）。
+- **已經開著的房間：正在玩的那一局照常玩完**；之後不能再開新局（開始、再來一局、換成這款都回「這款遊戲維護中暫停」），房主可以把房間換成別款繼續玩。房間收到開局訊息時讀旗標，最多快取 30 秒，所以按下暫停後最多半分鐘內生效。
+- 讀不到旗標表（D1 故障）時全部當作開放。
+
+也可以不用網頁，直接改 D1（例如網頁打不開時）：
+
+```sh
+npx wrangler d1 execute tku-arcade --remote --command   "INSERT INTO game_flags (game, enabled, updated_at) VALUES ('kart', 0, unixepoch() * 1000)
+   ON CONFLICT (game) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at"
+# 重新開放：把 0 改成 1，或 DELETE FROM game_flags WHERE game = 'kart'
+```
+
+預覽站共用 staging D1，所以在一個預覽暫停一款遊戲，所有預覽都會暫停；測完記得打開。
+

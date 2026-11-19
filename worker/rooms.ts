@@ -9,7 +9,9 @@ import { isRoomCode, newRoomCode } from '../shared/room-code.ts'
 import { isRoomId, newRoomId } from '../shared/room-id.ts'
 import type { Env } from './app.ts'
 import { ACCOUNT_HEADER, encodeAccountHeader, sessionAccount } from './auth.ts'
+import { isGameEnabled } from './flags.ts'
 import { LOBBY_NAME } from './lobby-board.ts'
+import { FixedWindowLimit } from './rate-limit.ts'
 
 /** Tries this many fresh ids before giving up (a collision at ~59 bits is not expected at all) */
 const CREATE_ATTEMPTS = 3
@@ -19,6 +21,17 @@ const MAX_CREATE_BODY_CHARS = 4_096
 
 /** Random numbers tried for a new room before it goes without one (9000 numbers, a few rooms open) */
 const CODE_ATTEMPTS = 12
+
+/**
+ * New rooms one address may open a minute, per Worker instance (e12-t13). Far above what a person
+ * does, and above a browser test run from one machine; it only blunts a script. The PRD's 5 a
+ * minute, counted across instances, is e12-t06's
+ */
+const CREATES_PER_ADDRESS = 30
+/** New rooms one Worker instance opens a minute, whoever asks */
+const CREATES_PER_INSTANCE = 600
+
+const createLimit = new FixedWindowLimit(CREATES_PER_ADDRESS, CREATES_PER_INSTANCE)
 
 const ROOM_PATH = /^\/api\/rooms\/([^/]+)$/
 const REPLAY_PATH = /^\/api\/rooms\/([^/]+)\/replay$/
@@ -76,9 +89,18 @@ export async function handleRoomCode(request: Request, env: Env, url: URL): Prom
 }
 
 /** POST /api/rooms creates a room and answers its id; GET /api/rooms/<id> answers its summary */
-export async function handleRooms(request: Request, env: Env, url: URL): Promise<Response> {
+export async function handleRooms(
+  request: Request,
+  env: Env,
+  url: URL,
+  limit: FixedWindowLimit = createLimit,
+  now: number = Date.now(),
+): Promise<Response> {
   if (url.pathname === '/api/rooms') {
     if (request.method !== 'POST') return fail('method_not_allowed', 405, { allow: 'POST' })
+    if (!limit.take(request.headers.get('cf-connecting-ip') ?? 'unknown', now)) {
+      return fail('rate_limited', 429, { 'retry-after': '60' })
+    }
     return createRoom(request, env)
   }
   const replay = REPLAY_PATH.exec(url.pathname)
@@ -117,6 +139,8 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
     password?: unknown
   }
   if (typeof gameId !== 'string' || !getGame(gameId)) return fail('unknown_game', 400)
+  // Paused by the owner (e12-t11, worker/flags.ts)
+  if (!(await isGameEnabled(env.DB, gameId))) return fail('game_disabled', 403)
   // A password that is there but no good (too long, only spaces) is refused, not dropped silently
   if (password !== undefined && password !== '' && normalizePassword(password) === null) {
     return fail('bad_password', 400)

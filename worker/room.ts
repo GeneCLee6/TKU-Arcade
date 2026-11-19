@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers'
+import { disabledGames } from './flags.ts'
 import { countMetric } from './metrics.ts'
 import type { ChatMessage } from '../shared/chat.ts'
 import { getGame } from '../shared/games/index.ts'
@@ -33,6 +34,19 @@ const CHAT_PREFIX = 'chat:'
 const chatKey = (id: number) => CHAT_PREFIX + String(id).padStart(12, '0')
 /** The most keys one `storage.delete` takes */
 const DELETE_BATCH = 128
+/** How long the paused games (e12-t11) read from D1 are trusted before a game may start on them */
+const FLAGS_TTL_MS = 30_000
+
+/** Whether this message may start a game (shared/protocol.ts): parsed, so no spelling slips past */
+function startsAGame(data: string): boolean {
+  try {
+    const t = (JSON.parse(data) as { t?: unknown } | null)?.t
+    return t === 'start' || t === 'rematch' || t === 'set_game'
+  } catch {
+    return false
+  }
+}
+
 /** What the lobby was last told (`LobbyReport`); only a public room ever has this key */
 const LOBBY_KEY = 'lobby'
 
@@ -50,6 +64,8 @@ export class RoomDO extends DurableObject<Env> {
   private alarmAt: number | null = null
   /** What the lobby was last told; stored, since a sweep every 15 s may find a new instance */
   private reported: LobbyReport | null = null
+  /** The paused games (e12-t11) as last read from D1, and when; re-read before a game may start */
+  private paused: { games: Set<string>; at: number } | null = null
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -100,6 +116,8 @@ export class RoomDO extends DurableObject<Env> {
       newSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],
       // e12-t07: counted after the change, never holding it up
       metric: (name, gameId) => ctx.waitUntil(countMetric(env.DB, name, gameId, Date.now())),
+      // Read just before (`webSocketMessage`), so the host can ask without waiting
+      gameEnabled: (gameId) => !this.paused?.games.has(gameId),
     })
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG))
     void ctx.blockConcurrencyWhile(async () => {
@@ -210,7 +228,10 @@ export class RoomDO extends DurableObject<Env> {
     const { conn } = ws.deserializeAttachment() as OpenSocket
     // Normally answered by the auto-response without waking the object
     if (data === HEARTBEAT_PING) ws.send(HEARTBEAT_PONG)
-    else if (typeof data === 'string') this.host.message(conn, data)
+    else if (typeof data === 'string') {
+      if (startsAGame(data)) await this.readFlags()
+      this.host.message(conn, data)
+    }
     else this.host.binary(conn, data)
     await this.settle()
   }
@@ -239,6 +260,18 @@ export class RoomDO extends DurableObject<Env> {
     }
     this.host.sweep()
     await this.settle()
+  }
+
+  /**
+   * The paused games, from D1 unless read in the last FLAGS_TTL_MS. Nothing else runs meanwhile
+   * (`blockConcurrencyWhile`), so the room's messages keep their order
+   */
+  private async readFlags(): Promise<void> {
+    const now = Date.now()
+    if (this.paused && now - this.paused.at < FLAGS_TTL_MS) return
+    await this.ctx.blockConcurrencyWhile(async () => {
+      this.paused = { games: await disabledGames(this.env.DB), at: now }
+    })
   }
 
   /** After anything that may have changed the room: what the outside world is told of it */

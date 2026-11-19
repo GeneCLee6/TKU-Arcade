@@ -117,6 +117,8 @@ class World {
   /** What the runtime keeps through hibernation */
   sockets: OpenSocket[] = []
   modules: Record<string, AnyGameModule>
+  /** The games the owner has paused (e12-t11) */
+  paused = new Set<string>()
 
   constructor(modules: Record<string, AnyGameModule> = {}) {
     this.modules = { tictactoe: ticTacToe as unknown as AnyGameModule, ...modules }
@@ -159,6 +161,7 @@ class World {
       newMemberId: () => `member-${++this.nextId}`,
       newToken: () => `token-${this.nextId}`.padEnd(43, '_'),
       newSeed: () => this.seed,
+      gameEnabled: (id) => !this.paused.has(id),
     })
   }
 
@@ -2561,5 +2564,52 @@ describe('reactions', () => {
     expect(reactions(o)).toHaveLength(2)
     x.send({ t: 'react', reaction: REACTION_COUNT })
     expect(x.closed).not.toBeNull()
+  })
+})
+
+describe('a game the owner has paused (e12-t11, AC-12.7)', () => {
+  it('cannot start in a waiting room, and the room may switch to another game', () => {
+    const world = room('tictactoe', { other: ticTacToe as unknown as AnyGameModule })
+    const x = world.join('Xia')
+    world.join('Ou')
+    world.paused.add('tictactoe')
+    x.send({ t: 'start' })
+    expect(x.errors).toEqual([{ t: 'error', code: 'game_disabled' }])
+    expect(x.view?.room.status).toBe('waiting')
+    expect(world.stored().game).toBeNull()
+    x.send({ t: 'set_game', gameId: 'other' })
+    x.send({ t: 'start' })
+    expect(x.errors).toHaveLength(1)
+    expect(x.view?.room.status).toBe('playing')
+    // Nor can the room be switched back to it
+    x.send({ t: 'set_game', gameId: 'tictactoe' })
+    expect(x.errors.at(-1)).toEqual({ t: 'error', code: 'game_disabled' })
+    expect(x.view?.room.gameId).toBe('other')
+    expect(x.view?.room.status).toBe('playing')
+  })
+
+  it('lets a game being played go on to its end, then starts no new one', () => {
+    const { world, x, o } = started()
+    world.paused.add('tictactoe')
+    for (const [client, cell] of [
+      [x, 0],
+      [o, 3],
+      [x, 1],
+      [o, 4],
+      [x, 2],
+    ] as const) {
+      client.send(place(cell))
+    }
+    expect(x.errors).toEqual([])
+    expect(o.errors).toEqual([])
+    expect(x.view?.room.status).toBe('ended')
+    x.send({ t: 'rematch' })
+    expect(x.errors).toEqual([{ t: 'error', code: 'game_disabled' }])
+    expect(x.view?.room.status).toBe('ended')
+    // Open again: the same room plays on
+    world.paused.delete('tictactoe')
+    x.send({ t: 'rematch' })
+    expect(x.errors).toHaveLength(1)
+    expect(x.view?.room.status).toBe('playing')
   })
 })

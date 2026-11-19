@@ -15,7 +15,7 @@ import { useToast } from '../components/useToast.ts'
 import { useT } from '../i18n/useT.ts'
 import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
-import { createRoom } from '../lib/rooms.ts'
+import { createRoom, fetchPausedGames } from '../lib/rooms.ts'
 import { useNavigate } from '../lib/useRouter.ts'
 import { clippedFill, displayType, slantClip } from '../styles/esports.ts'
 import { color, font, fontSize, space } from '../styles/tokens.ts'
@@ -46,9 +46,20 @@ export function HomePage() {
   // Off by default: nobody's room shows up in front of strangers unless they asked for that
   const [listPublicly, setListPublicly] = useState(false)
   const inFlight = useRef<AbortController | null>(null)
+  // The games the owner has paused (e12-t11): their cards say so, and New room is off
+  const [paused, setPaused] = useState<readonly string[]>([])
 
   // Whoever left the lobby meanwhile should not be carried off to the new room
   useEffect(() => () => inFlight.current?.abort(), [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    // Added to, not replaced: a refusal may have marked one meanwhile
+    void fetchPausedGames(controller.signal).then((games) =>
+      setPaused((known) => [...new Set([...known, ...games])]),
+    )
+    return () => controller.abort()
+  }, [])
 
   const create = async (gameId: string) => {
     const controller = new AbortController()
@@ -57,7 +68,10 @@ export function HomePage() {
     const id = await createRoom(gameId, listPublicly, controller.signal)
     if (controller.signal.aborted) return
     setCreating(false)
-    if (id !== null) navigate(`/r/${id}`)
+    if (id === 'paused') {
+      setPaused((games) => [...games, gameId])
+      toast(t('lobby.paused'), { tone: 'danger' })
+    } else if (id !== null) navigate(`/r/${id}`)
     else toast(t('lobby.newRoomFailed'), { tone: 'danger' })
   }
 
@@ -130,6 +144,7 @@ export function HomePage() {
                 <GameCard
                   game={game}
                   disabled={creating}
+                  paused={paused.includes(game.id)}
                   onNewRoom={() => handleNewRoom(game.id)}
                 />
               </li>

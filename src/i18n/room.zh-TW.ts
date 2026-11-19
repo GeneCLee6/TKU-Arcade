@@ -49,6 +49,7 @@ export const roomZhTW: Record<RoomMessageKey, string> = {
   'room.error.rate_limited': '太快了，請稍等再試。',
   'room.error.seat_taken': '這個座位已經有人了。',
   'room.error.unavailable': '這個功能還不能用。',
+  'room.error.game_disabled': '這款遊戲維護中暫停，不能開新局。請替房間換一款遊戲。',
   'room.error.password_required': '這個房間有密碼。',
   'room.error.wrong_password': '房間密碼不對。',
   'room.error.wrong_status': '遊戲現在的階段不能這麼做。',

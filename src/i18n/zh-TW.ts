@@ -32,6 +32,7 @@ export const zhTW: Messages = {
   'lobby.join.submit': '加入',
   'lobby.minutes': '約 {minutes} 分鐘',
   'lobby.newRoom': '建立房間',
+  'lobby.paused': '維護中暫停開放，稍後回來。',
   'lobby.newRoomFailed': '無法建立房間，請再試一次。',
   'lobby.players.exact': '{count} 人',
   'lobby.players.range': '{min}–{max} 人',

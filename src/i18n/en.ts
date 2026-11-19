@@ -34,6 +34,7 @@ export const en = {
   'lobby.join.submit': 'Join',
   'lobby.minutes': 'About {minutes} min',
   'lobby.newRoom': 'New room',
+  'lobby.paused': 'Paused for maintenance. Back soon.',
   'lobby.newRoomFailed': "Couldn't create the room. Try again.",
   'lobby.players.exact': '{count} players',
   'lobby.players.range': '{min}–{max} players',
