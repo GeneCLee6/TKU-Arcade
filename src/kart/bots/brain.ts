@@ -74,12 +74,11 @@ const JUMP_CLEAR = 18
 const JUMP_SECONDS = 0.9
 /**
  * A jump into a corner (2026-11-19): the road is taken to turn where it has come round this far
- * past the lip, radians; a car must be down this many metres before that, and is taken to fly this
- * much further than the bare parabola (the lip stands over the road); never slower than this, m/s
+ * past the lip, radians; a car must be down this many metres before that; never slower than this,
+ * m/s
  */
 const LANDING_TURN = 0.3
 const LANDING_MARGIN = 6
-const FLIGHT_EXTRA = 1.25
 const LANDING_SLOWEST = 34
 /** A drift jump is begun this long before the lip at the latest, seconds: the tail must be out */
 const DRIFT_JUMP_LEAST = 0.14
@@ -272,6 +271,22 @@ export function createBotBrain(
     return turned
   }
 
+  /** How far along the road a car that leaves `lip` at `speed` comes down, metres */
+  const flightOver = (lip: number, speed: number): number => {
+    const count = road.length
+    const from = road[lip]!.y ?? 0
+    let run = 0
+    for (let index = lip + 1; index < lip + count; index++) {
+      run += (along[index % count]! - along[(index - 1) % count]! + total) % total
+      const time = run / speed
+      const height =
+        from + TERRAIN_TUNING.jumpLift * speed * time - (TERRAIN_TUNING.gravity * time * time) / 2
+      if (height <= (road[index % count]!.y ?? 0)) return run
+      if (run > 400) break
+    }
+    return run
+  }
+
   // A jump into a corner (2026-11-19): the fastest a car may leave each lip and still be down
   // before the road turns. Lifting before the crest is the plain way through; the drift jump (a
   // cue) is the fast one
@@ -290,8 +305,20 @@ export function createBotBrain(
     }
     if (Math.abs(turned) < LANDING_TURN) continue
     const reach = Math.max(1, run - LANDING_MARGIN)
-    const flight = (2 * TERRAIN_TUNING.jumpLift * FLIGHT_EXTRA) / TERRAIN_TUNING.gravity
-    takeOff.set(lip, Math.max(LANDING_SLOWEST, Math.sqrt(reach / flight)))
+    // The fastest take-off whose flight (over the road as it falls or climbs beyond the lip) is
+    // down within that reach
+    let low = LANDING_SLOWEST
+    let high = t.topSpeed * 2
+    if (flightOver(lip, low) > reach) {
+      takeOff.set(lip, low)
+      continue
+    }
+    for (let pass = 0; pass < 12; pass++) {
+      const middle = (low + high) / 2
+      if (flightOver(lip, middle) > reach) high = middle
+      else low = middle
+    }
+    if (low < t.topSpeed * 1.9) takeOff.set(lip, low)
   }
 
   /** How much the road turns over the next `metres` from road point `from`, radians, signed */
@@ -526,10 +553,7 @@ export function createBotBrain(
     // Hands that do not mean to fire a dash that waits never press the throttle afresh by chance
     // (easing off at their own top speed and coming back on): the throttle stays as it was
     const waiting = kart.burstReady || kart.releaseWindow > 0
-    const gas =
-      waiting && !dashPlan
-        ? kart.throttleHeld
-        : !cruising
+    const gas = waiting && !dashPlan ? kart.throttleHeld : !cruising
     const base = { ...NO_INPUT, throttle: gas, boost: fire }
 
     if (move.kind === 'tap' || move.kind === 'double') move = NONE
@@ -690,7 +714,7 @@ export function createBotBrain(
       wrong = 0
       move = NONE
       carrying = null
-      fallback = SAFE_AFTER
+      if (tricks) fallback = SAFE_AFTER
       return { ...NO_INPUT, reset: true }
     }
 
@@ -736,8 +760,7 @@ export function createBotBrain(
       const crossZ = kart.z - Math.cos(travel) * toLip
       const turn = wrap(Math.atan2(land.x - crossX, -(land.z - crossZ)) - travel) * cue.way
       const left = toLip / Math.max(1, speed) - (skill.reactionSteps + 1) / 60
-      begin =
-        carrying === cue || left <= DRIFT_JUMP_LEAST || driftTurn(cue.into, left) <= turn
+      begin = carrying === cue || left <= DRIFT_JUMP_LEAST || driftTurn(cue.into, left) <= turn
     }
     if (cue && begin) {
       carrying = cue

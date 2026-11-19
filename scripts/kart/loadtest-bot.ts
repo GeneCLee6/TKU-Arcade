@@ -61,10 +61,23 @@ import {
 } from '../../shared/kart/timeTrial.ts'
 import { courseOf, type Track } from '../../shared/kart/track.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
-import { applyKart, loadoutByte, lookOf, type DriverId, type KartId } from '../../shared/kart/karts.ts'
+import {
+  applyKart,
+  loadoutByte,
+  lookOf,
+  type DriverId,
+  type KartId,
+} from '../../shared/kart/karts.ts'
 import type { KartView } from '../../shared/games/kart/types.ts'
 import { autopilot } from '../../src/kart/race/autopilot.ts'
-import { count, emptyTraffic, since, type BotTally, type DownTraffic, type UpTraffic } from './loadtest-report.ts'
+import {
+  count,
+  emptyTraffic,
+  since,
+  type BotTally,
+  type DownTraffic,
+  type UpTraffic,
+} from './loadtest-report.ts'
 
 /** Clock pings as netRace.ts sends them: a quick few, then one every 2 s; the best of 10 wins */
 const FIRST_PINGS = 5
@@ -129,8 +142,17 @@ export class Bot {
   private readonly options: BotOptions
   private readonly tuning: KartTuning
   private readonly body: number
-  private readonly up: UpTraffic = { frame: emptyTraffic(), item: emptyTraffic(), clock: emptyTraffic(), json: emptyTraffic() }
-  private readonly down: DownTraffic = { relay: emptyTraffic(), clock: emptyTraffic(), json: emptyTraffic() }
+  private readonly up: UpTraffic = {
+    frame: emptyTraffic(),
+    item: emptyTraffic(),
+    clock: emptyTraffic(),
+    json: emptyTraffic(),
+  }
+  private readonly down: DownTraffic = {
+    relay: emptyTraffic(),
+    clock: emptyTraffic(),
+    json: emptyTraffic(),
+  }
   /** Copies of the counters at GO and at the race's end */
   private atGo: { up: UpTraffic; down: DownTraffic } | null = null
   private atEnd: { up: UpTraffic; down: DownTraffic } | null = null
@@ -268,11 +290,16 @@ export class Bot {
           return
         }
         this.rev = message.rev
-        this.view = applyPatch(this.view as unknown as JsonValue, message.ops as PatchOp[]) as unknown as RoomView
+        this.view = applyPatch(
+          this.view as unknown as JsonValue,
+          message.ops as PatchOp[],
+        ) as unknown as RoomView
         this.afterPatch()
         return
       case 'error':
-        this.log(`error ${message.code}${message.code === 'game_error' ? ` ${JSON.stringify(message.error)}` : ''}`)
+        this.log(
+          `error ${message.code}${message.code === 'game_error' ? ` ${JSON.stringify(message.error)}` : ''}`,
+        )
         return
       default:
         return
@@ -414,7 +441,11 @@ export class Bot {
   private step(game: KartView): void {
     const course = this.course!
     let trial = this.trial!
-    const input = this.teamDrift(this.seekBox(trial, autopilot(trial, course.road), game), trial, game)
+    const input = this.teamDrift(
+      this.seekBox(trial, autopilot(trial, course.road), game),
+      trial,
+      game,
+    )
     if (trial.phase === 'countdown') {
       const server = this.serverNow()
       const left = game.goAt === null || server === null ? null : (game.goAt - server) / 1000
@@ -561,7 +592,10 @@ export class Bot {
       this.seen = event.n + 1
       const reached = event.targets.includes(this.seat) && !event.blocked.includes(this.seat)
       if (event.hit) {
-        if (reached && (event.item === 'hail' || event.item === 'cloud' || event.item === 'puddle')) {
+        if (
+          reached &&
+          (event.item === 'hail' || event.item === 'cloud' || event.item === 'puddle')
+        ) {
           this.stunUntil = event.at + SHOT_TUNING.stunMs[event.item]
           this.towUntil = 0
         }

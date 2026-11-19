@@ -72,7 +72,8 @@ export const FORT: TrackJson = {
   id: 'fort',
   // A working name (2026-11-18): the owner may rename it (docs/KART-WORLD.md §6)
   name: { en: 'Hobe Fort Hill', 'zh-TW': '滬尾砲台坡' },
-  revision: 1,
+  // 2026-11-19: the drift jump (terrain.ts) changed what a jump is
+  revision: 2,
   theme: 'sunset',
   laps: 3,
   road: made.road,

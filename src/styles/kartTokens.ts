@@ -29,6 +29,10 @@ export const kartScene = {
   barrier: '#1F6FB2',
   barrierTop: '#F4F4F4',
   barrierStripe: '#F2C230',
+  // 2026-11-19: a fence a flying kart clears, a shed of containers and a yard's brick wall
+  fence: '#F2C230',
+  container: '#2F7F9E',
+  yardWall: '#E9D8C4',
   water: '#2E8BC0',
   waterDeep: '#155E8C',
   checkerDark: '#1B1B1F',

@@ -54,10 +54,21 @@ describe('the default keys', () => {
   })
 
   it('drifts with Shift and boosts with Ctrl too (2026-11-14)', () => {
-    expect(readInput(DEFAULT_BINDINGS, keys('ShiftLeft', 'ControlLeft'))).toMatchObject({ drift: true, boost: true })
-    expect(readInput(DEFAULT_BINDINGS, keys('ShiftRight', 'ControlRight'))).toMatchObject({ drift: true, boost: true })
+    expect(readInput(DEFAULT_BINDINGS, keys('ShiftLeft', 'ControlLeft'))).toMatchObject({
+      drift: true,
+      boost: true,
+    })
+    expect(readInput(DEFAULT_BINDINGS, keys('ShiftRight', 'ControlRight'))).toMatchObject({
+      drift: true,
+      boost: true,
+    })
     expect(isBoundKey(DEFAULT_BINDINGS, 'ControlLeft')).toBe(true)
-    expect(actionKeys(DEFAULT_BINDINGS, 'boost')).toEqual(['KeyX', 'KeyE', 'ControlLeft', 'ControlRight'])
+    expect(actionKeys(DEFAULT_BINDINGS, 'boost')).toEqual([
+      'KeyX',
+      'KeyE',
+      'ControlLeft',
+      'ControlRight',
+    ])
   })
 
   it('lets Shift go when the player gives it to another action', () => {

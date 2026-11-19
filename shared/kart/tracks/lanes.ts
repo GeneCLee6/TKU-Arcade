@@ -159,15 +159,36 @@ guide.tech
 yards.forEach((yard, index) => guide.slot(yard, index === 1 ? -GATE_LINE : GATE_LINE))
 // The staircase: each drift jump is begun on the outside of the hairpin it lands in
 guide.tech.hold(step1 - 10, step1, -6, 3).hold(step2 - 5, step2, 6, 3)
-guide.cue({ lip: step1, way: 1, land: [step1 + 9, 0], into: 0.15, nose: (40 * Math.PI) / 180, most: 60 })
-guide.cue({ lip: step2, way: -1, land: [step2 + 9, 0], into: 0.15, nose: (40 * Math.PI) / 180, most: 60 })
+guide.cue({
+  lip: step1,
+  way: 1,
+  land: [step1 + 9, 0],
+  into: 0.15,
+  nose: (40 * Math.PI) / 180,
+  most: 60,
+})
+guide.cue({
+  lip: step2,
+  way: -1,
+  land: [step2 + 9, 0],
+  into: 0.15,
+  nose: (40 * Math.PI) / 180,
+  most: 60,
+})
 // The well: the outside lane for everyone; over the fence from a drift jump into the inside lane
 guide.safe.hold(step3 - 6, step3 + 3, -4, 6).hold(step3 + 4, wellOut + 3, -19, 12)
 guide.tech
   .hold(step3 - 12, step3, -6, 4)
   .hold(wellIn - 2, wellOut, 25, 6)
   .chord([wellOut, 25], [wellOut + 7, 2], 4)
-guide.cue({ lip: step3, way: 1, land: [wellIn - 0.5, 24], into: 0.4, nose: (36 * Math.PI) / 180, most: 74 })
+guide.cue({
+  lip: step3,
+  way: 1,
+  land: [wellIn - 0.5, 24],
+  into: 0.4,
+  nose: (36 * Math.PI) / 180,
+  most: 74,
+})
 
 export const LANES_GUIDE: TrackGuide = guide.build()
 

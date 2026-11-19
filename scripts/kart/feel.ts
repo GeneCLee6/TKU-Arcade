@@ -19,6 +19,9 @@ export const FEEL_TRACKS = [
   'fort',
   'danhai',
   'datun',
+  // 2026-11-19: the two to learn by heart (docs/KART-FEEL.md §11)
+  'wharf',
+  'lanes',
 ] as const
 
 export const FEEL_DRIVERS = DRIVERS

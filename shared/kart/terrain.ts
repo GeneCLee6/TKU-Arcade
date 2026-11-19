@@ -274,7 +274,16 @@ export function stepOnTerrain(
     vx *= kept
     vz *= kept
   }
-  return { ...next, vx, vz, y: state.y ?? ground.y, vy: 0, air: 0 }
+  return {
+    ...next,
+    vx,
+    vz,
+    y: state.y ?? ground.y,
+    vy: 0,
+    air: 0,
+    // The count of drift jumps landed is the terrain's, not the flat car's
+    ...(state.driftJumps === undefined ? {} : { driftJumps: state.driftJumps }),
+  }
 }
 
 /** What happened to the car's height in a step, for the sound and the look */

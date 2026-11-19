@@ -24,7 +24,15 @@ const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: t
 for (const name of ['novice', 'average', 'expert'] as const) {
   // The driver's skill alone: the plain computer hands, without a person's mistakes
   const { skill } = FEEL_DRIVERS[name]
-  const brain = createBotBrain(skill, track.road, KART_TUNING, seed, track.jumps, track.walls, trackGuide(track.id))
+  const brain = createBotBrain(
+    skill,
+    track.road,
+    KART_TUNING,
+    seed,
+    track.jumps,
+    track.walls,
+    trackGuide(track.id),
+  )
   let trial = startTrial(course)
   const hits: number[] = []
   const dashes: number[] = []

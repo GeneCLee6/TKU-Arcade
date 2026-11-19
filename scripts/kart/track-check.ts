@@ -26,7 +26,15 @@ const drivers: [string, BotSkill][] = [
   ['expert', FEEL_DRIVERS.expert.skill],
 ]
 for (const [name, skill] of drivers) {
-  const brain = createBotBrain(skill, track.road, KART_TUNING, seed, track.jumps, track.walls, trackGuide(track.id))
+  const brain = createBotBrain(
+    skill,
+    track.road,
+    KART_TUNING,
+    seed,
+    track.jumps,
+    track.walls,
+    trackGuide(track.id),
+  )
   let trial = startTrial(course)
   let wrong = 0
   let resets = 0

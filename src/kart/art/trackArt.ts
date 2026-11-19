@@ -115,6 +115,10 @@ export interface ArtKit {
 
 const BARRIER_HEIGHT = 0.95
 const BARRIER_THICKNESS = 0.45
+/** A wall with a top is drawn no higher than this, and as a fence up to `FENCE_MOST`, metres */
+const TALL_WALL_HEIGHT = 7
+const TALL_WALL_THICKNESS = 1.4
+const FENCE_MOST = 4
 const KERB_WIDTH = 0.9
 const LIFT = { road: 0.05, kerb: 0.07, line: 0.09 }
 
@@ -426,13 +430,38 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   // One material for them all: the old street's stall island alone is a hundred of them
   const extraMaterial =
     track.walls.length > 0 ? standard(kartScene.barrier, textures.barrier) : null
+  // 2026-11-19: a wall with a top (shared/kart/walls.ts) stands as high as it says: a fence a
+  // flying kart clears is low and striped, a shed or a yard wall is high enough to hide the road
+  // behind it (containers on the wharf, brick elsewhere)
+  const fenceMaterial = track.walls.some((wall) => wall.top !== undefined)
+    ? standard(kartScene.fence)
+    : null
+  const shedMaterial = fenceMaterial
+    ? track.id === 'wharf'
+      ? standard(kartScene.container)
+      : standard(kartScene.yardWall, textures.brick)
+    : null
   for (const extra of track.walls) {
     const span = Math.hypot(extra.bx - extra.ax, extra.bz - extra.az)
+    const midX = (extra.ax + extra.bx) / 2
+    const midZ = (extra.az + extra.bz) / 2
+    const base = extra.top === undefined ? 0 : groundAt(midX, midZ)
+    const height =
+      extra.top === undefined
+        ? BARRIER_HEIGHT
+        : Math.max(BARRIER_HEIGHT, Math.min(TALL_WALL_HEIGHT, extra.top - base))
+    const tall = height > FENCE_MOST
     const block = new Mesh(
-      keep(new BoxGeometry(span, BARRIER_HEIGHT, BARRIER_THICKNESS)),
-      extraMaterial!,
+      keep(
+        new BoxGeometry(
+          span + (tall ? TALL_WALL_THICKNESS : 0),
+          height,
+          tall ? TALL_WALL_THICKNESS : BARRIER_THICKNESS,
+        ),
+      ),
+      extra.top === undefined ? extraMaterial! : tall ? shedMaterial! : fenceMaterial!,
     )
-    block.position.set((extra.ax + extra.bx) / 2, BARRIER_HEIGHT / 2, (extra.az + extra.bz) / 2)
+    block.position.set(midX, base + height / 2, midZ)
     block.rotation.y = -Math.atan2(extra.bz - extra.az, extra.bx - extra.ax)
     group.add(shadowed(block))
   }

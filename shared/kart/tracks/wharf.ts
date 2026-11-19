@@ -188,7 +188,14 @@ const walls = [
 const guide = guideFor(road)
 // The loading ramp: the drift jump is begun on the left of the road
 guide.tech.hold(ramp1 - 12, ramp1, -6, 3)
-guide.cue({ lip: ramp1, way: 1, land: [ramp1 + 9, 0], into: 0.15, nose: (40 * Math.PI) / 180, most: 68 })
+guide.cue({
+  lip: ramp1,
+  way: 1,
+  land: [ramp1 + 9, 0],
+  into: 0.15,
+  nose: (40 * Math.PI) / 180,
+  most: 68,
+})
 // The shed: round the outside for everyone; through the gap and behind the shed for who knows it
 guide.safe.hold(shedIn - 13, shedIn - 9, 4, 6).hold(shedIn - 8, shedOut + 3, 14, 12)
 guide.tech
@@ -208,10 +215,15 @@ guide.tech
 rows.forEach((row, index) => guide.slot(row, index === 1 ? 21.7 : -21.7))
 // The quay: the outside lane for everyone; over the fence from a drift jump into the inside lane
 guide.safe.hold(ramp2 - 6, ramp2 + 3, -4, 6).hold(ramp2 + 4, quayOut + 3, -19, 12)
-guide.tech
-  .hold(quayIn - 2, quayOut, 25, 6)
-  .chord([quayOut, 25], [quayOut + 7, 2], 4)
-guide.cue({ lip: ramp2, way: 1, land: [quayIn - 0.5, 24], into: 0.4, nose: (36 * Math.PI) / 180, most: 74 })
+guide.tech.hold(quayIn - 2, quayOut, 25, 6).chord([quayOut, 25], [quayOut + 7, 2], 4)
+guide.cue({
+  lip: ramp2,
+  way: 1,
+  land: [quayIn - 0.5, 24],
+  into: 0.4,
+  nose: (36 * Math.PI) / 180,
+  most: 74,
+})
 
 export const WHARF_GUIDE: TrackGuide = guide.build()
 
