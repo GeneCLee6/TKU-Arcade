@@ -1,5 +1,5 @@
 // 2026-11-18 (owner: "more technical ... more maps, ones that tell the drivers apart";
-// docs/ARCHITECTURE.md §4.36, docs/KART-FEEL.md §10.1): the four new tracks. technical.test.ts checks
+// docs/ARCHITECTURE.md §4.37, docs/KART-FEEL.md §10.1): the four new tracks. technical.test.ts checks
 // each as it checks every built-in track (legal, never crossing itself, wide enough, gates in order,
 // a grid of eight, all three computer difficulties three laps without a wrong way or a reset);
 // here is what is their own: the way they are laid (lay.ts), the night circuit's roundabout and its

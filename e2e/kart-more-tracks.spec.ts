@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// 2026-11-18 (docs/ARCHITECTURE.md §4.36): the four technical tracks. Each opens from /kart's course
+// 2026-11-18 (docs/ARCHITECTURE.md §4.37): the four technical tracks. Each opens from /kart's course
 // picker as a time trial with its own minimap and scenery and draws without a complaint; the race
 // against the computer and the Grand Prix offer them (the new cup has all four); and one of them,
 // the expert's, is raced for a lap against a computer kart from the menu, over both of its jumps.

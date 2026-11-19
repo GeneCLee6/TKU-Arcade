@@ -1,4 +1,4 @@
-// 2026-11-18 (the four technical tracks, docs/ARCHITECTURE.md §4.36): each one's own scenery, built
+// 2026-11-18 (the four technical tracks, docs/ARCHITECTURE.md §4.37): each one's own scenery, built
 // where localPlan.ts says. Our own low-poly shapes and canvas-painted textures: no model or image
 // files (docs/ASSETS.md), no real building, sign or logo copied. Everything that glows (the new
 // town's windows and roof lines, the ring of light) is unlit colour bright enough for the bloom

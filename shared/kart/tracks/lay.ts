@@ -1,5 +1,5 @@
 // 2026-11-18 (owner: "more technical ... more maps, ones that tell the drivers apart"): a second
-// way to draw a circuit (docs/ARCHITECTURE.md §4.36). circuit.ts smooths hand-placed control points,
+// way to draw a circuit (docs/ARCHITECTURE.md §4.37). circuit.ts smooths hand-placed control points,
 // which is right for a road that follows a place; a track designed corner by corner wants each
 // corner's radius and angle to be exactly what was meant (a hairpin of 30 m is a different corner
 // from one of 36 m), so here the road is laid like a turtle's path: straights and arcs from the

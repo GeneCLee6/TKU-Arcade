@@ -1,4 +1,4 @@
-// 2026-11-18 (the four technical tracks, docs/ARCHITECTURE.md §4.36): where each one's own scenery
+// 2026-11-18 (the four technical tracks, docs/ARCHITECTURE.md §4.37): where each one's own scenery
 // stands, worked out from the track itself so that none of it is ever on the road (localArt.ts
 // builds it). Each has one thing to know it by and to learn its corners against:
 // - the mangrove channel: tidal pools ringed with mangroves, egrets standing in them, and a
