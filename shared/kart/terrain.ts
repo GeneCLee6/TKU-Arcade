@@ -30,6 +30,7 @@
 //
 // Pure, like physics.ts: the browser, the Worker and the load test all run it.
 import {
+  GAUGE_FULL,
   stepKart,
   STEP_SECONDS,
   type KartInput,
@@ -65,6 +66,11 @@ export const TERRAIN_TUNING = {
   driftJumpSlip: (10 * Math.PI) / 180,
   /** ... and the nose then swings this fast in the air at full steer, rad/s */
   airDriftTurnRate: 1.7,
+  /**
+   * ... and landing it fills the gauge by this much (of 100), in full after `landingMinAir` in
+   * the air: what the clean landing's boost is to a car that took off straight
+   */
+  driftJumpGauge: 45,
 } as const
 
 export type TerrainTuning = { readonly [K in keyof typeof TERRAIN_TUNING]: number }
@@ -285,6 +291,8 @@ export function settleTerrain(
   input: KartInput,
   terrain: Terrain,
   numbers: TerrainTuning = TERRAIN_TUNING,
+  /** How many charges a kart holds at the most (the drift jump's gauge may fill one) */
+  maxStoredBoosts = 2,
 ): { kart: KartState; event: TerrainEvent } {
   if (airborne(after)) {
     const ground = groundAt(terrain, after.x, after.z)
@@ -299,9 +307,21 @@ export function settleTerrain(
       // The drift jump: down in the drift it left in, as deep as the nose now is and as long as
       // it has been held; what it had earned is still there
       const deep = Math.max(0, wrapAngle(after.heading - Math.atan2(after.vx, -after.vz)) * carried)
+      // The gauge's share: a charge once it is full, as a drift's is (classic.ts)
+      let { gauge, storedBoosts } = after
+      if (storedBoosts < maxStoredBoosts) {
+        gauge += numbers.driftJumpGauge * Math.min(1, air / Math.max(1e-3, numbers.landingMinAir))
+        if (gauge >= GAUGE_FULL) {
+          storedBoosts++
+          gauge = storedBoosts < maxStoredBoosts ? gauge - GAUGE_FULL : GAUGE_FULL
+        }
+      }
       return {
         kart: {
           ...after,
+          gauge,
+          storedBoosts,
+          gaugeGain: gauge - after.gauge + (storedBoosts - after.storedBoosts) * GAUGE_FULL,
           y: ground.y,
           vy: 0,
           air: 0,

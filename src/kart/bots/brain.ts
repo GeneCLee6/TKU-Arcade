@@ -81,6 +81,8 @@ const LANDING_TURN = 0.3
 const LANDING_MARGIN = 6
 const FLIGHT_EXTRA = 1.25
 const LANDING_SLOWEST = 34
+/** A drift jump is begun this long before the lip at the latest, seconds: the tail must be out */
+const DRIFT_JUMP_LEAST = 0.14
 /** A drift jump's cue: the nose is steered to its mark in the air this hard, per radian */
 const AIR_NOSE_GAIN = 6
 /**
@@ -92,8 +94,6 @@ const SLOT_PASSED = 1.5
 const SLOT_BEYOND = 10
 /** ... nearer it than this the car is committed: straight on, whatever is left to correct */
 const SLOT_COMMIT = 20
-/** ... and they come to it no faster than this share of the top speed (a boost is let run out) */
-const SLOT_SPEED = 1.1
 /** ... and from this far before it they line up: no new drift, no boost fired, the car straight */
 const SLOT_CALM = 85
 /**
@@ -102,6 +102,8 @@ const SLOT_CALM = 85
  */
 const TRICK_SPEED = 0.7
 const SAFE_AFTER = 260
+/** ... and goes back to the technical one only where the two are no further apart than this, metres */
+const LINES_APART = 4
 
 /** The racing line: the road's curvature is averaged over this far either way, metres ... */
 const LINE_WINDOW = 28
@@ -221,7 +223,13 @@ export function createBotBrain(
       : { offsets: guide.safe, room: guide.safeRoom }
     : null
   const cues = new Map<number, DriftJumpCue>()
-  if (tricks) for (const cue of guide!.cues) cues.set(cue.lip, cue)
+  const landings = new Map<number, { x: number; z: number }>()
+  if (tricks) {
+    for (const cue of guide!.cues) {
+      cues.set(cue.lip, cue)
+      landings.set(cue.lip, acrossRoad(road, cue.land[0], cue.land[1]))
+    }
+  }
   // The slots: where each is, which way the road runs through it and how far along the road
   const slots = (tricks ? guide!.slots : []).map((slot) => {
     const whole = ((Math.round(slot.index) % road.length) + road.length) % road.length
@@ -246,6 +254,22 @@ export function createBotBrain(
       }
     }
     return found
+  }
+
+  /**
+   * How far the direction of travel comes round in the first `seconds` of a drift at speed, the
+   * stick `into` it, radians (classic.ts: the slip swings out, and the turn bites as it does)
+   */
+  const driftTurn = (into: number, seconds: number): number => {
+    const target = t.driftSlip + t.driftSlipSteer * into
+    let turned = 0
+    let slip = 0
+    for (let time = 0; time < seconds; time += 1 / 60) {
+      slip += (target - slip) * (1 - Math.exp(-Math.LN10 / 60 / Math.max(1 / 60, t.driftSlipIn)))
+      const bite = 1 - t.driftLoose * (1 - Math.min(1, slip / Math.max(1e-3, t.driftSlip)))
+      turned += (t.driftTurnRate * bite * (1 + t.driftSteerShare * into)) / 60
+    }
+    return turned
   }
 
   // A jump into a corner (2026-11-19): the fastest a car may leave each lip and still be down
@@ -392,14 +416,6 @@ export function createBotBrain(
       const apex = inside.length === 0 ? 0 : inside[index]! * (skill.apex ?? 0) * room
       return middle + clamp(wander + apex, -room, room)
     }
-    if (line) {
-      const room = line.room[index]!
-      const sway = Math.sin(swayPhase + (along[index]! / SWAY_METRES) * Math.PI)
-      const wander =
-        room * Math.max(-0.6, Math.min(0.6, lineBase * skill.lineNoise + sway * skill.lineNoise))
-      const apex = inside.length === 0 ? 0 : inside[index]! * (skill.apex ?? 0) * room
-      return line.offsets[index]! + clamp(wander + apex, -room, room)
-    }
     const kept = lane.get(index)
     if (kept !== undefined) return kept
     const half = road[index]!.width / 2
@@ -498,7 +514,6 @@ export function createBotBrain(
       !kart.drifting &&
       // One boost at a time (2026-11-18): the key does nothing while a boost runs
       kart.boostSeconds === 0 &&
-      !lineUp &&
       (teamReady || kart.storedBoosts > 0)
     boostPressed = fire
     const calm =
@@ -514,7 +529,7 @@ export function createBotBrain(
     const gas =
       waiting && !dashPlan
         ? kart.throttleHeld
-        : !cruising && !(lineUp && speed > t.topSpeed * SLOT_SPEED)
+        : !cruising
     const base = { ...NO_INPUT, throttle: gas, boost: fire }
 
     if (move.kind === 'tap' || move.kind === 'double') move = NONE
@@ -553,7 +568,7 @@ export function createBotBrain(
         ...base,
         throttle: base.throttle && !fast,
         boost: base.boost && !fast,
-        brake: speed > takeOffMost + 5,
+        brake: speed > takeOffMost + 3,
         steer: gripSteer,
       }
     }
@@ -664,7 +679,12 @@ export function createBotBrain(
     const speed = Math.hypot(kart.vx, kart.vz)
     stuck = speed < STUCK_SPEED ? stuck + 1 : 0
     wrong = trial.wrongWay ? wrong + 1 : 0
-    fallback = Math.max(0, fallback - speed / 60)
+    // Back to the technical line only where the two lines run together
+    if (fallback > 0) {
+      const here = nearestRoadPoint(road, kart.x, kart.z)
+      const apart = Math.abs(guide!.tech[here]! - guide!.safe[here]!) > LINES_APART
+      fallback = Math.max(apart ? 1 : 0, fallback - speed / 60)
+    }
     if (stuck > STUCK_STEPS || wrong > WRONG_STEPS) {
       stuck = 0
       wrong = 0
@@ -699,13 +719,33 @@ export function createBotBrain(
       fallback = SAFE_AFTER
       cue = undefined
     }
-    // A drift jump (by skill, where the guide has a cue): the drift begun this long before the lip
-    if (cue && jump.ahead <= speed * cue.seconds) {
+    // A drift jump (by skill, where the guide has a cue): the drift begun this long before the lip,
+    // measured to the lip's own line (a road point is too coarse for a fifth of a second)
+    const lipAt = cue ? road[cue.lip]! : null
+    const lipWay = cue ? roadDirection(road, cue.lip) : null
+    const toLip =
+      lipAt && lipWay ? (lipAt.x - kart.x) * lipWay.dx + (lipAt.z - kart.z) * lipWay.dz : Infinity
+    // Begun just early enough to have come round to the cue's angle at the lip, from the way the
+    // car is going now; never later than it takes for the tail to be out
+    let begin = false
+    if (cue && lipWay && jump.ahead <= 60) {
+      // From where the car will cross the lip to where the flight is to come down
+      const land = landings.get(cue.lip)!
+      const travel = Math.atan2(kart.vx, -kart.vz)
+      const crossX = kart.x + Math.sin(travel) * toLip
+      const crossZ = kart.z - Math.cos(travel) * toLip
+      const turn = wrap(Math.atan2(land.x - crossX, -(land.z - crossZ)) - travel) * cue.way
+      const left = toLip / Math.max(1, speed) - (skill.reactionSteps + 1) / 60
+      begin =
+        carrying === cue || left <= DRIFT_JUMP_LEAST || driftTurn(cue.into, left) <= turn
+    }
+    if (cue && begin) {
       carrying = cue
       move = NONE
       return {
         ...NO_INPUT,
         throttle: speed <= (cue.most ?? Infinity),
+        brake: speed > (cue.most ?? Infinity) + 3,
         drift: true,
         steer: cue.way * Math.max(0.12, cue.into),
       }

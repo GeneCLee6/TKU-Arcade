@@ -19,7 +19,7 @@
 //   ground; only a car that left the ramp in a drift flies over it.
 //
 // Flat but for the two ramps. The layout is ours; no other game's track was looked at.
-import { TRACK_FORMAT, type TrackJson } from '../track.ts'
+import { padsAlong, TRACK_FORMAT, type TrackJson } from '../track.ts'
 import { circuit } from './circuit.ts'
 import { fence, guideFor, island, type TrackGuide } from './guide.ts'
 import { fitted, lay, LAY_SAMPLE, left, line, right } from './lay.ts'
@@ -65,7 +65,8 @@ const laid = lay(
     right(45, ROWS_RADIUS, 36, { mark: 'rowsOut' }),
     // The quay ramp, and the last wide hairpin: a fence cuts the inside lane off from the ground
     fitted(36, { mark: 'ramp2' }),
-    line(60, SWEEP_WIDTH, { mark: 'quayIn' }),
+    line(18, SWEEP_WIDTH),
+    line(42, SWEEP_WIDTH, { mark: 'quayIn' }),
     right(180, SWEEP_RADIUS, SWEEP_WIDTH, { mark: 'quayOut', mid: 'quayMid' }),
     line(60, 34),
     // Home: the long quay, a left and a right onto the straight
@@ -126,23 +127,25 @@ const GAP_AT = -18.3
 const QUAY_INNER = 4
 const QUAY_OUTER = 8
 
-const tall = (walls: ReturnType<typeof fence>) => walls.map((wall) => ({ ...wall, top: SHED_HEIGHT }))
-
 const walls = [
   // The shed, begun on the straight before the bend, and the wall across the mouth of the lane
   // behind it, with one gap: on the straight line that meets the lane's curve without a kink
-  ...tall(island(road, shedIn - 4, shedOut, SHED_OUTER, SHED_INNER)),
-  ...tall(
-    fence(road, [
+  ...island(road, shedIn - 4, shedOut, SHED_OUTER, SHED_INNER, SHED_HEIGHT),
+  ...fence(
+    road,
+    [
       [shedIn - GAP_BEFORE, SHED_OUTER + 1],
       [shedIn - GAP_BEFORE, GAP_AT + SLOT / 2],
-    ]),
+    ],
+    SHED_HEIGHT,
   ),
-  ...tall(
-    fence(road, [
+  ...fence(
+    road,
+    [
       [shedIn - GAP_BEFORE, GAP_AT - SLOT / 2],
       [shedIn - GAP_BEFORE, -(road[shedIn - 3]!.width / 2 + 1)],
-    ]),
+    ],
+    SHED_HEIGHT,
   ),
   // The container rows: each from the kerb past the straight line through them, with a slot on it
   ...rows.flatMap((row, index) => {
@@ -150,19 +153,27 @@ const walls = [
     // the straight line, and the row comes in from the other
     const side = index === 1 ? 1 : -1
     const lineAt = side * 21.7
-    return tall([
-      ...fence(road, [
-        [row, side * (ROWS_WIDTH / 2 + 1)],
-        [row, lineAt + (side * SLOT) / 2],
-      ]),
-      ...fence(road, [
-        [row, lineAt - (side * SLOT) / 2],
-        [row, side * 9],
-      ]),
-    ])
+    return [
+      ...fence(
+        road,
+        [
+          [row, side * (ROWS_WIDTH / 2 + 1)],
+          [row, lineAt + (side * SLOT) / 2],
+        ],
+        SHED_HEIGHT,
+      ),
+      ...fence(
+        road,
+        [
+          [row, lineAt - (side * SLOT) / 2],
+          [row, side * 10],
+        ],
+        SHED_HEIGHT,
+      ),
+    ]
   }),
   // The quay: an island round the hairpin, and the fence from the kerb after the ramp to its nose
-  ...tall(island(road, quayIn, quayOut, QUAY_INNER, QUAY_OUTER)),
+  ...island(road, quayIn, quayOut, QUAY_INNER, QUAY_OUTER, SHED_HEIGHT),
   ...fence(
     road,
     [
@@ -177,9 +188,9 @@ const walls = [
 const guide = guideFor(road)
 // The loading ramp: the drift jump is begun on the left of the road
 guide.tech.hold(ramp1 - 12, ramp1, -6, 3)
-guide.cue({ lip: ramp1, way: 1, seconds: 0.2, into: 0.15, nose: (40 * Math.PI) / 180, most: 68 })
+guide.cue({ lip: ramp1, way: 1, land: [ramp1 + 9, 0], into: 0.15, nose: (40 * Math.PI) / 180, most: 68 })
 // The shed: round the outside for everyone; through the gap and behind the shed for who knows it
-guide.safe.hold(shedIn - 7, shedOut + 3, 14, 12)
+guide.safe.hold(shedIn - 13, shedIn - 9, 4, 6).hold(shedIn - 8, shedOut + 3, 14, 12)
 guide.tech
   .chord([shedIn - 11.6, 4], [shedIn - GAP_BEFORE, GAP_AT], 2)
   .chord([shedIn - GAP_BEFORE, GAP_AT], [shedIn + 4, -30], 3)
@@ -187,8 +198,8 @@ guide.tech
   .chord([shedOut, -30], [shedOut + 7, -2], 4)
 guide.slot(shedIn - GAP_BEFORE, GAP_AT)
 // The container rows: round each row for everyone; the straight line through the slots
-guide.safe.hold(rowsIn, rowsOut, 0, 8)
-rows.forEach((row, index) => guide.safe.hold(row - 8, row + 5, index === 1 ? -12 : 12, 6))
+guide.safe.hold(rowsIn, rowsOut, 0, 5)
+rows.forEach((row, index) => guide.safe.hold(row - 10, row + 5, index === 1 ? -14 : 14, 5))
 guide.tech
   .chord([rowsIn - 6, 3], [rows[0], -21.7], 2.5)
   .chord([rows[0], -21.7], [rows[1], 21.7], 2.5)
@@ -198,12 +209,20 @@ rows.forEach((row, index) => guide.slot(row, index === 1 ? 21.7 : -21.7))
 // The quay: the outside lane for everyone; over the fence from a drift jump into the inside lane
 guide.safe.hold(ramp2 - 6, ramp2 + 3, -4, 6).hold(ramp2 + 4, quayOut + 3, -19, 12)
 guide.tech
-  .hold(ramp2 - 12, ramp2, -9, 3)
   .hold(quayIn - 2, quayOut, 25, 6)
   .chord([quayOut, 25], [quayOut + 7, 2], 4)
-guide.cue({ lip: ramp2, way: 1, seconds: 0.45, into: 0.5, nose: (36 * Math.PI) / 180 })
+guide.cue({ lip: ramp2, way: 1, land: [quayIn - 0.5, 24], into: 0.4, nose: (36 * Math.PI) / 180, most: 74 })
 
 export const WHARF_GUIDE: TrackGuide = guide.build()
+
+// A boost pad behind the shed, one in the shadow of each container row, just through its slot, and
+// one in the quay's inside lane: what the technical line pays
+const lanePads = padsAlong(
+  road,
+  [shedIn + 9, ...rows.map((row) => row + 2), quayIn + 8].map(
+    (index) => [index, WHARF_GUIDE.tech[index]!] as const,
+  ),
+)
 
 export const WHARF: TrackJson = {
   format: TRACK_FORMAT,
@@ -218,7 +237,7 @@ export const WHARF: TrackJson = {
   respawns: made.respawns,
   grid: made.grid,
   walls,
-  boostPads: made.boostPads,
+  boostPads: [...made.boostPads, ...lanePads],
   itemBoxes: made.itemBoxes,
   decor: [],
   jumps: made.jumps,

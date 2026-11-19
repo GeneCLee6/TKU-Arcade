@@ -15,6 +15,7 @@ export const RACE_TRACK_IDS = [
   'danhai',
   'datun',
   'wharf',
+  'lanes',
 ] as const
 
 export type RaceTrackId = (typeof RACE_TRACK_IDS)[number]

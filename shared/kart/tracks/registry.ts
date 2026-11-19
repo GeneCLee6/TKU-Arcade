@@ -8,6 +8,7 @@ import { DATUN } from './datun.ts'
 import { FORT } from './fort.ts'
 import { GUANYIN } from './guanyin.ts'
 import { HARBOUR } from './harbour.ts'
+import { LANES } from './lanes.ts'
 import { MANGROVE } from './mangrove.ts'
 import { OLDSTREET } from './oldstreet.ts'
 import type { RaceTrackId } from './list.ts'
@@ -26,6 +27,7 @@ export const RACE_TRACKS: Readonly<Record<RaceTrackId, TrackJson>> = {
   danhai: DANHAI,
   datun: DATUN,
   wharf: WHARF,
+  lanes: LANES,
 }
 
 const parsed = new Map<string, Track>()

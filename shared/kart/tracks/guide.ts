@@ -24,8 +24,11 @@ export interface DriftJumpCue {
   readonly lip: number
   /** Which way to drift: -1 left, 1 right */
   readonly way: -1 | 1
-  /** How long before the lip the drift begins, seconds of travel */
-  readonly seconds: number
+  /**
+   * Where the flight is to come down: a road point (it may be a fraction) and metres right of
+   * the middle. The drift is begun just early enough for the car to leave the lip going that way
+   */
+  readonly land: readonly [index: number, across: number]
   /** How far the stick goes into the drift before the lip, 0 to 1 */
   readonly into: number
   /** How far out the tail is to be at the landing, radians */
@@ -114,6 +117,7 @@ export function island(
   last: number,
   inner: number,
   outer: number,
+  height?: number,
 ): Wall[] {
   const middle = (inner + outer) / 2
   const path: [number, number][] = [[first - 1, middle]]
@@ -121,7 +125,7 @@ export function island(
   path.push([last + 1, middle])
   for (let index = last; index >= first; index--) path.push([index, outer])
   path.push([first - 1, middle])
-  return fence(road, path)
+  return fence(road, path, height)
 }
 
 /**
