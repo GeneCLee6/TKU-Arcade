@@ -887,6 +887,18 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
     'Fiddler',
     'Egret',
     'Flying Fish',
+    // 2026-11-19: eight more karts and three bikes
+    'Dolphin',
+    'Mudskipper',
+    'Mantis Shrimp',
+    'Marlin',
+    'Eel',
+    'Squid',
+    'Hermit Crab',
+    'Humpback',
+    'Swift',
+    'Hornet',
+    'Petrel',
   ])
   // e10-t05: the garage picks a driver too, and shows the kart's stats
   await page.getByTestId('kart-garage-open').click()
@@ -1031,6 +1043,47 @@ for (const [width, height] of [
     ).toBeLessThanOrEqual(0)
   })
 }
+
+// 2026-11-19: seventeen vehicles under tabs, a 3D preview of the pick, and the bikes
+test('the garage narrows the vehicles by tab, previews the pick, and a bike races', async ({ page }) => {
+  test.setTimeout(90_000)
+  const errors = watchConsole(page)
+  await page.addInitScript(() => {
+    localStorage.setItem('tku-arcade.kart.quality', 'low')
+    localStorage.setItem('tku-arcade.kart.body', 'tide')
+  })
+  await page.goto('/kart?track=oval')
+  await expect(page.locator('canvas')).toBeVisible()
+  await page.getByTestId('kart-garage-open').click()
+  const garage = page.getByTestId('kart-garage')
+  await expect(garage.getByRole('radio')).toHaveCount(17 + 4)
+  // The pick, drawn in 3D: its own canvas, and a switch for its N2O shape
+  const preview = garage.getByTestId('kart-preview')
+  await expect(preview.locator('canvas')).toBeVisible()
+  await expect(preview).toHaveAttribute('data-kart', 'tide')
+  await preview.getByRole('button', { name: 'N2O shape' }).click()
+  await expect(preview).toHaveAttribute('data-open', 'true')
+  // The bikes
+  await garage.getByRole('tab', { name: 'Bikes' }).click()
+  await expect(garage.getByRole('radiogroup').first().getByRole('radio')).toHaveCount(3)
+  await garage.getByRole('radio', { name: /Swift/ }).click()
+  await expect(preview).toHaveAttribute('data-kart', 'swift')
+  await expect(garage.getByTestId('kart-tags')).toContainText('Bike')
+  await expect(garage.getByTestId('kart-bike-note')).toBeVisible()
+  // A series, then a tier
+  await garage.getByRole('tab', { name: 'Reef' }).click()
+  await expect(garage.getByRole('radio', { name: /Humpback/ })).toBeVisible()
+  await expect(garage.getByRole('radio', { name: /Swift/ })).toHaveCount(0)
+  await garage.getByRole('tab', { name: 'Entry' }).click()
+  await expect(garage.getByRole('radio', { name: /Swift/ })).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('button', { name: 'Close the garage' }).click()
+  // The bike races: the page keeps it, and the scene draws on
+  await expect(page.getByTestId('kart-body')).toHaveValue('swift')
+  await expect(page.getByTestId('kart-preview')).toHaveCount(0)
+  await expect(page.getByTestId('kart-countdown')).toBeVisible({ timeout: 15_000 })
+  await expect.poll(() => framesOf(page), { timeout: 30_000 }).toBeGreaterThan(10)
+  expect(errors).toEqual([])
+})
 
 // PR #86 left a new kart restarting the race behind the open garage: the pick now waits for the
 // panel to close, and the countdown starts then

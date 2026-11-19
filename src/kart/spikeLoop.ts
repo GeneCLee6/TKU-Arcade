@@ -19,7 +19,7 @@ import {
 } from './records.ts'
 import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
-import { DEFAULT_KART, kartMass, type DriverId, type KartId } from '../../shared/kart/karts.ts'
+import { DEFAULT_KART, kartMass, kartRadius, type DriverId, type KartId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { courseOf, parseTrack, recordKey, type Track } from '../../shared/kart/track.ts'
 import { DANHAI } from '../../shared/kart/tracks/danhai.ts'
@@ -335,7 +335,14 @@ export interface SpikeNet {
   /** After each step: the race so far, the input it ran with, and whether the kart was reset */
   afterStep(trial: Trial, input: KartInput, reset: boolean): void
   /** The other karts as drawn now, to bump into (e9-t09) */
-  bumpers(): readonly { x: number; z: number; vx: number; vz: number; mass?: number }[]
+  bumpers(): readonly {
+    x: number
+    z: number
+    vx: number
+    vz: number
+    mass?: number
+    radius?: number
+  }[]
   /** Each frame: the other karts to draw */
   others(): readonly OtherKart[]
   /** After each frame is drawn: to put the name tags where the karts are */
@@ -609,7 +616,12 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         run = trial.run
         if (net && trial.phase !== 'countdown') {
           // e9-t09: pushed out of the other karts, as this browser draws them
-          const bumped = bumpKart(run.kart, net.bumpers(), kartMass(options.body ?? DEFAULT_KART))
+          const bumped = bumpKart(
+            run.kart,
+            net.bumpers(),
+            kartMass(options.body ?? DEFAULT_KART),
+            kartRadius(options.body ?? DEFAULT_KART),
+          )
           if (bumped.kart !== run.kart) {
             run = { ...run, kart: bumped.kart }
             trial = { ...trial, run }

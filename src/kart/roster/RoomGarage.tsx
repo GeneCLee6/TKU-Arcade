@@ -2,7 +2,7 @@
 // room). Each member picks a kart and a driver, kept in their browser like on /kart, and the pick
 // goes to the room as their `look` (shared/protocol.ts), so everyone sees who races in what. The race
 // itself reads the pick from the browser and sends it in every frame (karts.ts, loadoutByte).
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { KART_ROSTER_MESSAGES } from '../../../shared/kart/i18n.roster.ts'
 import { lookOf, parseLook, type DriverId, type KartId } from '../../../shared/kart/karts.ts'
@@ -16,6 +16,10 @@ import { loadBody, loadDriver, saveBody, saveDriver } from '../bodies.ts'
 import { RosterPicker } from './RosterPicker.tsx'
 
 registerMessages(KART_ROSTER_MESSAGES)
+
+// The 3D preview brings three.js with it: fetched apart from the waiting room, which shows the
+// cards at once and the picture when it has come (the race needs the same code a moment later)
+const KartPreview = lazy(() => import('./KartPreview.tsx'))
 
 export interface RoomGarageProps {
   members: Record<string, RoomMember>
@@ -54,6 +58,17 @@ export default function RoomGarage({ members, you, onSetLook }: RoomGarageProps)
           saveDriver(next)
           setDriver(next)
         }}
+        preview={
+          <Suspense fallback={null}>
+            <KartPreview
+              kart={kart}
+              driver={driver}
+              label={t('kart.roster.preview', { kart: t(`kart.body.${kart}`) })}
+              hint={t('kart.roster.previewHint')}
+              morphLabel={t('kart.roster.morph')}
+            />
+          </Suspense>
+        }
       />
       <Subheading>{t('kart.roster.others')}</Subheading>
       <Picks data-testid="kart-picks">

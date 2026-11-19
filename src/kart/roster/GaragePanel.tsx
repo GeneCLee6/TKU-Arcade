@@ -7,6 +7,7 @@ import { Button } from '../../components/Button.tsx'
 import { displayType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { broadcastSolid } from '../ui/broadcast.ts'
+import KartPreview from './KartPreview.tsx'
 import { RosterPicker, type RosterT } from './RosterPicker.tsx'
 
 export interface GaragePanelProps {
@@ -40,7 +41,22 @@ export function GaragePanel({ t, kart, driver, onKart, onDriver, onClose }: Gara
           {t('kart.roster.close')}
         </Button>
       </Header>
-      <RosterPicker t={t} kart={kart} driver={driver} onKart={onKart} onDriver={onDriver} />
+      <RosterPicker
+        t={t}
+        kart={kart}
+        driver={driver}
+        onKart={onKart}
+        onDriver={onDriver}
+        preview={
+          <KartPreview
+            kart={kart}
+            driver={driver}
+            label={t('kart.roster.preview', { kart: t(`kart.body.${kart}`) })}
+            hint={t('kart.roster.previewHint')}
+            morphLabel={t('kart.roster.morph')}
+          />
+        }
+      />
     </Panel>
   )
 }

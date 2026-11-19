@@ -27,19 +27,18 @@
 // Same footprint for all (about 1.5 m wide and 2.6 m long closed, KART_RADIUS 1.2), same frame: -z
 // forward, the chassis floating above the road. The driver sits low, hips inside the hull.
 import { BoxGeometry, CylinderGeometry, type Group, type Material, type Object3D } from 'three'
-import type { KartId } from '../../../shared/kart/karts.ts'
 import { blade, hinge, hoop, hull, plate, wedge, type BodyFit, type BodyKit } from './kartParts.ts'
 
-const SIDES = [-1, 1] as const
+export const SIDES = [-1, 1] as const
 
 /** A box `w` across, `h` high and `l` along the kart */
-const box = (w: number, h: number, l: number) => new BoxGeometry(w, h, l)
+export const box = (w: number, h: number, l: number) => new BoxGeometry(w, h, l)
 
 /**
  * A hatch on the kart's back: a lit core under two covers that slide apart while a full boost runs.
  * From `z0` back to `z1`, `half` wide each side, its top at `y`
  */
-function coreHatch(
+export function coreHatch(
   kit: BodyKit,
   parent: Object3D,
   y: number,
@@ -65,7 +64,7 @@ function coreHatch(
  * behind the shoulders with an intake. `z` is the seat's, `y` the deck's height there, `half` the
  * rim's half width
  */
-function cockpit(kit: BodyKit, parent: Object3D, z: number, y: number, half = 0.24): void {
+export function cockpit(kit: BodyKit, parent: Object3D, z: number, y: number, half = 0.24): void {
   const { paint } = kit
   kit.put(
     parent,
@@ -87,7 +86,7 @@ function cockpit(kit: BodyKit, parent: Object3D, z: number, y: number, half = 0.
  * and `chord` deep, a neon lip and a lit line along its trailing edge, end plates with the racing
  * number, and two pylons `drop` long hanging from it `stance` apart
  */
-function rearWing(
+export function rearWing(
   kit: BodyKit,
   parent: Object3D,
   y: number,
@@ -153,7 +152,7 @@ function rearWing(
 }
 
 /** A blade skirt along a side, from `z0` back to `z1`, its top at `y`, a lit line along its foot */
-function skirt(
+export function skirt(
   kit: BodyKit,
   parent: Object3D,
   side: number,
@@ -181,7 +180,7 @@ function skirt(
 }
 
 /** A thruster in the open: a ribbed turbine housing ahead of the bell, then the bell itself */
-function thruster(
+export function thruster(
   kit: BodyKit,
   parent: Object3D,
   x: number,
@@ -207,7 +206,7 @@ function thruster(
 }
 
 /** A head lamp: a thin lit slit, `w` wide, turned `turn` about the upright */
-function slit(
+export function slit(
   kit: BodyKit,
   parent: Object3D,
   material: Material,
@@ -952,15 +951,5 @@ function flyfish(kit: BodyKit, chassis: Object3D): BodyFit {
   }
 }
 
-const BODIES: Readonly<Record<KartId, (kit: BodyKit, chassis: Object3D) => BodyFit>> = {
-  tide,
-  comet,
-  ray,
-  crab,
-  heron,
-  flyfish,
-}
-
-/** Builds `body` onto `chassis` */
-export const buildKartBody = (body: KartId, kit: BodyKit, chassis: Object3D): BodyFit =>
-  BODIES[body](kit, chassis)
+/** The six karts of e10-t05; the rest are in moreBodies.ts and bikeBodies.ts (vehicleBodies.ts) */
+export const FIRST_BODIES = { tide, comet, ray, crab, heron, flyfish }

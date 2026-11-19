@@ -77,6 +77,8 @@ export function collideWalls(
   tuning: KartTuning,
 ): WallResult {
   if (walls.length === 0) return { state: after, impact: 0, hitSpeed: 0, touching: false }
+  // A bike's circle is smaller (karts.ts); never bigger than a kart's, which MAX_TRAVEL is for
+  const radius = Math.min(KART_RADIUS, tuning.bodyRadius ?? KART_RADIUS)
   const dt = STEP_SECONDS
   const travel = Math.hypot(after.x - before.x, after.z - before.z)
   const checks = Math.min(MAX_CHECKS, Math.max(1, Math.ceil(travel / MAX_TRAVEL)))
@@ -106,12 +108,12 @@ export function collideWalls(
         const awayX = x - point.x
         const awayZ = z - point.z
         const distance = Math.hypot(awayX, awayZ)
-        if (distance >= KART_RADIUS) continue
+        if (distance >= radius) continue
         // A centre exactly on the line cannot happen (see MAX_TRAVEL); push it any way at all
         const nx = distance > 0 ? awayX / distance : 1
         const nz = distance > 0 ? awayZ / distance : 0
-        x = point.x + nx * KART_RADIUS
-        z = point.z + nz * KART_RADIUS
+        x = point.x + nx * radius
+        z = point.z + nz * radius
         hit = true
         touching = true
 

@@ -20,7 +20,10 @@ const option = (name, fallback) => {
 }
 const base = option('base', 'http://localhost:5263')
 const out = option('out', 'kart-shots')
-const karts = option('karts', 'tide,comet,ray,crab,heron,flyfish').split(',')
+const karts = option(
+  'karts',
+  'tide,comet,ray,crab,heron,flyfish,dolphin,skipper,shrimp,marlin,eel,squid,hermit,whale,swift,hornet,petrel',
+).split(',')
 const kinds = option('kinds', 'none,n2o').split(',')
 const quality = option('quality', 'high')
 const track = option('track', 'riverside')
