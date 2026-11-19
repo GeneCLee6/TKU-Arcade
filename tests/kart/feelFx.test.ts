@@ -136,21 +136,17 @@ describe('a boost kicks', () => {
   it('tells the start, the boost and the instant boost apart', () => {
     const full = T.startBoostDuration
     expect(burstBetween(still, { ...still, launchSeconds: full }, full)).toBe('start')
-    expect(burstBetween(still, { ...still, launchSeconds: full - STEP_SECONDS }, full)).toBe(
-      'start',
-    )
+    expect(burstBetween(still, { ...still, launchSeconds: full - STEP_SECONDS }, full)).toBe('start')
     expect(burstBetween(still, { ...still, launchSeconds: full * T.startEarlyShare }, full)).toBe(
       'quick',
     )
     expect(burstBetween(still, { ...still, boostSeconds: T.boostDuration }, full)).toBe('boost')
     expect(burstBetween(still, { ...still, miniSeconds: T.chainDuration }, full)).toBe('dash')
     // Running down is no burst; nor is a kart without a start boost at all
-    expect(
-      burstBetween({ ...still, boostSeconds: 2 }, { ...still, boostSeconds: 1.98 }, full),
-    ).toBe(null)
-    expect(
-      burstBetween({ boostSeconds: 0, miniSeconds: 0 }, { boostSeconds: 0, miniSeconds: 0 }, full),
-    ).toBe(null)
+    expect(burstBetween({ ...still, boostSeconds: 2 }, { ...still, boostSeconds: 1.98 }, full)).toBe(
+      null,
+    )
+    expect(burstBetween({ boostSeconds: 0, miniSeconds: 0 }, { boostSeconds: 0, miniSeconds: 0 }, full)).toBe(null)
   })
 
   it('a perfect start kicks hardest, an instant boost least', () => {

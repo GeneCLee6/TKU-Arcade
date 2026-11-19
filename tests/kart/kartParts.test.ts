@@ -37,8 +37,7 @@ describe('hull', () => {
         z += position.getZ(at) / 3
       }
       // From a point on the hull's axis to the face's middle
-      const away =
-        x * normal.getX(corner) + (y - 0.05) * normal.getY(corner) + z * 0.2 * normal.getZ(corner)
+      const away = x * normal.getX(corner) + (y - 0.05) * normal.getY(corner) + z * 0.2 * normal.getZ(corner)
       expect(away).toBeGreaterThan(0)
     }
   })

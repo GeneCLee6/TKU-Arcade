@@ -33,8 +33,7 @@ import { driveFrames } from './raceDriver.ts'
 function flatOut(id: (typeof KART_IDS)[number]): number {
   const tuning = applyKart(KART_TUNING, id)
   let state = INITIAL_KART
-  for (let step = 0; step < 900; step++)
-    state = stepKart(state, { ...NO_INPUT, throttle: true }, tuning)
+  for (let step = 0; step < 900; step++) state = stepKart(state, { ...NO_INPUT, throttle: true }, tuning)
   return Math.hypot(state.vx, state.vz)
 }
 
@@ -64,11 +63,9 @@ describe('the six karts and four drivers (e10-t05)', () => {
 
   it('keeps the gaps within the PRD: top speed ±5% (and 3% apart), drift charge and handling ±10%', () => {
     const tunings = KART_IDS.map((id) => applyKart(KART_TUNING, id))
-    const ratio = (key: keyof typeof KART_TUNING) =>
-      tunings.map((one) => one[key] / KART_TUNING[key])
+    const ratio = (key: keyof typeof KART_TUNING) => tunings.map((one) => one[key] / KART_TUNING[key])
     for (const share of ratio('topSpeed')) expect(Math.abs(share - 1)).toBeLessThanOrEqual(0.05)
-    for (const share of ratio('gaugeFillRate'))
-      expect(Math.abs(share - 1)).toBeLessThanOrEqual(0.1 + 1e-9)
+    for (const share of ratio('gaugeFillRate')) expect(Math.abs(share - 1)).toBeLessThanOrEqual(0.1 + 1e-9)
     for (const share of ratio('turnRate')) expect(Math.abs(share - 1)).toBeLessThanOrEqual(0.1)
     const tops = ratio('topSpeed')
     expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(0.03 + 1e-9)
@@ -162,12 +159,7 @@ describe("the server's speed check reads each kart's numbers", () => {
     let state = kartModule.init(seats, { track: 'riverside', laps: 1, mode: 'race' }, {
       int: () => 0,
     } as never)
-    state = {
-      ...state,
-      phase: 'racing',
-      goAt: GO,
-      racers: state.racers.map((one) => ({ ...one, loaded: true })),
-    }
+    state = { ...state, phase: 'racing', goAt: GO, racers: state.racers.map((one) => ({ ...one, loaded: true })) }
     const frame = driveFrames(track, 0).next().value as KartFrame
     const fast = (speedCapFor('heron') + speedCapFor('comet')) / 2
     const send = (kart: (typeof KART_IDS)[number]) =>

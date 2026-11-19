@@ -935,6 +935,45 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **限制**：(1) 上面說的差距量法。(2) 名稱是暫名。(3) 潮池是貼地的平面，行車視角只看得到一條水色，認得出來的是池邊的紅樹林。(4) 大屯的 31 m 髮夾與兩個落地彎，困難電腦車每圈大約撞一次；它跑得完、不逆走不卡住，但看起來不夠聰明。(5) 沒有做會動的障礙、第二條捷徑。(6) 卡丁車 chunk 353 → 361 kB gzip（預算 600 kB）（四張的路線是執行時算的，不是存好的座標）。
 
+### 4.38 路線圖外：反直覺技術（甩尾起跳、飛越矮欄、穿縫）、兩張背圖賽道、巷弄盃（2026-11-19，`feat/kart-skill-tracks`）
+
+擁有者：「太容易變成高手了……上跳台前要先甩、要提前背好地圖、有捷徑但是要技術好才過得去。」規格、操作方式與量到的數字在 `KART-FEEL.md` §11；這裡記程式怎麼做的。
+
+**物理**（`shared/`，純函式，瀏覽器、Worker、壓測共用）
+
+- `terrain.ts` **甩尾起跳**：`settleTerrain` 起跳時，如果是經典手感（狀態有 `steerNow`）、正在甩尾、甩尾鍵按著、車尾甩出 ≥ `driftJumpSlip`，就不清掉甩尾而是記在 `airDrift`（方向）與 `airHeld`（已經甩了幾秒）。`stepAir`：甩尾鍵按著時車頭用 `airDriftTurnRate` 轉、夾在滑行方向到 `driftMaxSlip` 之間、連段視窗不倒數；放開就把 `airDrift` 歸零。落地：`airDrift` 還在就直接回到甩尾狀態（`drifting`、`driftSeconds = airHeld`、`driftPeak`），補 `driftJumpGauge` 加速條（滿了照 `classic.ts` 的規則變成存量），`driftJumps`＋1。`KartState` 多三個選填欄位 `airDrift`、`airHeld`、`driftJumps`：沒有在甩尾中起跳過的車永遠沒有它們，街機（舊）手感永遠不會設。`stepOnTerrain` 把 `driftJumps` 帶過地面那一步（`stepClassic` 回傳的是新物件）。`settleTerrain` 多一個參數 `maxStoredBoosts`（`course.ts` 傳 tuning 的）。
+- `walls.ts`：`Wall.top?`。`collideWalls` 開頭算一次車的高度（在空中才算，否則 −∞），`top` 有值且高度 ≥ `top` 的牆跳過。`track.ts` 的 `parseTrack` 檢查 `top` 是數字。路緣牆沒有 `top`，照舊誰都飛不過。
+- 多人：車的物理本來就在各自的瀏覽器跑，frame 只送位置、朝向、速度與旗標，這三個新欄位不上線；`PROTOCOL_VERSION` 沒動。別人看你的高度用 `heightGuess`（從地面位置與速度推），甩尾起跳的飛行也是同一條拋物線。
+- **車款參數的介面**（另一個分支 `feat/kart-vehicle-roster` 在做車種）：甩尾起跳的數字（`driftJumpSlip`、`airDriftTurnRate`、`driftJumpGauge`、`airTurnRate`）在 `TERRAIN_TUNING`，`stepOnTerrain`／`settleTerrain` 都收 `numbers: TerrainTuning` 參數（預設 `TERRAIN_TUNING`）。之後要讓某種車空中比較靈活，在 `course.ts` 的 `stepRun` 依車款傳一份不同的 `numbers` 就好，不用動 `terrain.ts`。這一批沒有動 `karts.ts`。
+
+**導引**（`shared/kart/tracks/guide.ts`，新）
+
+- `TrackGuide`：`safe`／`tech` 兩條線（每個路點一個「中心線右邊幾公尺」）、各自的 `safeRoom`／`techRoom`（線兩側可以晃的寬度）、`slots`（技術線上的缺口：路點＋橫向位置）、`cues`（`DriftJumpCue`：哪個跳台、往哪邊甩、落點、方向打多深、落地時車尾要多開、起跳最快多少）。`guides.ts` 用賽道 id 查（`trackGuide(id)`）；沒有導引的賽道回 `undefined`，一切照舊。導引沒有放進 `TrackJson`：它是給駕駛腳本與電腦車用的，不是賽道格式的一部分，編輯器做的賽道沒有。
+- 給賽道作者的工具：`acrossRoad(road, 路點（可帶小數）, 公尺)`、`fence(road, 路徑, 高度?)`、`island(road, 起, 迄, 內, 外, 高度?)`（把 `circuit.ts` 的島牆做成可重複用的）、`guideFor(road)` 回一個 builder：`.safe`／`.tech`／`.both` 上有 `hold(起, 迄, 橫向, room)` 與 `chord(起點, 終點, room)`（**世界座標上的直線**換算成每個路點的橫向位置，穿縫的線就是這樣畫的），`.slot()`、`.cue()`、`.build()`（安全線的階梯會平滑三次，技術線不平滑）。
+
+**電腦車與駕駛**（`src/kart/bots/`）
+
+- `createBotBrain` 多第七個參數 `guide`。有導引時：路線＝導引的線＋自己的晃動與切彎（夾在 room 內），不再用 `walls` 猜島牆的車道。`skill.tricks`（新，只有頂尖駕駛有）走技術線，其他人（三種難度的電腦車、新手、一般、高手）走安全線。
+- **缺口**：離缺口 85 m 內「排隊」（不開新的甩尾、正在甩的放掉）；70 m 內方向盤直接瞄準缺口中心再往後 10 m；20 m 內不再修（來不及了，硬修只會打橫）。
+- **甩尾起跳**：每一步從「車現在的滑行方向、到跳台線還有幾秒」算「現在開始甩，到跳台時滑行方向會轉多少」（`driftTurn`：照 `classic.ts` 的 slip 與 `driftLoose` 積分），和「從起跳點到落點要轉多少」比，剛好夠就開始甩。所以不管從哪裡、多快進來，起跳方向都對（第一版用固定秒數，進彎位置差 5 m 就飛到牆上）。到跳台線的距離是對那條線投影算的，不是用路點（6 m 一格太粗）。空中把車尾甩到 `nose`。超過 `most` 就收油。
+- **退回安全線**：復位之後、或到了要甩尾起跳的跳台但速度不到極速 70%（剛撞過牆），接下來走安全線，直到兩條線重合的地方才換回來（否則會隔著牆想切過去）。
+- **坡頂收油**（所有人，沒有導引的舊賽道也是）：建腦時對每個跳台算「路在跳台後多遠轉了 0.3 rad」與「以速度 v 起跳會飛多遠」（`flightOver`：沿路點走拋物線，路往下掉就飛得更遠），二分找出來得及落地的最快起跳速度；快到跳台時超過就鬆油門、超過 3 m/s 就煞車。有 cue 的頂尖駕駛不收（它用甩尾起跳）。
+- `drivers.ts` 多 `master`（`DRIVER_IDS` 四個）：高手的手＋`tricks`。`/kart/spike?autopilot=master` 可以看。
+
+**賽道**（`shared/kart/tracks/wharf.ts`、`lanes.ts`，`lay.ts` 的寫法）
+
+- 捷徑都是「寬路裡的車道」：62 m 寬的直角彎區（貨櫃列、院子）裡，每個彎的內側伸出一道牆，牆上留 10 m 缺口，三個缺口在同一條直線上；84 m 寬、半徑 60 m 的大迴轉（倉庫、碼頭、水井）中間圍島牆，內側車道的入口用牆（留一個缺口）或矮欄（只能飛）封住。中心線永遠在安全車道裡，所以房間的 `?autopilot`、名次、逆走判定都不用改。
+- 兩張都有 `theme`（`day`／`sunset`），`revision` 1。加速帶：`circuit()` 給的兩條＋近路上的（`padsAlong` 用技術線的橫向位置擺，所以一定在車道中間）。
+- 選單、多人房選項、對戰電腦、小地圖（牆本來就會畫）跟著 `RACE_TRACK_IDS` 來；`spikeLoop.ts`、字串 `kart.course.<id>`／`games.kart.track.<id>`、盃 `backstreet`（`cups.ts`、`kart.cup.name.backstreet`）。
+
+**畫面**（`src/kart/art/trackArt.ts`）：有 `top` 的牆照高度畫。4 m 以下是矮欄（黃色，`kartScene.fence`）；以上是高牆，最多畫 7 m、厚 1.4 m：碼頭是貨櫃色（`container`），其他是紅磚貼圖（`yardWall`）。底部貼著地形（`groundAt`）。沒有新的模型或圖檔。`callouts.ts`／`Hud.tsx` 多 `driftJump`。
+
+**量測**：`scripts/kart-feel.ts` 表格多頂尖一列與「master vs expert」一行（有導引的賽道才有）；`scripts/kart/track-lines.ts`（新，設計工具：四位駕駛在一張圖上幾個種子的秒數、復位、甩尾起跳次數、撞牆的路點）、`track-shots-at.mjs`（新：指定駕駛開到一串座標時各截一張）、`track-svg.ts` 多畫導引的兩條線（綠＝安全、紅＝技術）與矮欄（橘）。數字在 `KART-FEEL.md` §11.3。
+
+**測試**：`tests/kart/skillTracks.test.ts`（新）：甩尾起跳（直飛照舊有落地加速；先甩的帶上空中、斜著飛、落地在甩尾裡、補加速條、瞬間加速已賺到、callout；落地 0.3 秒後轉過的角度比直飛的大；空中放開就放棄；車尾沒出去不算；街機手感不變）、牆的 `top`（夠高飛過、太慢撞上、沒有 `top` 或太高照撞、只算空中的車、格式檢查）、導引的工具、兩張圖各自（兩條線都在路上且安全線離每道牆 ≥ 4.2 m、缺口兩側剛好各有一個牆端、cue 的跳台存在且落點在路上、矮欄 1.5 m 其餘 ≥ 7 m、近路上至少三條別人碰不到的加速帶、**頂尖比高手快**（碼頭 > 9%、山城 > 6.5%，三個種子平均）、新手跑得完、頂尖三圈每次甩尾起跳都落地且每個缺口都穿過、三種難度電腦車零甩尾起跳零穿縫）、大屯高手撞牆 ≤ 20、沒有導引的賽道上頂尖＝高手。`technical.test.ts` 的整組檢查跑十一張（新兩張直線比例上限 36%、40%：穿縫的路就是直線）。`cup.test.tsx`、`cornerSigns.test.ts`、`bots.test.ts` 加新圖新盃。e2e `kart-skill-tracks.spec.ts`：兩張各自從選單開成計時賽、牆畫在小地圖上；對戰電腦與巷弄盃列出它們；`?autopilot=master` 在碼頭落地一次甩尾起跳；規則頁有「進階技巧」。
+
+**限制（照實寫）**：(1) 山城的頂尖 vs 熟練是 8.0%，在目標下緣。(2) 捷徑是「寬路裡的車道」，不是真的離開路面的岔路：要做穿過建築物的獨立小路得改賽道格式（路緣開口、第二條中心線、檢查點），這一批沒有做。(3) 高牆是素色的箱子（貨櫃色／磚牆），還沒有個別的場景（`localArt.ts` 那種地標）。(4) 困難電腦車不會這些技巧、走遠路：會甩尾起跳與穿縫的人在這兩張圖上會穩贏困難電腦車 8–11%。要不要給困難電腦車 `tricks` 等擁有者開過再決定。(5) 甩尾起跳的時機對人來說多寬鬆還沒有人試過；腳本是算出來的，人是用感覺。(6) 貼牆滑行、落地瞬間按鍵的時機噴沒有做。(7) 卡丁車 chunk 361 → 369 kB gzip（預算 600 kB）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

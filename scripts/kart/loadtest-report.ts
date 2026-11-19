@@ -367,8 +367,7 @@ export function buildReport(run: RunInfo, tallies: readonly BotTally[]): Report 
   const offsets = tallies.map((bot) => bot.offsetMs).filter((one): one is number => one !== null)
   const droppedWhy: Record<string, number> = {}
   for (const bot of bots) {
-    for (const [why, n] of Object.entries(bot.droppedWhy))
-      droppedWhy[why] = (droppedWhy[why] ?? 0) + n
+    for (const [why, n] of Object.entries(bot.droppedWhy)) droppedWhy[why] = (droppedWhy[why] ?? 0) + n
   }
   const framesIn = tallies.reduce((sum, bot) => sum + bot.raceUp.frame.messages, 0)
   const framesOut = tallies.reduce((sum, bot) => sum + bot.raceDown.relay.messages, 0)
@@ -400,8 +399,7 @@ export function buildReport(run: RunInfo, tallies: readonly BotTally[]): Report 
 
 // ── As text ──────────────────────────────────────────────────────────────────────────────────
 
-const show = (value: number | null | undefined) =>
-  value === null || value === undefined ? '–' : String(value)
+const show = (value: number | null | undefined) => (value === null || value === undefined ? '–' : String(value))
 const kB = (bytes: number) => (bytes / 1000).toFixed(2)
 const time = (ms: number | null) => (ms === null ? '–' : (ms / 1000).toFixed(2))
 const pcts = (d: Distribution) => `${show(d.p50)} / ${show(d.p95)} / ${show(d.p99)}`
