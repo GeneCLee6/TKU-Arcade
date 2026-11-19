@@ -6,7 +6,7 @@ import type { MessageParams } from '../i18n/t.ts'
 import { clippedFill, displayType, monoType, SLANT } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import type { Callout } from './callouts.ts'
-import { streak } from './ui/broadcast.ts'
+import { streak, ticker } from './ui/broadcast.ts'
 import { HUD_STEPS, type SpikeHud } from './spikeLoop.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
@@ -47,6 +47,12 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
   // A team race: how many of the charges are blue; any other race has no such field
   const team = hud.teamBoosts !== undefined
   const blue = Math.min(hud.teamBoosts ?? 0, hud.storedBoosts)
+  const combo = hud.combo ?? 0
+  const gains = hud.gains ?? 0
+  const gain = hud.gain ?? 0
+  const perfect = dash === 1 && (hud.perfectReady ?? false)
+  // The classic feel shows its combo by the gauge, all the time; the arcade feel on the boost's tag
+  const chained = hud.chain >= 2 && hud.combo === undefined
   return (
     <Box
       data-testid="kart-hud"
@@ -56,8 +62,21 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
     >
       {dash > 0 && (
         <DashSlot>
-          <DashPrompt $now={dash === 2} data-testid="kart-dash" data-state={dash} role="status">
-            {t(dash === 2 ? 'kart.hud.dashNow' : 'kart.hud.dashEarned')}
+          <DashPrompt
+            $now={dash === 2}
+            $perfect={perfect}
+            data-testid="kart-dash"
+            data-state={dash}
+            data-perfect={perfect || undefined}
+            role="status"
+          >
+            {t(
+              dash === 2
+                ? 'kart.hud.dashNow'
+                : perfect
+                  ? 'kart.hud.dashPerfect'
+                  : 'kart.hud.dashEarned',
+            )}
           </DashPrompt>
         </DashSlot>
       )}
@@ -91,7 +110,25 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
       <BoostPanel>
         <LabelRow>
           <Label>{t('kart.hud.gauge')}</Label>
-          <Percent>{t('kart.hud.percent', { value: hud.gauge })}</Percent>
+          {combo >= 2 && (
+            <Combo key={combo} data-testid="kart-combo" role="status">
+              {t('kart.hud.combo', { count: combo })}
+            </Combo>
+          )}
+          <Percent>
+            {gains > 0 && gain > 0 && (
+              <Gain
+                key={gains}
+                $perfect={hud.grade === 3}
+                data-testid="kart-gain"
+                data-grade={hud.grade}
+                aria-label={t('kart.hud.gainSaid', { value: gain })}
+              >
+                {t('kart.hud.gain', { value: gain })}
+              </Gain>
+            )}
+            {t('kart.hud.percent', { value: hud.gauge })}
+          </Percent>
         </LabelRow>
         <Segments
           role="meter"
@@ -104,6 +141,9 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
           {Array.from({ length: GAUGE_SEGMENTS }, (_, index) => (
             <Segment key={index} $on={index < lit} />
           ))}
+          {gains > 0 && gain > 0 && (
+            <Jump key={gains} $perfect={hud.grade === 3} aria-hidden="true" />
+          )}
         </Segments>
         <LabelRow>
           <Charges
@@ -139,8 +179,8 @@ export const Hud = memo(function Hud({ t, hud, maxStored, dense = false }: HudPr
             ))}
           </Charges>
           {hud.boosting && (
-            <Tag $chain={hud.chain >= 2} data-testid="kart-boosting">
-              {hud.chain >= 2 ? t('kart.hud.chain', { count: hud.chain }) : t('kart.hud.boosting')}
+            <Tag $chain={chained} data-testid="kart-boosting">
+              {chained ? t('kart.hud.chain', { count: hud.chain }) : t('kart.hud.boosting')}
             </Tag>
           )}
         </LabelRow>
@@ -180,7 +220,8 @@ const CALLOUT_KEYS = {
   start: 'kart.callout.start',
   quick: 'kart.callout.quick',
   stall: 'kart.callout.stall',
-} as const satisfies Record<Exclude<Callout['kind'], 'chain'>, KartMessageKey>
+  late: 'kart.callout.late',
+} as const satisfies Record<Exclude<Callout['kind'], 'chain' | 'perfect'>, KartMessageKey>
 
 /**
  * DRIFT, BOOST, CHAIN ×n, and the techniques' words: big, brief, and only for the eyes (the HUD says
@@ -190,7 +231,11 @@ export const CalloutText = memo(function CalloutText({ t, callout }: CalloutProp
   const text =
     callout.kind === 'chain'
       ? t('kart.callout.chain', { count: callout.count })
-      : t(CALLOUT_KEYS[callout.kind])
+      : callout.kind === 'perfect'
+        ? callout.count >= 2
+          ? t('kart.callout.perfectCombo', { count: callout.count })
+          : t('kart.callout.perfect')
+        : t(CALLOUT_KEYS[callout.kind])
   return (
     <CalloutBox aria-hidden="true" data-testid="kart-callout" data-kind={callout.kind}>
       <CalloutTag $kind={callout.kind}>{text}</CalloutTag>
@@ -305,11 +350,87 @@ const LabelRow = styled.div`
 
 const Percent = styled.span`
   ${monoType}
+  position: relative;
   font-size: ${fontSize.sm}px;
   font-weight: 700;
 `
 
+const gainUp = keyframes`
+  0% { opacity: 0; transform: translateY(6px) scale(0.7); }
+  14% { opacity: 1; transform: translateY(-4px) scale(1.25); }
+  28% { transform: translateY(-6px) scale(1); }
+  75% { opacity: 1; transform: translateY(-8px) scale(1); }
+  100% { opacity: 0; transform: translateY(-20px) scale(1); }
+`
+
+const shown = keyframes`
+  0%, 99% { opacity: 1; }
+  100% { opacity: 0; }
+`
+
+/**
+ * What an instant boost out of a drift has just added to the gauge (2026-11-18): the number jumps
+ * out over the percentage and floats away; gold for a perfect one. Under reduced motion it only
+ * shows, and goes
+ */
+const Gain = styled.span<{ $perfect: boolean }>`
+  ${displayType}
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  font-size: 22px;
+  line-height: 1;
+  white-space: nowrap;
+  color: ${({ $perfect }) => ($perfect ? color.warning : color.accent)};
+  text-shadow: 0 0 10px ${({ $perfect }) => ($perfect ? color.warning : color.accent)};
+  opacity: 0;
+  pointer-events: none;
+  animation: ${gainUp} 1.1s ease-out both;
+
+  ${DENSE} {
+    font-size: 15px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: ${shown} 1.1s linear both;
+  }
+`
+
+const comboIn = keyframes`
+  0% { transform: scale(1.5) skewX(-10deg); }
+  100% { transform: scale(1) skewX(0deg); }
+`
+
+/** The combo: instant boosts in a row. It kicks each time it grows */
+const Combo = styled.span`
+  ${monoType}
+  ${ticker(color.magenta, 6)}
+  padding: 1px ${space.md}px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: ${color.onAccent};
+  animation: ${comboIn} 0.22s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+
+  ${DENSE} {
+    padding: 0 ${space.sm}px;
+    font-size: 10px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`
+
+const jumpOut = keyframes`
+  0% { opacity: 0.95; transform: scaleY(1.9); }
+  100% { opacity: 0; transform: scaleY(1); }
+`
+
 const Segments = styled.div`
+  position: relative;
   display: flex;
   gap: 4px;
   padding-inline: 4px;
@@ -338,6 +459,22 @@ const Segment = styled.i<{ $on: boolean }>`
   ${DENSE} {
     width: 5px;
     height: 14px;
+  }
+`
+
+/** The gauge jumps: a flash over the whole bar the moment an exit's bonus lands */
+const Jump = styled.i<{ $perfect: boolean }>`
+  position: absolute;
+  inset: 0;
+  background: ${({ $perfect }) => ($perfect ? color.warning : color.accent)};
+  box-shadow: 0 0 18px ${({ $perfect }) => ($perfect ? color.warning : color.accent)};
+  mix-blend-mode: screen;
+  opacity: 0;
+  pointer-events: none;
+  animation: ${jumpOut} 0.45s ease-out both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: ${shown} 0.3s linear both;
   }
 `
 
@@ -422,9 +559,10 @@ const DashSlot = styled.div`
  * Between the panels, under the kart: the instant boost is earned (gold, like the sparks), or a
  * fresh press of forward fires it now (bright, pulsing)
  */
-const DashPrompt = styled.span<{ $now: boolean }>`
+const DashPrompt = styled.span<{ $now: boolean; $perfect: boolean }>`
   ${monoType}
   ${({ $now }) => clippedFill(tagClip, $now ? color.success : color.warning)}
+  box-shadow: ${({ $perfect }) => ($perfect ? `0 0 18px ${color.warning}` : 'none')};
   padding: ${space.xs}px ${space.lg}px;
   font-size: ${({ $now }) => ($now ? '16px' : '13px')};
   font-weight: 700;
@@ -533,6 +671,7 @@ const CalloutBox = styled.div`
   &[data-kind='quick'],
   &[data-kind='boost'],
   &[data-kind='chain'],
+  &[data-kind='perfect'],
   &[data-kind='double'],
   &[data-kind='stack'] {
     ${streak(color.accent)}
@@ -558,6 +697,8 @@ const calloutFill: Record<Callout['kind'], string> = {
   pad: color.accent,
   stack: color.magenta,
   broken: color.danger,
+  perfect: color.warning,
+  late: color.accent,
 }
 /** The small callouts: the ones that come often in a lap */
 const SMALL: ReadonlySet<Callout['kind']> = new Set([
@@ -567,6 +708,9 @@ const SMALL: ReadonlySet<Callout['kind']> = new Set([
   'catch',
   'counter',
   'pad',
+  'late',
+  // Every corner, for a good driver
+  'perfect',
 ])
 const calloutClip = 'polygon(18px 0, 100% 0, calc(100% - 18px) 100%, 0 100%)'
 

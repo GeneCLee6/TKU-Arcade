@@ -148,8 +148,12 @@ const GOLDEN_ARENA = '72389793'
 // the next"): the drift is looser, the instant boost takes a deep and long drift, a boost cannot be
 // fired while one runs, and the hard bot drifts deep and no longer taps down the straights. And again
 // later that day (owner: "a drift that really slid should boost"): lower marks, a milder dash
+// And once more that day (owner: "the N2O fills too slowly: an expert should boost all the way round,
+// a novice not"): the gauge goes by the quality of the drift (a bonus at the exit for an instant
+// boost, by its timing and the combo), it fills in a boost too, and a perfectly timed instant boost
+// is longer and stronger. The hard bot's hands are the same; it is the physics that changed
 const CLASSIC_GOLDEN: Record<string, { hash: string; steps: number }> = {
-  harbour: { hash: 'b9c34253', steps: 7572 },
-  oldstreet: { hash: '4af27555', steps: 6824 },
+  harbour: { hash: '81d17129', steps: 7074 },
+  oldstreet: { hash: 'a07e98ae', steps: 6749 },
 }
-const CLASSIC_GOLDEN_ARENA = 'ad74f6db'
+const CLASSIC_GOLDEN_ARENA = '481a0bad'

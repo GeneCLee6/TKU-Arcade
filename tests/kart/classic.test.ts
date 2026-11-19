@@ -528,29 +528,266 @@ describe('the boost (N2O)', () => {
     expect(kartSpeed(boosted)).toBeLessThanOrEqual(T.topSpeed * T.boostTopSpeedFactor + 1e-9)
   })
 
-  it('stores one a full gauge, two at most, and fills nothing during a boost', () => {
-    const full = run(atSpeed(), DRIFT_RIGHT, 0.1)
+  it('stores one a full gauge, two at most', () => {
+    const full = run(atSpeed(), DRIFT_RIGHT, 0.5)
     const ready = stepKart({ ...full, gauge: 99.99 }, DRIFT_RIGHT)
     expect(ready.storedBoosts).toBe(1)
-    const boosting = { ...drifted(0.2), boostSeconds: 2, gauge: 10 }
-    expect(stepKart(boosting, DRIFT_RIGHT).gauge).toBe(10)
-    const stored = { ...drifted(0.2), storedBoosts: T.maxStoredBoosts, gauge: 50 }
+    const stored = { ...drifted(0.5), storedBoosts: T.maxStoredBoosts, gauge: 50 }
     expect(stepKart(stored, DRIFT_RIGHT).gauge).toBe(50)
   })
+})
 
-  it('fills by the speed, and less a second the longer one drift lasts', () => {
-    const rate = (state: KartState, seconds: number) => {
-      const after = run(state, DRIFT_RIGHT, seconds)
-      return (after.gauge - state.gauge) / seconds
-    }
-    const fresh = drifted(0.1)
-    const long = drifted(2)
-    expect(rate(fresh, 0.3)).toBeGreaterThan(rate(long, 0.3) * 1.8)
-    // Slower, less
-    const slow = run(INITIAL_KART, GAS, 1)
-    const slowDrift = run(slow, DRIFT_RIGHT, 0.1)
-    expect(rate(slowDrift, 0.3)).toBeLessThan(rate(fresh, 0.3))
+// 2026-11-18, owner, after #102 to #104: "the N2O fills too slowly: an expert should be able to
+// boost all the way round and a novice not; ask a little more skill". The gauge goes by the quality
+// of the drift: how deep, how long, how fast, a clean exit, an instant boost out of it, well timed,
+// and one after another (docs/KART-FEEL.md §3.5)
+describe('the gauge by the quality of the drift', () => {
+  const rate = (state: KartState, seconds: number) =>
+    (run(state, DRIFT_RIGHT, seconds).gauge - state.gauge) / seconds
+  /** A drift held `seconds`, then let go with the stick against it and the throttle up */
+  const letGo = (seconds: number, from: KartState = atSpeed()) =>
+    stepKart(run(from, DRIFT_RIGHT, seconds), { ...NO_INPUT, steer: -1 })
+  /** ... and the throttle pressed afresh `after` seconds later: the instant boost */
+  const exit = (seconds: number, after = 0, from: KartState = atSpeed()) =>
+    stepKart(run(letGo(seconds, from), { ...NO_INPUT, steer: -1 }, after), { ...GAS, steer: -1 })
+
+  it('a tapped drift fills nothing; a real one fills, and less a second once it is a long one', () => {
+    expect(run(atSpeed(), DRIFT_RIGHT, T.gaugeLead).gauge).toBe(0)
+    const real = drifted(2 * T.gaugeLead + 0.05)
+    const long = drifted(T.gaugeFade + 2)
+    expect(rate(real, 0.3)).toBeGreaterThan(10)
+    expect(rate(real, 0.3)).toBeGreaterThan(rate(long, 0.3) * 1.8)
   })
+
+  it('goes by the square of the speed: a slow drift fills a fraction', () => {
+    const slow = run(INITIAL_KART, GAS, 1)
+    const share = kartSpeed(slow) / kartSpeed(atSpeed())
+    expect(share).toBeLessThan(0.6)
+    const slowRate = rate(run(slow, DRIFT_RIGHT, 0.45), 0.2)
+    expect(slowRate).toBeGreaterThan(0)
+    expect(slowRate).toBeLessThan(rate(drifted(0.45), 0.2) * 0.45)
+  })
+
+  it('fills during a boost as well: a drift through a boost earns the next', () => {
+    const plain = drifted(0.45)
+    const boosting = { ...plain, boostSeconds: 2 }
+    expect(rate(boosting, 0.2)).toBeGreaterThan(rate(plain, 0.2) * 0.95)
+  })
+
+  it('grades the timing of the press: perfect, good, late', () => {
+    const perfect = exit(0.6)
+    const good = exit(0.6, T.perfectWindow + 0.1)
+    const straight = run(drifted(0.6), GAS, 1)
+    const late = stepKart(stepKart(straight, NO_INPUT), GAS)
+    expect([perfect.dashGrade, good.dashGrade, late.dashGrade]).toEqual([3, 2, 1])
+    // The exit's bonus: a perfect one is worth the most, a late one the least
+    expect(perfect.gaugeGain!).toBeGreaterThan(good.gaugeGain! * 1.3)
+    expect(good.gaugeGain!).toBeGreaterThan(late.gaugeGain! * 1.3)
+    expect(late.gaugeGain!).toBeGreaterThan(0)
+    // ... and the longest and strongest instant boost
+    expect(perfect.miniSeconds).toBeCloseTo(T.chainDuration * T.perfectShare - STEP_SECONDS, 9)
+    expect(good.miniSeconds).toBeCloseTo(T.chainDuration - STEP_SECONDS, 9)
+    expect(late.miniSeconds).toBeCloseTo(T.chainDuration * T.lateShare - STEP_SECONDS, 9)
+    const reach = (fired: KartState) => kartSpeed(run(fired, GAS, fired.miniSeconds))
+    expect(reach(perfect)).toBeGreaterThan(reach(good) + 1)
+    // The window: a press just inside it is still perfect
+    expect(exit(0.6, T.perfectWindow - 2 * STEP_SECONDS).dashGrade).toBe(3)
+  })
+
+  it('a perfect one takes a drift that lasted: a short one, however crisp, is good', () => {
+    expect(exit(T.perfectMinSeconds - 0.1).dashGrade).toBe(2)
+    expect(exit(T.perfectMinSeconds + 0.05).dashGrade).toBe(3)
+    // With the drift key still held (the stick against the drift): good
+    const held = stepKart(drifted(0.6), { ...TAP, steer: -1, drift: true })
+    expect(held.dashGrade).toBe(2)
+  })
+
+  it('a press wasted just before letting go spoils it: mashing forward is not timing', () => {
+    // The throttle let go and pressed again in the drift, steering into it: nothing fires
+    const mashed = stepKart(drifted(0.6), { ...DRIFT_RIGHT, throttleTap: true })
+    expect(mashed.miniSeconds).toBe(0)
+    const soon = stepKart(stepKart(run(mashed, DRIFT_RIGHT, 0.05), { ...NO_INPUT, steer: -1 }), {
+      ...GAS,
+      steer: -1,
+    })
+    expect(soon.dashGrade).toBe(2)
+    // Long enough after it, the press is forgotten
+    const later = stepKart(stepKart(run(mashed, DRIFT_RIGHT, 0.3), { ...NO_INPUT, steer: -1 }), {
+      ...GAS,
+      steer: -1,
+    })
+    expect(later.dashGrade).toBe(3)
+  })
+
+  it('most of the gauge comes at the exit: the same drift with no instant boost earns a third', () => {
+    const without = run(drifted(0.6), GAS, 1.5)
+    expect(without.miniSeconds).toBe(0)
+    const fired = exit(0.6)
+    expect(fired.gauge).toBeGreaterThan(without.gauge * 2.5)
+    // A longer drift is worth more; one only just earned, a little
+    expect(exit(0.6).gaugeGain!).toBeGreaterThan(exit(T.dashMinSeconds + 0.05).gaugeGain! * 3)
+    // A deep one more than a shallow one (the stick centred after the drift begins)
+    const shallow = stepKart(atSpeed(), DRIFT_RIGHT)
+    const centred = stepKart(run(shallow, { ...GAS, drift: true }, 0.6), { ...NO_INPUT, steer: -1 })
+    expect(stepKart(centred, { ...GAS, steer: -1 }).gaugeGain!).toBeLessThan(exit(0.6).gaugeGain!)
+    // And a slow one, a fraction
+    const slow = run(INITIAL_KART, GAS, 1)
+    expect(exit(0.6, 0, slow).gaugeGain!).toBeLessThan(exit(0.6).gaugeGain! * 0.5)
+  })
+
+  it('a combo: instant boosts one after another, each link worth more to the gauge', () => {
+    let kart = exit(0.6)
+    const gains = [kart.gaugeGain!]
+    for (let link = 0; link < 3; link++) {
+      // Back to a straight line and the top speed, inside the combo's window
+      kart = run({ ...kart, gauge: 0, storedBoosts: 0 }, GAS, 1.2)
+      expect(kart.chain).toBe(link + 1)
+      kart = exit(0.6, 0, kart)
+      gains.push(kart.gaugeGain!)
+    }
+    expect(kart.chain).toBe(4)
+    expect(gains[1]!).toBeGreaterThan(gains[0]! * 1.05)
+    expect(gains[3]!).toBeGreaterThan(gains[2]! * 1.05)
+    // The window runs out on a straight, but not while a boost burns
+    expect(run(kart, GAS, T.chainDuration * T.perfectShare + T.chainGrace + 0.1).chain).toBe(0)
+    const boosting = run({ ...kart, storedBoosts: 1 }, { ...GAS, boost: true }, T.boostDuration)
+    expect(boosting.chain).toBe(4)
+  })
+
+  it('an instant boost earned and never fired ends the combo; a late one only keeps it', () => {
+    const one = run(exit(0.6), GAS, 1.2)
+    expect(one.chain).toBe(1)
+    // The drift again, let go, and no press: the window closes, and the combo with it
+    let missed = stepKart(run(one, DRIFT_RIGHT, 0.6), GAS)
+    expect(missed.chain).toBe(1)
+    missed = run(missed, GAS, 2)
+    expect(missed.releaseWindow).toBe(0)
+    expect(missed.chain).toBe(0)
+    // Drifting again before firing throws it away as well
+    const straight = run(stepKart(run(one, DRIFT_RIGHT, 0.6), GAS), GAS, 0.8)
+    expect(straight.releaseWindow).toBeGreaterThan(0)
+    expect(straight.chain).toBe(1)
+    expect(stepKart(straight, DRIFT_RIGHT).chain).toBe(0)
+    // A late press fires, and the combo stands where it was
+    const late = stepKart(stepKart(straight, NO_INPUT), GAS)
+    expect(late.dashGrade).toBe(1)
+    expect(late.chain).toBe(1)
+  })
+
+  describe('and the walls', () => {
+    const WALL: Wall = { ax: -100, az: -1000, bx: 100, bz: -1000 }
+    const course = (wall: Wall): Course => ({ walls: [wall], start: { x: 0, z: 0, heading: 0 } })
+
+    it('a wall brushed in the drift takes the bonus of its exit away, and adds nothing to the combo', () => {
+      const one = run(exit(0.6), GAS, 1.2)
+      const drift = run(one, DRIFT_RIGHT, 0.6)
+      // A wall just to the left of the car, closing on its way at a small angle: a light touch
+      const travel = Math.atan2(drift.vx, -drift.vz)
+      const ax = drift.x - 2.2 * Math.cos(travel) - 40 * Math.sin(travel)
+      const az = drift.z - 2.2 * Math.sin(travel) + 40 * Math.cos(travel)
+      const along: Wall = {
+        ax,
+        az,
+        bx: ax + 160 * Math.sin(travel + 0.06),
+        bz: az - 160 * Math.cos(travel + 0.06),
+      }
+      let state = { ...startRun(course(along)), kart: drift }
+      const hold: KartInput = { ...GAS, drift: true, steer: -1 }
+      for (let step = 0; step < 60 && !state.kart.driftDirty; step++) {
+        state = stepRun(state, hold, course(along))
+      }
+      expect(state.kart.driftDirty).toBe(true)
+      expect(state.kart.drifting).toBe(true)
+      const fired = stepKart(stepKart(state.kart, { ...NO_INPUT, steer: -1 }), {
+        ...GAS,
+        steer: -1,
+      })
+      expect(fired.miniSeconds).toBeGreaterThan(0)
+      expect(fired.gaugeGain).toBe(0)
+      expect(fired.chain).toBe(1)
+      // The next drift starts clean
+      expect(run(run(fired, GAS, 1), DRIFT_RIGHT, 0.3).driftDirty).toBe(false)
+    })
+
+    it('a hard crash ends the combo and takes gauge by how hard: up to half', () => {
+      const crash = (speed: number) => {
+        let state = startRun(course(WALL))
+        state = {
+          ...state,
+          kart: { ...state.kart, z: -998, vz: -speed, gauge: 60, chain: 3, chainWindow: 2 },
+        }
+        for (let step = 0; step < 10 && state.hitSpeed === 0; step++) {
+          state = stepRun(state, GAS, course(WALL))
+        }
+        return state
+      }
+      const hard = crash(50)
+      expect(hard.kart.chain).toBe(0)
+      expect(hard.kart.gauge).toBeCloseTo(60 * T.wallGaugeKeep, 5)
+      const light = crash(T.wallBreakSpeed + 1)
+      expect(light.hitSpeed).toBeGreaterThanOrEqual(T.wallBreakSpeed)
+      expect(light.kart.chain).toBe(0)
+      expect(light.kart.gauge).toBeGreaterThan(45)
+      expect(light.kart.gauge).toBeLessThan(55)
+    })
+  })
+
+  // #102's check, with the gauge counted: weaving down a straight, each drift held as long as it
+  // takes to be worth something, firing every charge it earns, gets no further than driving straight
+  it.each([0, 0.2, 0.4])(
+    'weaving down a straight for the gauge does not pay: drifts held %s s past the mark',
+    (extra) => {
+      const from = atSpeed()
+      const seconds = 30
+      const plain = run(from, GAS, seconds)
+      let kart = from
+      let phase: 'drift' | 'lift' | 'tap' | 'recover' = 'drift'
+      let dir = 1
+      let lift = 0
+      let hold = 0
+      let charges = 0
+      for (let step = 0; step < seconds * 60; step++) {
+        let input: KartInput = GAS
+        if (phase === 'drift') {
+          input = { ...GAS, drift: true, steer: dir }
+          if (kart.burstReady && (hold += STEP_SECONDS) > extra) {
+            phase = 'lift'
+            lift = 2
+            hold = 0
+          }
+        } else if (phase === 'lift') {
+          input = { ...NO_INPUT, steer: -dir }
+          if (--lift <= 0) phase = 'tap'
+        } else if (phase === 'tap') {
+          input = { ...TAP, steer: -dir }
+          phase = 'recover'
+        } else {
+          input = { ...GAS, steer: Math.max(-1, Math.min(1, -kart.heading * 6)) }
+          const travel = Math.atan2(kart.vx, -kart.vz)
+          const settled = kart.slideDirection === 0 && Math.abs(travel) < 3 * DEG
+          if (settled && kart.miniSeconds < 0.05) {
+            dir = kart.x - from.x > 0 ? -1 : 1
+            phase = 'drift'
+          }
+        }
+        // Every charge fired as soon as it may be
+        const fire = kart.storedBoosts > 0 && kart.boostSeconds === 0 && !kart.boostHeld
+        const next = stepKart(kart, { ...input, boost: fire })
+        if (next.storedBoosts < kart.storedBoosts) charges++
+        kart = next
+      }
+      console.log(
+        'weave',
+        extra,
+        (from.z - kart.z).toFixed(0),
+        (from.z - plain.z).toFixed(0),
+        charges,
+      )
+      expect(from.z - kart.z).toBeLessThan((from.z - plain.z) * 1.01)
+      // Not for want of gauge: the long ones do earn charges
+      if (extra >= 0.4) expect(charges).toBeGreaterThanOrEqual(2)
+    },
+  )
 })
 
 describe('the start', () => {
@@ -648,7 +885,7 @@ describe('walls', () => {
     expect(hit(45 * DEG)).toBeLessThan(hit(90 * DEG))
   })
 
-  it('a hard crash keeps half the gauge and ends the drift', () => {
+  it('a hard crash takes up to half the gauge and ends the drift', () => {
     const course: Course = {
       walls: [WALL],
       start: { x: 0, z: 0, heading: 0 },
@@ -665,7 +902,8 @@ describe('walls', () => {
       before = crashed
       crashed = stepRun(crashed, { ...GAS, steer: 1, drift: true }, course)
     }
-    expect(crashed.hitSpeed).toBeGreaterThanOrEqual(T.wallBreakSpeed)
+    // Head on at 50 m/s: well past three times the mark, so all of the share goes
+    expect(crashed.hitSpeed).toBeGreaterThanOrEqual(T.wallBreakSpeed * 3)
     expect(crashed.kart.gauge).toBeLessThanOrEqual(before.kart.gauge * T.wallGaugeKeep + 1)
     expect(crashed.kart.gauge).toBeGreaterThan(before.kart.gauge * T.wallGaugeKeep - 1)
     expect(crashed.kart.drifting).toBe(false)

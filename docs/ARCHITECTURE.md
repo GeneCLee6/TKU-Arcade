@@ -853,6 +853,38 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **沒做**：車庫的 3D 轉台（`/kart` 的車庫選了要關掉面板才換車，預覽得另開一個 WebGL context，手機記憶體不划算；先用色條與號碼）；等待室的車庫（`RoomGarage.tsx`）只跟著 `RosterPicker` 換樣式。
 
+### 4.36 路線圖外：加速條看甩尾品質、時機三級、連段；量法換成噴射覆蓋率（2026-11-18，`feat/kart-n2o-economy`）
+
+擁有者試完 #102–#104：「氮氣集太慢，要設計成高手可以整路噴，但新手不行，然後技術要求高一點，地圖可能也有差，地圖多設計一些，要有實力鑑別度的」。地圖在另一個分支（`feat/kart-more-tracks`）；這一批是集氣規則、技術上限、量法與 HUD。規格與要試的清單：`KART-FEEL.md` §3.2、§3.5、§5.1、§6、§7。
+
+**一、規則**（`shared/kart/classic.ts`；只有經典手感，街機（舊）每一步都沒變）
+
+- **加速條分兩筆**。甩尾中的小筆：`gaugeFillRate` 34 ×（速度比）² × 深度 × 起步（前 `gaugeLead` 0.2 秒不給）× 遞減 × 連段倍率。出彎接瞬間加速的大筆（一次給）：`gaugeDashBonus` 24 × `driftWorthOf()`（深度 0.6–1.25 × 長度：0.3 秒以下 0、0.52 秒以上 1）×（速度比）² × 時機（1.4／1／0.6）× `comboFactor()`（每環 +12%、最多 5 環）；甩尾中碰過牆是 0。極速下一個 0.5–0.6 秒的甩尾：小筆 6.5–9.5、大筆完美 34–36／普通 21–23／太晚 14–15。
+- **噴射中照常集氣**（`boostGaugeShare` 1，藍色團隊噴射中也是）。#102 以前是不集。這條是「整路噴」的前提：噴射佔七成時間時，那七成的甩尾不能白甩。
+- **時機三級**（`KartState.dashGrade`，常數 `DASH_LATE`／`DASH_GOOD`／`DASH_PERFECT`）：完美＝甩尾 ≥ `perfectMinSeconds` 0.4 秒，且放開甩尾鍵後 `perfectWindow` 0.1 秒內新按前進，且放開前 0.2 秒內沒有在甩尾中白按過前進（`tapEarly`：連打拿不到）；普通＝滑出中較晚，或甩尾鍵還按著；太晚＝回正後的窗。完美的瞬間加速 0.98 秒、推力 ×1.9、上限 ×1.11；太晚的 0.42 秒、×1.5、×1.05。
+- **連段**沿用 `chain`／`chainWindow`：`chainGrace` 1 → 2.5 秒，窗在甩尾中與噴射中都不倒數；太晚與碰牆的那一次不加；賺到瞬間加速沒噴（窗過了、或直接再甩）歸零；重撞牆歸零。
+- **撞牆**（`course.ts` `afterWalls`）：甩尾或滑出中碰到牆 → `driftDirty`；重撞（≥ `wallBreakSpeed`）加速條依力道扣（剛過門檻約 17%，三倍門檻以上扣到剩 `wallGaugeKeep`）。
+- `KartState` 新增的欄位全是選填、只有經典手感會設：`driftDirty`、`sinceRelease`、`driftWorth`、`driftHeld`、`tapEarly`、`dashGrade`、`dashCount`、`gaugeGain`。街機（舊）的狀態物件一個鍵都沒多（`flatGolden.test.ts` 連鍵名一起雜湊）。
+- 新參數（調參面板都看得到）：`gaugeLead`、`gaugeDashBonus`、`gaugeComboStep`、`gaugeComboLinks`、`perfectWindow`、`perfectMinSeconds`、`perfectShare`、`perfectAccelStep`、`perfectSpeedStep`、`lateShare`；`boostGaugeShare` 經典手感現在也讀；`chainGrace` 的上限放寬到 5 秒。調參的儲存鍵換成 `tku-arcade.kart.tuning.7`（舊鍵存的集氣數字會蓋掉新規則）。
+- **直線硬甩**（#102 的檢查保留，再加一條算上加速條的）：直線上左右連甩連噴、集到就噴 N2O，30 秒，甩到剛好夠／多撐 0.2 秒／多撐 0.4 秒，前進距離都 ≤ 直直開的 101%。靠的是三件事：前 0.2 秒不集氣、大筆在 0.3 秒以下是 0、完美要 0.4 秒以上。
+- **團隊條（§4.34）不動**：`shared/kart/team.ts` 的 `teamGain` 只看甩尾中的時間與速度，伺服器沒改，所以這批沒有跑 `kart:loadtest -- --teams`。理由寫在 `KART-FEEL.md` §3.5。
+- 內建賽道 `revision` 各 +1（河畔 12、漁港 12、淡江 11、老街 7、觀音山 7）、`CUSTOM_REVISION` 5 → 6：紀錄與幽靈車重來。經典手感的 golden 重取（`flatGolden.test.ts`）；街機（舊）的三個雜湊沒變。
+
+**二、量法**（`scripts/kart/drivers.ts`、`src/kart/bots/drivers.ts`、`scripts/kart-feel.ts`）
+
+- **噴射覆蓋率**＝比賽中 `kartBoosting()` 為真的步數比例。`measure(track, driver, tuning, seed)` 回傳秒數、最快圈、覆蓋率、其中 N2O 的比例、N2O 發數、瞬間加速數與三級各幾次、最長連段、重撞牆數、復位數。新賽道直接呼叫它。
+- **駕駛腳本是人**：`DRIVERS.novice`／`average`／`expert`＝對戰電腦的追路線（`brain.ts`）＋人的手（`Hands`：方向抖、恍神、彎前鬆油門、亂甩、放太晚）。`createDriver(driver, track, tuning, seed)` 回傳 `(trial) => KartInput`，有種子、可重現。放在 `src/` 是為了 `/kart/spike?autopilot=expert|average|novice` 能在瀏覽器裡看它開。
+- **對戰電腦沒有變**：`BOT_SKILLS` 三級一個數字都沒改。`BotSkill` 多了五個選填欄位，只有腳本在用，沒給的時候 `brain.ts` 走原本的路、亂數序列也一樣：`flatOut`（不在自己的極速收油）、`exitWait`／`liftSteps`（放開甩尾後多久鬆油門、鬆多久：時機）、`boostAt`（多彎還敢噴 N2O）、`holdSeconds`（每個甩尾甩滿）、`cornerTurn`（前方路轉不到這麼多就不甩；`turnAhead()`）。困難電腦車的手照舊（短甩多），在新規則下河畔三圈 101.1 秒、覆蓋率 44–58%；試過把 `holdSeconds`／`cornerTurn` 給它，覆蓋率到 71–88% 但撞牆多三倍、秒數沒變快，所以沒給。
+- **結果**（5 場平均，三圈）：高手 79–89%（老街 43%）、中等 19–37%、新手 5–11%；高手比新手少 35–41% 的時間。完整的表、怎麼讀、哪裡沒達標在 `KART-FEEL.md` §5.1。`npm run kart:feel -- --seeds 5`（`--classic` 只跑經典）。
+
+**三、HUD**（`src/kart/Hud.tsx`、`spikeLoop.ts`、`callouts.ts`；樣式用 `ui/broadcast.ts` 的 `ticker`）
+
+`SpikeHud` 多 `combo`、`perfectReady`、`gains`、`gain`、`grade`（都選填）。加速條面板：洋紅「連段 ×n」ticker；獎勵進帳時整條閃光（`Jump`）＋飄走的「+35」（`Gain`，以 `gains` 當 key 重播）；甩夠久時金色提示換成發光的「完美時機 已備妥」。大字多 `perfect`（「完美！」／「完美！連段 ×n」）與 `late`。`scripts/kart-ui-shots.mjs --only combo` 截圖。
+
+**測試**：`tests/kart/classic.test.ts`「the gauge by the quality of the drift」（點甩不集、速度平方、噴射中集、三級時機、完美要甩夠久、連打不算、不接只有三分之一、連段與中斷、碰牆與重撞、直線硬甩 ×3）；`feel.test.ts`（覆蓋率與秒數的門檻）；`hud.test.tsx`（連段、獎勵數字、完美提示、大字）；`team.test.ts`（團隊條的節奏、藍色噴射中照常集）。e2e：測試場太小、速度低，原本「甩一圈就集滿」的兩個情境改成先存一組集得快的調參（`quickGauge`）；回正後才按的那一下現在是「太晚」。
+
+**沒做**：聲音沒有分級（完美與普通同一聲）；困難電腦車不會新打法（見上）；老街到不了 70%（要改路線）；時機窗沒有依裝置調整（手機兩指的 0.1 秒可能偏緊，等擁有者試）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

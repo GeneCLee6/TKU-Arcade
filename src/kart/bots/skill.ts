@@ -57,6 +57,33 @@ export interface BotSkill {
   readonly itemDelayMs: readonly [number, number]
   /** Waits for a good moment to use an item (a target in range, a straight); else uses it as it comes */
   readonly itemSense: boolean
+  // 2026-11-18, the gauge by the quality of the drift (docs/KART-FEEL.md §5): the hands of the
+  // scripted drivers `npm run kart:feel` measures with (scripts/kart/drivers.ts). The three
+  // difficulties leave them all out, and drive as they always did
+  /** The foot stays down, as a player's does: no easing off at the kart's own top speed */
+  readonly flatOut?: boolean
+  /**
+   * The instant boost's timing, in steps, each drawn between the two: how long after letting the
+   * drift go the throttle comes up, and for how long before it is pressed afresh. Left out: at once,
+   * for two steps (a perfect one)
+   */
+  readonly exitWait?: readonly [number, number]
+  readonly liftSteps?: readonly [number, number]
+  /**
+   * A charge is fired where the turn wanted now and further on are under this share of what the grip
+   * gives (left out: 0.4, a straight)
+   */
+  readonly boostAt?: number
+  /**
+   * Every drift begun is held at least this long, seconds, and until it has earned its instant
+   * boost, steering out of it if the corner is over: a drift cut short is worth little to the gauge
+   */
+  readonly holdSeconds?: number
+  /**
+   * A drift is begun only where the road ahead turns at least this much the same way, radians: a
+   * corner big enough to hold a drift through. Left out: wherever the grip is not enough
+   */
+  readonly cornerTurn?: number
 }
 
 export const BOT_SKILLS: Readonly<Record<Difficulty, BotSkill>> = {

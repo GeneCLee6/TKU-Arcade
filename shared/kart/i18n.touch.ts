@@ -27,7 +27,7 @@ const en = {
   'kart.touch.notSaved': "This browser won't keep it: it lasts until the page closes.",
   'kart.touch.howTo': 'How to drive by touch',
   'kart.touch.help':
-    'Left thumb steers; right thumb drives. To drift, hold Drift and steer: holding Drift keeps the gas on too. Let go of Drift and the kart slides out: steer the other way to pull it straight, then tap Gas for an instant boost (once a drift has earned one, gold sparks, the automatic throttle lets go by itself so that your tap counts; nothing fires until you tap). Tap Drift again right after it and do the same for a double; keep going, even with short drifts on the straights, to chain them. Boost fires a stored boost, Item uses the item, Brake brakes and reverses, Reset puts the kart back on the road. With the automatic throttle the engine runs by itself after GO; hold Gas just before GO for a start boost.',
+    'Left thumb steers; right thumb drives. To drift, hold Drift and steer: holding Drift keeps the gas on too. Let go of Drift and the kart slides out: steer the other way to pull it straight, then tap Gas for an instant boost (once a drift has earned one, gold sparks, the automatic throttle lets go by itself so that your tap counts; nothing fires until you tap). Tap Gas the moment you let go of a drift that lasted and it is a perfect one: longer, stronger, and worth the most to the boost gauge. One after another is a combo, and the gauge fills faster with every link; a tapped drift fills nothing. Boost fires a stored boost, Item uses the item, Brake brakes and reverses, Reset puts the kart back on the road. With the automatic throttle the engine runs by itself after GO; hold Gas just before GO for a start boost.',
   'kart.touch.rotate': 'Turn your phone sideways for a better view.',
 } as const
 
@@ -59,7 +59,7 @@ const zhTW: Record<KartTouchKey, string> = {
   'kart.touch.notSaved': '這個瀏覽器不讓存：關掉頁面前有效。',
   'kart.touch.howTo': '觸控怎麼開',
   'kart.touch.help':
-    '左手轉向，右手開車。甩尾：按住「甩尾」再轉向（按住甩尾時油門也一直踩著）。放開「甩尾」車會滑出去：往反方向轉把它拉正，再點一下「油門」才會瞬間加速（甩到出金色火花之後，自動油門會自己鬆開等你點；不點就不會噴）；噴完馬上再點一下甩尾、照做一次是雙收尾，一路接下去（直線上短甩也行）就是連噴。「噴射」放出存好的加速，「道具」用道具，「煞車」煞車與倒車，「復位」回到路上。開著自動油門時，GO 之後引擎自己跑；GO 前一刻按住油門可以起步加速。',
+    '左手轉向，右手開車。甩尾：按住「甩尾」再轉向（按住甩尾時油門也一直踩著）。放開「甩尾」車會滑出去：往反方向轉把它拉正，再點一下「油門」才會瞬間加速（甩到出金色火花之後，自動油門會自己鬆開等你點；不點就不會噴）；甩夠久之後，放開「甩尾」的那一瞬間就點「油門」是完美時機：噴得更久更強，加速條也給最多。一個接一個就是連段，每一環加速條再多給；點一下就放的甩尾不集氣。「噴射」放出存好的加速，「道具」用道具，「煞車」煞車與倒車，「復位」回到路上。開著自動油門時，GO 之後引擎自己跑；GO 前一刻按住油門可以起步加速。',
   'kart.touch.rotate': '把手機轉橫，畫面比較好看。',
 }
 
