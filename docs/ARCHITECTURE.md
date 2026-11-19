@@ -461,7 +461,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 - **`shared/kart/karts.ts`**（瀏覽器與 Worker 共用）：`KART_IDS`（6）、`DRIVER_IDS`（4）、每台車的級別與五項點數（−2～+2）。`applyKart(tuning, id)` 把點數換成物理參數的倍率（極速 `topSpeed`、加速 `acceleration`、操控 `turnRate`／`driftTurnRate`／`driftSteerRate`、集氣 `gaugeFillRate`），疊在標準調校或調參面板的數字上；`kartMass` 給車撞車用。`tide` 全 0＝原本的手感。
 - **套用**：`/kart` 與比賽畫面把 `applyKart` 後的 tuning 交給 `spikeLoop`（物理本身沒改）；`bumpKart` 多一個自己的質量與對方的 `mass`，輕的分到比較多的推力（相等時和原本一樣各一半）。
-- **線上**：frame 第 2 個 byte＝車 index（低 4 bit）＋角色 index（高 4 bit）（`loadoutByte`／`loadoutOfByte`；舊的 0–2 讀成同一台車、第一個角色）。別人的車照這個 byte 畫。伺服器 `judgeFrame` 多一個 `speedCap`，房間用 frame 那台車的 `speedCapFor`（該車極速 × 疊噴倍率 × 1.5）；`SPEED_CAP` 改成最快那台車的上限。
+- **線上**（2026-11-19 起車 5 bit＋角色 3 bit，舊 byte 不變，§4.38）：frame 第 2 個 byte＝車 index（低 4 bit）＋角色 index（高 4 bit）（`loadoutByte`／`loadoutOfByte`；舊的 0–2 讀成同一台車、第一個角色）。別人的車照這個 byte 畫。伺服器 `judgeFrame` 多一個 `speedCap`，房間用 frame 那台車的 `speedCapFor`（該車極速 × 疊噴倍率 × 1.5）；`SPEED_CAP` 改成最快那台車的上限。
 - **等待室同步**：協定的 `set_look`（`RoomMember.look`，格式 `^[a-z0-9-]{1,16}(\.[a-z0-9-]{1,16})?$`，房間不懂內容；卡丁車放 `kart.driver`），存在成員紀錄裡，任何狀態都能改。等待室在卡丁車房 lazy 載 `src/kart/roster/RoomGarage.tsx`：進來就把瀏覽器存的選擇送出去，列出每個座位的選擇。比賽本身不讀 `look`，讀瀏覽器存的選擇（兩者同一份）。
 - **模型**：`src/kart/art/kartModel.ts` 的車身（`tide` `comet` `ray`）＋ `rosterBodies.ts`（`crab` `heron` `flyfish`）；車手抽到 `driverModel.ts`，裝在車身的 `seat`（掛點）上。顏色在 `kartTokens.ts` 的 `kartBodies`（車）與 `kartDrivers`（角色）。
 - **畫面**：`src/kart/roster/RosterPicker.tsx`（純 DOM，選車、數值條、選角色），`/kart` 用 `GaragePanel.tsx` 包成面板，等待室用 `RoomGarage.tsx`。字串在 `shared/kart/i18n.roster.ts`（併進 `KART_MESSAGES`，等待室只註冊這一份；原本三台車的名稱也搬來這裡，內容沒改）。
@@ -555,7 +555,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **舊紀錄的遷移**：不用搬：舊 key 原地就是總最佳。舊幽靈車沒有 `kart`，畫面標「未知車款」，**不歸到 `tide`**：#61（2026-11-14）起就能換車而紀錄不知道，舊紀錄可能是任何一台開的；歸給標準車會讓一台快車的時間變成 `tide` 永遠破不了的紀錄。之後誰破了總最佳，就換成有車款的新紀錄。
 - **追哪個幽靈**：計時框下面的「幽靈車」三個按鈕（`src/kart/GhostPicker.tsx`；不用下拉，因為被點過的下拉會吃掉方向鍵）（`tku-arcade.kart.ghostPick`：`overall` 預設／`kart`／`off`），`spikeLoop` 的 `ghostPick` 選項；換了就重開這一趟（和換車一樣）。計時框的「紀錄」標車款，多一行「這台車」；完賽時只破了這台車的紀錄也會提示。
 - **測試**：`tests/kart/cup.test.tsx`、`tests/kart/ghost.test.ts`（見 `NEXT.md`）、`e2e/kart-cup.spec.ts`。
-- **已知限制**：比賽中重新整理那一場從起跑重來；每台車各存一份幽靈車（最多 6 台 × 每張賽道一份，約 30 kB 一份）；盃賽中途換車照樣算（每場用車庫當下的車）。
+- **已知限制**：比賽中重新整理那一場從起跑重來；每台車各存一份幽靈車（每台車 × 每張賽道一份，約 30 kB 一份；2026-11-19 起 17 台車，全部開過會接近瀏覽器 5 MB 的上限，存不進去時紀錄只留到關頁面，§4.38）；盃賽中途換車照樣算（每場用車庫當下的車）。
 
 ### 4.25 路線圖外：手機觸控操作（2026-11-17，`feat/kart-touch`）
 
@@ -934,6 +934,63 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 **測試**：`tests/kart/technical.test.ts` 的整組檢查現在跑九張（新四張的上限：直線比例 < 30%）：不自交、路緣不折疊、路寬 ≥ 28 m、檢查點依序且相鄰 < 70 m、復位點在路上且離島牆夠遠、起跑格八格、加速帶與道具箱在路上、跳台數與落地直線、**簡單／一般／困難各兩個種子三圈零逆走零復位**、困難 < 一般 < 簡單。`tests/kart/moreTracks.test.ts`（新）：`lay()`（閉合、弧在圓上、寬高、三種拒絕）、每張的彎數與換向下限、道具箱、三種駕駛的順序與差距下限（寬鬆：物理還在改）、場景不壓路且每次相同、砲台在跳台正前方、光環在圓環圓心、淡海島牆是封閉的一圈且兩側車道夠寬、**困難電腦車走圓環內側捷徑、其他走外側**。`cornerSigns.test.ts`、`cup.test.tsx` 加新圖與新盃。e2e `kart-more-tracks.spec.ts`：四張各自從賽道選單開成計時賽（小地圖、淡海的島牆畫在地圖上）、對戰電腦與大獎賽選單列出四張與漲潮盃、大屯對一台電腦跑一圈過兩個跳台。
 
 **限制**：(1) 上面說的差距量法。(2) 名稱是暫名。(3) 潮池是貼地的平面，行車視角只看得到一條水色，認得出來的是池邊的紅樹林。(4) 大屯的 31 m 髮夾與兩個落地彎，困難電腦車每圈大約撞一次；它跑得完、不逆走不卡住，但看起來不夠聰明。(5) 沒有做會動的障礙、第二條捷徑。(6) 卡丁車 chunk 353 → 361 kB gzip（預算 600 kB）（四張的路線是執行時算的，不是存好的座標）。
+
+### 4.38 路線圖外：車系、17 台車、懸浮摩托車、選車頁籤與 3D 預覽（2026-11-19，`feat/kart-vehicle-roster`）
+
+擁有者：「車種要多一些，以前跑跑都有什麼舒適，尖峰，等離子有的沒的，還有摩托車，你再多變通一下。」6 台 → **17 台（14 台卡丁車＋3 台摩托車）**，有自己的車系／等級／車型體系。原作的車名、車系、造型、數值表都沒用（`IP-CHECKLIST.md`）；車款表、暫名、造型與變身在 `KART-WORLD.md` §4.3，公平性的數字在 `KART-FEEL.md` §11，協定在 `KART-NETCODE.md` §12。解鎖（`e10-t06`）仍等 F2，全部開放。
+
+**資料（`shared/kart/karts.ts`）**
+
+- `KartSpec` 多三個欄位：`kind`（`kart`／`bike`）、`series`（`allround`／`sprint`／`speed`／`drift`／`heavy`）、可選的 `traits`。`KART_IDS` 前 6 個照舊（位置、等級、點數都沒動，測試擋），後面接 8 台卡丁車、3 台摩托車。
+- **依車種調整參數的介面：`KartTraits`**＝「`KART_TUNING` 任一個 key → 倍率」。`applyKart(base, id)` 先套四項點數（照舊），再乘車型的倍率（`KIND_TRAITS[kind].traits`），再乘這台車自己的（`spec.traits`，目前沒有車用）。**物理完全不知道車種**：`classic.ts`、`physics.ts` 只讀傳進來的 `KartTuning`。之後誰加新技術（跳台前甩、新的噴射），照常把數字放進 `KART_TUNING`、從 `t` 讀；要讓摩托車或某台車不一樣，只在 `KIND_TRAITS` 或那台車的 `traits` 加一行，技術的程式不用碰（`karts.ts` 檔頭寫了這段給平行開發的人）。倍率只作用在存在的 key，`tide` 套完仍等於 `KART_TUNING`（測試擋）。
+- **碰撞圓**：`KIND_TRAITS[kind].radius`（卡丁車 1.2 m＝`walls.ts` 的 `KART_RADIUS`，測試把兩個數字綁在一起；摩托車 0.85 m）。`applyKart` 在不是 1.2 時多放一個 `bodyRadius` 到回傳的 tuning；`KartTuning` 型別多一個**可選**的 `bodyRadius`（不在 `KART_TUNING`、不在調校面板、不會存進預設）。`collideWalls` 讀 `tuning.bodyRadius ?? KART_RADIUS`（最多 `KART_RADIUS`：分段檢查的步長是照它算的）。所以所有走 `stepRun`／`stepTrial` 的地方（計時賽、對戰電腦、多人、壓測機器人、`kart:feel`）自動用對的半徑，沒有改任何呼叫端的簽名。
+- **車撞車**：`bumpKart(kart, others, mass, radius)`，`others` 的每一台可帶 `radius`；兩台的接觸距離＝兩個半徑相加。`kartMass(id)`＝重量點數 × 車型質量（摩托車 0.8）。`netRace.ts`、`botRace.ts`、`spikeLoop.ts` 從 frame 的車 byte 查 `kartMass`／`kartRadius`（`botRace` 以前把真人當質量 1，現在也查表）。
+- **線上的車 byte**：5 bit 車＋3 bit 角色，舊 byte 解出來不變（`KART-NETCODE.md` §12）。`speedCapFor` 沒改：它本來就走 `applyKart`，摩托車的倍率不動極速與噴射上限，所以上限只跟極速點數走。
+- 道具命中（`shots.ts`）仍用 `KART_RADIUS`：摩托車不會比較難被打中。
+
+**摩托車的手感**是 `KIND_TRAITS.bike` 那十幾個倍率（表在 `KART-WORLD.md` §4.3）：窄、輕、方向跟手快、甩尾來得快收得快但淺、側滑與撞牆更痛、N2O 短一點、集氣偏重出彎時機。沒有分叉出第二套物理，也沒有新的狀態欄位。
+
+**畫面**
+
+- `src/kart/art/vehicleBodies.ts`（新）：車身的總表；`kartBodies.ts` 匯出原本六台（`FIRST_BODIES`）與共用零件（`cockpit`、`rearWing`、`skirt`、`thruster`、`coreHatch`、`slit`），`moreBodies.ts`（八台）、`bikeBodies.ts`（三台）各自一個檔。每台都有自己的 N2O 變身（`kit.morph`）。
+- `BodyFit` 多一個可選的 `bike: { bar, crouch }`。`kartModel.ts` 看到它就：車手用 `buildDriver(kit, id, true)`（跨坐：大腿往前下夾油箱、小腿往後踩腳踏）、上身前趴 `crouch`、頭抬回來、把手換成低的分離把；**傾車**：抓地轉向時車身 roll 到 `BIKE_LEAN`（0.52 rad，約 30°，乘速度），甩尾 0.5–0.62 rad，而且繞著地面那條線傾（`chassis.position.x/y` 跟著補），所以懸浮墊留在路面上、車手的頭往彎內去；車底光暈與頭燈光斑變窄。別人的摩托車、電腦車、重播用同一個模型與同樣的 `KartLook`，所以也會傾。
+- 摩托車只有一個後接觸點（`rearContacts` 一筆）：胎痕、火花、煙都是一道；`effects.ts` 本來就照筆數做，沒改。
+- 11 個新的抽象標誌（`MARKS`）與 11 組顏色（`kartTokens.ts` 的 `kartBodies`）。
+
+**選車畫面（`src/kart/roster/`）**
+
+- `RosterPicker.tsx`：卡片上方一排頁籤（`role="tablist"`）：全部、摩托車、五個車系、三個等級，單選、預設「全部」；卡片第二行寫性格與等級（摩托車寫「摩托車」與等級）；選中的車有名稱、標籤（車型、車系、性格、等級，摩托車多三個）、一句話、數值條；選摩托車時多一段說明。仍然不 import three.js（等待室先畫得出來）。換頁籤不會改選中的車。
+- `KartPreview.tsx`＋`previewStage.ts`（新）：3D 預覽。自己的一個小 WebGL 場景（透明底、一顆半球光一顆太陽、深色圓盤、環境貼圖），畫**比賽用的同一個模型**；自己慢慢轉（`prefers-reduced-motion` 時不轉）、拖曳或方向鍵轉、「N2O 變身」開關（`boosting`＋`boostKind: 'n2o'`，模型自己開合）。沒有後處理、沒有陰影。canvas 由 stage 自己建立與移除（React StrictMode 會重掛一次，重掛拿到新的 canvas；卸載時 `forceContextLoss`）。**沒有 WebGL 時整塊不畫**（jsdom、被擋的 GPU），選車照常。預覽 `position: sticky`，卡片在它下面捲，選了馬上看得到；螢幕高度 < 500 px（橫拿手機）不黏。
+- `/kart` 的 `GaragePanel` 直接用（three 已載入）；等待室的 `RoomGarage` 用 `lazy` 載（three 不進等待室的首屏；反正接下來的比賽要載同一包）。
+
+**電腦車**：`drawBots`、`RoomBots` 本來就從 `KART_IDS` 抽，所以會抽到新車與摩托車；`botBrain` 用那台車的 tuning 開。
+
+**量到的**（`npm run kart:feel -- --karts`：同一位駕駛腳本、九張賽道、每台車、五個種子平均；完整表在 `KART-FEEL.md` §11）
+
+| | 一場平均（秒） | 說明 |
+| --- | --- | --- |
+| 原本六台卡丁車 | 91.0（白鷺）–94.8（招潮蟹） | 數值沒動 |
+| 新的八台卡丁車 | 91.9（蝦蛄）–94.9（寄居蟹） | |
+| 三台摩托車 | 92.3（雨燕）、92.6（海燕）、94.1（虎頭蜂） | 落在卡丁車的範圍裡 |
+| 最快與最慢的平均差 | 3.9 秒（4.3%） | 新手比高手慢 48–87% |
+| 單一賽道第一最多的車 | 雨燕 4／9 張，但河畔慢 6.2 秒 | 沒有一台到處最快 |
+
+第一版的海燕（極速 +1、操控 −2）九張贏五張，所以改成極速 0、操控 −1，並給摩托車「N2O 短 7%」。
+
+**測試**：`tests/kart/karts.test.ts`（17 台、舊六台的位置／等級／點數／手感不變、每車系至少兩台且等級不重複、每車系在自己那一項是正的、點數總和 0、極速 ±5% 且彼此 3% 內、摩托車的倍率在範圍內且不動極速與噴射上限、所有車都在調校面板允許的範圍內；車 byte 來回、每種組合一個 byte、容量、舊 byte 逐一相容、舊頁面讀新 byte 不會讀到空的；每台車的速度上限；摩托車：半徑與質量、有得有失、倍率只動被點名的 key、牆邊 1 m 卡丁車被推開而摩托車不碰、車撞車的接觸距離與被推開的比例）、`tests/kart/vehicles.test.ts`（同一位高手換車：兩張短賽道，摩托車與標準車差 5% 內、沒有一台兩張都明顯最快）、`tests/kart/roster.test.tsx`（17 張卡、頁籤篩選、標籤、摩托車說明、每台車雙語都有名字與介紹）、`e2e/kart-spike.spec.ts`（車庫：頁籤、3D 預覽的 canvas 與變身開關、選摩托車後關車庫開跑、沒有 console error；下拉選單 17 台）。
+
+**預算**：卡丁車 chunk 364 → **376 kB**／600（gzip）；多人房第一個畫面 139.7／150 kB（多的是車名與選車字串）。
+
+**限制**
+
+1. 名稱（車系與 11 台車）都是暫名，等擁有者拍板。
+2. **公平性是用駕駛腳本量的，不是人**（§11 照實寫了腳本的偏差：它對「操控」點數的反應和人相反）。摩托車窄車身的好處，腳本只吃到「少擦牆」，不會刻意鑽縫；人可能吃到更多。要擁有者實際開過再調 `KIND_TRAITS`。
+3. 既有六台之間本來就有差距（同一個量法 3–4 秒／場），這一批沒有動它們的數值（紀錄與幽靈車依車款存）。
+4. 每台車各存一份幽靈車：17 台 × 9 張賽道全部開過約 4.6 MB，接近 localStorage 上限；存不進去時不會壞（`storage.ts` 不丟例外），只是那筆紀錄關頁面就沒了。真的遇到再做「只留最近用的幾台」。
+5. 還開著的舊頁面會把第 17 台車（海燕）畫成別台，重新整理就好（`KART-NETCODE.md` §12）。
+6. 摩托車沒有專屬的引擎聲、沒有後輪滑胎之類的專屬特效；道具命中判定仍用卡丁車的圓。
+7. 沒有「道具型」車系：重裝型（礁岩系）在車陣與道具賽最吃香，但沒有改道具機率或效果的車款參數；要做的話在 `KartTraits` 之外另加（道具邏輯在伺服器，不讀 tuning）。
+8. 3D 預覽在等待室會一直以 60 fps 畫（分頁在背景時瀏覽器自己停）；低階手機若嫌重，之後可改成捲出畫面就停。
 
 ## 5. i18n
 

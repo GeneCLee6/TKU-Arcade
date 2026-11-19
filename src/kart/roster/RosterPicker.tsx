@@ -75,11 +75,8 @@ export function RosterPicker({ t, kart, driver, onKart, onDriver, preview }: Ros
   const spec = kartSpec(kart)
   const [tab, setTab] = useState<RosterTab>('all')
   const tabLabel = (one: RosterTab): string =>
-    one === 'all' || one === 'bike'
-      ? t(`kart.roster.tab.${one}`)
-      : one.startsWith('series.')
-        ? t(`kart.${one}` as KartRosterKey)
-        : t(`kart.${one}` as KartRosterKey)
+    // A series' or a tier's tab is named by its own key: `kart.series.<id>`, `kart.tier.<id>`
+    one === 'all' || one === 'bike' ? t(`kart.roster.tab.${one}`) : t(`kart.${one}`)
   // Within a tab: the karts before the bikes, each by tier, as the table has them
   const shown = KARTS.filter((one) => inTab(one, tab)).sort(
     (a, b) =>
