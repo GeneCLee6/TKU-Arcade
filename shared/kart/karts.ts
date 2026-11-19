@@ -116,9 +116,11 @@ export const KART_BODY_RADIUS = 1.2
  * A bike against a kart (2026-11-19). What it gains: it is a third narrower, the steering follows
  * the stick at once (it tips in), the tail comes out sooner in a drift and the slide straightens
  * sooner after it, so the instant boost comes earlier out of a corner. What it pays: the drift is
- * shallower (less of the gauge from sliding, a little more from a clean exit), sliding scrubs more
- * speed, its N2O burns a little shorter (a small tank), a wall hit takes more of its speed, and in
- * a bump it is the one thrown aside. Measured, not
+ * shallower (and a clean exit is worth a little more of the gauge), sliding scrubs more
+ * speed, turning hard without a drift scrubs much more (it rides on two narrow pads: it wants to be
+ * drifted through a corner, not hauled round it), a wall hit takes more of its speed, and in a bump
+ * it is the one thrown aside. The last but one is what keeps a bike from being the easy choice: a
+ * driver who steers on grip alone, as a novice does, is no quicker on it. Measured, not
  * guessed: `npm run kart:feel -- --karts` drives every vehicle with the same hands, and the bikes
  * lap inside the karts' spread (docs/KART-FEEL.md §11).
  */
@@ -137,9 +139,8 @@ export const KIND_TRAITS: { readonly [K in KartKind]: KindSpec } = {
       dashMinSlip: 0.86,
       driftRecoverRate: 1.4,
       driftScrub: 1.25,
-      gaugeFillRate: 0.88,
       gaugeDashBonus: 1.12,
-      boostDuration: 0.93,
+      gripScrub: 1.6,
       wallImpactLoss: 1.25,
       wallScrapeDrag: 1.3,
     },

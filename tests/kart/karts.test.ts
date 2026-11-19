@@ -327,7 +327,9 @@ describe('a bike (2026-11-19): numbers on the same physics, not physics of its o
     // What it pays
     expect(bike.driftSlip).toBeLessThan(kart.driftSlip)
     expect(bike.driftScrub).toBeGreaterThan(kart.driftScrub)
-    expect(bike.boostDuration).toBeLessThan(kart.boostDuration)
+    expect(bike.gripScrub).toBeGreaterThan(kart.gripScrub)
+    // Its boosts are a kart's: as long, as strong
+    expect(bike.boostDuration).toBe(kart.boostDuration)
     expect(bike.wallImpactLoss).toBeGreaterThan(kart.wallImpactLoss)
     // The instant boost is still earned by the same share of the drift's depth
     expect(bike.dashMinSlip / bike.driftSlip).toBeCloseTo(kart.dashMinSlip / kart.driftSlip, 9)

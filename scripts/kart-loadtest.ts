@@ -1,5 +1,5 @@
 // e9-t11: `npm run kart:loadtest -- [--url <site>] [--bots 6] [--track oldstreet] [--laps 3]
-// [--mode items|race] [--teams] [--json <file>]`. Opens a kart room on a site (the local dev server by
+// [--mode items|race] [--teams] [--karts petrel,swift,whale] [--json <file>]`. Opens a kart room on a site (the local dev server by
 // default), lets N bots (`bot-1`, `bot-2`, ...) join it over the real protocol, sit, pick karts and
 // race it to the end with the game's physics and the autopilot (scripts/kart/loadtest-bot.ts), then
 // dissolves the room and prints what they measured: bytes a second each way, how long a frame took
@@ -10,7 +10,7 @@
 // Never against the live site unless its owner asks: that needs --allow-production.
 import { writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
-import { DRIVER_IDS, KART_IDS } from '../shared/kart/karts.ts'
+import { DRIVER_IDS, isKartId, KART_IDS } from '../shared/kart/karts.ts'
 import { teamScore } from '../shared/games/kart/rules.ts'
 import type { KartView } from '../shared/games/kart/types.ts'
 import { MAX_RACERS } from '../shared/kart/race.ts'
@@ -29,7 +29,7 @@ const PRODUCTION_HOST = 'tku-arcade.genelee-pro.workers.dev'
 /** Frames sent this close before the race was seen to end may reach a room that has stopped judging */
 const CLOSE_MARGIN_MS = 1_000
 
-const USAGE = `Usage: npm run kart:loadtest -- [--url http://localhost:5175] [--bots 6] [--track oldstreet] [--laps 3] [--mode items|race] [--teams] [--json out.json] [--quiet]`
+const USAGE = `Usage: npm run kart:loadtest -- [--url http://localhost:5175] [--bots 6] [--track oldstreet] [--laps 3] [--mode items|race] [--teams] [--karts petrel,swift,whale] [--json out.json] [--quiet]`
 
 function usage(problem: string): never {
   console.error(`${problem}\n${USAGE}`)
@@ -46,6 +46,9 @@ const { values } = parseArgs({
     // 2026-11-18: a team race (shared/kart/team.ts); the bots then drift through the bends, so that
     // the team gauges fill, and fire the team boosts they get
     teams: { type: 'boolean', default: false },
+    // 2026-11-19: the vehicles the bots take turns in (shared/kart/karts.ts); left out, all of them
+    // in the table's order, so six bots drive the first six
+    karts: { type: 'string' },
     json: { type: 'string' },
     quiet: { type: 'boolean', default: false },
     'allow-production': { type: 'boolean', default: false },
@@ -61,6 +64,8 @@ if (!Number.isInteger(bots) || bots < 1 || bots > MAX_RACERS) usage(`--bots must
 if (!Number.isInteger(laps) || laps < 1 || laps > 9) usage('--laps must be 1 to 9')
 if (!(RACE_TRACK_IDS as readonly string[]).includes(track)) usage(`--track must be one of ${RACE_TRACK_IDS.join(', ')}`)
 if (mode !== 'items' && mode !== 'race') usage('--mode must be items or race')
+const picks = values.karts === undefined ? KART_IDS : values.karts.split(',').filter(isKartId)
+if (picks.length === 0) usage(`--karts must name vehicles: ${KART_IDS.join(', ')}`)
 if (url.hostname === PRODUCTION_HOST && !values['allow-production']) {
   usage(`${url.hostname} is the live site: only when its owner asks, with --allow-production`)
 }
@@ -119,7 +124,7 @@ async function main(): Promise<number> {
   try {
     // One at a time, so that bot-1 is the host and the seats go in order
     for (let i = 0; i < bots; i++) {
-      const kart = KART_IDS[i % KART_IDS.length]!
+      const kart = picks[i % picks.length]!
       const driver = DRIVER_IDS[i % DRIVER_IDS.length]!
       const bot = new Bot({ name: `bot-${i + 1}`, url: url.origin, room: room.id, kart, driver, ledger, log })
       await bot.connect()
