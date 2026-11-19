@@ -949,6 +949,9 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
     'Hobe Fort Hill',
     'Danhai Night Circuit',
     'Datun Ridgeline',
+    // 2026-11-19: the two to learn by heart
+    'Wharf Warehouses',
+    'Hillside Lanes',
   ])
   await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
   await expect(page.getByText('Time trial')).toBeVisible()
