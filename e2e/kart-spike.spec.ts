@@ -775,6 +775,7 @@ for (const scheme of ['light', 'dark'] as const) {
     test.beforeEach(({ context }) => pinTheme(context, scheme))
 
     test('has no problems, mid-boost and with the panel open', async ({ page }) => {
+      await quickGauge(page)
       await openSpike(page)
       const problems = async () => {
         const { violations } = await new AxeBuilder({ page }).analyze()
