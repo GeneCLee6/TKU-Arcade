@@ -16,6 +16,7 @@
 | **能不能用某個名稱／圖／題目／模型** | `docs/PRD/01-legal-ip-analysis.md` §4 |
 | 架構、GameModule、卡丁車同步 | `docs/ARCHITECTURE.md` |
 | 介面、token、i18n 規則、術語表 | `docs/DESIGN.md` |
+| CSP、安全標頭、速率限制、擁有者端點 | `docs/SECURITY.md` |
 
 ## 硬性規則
 
