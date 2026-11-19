@@ -48,10 +48,10 @@ depends_on: []
 - [x] AC-12.1 — 部署：正式站上線、`DEPLOY.md`、PR 預覽。
 - [ ] AC-12.2 — CI：lint／typecheck／test／build／預算／i18n／資產檢查全在 PR 跑。
 - [ ] AC-12.3 — 遙測：錯誤回報與每日指標可見。
-- [ ] AC-12.4 — 成本：儀表板與 80% 警示。
-- [ ] AC-12.5 — 濫用防護：速率、過濾、連線上限，有測試。
+- [ ] AC-12.4 — 成本：儀表板與 80% 警示。（P1 #107 程式與測試完成；等擁有者設好 `CF_ANALYTICS_TOKEN`、`CF_ACCOUNT_ID`、在 `/stats` 看到數字再勾，DEPLOY.md §13）
+- [ ] AC-12.5 — 濫用防護：速率、過濾、連線上限，有測試。（P1 #107 的安全複查 `e12-t13` 完成，結論在 `docs/SECURITY.md`；跨 instance 的建房速率與管理頁權限還在 `e12-t06`，勾選等它）
 - [x] AC-12.6 — 資產授權清單：`ASSETS.md`、上傳腳本、CI 擋未登記。
-- [ ] AC-12.7 — 功能旗標：每款遊戲可關；關閉行為有測試。
+- [x] AC-12.7 — 功能旗標：每款遊戲可關；關閉行為有測試。（P1 #107：D1 `game_flags`、`/stats` 的開關；`flags.test.ts` 每款遊戲各測一次，`room-host.test.ts` 測既有房間；本機 workerd 用真的 `RoomDO` 實測，預覽站沒有 `STATS_KEY` 只驗了 404，`docs/SECURITY.md` §8）
 - [ ] AC-12.8 — IP 檢查清單：文件存在；每款遊戲上線前有簽名紀錄。
 
 ## Task 拆分
@@ -79,9 +79,9 @@ depends_on: []
 
 ### M4
 
-- [ ] `e12-t11` 功能旗標（每款遊戲）與關閉行為測試 · AC-12.7 · S · ← e1-t09
-- [ ] `e12-t12` 成本儀表板與 80% 警示 cron · AC-12.4 · M · ← e12-t07
-- [ ] `e12-t13` 安全複查（WebSocket 來源檢查、CSP、依賴更新） · AC-12.5 · S
+- [x] `e12-t11` 功能旗標（每款遊戲）與關閉行為測試 · AC-12.7 · S · ← e1-t09 · P1（#107）：D1 `game_flags`（`migrations/0004`），擁有者在 `/stats` 切換、不用重新部署；暫停的遊戲大廳卡片標「維護中」、不能開房、公開房不列出；既有房間**讓當局玩完**，之後不能再開局（`start`／`rematch`／`set_game` 回 `game_disabled`），房主可以換別款；讀不到旗標表時全部開放
+- [x] `e12-t15` 成本儀表板與 80% 警示 cron · AC-12.4 · M · ← e12-t07 · P1（#107）：原本也叫 `e12-t12`，和 D4 的首屏預算撞號，2026-11-19 改成 `e12-t15`。Cloudflare GraphQL Analytics API（secret `CF_ANALYTICS_TOKEN`、`CF_ACCOUNT_ID`），`/stats` 下方的用量表；每日 cron 超過 80% 寫 D1 `cost_alerts`（`migrations/0005`）並在儀表板紅字，選用 `ALERT_WEBHOOK_URL`；沒有 secret 時顯示「未設定」
+- [x] `e12-t13` 安全複查（WebSocket 來源檢查、CSP、依賴更新） · AC-12.5 · S · P1（#107）：結論在 `docs/SECURITY.md`；加了 CSP 與安全標頭（`_headers` 由 build 產生）、每 instance 的建房速率；`npm audit` 0 個弱點
 
 ## 風險與對策
 

@@ -1,6 +1,8 @@
 import type { HealthResponse } from '../shared/health.ts'
 import { handleTelemetry } from './telemetry.ts'
 import { handleStats } from './metrics.ts'
+import { handleAdminFlags, handleFlags, disabledGames } from './flags.ts'
+import { handleUsage } from './usage.ts'
 import { handleVoice } from './voice.ts'
 import type { LobbyResponse } from '../shared/protocol.ts'
 import { handleAuth, isAuthPath } from './auth.ts'
@@ -40,6 +42,16 @@ export interface Env {
   LONGTALK?: Fetcher
   /** The owner's key to the daily metrics (e12-t07, worker/metrics.ts): a secret; no secret, no stats */
   STATS_KEY?: string
+  /**
+   * The cost dashboard (e12-t15, worker/usage.ts, DEPLOY.md §13): a Cloudflare API token with
+   * Account Analytics read, and the account's id, both secrets. Without them it says "not set up"
+   */
+  CF_ANALYTICS_TOKEN?: string
+  CF_ACCOUNT_ID?: string
+  /** Which allowances the dashboard measures against: `free` (the default) or `paid` (a var) */
+  COST_PLAN?: string
+  /** Optional: where a new 80% alert is also posted as JSON (a Discord or Slack webhook; a secret) */
+  ALERT_WEBHOOK_URL?: string
 }
 
 const noStore = { 'cache-control': 'no-store' }
@@ -54,8 +66,12 @@ async function handleLobby(request: Request, env: Env): Promise<Response> {
       { status: 405, headers: { ...noStore, allow: 'GET' } },
     )
   }
-  const rooms = await env.LOBBY.get(env.LOBBY.idFromName(LOBBY_NAME)).list()
-  const body: LobbyResponse = { rooms }
+  const [rooms, paused] = await Promise.all([
+    env.LOBBY.get(env.LOBBY.idFromName(LOBBY_NAME)).list(),
+    disabledGames(env.DB),
+  ])
+  // A paused game's rooms cannot start a game (e12-t11): nobody is invited to them
+  const body: LobbyResponse = { rooms: rooms.filter((room) => !paused.has(room.gameId)) }
   return Response.json(body, { headers: noStore })
 }
 
@@ -74,6 +90,9 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   if (url.pathname === '/api/lobby') return handleLobby(request, env)
   if (url.pathname === '/api/voice') return handleVoice(request, env)
   if (url.pathname === '/api/stats') return handleStats(request, env)
+  if (url.pathname === '/api/flags') return handleFlags(request, env)
+  if (url.pathname === '/api/admin/flags') return handleAdminFlags(request, env)
+  if (url.pathname === '/api/admin/usage') return handleUsage(request, env)
   if (url.pathname === '/api/telemetry') return handleTelemetry(request, env, url)
   if (isAuthPath(url.pathname)) return handleAuth(request, env, url)
   if (url.pathname === '/api/errors') return handleClientError(request, env, url)

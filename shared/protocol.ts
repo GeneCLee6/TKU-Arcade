@@ -243,6 +243,8 @@ export type PatchMessage = { t: 'patch'; rev: number; ops: PatchOp[] }
  * - `unavailable`: this server does not do that yet
  * - `password_required`: `join` of someone new, without a password, to a room that has one (e1-t16)
  * - `wrong_password`: `join` with the wrong one; after PASSWORD_TRIES of them the socket is closed
+ * - `game_disabled`: `start`, `rematch` or `set_game` of a game the owner has paused (e12-t11); a
+ *   game already being played goes on to its end
  */
 export type ErrorCode =
   | 'forbidden'
@@ -262,6 +264,7 @@ export type ErrorCode =
   | 'unavailable'
   | 'password_required'
   | 'wrong_password'
+  | 'game_disabled'
 
 /** A refusal, to the sender only. `game_error`: the game refused the action, `error` says why */
 export type ErrorMessage =
@@ -486,6 +489,18 @@ export type DailyMetricRow = { day: string; metric: MetricName; game: string; co
 
 /** GET /api/stats (e12-t07): the owner's daily counts, from `since` (YYYY-MM-DD, Taipei) on */
 export type StatsResponse = { since: string; rows: DailyMetricRow[] }
+
+/**
+ * GET /api/flags (e12-t11): the games the owner has paused. Absent from the list means open, which is
+ * also what an unreadable flag table means (a flag only ever closes)
+ */
+export type FlagsResponse = { disabled: string[] }
+
+/** GET /api/admin/flags (e12-t11, owner): every game the server has, open or not */
+export type AdminFlagsResponse = { games: { id: string; enabled: boolean; updatedAt: number | null }[] }
+
+/** PUT /api/admin/flags (e12-t11, owner): open or pause one game */
+export type SetFlagRequest = { game: string; enabled: boolean }
 
 /** GET /api/voice (e1-t14): whether this site can open a LongTalk voice room */
 export type VoiceStatus = { available: boolean }

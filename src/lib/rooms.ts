@@ -1,6 +1,7 @@
 import type {
   CreateRoomRequest,
   CreateRoomResponse,
+  FlagsResponse,
   LobbyResponse,
   RoomCodeResponse,
   RoomListing,
@@ -8,12 +9,15 @@ import type {
 } from '../../shared/protocol.ts'
 import { isRoomId } from '../../shared/room-id.ts'
 
-/** The new room's id, or null when it could not be created (any reason: the toast is the same) */
+/**
+ * The new room's id; `paused` when the owner has paused that game (e12-t11); null when it could not
+ * be created for any other reason (the toast is the same)
+ */
 export async function createRoom(
   gameId: string,
   isPublic: boolean,
   signal?: AbortSignal,
-): Promise<string | null> {
+): Promise<string | 'paused' | null> {
   const request: CreateRoomRequest = isPublic ? { gameId, public: true } : { gameId }
   try {
     const response = await fetch('/api/rooms', {
@@ -22,6 +26,7 @@ export async function createRoom(
       body: JSON.stringify(request),
       signal,
     })
+    if (response.status === 403) return 'paused'
     if (!response.ok) return null
     const { id } = (await response.json()) as CreateRoomResponse
     return isRoomId(id) ? id : null
@@ -43,6 +48,17 @@ export async function findRoomByCode(code: string, signal?: AbortSignal): Promis
     return isRoomId(id) ? id : null
   } catch {
     return null
+  }
+}
+
+/** The games the owner has paused (e12-t11); none when there is no clear answer */
+export async function fetchPausedGames(signal?: AbortSignal): Promise<string[]> {
+  try {
+    const response = await fetch('/api/flags', { signal })
+    const { disabled } = response.ok ? ((await response.json()) as FlagsResponse) : { disabled: [] }
+    return Array.isArray(disabled) ? disabled : []
+  } catch {
+    return []
   }
 }
 

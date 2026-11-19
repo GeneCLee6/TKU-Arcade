@@ -1,40 +1,21 @@
 import { MAX_CLIENT_ERROR_BYTES, parseClientError } from '../shared/client-error.ts'
 import type { Env } from './app.ts'
+import { FixedWindowLimit } from './rate-limit.ts'
 
 const noStore = { 'cache-control': 'no-store' }
 
 const fail = (error: string, status: number, headers: Record<string, string> = {}) =>
   Response.json({ error }, { status, headers: { ...noStore, ...headers } })
 
-const WINDOW_MS = 60_000
 /** Reports one address may send a minute; a page sends only a few itself (src/lib/errorReport.ts) */
 const PER_ADDRESS = 10
 /** Reports one Worker instance logs a minute, whoever they come from */
 const PER_INSTANCE = 120
-/** Addresses remembered; past this the window starts over, which only ever lets someone send sooner */
-const MAX_ADDRESSES = 2_000
 
-/**
- * A fixed window per address, in the Worker instance's memory. Not exact (each instance counts for
- * itself, and forgets), but this only keeps the logs and the free tier from being flooded, needs no
- * storage, and the address goes nowhere else.
- */
-export class ErrorReportLimit {
-  private windowStart = 0
-  private total = 0
-  private readonly counts = new Map<string, number>()
-
-  take(address: string, now: number): boolean {
-    if (now - this.windowStart >= WINDOW_MS || this.counts.size >= MAX_ADDRESSES) {
-      this.windowStart = now
-      this.total = 0
-      this.counts.clear()
-    }
-    const count = this.counts.get(address) ?? 0
-    if (count >= PER_ADDRESS || this.total >= PER_INSTANCE) return false
-    this.counts.set(address, count + 1)
-    this.total++
-    return true
+/** worker/rate-limit.ts, with the error reports' numbers */
+export class ErrorReportLimit extends FixedWindowLimit {
+  constructor() {
+    super(PER_ADDRESS, PER_INSTANCE)
   }
 }
 

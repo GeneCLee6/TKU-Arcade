@@ -34,16 +34,22 @@ function renderLobby() {
 /** Every listed game has its own New room button; these tests make Promotion rooms */
 const cardOf = (name: string) => screen.getByRole('heading', { level: 3, name }).closest('li')!
 const newRoom = () => within(cardOf('Promotion')).getByRole('button', { name: 'New room' })
-/** `implementation` answers everything but the public list, which only `lobby` answers */
+/**
+ * `implementation` answers everything but the public list, which only `lobby` answers, and the
+ * paused games (e12-t11), which are `paused`
+ */
 const stubFetch = (
   implementation: () => Promise<Response>,
   lobby: () => Promise<Response> = () => Promise.resolve(Response.json({ rooms: [] })),
+  paused: readonly string[] = [],
 ) => {
   const fetchMock = vi.fn(implementation)
   vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
     url === '/api/lobby'
       ? lobby()
-      : (fetchMock as (u: string, i?: RequestInit) => unknown)(url, init),
+      : url === '/api/flags'
+        ? Promise.resolve(Response.json({ disabled: paused }))
+        : (fetchMock as (u: string, i?: RequestInit) => unknown)(url, init),
   )
   return fetchMock
 }
@@ -495,5 +501,30 @@ describe('public rooms', () => {
     expect(await screen.findByTestId('where')).toHaveTextContent(`/r/${ROOM}`)
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(JSON.parse(init.body as string)).toEqual({ gameId: 'promotion', public: true })
+  })
+})
+
+describe('a game the owner has paused (e12-t11)', () => {
+  it('says so on its card and offers no New room; the other games are untouched', async () => {
+    localStorage.setItem(NICKNAME_KEY, 'Al')
+    const fetchMock = stubFetch(created, undefined, ['promotion'])
+    renderLobby()
+    await waitFor(() => expect(newRoom()).toBeDisabled())
+    expect(within(cardOf('Promotion')).getByRole('note')).toHaveTextContent('Paused for maintenance')
+    const others = screen.getAllByRole('button', { name: 'New room' }).filter((b) => b !== newRoom())
+    expect(others.length).toBeGreaterThan(0)
+    expect(others.every((button) => !(button as HTMLButtonElement).disabled)).toBe(true)
+    fireEvent.click(newRoom())
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('paused after the lobby loaded: the refusal says so, and the card turns paused', async () => {
+    localStorage.setItem(NICKNAME_KEY, 'Al')
+    stubFetch(() => Promise.resolve(Response.json({ error: 'game_disabled' }, { status: 403 })))
+    renderLobby()
+    fireEvent.click(newRoom())
+    expect(await screen.findByRole('alert')).toHaveTextContent('Paused for maintenance')
+    expect(screen.queryByTestId('where')).not.toBeInTheDocument()
+    await waitFor(() => expect(newRoom()).toBeDisabled())
   })
 })
