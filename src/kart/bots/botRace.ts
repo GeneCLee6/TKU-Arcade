@@ -9,7 +9,13 @@
 import type { KartAction, KartState as RoomState } from '../../../shared/games/kart/types.ts'
 import type { Course } from '../../../shared/kart/course.ts'
 import { encodeItemFrame, ITEM_TUNING, itemBoxes, type ItemId } from '../../../shared/kart/items.ts'
-import { applyKart, kartMass, loadoutByte } from '../../../shared/kart/karts.ts'
+import {
+  applyKart,
+  kartMass,
+  kartRadius,
+  loadoutByte,
+  loadoutOfByte,
+} from '../../../shared/kart/karts.ts'
 import {
   encodeFrame,
   readRelayed,
@@ -68,6 +74,7 @@ interface Bot {
   /** A team race (2026-11-18): the team boosts it may fire, kept in step with the room */
   readonly team: TeamRider
   readonly mass: number
+  readonly radius: number
   readonly body: number
   readonly rng: () => number
   trial: Trial
@@ -189,6 +196,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
         return createTeamRider(racer, state.teams?.fills[racer?.team ?? 0] ?? 0)
       })(),
       mass: kartMass(entry.kart),
+      radius: kartRadius(entry.kart),
       body: loadoutByte(entry.kart, entry.driver),
       rng: flips(options.seed * 17 + seat),
       trial: startTrial(course),
@@ -243,8 +251,15 @@ export function createBotRace(options: BotRaceOptions): BotRace {
 
   /** Where every other kart is now, with its speed and mass */
   const othersOf = (seat: number) => {
-    const others: { x: number; z: number; vx: number; vz: number; mass: number; seat: number }[] =
-      []
+    const others: {
+      x: number
+      z: number
+      vx: number
+      vz: number
+      mass: number
+      radius: number
+      seat: number
+    }[] = []
     for (const bot of bots) {
       if (bot.seat === seat) continue
       const { kart } = bot.trial.run
@@ -255,10 +270,20 @@ export function createBotRace(options: BotRaceOptions): BotRace {
         vx: kart.vx,
         vz: kart.vz,
         mass: bot.mass,
+        radius: bot.radius,
       })
     }
     for (const [person, frame] of people) {
-      others.push({ seat: person, x: frame.x, z: frame.z, vx: frame.vx, vz: frame.vz, mass: 1 })
+      const pick = loadoutOfByte(frame.body).kart
+      others.push({
+        seat: person,
+        x: frame.x,
+        z: frame.z,
+        vx: frame.vx,
+        vz: frame.vz,
+        mass: kartMass(pick),
+        radius: kartRadius(pick),
+      })
     }
     return others
   }
@@ -403,7 +428,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
     const before = trial.run
     trial = stepTrial(trial, input, bot.course, tunings.get(bot.seat), DEFAULT_RULES)
     if (trial.phase !== 'countdown') {
-      const bumped = bumpKart(trial.run.kart, othersOf(bot.seat), bot.mass)
+      const bumped = bumpKart(trial.run.kart, othersOf(bot.seat), bot.mass, bot.radius)
       if (bumped.kart !== trial.run.kart)
         trial = { ...trial, run: { ...trial.run, kart: bumped.kart } }
     }

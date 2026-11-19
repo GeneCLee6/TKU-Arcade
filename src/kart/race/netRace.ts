@@ -44,6 +44,7 @@ import { CLOCK_ANSWER_BYTES, CLOCK_FRAME, CLOCK_PING_BYTES } from '../../../shar
 import type { RoomRealtime } from '../../lib/useRoom.ts'
 import {
   kartMass,
+  kartRadius,
   loadoutByte,
   loadoutOfByte,
   type DriverId,
@@ -461,7 +462,10 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     bumpers: () =>
       poses
         .filter((pose) => !pose.stale)
-        .map((pose) => ({ ...pose, mass: kartMass(loadoutOfByte(pose.frame.body).kart) })),
+        .map((pose) => {
+          const { kart } = loadoutOfByte(pose.frame.body)
+          return { ...pose, mass: kartMass(kart), radius: kartRadius(kart) }
+        }),
     others() {
       poses = remotes.poses(performance.now() / 1000)
       debug.others = poses.filter((pose) => !pose.stale).length

@@ -308,7 +308,7 @@ export const BUMP_MIN_PUSH = 2
  * about a bump, which a race between friends can live with. The other kart is taken to be standing
  * still (its own browser pushes it the other way). e10-t05a: each kart has a mass (karts.ts's
  * `kartMass`, 1 when not given); the lighter of two takes the larger share of the push, equal karts
- * half each.
+ * half each. 2026-11-19: and a circle of its own (`kartRadius`): two bikes pass closer than two karts.
  */
 export function bumpKart(
   kart: KartState,
@@ -318,13 +318,17 @@ export function bumpKart(
     readonly vx: number
     readonly vz: number
     readonly mass?: number
+    /** The other's circle, metres (karts.ts's `kartRadius`): a kart's when not given */
+    readonly radius?: number
   }[],
   mass = 1,
+  /** This kart's own circle */
+  radius = KART_RADIUS,
 ): { kart: KartState; hit: number } {
   let { x, z, vx, vz } = kart
   let hit = 0
-  const reach = KART_RADIUS * 2
   for (const other of others) {
+    const reach = radius + (other.radius ?? KART_RADIUS)
     const dx = x - other.x
     const dz = z - other.z
     const distance = Math.hypot(dx, dz)

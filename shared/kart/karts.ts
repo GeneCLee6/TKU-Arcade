@@ -15,15 +15,70 @@
 // difference stays well under the gap between a clean and a messy lap: the driving decides, the
 // kart only flavours it. Acceleration, handling and drift charge move further (±8–10%), since a
 // player can work round each of them. Pure: the Worker reads it to judge frames (race.ts).
+//
+// 2026-11-19 (owner: "more kinds of vehicle ... and motorbikes; be inventive"): seventeen vehicles
+// of our own, in a system of our own (docs/KART-WORLD.md §4.3; no other game's vehicle names, shapes
+// or tables). Three things say what a vehicle is:
+// - its series (`KartSeries`), the character it is built for: all-round, launch, top speed, drift
+//   or heavy. Each series has an entry, an advanced and an expert machine (the all-rounders two);
+// - its tier, how demanding it is, as before;
+// - its kind (`KartKind`): a hover kart, or a hover bike. A bike is a different machine to drive,
+//   not a better one: narrower (it fits a gap a kart scrapes through, `radius`), light (a bump
+//   throws it further, `mass`), it tips into a corner at once, its tail comes out and comes back
+//   quicker and not as far, and a wall costs it more. All of it is numbers on the same physics
+//   (`KIND_TRAITS`): classic.ts never asks what it is driving.
+//
+// The first six keep their ids, their numbers and their places in KART_IDS (best laps and ghosts
+// are kept by kart, and a frame names its kart by its place).
+//
+// Numbers by vehicle, for whoever adds a technique (a jump's flick, a new boost): give the
+// technique its number in KART_TUNING as usual and read it from the tuning the step is handed. A
+// vehicle then scales it with a line in `KIND_TRAITS` (every bike) or in its own `traits` (one
+// machine), and nothing in the technique's code knows about vehicles.
 import type { KartTuning } from './physics.ts'
 
-export const KART_IDS = ['tide', 'comet', 'ray', 'crab', 'heron', 'flyfish'] as const
+export const KART_IDS = [
+  'tide',
+  'comet',
+  'ray',
+  'crab',
+  'heron',
+  'flyfish',
+  // 2026-11-19: eight more karts ...
+  'dolphin',
+  'skipper',
+  'shrimp',
+  'marlin',
+  'eel',
+  'squid',
+  'hermit',
+  'whale',
+  // ... and three bikes
+  'swift',
+  'hornet',
+  'petrel',
+] as const
 export type KartId = (typeof KART_IDS)[number]
 
 export const DRIVER_IDS = ['spade', 'heart', 'diamond', 'club'] as const
 export type DriverId = (typeof DRIVER_IDS)[number]
 
-export type KartTier = 'entry' | 'advanced' | 'expert'
+export const KART_TIERS = ['entry', 'advanced', 'expert'] as const
+export type KartTier = (typeof KART_TIERS)[number]
+
+/** What a vehicle is built for: the stat it buys, and what it pays with */
+export const KART_SERIES = ['allround', 'sprint', 'speed', 'drift', 'heavy'] as const
+export type KartSeries = (typeof KART_SERIES)[number]
+
+/** A hover kart, or a hover bike (2026-11-19) */
+export const KART_KINDS = ['kart', 'bike'] as const
+export type KartKind = (typeof KART_KINDS)[number]
+
+/**
+ * Numbers of the tuning a vehicle multiplies, on top of its stats: any key of KART_TUNING, 1 when
+ * left out. How a kind of vehicle (or one machine) drives differently without the physics knowing
+ */
+export type KartTraits = { readonly [K in keyof KartTuning]?: number }
 
 /** The stats a kart is drawn with, each -2 to 2 points; 0 is the standard tuning */
 export const KART_STATS = ['speed', 'acceleration', 'handling', 'charge', 'weight'] as const
@@ -37,8 +92,59 @@ export const STAT_MAX = 2
 
 export interface KartSpec {
   readonly id: KartId
+  readonly kind: KartKind
+  readonly series: KartSeries
   readonly tier: KartTier
   readonly stats: { readonly [S in KartStat]: number }
+  /** This machine's own multipliers, after its kind's */
+  readonly traits?: KartTraits
+}
+
+/** What every vehicle of a kind shares */
+export interface KindSpec {
+  /** The circle that walls and other vehicles push on, metres (walls.ts's KART_RADIUS for a kart) */
+  readonly radius: number
+  /** Its mass in a bump, times its weight stat's */
+  readonly mass: number
+  readonly traits: KartTraits
+}
+
+/** A kart's circle: the same number as walls.ts's KART_RADIUS (a test holds them together) */
+export const KART_BODY_RADIUS = 1.2
+
+/**
+ * A bike against a kart (2026-11-19). What it gains: it is a third narrower, the steering follows
+ * the stick at once (it tips in), the tail comes out sooner in a drift and the slide straightens
+ * sooner after it, so the instant boost comes earlier out of a corner. What it pays: the drift is
+ * shallower (and a clean exit is worth a little more of the gauge), sliding scrubs more
+ * speed, turning hard without a drift scrubs much more (it rides on two narrow pads: it wants to be
+ * drifted through a corner, not hauled round it), a wall hit takes more of its speed, and in a bump
+ * it is the one thrown aside. The last but one is what keeps a bike from being the easy choice: a
+ * driver who steers on grip alone, as a novice does, is no quicker on it. Measured, not
+ * guessed: `npm run kart:feel -- --karts` drives every vehicle with the same hands, and the bikes
+ * lap inside the karts' spread (docs/KART-FEEL.md §12).
+ */
+export const KIND_TRAITS: { readonly [K in KartKind]: KindSpec } = {
+  kart: { radius: KART_BODY_RADIUS, mass: 1, traits: {} },
+  bike: {
+    radius: 0.85,
+    mass: 0.8,
+    traits: {
+      steerResponse: 1.5,
+      turnRate: 1.04,
+      driftSlipIn: 0.72,
+      driftSlip: 0.86,
+      driftSlipSteer: 0.86,
+      driftMaxSlip: 0.86,
+      dashMinSlip: 0.86,
+      driftRecoverRate: 1.4,
+      driftScrub: 1.25,
+      gaugeDashBonus: 1.12,
+      gripScrub: 1.6,
+      wallImpactLoss: 1.25,
+      wallScrapeDrag: 1.3,
+    },
+  },
 }
 
 /**
@@ -54,41 +160,139 @@ export const STAT_STEP: { readonly [S in KartStat]: number } = {
 }
 
 /**
- * Two of each tier (the PRD's entry, advanced and top tiers). In order: the one that is middling at
- * everything; the light, quick-off-the-line one; the planted, fast one that charges slowly; the
- * heavy one that charges fast but pulls away slowly; the fastest, twitchy and light; the drift
- * charger that pays in top speed and handling.
+ * The seventeen. The first six are the karts of e10-t05, as they were. By series, entry to expert:
+ * all-round `tide`, `dolphin`; launch `comet`, `skipper`, `shrimp`; top speed `marlin`, `ray`,
+ * `heron`; drift `eel`, `squid`, `flyfish`; heavy `hermit`, `crab`, `whale`. The bikes: `swift`
+ * (launch), `hornet` (top speed), `petrel` (drift). Each spends a budget of zero; no two alike.
  */
 export const KARTS: readonly KartSpec[] = [
   {
     id: 'tide',
+    kind: 'kart',
+    series: 'allround',
     tier: 'entry',
     stats: { speed: 0, acceleration: 0, handling: 0, charge: 0, weight: 0 },
   },
   {
     id: 'comet',
+    kind: 'kart',
+    series: 'sprint',
     tier: 'entry',
     stats: { speed: -1, acceleration: 2, handling: 1, charge: -2, weight: -1 },
   },
   {
     id: 'ray',
+    kind: 'kart',
+    series: 'speed',
     tier: 'advanced',
     stats: { speed: 1, acceleration: -1, handling: 1, charge: -1, weight: 0 },
   },
   {
     id: 'crab',
+    kind: 'kart',
+    series: 'heavy',
     tier: 'advanced',
     stats: { speed: 0, acceleration: -2, handling: 1, charge: 1, weight: 2 },
   },
   {
     id: 'heron',
+    kind: 'kart',
+    series: 'speed',
     tier: 'expert',
     stats: { speed: 2, acceleration: -1, handling: -2, charge: 1, weight: -1 },
   },
   {
     id: 'flyfish',
+    kind: 'kart',
+    series: 'drift',
     tier: 'expert',
     stats: { speed: -1, acceleration: 0, handling: -1, charge: 2, weight: 0 },
+  },
+  // The all-rounder that leans towards the straight
+  {
+    id: 'dolphin',
+    kind: 'kart',
+    series: 'allround',
+    tier: 'advanced',
+    stats: { speed: 1, acceleration: 0, handling: 0, charge: -1, weight: 0 },
+  },
+  // Off the line like the comet, and loose where the comet is sharp
+  {
+    id: 'skipper',
+    kind: 'kart',
+    series: 'sprint',
+    tier: 'advanced',
+    stats: { speed: -1, acceleration: 2, handling: -1, charge: 0, weight: -1 },
+  },
+  // All punch, and a handful: the standard top speed, the hardest to place
+  {
+    id: 'shrimp',
+    kind: 'kart',
+    series: 'sprint',
+    tier: 'expert',
+    stats: { speed: 0, acceleration: 2, handling: -2, charge: 0, weight: -1 },
+  },
+  // A first taste of top speed, paid for only in the corners
+  {
+    id: 'marlin',
+    kind: 'kart',
+    series: 'speed',
+    tier: 'entry',
+    stats: { speed: 1, acceleration: 0, handling: -1, charge: 0, weight: 0 },
+  },
+  // A first drift charger: slow to pull away, nothing else to learn
+  {
+    id: 'eel',
+    kind: 'kart',
+    series: 'drift',
+    tier: 'entry',
+    stats: { speed: 0, acceleration: -1, handling: 0, charge: 1, weight: 0 },
+  },
+  // Charges like the flying fish and pulls away better; the loosest kart there is
+  {
+    id: 'squid',
+    kind: 'kart',
+    series: 'drift',
+    tier: 'advanced',
+    stats: { speed: -1, acceleration: 1, handling: -2, charge: 2, weight: -1 },
+  },
+  // Heavy enough to hold a line in a crowd, and easy to place
+  {
+    id: 'hermit',
+    kind: 'kart',
+    series: 'heavy',
+    tier: 'entry',
+    stats: { speed: 0, acceleration: -1, handling: 1, charge: 0, weight: 1 },
+  },
+  // The heaviest: fast once it is rolling and a fast charger, the slowest of all to get there
+  {
+    id: 'whale',
+    kind: 'kart',
+    series: 'heavy',
+    tier: 'expert',
+    stats: { speed: 1, acceleration: -2, handling: -1, charge: 2, weight: 2 },
+  },
+  // The bikes (KIND_TRAITS): all light
+  {
+    id: 'swift',
+    kind: 'bike',
+    series: 'sprint',
+    tier: 'entry',
+    stats: { speed: 0, acceleration: 1, handling: 0, charge: -1, weight: -1 },
+  },
+  {
+    id: 'hornet',
+    kind: 'bike',
+    series: 'speed',
+    tier: 'advanced',
+    stats: { speed: 1, acceleration: 0, handling: 1, charge: -2, weight: -1 },
+  },
+  {
+    id: 'petrel',
+    kind: 'bike',
+    series: 'drift',
+    tier: 'expert',
+    stats: { speed: 0, acceleration: -1, handling: -1, charge: 2, weight: -2 },
   },
 ]
 
@@ -116,50 +320,89 @@ export function kartSpec(id: KartId): KartSpec {
   return KARTS.find((kart) => kart.id === id) ?? KARTS[0]!
 }
 
+/** A vehicle's kind: a kart or a bike */
+export const kartKind = (id: KartId): KartKind => kartSpec(id).kind
+
+/** The circle walls and other vehicles push on, metres: a bike's is smaller */
+export const kartRadius = (id: KartId): number => KIND_TRAITS[kartSpec(id).kind].radius
+
 /** The share a stat's points make of the standard number: 1 for 0 points */
 export const statFactor = (stat: KartStat, points: number): number =>
   1 + STAT_STEP[stat] * points
+
+function scaled(tuning: KartTuning, traits: KartTraits | undefined): KartTuning {
+  if (!traits) return tuning
+  const next: { [key: string]: number | undefined } = { ...tuning }
+  for (const [key, factor] of Object.entries(traits)) {
+    const base = next[key]
+    if (typeof base === 'number' && typeof factor === 'number') next[key] = base * factor
+  }
+  return next as unknown as KartTuning
+}
 
 /**
  * The tuning this kart drives with, from `base` (the standard tuning, or the tuning panel's). Speed
  * is the top speed (boosts are factors of it, so they follow); acceleration the throttle's push;
  * handling the turn rate with grip and in a drift, and how much steering moves the drift; charge
- * how fast a drift fills the gauge
+ * how fast a drift fills the gauge. Then its kind's multipliers and its own (`KartTraits`), and its
+ * circle when that is not a kart's (`bodyRadius`, which walls.ts reads)
  */
 export function applyKart(base: KartTuning, id: KartId): KartTuning {
-  const { stats } = kartSpec(id)
+  const spec = kartSpec(id)
+  const { stats } = spec
+  const kind = KIND_TRAITS[spec.kind]
   const speed = statFactor('speed', stats.speed)
   const acceleration = statFactor('acceleration', stats.acceleration)
   const handling = statFactor('handling', stats.handling)
   const charge = statFactor('charge', stats.charge)
-  return {
-    ...base,
-    topSpeed: base.topSpeed * speed,
-    acceleration: base.acceleration * acceleration,
-    turnRate: base.turnRate * handling,
-    driftTurnRate: base.driftTurnRate * handling,
-    driftSteerRate: base.driftSteerRate * handling,
-    gaugeFillRate: base.gaugeFillRate * charge,
-  }
+  const tuned = scaled(
+    scaled(
+      {
+        ...base,
+        topSpeed: base.topSpeed * speed,
+        acceleration: base.acceleration * acceleration,
+        turnRate: base.turnRate * handling,
+        driftTurnRate: base.driftTurnRate * handling,
+        driftSteerRate: base.driftSteerRate * handling,
+        gaugeFillRate: base.gaugeFillRate * charge,
+      },
+      kind.traits,
+    ),
+    spec.traits,
+  )
+  return kind.radius === KART_BODY_RADIUS ? tuned : { ...tuned, bodyRadius: kind.radius }
 }
 
-/** A kart's mass in a bump, the standard kart's being 1 */
-export const kartMass = (id: KartId): number => statFactor('weight', kartSpec(id).stats.weight)
+/** A kart's mass in a bump, the standard kart's being 1: its weight stat, times its kind's */
+export function kartMass(id: KartId): number {
+  const spec = kartSpec(id)
+  return statFactor('weight', spec.stats.weight) * KIND_TRAITS[spec.kind].mass
+}
 
 // ── On the wire ──────────────────────────────────────────────────────────────────────────────
 
-/** The kart and driver in one byte, for a frame (net.ts): the kart in the low four bits */
+/**
+ * The kart and driver in one byte, for a frame (net.ts). 2026-11-19: five bits of kart (up to 32)
+ * and three of driver (up to 8), laid out so that every byte sent before reads as it did: the
+ * kart's low four bits in bits 0–3, the driver in bits 4–6, the kart's fifth bit in bit 7. Before,
+ * it was four bits each, and no kart or driver then had a number that reached bits 6 or 7. A page
+ * from before that is still open sees a kart past the sixteenth as one of the first (a look only;
+ * the room judges by this table), until it reloads
+ */
+export const LOADOUT_KARTS = 32
+export const LOADOUT_DRIVERS = 8
+
 export function loadoutByte(kart: KartId, driver: DriverId): number {
-  const kartIndex = Math.max(0, KART_IDS.indexOf(kart)) & 0x0f
-  const driverIndex = Math.max(0, DRIVER_IDS.indexOf(driver)) & 0x0f
-  return kartIndex | (driverIndex << 4)
+  const kartIndex = Math.max(0, KART_IDS.indexOf(kart)) % LOADOUT_KARTS
+  const driverIndex = Math.max(0, DRIVER_IDS.indexOf(driver)) % LOADOUT_DRIVERS
+  return (kartIndex & 0x0f) | (driverIndex << 4) | ((kartIndex & 0x10) << 3)
 }
 
 /** The kart and driver a frame's byte names; anything unknown is the default */
 export function loadoutOfByte(byte: number): { kart: KartId; driver: DriverId } {
   return {
-    kart: KART_IDS[byte & 0x0f] ?? DEFAULT_KART,
-    driver: DRIVER_IDS[(byte >> 4) & 0x0f] ?? DEFAULT_DRIVER,
+    kart: KART_IDS[(byte & 0x0f) | ((byte >> 3) & 0x10)] ?? DEFAULT_KART,
+    driver: DRIVER_IDS[(byte >> 4) & 0x07] ?? DEFAULT_DRIVER,
   }
 }
 

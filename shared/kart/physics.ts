@@ -575,7 +575,14 @@ export const KART_TUNING = {
   model: MODEL_CLASSIC as number,
 }
 
-export type KartTuning = { readonly [K in keyof typeof KART_TUNING]: number }
+export type KartTuning = { readonly [K in keyof typeof KART_TUNING]: number } & {
+  /**
+   * The circle walls push on, metres, when it is not the standard kart's (walls.ts's KART_RADIUS):
+   * a bike's (2026-11-19, karts.ts's applyKart). Not a number of the feel: the tuning panel neither
+   * shows nor saves it
+   */
+  readonly bodyRadius?: number
+}
 
 /** The arcade feel (before 2026-11-17), the "arcade (old)" preset: bit for bit what it always drove */
 export const ARCADE_TUNING: KartTuning = { ...KART_TUNING, ...ARCADE_NUMBERS, model: MODEL_ARCADE }

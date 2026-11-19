@@ -230,6 +230,18 @@ export const kartBodies = {
   crab: { main: '#111A14', second: '#2A3B30', accent: '#35E85C', glow: '#7CFF8E' },
   heron: { main: '#1A1A14', second: '#3A3A2E', accent: '#FFD60A', glow: '#FFE75C' },
   flyfish: { main: '#1C1218', second: '#3F2A36', accent: '#FF2E88', glow: '#FF7AB8' },
+  // 2026-11-19: eight more karts and three bikes, each with a neon of its own
+  dolphin: { main: '#10161F', second: '#273447', accent: '#2F7BFF', glow: '#6FA4FF' },
+  skipper: { main: '#171A10', second: '#353B26', accent: '#B6F21A', glow: '#D4FF66' },
+  shrimp: { main: '#1D1113', second: '#42282C', accent: '#FF3B3B', glow: '#FF7D74' },
+  marlin: { main: '#101A1D', second: '#263D42', accent: '#16E0C0', glow: '#6BF5DE' },
+  eel: { main: '#141420', second: '#2E2E48', accent: '#5B5BFF', glow: '#9494FF' },
+  squid: { main: '#1B1220', second: '#3D2A47', accent: '#D94DFF', glow: '#EB96FF' },
+  hermit: { main: '#1D1810', second: '#423827', accent: '#FF9F1A', glow: '#FFC266' },
+  whale: { main: '#12181B', second: '#2B383E', accent: '#C8E6F5', glow: '#E6F6FF' },
+  swift: { main: '#12161C', second: '#2A3340', accent: '#3DC8FF', glow: '#8ADEFF' },
+  hornet: { main: '#1B180E', second: '#3D3722', accent: '#FFB800', glow: '#FFD45C' },
+  petrel: { main: '#1C1016', second: '#402633', accent: '#FF4D9D', glow: '#FF94C4' },
 } as const
 
 /**

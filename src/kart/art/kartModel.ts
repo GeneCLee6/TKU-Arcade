@@ -60,7 +60,7 @@ import {
   type BoostReading,
 } from '../boostFx.ts'
 import { buildDriver } from './driverModel.ts'
-import { buildKartBody } from './kartBodies.ts'
+import { buildKartBody } from './vehicleBodies.ts'
 import {
   bell,
   carbonTexture,
@@ -132,6 +132,8 @@ export interface KartModel {
 
 /** How high the body floats over the road, metres */
 const HOVER = 0.27
+/** How far a bike leans into a turn on grip, flat out and at full lock, radians (about 30°) */
+const BIKE_LEAN = 0.52
 /** How much lower it rides with its shape open */
 const MORPH_DROP = 0.07
 
@@ -200,6 +202,58 @@ const MARKS: Readonly<Record<KartBody, readonly (readonly [Outline, 'accent' | '
     [[[1, 13], [3, 15], [15, 4], [15, 1]], 'accent'],
     [[[1, 9], [1, 11.4], [11, 1], [8, 1]], 'ink'],
     [[[6, 15], [9, 15], [15, 9.4], [15, 7]], 'ink'],
+  ],
+  // 2026-11-19: `dolphin` an arc and its fin, `skipper` two leaps, `shrimp` three plates, `marlin` a
+  // spear and a sail, `eel` a wave, `squid` an arrow backwards, `hermit` a turn of the shell,
+  // `whale` a fluke, `swift` a forked tail, `hornet` three bands, `petrel` a cranked wing
+  dolphin: [
+    [[[1, 12], [5, 6], [11, 4], [15, 7], [11, 6.4], [6, 8.4], [3.4, 13]], 'accent'],
+    [[[8, 5], [11, 1], [11.6, 4.6]], 'ink'],
+  ],
+  skipper: [
+    [[[1, 13], [5, 5], [9, 13], [7, 13], [5, 9], [3, 13]], 'accent'],
+    [[[8, 11], [11.4, 4], [15, 11], [13, 11], [11.4, 7.6], [10, 11]], 'ink'],
+  ],
+  shrimp: [
+    [[[1, 3], [10, 3], [8, 6.4], [1, 6.4]], 'accent'],
+    [[[4, 7.4], [13, 7.4], [11, 10.8], [4, 10.8]], 'ink'],
+    [[[7, 11.8], [15, 11.8], [13, 15], [7, 15]], 'accent'],
+  ],
+  marlin: [
+    [[[1, 11], [15, 9], [15, 10.6], [1, 12.6]], 'ink'],
+    [[[5, 9.6], [8, 2], [13, 8.4]], 'accent'],
+  ],
+  eel: [
+    [[[1, 9], [4, 4], [8, 9], [11, 13], [15, 7], [15, 10], [11, 15.4], [8, 12], [4, 7], [1, 12]], 'accent'],
+    [[[11, 3], [15, 3], [15, 5], [11, 5]], 'ink'],
+  ],
+  squid: [
+    [[[15, 8], [9, 2], [9, 14]], 'accent'],
+    [[[1, 4], [8, 6], [8, 7.4], [1, 5.4]], 'ink'],
+    [[[1, 7.3], [8, 7.3], [8, 8.7], [1, 8.7]], 'ink'],
+    [[[1, 10.6], [8, 8.6], [8, 10], [1, 12]], 'ink'],
+  ],
+  hermit: [
+    [[[8, 1], [15, 8], [8, 15], [1, 8]], 'accent'],
+    [[[8, 4.4], [11.6, 8], [8, 11.6], [4.4, 8]], 'cut'],
+    [[[8, 6.6], [9.4, 8], [8, 9.4], [6.6, 8]], 'ink'],
+  ],
+  whale: [
+    [[[8, 14], [1, 3], [5, 4], [8, 9], [11, 4], [15, 3]], 'accent'],
+    [[[7.2, 10], [8.8, 10], [8.8, 15.5], [7.2, 15.5]], 'ink'],
+  ],
+  swift: [
+    [[[1, 1], [8, 9], [15, 1], [15, 4], [8, 13], [1, 4]], 'accent'],
+    [[[8, 4], [9.4, 6], [8, 8], [6.6, 6]], 'ink'],
+  ],
+  hornet: [
+    [[[3, 2], [15, 2], [13, 5], [1, 5]], 'accent'],
+    [[[3, 6.5], [15, 6.5], [13, 9.5], [1, 9.5]], 'ink'],
+    [[[3, 11], [15, 11], [13, 14], [1, 14]], 'accent'],
+  ],
+  petrel: [
+    [[[1, 10], [5, 4], [8, 8], [11, 4], [15, 10], [11, 7.4], [8, 11.4], [5, 7.4]], 'accent'],
+    [[[7, 12.4], [9, 12.4], [8, 15]], 'ink'],
   ],
 }
 
@@ -407,19 +461,32 @@ export function buildKartModel(
     },
   }
 
-  const { seat, rearContacts } = buildKartBody(body, kit, chassis)
+  const { seat, rearContacts, bike } = buildKartBody(body, kit, chassis)
 
-  // A yoke in front of the driver, on a column: two grips and a lit read-out between them
-  const bar = hinge(chassis, 0, seat.y + 0.4, seat.z - 0.46)
-  put(bar, new CylinderGeometry(0.02, 0.026, 0.3, 6), paint.metal, 0, -0.1, -0.1).rotation.x = -0.8
-  put(bar, new BoxGeometry(0.2, 0.07, 0.03), paint.carbon)
-  put(bar, new BoxGeometry(0.11, 0.035, 0.012), paint.glow, 0, 0.005, 0.02)
-  for (const side of [-1, 1]) {
-    put(bar, new BoxGeometry(0.035, 0.12, 0.04), paint.dark, side * 0.115, 0, 0)
+  // A yoke in front of the driver, on a column: two grips and a lit read-out between them. On a
+  // bike (2026-11-19), low bars over the tank instead: a clip-on each side of a small read-out
+  const bar = bike
+    ? hinge(chassis, 0, bike.bar.y, bike.bar.z)
+    : hinge(chassis, 0, seat.y + 0.4, seat.z - 0.46)
+  if (bike) {
+    put(bar, new BoxGeometry(0.09, 0.03, 0.05), paint.carbon, 0, -0.01, -0.03)
+    put(bar, new BoxGeometry(0.06, 0.012, 0.03), paint.glow, 0, 0.01, -0.03)
+    for (const side of [-1, 1]) {
+      const grip = put(bar, new CylinderGeometry(0.02, 0.02, 0.17, 6), paint.dark, side * 0.12, -0.01, 0.015)
+      grip.rotation.set(0.25, 0, side * -1.3)
+    }
+  } else {
+    put(bar, new CylinderGeometry(0.02, 0.026, 0.3, 6), paint.metal, 0, -0.1, -0.1).rotation.x = -0.8
+    put(bar, new BoxGeometry(0.2, 0.07, 0.03), paint.carbon)
+    put(bar, new BoxGeometry(0.11, 0.035, 0.012), paint.glow, 0, 0.005, 0.02)
+    for (const side of [-1, 1]) {
+      put(bar, new BoxGeometry(0.035, 0.12, 0.04), paint.dark, side * 0.115, 0, 0)
+    }
   }
 
-  // The driver (driverModel.ts), mounted at the seat
-  const driver = buildDriver(kit, driverId)
+  // The driver (driverModel.ts), mounted at the seat: seated in a kart, astride a bike
+  const crouch = bike?.crouch ?? 0
+  const driver = buildDriver(kit, driverId, bike !== undefined)
   driver.group.position.set(0, seat.y, seat.z)
   chassis.add(driver.group)
 
@@ -454,12 +521,15 @@ export function buildKartModel(
         }),
       )
     underMaterial = pool(colours.glow, 0.6)
-    under = new Mesh(keep(new PlaneGeometry(2.2, 3.4)), underMaterial)
+    under = new Mesh(keep(new PlaneGeometry(bike ? 1.3 : 2.2, 3.4)), underMaterial)
     under.rotation.x = -Math.PI / 2
     // Above the road, kerbs and lines (trackArt.ts LIFT), under the body
     under.position.y = 0.1
     group.add(under)
-    const beam = new Mesh(keep(new PlaneGeometry(2.6, 4.4)), pool(kartParts.headLamp, 0.14))
+    const beam = new Mesh(
+      keep(new PlaneGeometry(bike ? 1.6 : 2.6, 4.4)),
+      pool(kartParts.headLamp, 0.14),
+    )
     beam.rotation.x = -Math.PI / 2
     beam.position.set(0, 0.1, -3.1)
     group.add(beam)
@@ -497,8 +567,12 @@ export function buildKartModel(
       const speedShare = Math.min(1, Math.abs(look.speed) / 30)
       // Banking into a drift, a little into a fast turn: - about z leans the top towards +x, into a right turn
       // (2026-11-17: deeper, by how hard it slides, so that the weight is seen to go over)
-      const targetRoll =
-        look.drift !== 0
+      // A bike (2026-11-19) leans like one: far over in a turn, further in a drift, the rider with it
+      const targetRoll = bike
+        ? look.drift !== 0
+          ? -look.drift * (0.5 + 0.12 * (look.skid ?? 1))
+          : -look.steer * BIKE_LEAN * speedShare
+        : look.drift !== 0
           ? -look.drift * (0.13 + 0.09 * (look.skid ?? 1))
           : -look.steer * 0.07 * speedShare
       roll = ease(roll, targetRoll, 7, seconds)
@@ -522,8 +596,12 @@ export function buildKartModel(
       }
       chassis.rotation.z = roll
       chassis.rotation.x = pitch
+      // A bike leans about the line it rides on, not about its own middle: its pads stay over the
+      // road and the rider's head goes in towards the corner
+      chassis.position.x = bike ? -Math.sin(roll) * HOVER : 0
       chassis.position.y =
         HOVER -
+        (bike ? (1 - Math.cos(roll)) * HOVER : 0) -
         MORPH_DROP * open +
         Math.sin(bob) * (0.045 - speedShare * 0.02) +
         Math.sin(bob * 7.3) * 0.006 * speedShare
@@ -531,7 +609,13 @@ export function buildKartModel(
       // The driver: into the turn, thrown back by a boost and by pulling away, forward under
       // braking; the head looks where they steer; stunned, they sway and the head lolls
       const heat = reading.heat
-      lean = ease(lean, -look.steer * 0.16 - look.drift * 0.12, 8, seconds)
+      // On a bike the rider goes over with it, and hangs off a little further into the turn
+      lean = ease(
+        lean,
+        bike ? -look.steer * 0.1 - look.drift * 0.16 : -look.steer * 0.16 - look.drift * 0.12,
+        8,
+        seconds,
+      )
       thrown = ease(
         thrown,
         Math.max(-0.16, Math.min(0.12, accel * 0.006)) + heat * 0.24 + rear * 0.8,
@@ -541,13 +625,15 @@ export function buildKartModel(
       sway += seconds * (dazed > 0 ? 9 : 0)
       const { torso, head, arms } = driver
       torso.rotation.z = lean + Math.sin(sway) * 0.3 * dazed
-      torso.rotation.x = thrown + Math.cos(sway * 0.7) * 0.12 * dazed
+      torso.rotation.x = crouch + thrown * (bike ? 0.6 : 1) + Math.cos(sway * 0.7) * 0.12 * dazed
       head.rotation.y = -look.steer * 0.3 - look.drift * 0.15
       head.rotation.z = Math.sin(sway * 1.3 + 1) * 0.35 * dazed
-      head.rotation.x = -thrown * 0.5 + Math.cos(sway * 1.1) * 0.2 * dazed
+      head.rotation.x = -crouch * 0.9 - thrown * 0.5 + Math.cos(sway * 1.1) * 0.2 * dazed
       bar.rotation.y = -look.steer * 0.45
       // The arms stay on the bar: they reach as the torso goes back, and follow the bar round
-      for (const arm of arms) arm.rotation.set(-thrown * 0.9 - 0.3 * dazed, -look.steer * 0.3, 0)
+      for (const arm of arms) {
+        arm.rotation.set(-thrown * (bike ? 0.5 : 0.9) - 0.3 * dazed, -look.steer * 0.3, 0)
+      }
 
       // The lit parts: the thruster mouths by the speed, white-hot in the boost's own colour; the
       // core by how far the shape has opened; the tail lamps brighter under braking

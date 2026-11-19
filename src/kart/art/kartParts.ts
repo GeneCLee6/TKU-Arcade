@@ -604,4 +604,13 @@ export interface BodyFit {
   readonly seat: { readonly y: number; readonly z: number }
   /** Under the back corners, (x, z): where the drift trails and sparks start */
   readonly rearContacts: [number, number][]
+  /**
+   * A bike (2026-11-19, bikeBodies.ts): the rider sits astride it and lies forward, `crouch`
+   * radians (negative is forward), to bars at `bar` on the chassis; the model leans it deep into a
+   * turn. Left out, a kart: the driver sits in it, at a yoke
+   */
+  readonly bike?: {
+    readonly bar: { readonly y: number; readonly z: number }
+    readonly crouch: number
+  }
 }

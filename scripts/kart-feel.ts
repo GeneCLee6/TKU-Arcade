@@ -5,12 +5,15 @@
 // (docs/KART-FEEL.md §5).
 // 2026-11-19: and a fourth driver, the master, who knows a track by heart (its guide: shared/kart/
 // tracks/guide.ts); the line under each track with a guide is what that is worth.
-// Run: npm run kart:feel   (-- --seeds 5: the mean of five races each; -- --classic: skip the old preset)
+// Run: npm run kart:feel   (-- --seeds 5: the mean of five races each; -- --classic: skip the old preset;
+// -- --karts: every vehicle with the same hands too, -- --only-karts: only that, -- --who expert: one driver,
+// -- --vehicles swift,tide: only these vehicles)
+import { isKartId, KART_IDS } from '../shared/kart/karts.ts'
 import { ARCADE_TUNING, KART_TUNING } from '../shared/kart/physics.ts'
 import { trackGuide } from '../shared/kart/tracks/guides.ts'
 import { raceTrack } from '../shared/kart/tracks/registry.ts'
 import { DRIVER_IDS, type Measure } from './kart/drivers.ts'
-import { FEEL_DRIVERS, FEEL_TRACKS, feelRace } from './kart/feel.ts'
+import { FEEL_DRIVERS, FEEL_TRACKS, feelRace, vehicleTable } from './kart/feel.ts'
 import { roadShape } from './kart/shape.ts'
 
 const seedsAt = process.argv.indexOf('--seeds')
@@ -34,7 +37,9 @@ const FEELS = [
   ['arcade (old)', ARCADE_TUNING],
 ] as const
 // --classic: the classic feel only (half the time)
-for (const [name, tuning] of process.argv.includes('--classic') ? FEELS.slice(0, 1) : FEELS) {
+const ONLY_KARTS = process.argv.includes('--only-karts')
+const CHOSEN = ONLY_KARTS ? [] : process.argv.includes('--classic') ? FEELS.slice(0, 1) : FEELS
+for (const [name, tuning] of CHOSEN) {
   console.log(`\n${name}: the mean of ${SEEDS} race${SEEDS > 1 ? 's' : ''} each, three laps`)
   console.log(
     'track       driver   time     cover  charge  fired  dashes (perfect/good/late)  combo  crashes  resets',
@@ -82,5 +87,33 @@ for (const [name, tuning] of process.argv.includes('--classic') ? FEELS.slice(0,
         `${''.padEnd(12)}master vs expert: ${known.toFixed(1)} s faster (${((known / expert!.seconds) * 100).toFixed(1)}% less time): what knowing the track is worth`,
       )
     }
+  }
+}
+
+// 2026-11-19 (--karts): the same hands in every vehicle (shared/kart/karts.ts). What a kart is worth
+// is the spread of this table: no vehicle the quickest everywhere, none the slowest everywhere, and
+// the whole spread small beside the gap between two drivers (docs/KART-FEEL.md §12)
+if (process.argv.includes('--karts') || ONLY_KARTS) {
+  const whoAt = process.argv.indexOf('--who')
+  const chosen = DRIVER_IDS.filter((who) => whoAt < 0 || who === process.argv[whoAt + 1])
+  const vehiclesAt = process.argv.indexOf('--vehicles')
+  const vehicles =
+    vehiclesAt > 0 ? (process.argv[vehiclesAt + 1] ?? '').split(',').filter(isKartId) : KART_IDS
+  for (const who of chosen) {
+    const table = vehicleTable(FEEL_DRIVERS[who], SEEDS, FEEL_TRACKS, vehicles)
+    console.log(
+      `\nevery vehicle, the ${who}: three laps, the mean of ${SEEDS}; seconds behind the quickest`,
+    )
+    console.log(
+      `${'vehicle'.padEnd(10)}${table.tracks.map((id) => id.slice(0, 7).padEnd(8)).join('')}mean    race     wins  last`,
+    )
+    for (const row of table.rows) {
+      console.log(
+        `${`${row.kart}${row.finished ? '' : '!'}`.padEnd(10)}${row.behind.map((gap) => `+${gap.toFixed(1)}`.padEnd(8)).join('')}${`+${row.mean.toFixed(2)}`.padEnd(8)}${`${row.seconds.toFixed(1)} s`.padEnd(9)}${String(row.wins).padEnd(6)}${row.lasts}`,
+      )
+    }
+    console.log(
+      `spread of the means: ${table.spread.toFixed(2)} s (${(table.spreadShare * 100).toFixed(1)}% of a race)`,
+    )
   }
 }

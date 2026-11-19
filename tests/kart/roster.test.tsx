@@ -4,6 +4,7 @@ import { KART_MESSAGES } from '../../shared/kart/i18n.ts'
 import type { RoomMember } from '../../shared/protocol.ts'
 import { registerMessages, translate } from '../../src/i18n/t.ts'
 import { loadBody, loadDriver } from '../../src/kart/bodies.ts'
+import { KART_IDS, KARTS } from '../../shared/kart/karts.ts'
 import RoomGarage from '../../src/kart/roster/RoomGarage.tsx'
 import { RosterPicker } from '../../src/kart/roster/RosterPicker.tsx'
 
@@ -25,12 +26,12 @@ const member = (id: string, name: string, seat: number | null, look?: string): R
 beforeEach(() => window.localStorage.clear())
 
 describe('the garage (e10-t05)', () => {
-  it('shows six karts with their tiers, the picked one’s stats as bars, and four drivers', () => {
+  it('shows every vehicle with its tier, the picked one’s stats as bars, and four drivers', () => {
     const onKart = vi.fn()
     const onDriver = vi.fn()
     render(<RosterPicker t={en} kart="heron" driver="club" onKart={onKart} onDriver={onDriver} />)
     const [karts, drivers] = screen.getAllByRole('radiogroup')
-    expect(within(karts!).getAllByRole('radio')).toHaveLength(6)
+    expect(within(karts!).getAllByRole('radio')).toHaveLength(KART_IDS.length)
     expect(within(drivers!).getAllByRole('radio')).toHaveLength(4)
     expect(screen.getByRole('radio', { name: /Egret/ })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTestId('kart-blurb')).toHaveTextContent('The fastest on a straight')
@@ -43,6 +44,60 @@ describe('the garage (e10-t05)', () => {
     expect(onKart).toHaveBeenCalledWith('crab')
     fireEvent.click(screen.getByRole('radio', { name: 'Heart' }))
     expect(onDriver).toHaveBeenCalledWith('heart')
+  })
+
+  it('narrows the cards by tab: the bikes, a series, a tier; the pick stays what it was', () => {
+    const onKart = vi.fn()
+    render(<RosterPicker t={en} kart="heron" driver="club" onKart={onKart} onDriver={vi.fn()} />)
+    const cards = () => within(screen.getAllByRole('radiogroup')[0]!).getAllByRole('radio')
+    const ids = () => cards().map((card) => card.getAttribute('data-kart'))
+    const tabs = within(screen.getByRole('tablist')).getAllByRole('tab')
+    // All, the bikes, five series, three tiers
+    expect(tabs).toHaveLength(10)
+    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Bikes' }))
+    expect(ids()).toEqual(['swift', 'hornet', 'petrel'])
+    expect(screen.getByRole('tab', { name: 'Bikes' })).toHaveAttribute('aria-selected', 'true')
+    // The picked kart is not a bike: still picked, its stats still shown
+    expect(screen.getByTestId('kart-picked')).toHaveTextContent('Egret')
+    fireEvent.click(screen.getByRole('radio', { name: /Hornet/ }))
+    expect(onKart).toHaveBeenCalledWith('hornet')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Tailwind' }))
+    expect(ids()).toEqual(['marlin', 'ray', 'heron', 'hornet'])
+    fireEvent.click(screen.getByRole('tab', { name: 'Expert' }))
+    expect(ids()).toEqual(KARTS.filter((one) => one.tier === 'expert').map((one) => one.id))
+    fireEvent.click(screen.getByRole('tab', { name: 'All' }))
+    expect(ids()).toHaveLength(KART_IDS.length)
+  })
+
+  it('says what the picked vehicle is in tags, and what a bike does differently', () => {
+    const { rerender } = render(
+      <RosterPicker t={en} kart="whale" driver="club" onKart={vi.fn()} onDriver={vi.fn()} />,
+    )
+    const tags = () => Array.from(screen.getByTestId('kart-tags').children, (tag) => tag.textContent)
+    expect(tags()).toEqual(['Kart', 'Reef', 'Heavy', 'Expert'])
+    expect(screen.queryByTestId('kart-bike-note')).toBeNull()
+    rerender(<RosterPicker t={en} kart="petrel" driver="club" onKart={vi.fn()} onDriver={vi.fn()} />)
+    expect(tags()).toEqual(['Bike', 'Eddy', 'Drift', 'Expert', 'Narrow', 'Tips in fast', 'Easily knocked'])
+    expect(screen.getByTestId('kart-bike-note')).toHaveTextContent('narrower')
+    // Weight -2: one of five
+    expect(screen.getByTestId('kart-stats').querySelector('[data-stat="weight"]')).toHaveAttribute(
+      'data-value',
+      '1',
+    )
+  })
+
+  it('has a name and a line about every vehicle, in both languages', () => {
+    for (const lang of ['en', 'zh-TW'] as const) {
+      const names = KART_IDS.map((id) => translate(lang, `kart.body.${id}`))
+      expect(new Set(names).size).toBe(KART_IDS.length)
+      for (const id of KART_IDS) {
+        expect(translate(lang, `kart.body.${id}`)).not.toContain('kart.')
+        expect(translate(lang, `kart.blurb.${id}` as `kart.${string}`)).not.toContain('kart.')
+      }
+    }
   })
 
   it('in the waiting room, tells the room this browser’s pick and shows everyone’s', () => {

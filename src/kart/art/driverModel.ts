@@ -112,7 +112,11 @@ function limb(
 /** A hull standing up: its sections' `z` is the height, its crest the front, its keel the back */
 const standing = (sections: Parameters<typeof hull>[0]) => hull(sections).rotateX(-Math.PI / 2)
 
-export function buildDriver(kit: BodyKit, driver: DriverId): DriverModel {
+/**
+ * `astride` (2026-11-19): on a bike. The legs go down either side to the pegs, knees forward,
+ * instead of out ahead into a kart's nose; the model lays the torso forward (kartModel.ts)
+ */
+export function buildDriver(kit: BodyKit, driver: DriverId, astride = false): DriverModel {
   const colours = kartDrivers[driver]
   const suit = kit.colour(colours.suit, 0.8, 0.05)
   const panel = kit.colour(colours.panel, 0.55, 0.1, 0.12)
@@ -126,6 +130,16 @@ export function buildDriver(kit: BodyKit, driver: DriverId): DriverModel {
   const group = new Group()
   // Seated: the thighs forward and up to the knees, the shins down into the nose, boots
   for (const side of [-1, 1]) {
+    if (astride) {
+      // Astride: the thighs forward and down round the tank, the shins back to the pegs, boots
+      const knee: Point = [side * 0.215, -0.02, -0.34]
+      const ankle: Point = [side * 0.2, -0.21, -0.04]
+      limb(kit, group, suit, [side * 0.1, 0.09, 0], knee, 0.085, 0.066)
+      limb(kit, group, suit, knee, ankle, 0.062, 0.046)
+      limb(kit, group, panel, [side * 0.2, 0.0, -0.26], [side * 0.222, -0.03, -0.37], 0.066, 0.072)
+      limb(kit, group, trim, ankle, [side * 0.2, -0.24, -0.17], 0.05, 0.04)
+      continue
+    }
     limb(kit, group, suit, [side * 0.09, 0.1, 0], [side * 0.12, 0.21, -0.4], 0.085, 0.065)
     limb(kit, group, suit, [side * 0.12, 0.21, -0.4], [side * 0.1, 0.07, -0.76], 0.06, 0.045)
     limb(kit, group, panel, [side * 0.117, 0.24, -0.3], [side * 0.123, 0.26, -0.4], 0.062, 0.07)
