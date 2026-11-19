@@ -143,6 +143,23 @@ export interface KartState {
   readonly driftLatch?: boolean
   readonly launchSeconds?: number
   /**
+   * The classic feel only (2026-11-18, the gauge by the quality of the drift; classic.ts,
+   * docs/KART-FEEL.md §3.5): whether a wall was touched in the drift under way or just let go;
+   * the seconds since a drift was let go with an instant boost waiting; what that drift was worth
+   * to the exit's bonus and how long it lasted; the seconds left in which a throttle press wasted
+   * in the drift spoils a perfect exit; and the last instant boost fired: its grade (1 late, 2
+   * good, 3 perfect), how many have been fired, and the gauge points it added. The arcade feel
+   * never sets them
+   */
+  readonly driftDirty?: boolean
+  readonly sinceRelease?: number
+  readonly driftWorth?: number
+  readonly driftHeld?: number
+  readonly tapEarly?: number
+  readonly dashGrade?: number
+  readonly dashCount?: number
+  readonly gaugeGain?: number
+  /**
    * A team race only (2026-11-18, teamBoost.ts; shared/kart/team.ts): how many of the charges the
    * kart holds are blue (set by its browser, teamRider.ts) and the seconds of blue boost left. Any
    * other kart never has them
@@ -434,15 +451,37 @@ export const KART_TUNING = {
   slidePull: 0.85,
 
   // The boost gauge and the boost (N2O)
-  /** Gauge points a second drifting at the top speed (in proportion to the speed) ... */
-  gaugeFillRate: 70,
+  // The gauge goes by the quality of the drift (2026-11-18, owner: "it fills too slowly; an expert
+  // should boost all the way round, a novice not"; docs/KART-FEEL.md §3.5)
+  /** Gauge points a second drifting at the top speed (by the square of the speed) ... */
+  gaugeFillRate: 34,
   /**
    * ... as deep as driftSlip or deeper; a drift with no slip yet fills at this share of it, in
-   * proportion between: a tapped drift fills about half as fast as a deep one
+   * proportion between
    */
   gaugeShallow: 0.5,
-  /** ... at the start of a drift; after this many seconds of the same drift, half that, and so on */
+  /** ... for this many seconds of one drift; a second of it later, half that, and so on */
   gaugeFade: 1,
+  /**
+   * A drift fills nothing for this long, then more and more for as long again: a tapped drift
+   * (down a straight, say) fills nothing at all
+   */
+  gaugeLead: 0.2,
+  /**
+   * The exit: an instant boost fired out of a drift adds this many points, times what the drift was
+   * worth (its depth and its length), the square of the speed, the timing's grade and the combo;
+   * nothing if the drift touched a wall
+   */
+  gaugeDashBonus: 24,
+  /** Each instant boost in a row after the first adds this share to all the gauge gains ... */
+  gaugeComboStep: 0.12,
+  /** ... for up to this many */
+  gaugeComboLinks: 5,
+  /**
+   * The share of all that the gauge still gets while a boost runs: all of it, so that an expert
+   * drifts through a boost for the next one (the arcade feel: a quarter)
+   */
+  boostGaugeShare: 1,
   maxStoredBoosts: 2,
   boostDuration: 2.9,
   /** A boost multiplies the engine's pull by this ... */
@@ -484,8 +523,23 @@ export const KART_TUNING = {
   dashAccelFactor: 1.7,
   /** ... with the top speed this much higher */
   miniTopSpeedFactor: 1.08,
-  /** Dashes in a row within this long of each other chain ... */
-  chainGrace: 1,
+  /**
+   * The timing of the press (2026-11-18): within this long of letting go of the drift ...
+   */
+  perfectWindow: 0.1,
+  /** ... a drift that lasted at least this long, it is perfect: the dash lasts this many times as long (and the gauge's bonus is as many times as big) ... */
+  perfectMinSeconds: 0.4,
+  perfectShare: 1.4,
+  /** ... pulls this much harder and goes this much higher (a late one, this much less) */
+  perfectAccelStep: 0.2,
+  perfectSpeedStep: 0.03,
+  /** Late (the car already straight): this share of the dash's length and of the gauge's bonus */
+  lateShare: 0.6,
+  /**
+   * Dashes in a row within this long of each other chain: the combo (2.5 s since 2026-11-18, 1 s
+   * before; the window also holds through a drift and through a boost) ...
+   */
+  chainGrace: 2.5,
   /** ... each link after the first adding this to the dash's top speed factor ... */
   chainSpeedStep: 0.01,
   /** ... and this to its pull ... */

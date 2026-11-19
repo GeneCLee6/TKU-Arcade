@@ -159,6 +159,17 @@ export interface SpikeHud {
    * the HUD shows the charges locked
    */
   readonly boostLocked?: boolean
+  /**
+   * The gauge by the quality of the drift (2026-11-18, docs/KART-FEEL.md §3.5): the combo (instant
+   * boosts in a row; shown from 2), whether the drift under way has lasted long enough for a perfect
+   * exit, and the last instant boost: how many have been fired (so that the HUD plays its feedback
+   * once each), the gauge points it added (whole) and its grade (1 late, 2 good, 3 perfect)
+   */
+  readonly combo?: number
+  readonly perfectReady?: boolean
+  readonly gains?: number
+  readonly gain?: number
+  readonly grade?: number
 }
 
 /** The HUD's meters move in twentieths, so that the HUD is drawn again only when one moves */
@@ -406,7 +417,10 @@ const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
   (a.dash ?? 0) === (b.dash ?? 0) &&
   (a.depth ?? 0) === (b.depth ?? 0) &&
   (a.boostLeft ?? 0) === (b.boostLeft ?? 0) &&
-  (a.boostLocked ?? false) === (b.boostLocked ?? false)
+  (a.boostLocked ?? false) === (b.boostLocked ?? false) &&
+  (a.combo ?? 0) === (b.combo ?? 0) &&
+  (a.perfectReady ?? false) === (b.perfectReady ?? false) &&
+  (a.gains ?? 0) === (b.gains ?? 0)
 
 /**
  * The game loop, outside React (docs/ARCHITECTURE.md §4): rendering follows the display, the physics
@@ -648,7 +662,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         const was = before.kart
         const fired = burstBetween(was, kart, tuning.startBoostDuration)
         if (fired) {
-          if (fired === 'start' || fired === 'quick') launchKind = fired === 'start' ? 'start' : 'mini'
+          if (fired === 'start' || fired === 'quick')
+            launchKind = fired === 'start' ? 'start' : 'mini'
           bursts++
           burstPower = BURST_POWER[fired]
           audio.burst(burstPower)
@@ -707,7 +722,12 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     // How hard the tyres slide: the skid marks, the smoke and the squeal all follow it
     const skid = airborne
       ? 0
-      : skidStrength(kartSlip(current), kartSpeed(current), skidding, debug.input.brake && forward > 0)
+      : skidStrength(
+          kartSlip(current),
+          kartSpeed(current),
+          skidding,
+          debug.input.brake && forward > 0,
+        )
     const waiting = kartBurstWaiting(current, tuning)
     const look: KartLook = {
       speed: forward,
@@ -779,6 +799,18 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         ),
       ),
       boostLocked: isClassic(tuning) && (current.boostSeconds > 0 || kartTeamBoosting(current)),
+      ...(isClassic(tuning) && rules.chainBoosts
+        ? {
+            combo: current.chain >= 2 ? current.chain : 0,
+            perfectReady:
+              current.drifting &&
+              current.burstReady &&
+              current.driftSeconds >= tuning.perfectMinSeconds,
+            gains: current.dashCount ?? 0,
+            gain: Math.round(current.gaugeGain ?? 0),
+            grade: current.dashGrade ?? 0,
+          }
+        : {}),
     }
     options.onPose?.(current.x, current.z, current.heading, run.nextGate)
     if (trial && track) {

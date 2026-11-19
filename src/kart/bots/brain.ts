@@ -89,6 +89,8 @@ type Move =
       readonly double: boolean
       /** The classic feel: the steer held while the throttle is up and pressed again (the counter-steer) */
       readonly counter?: number
+      /** Steps the throttle still stays down before it comes up (slow hands: skill.exitWait) */
+      readonly wait?: number
     }
   | { readonly kind: 'double'; readonly direction: -1 | 1; readonly steps: number }
 
@@ -164,6 +166,21 @@ export function createBotBrain(
       if (ahead < least) least = ahead
     }
     return least
+  }
+
+  /** How much the road turns over the next `metres` from road point `from`, radians, signed */
+  const turnAhead = (from: number, metres: number): number => {
+    const count = road.length
+    let sum = 0
+    let run = 0
+    let before = roadDirection(road, from % count)
+    for (let index = from + 1; run < metres && index < from + count; index++) {
+      const now = roadDirection(road, index % count)
+      sum += Math.asin(clamp(before.dx * now.dz - before.dz * now.dx, -1, 1))
+      run += (along[index % count]! - along[(index - 1) % count]! + total) % total || 1
+      before = now
+    }
+    return sum
   }
 
   let move: Move = NONE
@@ -289,6 +306,17 @@ export function createBotBrain(
   }
 
   const classic = t.model === MODEL_CLASSIC
+  /** A whole number between the two, drawn; `fallback` (and nothing drawn) when the skill has none */
+  const drawn = (range: readonly [number, number] | undefined, fallback: number): number =>
+    range ? Math.round(range[0] + (range[1] - range[0]) * rng.float()) : fallback
+  /** The lift that fires a dash, timed by skill: at once for two steps, or later and longer */
+  const liftMove = (counter?: number): Extract<Move, { kind: 'lift' }> => ({
+    kind: 'lift',
+    steps: drawn(skill.liftSteps, LIFT_STEPS) - 1,
+    double: false,
+    counter,
+    wait: drawn(skill.exitWait, 0),
+  })
   /** Whether this drift is to end in an instant boost: decided once a drift, by skill */
   let dashPlan: boolean | null = null
   /** The classic feel: a drift decided on, pressed for this many more steps until it has begun */
@@ -313,9 +341,11 @@ export function createBotBrain(
     gripTurn: number,
     jumpNear: boolean,
     slip: number,
+    nearest: number,
   ): KartInput => {
     wasDrifting = kart.drifting
-    const straight = Math.abs(later) < gripTurn * 0.4 && Math.abs(want) < gripTurn * 0.4
+    const boostAt = skill.boostAt ?? 0.4
+    const straight = Math.abs(later) < gripTurn * boostAt && Math.abs(want) < gripTurn * boostAt
     // A team boost held (a team race) is fired like a charge, once nothing else burns
     const teamReady = (kart.teamBoosts ?? 0) > 0 && kart.boostSeconds === 0
     const fire =
@@ -332,7 +362,7 @@ export function createBotBrain(
       kart.miniSeconds === 0 &&
       (kart.launchSeconds ?? 0) === 0 &&
       (kart.teamSeconds ?? 0) === 0
-    const cruising = calm && speed > t.topSpeed * Math.min(1, sense.speedShare)
+    const cruising = calm && !skill.flatOut && speed > t.topSpeed * Math.min(1, sense.speedShare)
     const gripSteer = clampSteer(noseWant / gripTurn)
     // Hands that do not mean to fire a dash that waits never press the throttle afresh by chance
     // (easing off at their own top speed and coming back on): the throttle stays as it was
@@ -343,8 +373,13 @@ export function createBotBrain(
     if (move.kind === 'tap' || move.kind === 'double') move = NONE
     if (move.kind === 'lift') {
       // A dash waiting (the car still sliding, or just straightened): lift, then press afresh
-      const { steps, double, counter } = move
+      const { steps, double, counter, wait = 0 } = move
       const steer = counter !== undefined && kart.slideDirection !== 0 ? counter : gripSteer
+      if (wait > 0) {
+        // Slow hands: the drift is let go, the throttle still down for a moment
+        move = { kind: 'lift', steps, double, counter, wait: wait - 1 }
+        return { ...base, throttle: kart.throttleHeld, steer }
+      }
       if (steps > 0) {
         move = { kind: 'lift', steps: steps - 1, double, counter }
         return { ...base, throttle: false, steer }
@@ -353,13 +388,13 @@ export function createBotBrain(
       return { ...base, throttle: true, steer }
     }
     if (kart.releaseWindow > 0 && dashPlan) {
-      move = { kind: 'lift', steps: LIFT_STEPS - 1, double: false }
+      move = { ...liftMove(), wait: 0 }
       return { ...base, throttle: false, steer: gripSteer }
     }
     // Sliding out of a drift that earned a dash (let go for a jump, or too slow to hold)
     if (!kart.drifting && kart.slideDirection !== 0 && kart.burstReady && dashPlan && !jumpNear) {
       const counter = -kart.slideDirection
-      move = { kind: 'lift', steps: LIFT_STEPS - 1, double: false, counter }
+      move = { ...liftMove(counter), wait: 0 }
       return { ...base, throttle: false, steer: counter }
     }
 
@@ -394,7 +429,11 @@ export function createBotBrain(
         kart.driftSeconds >= holdSeconds - CLASSIC_NEARLY_SECONDS &&
         (kart.driftPeak ?? 0) >= holdSlip - CLASSIC_NEARLY_SLIP
       const held = (kart.driftPeak ?? 0) >= holdSlip && kart.driftSeconds >= holdSeconds
-      const earning = dashPlan && !held && (goesOn || nearly)
+      // By skill, every drift is seen through: long enough to be worth its bonus
+      const committed =
+        skill.holdSeconds !== undefined &&
+        (kart.driftSeconds < skill.holdSeconds || !kart.burstReady)
+      const earning = dashPlan && ((!held && (goesOn || nearly)) || committed)
       if (earning && (kart.driftPeak ?? 0) < holdSlip) into = Math.max(into, deepInto)
       // The corner is over (or the car has come round too far) and no dash is about to be earned.
       // Through a long bend the drift is held, steering out of it, not let go and begun again
@@ -407,8 +446,10 @@ export function createBotBrain(
         // Out of the corner: let go, counter-steer and lift, then press afresh for the dash; or
         // just let go
         if (dashPlan && kart.burstReady) {
-          move = { kind: 'lift', steps: LIFT_STEPS - 1, double: false, counter: -dir }
-          return { ...base, throttle: false, steer: -dir }
+          const lift = liftMove(-dir)
+          move = lift
+          const waits = (lift.wait ?? 0) > 0
+          return { ...base, throttle: waits ? kart.throttleHeld : false, steer: -dir }
         }
         return { ...base, steer: gripSteer }
       }
@@ -429,7 +470,11 @@ export function createBotBrain(
       entering = { ...entering, steps: entering.steps - 1 }
       return { ...base, drift: true, steer: entering.direction }
     }
-    if (speed > t.driftMinSpeed + 4 && Math.abs(want) > gripTurn * skill.driftAt) {
+    // By skill, only into a corner big enough to hold a drift through
+    const worthIt =
+      skill.cornerTurn === undefined ||
+      turnAhead(nearest, 24 + speed * 0.8) * Math.sign(want) >= skill.cornerTurn
+    if (speed > t.driftMinSpeed + 4 && Math.abs(want) > gripTurn * skill.driftAt && worthIt) {
       entering = { direction: Math.sign(want), steps: skill.reactionSteps + 1 }
       return { ...base, drift: true, steer: Math.sign(want) }
     }
@@ -486,7 +531,18 @@ export function createBotBrain(
     const gripTurn = t.turnRate * (1 - t.turnLossAtTopSpeed * Math.min(1, speed / t.topSpeed))
     const slip = Math.abs(wrap(kart.heading - travel))
     if (classic) {
-      return classicHands(kart, sense, speed, want, noseWant, later, gripTurn, jumpNear, slip)
+      return classicHands(
+        kart,
+        sense,
+        speed,
+        want,
+        noseWant,
+        later,
+        gripTurn,
+        jumpNear,
+        slip,
+        nearest,
+      )
     }
 
     const letGo = wasDrifting && !kart.drifting && (kart.burstReady || kart.releaseWindow > 0)

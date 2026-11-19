@@ -4,7 +4,7 @@
 //
 //   npm run dev -- --port 5263           (in another terminal)
 //   node scripts/kart-ui-shots.mjs [--base http://localhost:5263] [--out kart-ui-shots]
-//        [--sizes desktop,landscape,portrait] [--langs en,zh-TW] [--only trial,garage,race]
+//        [--sizes desktop,landscape,portrait] [--langs en,zh-TW] [--only trial,garage,race,combo]
 //
 // Not a test: nothing is compared. The pictures go to `--out` (ignored by git).
 import { mkdirSync } from 'node:fs'
@@ -24,8 +24,18 @@ const only = option('only', 'trial,garage,race').split(',')
 
 const SIZES = {
   desktop: { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 },
-  landscape: { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true },
-  portrait: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true },
+  landscape: {
+    viewport: { width: 844, height: 390 },
+    deviceScaleFactor: 2,
+    hasTouch: true,
+    isMobile: true,
+  },
+  portrait: {
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    hasTouch: true,
+    isMobile: true,
+  },
 }
 
 mkdirSync(out, { recursive: true })
@@ -93,6 +103,35 @@ for (const size of sizes) {
         await page.getByTestId('kart-bots-results').waitFor({ timeout: 200_000 })
         await page.waitForTimeout(800)
         await shot('results')
+      }
+      if (only.includes('combo')) {
+        // 2026-11-18: the gauge by the quality of the drift. The expert driver of `npm run
+        // kart:feel` drives (?autopilot=expert); the page is looked at every 120 ms for a while, to
+        // catch the perfect prompt, then the combo with the number the gauge jumps by and the callout
+        await page.goto(`${base}/kart/spike?track=riverside&autopilot=expert`)
+        await page.getByTestId('kart-countdown').waitFor({ timeout: 60_000 })
+        await page.getByTestId('kart-countdown').waitFor({ state: 'detached', timeout: 20_000 })
+        let wanted = 3
+        let ready = false
+        for (let frame = 0; frame < 400 && wanted > 0; frame++) {
+          await page.waitForTimeout(120)
+          const seen = await page.evaluate(() => ({
+            gain: !!document.querySelector('[data-testid="kart-gain"]'),
+            combo: !!document.querySelector('[data-testid="kart-combo"]'),
+            callout: document
+              .querySelector('[data-testid="kart-callout"]')
+              ?.getAttribute('data-kind'),
+            ready: !!document.querySelector('[data-testid="kart-dash"][data-perfect]'),
+          }))
+          if (seen.combo && seen.gain && seen.callout === 'perfect') {
+            await shot(`combo-${3 - wanted}`)
+            wanted--
+            await page.waitForTimeout(1500)
+          } else if (seen.ready && !ready) {
+            ready = true
+            await shot('combo-ready')
+          }
+        }
       }
     } catch (error) {
       console.error(`[${size} ${lang}] ${error.message.split('\n')[0]}`)

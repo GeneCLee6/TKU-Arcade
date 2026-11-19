@@ -21,7 +21,8 @@ const track = raceTrack(id!)!
 const plain = courseOf(track)
 const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
 for (const name of ['novice', 'average', 'expert'] as const) {
-  const skill = FEEL_DRIVERS[name]
+  // The driver's skill alone: the plain computer hands, without a person's mistakes
+  const { skill } = FEEL_DRIVERS[name]
   const brain = createBotBrain(skill, track.road, KART_TUNING, seed, track.jumps, track.walls)
   let trial = startTrial(course)
   const hits: number[] = []

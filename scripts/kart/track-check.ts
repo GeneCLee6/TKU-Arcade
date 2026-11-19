@@ -1,4 +1,5 @@
-// A design aid (2026-11-18): the three computer difficulties and the feel drivers, three laps of a
+// A design aid (2026-11-18): the three computer difficulties and the feel drivers' pursuit (without
+// their hands' mistakes: scripts/kart/drivers.ts and `npm run kart:feel` have those), three laps of a
 // built-in track each: whether they finish, how long they take, and how often they were told they
 // were going the wrong way or had to be put back on the road.
 // Run: node --experimental-strip-types scripts/kart/track-check.ts <id> [seed]
@@ -19,9 +20,9 @@ const drivers: [string, BotSkill][] = [
   ['easy', BOT_SKILLS.easy],
   ['normal', BOT_SKILLS.normal],
   ['hard', BOT_SKILLS.hard],
-  ['novice', FEEL_DRIVERS.novice],
-  ['average', FEEL_DRIVERS.average],
-  ['expert', FEEL_DRIVERS.expert],
+  ['novice', FEEL_DRIVERS.novice.skill],
+  ['average', FEEL_DRIVERS.average.skill],
+  ['expert', FEEL_DRIVERS.expert.skill],
 ]
 for (const [name, skill] of drivers) {
   const brain = createBotBrain(skill, track.road, KART_TUNING, seed, track.jumps, track.walls)

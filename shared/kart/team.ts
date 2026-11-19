@@ -141,8 +141,11 @@ export const TEAM_GAUGE = {
   full: 100,
   /**
    * Points a second one kart earns its team while it drifts at the top speed (in proportion to its
-   * speed), before the share below. A kart's own gauge fills at 70 (less in a shallow or a long
-   * drift), so the team's is full about when every kart of the team has filled its own twice
+   * speed), before the share below: full after three to four seconds of drifting a kart. Unchanged
+   * 2026-11-18, when a kart's own gauge began to go by the quality of its drifts (classic.ts): the
+   * team's still counts only the time spent drifting at speed, whoever drifts and however well. The
+   * room works it out from the frames, which say nothing of an exit's timing; and it is the boost a
+   * side of beginners can count on, while a good driver fills their own two or three times as fast
    */
   driftRate: 30,
   /** The speed counts as a share of this, m/s (the standard kart's top speed), up to `speedMax` */

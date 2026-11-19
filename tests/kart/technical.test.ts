@@ -24,17 +24,17 @@ const PLAN: Record<
   { key: string; straight: number; was: number; longest: number; jumps: number; hilly: boolean }
 > = {
   riverside: {
-    key: 'riverside@11',
+    key: 'riverside@12',
     straight: 0.35,
     was: 0.36,
     longest: 285,
     jumps: 1,
     hilly: true,
   },
-  harbour: { key: 'harbour@11', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
-  tamkang: { key: 'tamkang@10', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
-  oldstreet: { key: 'oldstreet@6', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
-  guanyin: { key: 'guanyin@6', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
+  harbour: { key: 'harbour@12', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
+  tamkang: { key: 'tamkang@11', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
+  oldstreet: { key: 'oldstreet@7', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
+  guanyin: { key: 'guanyin@7', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
   // 2026-11-18, the four new ones (moreTracks.test.ts has what is their own): at most 30% straight
   mangrove: { key: 'mangrove', straight: 0.3, was: 0.3, longest: 280, jumps: 0, hilly: false },
   fort: { key: 'fort', straight: 0.3, was: 0.3, longest: 200, jumps: 1, hilly: true },

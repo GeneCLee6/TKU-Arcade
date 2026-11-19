@@ -1,16 +1,12 @@
 // 2026-11-17 (docs/KART-FEEL.md): what the classic feel's techniques are worth. Three drivers race
-// three laps on every built-in track, with the classic feel and with the arcade (old) preset: a novice
-// (the easy computer kart's hands: no drift techniques, a sloppy line), an average driver (drifts, no
-// instant boosts) and an expert (the hard computer kart's hands on a clean line: instant boosts out
-// of every drift, taps down the straights, the double, the perfect start, boosts on the straights).
-// scripts/kart-feel.ts prints the times and the gaps (npm run kart:feel); tests/kart/feel.test.ts
-// pins them.
+// three laps on every built-in track, with the classic feel and with the arcade (old) preset.
+// 2026-11-18: the drivers are people now, not the computer opponents (scripts/kart/drivers.ts: a
+// novice who makes a novice's mistakes, an average driver and an expert), and what is measured is
+// the boost cover, the share of the race spent in a boost, besides the times.
+// scripts/kart-feel.ts prints the table (npm run kart:feel); tests/kart/feel.test.ts pins it.
 import type { KartTuning } from '../../shared/kart/physics.ts'
-import { seconds, startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
-import { courseOf } from '../../shared/kart/track.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
-import { createBotBrain } from '../../src/kart/bots/brain.ts'
-import { BOT_SKILLS, type BotSkill } from '../../src/kart/bots/skill.ts'
+import { DRIVERS, measure, type Driver, type Measure } from './drivers.ts'
 
 export const FEEL_TRACKS = [
   'riverside',
@@ -25,42 +21,16 @@ export const FEEL_TRACKS = [
   'datun',
 ] as const
 
-export const FEEL_DRIVERS: Readonly<Record<'novice' | 'average' | 'expert', BotSkill>> = {
-  novice: { ...BOT_SKILLS.easy },
-  average: {
-    ...BOT_SKILLS.normal,
-    lineNoise: 0.1,
-    reactionSteps: 3,
-    topSpeedShare: 1,
-    releaseBoosts: 0,
-    startBoost: 0,
-  },
-  expert: { ...BOT_SKILLS.hard, lineNoise: 0, reactionSteps: 1, startBoost: 1 },
-}
+export const FEEL_DRIVERS = DRIVERS
 
-export interface FeelResult {
-  readonly seconds: number
-  readonly dashes: number
-  readonly finished: boolean
-}
+export type FeelResult = Measure
 
 /** One driver, three laps (or 400 s) of a built-in track */
 export function feelRace(
   trackId: string,
-  skill: BotSkill,
+  driver: Driver,
   tuning: KartTuning,
   seed = 7,
 ): FeelResult {
-  const track = raceTrack(trackId)!
-  const plain = courseOf(track)
-  const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
-  const brain = createBotBrain(skill, track.road, tuning, seed, track.jumps, track.walls)
-  let trial = startTrial(course)
-  let dashes = 0
-  for (let step = 0; trial.phase !== 'finished' && step < 400 * 60; step++) {
-    const before = trial.run.kart.miniSeconds
-    trial = stepTrial(trial, brain(trial, { speedShare: skill.topSpeedShare }), course, tuning)
-    if (trial.run.kart.miniSeconds > before) dashes++
-  }
-  return { seconds: seconds(trial.steps), dashes, finished: trial.phase === 'finished' }
+  return measure(raceTrack(trackId)!, driver, tuning, seed)
 }

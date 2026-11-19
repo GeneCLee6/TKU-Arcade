@@ -45,6 +45,7 @@ import type { BotSetup } from './bots/setup.ts'
 import { customTrack } from '../../shared/kart/editor/custom.ts'
 import type { Track } from '../../shared/kart/track.ts'
 import { codeInAddress } from './editor/link.ts'
+import { createDriver, DRIVER_IDS, DRIVERS } from './bots/drivers.ts'
 import { autopilot } from './race/autopilot.ts'
 import { CupSetupPanel } from './cup/CupSetupPanel.tsx'
 import type { CupRun } from './cup/cupRun.ts'
@@ -159,6 +160,12 @@ export function SpikePage({
   )
   // Testing: the time trial drives itself (the browser tests)
   const [autopiloted] = useState(() => new URLSearchParams(window.location.search).has('autopilot'))
+  // 2026-11-18: `?autopilot=expert` (or average, or novice) shows one of the drivers `npm run
+  // kart:feel` measures with (bots/drivers.ts), to watch how each one's lap goes
+  const [pilot] = useState(() => {
+    const asked = new URLSearchParams(window.location.search).get('autopilot')
+    return DRIVER_IDS.find((id) => id === asked)
+  })
   const minimap = useRef<MinimapHandle>(null)
   const clock = useRef<RaceClockHandle>(null)
   const race = useRef<{ restart: () => void } | null>(null)
@@ -189,7 +196,11 @@ export function SpikePage({
         onContextLost: () => setFailure('contextLost'),
         ...(course === 'custom' ? { track: track ?? undefined } : { course }),
         ...(autopiloted && track
-          ? { autopilot: (trial: Parameters<typeof autopilot>[0]) => autopilot(trial, track.road) }
+          ? {
+              autopilot: pilot
+                ? createDriver(DRIVERS[pilot], track, controls.current.tuning, 7)
+                : (trial: Parameters<typeof autopilot>[0]) => autopilot(trial, track.road),
+            }
           : {}),
         quality,
         body,
@@ -207,7 +218,7 @@ export function SpikePage({
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, track, autopiloted, quality, body, driver, ghostPick, touchSource])
+  }, [course, track, autopiloted, pilot, quality, body, driver, ghostPick, touchSource])
 
   const switchCourse = (next: PlayCourse) => {
     const url = new URL(window.location.href)
