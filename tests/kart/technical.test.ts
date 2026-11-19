@@ -12,6 +12,7 @@ import { roadClearance } from '../../shared/kart/scenery.ts'
 import { seconds, startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
 import { courseOf, gateCrossing, recordKey, type Track } from '../../shared/kart/track.ts'
 import { RACE_TRACK_IDS, type RaceTrackId } from '../../shared/kart/tracks/list.ts'
+import { trackGuide } from '../../shared/kart/tracks/guides.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { KART_RADIUS, wallClearance } from '../../shared/kart/walls.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
@@ -24,7 +25,7 @@ const PLAN: Record<
   { key: string; straight: number; was: number; longest: number; jumps: number; hilly: boolean }
 > = {
   riverside: {
-    key: 'riverside@12',
+    key: 'riverside@13',
     straight: 0.35,
     was: 0.36,
     longest: 285,
@@ -32,14 +33,18 @@ const PLAN: Record<
     hilly: true,
   },
   harbour: { key: 'harbour@12', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
-  tamkang: { key: 'tamkang@11', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
-  oldstreet: { key: 'oldstreet@7', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
-  guanyin: { key: 'guanyin@7', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
+  tamkang: { key: 'tamkang@12', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
+  oldstreet: { key: 'oldstreet@8', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
+  guanyin: { key: 'guanyin@8', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
   // 2026-11-18, the four new ones (moreTracks.test.ts has what is their own): at most 30% straight
   mangrove: { key: 'mangrove', straight: 0.3, was: 0.3, longest: 280, jumps: 0, hilly: false },
-  fort: { key: 'fort', straight: 0.3, was: 0.3, longest: 200, jumps: 1, hilly: true },
+  fort: { key: 'fort@2', straight: 0.3, was: 0.3, longest: 200, jumps: 1, hilly: true },
   danhai: { key: 'danhai', straight: 0.3, was: 0.3, longest: 220, jumps: 0, hilly: false },
-  datun: { key: 'datun', straight: 0.3, was: 0.3, longest: 200, jumps: 2, hilly: true },
+  datun: { key: 'datun@2', straight: 0.3, was: 0.3, longest: 200, jumps: 2, hilly: true },
+  // 2026-11-19, the two to learn by heart (skillTracks.test.ts has what is their own): a shortcut
+  // is a straight line, so they are straighter than the technical four
+  wharf: { key: 'wharf', straight: 0.36, was: 0.36, longest: 220, jumps: 2, hilly: true },
+  lanes: { key: 'lanes', straight: 0.4, was: 0.4, longest: 220, jumps: 3, hilly: true },
 }
 
 const load = (id: RaceTrackId): Track => raceTrack(id)!
@@ -161,7 +166,15 @@ describe.each(RACE_TRACK_IDS)('the redrawn %s', (id) => {
       const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road }
       const skill = BOT_SKILLS[level]
       for (const seed of [7, 3]) {
-        const brain = createBotBrain(skill, road, KART_TUNING, seed, track.jumps, track.walls)
+        const brain = createBotBrain(
+          skill,
+          road,
+          KART_TUNING,
+          seed,
+          track.jumps,
+          track.walls,
+          trackGuide(track.id),
+        )
         let trial = startTrial(course)
         let wrong = 0
         let resets = 0
@@ -213,7 +226,15 @@ describe('the computer karts on the technical tracks', () => {
       const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
       const time = (level: (typeof DIFFICULTIES)[number]) => {
         const skill = BOT_SKILLS[level]
-        const brain = createBotBrain(skill, track.road, KART_TUNING, 7, track.jumps, track.walls)
+        const brain = createBotBrain(
+          skill,
+          track.road,
+          KART_TUNING,
+          7,
+          track.jumps,
+          track.walls,
+          trackGuide(track.id),
+        )
         let trial = startTrial(course)
         for (let step = 0; trial.phase !== 'finished' && step < 300 * 60; step++) {
           trial = stepTrial(trial, brain(trial, { speedShare: skill.topSpeedShare }), course)

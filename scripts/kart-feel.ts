@@ -3,11 +3,14 @@
 // laps of every built-in track. The boost cover is the share of the race spent in any boost: the
 // owner's targets are 70% or more for the expert, 15% or less for the novice, 30 to 45% between
 // (docs/KART-FEEL.md §5).
+// 2026-11-19: and a fourth driver, the master, who knows a track by heart (its guide: shared/kart/
+// tracks/guide.ts); the line under each track with a guide is what that is worth.
 // Run: npm run kart:feel   (-- --seeds 5: the mean of five races each; -- --classic: skip the old preset;
 // -- --karts: every vehicle with the same hands too, -- --only-karts: only that, -- --who expert: one driver,
 // -- --vehicles swift,tide: only these vehicles)
 import { isKartId, KART_IDS } from '../shared/kart/karts.ts'
 import { ARCADE_TUNING, KART_TUNING } from '../shared/kart/physics.ts'
+import { trackGuide } from '../shared/kart/tracks/guides.ts'
 import { raceTrack } from '../shared/kart/tracks/registry.ts'
 import { DRIVER_IDS, type Measure } from './kart/drivers.ts'
 import { FEEL_DRIVERS, FEEL_TRACKS, feelRace, vehicleTable } from './kart/feel.ts'
@@ -42,7 +45,8 @@ for (const [name, tuning] of CHOSEN) {
     'track       driver   time     cover  charge  fired  dashes (perfect/good/late)  combo  crashes  resets',
   )
   for (const id of FEEL_TRACKS) {
-    const rows = DRIVER_IDS.map((who) => {
+    // The master is the expert where a track has no guide: not raced twice
+    const rows = DRIVER_IDS.filter((who) => who !== 'master' || trackGuide(id)).map((who) => {
       const runs: Measure[] = []
       for (let seed = 1; seed <= SEEDS; seed++) {
         runs.push(feelRace(id, FEEL_DRIVERS[who], tuning, seed * 7))
@@ -69,17 +73,26 @@ for (const [name, tuning] of CHOSEN) {
         `${id.padEnd(12)}${row.who.padEnd(9)}${`${row.seconds.toFixed(1)}${row.finished ? '' : '!'}`.padEnd(9)}${pct(row.cover).padEnd(7)}${pct(row.charge).padEnd(8)}${row.fired.toFixed(1).padEnd(7)}${`${row.dashes.toFixed(1)} (${row.perfect.toFixed(1)}/${row.good.toFixed(1)}/${row.late.toFixed(1)})`.padEnd(28)}${String(row.combo).padEnd(7)}${row.crashes.toFixed(1).padEnd(9)}${row.resets.toFixed(1)}`,
       )
     }
-    const [novice, , expert] = rows
+    const [novice, , expert, master] = rows
     const gap = novice!.seconds - expert!.seconds
     console.log(
       `${''.padEnd(12)}expert vs novice: ${gap.toFixed(1)} s faster (${((gap / novice!.seconds) * 100).toFixed(0)}% less time; the novice takes ${((gap / expert!.seconds) * 100).toFixed(0)}% longer)`,
     )
+    // 2026-11-19: the skilled driver (the expert: drives well, does not know the track) against
+    // the top one (the master: the technical line, the slots, the drift jumps). On a track
+    // without a guide the two are the same driver
+    if (master) {
+      const known = expert!.seconds - master.seconds
+      console.log(
+        `${''.padEnd(12)}master vs expert: ${known.toFixed(1)} s faster (${((known / expert!.seconds) * 100).toFixed(1)}% less time): what knowing the track is worth`,
+      )
+    }
   }
 }
 
 // 2026-11-19 (--karts): the same hands in every vehicle (shared/kart/karts.ts). What a kart is worth
 // is the spread of this table: no vehicle the quickest everywhere, none the slowest everywhere, and
-// the whole spread small beside the gap between two drivers (docs/KART-FEEL.md §11)
+// the whole spread small beside the gap between two drivers (docs/KART-FEEL.md §12)
 if (process.argv.includes('--karts') || ONLY_KARTS) {
   const whoAt = process.argv.indexOf('--who')
   const chosen = DRIVER_IDS.filter((who) => whoAt < 0 || who === process.argv[whoAt + 1])

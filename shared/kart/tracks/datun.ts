@@ -89,7 +89,8 @@ export const DATUN: TrackJson = {
   id: 'datun',
   // A working name (2026-11-18): the owner may rename it (docs/KART-WORLD.md §6)
   name: { en: 'Datun Ridgeline', 'zh-TW': '大屯稜線' },
-  revision: 1,
+  // 2026-11-19: the drift jump (terrain.ts) changed what a jump is
+  revision: 2,
   theme: 'campus',
   laps: 3,
   road: made.road,

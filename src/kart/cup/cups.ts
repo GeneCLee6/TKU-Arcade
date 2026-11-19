@@ -5,7 +5,7 @@
 // result of each cup by id). Pure.
 import type { RaceTrackId } from '../../../shared/kart/tracks/list.ts'
 
-export const CUP_IDS = ['ebb', 'hill', 'rivermouth', 'flood', 'sprint'] as const
+export const CUP_IDS = ['ebb', 'hill', 'rivermouth', 'flood', 'backstreet', 'sprint'] as const
 export type CupId = (typeof CUP_IDS)[number]
 
 export interface Cup {
@@ -25,6 +25,9 @@ export const CUPS: readonly Cup[] = [
   { id: 'rivermouth', tracks: ['riverside', 'harbour', 'tamkang', 'oldstreet'] },
   // 2026-11-18: the tide comes in. The four technical tracks, the easiest first and the expert's last
   { id: 'flood', tracks: ['mangrove', 'danhai', 'fort', 'datun'] },
+  // 2026-11-19: the tracks with a way round only those who know them take: the night circuit's
+  // lane, then the two to learn by heart (docs/KART-FEEL.md §11)
+  { id: 'backstreet', tracks: ['danhai', 'wharf', 'lanes'] },
   { id: 'sprint', tracks: ['riverside'], hidden: true },
 ]
 

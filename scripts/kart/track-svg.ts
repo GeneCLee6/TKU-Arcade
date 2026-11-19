@@ -3,6 +3,8 @@
 // Run: node --experimental-strip-types scripts/kart/track-svg.ts <id> <out.svg> ["minX,minZ,maxX,maxZ;..."]
 import { writeFileSync } from 'node:fs'
 import { kerbs, parseTrack } from '../../shared/kart/track.ts'
+import { acrossRoad } from '../../shared/kart/tracks/guide.ts'
+import { trackGuide } from '../../shared/kart/tracks/guides.ts'
 import { RACE_TRACKS } from '../../shared/kart/tracks/registry.ts'
 import { curvatures, roadShape, STRAIGHT_RADIUS } from './shape.ts'
 
@@ -44,7 +46,18 @@ road.forEach((p, i) => {
 svg += `<polyline points="${poly(k.slice(0, half))} ${k[0]!.ax},${k[0]!.az}" fill="none" stroke="#333" stroke-width="1.2"/>`
 svg += `<polyline points="${poly(k.slice(half))} ${k[half]!.ax},${k[half]!.az}" fill="none" stroke="#333" stroke-width="1.2"/>`
 for (const wall of track.walls)
-  svg += `<line x1="${wall.ax}" y1="${wall.az}" x2="${wall.bx}" y2="${wall.bz}" stroke="#a0f" stroke-width="2"/>`
+  svg += `<line x1="${wall.ax}" y1="${wall.az}" x2="${wall.bx}" y2="${wall.bz}" stroke="${wall.top !== undefined && wall.top < 4 ? '#f80' : '#a0f'}" stroke-width="2"/>`
+// The guide's two lines (2026-11-19): the safe one green, the technical one red
+const guide = trackGuide(track.id)
+if (guide) {
+  for (const [offsets, colour] of [
+    [guide.safe, '#0a0'],
+    [guide.tech, '#d00'],
+  ] as const) {
+    const points = offsets.map((across, index) => acrossRoad(road, index, across))
+    svg += `<polyline points="${points.map((p) => `${p.x},${p.z}`).join(' ')} ${points[0]!.x},${points[0]!.z}" fill="none" stroke="${colour}" stroke-width="1.5"/>`
+  }
+}
 for (const j of track.jumps ?? [])
   svg += `<circle cx="${road[j]!.x}" cy="${road[j]!.z}" r="9" fill="none" stroke="#080" stroke-width="4"/>`
 for (const b of track.itemBoxes)

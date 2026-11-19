@@ -11,6 +11,11 @@ export interface Wall {
   readonly az: number
   readonly bx: number
   readonly bz: number
+  /**
+   * The height of its top, metres (2026-11-19): a car in the air (terrain.ts) at least this high
+   * flies over it. Left out: nothing flies over it
+   */
+  readonly top?: number
 }
 
 /** The car seen from above, as a circle: half its length, so the nose stops at the wall's face */
@@ -83,6 +88,9 @@ export function collideWalls(
   const travel = Math.hypot(after.x - before.x, after.z - before.z)
   const checks = Math.min(MAX_CHECKS, Math.max(1, Math.ceil(travel / MAX_TRAVEL)))
 
+  // A car in the air is over every wall whose top it has cleared
+  const height = (after.air ?? 0) > 0 ? (after.y ?? 0) : -Infinity
+
   let x = before.x
   let z = before.z
   let vx = after.vx
@@ -104,6 +112,7 @@ export function collideWalls(
     }
     for (let pass = 0; pass < PASSES; pass++) {
       for (const wall of walls) {
+        if (wall.top !== undefined && height >= wall.top) continue
         const point = nearest(wall, x, z)
         const awayX = x - point.x
         const awayZ = z - point.z

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { FEEL_DRIVERS, vehicleTable } from '../../scripts/kart/feel.ts'
 
 // 2026-11-19 (the series and the bikes): the same hands in different vehicles. The whole table,
-// seventeen vehicles on nine tracks, is `npm run kart:feel -- --karts` (docs/KART-FEEL.md §11);
+// seventeen vehicles on nine tracks, is `npm run kart:feel -- --karts` (docs/KART-FEEL.md §12);
 // this pins a corner of it, the expert on the two shortest tracks in the standard kart, the fastest
 // kart and the three bikes: a bike is another way round a lap, not a quicker one.
 describe('the same expert in different vehicles', () => {

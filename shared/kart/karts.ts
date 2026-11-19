@@ -122,7 +122,7 @@ export const KART_BODY_RADIUS = 1.2
  * it is the one thrown aside. The last but one is what keeps a bike from being the easy choice: a
  * driver who steers on grip alone, as a novice does, is no quicker on it. Measured, not
  * guessed: `npm run kart:feel -- --karts` drives every vehicle with the same hands, and the bikes
- * lap inside the karts' spread (docs/KART-FEEL.md §11).
+ * lap inside the karts' spread (docs/KART-FEEL.md §12).
  */
 export const KIND_TRAITS: { readonly [K in KartKind]: KindSpec } = {
   kart: { radius: KART_BODY_RADIUS, mass: 1, traits: {} },

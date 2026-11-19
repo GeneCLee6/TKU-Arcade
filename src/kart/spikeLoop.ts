@@ -27,11 +27,13 @@ import { DATUN } from '../../shared/kart/tracks/datun.ts'
 import { FORT } from '../../shared/kart/tracks/fort.ts'
 import { GUANYIN } from '../../shared/kart/tracks/guanyin.ts'
 import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
+import { LANES } from '../../shared/kart/tracks/lanes.ts'
 import { MANGROVE } from '../../shared/kart/tracks/mangrove.ts'
 import { OLDSTREET } from '../../shared/kart/tracks/oldstreet.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TAMKANG } from '../../shared/kart/tracks/tamkang.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
+import { WHARF } from '../../shared/kart/tracks/wharf.ts'
 import { bumpKart } from '../../shared/kart/race.ts'
 import {
   COUNTDOWN_SECONDS,
@@ -193,6 +195,9 @@ export type SpikeCourse =
   | 'fort'
   | 'danhai'
   | 'datun'
+  // 2026-11-19: two to learn by heart (docs/KART-FEEL.md §11)
+  | 'wharf'
+  | 'lanes'
 
 export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'arena',
@@ -206,6 +211,8 @@ export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'fort',
   'danhai',
   'datun',
+  'wharf',
+  'lanes',
 ]
 
 const TRACKS = {
@@ -219,6 +226,8 @@ const TRACKS = {
   fort: FORT,
   danhai: DANHAI,
   datun: DATUN,
+  wharf: WHARF,
+  lanes: LANES,
 } as const
 
 /** Where the ghost is, and (for its height on a hill track) how fast it goes there */
