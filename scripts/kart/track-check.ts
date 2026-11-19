@@ -6,6 +6,7 @@
 import { KART_TUNING } from '../../shared/kart/physics.ts'
 import { seconds, startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
 import { courseOf } from '../../shared/kart/track.ts'
+import { trackGuide } from '../../shared/kart/tracks/guides.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
 import { BOT_SKILLS, type BotSkill } from '../../src/kart/bots/skill.ts'
@@ -25,7 +26,7 @@ const drivers: [string, BotSkill][] = [
   ['expert', FEEL_DRIVERS.expert.skill],
 ]
 for (const [name, skill] of drivers) {
-  const brain = createBotBrain(skill, track.road, KART_TUNING, seed, track.jumps, track.walls)
+  const brain = createBotBrain(skill, track.road, KART_TUNING, seed, track.jumps, track.walls, trackGuide(track.id))
   let trial = startTrial(course)
   let wrong = 0
   let resets = 0

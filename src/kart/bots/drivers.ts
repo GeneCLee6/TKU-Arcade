@@ -28,6 +28,7 @@ import { createRng } from '../../../shared/games/rng.ts'
 import type { KartInput, KartTuning } from '../../../shared/kart/physics.ts'
 import type { Trial } from '../../../shared/kart/timeTrial.ts'
 import type { Track } from '../../../shared/kart/track.ts'
+import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
 import { createBotBrain } from './brain.ts'
 import { BOT_SKILLS, type BotSkill } from './skill.ts'
 
@@ -65,7 +66,7 @@ const STEADY: Hands = {
   holdOn: [0, 0],
 }
 
-export const DRIVER_IDS = ['novice', 'average', 'expert'] as const
+export const DRIVER_IDS = ['novice', 'average', 'expert', 'master'] as const
 export type DriverId = (typeof DRIVER_IDS)[number]
 
 export const DRIVERS: Readonly<Record<DriverId, Driver>> = {
@@ -140,6 +141,28 @@ export const DRIVERS: Readonly<Record<DriverId, Driver>> = {
     },
     hands: { ...STEADY, shake: 0.02 },
   },
+  // 2026-11-19 (owner: "it is too easy to become an expert ... know the map by heart"): the expert's
+  // hands, and the track known by heart (shared/kart/tracks/guide.ts): its technical line through
+  // the slots and over the fences, and the drift jumps that line asks for. On a track without a
+  // guide it is the expert
+  master: {
+    skill: {
+      ...BOT_SKILLS.hard,
+      lineNoise: 0.04,
+      reactionSteps: 2,
+      topSpeedShare: 1,
+      flatOut: true,
+      apex: 0.15,
+      driftAt: 0.9,
+      cornerTurn: 0.5,
+      holdSeconds: 0.45,
+      releaseBoosts: 1,
+      startBoost: 1,
+      boostAt: 0.6,
+      tricks: true,
+    },
+    hands: { ...STEADY, shake: 0.02 },
+  },
 }
 
 /** A brain with a person's hands on it. Seeded: the same seed drives the same race */
@@ -150,7 +173,15 @@ export function createDriver(
   seed: number,
 ): (trial: Trial) => KartInput {
   const { skill, hands } = driver
-  const brain = createBotBrain(skill, track.road, tuning, seed, track.jumps, track.walls)
+  const brain = createBotBrain(
+    skill,
+    track.road,
+    tuning,
+    seed,
+    track.jumps,
+    track.walls,
+    trackGuide(track.id),
+  )
   const rng = createRng(seed * 7919 + 13)
   const between = (range: readonly [number, number]) =>
     Math.round(range[0] + (range[1] - range[0]) * rng.float())

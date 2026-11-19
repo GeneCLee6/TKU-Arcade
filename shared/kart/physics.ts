@@ -132,6 +132,15 @@ export interface KartState {
   readonly vy?: number
   readonly air?: number
   /**
+   * The drift jump (2026-11-19, terrain.ts; the classic feel only): the way of the drift the car
+   * took off in and still carries (0 once let go or landed), how long that drift has been held,
+   * and how many drifts have been landed, for the HUD. Never set before a car first takes off in
+   * a drift
+   */
+  readonly airDrift?: -1 | 0 | 1
+  readonly airHeld?: number
+  readonly driftJumps?: number
+  /**
    * The classic feel only (2026-11-17, classic.ts; docs/KART-FEEL.md): the steering as the wheels
    * have it (it follows the stick quickly, not at once), the deepest slip angle of this drift, the
    * drift key as it was at the last step, whether the drift key must be let go before it drifts

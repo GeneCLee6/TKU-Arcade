@@ -16,7 +16,13 @@ import {
   type KartTuning,
 } from '../../../shared/kart/physics.ts'
 import { nearestRoadPoint, type Trial } from '../../../shared/kart/timeTrial.ts'
+import { TERRAIN_TUNING } from '../../../shared/kart/terrain.ts'
 import { roadDirection, type RoadPoint } from '../../../shared/kart/track.ts'
+import {
+  acrossRoad,
+  type DriftJumpCue,
+  type TrackGuide,
+} from '../../../shared/kart/tracks/guide.ts'
 import type { BotSkill } from './skill.ts'
 
 const wrap = (angle: number) => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI))
@@ -66,6 +72,36 @@ const SWAY_METRES = 160
  */
 const JUMP_CLEAR = 18
 const JUMP_SECONDS = 0.9
+/**
+ * A jump into a corner (2026-11-19): the road is taken to turn where it has come round this far
+ * past the lip, radians; a car must be down this many metres before that, and is taken to fly this
+ * much further than the bare parabola (the lip stands over the road); never slower than this, m/s
+ */
+const LANDING_TURN = 0.3
+const LANDING_MARGIN = 6
+const FLIGHT_EXTRA = 1.25
+const LANDING_SLOWEST = 34
+/** A drift jump's cue: the nose is steered to its mark in the air this hard, per radian */
+const AIR_NOSE_GAIN = 6
+/**
+ * A slot on the technical line: the hands aim at it from this far before it, metres of road, until
+ * the car is this near its line; the aim is this far beyond it, so that the car goes on straight
+ */
+const SLOT_FROM = 70
+const SLOT_PASSED = 1.5
+const SLOT_BEYOND = 10
+/** ... nearer it than this the car is committed: straight on, whatever is left to correct */
+const SLOT_COMMIT = 20
+/** ... and they come to it no faster than this share of the top speed (a boost is let run out) */
+const SLOT_SPEED = 1.1
+/** ... and from this far before it they line up: no new drift, no boost fired, the car straight */
+const SLOT_CALM = 85
+/**
+ * The technical line is for a car at speed: after a reset, or coming to a drift jump slower than
+ * this share of the top speed, the hands take the safe line for this many metres
+ */
+const TRICK_SPEED = 0.7
+const SAFE_AFTER = 260
 
 /** The racing line: the road's curvature is averaged over this far either way, metres ... */
 const LINE_WINDOW = 28
@@ -144,6 +180,11 @@ export function createBotBrain(
    * bend, the shorter and tighter; otherwise the other
    */
   walls: readonly { ax: number; az: number; bx: number; bz: number }[] = [],
+  /**
+   * The track's guide, if it has one (2026-11-19, shared/kart/tracks/guide.ts): its safe line and,
+   * by skill (`tricks`), the line through its shortcuts and the drift jumps that line asks for
+   */
+  guide?: TrackGuide,
 ): BotBrain {
   const t = tuning
   const rng = createRng(seed)
@@ -158,14 +199,75 @@ export function createBotBrain(
     total += Math.hypot(next.x - point.x, next.z - point.z)
   })
 
-  /** How far along the road the next jump lip is from road point `from`; Infinity with none */
-  const toJump = (from: number): number => {
+  /** The next jump lip from road point `from` and how far along the road it is; Infinity with none */
+  const nextJump = (from: number): { lip: number; ahead: number } => {
     let least = Infinity
+    let which = -1
     for (const lip of jumps) {
       const ahead = (along[lip]! - along[from]! + total) % total
-      if (ahead < least) least = ahead
+      if (ahead < least) {
+        least = ahead
+        which = lip
+      }
     }
-    return least
+    return { lip: which, ahead: least }
+  }
+
+  // The guide's line for these hands: the shortcuts by skill, otherwise the safe one
+  const tricks = (skill.tricks ?? false) && guide !== undefined
+  const line = guide
+    ? tricks
+      ? { offsets: guide.tech, room: guide.techRoom }
+      : { offsets: guide.safe, room: guide.safeRoom }
+    : null
+  const cues = new Map<number, DriftJumpCue>()
+  if (tricks) for (const cue of guide!.cues) cues.set(cue.lip, cue)
+  // The slots: where each is, which way the road runs through it and how far along the road
+  const slots = (tricks ? guide!.slots : []).map((slot) => {
+    const whole = ((Math.round(slot.index) % road.length) + road.length) % road.length
+    return {
+      ...acrossRoad(road, slot.index, slot.across),
+      ...roadDirection(road, whole),
+      at: along[whole]!,
+    }
+  })
+  /** The slot the car is coming to, if it is within `metres` of road and not yet through it */
+  const slotAhead = (x: number, z: number, nearest: number, metres: number) => {
+    let found: (typeof slots)[number] | null = null
+    let least = metres
+    for (const slot of slots) {
+      const ahead = (slot.at - along[nearest]! + total + 30) % total
+      if (ahead - 30 > least) continue
+      // Not yet through its line
+      if ((slot.x - x) * slot.dx + (slot.z - z) * slot.dz < SLOT_PASSED) continue
+      if (ahead - 30 < least) {
+        least = ahead - 30
+        found = slot
+      }
+    }
+    return found
+  }
+
+  // A jump into a corner (2026-11-19): the fastest a car may leave each lip and still be down
+  // before the road turns. Lifting before the crest is the plain way through; the drift jump (a
+  // cue) is the fast one
+  const takeOff = new Map<number, number>()
+  for (const lip of jumps) {
+    const count = road.length
+    let turned = 0
+    let run = 0
+    let before = roadDirection(road, lip)
+    for (let index = lip + 1; index < lip + count && run < 160; index++) {
+      const now = roadDirection(road, index % count)
+      turned += Math.asin(clamp(before.dx * now.dz - before.dz * now.dx, -1, 1))
+      run += (along[index % count]! - along[(index - 1) % count]! + total) % total
+      before = now
+      if (Math.abs(turned) >= LANDING_TURN) break
+    }
+    if (Math.abs(turned) < LANDING_TURN) continue
+    const reach = Math.max(1, run - LANDING_MARGIN)
+    const flight = (2 * TERRAIN_TUNING.jumpLift * FLIGHT_EXTRA) / TERRAIN_TUNING.gravity
+    takeOff.set(lip, Math.max(LANDING_SLOWEST, Math.sqrt(reach / flight)))
   }
 
   /** How much the road turns over the next `metres` from road point `from`, radians, signed */
@@ -186,6 +288,10 @@ export function createBotBrain(
   let move: Move = NONE
   /** Straight down the middle for a jump: set each step before the line is worked out */
   let jumpLine = false
+  /** The drift jump under way: begun before its lip, carried through the air */
+  let carrying: DriftJumpCue | null = null
+  /** Metres of road still to be driven on the safe line by hands that know the technical one */
+  let fallback = 0
   let wasDrifting = false
   let boostPressed = false
   let lastTap: -1 | 1 = 1
@@ -231,7 +337,7 @@ export function createBotBrain(
 
   // Islands: at each road point beside one, the lane the line keeps to, as an offset from the middle
   const lane = new Map<number, number>()
-  if (walls.length > 0) {
+  if (walls.length > 0 && !line) {
     const count = road.length
     const band = new Map<number, { low: number; high: number }>()
     for (const wall of walls) {
@@ -274,6 +380,26 @@ export function createBotBrain(
 
   /** The line's offset from the middle at road point `index`, metres (+ is to the right) */
   const offsetAt = (index: number): number => {
+    if (line) {
+      // A guide's line, and its own room either side to wander and clip the apex in
+      const cautious = tricks && fallback > 0
+      const room = cautious ? guide!.safeRoom[index]! : line.room[index]!
+      const middle = cautious ? guide!.safe[index]! : line.offsets[index]!
+      if (jumpLine) return middle
+      const sway = Math.sin(swayPhase + (along[index]! / SWAY_METRES) * Math.PI)
+      const wander =
+        room * Math.max(-0.6, Math.min(0.6, lineBase * skill.lineNoise + sway * skill.lineNoise))
+      const apex = inside.length === 0 ? 0 : inside[index]! * (skill.apex ?? 0) * room
+      return middle + clamp(wander + apex, -room, room)
+    }
+    if (line) {
+      const room = line.room[index]!
+      const sway = Math.sin(swayPhase + (along[index]! / SWAY_METRES) * Math.PI)
+      const wander =
+        room * Math.max(-0.6, Math.min(0.6, lineBase * skill.lineNoise + sway * skill.lineNoise))
+      const apex = inside.length === 0 ? 0 : inside[index]! * (skill.apex ?? 0) * room
+      return line.offsets[index]! + clamp(wander + apex, -room, room)
+    }
     const kept = lane.get(index)
     if (kept !== undefined) return kept
     const half = road[index]!.width / 2
@@ -293,13 +419,26 @@ export function createBotBrain(
     metres: number,
     speed: number,
     heading: number,
+    /** Aim at a slot ahead, if there is one within the reach */
+    aimAtSlots = false,
   ): number => {
     const ahead = pointAhead(road, nearest, metres)
     const { dx, dz } = roadDirection(road, ahead.index)
     // Right of the road's direction: heading 0 faces -z, clockwise
-    const offset = jumpLine ? 0 : offsetAt(ahead.index)
-    const tx = ahead.x - dz * offset
-    const tz = ahead.z + dx * offset
+    const offset = jumpLine && !line ? 0 : offsetAt(ahead.index)
+    let tx = ahead.x - dz * offset
+    let tz = ahead.z + dx * offset
+    const slot =
+      aimAtSlots && slots.length > 0 && fallback === 0
+        ? slotAhead(x, z, nearest, Math.min(metres, SLOT_FROM))
+        : null
+    if (slot) {
+      // Through the middle of the slot, and straight on beyond it; committed once it is near
+      const gap = Math.max(1e-3, Math.hypot(slot.x - x, slot.z - z))
+      if (gap < SLOT_COMMIT) return 0
+      tx = slot.x + ((slot.x - x) / gap) * SLOT_BEYOND
+      tz = slot.z + ((slot.z - z) / gap) * SLOT_BEYOND
+    }
     const angle = wrap(Math.atan2(tx - x, -(tz - z)) - heading)
     const distance = Math.max(1, Math.hypot(tx - x, tz - z))
     return (2 * Math.sin(angle) * Math.max(speed, 5)) / distance
@@ -342,6 +481,10 @@ export function createBotBrain(
     jumpNear: boolean,
     slip: number,
     nearest: number,
+    /** The fastest the car may leave the jump ahead, m/s; Infinity for no limit */
+    takeOffMost: number,
+    /** Lining up for a slot: no new drift, no boost fired */
+    lineUp: boolean,
   ): KartInput => {
     wasDrifting = kart.drifting
     const boostAt = skill.boostAt ?? 0.4
@@ -355,6 +498,7 @@ export function createBotBrain(
       !kart.drifting &&
       // One boost at a time (2026-11-18): the key does nothing while a boost runs
       kart.boostSeconds === 0 &&
+      !lineUp &&
       (teamReady || kart.storedBoosts > 0)
     boostPressed = fire
     const calm =
@@ -367,7 +511,10 @@ export function createBotBrain(
     // Hands that do not mean to fire a dash that waits never press the throttle afresh by chance
     // (easing off at their own top speed and coming back on): the throttle stays as it was
     const waiting = kart.burstReady || kart.releaseWindow > 0
-    const gas = waiting && !dashPlan ? kart.throttleHeld : !cruising
+    const gas =
+      waiting && !dashPlan
+        ? kart.throttleHeld
+        : !cruising && !(lineUp && speed > t.topSpeed * SLOT_SPEED)
     const base = { ...NO_INPUT, throttle: gas, boost: fire }
 
     if (move.kind === 'tap' || move.kind === 'double') move = NONE
@@ -400,7 +547,15 @@ export function createBotBrain(
 
     if (jumpNear) {
       entering = NOT_ENTERING
-      return { ...base, steer: gripSteer }
+      // A jump into a corner: off the throttle before the crest (and on the brake, well over)
+      const fast = speed > takeOffMost
+      return {
+        ...base,
+        throttle: base.throttle && !fast,
+        boost: base.boost && !fast,
+        brake: speed > takeOffMost + 5,
+        steer: gripSteer,
+      }
     }
 
     const turnMost = t.driftTurnRate * (1 + t.driftSteerShare)
@@ -441,7 +596,7 @@ export function createBotBrain(
         Math.sign(want) !== dir ||
         (Math.abs(want) < gripTurn * CLASSIC_END_NOW &&
           Math.abs(later) < gripTurn * CLASSIC_END_LATER)
-      const done = kart.driftSeconds > 0.15 && over && !earning
+      const done = (kart.driftSeconds > 0.15 && over && !earning) || lineUp
       if (done) {
         // Out of the corner: let go, counter-steer and lift, then press afresh for the dash; or
         // just let go
@@ -474,7 +629,12 @@ export function createBotBrain(
     const worthIt =
       skill.cornerTurn === undefined ||
       turnAhead(nearest, 24 + speed * 0.8) * Math.sign(want) >= skill.cornerTurn
-    if (speed > t.driftMinSpeed + 4 && Math.abs(want) > gripTurn * skill.driftAt && worthIt) {
+    if (
+      speed > t.driftMinSpeed + 4 &&
+      Math.abs(want) > gripTurn * skill.driftAt &&
+      worthIt &&
+      !lineUp
+    ) {
       entering = { direction: Math.sign(want), steps: skill.reactionSteps + 1 }
       return { ...base, drift: true, steer: Math.sign(want) }
     }
@@ -504,10 +664,13 @@ export function createBotBrain(
     const speed = Math.hypot(kart.vx, kart.vz)
     stuck = speed < STUCK_SPEED ? stuck + 1 : 0
     wrong = trial.wrongWay ? wrong + 1 : 0
+    fallback = Math.max(0, fallback - speed / 60)
     if (stuck > STUCK_STEPS || wrong > WRONG_STEPS) {
       stuck = 0
       wrong = 0
       move = NONE
+      carrying = null
+      fallback = SAFE_AFTER
       return { ...NO_INPUT, reset: true }
     }
 
@@ -517,16 +680,50 @@ export function createBotBrain(
       move = NONE
       wasDrifting = false
       const flight = Math.atan2(kart.vx, -kart.vz)
+      if (carrying && (kart.airDrift ?? 0) !== 0) {
+        // A drift jump: the drift key held, the nose swung out to the cue's mark for the landing
+        const out = wrap(kart.heading - flight) * carrying.way
+        return {
+          ...NO_INPUT,
+          throttle: true,
+          drift: true,
+          steer: carrying.way * clampSteer((carrying.nose - out) * AIR_NOSE_GAIN),
+        }
+      }
       return { ...NO_INPUT, throttle: true, steer: clampSteer(wrap(flight - kart.heading) * 4) }
     }
-    const jumpNear = jumps.length > 0 && toJump(nearest) < JUMP_CLEAR + speed * JUMP_SECONDS
+    const jump = jumps.length > 0 ? nextJump(nearest) : { lip: -1, ahead: Infinity }
+    let cue = fallback > 0 ? undefined : cues.get(jump.lip)
+    // Too slow for it (a crash just before): the plain way this time
+    if (cue && !carrying && jump.ahead <= 60 && speed < t.topSpeed * TRICK_SPEED) {
+      fallback = SAFE_AFTER
+      cue = undefined
+    }
+    // A drift jump (by skill, where the guide has a cue): the drift begun this long before the lip
+    if (cue && jump.ahead <= speed * cue.seconds) {
+      carrying = cue
+      move = NONE
+      return {
+        ...NO_INPUT,
+        throttle: speed <= (cue.most ?? Infinity),
+        drift: true,
+        steer: cue.way * Math.max(0.12, cue.into),
+      }
+    }
+    if (carrying && !kart.drifting) carrying = null
+    const jumpNear = jump.ahead < JUMP_CLEAR + speed * JUMP_SECONDS
     if (jumpNear && (move.kind === 'tap' || move.kind === 'double')) move = NONE
     jumpLine = jumpNear
+    const takeOffMost = !jumpNear
+      ? Infinity
+      : cue
+        ? (cue.most ?? Infinity)
+        : (takeOff.get(jump.lip) ?? Infinity)
     const travel = speed > 3 ? Math.atan2(kart.vx, -kart.vz) : kart.heading
     // Slow hands look further ahead, to make up for answering late
     const reach = 14 + speed * (REACH + skill.reactionSteps / 120)
-    const want = pursuit(kart.x, kart.z, nearest, reach, speed, travel)
-    const noseWant = pursuit(kart.x, kart.z, nearest, reach, speed, kart.heading)
+    const want = pursuit(kart.x, kart.z, nearest, reach, speed, travel, true)
+    const noseWant = pursuit(kart.x, kart.z, nearest, reach, speed, kart.heading, true)
     const later = pursuit(kart.x, kart.z, nearest, 30 + speed * 0.9, speed, travel)
     const gripTurn = t.turnRate * (1 - t.turnLossAtTopSpeed * Math.min(1, speed / t.topSpeed))
     const slip = Math.abs(wrap(kart.heading - travel))
@@ -542,6 +739,10 @@ export function createBotBrain(
         jumpNear,
         slip,
         nearest,
+        takeOffMost,
+        slots.length > 0 &&
+          fallback === 0 &&
+          slotAhead(kart.x, kart.z, nearest, SLOT_CALM) !== null,
       )
     }
 
