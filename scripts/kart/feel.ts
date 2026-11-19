@@ -8,7 +8,18 @@ import type { KartTuning } from '../../shared/kart/physics.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { DRIVERS, measure, type Driver, type Measure } from './drivers.ts'
 
-export const FEEL_TRACKS = ['riverside', 'harbour', 'tamkang', 'oldstreet', 'guanyin'] as const
+export const FEEL_TRACKS = [
+  'riverside',
+  'harbour',
+  'tamkang',
+  'oldstreet',
+  'guanyin',
+  // 2026-11-18: the four technical tracks (docs/KART-FEEL.md §10.1)
+  'mangrove',
+  'fort',
+  'danhai',
+  'datun',
+] as const
 
 export const FEEL_DRIVERS = DRIVERS
 

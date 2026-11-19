@@ -50,6 +50,8 @@ import {
 import { buildCornerDressing, buildCornerSigns } from './cornerArt.ts'
 import { buildFestival } from './festival.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
+import { buildLocal } from './localArt.ts'
+import { localPlan } from './localPlan.ts'
 import { buildOldStreet, inOldStreetRiver, oldStreetTreeFits } from './oldStreetArt.ts'
 import {
   ASPHALT_LENGTH,
@@ -331,6 +333,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     return object
   }
 
+  // 2026-11-18: the four technical tracks' own scenery (localArt.ts); null for any other track
+  const local = localPlan(track, level.density)
+
   const { along, length } = roadDistances(track.road)
   const sides = edges(track)
   const kerbInner = edges(track, KERB_WIDTH)
@@ -502,7 +507,8 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       !inRiver(x) &&
       (!harbour || harbourTreeFits(x, z)) &&
       (!tamkang || tamkangTreeFits(x, z)) &&
-      (!oldStreet || oldStreetTreeFits(x, z)),
+      (!oldStreet || oldStreetTreeFits(x, z)) &&
+      (!local || local.fits(x, z)),
   })
   const trunks = new InstancedMesh(
     keep(new CylinderGeometry(0.22, 0.32, 2.2, 6)),
@@ -745,7 +751,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
             ? tamkangFestivalFits(x, z)
             : oldStreet
               ? oldStreetTreeFits(x, z)
-              : !inRiver(x),
+              : !inRiver(x) && (!local || local.fits(x, z)),
     },
   )
 
@@ -875,6 +881,15 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       })
     : null
 
+  // ── The four technical tracks: each one's own landmark (2026-11-18) ──
+  const localScenery = local
+    ? buildLocal(
+        { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
+        local,
+        groundAt,
+      )
+    : null
+
   for (const instances of group.children) {
     if (instances instanceof InstancedMesh) {
       instances.instanceMatrix.setUsage(DynamicDrawUsage)
@@ -891,6 +906,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       festival.update(seconds)
       tamkangScenery?.update(seconds)
       oldStreetScenery?.update(seconds)
+      localScenery?.update(seconds)
     },
     dispose() {
       for (const geometry of geometries) geometry.dispose()

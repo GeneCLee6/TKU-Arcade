@@ -3,6 +3,17 @@
 // id to its track and its type makes the two lists agree; a new track goes in both, with its name in
 // shared/games/kart/i18n.ts (`games.kart.track.<id>`).
 // 2026-11-17: Guanyin Hill Road, the first with slopes and jumps (terrain.ts)
-export const RACE_TRACK_IDS = ['riverside', 'harbour', 'tamkang', 'oldstreet', 'guanyin'] as const
+// 2026-11-18: four more, each made to tell drivers apart (docs/KART-FEEL.md §10.1)
+export const RACE_TRACK_IDS = [
+  'riverside',
+  'harbour',
+  'tamkang',
+  'oldstreet',
+  'guanyin',
+  'mangrove',
+  'fort',
+  'danhai',
+  'datun',
+] as const
 
 export type RaceTrackId = (typeof RACE_TRACK_IDS)[number]

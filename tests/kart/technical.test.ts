@@ -35,6 +35,11 @@ const PLAN: Record<
   tamkang: { key: 'tamkang@11', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
   oldstreet: { key: 'oldstreet@7', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
   guanyin: { key: 'guanyin@7', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
+  // 2026-11-18, the four new ones (moreTracks.test.ts has what is their own): at most 30% straight
+  mangrove: { key: 'mangrove', straight: 0.3, was: 0.3, longest: 280, jumps: 0, hilly: false },
+  fort: { key: 'fort', straight: 0.3, was: 0.3, longest: 200, jumps: 1, hilly: true },
+  danhai: { key: 'danhai', straight: 0.3, was: 0.3, longest: 220, jumps: 0, hilly: false },
+  datun: { key: 'datun', straight: 0.3, was: 0.3, longest: 200, jumps: 2, hilly: true },
 }
 
 const load = (id: RaceTrackId): Track => raceTrack(id)!

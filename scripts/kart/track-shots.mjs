@@ -16,7 +16,7 @@ const option = (name, fallback) => {
 }
 const base = option('base', 'http://localhost:5263')
 const out = option('out', 'kart-shots')
-const tracks = option('tracks', 'riverside,harbour,tamkang,oldstreet,guanyin').split(',')
+const tracks = option('tracks', 'riverside,harbour,tamkang,oldstreet,guanyin,mangrove,fort,danhai,datun').split(',')
 const shots = Number(option('shots', '6'))
 const every = Number(option('every', '5000'))
 const quality = option('quality', 'high')

@@ -22,8 +22,12 @@ import type { Quality } from './quality.ts'
 import { DEFAULT_KART, kartMass, type DriverId, type KartId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { courseOf, parseTrack, recordKey, type Track } from '../../shared/kart/track.ts'
+import { DANHAI } from '../../shared/kart/tracks/danhai.ts'
+import { DATUN } from '../../shared/kart/tracks/datun.ts'
+import { FORT } from '../../shared/kart/tracks/fort.ts'
 import { GUANYIN } from '../../shared/kart/tracks/guanyin.ts'
 import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
+import { MANGROVE } from '../../shared/kart/tracks/mangrove.ts'
 import { OLDSTREET } from '../../shared/kart/tracks/oldstreet.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TAMKANG } from '../../shared/kart/tracks/tamkang.ts'
@@ -184,6 +188,11 @@ export type SpikeCourse =
   | 'oldstreet'
   // 2026-11-17: slopes and jumps (shared/kart/terrain.ts)
   | 'guanyin'
+  // 2026-11-18: four more, each made to tell drivers apart (docs/KART-FEEL.md §10.1)
+  | 'mangrove'
+  | 'fort'
+  | 'danhai'
+  | 'datun'
 
 export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'arena',
@@ -193,6 +202,10 @@ export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'tamkang',
   'oldstreet',
   'guanyin',
+  'mangrove',
+  'fort',
+  'danhai',
+  'datun',
 ]
 
 const TRACKS = {
@@ -202,6 +215,10 @@ const TRACKS = {
   tamkang: TAMKANG,
   oldstreet: OLDSTREET,
   guanyin: GUANYIN,
+  mangrove: MANGROVE,
+  fort: FORT,
+  danhai: DANHAI,
+  datun: DATUN,
 } as const
 
 /** Where the ghost is, and (for its height on a hill track) how fast it goes there */
