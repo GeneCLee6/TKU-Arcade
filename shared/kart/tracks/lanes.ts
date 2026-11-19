@@ -196,7 +196,7 @@ export const LANES_GUIDE: TrackGuide = guide.build()
 // lane: what the technical line pays
 const lanePads = padsAlong(
   road,
-  [...yards.map((yard) => yard + 2), wellIn + 8].map(
+  [...yards.map((yard) => yard + 2), wellIn + 4, wellIn + 14].map(
     (index) => [index, LANES_GUIDE.tech[index]!] as const,
   ),
 )

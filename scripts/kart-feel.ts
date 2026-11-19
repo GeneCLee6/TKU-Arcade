@@ -40,7 +40,8 @@ for (const [name, tuning] of process.argv.includes('--classic') ? FEELS.slice(0,
     'track       driver   time     cover  charge  fired  dashes (perfect/good/late)  combo  crashes  resets',
   )
   for (const id of FEEL_TRACKS) {
-    const rows = DRIVER_IDS.map((who) => {
+    // The master is the expert where a track has no guide: not raced twice
+    const rows = DRIVER_IDS.filter((who) => who !== 'master' || trackGuide(id)).map((who) => {
       const runs: Measure[] = []
       for (let seed = 1; seed <= SEEDS; seed++) {
         runs.push(feelRace(id, FEEL_DRIVERS[who], tuning, seed * 7))
@@ -75,8 +76,8 @@ for (const [name, tuning] of process.argv.includes('--classic') ? FEELS.slice(0,
     // 2026-11-19: the skilled driver (the expert: drives well, does not know the track) against
     // the top one (the master: the technical line, the slots, the drift jumps). On a track
     // without a guide the two are the same driver
-    const known = expert!.seconds - master!.seconds
-    if (trackGuide(id)) {
+    if (master) {
+      const known = expert!.seconds - master.seconds
       console.log(
         `${''.padEnd(12)}master vs expert: ${known.toFixed(1)} s faster (${((known / expert!.seconds) * 100).toFixed(1)}% less time): what knowing the track is worth`,
       )
