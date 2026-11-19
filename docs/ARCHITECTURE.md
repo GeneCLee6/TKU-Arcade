@@ -1009,8 +1009,10 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 ## 7. 部署與環境
 
 - 一個 Worker、`main` 通過 CI 後自動部署；每個 PR 部署自己的 Worker `tku-arcade-pr-<號>`（`wrangler deploy --name`，PR 關閉即刪；不用 `versions upload`，因為 DO migration 不能走 versions upload，且版本會共用正式站的 DO 與 D1）；預覽共用 staging D1 `tku-arcade-staging`，R2 assets 與正式站共用、沒有備份桶。細節見 `DEPLOY.md`。
-- Secrets：`AUTH_SHARED_SECRET`（與牌桌共用，F1；var `AUTH_BRIDGE_URL` 是牌桌的網址，DEPLOY.md §11）、`ANTHROPIC_API_KEY`（題目草稿）、`LONGTALK_URL`（選用）。
-- 成本：Workers、DO、D1、R2 都在免費額度內；卡丁車多人是最大變數（E12 儀表板）。
+- Secrets：`AUTH_SHARED_SECRET`（與牌桌共用，F1；var `AUTH_BRIDGE_URL` 是牌桌的網址，DEPLOY.md §11）、`ANTHROPIC_API_KEY`（題目草稿）、`LONGTALK_URL`（選用）、`STATS_KEY`（擁有者頁）、`CF_ANALYTICS_TOKEN`／`CF_ACCOUNT_ID`（成本儀表板）、`ALERT_WEBHOOK_URL`（選用）。
+- 成本：Workers、DO、D1、R2 都在免費額度內；卡丁車多人是最大變數。儀表板（P1，`e12-t15`，`worker/usage.ts`）向 Cloudflare GraphQL Analytics API 要**整個帳號**的用量（免費額度是帳號共用：預覽、牌桌、LongTalk 都算），每個資料集一個查詢，一個失敗其他照常；每日 cron（與備份同一條 `0 19 * * *`，`Promise.allSettled`，任一失敗整次記失敗）超過 80% 寫 D1 `cost_alerts`（每個指標每個期間一筆，不重複警示），選用 webhook。每日額度取昨天與今天（UTC）較高的一天，因為 cron 在 19:00 UTC 跑、今天只過了 79%。
+- 功能旗標（P1，`e12-t11`，`worker/flags.ts`）：D1 `game_flags`，沒有列就是開放。三個檢查點：`POST /api/rooms`（Worker，每次讀 D1）、`GET /api/lobby` 濾掉暫停遊戲的公開房、`RoomDO` 收到 `start`／`rematch`／`set_game` 時讀旗標（快取 30 秒，`blockConcurrencyWhile` 讀，訊息順序不亂；`RoomHost` 保持同步，只問 `deps.gameEnabled`）。既有房間的當局不受影響；讀不到旗標表時全部開放（旗標只會關，不能讓旗標故障關掉整站）。
+- 安全標頭（P1，`e12-t13`，`docs/SECURITY.md`）：靜態資產的 `_headers` 由 `vite.config.ts` 的 `security-headers` 外掛在 build 時寫出（CSP 用 `index.html` 唯一 inline script 的 sha256，每次 build 的語言 chunk 檔名不同，所以 hash 只能在 build 時算）；Worker 自己的回應由 `worker/security.ts` 補同一組基本標頭（WebSocket 升級除外）。
 
 ## 8. 從牌桌與 LongTalk 直接搬的東西
 

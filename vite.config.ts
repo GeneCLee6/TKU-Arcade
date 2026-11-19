@@ -1,7 +1,9 @@
 /// <reference types="vitest/config" />
 import { cloudflare } from '@cloudflare/vite-plugin'
 import react from '@vitejs/plugin-react'
+import { createHash } from 'node:crypto'
 import { defineConfig, type Plugin } from 'vite'
+import { headersFile } from './shared/security-headers.ts'
 
 // Stamps the built commit into index.html so a deployment can be traced back to its commit.
 // The deploy workflows set APP_VERSION to the commit they deploy.
@@ -39,10 +41,35 @@ const languageChunks = (): Plugin => ({
   },
 })
 
+// Writes the static assets' `_headers` (e12-t13, shared/security-headers.ts, docs/SECURITY.md): the
+// Content-Security-Policy allows index.html's inline script by its hash, which changes with every
+// build (the language chunks' names are in it), so the file is made here, after index.html
+const INLINE_SCRIPT = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g
+const securityHeaders = (): Plugin => ({
+  name: 'security-headers',
+  apply: 'build',
+  enforce: 'post',
+  generateBundle(_options, bundle) {
+    if (this.environment.name !== 'client') return
+    const page = bundle['index.html']
+    if (page?.type !== 'asset') throw new Error('security-headers: no index.html in the client build')
+    const html = typeof page.source === 'string' ? page.source : new TextDecoder().decode(page.source)
+    const hashes = [...html.matchAll(INLINE_SCRIPT)].map(
+      ([, script]) => `sha256-${createHash('sha256').update(script).digest('base64')}`,
+    )
+    this.emitFile({ type: 'asset', fileName: '_headers', source: headersFile(hashes) })
+  },
+})
+
 // The Cloudflare plugin runs the Worker (API, Durable Objects) inside `vite dev` and builds it
 // next to the client; it is left out of Vitest, which tests the Worker's logic directly.
 export default defineConfig({
-  plugins: [react(), appVersion(), languageChunks(), ...(process.env.VITEST ? [] : [cloudflare()])],
+  plugins: [
+    react(),
+    appVersion(),
+    languageChunks(),
+    securityHeaders(),
+    ...(process.env.VITEST ? [] : [cloudflare()])],
   // Port 5175: TKU-BridgeTable uses 5173, BridgeHall 5174
   server: { port: 5175, strictPort: true },
   // The JS budget script (e12-t03) reads the manifest to know which chunks each page loads

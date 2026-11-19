@@ -7,6 +7,7 @@ import { TopBar } from '../components/TopBar.tsx'
 import '../i18n/roomExtras.ts'
 import { useT } from '../i18n/useT.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
+import { GameFlagsPanel, UsagePanel } from './OwnerPanels.tsx'
 import { readStored, writeStored } from '../lib/storage.ts'
 import { monoType } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
@@ -48,7 +49,8 @@ function sums(
 }
 
 /**
- * The owner's daily counts (e12-t07): rooms opened, games started and finished, by day and by game.
+ * The owner's daily counts (e12-t07): rooms opened, games started and finished, by day and by game;
+ * below them the per-game switches (e12-t11) and the Cloudflare usage (e12-t15).
  * Nothing links here; the key is the STATS_KEY secret (DEPLOY.md §12), kept in this browser.
  */
 export function StatsPage() {
@@ -199,6 +201,8 @@ export function StatsPage() {
                 </Table>
               </>
             )}
+            <GameFlagsPanel ownerKey={key} />
+            <UsagePanel ownerKey={key} />
             <div>
               <Button
                 $variant="ghost"

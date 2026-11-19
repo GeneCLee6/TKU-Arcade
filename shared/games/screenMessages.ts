@@ -14,6 +14,7 @@ import { secretScrollScreenMessages } from './secret-scroll/i18n.screen.ts'
 import { wasabiScreenMessages } from './wasabi/i18n.screen.ts'
 import { palaceScreenMessages } from './palace/i18n.screen.ts'
 import { holdemScreenMessages } from './holdem/i18n.screen.ts'
+import { ownerMessages } from './ownerMessages.ts'
 import { roomExtraMessages } from './roomExtras.ts'
 import { promotionDetailMessages } from './promotion/i18n.detail.ts'
 import { promotionFullMessages } from './promotion/i18n.full.ts'
@@ -53,6 +54,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...kartWatchMessages.en,
     ...kartTeamMessages.en,
     ...roomExtraMessages.en,
+    ...ownerMessages.en,
   },
   'zh-TW': {
     ...promotionScreenMessages['zh-TW'],
@@ -79,5 +81,6 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...kartWatchMessages['zh-TW'],
     ...kartTeamMessages['zh-TW'],
     ...roomExtraMessages['zh-TW'],
+    ...ownerMessages['zh-TW'],
   },
 }

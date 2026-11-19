@@ -51,6 +51,8 @@ export const roomEn = {
   'room.error.rate_limited': 'Too fast. Wait a moment and try again.',
   'room.error.seat_taken': 'Someone is already in that seat.',
   'room.error.unavailable': "That isn't available yet.",
+  'room.error.game_disabled':
+    'This game is paused for maintenance: no new game can start. Pick another game for the room.',
   'room.error.password_required': 'This room has a password.',
   'room.error.wrong_password': 'That is not the room’s password.',
   'room.error.wrong_status': "That isn't possible at this point in the game.",
