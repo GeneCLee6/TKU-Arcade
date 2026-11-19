@@ -162,6 +162,11 @@ export type RoomHostDeps = {
   newSeed(): number
   /** Counts a daily metric (e12-t07); without waiting, and a failure is the counter's own */
   metric?(name: MetricName, gameId: string): void
+  /**
+   * Whether a new game of `gameId` may start (e12-t11): false once the owner has paused it. Asked
+   * on `start`, `rematch` and `set_game` only; a game already being played goes on. Absent: all open
+   */
+  gameEnabled?(gameId: string): boolean
 }
 
 export type Admission = { ok: true } | { ok: false; code: number; reason: string }
@@ -919,6 +924,7 @@ export class RoomHost {
       .filter((other) => other.seat !== null)
       .sort((a, b) => (a.seat as number) - (b.seat as number))
     if (seated.length < room.minPlayers) return this.refuse(conn, 'not_enough_players')
+    if (this.deps.gameEnabled?.(room.gameId) === false) return this.refuse(conn, 'game_disabled')
     const module = this.deps.games(room.gameId)
     const game =
       module &&
@@ -1181,6 +1187,7 @@ export class RoomHost {
     if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
     const module = this.deps.games(gameId)
     if (!module) return this.refuse(conn, 'bad_game')
+    if (this.deps.gameEnabled?.(gameId) === false) return this.refuse(conn, 'game_disabled')
     this.change(() => {
       this.dropGame()
       room.gameId = gameId

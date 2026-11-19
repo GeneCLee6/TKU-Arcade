@@ -16,10 +16,12 @@ interface GameCardProps {
   game: GameCardInfo
   /** A room is being created: a second click would make a second room */
   disabled: boolean
+  /** Paused by the owner (e12-t11): said on the card, and no New room */
+  paused?: boolean
   onNewRoom: () => void
 }
 
-export function GameCard({ game, disabled, onNewRoom }: GameCardProps) {
+export function GameCard({ game, disabled, paused = false, onNewRoom }: GameCardProps) {
   const t = useT()
   const { minPlayers, maxPlayers, minutes, i18nKey } = game.meta
   const name = t(`${i18nKey}.name`)
@@ -53,12 +55,20 @@ export function GameCard({ game, disabled, onNewRoom }: GameCardProps) {
           {t(`${i18nKey}.tryAlone`)}
         </RulesLink>
       )}
-      <Button disabled={disabled} onClick={onNewRoom}>
+      {paused && <Paused role="note">{t('lobby.paused')}</Paused>}
+      <Button disabled={disabled || paused} onClick={onNewRoom}>
         {t('lobby.newRoom')}
       </Button>
     </Body>
   )
 }
+
+const Paused = styled.p`
+  margin: 0;
+  color: ${color.danger};
+  font-size: ${fontSize.sm}px;
+  font-weight: 700;
+`
 
 const Facts = styled.p`
   ${monoType}

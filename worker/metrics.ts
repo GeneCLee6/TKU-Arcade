@@ -4,6 +4,7 @@
 // the STATS_KEY secret (DEPLOY.md §12); without that secret the endpoint is not there.
 import type { DailyMetricRow, MetricName, StatsResponse } from '../shared/protocol.ts'
 import type { Env } from './app.ts'
+import { ownerRefusal } from './owner.ts'
 
 /** The day a count goes to: Taiwan's, since that is where the tables are */
 export function metricDay(now: number): string {
@@ -34,27 +35,10 @@ export const STATS_DAYS = 30
 
 const noStore = { 'cache-control': 'no-store' }
 
-/** Constant time for equal lengths: the key is not guessable a character at a time */
-function sameKey(given: string, expected: string): boolean {
-  if (given.length !== expected.length) return false
-  let diff = 0
-  for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i)
-  return diff === 0
-}
-
 /** GET /api/stats with `Authorization: Bearer <STATS_KEY>`: the last STATS_DAYS days of counts */
 export async function handleStats(request: Request, env: Env, now = Date.now()): Promise<Response> {
-  const key = env.STATS_KEY?.trim()
-  if (!key) return Response.json({ error: 'not_found' }, { status: 404, headers: noStore })
-  if (request.method !== 'GET') {
-    return Response.json(
-      { error: 'method_not_allowed' },
-      { status: 405, headers: { ...noStore, allow: 'GET' } },
-    )
-  }
-  const given = /^Bearer (.+)$/.exec(request.headers.get('authorization') ?? '')?.[1] ?? ''
-  if (!sameKey(given, key))
-    return Response.json({ error: 'forbidden' }, { status: 403, headers: noStore })
+  const refusal = ownerRefusal(request, env)
+  if (refusal) return refusal
   const since = metricDay(now - (STATS_DAYS - 1) * 86_400_000)
   const { results } = await env.DB.prepare(
     'SELECT day, metric, game, count FROM daily_metrics WHERE day >= ? ORDER BY day DESC, metric, game',
