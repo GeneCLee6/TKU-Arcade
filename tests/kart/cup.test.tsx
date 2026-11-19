@@ -103,9 +103,17 @@ describe('the points', () => {
 describe('the cups', () => {
   it('race the four tracks, the full cup in order, and hide the test cup', () => {
     expect(cupOf('rivermouth').tracks).toEqual(['riverside', 'harbour', 'tamkang', 'oldstreet'])
-    expect(pickableCups(false).map((cup) => cup.id)).toEqual(['ebb', 'hill', 'rivermouth', 'flood'])
+    expect(pickableCups(false).map((cup) => cup.id)).toEqual([
+      'ebb',
+      'hill',
+      'rivermouth',
+      'flood',
+      'backstreet',
+    ])
     // 2026-11-18: the four technical tracks, the expert's last
     expect(cupOf('flood').tracks).toEqual(['mangrove', 'danhai', 'fort', 'datun'])
+    // 2026-11-19: the tracks with a way round for those who know them
+    expect(cupOf('backstreet').tracks).toEqual(['danhai', 'wharf', 'lanes'])
     expect(pickableCups(true)).toHaveLength(CUPS.length)
     expect(cupOf('sprint').tracks).toHaveLength(1)
   })
@@ -288,7 +296,7 @@ describe('the cup’s screens', () => {
       within(screen.getByTestId('kart-cup-cup'))
         .getAllByRole('option')
         .map((option) => option.getAttribute('value')),
-    ).toEqual(['ebb', 'hill', 'rivermouth', 'flood'])
+    ).toEqual(['ebb', 'hill', 'rivermouth', 'flood', 'backstreet'])
     fireEvent.change(screen.getByTestId('kart-cup-cup'), { target: { value: 'rivermouth' } })
     fireEvent.change(screen.getByTestId('kart-cup-count'), { target: { value: '7' } })
     fireEvent.click(screen.getByTestId('kart-cup-start'))

@@ -18,11 +18,19 @@
 //   turns the nose a little (`airTurnRate`), and the throttle and boost do nothing; timers run on.
 //   Landing with the throttle held, nose in line, after a real flight, gives a small release boost.
 //   A drift held through the landing starts again at once, the way any drift starts.
+// - The drift jump (2026-11-19, the classic feel only; docs/KART-FEEL.md §11): a car that crosses
+//   the lip in a real drift (the tail out `driftJumpSlip` or more, the drift key down) carries the
+//   drift through the air. It flies the way it was sliding, not the way the road runs; while the
+//   drift key stays down the nose can be swung much faster (`airDriftTurnRate`), as far as a drift
+//   goes; and it lands in the drift it left in, already turning, the instant boost it has earned
+//   still there to be fired. A car that takes off straight lands straight, and only then begins
+//   to turn. Letting go of the drift key in the air drops the drift.
 // - Walls, gates, item boxes, other karts: all as before, on the ground plane. A car in the air is
 //   where its shadow is, as far as anything else in the game knows.
 //
 // Pure, like physics.ts: the browser, the Worker and the load test all run it.
 import {
+  GAUGE_FULL,
   stepKart,
   STEP_SECONDS,
   type KartInput,
@@ -54,6 +62,15 @@ export const TERRAIN_TUNING = {
   landingAlign: (16 * Math.PI) / 180,
   /** ... and lasts this long, as a release boost does */
   landingBoost: 0.5,
+  /** The drift jump: the tail must be out this far at the lip for the drift to be carried, radians */
+  driftJumpSlip: (10 * Math.PI) / 180,
+  /** ... and the nose then swings this fast in the air at full steer, rad/s */
+  airDriftTurnRate: 1.7,
+  /**
+   * ... and landing it fills the gauge by this much (of 100), in full after `landingMinAir` in
+   * the air: what the clean landing's boost is to a car that took off straight
+   */
+  driftJumpGauge: 45,
 } as const
 
 export type TerrainTuning = { readonly [K in keyof typeof TERRAIN_TUNING]: number }
@@ -186,7 +203,18 @@ function stepAir(
   const steer = clamp(input.steer, -1, 1)
   const vy = (state.vy ?? 0) - terrain.gravity * dt
   const boostSeconds = Math.max(0, state.boostSeconds - dt)
-  const chainWindow = Math.max(0, state.chainWindow - dt)
+  // The drift jump: carried for as long as the drift key stays down
+  const carried = input.drift ? (state.airDrift ?? 0) : 0
+  // A combo holds through a carried drift, as it does through one on the ground
+  const chainWindow = carried !== 0 ? state.chainWindow : Math.max(0, state.chainWindow - dt)
+  let heading = wrapAngle(state.heading + steer * terrain.airTurnRate * dt)
+  if (carried !== 0) {
+    // The nose swings fast, between the way the car flies and the deepest a drift goes
+    const flight = Math.atan2(state.vx, -state.vz)
+    const slip =
+      wrapAngle(state.heading - flight) * carried + steer * carried * terrain.airDriftTurnRate * dt
+    heading = wrapAngle(flight + carried * clamp(slip, 0, tuning.driftMaxSlip))
+  }
   return {
     ...state,
     x: state.x + state.vx * dt,
@@ -194,7 +222,13 @@ function stepAir(
     y: (state.y ?? 0) + vy * dt,
     vy,
     air: (state.air ?? 0) + dt,
-    heading: wrapAngle(state.heading + steer * terrain.airTurnRate * dt),
+    heading,
+    ...(state.airDrift === undefined
+      ? {}
+      : {
+          airDrift: carried as -1 | 0 | 1,
+          airHeld: carried !== 0 ? (state.airHeld ?? 0) + dt : 0,
+        }),
     boostSeconds,
     stackSeconds: boostSeconds > 0 ? Math.max(0, state.stackSeconds - dt) : 0,
     miniSeconds: Math.max(0, state.miniSeconds - dt),
@@ -240,7 +274,16 @@ export function stepOnTerrain(
     vx *= kept
     vz *= kept
   }
-  return { ...next, vx, vz, y: state.y ?? ground.y, vy: 0, air: 0 }
+  return {
+    ...next,
+    vx,
+    vz,
+    y: state.y ?? ground.y,
+    vy: 0,
+    air: 0,
+    // The count of drift jumps landed is the terrain's, not the flat car's
+    ...(state.driftJumps === undefined ? {} : { driftJumps: state.driftJumps }),
+  }
 }
 
 /** What happened to the car's height in a step, for the sound and the look */
@@ -257,6 +300,8 @@ export function settleTerrain(
   input: KartInput,
   terrain: Terrain,
   numbers: TerrainTuning = TERRAIN_TUNING,
+  /** How many charges a kart holds at the most (the drift jump's gauge may fill one) */
+  maxStoredBoosts = 2,
 ): { kart: KartState; event: TerrainEvent } {
   if (airborne(after)) {
     const ground = groundAt(terrain, after.x, after.z)
@@ -266,12 +311,50 @@ export function settleTerrain(
     const slip =
       speed > 1 ? Math.abs(wrapAngle(Math.atan2(after.vx, -after.vz) - after.heading)) : 0
     const clean = air >= numbers.landingMinAir && input.throttle && slip <= numbers.landingAlign
+    const carried = input.drift ? (after.airDrift ?? 0) : 0
+    if (carried !== 0 && speed > 1) {
+      // The drift jump: down in the drift it left in, as deep as the nose now is and as long as
+      // it has been held; what it had earned is still there
+      const deep = Math.max(0, wrapAngle(after.heading - Math.atan2(after.vx, -after.vz)) * carried)
+      // The gauge's share: a charge once it is full, as a drift's is (classic.ts)
+      let { gauge, storedBoosts } = after
+      if (storedBoosts < maxStoredBoosts) {
+        gauge += numbers.driftJumpGauge * Math.min(1, air / Math.max(1e-3, numbers.landingMinAir))
+        if (gauge >= GAUGE_FULL) {
+          storedBoosts++
+          gauge = storedBoosts < maxStoredBoosts ? gauge - GAUGE_FULL : GAUGE_FULL
+        }
+      }
+      return {
+        kart: {
+          ...after,
+          gauge,
+          storedBoosts,
+          gaugeGain: gauge - after.gauge + (storedBoosts - after.storedBoosts) * GAUGE_FULL,
+          y: ground.y,
+          vy: 0,
+          air: 0,
+          airDrift: 0,
+          airHeld: 0,
+          drifting: true,
+          driftDirection: carried,
+          driftSeconds: after.airHeld ?? 0,
+          driftPeak: Math.max(after.driftPeak ?? 0, deep),
+          slideDirection: 0,
+          driftKey: true,
+          driftLatch: false,
+          driftJumps: (after.driftJumps ?? 0) + 1,
+        },
+        event: 'landing',
+      }
+    }
     return {
       kart: {
         ...after,
         y: ground.y,
         vy: 0,
         air: 0,
+        ...(after.airDrift === undefined ? {} : { airDrift: 0 as const, airHeld: 0 }),
         miniSeconds: clean ? Math.max(after.miniSeconds, numbers.landingBoost) : after.miniSeconds,
       },
       event: 'landing',
@@ -282,6 +365,31 @@ export function settleTerrain(
     // Along the road at the lip: its share of the speed is what the ramp throws upwards
     const along = after.vx * lip.dx + after.vz * lip.dz
     if (along < numbers.jumpMinSpeed) break
+    // The drift jump (the classic feel, which alone has `steerNow`): a real drift, the key down,
+    // is carried through the air
+    const way =
+      after.steerNow !== undefined && after.drifting && input.drift ? after.driftDirection : 0
+    const out = way === 0 ? 0 : wrapAngle(after.heading - Math.atan2(after.vx, -after.vz)) * way
+    if (way !== 0 && out >= numbers.driftJumpSlip) {
+      return {
+        kart: {
+          ...after,
+          y: lip.y,
+          vy: along * numbers.jumpLift,
+          air: STEP_SECONDS / 2,
+          drifting: false,
+          driftDirection: 0,
+          sliding: false,
+          slideDirection: 0,
+          doubleDrift: false,
+          airDrift: way,
+          airHeld: after.driftSeconds,
+          driftSeconds: 0,
+          driftPeak: Math.max(after.driftPeak ?? 0, out),
+        },
+        event: 'takeoff',
+      }
+    }
     return {
       kart: {
         ...after,

@@ -37,6 +37,7 @@ import {
   type TrialCourse,
 } from '../../../shared/kart/timeTrial.ts'
 import { courseOf, roadDirection, type Track } from '../../../shared/kart/track.ts'
+import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
 import { createBotBrain, pointAhead, type BotBrain } from './brain.ts'
 import { createItemRider, type ItemRider } from './effects.ts'
 import { wantsToUse } from './itemSense.ts'
@@ -179,6 +180,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
         options.seed * 31 + seat,
         track.jumps,
         track.walls,
+        trackGuide(track.id),
       ),
       rider: createItemRider(seat, track, room.state().used),
       team: (() => {

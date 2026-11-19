@@ -122,22 +122,21 @@ describe('the arrow boards', () => {
     'fort',
     'danhai',
     'datun',
-  ])(
-    '%s: every corner sharp enough has boards, none of them on the road',
-    (id) => {
-      const track = raceTrack(id)!
-      const corners = roadCorners(track.road)
-      const boards = cornerSigns(track.road)
-      expect(corners.length).toBeGreaterThanOrEqual(5)
-      expect(boards.length).toBeGreaterThanOrEqual(corners.length * 2)
-      expect(boards.length).toBeLessThan(120)
-      for (const sign of boards) {
-        expect(roadClearance(track.road, sign.x, sign.z)).toBeGreaterThan(0.5)
-      }
-      // The same road, the same boards
-      expect(cornerSigns(track.road)).toEqual(boards)
-    },
-  )
+    'wharf',
+    'lanes',
+  ])('%s: every corner sharp enough has boards, none of them on the road', (id) => {
+    const track = raceTrack(id)!
+    const corners = roadCorners(track.road)
+    const boards = cornerSigns(track.road)
+    expect(corners.length).toBeGreaterThanOrEqual(5)
+    expect(boards.length).toBeGreaterThanOrEqual(corners.length * 2)
+    expect(boards.length).toBeLessThan(120)
+    for (const sign of boards) {
+      expect(roadClearance(track.road, sign.x, sign.z)).toBeGreaterThan(0.5)
+    }
+    // The same road, the same boards
+    expect(cornerSigns(track.road)).toEqual(boards)
+  })
 })
 
 // 2026-11-18: the rest of a corner's dressing (docs/ARCHITECTURE.md §4.33)

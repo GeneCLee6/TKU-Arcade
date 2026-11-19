@@ -142,7 +142,7 @@ function crossings(laid: Laid, at: number[], total: number, max: number): [numbe
 }
 
 /** Raised whenever the physics changes enough that old times on custom tracks mean nothing */
-export const CUSTOM_REVISION = 6
+export const CUSTOM_REVISION = 7
 
 /** The track the spec makes, under its own id (`custom-<hash>`), and everything wrong with it */
 export function buildSpec(spec: TrackSpec): Built {

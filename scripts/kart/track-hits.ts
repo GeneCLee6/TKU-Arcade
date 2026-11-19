@@ -11,6 +11,7 @@ import {
   type TrialCourse,
 } from '../../shared/kart/timeTrial.ts'
 import { courseOf } from '../../shared/kart/track.ts'
+import { trackGuide } from '../../shared/kart/tracks/guides.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
 import { FEEL_DRIVERS } from './feel.ts'
@@ -23,7 +24,15 @@ const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: t
 for (const name of ['novice', 'average', 'expert'] as const) {
   // The driver's skill alone: the plain computer hands, without a person's mistakes
   const { skill } = FEEL_DRIVERS[name]
-  const brain = createBotBrain(skill, track.road, KART_TUNING, seed, track.jumps, track.walls)
+  const brain = createBotBrain(
+    skill,
+    track.road,
+    KART_TUNING,
+    seed,
+    track.jumps,
+    track.walls,
+    trackGuide(track.id),
+  )
   let trial = startTrial(course)
   const hits: number[] = []
   const dashes: number[] = []

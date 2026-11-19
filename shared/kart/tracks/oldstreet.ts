@@ -181,6 +181,8 @@ const row = (x: number, z: number, offsets: readonly number[]) => {
 }
 
 const span = islandSpan(fromLine)
+/** The alley's boost pads lie this far right of the centre line: the middle of the inside lane */
+const ALLEY_PAD = 27
 const apex = Math.round((span.first + span.last) / 2)
 
 export const OLDSTREET: TrackJson = {
@@ -190,7 +192,8 @@ export const OLDSTREET: TrackJson = {
   // 2: the classic feel (2026-11-17): the physics changed, so the old times are set aside
   // 5: the straights broken up by alleys, the back lanes' esses made real (2026-11-18)
   // 6: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
-  revision: 7,
+  // 8: two boost pads in the fork's alley (2026-11-19)
+  revision: 8,
   laps: 3,
   road: fromLine,
   gates,
@@ -211,6 +214,10 @@ export const OLDSTREET: TrackJson = {
     [12, 10],
     [nearestIndex(176, 222), -8],
     [nearestIndex(240, 312), 10],
+    // 2026-11-19: two in the alley behind the stalls, which only the short way reaches: the
+    // shortcut pays in speed as well as in metres (docs/KART-FEEL.md §11.4)
+    [span.first + 4, ALLEY_PAD],
+    [span.last - 4, ALLEY_PAD],
   ]),
   // The item race reads these (shared/kart/items.ts): rows across the wide parts, a row in the
   // fork's safe lane, two on the hairpin's inside kerb

@@ -267,7 +267,14 @@ export function stepRun(
   // On a track with terrain: take off, land, or sit on the ground
   let terrainEvent: TerrainEvent | undefined
   if (terrain) {
-    const settled = settleTerrain(run.kart, kart, input, terrain)
+    const settled = settleTerrain(
+      run.kart,
+      kart,
+      input,
+      terrain,
+      undefined,
+      tuning.maxStoredBoosts,
+    )
     kart = settled.kart
     terrainEvent = settled.event
   }

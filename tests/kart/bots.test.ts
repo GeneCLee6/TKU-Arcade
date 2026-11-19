@@ -3,6 +3,7 @@ import { KART_TUNING } from '../../shared/kart/physics.ts'
 import { seconds, startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
 import { courseOf, type Track } from '../../shared/kart/track.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
+import { trackGuide } from '../../shared/kart/tracks/guides.ts'
 import { RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
 import type { KartMode } from '../../shared/games/kart/types.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
@@ -33,7 +34,15 @@ function solo(track: Track, difficulty: Difficulty, seed: number) {
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
   const skill = BOT_SKILLS[difficulty]
-  const brain = createBotBrain(skill, track.road, KART_TUNING, seed, track.jumps, track.walls)
+  const brain = createBotBrain(
+    skill,
+    track.road,
+    KART_TUNING,
+    seed,
+    track.jumps,
+    track.walls,
+    trackGuide(track.id),
+  )
   let trial = startTrial(course)
   let wrongWays = 0
   for (let step = 0; trial.phase !== 'finished' && step < 400 * 60; step++) {

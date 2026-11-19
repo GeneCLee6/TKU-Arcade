@@ -24,6 +24,12 @@ export interface BotSkill {
   readonly apex?: number
   /** Past an island that splits the road, takes the lane inside the bend: the shortcut (2026-11-18) */
   readonly shortcuts?: boolean
+  /**
+   * Knows the track by heart (2026-11-19, shared/kart/tracks/guide.ts): on a track with a guide,
+   * drives its technical line (through the slots, over the fences) and does the drift jumps that
+   * line asks for. Without it the safe line, lifting before a jump into a corner
+   */
+  readonly tricks?: boolean
   /** Steps between seeing the road and the hands answering (1/60 s each) */
   readonly reactionSteps: number
   /**

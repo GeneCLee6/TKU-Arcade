@@ -158,8 +158,15 @@ const spot = (item: unknown, at: string, problems: Problems): Spot | null =>
     ? { x: (item as Spot).x, z: (item as Spot).z, heading: (item as Spot).heading }
     : null
 
-const wall = (item: unknown, at: string, problems: Problems): Wall | null =>
-  numbers(item, ['ax', 'az', 'bx', 'bz'], at, problems) ? (item as Wall) : null
+const wall = (item: unknown, at: string, problems: Problems): Wall | null => {
+  if (!numbers(item, ['ax', 'az', 'bx', 'bz'], at, problems)) return null
+  const top = (item as { top?: unknown }).top
+  if (top !== undefined && (!isNumber(top) || Math.abs(top) > MAX_HEIGHT + 20)) {
+    problems.push(`${at}: top must be a height`)
+    return null
+  }
+  return item as Wall
+}
 
 /**
  * The track in `json`, checked, with its walls worked out; or every problem found, so that whoever

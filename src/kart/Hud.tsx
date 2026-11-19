@@ -221,6 +221,7 @@ const CALLOUT_KEYS = {
   quick: 'kart.callout.quick',
   stall: 'kart.callout.stall',
   late: 'kart.callout.late',
+  driftJump: 'kart.callout.driftJump',
 } as const satisfies Record<Exclude<Callout['kind'], 'chain' | 'perfect'>, KartMessageKey>
 
 /**
@@ -673,6 +674,7 @@ const CalloutBox = styled.div`
   &[data-kind='chain'],
   &[data-kind='perfect'],
   &[data-kind='double'],
+  &[data-kind='driftJump'],
   &[data-kind='stack'] {
     ${streak(color.accent)}
   }
@@ -699,6 +701,7 @@ const calloutFill: Record<Callout['kind'], string> = {
   broken: color.danger,
   perfect: color.warning,
   late: color.accent,
+  driftJump: color.magenta,
 }
 /** The small callouts: the ones that come often in a lap */
 const SMALL: ReadonlySet<Callout['kind']> = new Set([

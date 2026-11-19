@@ -22,6 +22,8 @@ const en = {
   'games.kart.track.fort': 'Hobe Fort Hill',
   'games.kart.track.danhai': 'Danhai Night Circuit',
   'games.kart.track.datun': 'Datun Ridgeline',
+  'games.kart.track.wharf': 'Wharf Warehouses',
+  'games.kart.track.lanes': 'Hillside Lanes',
   // e10-t08: a track made in the editor (/kart/editor), given as its link
   'games.kart.track.custom': 'A track from the editor',
   'games.kart.option.custom': 'Custom track',
@@ -79,6 +81,8 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.track.fort': '滬尾砲台坡',
   'games.kart.track.danhai': '淡海夜城',
   'games.kart.track.datun': '大屯稜線',
+  'games.kart.track.wharf': '碼頭倉庫',
+  'games.kart.track.lanes': '山城坡巷',
   'games.kart.track.custom': '自訂賽道（編輯器）',
   'games.kart.option.custom': '自訂賽道',
   'games.kart.custom.paste': '貼上賽道連結',
