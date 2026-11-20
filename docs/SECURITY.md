@@ -149,3 +149,13 @@ PR 預覽站（`tku-arcade-pr-107`）：
 - 表單邊打邊提示（`nickname.reserved`／`nickname.blocked`／長度）；伺服器在 `join` 用同一套檢查（`acceptableName`），不過就當協定錯誤關閉（4422），因為正常的頁面送不出這種名字。localStorage 裡存的舊暱稱不合規時會重新問。登入帳號的名字來自牌桌、不經這個檢查。
 - 測試：`tests/worker/abuse.test.ts`（擋與不擋的例子都列了）、`tests/components/NicknameForm.test.tsx`。
 
+
+## 10. 實測（#110）
+
+PR 預覽站（`tku-arcade-pr-110`），從一台電腦（同一個 IPv6 /64）：
+
+- **建房**：連續 7 次 `POST /api/rooms` → `201 ×5、429 ×2`，429 帶 `Retry-After: 60`。第一版用 Rate Limiting binding 時同樣的測試是 25 次全部 201（日誌裡每次 `success: true`），所以換成 `LimiterDO`。
+- **WebSocket 升級**：對一個不存在的房間連續開 125 條 → 120 條 4404（找不到房間）、5 條 **4429**。
+- **每房每位址**：同一個房間開 26 條並送 `join` → 24 條留著、第 25、26 條 **4429**。
+- **暱稱**：`join` 送 `系統`、`Admin` → 4422；`A` + 零寬空格 + `l` → 正常加入。
+- **擁有者金鑰**：預覽沒有 `STATS_KEY`（端點 404），鎖定只有單元測試。
