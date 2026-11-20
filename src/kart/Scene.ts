@@ -18,7 +18,14 @@ import {
 import type { Wall } from '../../shared/kart/walls.ts'
 import type { Track } from '../../shared/kart/track.ts'
 import { groundAt, heightGuess, pitchOf, terrainOf } from '../../shared/kart/terrain.ts'
-import { buildTrackArt, themeOf, type TrackArt } from './art/trackArt.ts'
+import { buildTrackArt, isNightTrack, themeOf, type TrackArt } from './art/trackArt.ts'
+import {
+  addKartLights,
+  buildStreetLights,
+  createNightKit,
+  headlightLevel,
+  type KartLights,
+} from './art/nightLights.ts'
 import { QUALITY, type Quality } from './quality.ts'
 import { createKartEffects, type KartEffects } from './art/effects.ts'
 import { buildKartEnvironment } from './art/kartParts.ts'
@@ -41,7 +48,7 @@ const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 const HEAT_REACH = 0.17
 const NO_HEAT: PostFrame['heat'] = []
 const FLAT = { y: 0, pitch: 0 }
-import { kartScene, kartThemes } from '../styles/kartTokens.ts'
+import { kartNight, kartScene, kartThemes } from '../styles/kartTokens.ts'
 import {
   cameraPull,
   cameraShake,
@@ -287,6 +294,22 @@ export function createKartScene(
   const car = kart.group
   scene.add(car)
   const effects = createKartEffects(scene, kart, false, finish.glow)
+  // 2026-11-20 (§4.47): at night the lamps light the road: the headlights (a real light on this
+  // kart on high), the tail lamps' glow, the street lamps' pools
+  const nightKit = track && isNightTrack(track) ? createNightKit() : null
+  const lightLevel = headlightLevel(quality, software)
+  const ownLights: KartLights | null = nightKit ? addKartLights(kart, lightLevel, nightKit) : null
+  const otherLights = new Map<number, KartLights>()
+  const streetLights =
+    track && nightKit
+      ? buildStreetLights(
+          track,
+          nightKit,
+          track.id !== 'oldstreet',
+          track.id === 'oldstreet' ? kartNight.lanternPool : kartNight.lampPool,
+        )
+      : null
+  if (streetLights) scene.add(streetLights.group)
   // Made the first time there is a ghost to show
   let ghostKart: KartModel | null = null
   // The other racers' karts, by id, made when each first appears
@@ -403,6 +426,7 @@ export function createKartScene(
       car.position.set(x, 0, z)
       spinModel(car, heading, spins.get(OWN_KART), lift)
       kart.update(look, frameSeconds, dazedBy(spins.get(OWN_KART)))
+      ownLights?.update()
       effects.update(terrain ? { x, z, heading, y: lift.y } : { x, z, heading }, look, frameSeconds)
       if (terrain) cameraY += (lift.y - cameraY) * (1 - Math.exp(-CAMERA_RISE * frameSeconds))
 
@@ -548,6 +572,8 @@ export function createKartScene(
           scene.remove(model.group)
           otherEffects.get(other.id)?.dispose()
           otherEffects.delete(other.id)
+          otherLights.get(other.id)?.dispose()
+          otherLights.delete(other.id)
           model.dispose()
           model = undefined
         }
@@ -556,11 +582,19 @@ export function createKartScene(
           otherKarts.set(other.id, model)
           scene.add(model.group)
           otherEffects.set(other.id, createKartEffects(scene, model, true, finish.glow))
+          // Only this kart carries a real light: the others' beams are pools
+          if (nightKit) {
+            otherLights.set(
+              other.id,
+              addKartLights(model, lightLevel === 'spot' ? 'pool' : lightLevel, nightKit),
+            )
+          }
         }
         model.group.position.set(other.x, 0, other.z)
         const lift = liftOf(other, Math.abs(other.look.speed))
         spinModel(model.group, other.heading, spins.get(other.id), lift)
         model.update(other.look, frameSeconds, dazedBy(spins.get(other.id)))
+        otherLights.get(other.id)?.update()
         otherEffects
           .get(other.id)
           ?.update(
@@ -574,6 +608,8 @@ export function createKartScene(
         scene.remove(model.group)
         otherEffects.get(id)?.dispose()
         otherEffects.delete(id)
+        otherLights.get(id)?.dispose()
+        otherLights.delete(id)
         model.dispose()
         otherKarts.delete(id)
       }
@@ -609,6 +645,10 @@ export function createKartScene(
         material.dispose()
       }
       effects.dispose()
+      ownLights?.dispose()
+      for (const lights of otherLights.values()) lights.dispose()
+      streetLights?.dispose()
+      nightKit?.dispose()
       speedLines.dispose()
       kart.dispose()
       ghostKart?.dispose()
