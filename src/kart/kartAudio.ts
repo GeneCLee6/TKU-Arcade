@@ -6,7 +6,10 @@
 // how fast the tyres slide (feelFx.ts), and a boost bangs, whooshes and roars for as long as it
 // lasts. All of it made here from oscillators and noise. Muted with the site's own sound switch (src/lib/sound.ts). A browser
 // only lets a page make sound after a gesture: `unlock` is called from the first key or tap.
+// 2026-11-20 (§4.46): through the kart's one AudioContext (audio/bus.ts), into its effects bus, so
+// that the effects volume sets it apart from the music.
 import { isSoundOn } from '../lib/sound.ts'
+import { refreshKartBus, unlockKartAudio } from './audio/bus.ts'
 import { squealVoice } from './feelFx.ts'
 import type { ItemCue } from './hitFx.ts'
 import { voicesOf, type Voice } from './itemSounds.ts'
@@ -81,13 +84,6 @@ export function engineFrequency(speed: number, throttle: boolean): number {
   )
 }
 
-function noiseBuffer(audio: AudioContext, seconds: number): AudioBuffer {
-  const buffer = audio.createBuffer(1, Math.floor(audio.sampleRate * seconds), audio.sampleRate)
-  const data = buffer.getChannelData(0)
-  for (let index = 0; index < data.length; index++) data[index] = Math.random() * 2 - 1
-  return buffer
-}
-
 /** One cue's voices, into `destination` now, at `volume` */
 function playVoices(
   audio: AudioContext,
@@ -146,22 +142,21 @@ export function createCuePlayer(): CuePlayer {
   let noise: AudioBuffer | null = null
   return {
     unlock() {
-      if (typeof window.AudioContext !== 'function') return
-      if (!audio) {
-        audio = new window.AudioContext()
-        master = audio.createGain()
-        master.gain.value = MASTER
-        master.connect(audio.destination)
-        noise = noiseBuffer(audio, 2)
-      }
-      if (audio.state === 'suspended') void audio.resume()
+      const bus = unlockKartAudio()
+      if (!bus || audio) return
+      audio = bus.context
+      master = audio.createGain()
+      master.gain.value = MASTER
+      master.connect(bus.effects)
+      noise = bus.noise
     },
     cue(cue, volume) {
       if (!audio || !master || !noise || !isSoundOn() || audio.state !== 'running') return
+      refreshKartBus()
       playVoices(audio, master, noise, voicesOf(cue), volume)
     },
     dispose() {
-      void audio?.close()
+      master?.disconnect()
       audio = null
       master = null
       noise = null
@@ -192,16 +187,18 @@ export function createKartAudio(): KartAudio {
   let lastBurst = -Infinity
   const burstAt = (now: number) => now - lastBurst < 0.25
 
-  const build = (context: AudioContext) => {
+  /** Everything that runs for as long as the kart does: stopped when it goes */
+  let running: AudioScheduledSourceNode[] = []
+  const build = (context: AudioContext, effects: AudioNode, noise: AudioBuffer) => {
     const master = context.createGain()
     master.gain.value = 0
-    master.connect(context.destination)
-    const noise = noiseBuffer(context, 2)
+    master.connect(effects)
     const loop = () => {
       const source = context.createBufferSource()
       source.buffer = noise
       source.loop = true
       source.start(0, Math.random())
+      running.push(source)
       return source
     }
 
@@ -273,6 +270,7 @@ export function createKartAudio(): KartAudio {
     squealTone.start()
     squealHigh.start()
     waver.start()
+    running.push(engine, engineTwin, engineLow, squealTone, squealHigh, waver)
 
     // The boost: a jet's roar and a low rumble under it
     const jetFilter = context.createBiquadFilter()
@@ -390,15 +388,14 @@ export function createKartAudio(): KartAudio {
 
   return {
     unlock() {
-      if (typeof window.AudioContext !== 'function') return
-      if (!audio) {
-        audio = new window.AudioContext()
-        build(audio)
-      }
-      if (audio.state === 'suspended') void audio.resume()
+      const bus = unlockKartAudio()
+      if (!bus || audio) return
+      audio = bus.context
+      build(audio, bus.effects, bus.noise)
     },
     update(sound) {
       if (!audio || !nodes) return
+      refreshKartBus()
       const now = audio.currentTime
       const glide = (param: AudioParam, value: number, seconds = 0.06) =>
         param.setTargetAtTime(value, now, seconds)
@@ -454,9 +451,24 @@ export function createKartAudio(): KartAudio {
       playVoices(audio, nodes.master, nodes.noise, voicesOf(cue), volume)
     },
     dispose() {
-      void audio?.close()
+      const master = nodes?.master
+      const sources = running
+      running = []
       audio = null
       nodes = null
+      if (!master) return
+      // Out quickly, then stopped: a context shared with the music lives on
+      master.gain.setTargetAtTime(0, master.context.currentTime, 0.03)
+      setTimeout(() => {
+        for (const source of sources) {
+          try {
+            source.stop()
+          } catch {
+            // never started, or already stopped
+          }
+        }
+        master.disconnect()
+      }, 200)
     },
   }
 }

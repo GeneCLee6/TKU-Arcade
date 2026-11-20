@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.45): the item series' three karts (shared/kart/karts.ts), in the
+// 2026-11-20 (docs/ARCHITECTURE.md §4.48): the item series' three karts (shared/kart/karts.ts), in the
 // look of the rest (kartBodies.ts: hulls cut in flat faces, satin black and carbon with one neon
 // colour, lit lines, a livery) and from the same river mouth: three birds and a beast that gather
 // things. All our own shapes: no other game's kart, part or change of shape.

@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.45): the six items of the second round in the browser: what
+// 2026-11-20 (docs/ARCHITECTURE.md §4.48): the six items of the second round in the browser: what
 // they do to a kart (static, fog, the lifts), how they look and sound (hitFx.ts, itemSounds.ts), how
 // a replay shows a mirror and a bubble that stops two, and when a computer kart uses each, the
 // expert's included. The room's side is tests/games/kart-items-more.test.ts.

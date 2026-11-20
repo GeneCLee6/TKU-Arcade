@@ -3,7 +3,7 @@
 // the next race, the standings so far and the field; each race is a race against the computer
 // (BotRaceView) with the cup's own opponents; after the last, the podium. Every step is kept in this
 // browser (store.ts) before it shows.
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { Button } from '../../components/Button.tsx'
 import { useT } from '../../i18n/useT.ts'
@@ -29,6 +29,11 @@ import {
 import type { CupLine } from './points.ts'
 import { clearCupRun, keepCupBest, saveCupRun } from './store.ts'
 import { Trophy } from './Trophy.tsx'
+import { useMenuMusic } from '../audio/useMenuMusic.ts'
+import { loadBody, loadDriver } from '../bodies.ts'
+
+// 2026-11-20 (§4.47): the player's own driver on the podium, celebrating (three.js, fetched then)
+const KartPreview = lazy(() => import('../roster/KartPreview.tsx'))
 
 export interface CupViewProps {
   readonly run: CupRun
@@ -38,6 +43,8 @@ export interface CupViewProps {
 
 export default function CupView({ run: first, onMenu }: CupViewProps) {
   const t = useT()
+  // 2026-11-20 (§4.46): the quiet song on the cup's card and podium
+  useMenuMusic()
   const [run, setRunState] = useState(first)
   const [newBest, setNewBest] = useState(false)
   const [abandoning, setAbandoning] = useState(false)
@@ -98,6 +105,16 @@ export default function CupView({ run: first, onMenu }: CupViewProps) {
         <Card>
           <Heading>{t('kart.cup.podium', { cup: cupName })}</Heading>
           <Podium lines={table} nameOf={nameOf} you={you} />
+          <Suspense fallback={null}>
+            <KartPreview
+              kart={loadBody()}
+              driver={loadDriver()}
+              label={t(outcome.place <= 3 ? 'kart.cup.podiumDriver' : 'kart.cup.offPodiumDriver')}
+              hint=""
+              morphLabel=""
+              pose={outcome.place <= 3 ? 'podium' : 'idle'}
+            />
+          </Suspense>
           <TrophyRow>
             <Trophy
               cup={run.setup.cup}

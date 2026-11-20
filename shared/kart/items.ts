@@ -7,7 +7,7 @@
 // Five direct items (L4) and three thrown or dropped ones (L5, e9-t06b; shots.ts). Names and looks
 // are working titles of our own, to be settled with the kart's world (e10-t01).
 //
-// 2026-11-20 (docs/ARCHITECTURE.md §4.45): six more, one of each kind the table lacked, all our own
+// 2026-11-20 (docs/ARCHITECTURE.md §4.48): six more, one of each kind the table lacked, all our own
 // names, effects and looks: a ward that turns the next shot back on whoever sent it (`mirror`), a
 // bank of sea fog laid on the road ahead of the kart in front (`fog`, a shot: shots.ts), a skip
 // forward to the next gate (`skip`), static that keeps the kart in front from firing its boosts

@@ -1,4 +1,4 @@
-// 2026-11-20: screenshots of the item race's things (docs/ARCHITECTURE.md §4.45), for looking at with
+// 2026-11-20: screenshots of the item race's things (docs/ARCHITECTURE.md §4.48), for looking at with
 // one's own eyes: a mirror's ring, a bank of sea fog, a fake box beside a real one's look, the hits'
 // bursts (a mirror turning a shot back, fog closing in, a skip's splash, a rally's cheer, static).
 // Drives the real page in Chromium on this machine's GPU through the debug hook spikeLoop.ts leaves

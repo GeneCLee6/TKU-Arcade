@@ -66,6 +66,7 @@ import {
 } from '../hitFx.ts'
 import type { SpikeNet } from '../spikeLoop.ts'
 import { createRemotes, type RemotePose } from './remotes.ts'
+import { gestureAt } from '../driverGestures.ts'
 
 /** Clock pings: a quick few at first, then one every PING_EVERY_MS */
 const FIRST_PINGS = 5
@@ -526,6 +527,29 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     return out
   }
 
+  /** The racers in race order, the leader first (the places shown, and this kart's own) */
+  const orderOf = (racers: readonly KartRacer[]): number[] => {
+    const count = track.gates.length
+    const latest = remotes.latest()
+    const progress = (racer: KartRacer): number => {
+      if (racer.seat === seat)
+        return raceProgress(track, own.crossings, own.nextGate, own.x, own.z)
+      const frame = latest.get(racer.seat)
+      if (!frame || frame.nextGate >= count) return racer.lapMs.length * count
+      return raceProgress(track, frame.crossings, frame.nextGate, frame.x, frame.z)
+    }
+    const finished = racers
+      .filter((racer) => racer.finishMs !== null)
+      .sort((a, b) => (a.finishMs as number) - (b.finishMs as number))
+    const racing = racers
+      .filter((racer) => racer.finishMs === null && !racer.out)
+      .map((racer) => ({ racer, at: progress(racer) }))
+      .sort((a, b) => b.at - a.at)
+      .map(({ racer }) => racer)
+    const out = racers.filter((racer) => racer.finishMs === null && racer.out)
+    return [...finished, ...racing, ...out].map((racer) => racer.seat)
+  }
+
   const net: SpikeNet = {
     start: gridSpot(track, options.slot),
     laps: options.laps,
@@ -558,6 +582,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           return { ...pose, mass: kartMass(kart), radius: kartRadius(kart) }
         }),
     gridSpots: () => options.view().racers.map((_, slot) => gridSpot(track, slot)),
+    place: () => orderOf(options.view().racers).indexOf(seat) + 1,
     others() {
       const view = options.view()
       poses = onGrid(remotes.poses(performance.now() / 1000), view)
@@ -571,8 +596,16 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
               .map((racer) => racer.seat),
           )
         : null
+      // §4.47: the drivers wave in the fly round, look round on the grid, cheer across the line
+      const goAt = options.goAt()
+      const toGo = goAt === null ? null : (goAt - at) / 1000
       return poses.map((pose): OtherKart => {
         const { kart, driver } = loadoutOfByte(pose.frame.body)
+        const finishMs = view.racers.find((racer) => racer.seat === pose.seat)?.finishMs ?? null
+        const gesture = gestureAt({
+          toGo: toGo !== null && toGo > 0 ? toGo : null,
+          sinceFinish: finishMs === null || goAt === null ? null : (at - goAt - finishMs) / 1000,
+        })
         const forward = pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading)
         const side = pose.vx * Math.cos(pose.heading) + pose.vz * Math.sin(pose.heading)
         return {
@@ -599,6 +632,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
               Math.hypot(pose.vx, pose.vz),
               pose.frame.drifting || pose.frame.skidding,
             ),
+            ...(gesture ? { gesture } : {}),
           },
         }
       })
@@ -683,27 +717,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       else badSince ??= now
       return { rtt: lastRtt, unstable: badSince !== null && now - badSince >= UNSTABLE_AFTER_MS }
     },
-    order(racers) {
-      const count = track.gates.length
-      const latest = remotes.latest()
-      const progress = (racer: KartRacer): number => {
-        if (racer.seat === seat)
-          return raceProgress(track, own.crossings, own.nextGate, own.x, own.z)
-        const frame = latest.get(racer.seat)
-        if (!frame || frame.nextGate >= count) return racer.lapMs.length * count
-        return raceProgress(track, frame.crossings, frame.nextGate, frame.x, frame.z)
-      }
-      const finished = racers
-        .filter((racer) => racer.finishMs !== null)
-        .sort((a, b) => (a.finishMs as number) - (b.finishMs as number))
-      const racing = racers
-        .filter((racer) => racer.finishMs === null && !racer.out)
-        .map((racer) => ({ racer, at: progress(racer) }))
-        .sort((a, b) => b.at - a.at)
-        .map(({ racer }) => racer)
-      const out = racers.filter((racer) => racer.finishMs === null && racer.out)
-      return [...finished, ...racing, ...out].map((racer) => racer.seat)
-    },
+    order: orderOf,
     stop() {
       stopListening()
       for (const timer of timers) clearTimeout(timer)

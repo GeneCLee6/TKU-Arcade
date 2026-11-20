@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.45): the six items of the second round as the room judges them
+// 2026-11-20 (docs/ARCHITECTURE.md §4.48): the six items of the second round as the room judges them
 // (a mirror, sea fog, a skip, static, a rally flag, a fake box), how they meet the bubble and the
 // other items, the draw (the leader never gets one that reaches the kart in front, the rally only
 // in a team race, luck), and the item series' perks, read by the room from the kart a frame names.

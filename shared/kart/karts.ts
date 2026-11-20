@@ -36,7 +36,7 @@
 // vehicle then scales it with a line in `KIND_TRAITS` (every bike) or in its own `traits` (one
 // machine), and nothing in the technique's code knows about vehicles.
 //
-// 2026-11-20 (docs/ARCHITECTURE.md §4.45): a sixth series, built for the item race (`item`). Its
+// 2026-11-20 (docs/ARCHITECTURE.md §4.48): a sixth series, built for the item race (`item`). Its
 // machines spend points of the same budget on how they do with items instead of on driving
 // (`ItemPoints`): more often a strong item, their own items lasting longer, a bubble that stops a
 // second hit. So in a race without items they are simply a little slower everywhere: the trade is

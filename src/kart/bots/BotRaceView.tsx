@@ -25,6 +25,7 @@ import { botSeats, createBotRace } from './botRace.ts'
 import { createLocalRoom } from './localRoom.ts'
 import { drawBots, type BotEntry } from './roster.ts'
 import { botTrackId, type BotSetup } from './setup.ts'
+import { useMenuMusic } from '../audio/useMenuMusic.ts'
 
 registerMessages(KART_MESSAGES)
 
@@ -50,6 +51,8 @@ export interface BotRaceViewProps {
 }
 
 export default function BotRaceView({ setup, onMenu, cup }: BotRaceViewProps) {
+  // 2026-11-20 (§4.46): the quiet song on the results; the race claims the music over it
+  useMenuMusic()
   // A new round is a new room and new bots
   const [round, setRound] = useState(0)
   return (

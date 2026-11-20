@@ -9,6 +9,7 @@ import { monoType } from '../../styles/esports.ts'
 import { color, space } from '../../styles/tokens.ts'
 import { cutClip } from '../ui/broadcast.ts'
 import { createPreviewStage, type PreviewStage } from './previewStage.ts'
+import type { DriverGesture } from '../driverGestures.ts'
 
 export interface KartPreviewProps {
   kart: KartId
@@ -17,9 +18,21 @@ export interface KartPreviewProps {
   label: string
   hint: string
   morphLabel: string
+  /**
+   * 2026-11-20 (§4.47): the driver does this, standing (the Grand Prix's podium): no hint, no N2O
+   * switch, and it scrolls with the page
+   */
+  pose?: DriverGesture
 }
 
-export default function KartPreview({ kart, driver, label, hint, morphLabel }: KartPreviewProps) {
+export default function KartPreview({
+  kart,
+  driver,
+  label,
+  hint,
+  morphLabel,
+  pose,
+}: KartPreviewProps) {
   const holder = useRef<HTMLDivElement>(null)
   const stage = useRef<PreviewStage | null>(null)
   const [missing, setMissing] = useState(false)
@@ -39,23 +52,28 @@ export default function KartPreview({ kart, driver, label, hint, morphLabel }: K
   useEffect(() => stage.current?.show(kart, driver), [kart, driver])
   useEffect(() => stage.current?.label(label), [label])
   useEffect(() => stage.current?.boost(open), [open])
+  useEffect(() => stage.current?.pose(pose), [pose])
 
   if (missing) return null
   return (
-    <Frame data-testid="kart-preview" data-kart={kart} data-open={open}>
+    <Frame data-testid="kart-preview" data-kart={kart} data-open={open} data-pose={pose} $still={!!pose}>
       <Holder ref={holder} />
-      <Hint aria-hidden="true">{hint}</Hint>
-      <Morph type="button" aria-pressed={open} onClick={() => setOpen((was) => !was)}>
-        {morphLabel}
-      </Morph>
+      {!pose && (
+        <>
+          <Hint aria-hidden="true">{hint}</Hint>
+          <Morph type="button" aria-pressed={open} onClick={() => setOpen((was) => !was)}>
+            {morphLabel}
+          </Morph>
+        </>
+      )}
     </Frame>
   )
 }
 
 // It stays in sight while the cards under it scroll, so that a pick is seen at once; not on a
 // screen too short to spare the room (a phone on its side)
-const Frame = styled.div`
-  position: sticky;
+const Frame = styled.div<{ $still: boolean }>`
+  position: ${({ $still }) => ($still ? 'relative' : 'sticky')};
   top: 0;
   z-index: 1;
   height: clamp(130px, 26vh, 220px);

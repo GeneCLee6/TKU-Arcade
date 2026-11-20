@@ -11,7 +11,7 @@
 //
 // A hit stuns the kart (itemEffects.ts's `stunStep`). A bubble up stops the hit, and both are gone.
 //
-// 2026-11-20 (docs/ARCHITECTURE.md §4.45), two more:
+// 2026-11-20 (docs/ARCHITECTURE.md §4.48), two more:
 //
 //   fog     Sea Fog       a bank of fog laid on the road ahead of the kart in front; it lies a while,
 //                         and every kart but its owner that drives in is fogged for a moment (its

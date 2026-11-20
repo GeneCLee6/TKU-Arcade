@@ -102,6 +102,12 @@ import type { KartLook } from './art/kartModel.ts'
 import type { HitBurst, ItemCue } from './hitFx.ts'
 import type { ShotItem } from '../../shared/kart/shots.ts'
 import type { TouchSource } from './touch/touchSource.ts'
+import { claimMusic } from './audio/musicPlayer.ts'
+import { sectionFor } from './audio/sequencer.ts'
+import { songFor } from './audio/songs.ts'
+import { createAmbience } from './audio/ambiencePlayer.ts'
+import { isNightTrack } from './art/trackArt.ts'
+import { gestureAt, type DriverGesture } from './driverGestures.ts'
 
 const STATS_EVERY_MS = 500
 
@@ -337,6 +343,10 @@ export interface SpikeDebug {
   /** On a track: finish line crossings and the next gate (e8-t04) */
   crossings: number
   nextGate: number
+  /** 2026-11-20 (§4.46): the song and its part asked for this frame, `song:section` */
+  music?: string
+  /** 2026-11-20 (§4.47), for looking at the drivers: this driver does this whatever the race says */
+  gesture?: DriverGesture | null
   /**
    * 2026-11-18, for looking at the effects (a screenshot, a curious owner): draws the kart as if a
    * boost of this kind ran, whatever the physics says. Looks only; null or left out, nothing
@@ -380,6 +390,8 @@ export interface SpikeNet {
    * the whole grid in view (director.ts)
    */
   readonly gridSpots?: () => readonly Spot[]
+  /** 2026-11-20 (§4.47): this kart's place now, 1 for the lead: a place gained, a fist in the air */
+  readonly place?: () => number
   /** After each step: the race so far, the input it ran with, and whether the kart was reset */
   afterStep(trial: Trial, input: KartInput, reset: boolean): void
   /** The other karts as drawn now, to bump into (e9-t09) */
@@ -558,6 +570,22 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     options.driver,
   )
   const audio = createKartAudio()
+  // 2026-11-20 (§4.46): the track's song, by the race's part, and the world around the track
+  const music = claimMusic(true)
+  const song = songFor(track)
+  const finishLine = track?.gates[0]
+  const ambience =
+    track && finishLine
+      ? createAmbience(
+          track,
+          { x: (finishLine.ax + finishLine.bx) / 2, z: (finishLine.az + finishLine.bz) / 2 },
+          isNightTrack(track),
+        )
+      : null
+  let crossingsHeard = 0
+  // §4.47: this kart's place as last seen, and when it last went up (the driver punches the air)
+  let lastPlace = 0
+  let placeUpAt = -Infinity
   const held = new Set<string>()
   // A boost or reset key pressed and let go between two steps still counts
   let boostTapped = false
@@ -837,6 +865,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       burstPower,
       skid,
       ...(trialCourse?.terrain ? { airborne, landings } : {}),
+      ...ownGesture(now),
     }
     const pose = poseBetween(previous, current, clock.alpha)
     const hitFrame = net?.fx?.(pose)
@@ -907,6 +936,20 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       boosting,
       skid,
     })
+    const totalLaps = trialCourse?.checkpoints.laps ?? track?.laps ?? 1
+    const section = sectionFor({
+      phase: trial?.phase ?? 'none',
+      finalLap: !!trial && totalLaps > 1 && currentLap(trial) === totalLaps,
+      celebrating: finishedAt !== null && now - finishedAt < CELEBRATE_SECONDS * 1000,
+    })
+    // After the finish's show (the results), and off a track, the quiet song
+    const playing = section === 'menu' ? 'lounge' : song
+    music.set({ song: playing, section, boosting })
+    debug.music = `${playing}:${section}`
+    ambience?.update(pose.x, pose.z)
+    // The crowd roars as the kart crosses the line
+    if (run.crossings > crossingsHeard && trial?.phase !== 'countdown') ambience?.cheer()
+    crossingsHeard = run.crossings
     if (callout) options.onCallout(callout)
 
     const hud: SpikeHud = {
@@ -1005,12 +1048,30 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     }
   }
 
+  /** §4.47: what this kart's driver does besides drive, by the race's moment */
+  function ownGesture(now: number): { gesture?: DriverGesture } {
+    if (debug.gesture) return { gesture: debug.gesture }
+    if (trial?.phase === 'racing' && net?.place) {
+      const place = net.place()
+      if (lastPlace > 0 && place > 0 && place < lastPlace) placeUpAt = now
+      lastPlace = place
+    }
+    const gesture = gestureAt({
+      toGo: trial?.phase === 'countdown' ? (net ? net.countdown() : trial.countdown) : null,
+      sinceFinish: finishedAt === null ? null : (now - finishedAt) / 1000,
+      sincePlaceUp: (now - placeUpAt) / 1000,
+    })
+    return gesture ? { gesture } : {}
+  }
+
   // A driving key must not also press the focused button (Space) or scroll the page (arrows)
   const ownsKey = (code: string, bindings: Bindings) =>
     isBoundKey(bindings, code) || code.startsWith('Arrow')
 
   // §4.43: any key or touch skips the fly round on this screen (GO stays the room's)
   const skip = () => {
+    // A tap is a gesture too: the sound may start (a phone has no keys)
+    audio.unlock()
     if (trial?.phase === 'countdown') skipped = true
   }
   const onKeyDown = (event: KeyboardEvent) => {
@@ -1067,6 +1128,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     scene.canvas.removeEventListener('webglcontextlost', onContextLost)
     scene.dispose()
     audio.dispose()
+    music.release()
+    ambience?.dispose()
   }
   const onContextLost = () => {
     stop()
