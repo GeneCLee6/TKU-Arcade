@@ -51,10 +51,10 @@ test('a track laid in the editor, shared and driven in a time trial', async ({ p
   await expect(page.getByTestId('kart-course').locator('option:checked')).toHaveText('Test Loop')
   await expect(page.getByTestId('kart-minimap')).toBeVisible()
   await expect(page.getByTestId('kart-results')).toBeVisible({ timeout: 240_000 })
-  // The best run is kept under the track's hash and the physics' revision (CUSTOM_REVISION), as a
-  // ghost to race next time
+  // The best run is kept under the track's hash and the physics' revision (CUSTOM_REVISION). Since
+  // §4.40 localStorage keeps the record and IndexedDB the ghost
   const keys = await page.evaluate(() => Object.keys(localStorage))
-  expect(keys.some((key) => /^tku-arcade\.kart\.ghost\.custom-[a-z0-9]+@\d+$/.test(key))).toBe(true)
+  expect(keys.some((key) => /^tku-arcade\.kart\.bestRun\.custom-[a-z0-9]+@\d+$/.test(key))).toBe(true)
 })
 
 test('a race room on a track from the editor: pasted by the host, raced by two', async ({

@@ -24,6 +24,7 @@ import type { MessageParams } from '../i18n/t.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
 import { keyLabel, padLabel, readGamepad } from './devices.ts'
 import { VolumeSliders } from './audio/VolumeSliders.tsx'
+import { CoachSwitch } from './school/CoachTip.tsx'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -266,6 +267,8 @@ export const ControlsPanel = memo(function ControlsPanel({
           />
           {t('kart.controls.chainBoosts')}
         </label>
+        {/* 2026-11-20 (§4.49): the tips during a race */}
+        <CoachSwitch t={t} />
       </Rules>
       <VolumeSliders t={t} />
     </Panel>

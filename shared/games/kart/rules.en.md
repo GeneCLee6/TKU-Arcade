@@ -17,6 +17,8 @@ A 3D kart race in the browser for 1 to 8 karts: friends in one room, computer ka
 
 The controls panel on the Kart page lists the keys, the gamepad buttons and the touch buttons, and lets you change them.
 
+**Driving school**: the Kart page's menu has ten short lessons, one technique each, from the first lap to the drift jump: the drift, the instant boost, perfect timing, the combo, N2O, the perfect start, the drift jump, the gates and a final test. Each shows your own keys, says what went wrong when a try fails, and can be tried again or skipped; a pass earns one to three stars. During a race, a short tip comes once for a technique you have not used yet (it can be turned off in the controls panel).
+
 ## Advanced techniques
 
 Some tracks (**Wharf Warehouses**, **Hillside Lanes**, **Viaduct Works**) have to be learnt by heart: the road everyone sees is the long way round, and the short way asks for one of these. On some the short way is a road of its own, a **branch** that leaves the road and joins it again further on: its checkpoints count the same, and a reset on it puts you back on it.

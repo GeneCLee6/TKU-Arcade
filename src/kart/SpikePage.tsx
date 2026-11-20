@@ -54,6 +54,10 @@ import { loadGhostPick, saveGhostPick, type GhostPick } from './records.ts'
 import { TouchControls } from './touch/TouchControls.tsx'
 import { useTouchControls } from './touch/useTouchControls.ts'
 import { touchBottom, touchCorner, touchSpace } from './touch/touchLayout.ts'
+import { broadcastSolid } from './ui/broadcast.ts'
+import { CoachTip } from './school/CoachTip.tsx'
+import { useCoach } from './school/useCoach.ts'
+import { answerInvite, shouldInvite } from './school/store.ts'
 
 registerMessages(KART_MESSAGES)
 
@@ -106,12 +110,15 @@ export function SpikePage({
   play = false,
   onBotRace,
   onCup,
+  onSchool,
 }: {
   play?: boolean
   /** 2026-11-17: /kart's menu starts a race against the computer with these settings */
   onBotRace?: (setup: BotSetup) => void
   /** 2026-11-17: /kart's menu starts or continues a Grand Prix (src/kart/cup/) */
   onCup?: (run: CupRun) => void
+  /** 2026-11-20 (§4.49): /kart's menu opens the driving school (src/kart/school/) */
+  onSchool?: () => void
 } = {}) {
   const t: (key: KartMessageKey, params?: MessageParams) => string = useT()
   const stage = useRef<HTMLDivElement>(null)
@@ -184,6 +191,10 @@ export function SpikePage({
   const menuId = useId()
   // 2026-11-17: folded on every screen, so that nothing covers the kart and what it leaves behind
   const [helpOpen, setHelpOpen] = useState(false)
+  // 2026-11-20 (§4.49): a tip for a technique not yet used, and, the first time here, the school
+  const coach = useCoach()
+  const coachStep = coach.onStep
+  const [invite, setInvite] = useState(() => !!onSchool && !autopiloted && shouldInvite())
 
   useEffect(() => {
     if (!stage.current) return
@@ -213,12 +224,13 @@ export function SpikePage({
           race.current = handle
         },
         touch: touchSource,
+        ...(autopiloted ? {} : { onStep: (step) => coachStep(step, controls.current.tuning) }),
       })
     } catch {
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, track, autopiloted, pilot, quality, body, driver, ghostPick, touchSource])
+  }, [course, track, autopiloted, pilot, quality, body, driver, ghostPick, touchSource, coachStep])
 
   const switchCourse = (next: PlayCourse) => {
     const url = new URL(window.location.href)
@@ -403,6 +415,18 @@ export function SpikePage({
           {t('kart.spike.menu')}
         </MenuButton>
         <Buttons id={menuId} $open={menuOpen}>
+          {onSchool && (
+            <Button
+              $size="sm"
+              onClick={() => {
+                answerInvite()
+                onSchool()
+              }}
+              data-testid="kart-school-open"
+            >
+              {t('kart.school.open')}
+            </Button>
+          )}
           {onBotRace && (
             <Button
               ref={botsOpener}
@@ -537,6 +561,35 @@ export function SpikePage({
         <WallFlash key={`hit-${hud.hits}`} aria-hidden="true" data-testid="kart-wall-flash" />
       )}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
+      <CoachTip t={t} coach={coach} bindings={bindings} touch={touch.shown} />
+      {invite && onSchool && (
+        <Invite role="region" aria-label={t('kart.school.open')} data-testid="kart-school-invite">
+          <p>{t('kart.school.invite')}</p>
+          <InviteButtons>
+            <Button
+              $size="sm"
+              onClick={() => {
+                answerInvite()
+                onSchool()
+              }}
+              data-testid="kart-school-invite-go"
+            >
+              {t('kart.school.inviteGo')}
+            </Button>
+            <Button
+              $size="sm"
+              $variant="secondary"
+              onClick={() => {
+                answerInvite()
+                setInvite(false)
+              }}
+              data-testid="kart-school-invite-no"
+            >
+              {t('kart.school.inviteNo')}
+            </Button>
+          </InviteButtons>
+        </Invite>
+      )}
       {track && (
         <MapCorner $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}>
           {trial && <RaceClock ref={clock} t={t} trial={trial} />}
@@ -656,6 +709,39 @@ const WallFlash = styled.div`
   box-shadow: inset 0 0 64px ${color.danger};
   opacity: 0;
   animation: ${flash} 0.5s ease-out;
+`
+
+// 2026-11-20 (§4.49): under the top row on the left, clear of the map and the HUD
+const Invite = styled.section`
+  ${broadcastSolid}
+  /* Under the top row's open menu (its z-index), over the race */
+  position: absolute;
+  top: 64px;
+  left: ${space.sm}px;
+  display: grid;
+  gap: ${space.sm}px;
+  width: min(340px, calc(100% - ${2 * space.sm}px));
+  padding: ${space.sm}px ${space.md}px;
+  color: ${color.text};
+  font-size: ${fontSize.sm}px;
+
+  p {
+    margin: 0;
+  }
+
+  /* A phone held sideways: the map and the clock have the left; the invite goes top centre */
+  @media (max-height: 500px) {
+    top: ${space.sm}px;
+    left: 50%;
+    translate: -50% 0;
+    width: min(340px, calc(100% - 320px));
+  }
+`
+
+const InviteButtons = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${space.sm}px;
 `
 
 const BadLink = styled.p`
