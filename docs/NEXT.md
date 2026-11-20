@@ -345,10 +345,10 @@
   - **要擁有者做的**：見 §2 的三列（`STATS_KEY` 若還沒設、`CF_ANALYTICS_TOKEN`＋`CF_ACCOUNT_ID`、警示管道）。
 
 - **`e12-t06` 濫用防護提前完成（2026-11-20，擁有者要求「其他沒完成的也開多 agent 一起做」；F3 的另一半，不需要帳號）**：AC-12.5 勾了。細節與數字在 `docs/SECURITY.md` §6、§7、§9。
-  - **跨 instance 的速率**：Cloudflare Rate Limiting binding（`wrangler.jsonc` 的 `ratelimits`，免費方案可用，同一個 Cloudflare 機房的所有 instance 共用計數；正式站與預覽用不同 namespace）。key 是位址的雜湊（`worker/address.ts`：`CF-Connecting-IP`，IPv6 取 /64，SHA-256 前 16 個十六進位字），**完整位址不存、不記**。建房每位址每分鐘 **5 間**（原本每 instance 30 間的記憶體限制留著當第一道）；WebSocket 升級每位址每分鐘 **120 次**（超過時接受再以 **4429** 關閉，頁面說「你所在的網路目前連線太多」，有重試鈕）；本機（127.0.0.1／::1）不經 binding，`npm run dev` 與瀏覽器測試不受影響。binding 壞掉時放行（fail open）。
+  - **跨 instance 的速率**：Durable Object `LimiterDO`（`worker/limiter.ts`，DO migration `v2`），依位址雜湊的第一個字分 16 片，固定視窗只在記憶體、不寫儲存。key 是位址的雜湊（`worker/address.ts`：`CF-Connecting-IP`，IPv6 取 /64，SHA-256 前 16 個十六進位字），**完整位址不存、不記**。建房每位址每分鐘 **5 間**（原本每 instance 30 間的記憶體限制留著當第一道）；WebSocket 升級每位址每分鐘 **120 次**（超過時接受再以 **4429** 關閉，頁面說「你所在的網路目前連線太多」，有重試鈕）；本機（127.0.0.1／::1）不經 LimiterDO，`npm run dev` 與瀏覽器測試不受影響。LimiterDO 出錯時放行（fail open）。**先試過 Cloudflare 的 Rate Limiting binding（`ratelimits`）**：部署成功、預覽站日誌看到每次都回 `success: true`（同一個 key 連 25 次），在這個帳號上沒有作用，所以換成 DO（多一次 DO 請求，算進免費額度的每日 10 萬次）。
   - **連線上限**：每房每位址最多 **24 條**（`MAX_CONNECTIONS_PER_ADDRESS`，含旁觀；Worker 把位址雜湊放在 `x-tku-address` 交給 RoomDO，瀏覽器送的同名標頭會被覆蓋），超過 4429；每房總數維持 72 條／64 人。
   - **暱稱**：`normalizeName` 另外濾掉零寬、方向標記、韓文與點字空白、BOM、tag 字元（emoji 的 ZWJ 保留），全形空白變半形；`shared/nickname.ts` 擋冒充（`房主`、`管理員`、`系統`、`admin`、`system`、`host`…）與基本中英文髒話，清單在 `shared/nickname-words.ts`（英文冒充詞要整個名字只剩那個字才擋：`Badminton`、`Ghostface`、`幹部` 都過）。表單邊打邊提示；伺服器在 `join` 再檢查（不過就是協定錯誤，正常頁面送不出這種名字）。存在 localStorage 的舊暱稱不合規時會重新問。
-  - **管理頁**：金鑰比對改成連長度都不洩漏；同一位址錯 5 次（binding 或單一 instance 的記憶體計數）之後一分鐘內一律 429，連對的金鑰也一樣，`/stats` 顯示「金鑰錯太多次了」；金鑰只走 `Authorization` 標頭、不進網址、不寫日誌。
+  - **管理頁**：金鑰比對改成連長度都不洩漏；同一位址錯 5 次（LimiterDO 或單一 instance 的記憶體計數）之後一分鐘內一律 429，連對的金鑰也一樣，`/stats` 顯示「金鑰錯太多次了」；金鑰只走 `Authorization` 標頭、不進網址、不寫日誌。
   - **聊天**：B4 就有（每人每 10 秒 10 則、500 字）；遊戲內的文字（撞詞、搭橋的提示，光譜的答案）由規則限長度、每輪只能送一次，不另外限速率；卡丁車編輯器的分享碼只在瀏覽器裡解析。
   - **首屏**：主站 98.6 → 99.7 kB（上限 103），陞官圖 139.9 → 141.0 kB、完整版 141.7 → 142.9 kB（上限 150，`warn`）：暱稱檢查與清單跟著暱稱表單進首屏。
 
@@ -378,7 +378,7 @@
 | 成本儀表板的資料（P1）：建一把只有 Account Analytics 讀取權限的 Cloudflare API token，設正式站 secret `CF_ANALYTICS_TOKEN` 與 `CF_ACCOUNT_ID`；`/stats` 要 `STATS_KEY`（I4 起，若還沒設） | 盡快（AC-12.4 等這個才勾） | 步驟在 `DEPLOY.md` §13.1；設好後看 `/stats` 最下面每列都有數字 |
 | 80% 警示要送到哪（P1）：目前只寫 D1＋儀表板紅字＋日誌 | 不急 | 最簡單是 Discord 頻道的 webhook，設 secret `ALERT_WEBHOOK_URL`（`DEPLOY.md` §13.2）；要 email 得接 Cloudflare Email Routing，另開小 PR |
 | 用付費方案嗎（P1） | 改方案時 | 改了就設 var `COST_PLAN=paid`，儀表板改對照每月內含量 |
-| 濫用防護的數字（`e12-t06`）：PRD 寫「每房連線上限 16」，實作沿用 B4 的每房 72 條／64 人（旁觀很多時不會被擋），另加每房每位址 24 條；建房每位址每分鐘 5 間（同一個校園 Wi-Fi 共用位址時，一分鐘內第 6 間會被擋）；暱稱清單 `shared/nickname-words.ts` 要不要增刪 | 不急 | 數字在 `shared/protocol.ts` 與 `wrangler.jsonc`，改一行；Cloudflare 後台**不用設定**任何東西 |
+| 濫用防護的數字（`e12-t06`）：PRD 寫「每房連線上限 16」，實作沿用 B4 的每房 72 條／64 人（旁觀很多時不會被擋），另加每房每位址 24 條；建房每位址每分鐘 5 間（同一個校園 Wi-Fi 共用位址時，一分鐘內第 6 間會被擋）；暱稱清單 `shared/nickname-words.ts` 要不要增刪 | 不急 | 數字在 `shared/protocol.ts` 與 `worker/rate-limit.ts` 的 `SHARED_LIMITS`，改一行；Cloudflare 後台**不用設定**任何東西 |
 
 ## 3. 工作方式（每批）
 

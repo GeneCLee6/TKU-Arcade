@@ -8,6 +8,7 @@ import type { LobbyResponse } from '../shared/protocol.ts'
 import { handleAuth, isAuthPath } from './auth.ts'
 import { handleClientError } from './errors.ts'
 import { LOBBY_NAME } from './lobby-board.ts'
+import type { LimiterDO } from './limiter.ts'
 import type { LobbyDO } from './lobby.ts'
 import type { RoomDO } from './room.ts'
 import { handleRoomCode, handleRooms, handleRoomSocket } from './rooms.ts'
@@ -51,13 +52,11 @@ export interface Env {
   /** Which allowances the dashboard measures against: `free` (the default) or `paid` (a var) */
   COST_PLAN?: string
   /**
-   * Rate limits shared by every Worker instance in a Cloudflare location (e12-t06, wrangler
-   * `ratelimits`, docs/SECURITY.md §6), keyed by a hashed address (worker/address.ts): new rooms,
-   * WebSocket upgrades, and wrong owner keys. Without them only the per-instance limits apply
+   * The abuse limits shared by every Worker instance (e12-t06, worker/limiter.ts, docs/SECURITY.md
+   * §6), keyed by a hashed address (worker/address.ts): new rooms, WebSocket upgrades, and wrong
+   * owner keys. Without it only the per-instance limits apply
    */
-  ROOM_CREATE_LIMIT?: RateLimit
-  SOCKET_LIMIT?: RateLimit
-  OWNER_FAIL_LIMIT?: RateLimit
+  LIMITER?: DurableObjectNamespace<LimiterDO>
   /** Optional: where a new 80% alert is also posted as JSON (a Discord or Slack webhook; a secret) */
   ALERT_WEBHOOK_URL?: string
 }

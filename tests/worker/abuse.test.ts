@@ -1,5 +1,5 @@
-// e12-t06 (AC-12.5): the abuse limits. New rooms and WebSocket upgrades through the shared rate
-// limiters, sockets per address in a room, the nickname check, and the owner key's lockout. The
+// e12-t06 (AC-12.5): the abuse limits. New rooms and WebSocket upgrades through the shared
+// LimiterDO, sockets per address in a room, the nickname check, and the owner key's lockout. The
 // per-instance limit and the security headers are security.test.ts; chat's rate, room-host.test.ts.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { acceptableName, nameIssue, nameProblem } from '../../shared/nickname.ts'
@@ -24,16 +24,27 @@ import { RoomHost } from '../../worker/room-host.ts'
 import { handleRooms, handleRoomSocket } from '../../worker/rooms.ts'
 import { newRoomId } from '../../shared/room-id.ts'
 
-/** A Rate Limiting binding that allows `limit` takes per key, and records the keys */
-function fakeLimiter(limit: number) {
+/**
+ * The LIMITER namespace: one stand-in object per shard name, each counting takes per bucket and key
+ * against the limit it is given, or against `cap` when that is lower. Records the shards and keys
+ */
+function fakeLimiter(cap = Number.POSITIVE_INFINITY) {
   const counts = new Map<string, number>()
+  const shards: string[] = []
+  const take = vi.fn(async (bucket: string, key: string, limit: number) => {
+    const count = (counts.get(`${bucket}:${key}`) ?? 0) + 1
+    counts.set(`${bucket}:${key}`, count)
+    return count <= Math.min(limit, cap)
+  })
   return {
     counts,
-    limit: vi.fn(async ({ key }: { key: string }) => {
-      const count = (counts.get(key) ?? 0) + 1
-      counts.set(key, count)
-      return { success: count <= limit }
-    }),
+    shards,
+    take,
+    idFromName: (name: string) => {
+      shards.push(name)
+      return name as unknown as DurableObjectId
+    },
+    get: () => ({ take }),
   }
 }
 
@@ -64,12 +75,22 @@ describe('addresses', () => {
 })
 
 describe('the shared limiter', () => {
-  it('lets everything through without a binding, or when the binding fails', async () => {
-    expect(await takeShared(undefined, 'k')).toBe(true)
-    const broken = { limit: vi.fn(async () => Promise.reject(new Error('down'))) }
+  it('lets everything through without a binding, or when the limiter fails', async () => {
+    expect(await takeShared(undefined, 'create', 'k')).toBe(true)
+    const broken = {
+      idFromName: (name: string) => name as unknown as DurableObjectId,
+      get: () => ({ take: async () => Promise.reject(new Error('down')) }),
+    }
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(await takeShared(broken, 'k')).toBe(true)
+    expect(await takeShared(broken, 'create', 'k')).toBe(true)
     spy.mockRestore()
+  })
+
+  it('asks the shard of the key’s first character, with the bucket’s own limit', async () => {
+    const limiter = fakeLimiter()
+    await takeShared(limiter, 'socket', 'a1b2')
+    expect(limiter.shards).toEqual(['limiter-a'])
+    expect(limiter.take).toHaveBeenCalledWith('socket', 'a1b2', 120)
   })
 })
 
@@ -82,9 +103,9 @@ describe('new rooms across instances', () => {
     })
   const url = new URL('https://x/api/rooms')
 
-  it('are 5 a minute per address through ROOM_CREATE_LIMIT, keyed by the hash', async () => {
-    const limiter = fakeLimiter(5)
-    const env = { ROOM_CREATE_LIMIT: limiter } as unknown as Env
+  it('are 5 a minute per address through the LimiterDO, keyed by the hash', async () => {
+    const limiter = fakeLimiter()
+    const env = { LIMITER: limiter } as unknown as Env
     const limit = new FixedWindowLimit(30, 600)
     const statuses: number[] = []
     for (let i = 0; i < 6; i++) {
@@ -92,17 +113,17 @@ describe('new rooms across instances', () => {
     }
     // An unknown game gets as far as the body: 400; the sixth not even that
     expect(statuses).toEqual([400, 400, 400, 400, 400, 429])
-    expect([...limiter.counts.keys()]).toEqual([await addressKey('198.51.100.7')])
+    expect([...limiter.counts.keys()]).toEqual([`create:${await addressKey('198.51.100.7')}`])
     // Someone else is not held up
     expect((await handleRooms(post('198.51.100.8'), env, url, limit, 7)).status).toBe(400)
   })
 
   it('are not counted by the binding from loopback (npm run dev, browser tests)', async () => {
     const limiter = fakeLimiter(0)
-    const env = { ROOM_CREATE_LIMIT: limiter } as unknown as Env
+    const env = { LIMITER: limiter } as unknown as Env
     const limit = new FixedWindowLimit(30, 600)
     expect((await handleRooms(post('127.0.0.1'), env, url, limit, 0)).status).toBe(400)
-    expect(limiter.limit).not.toHaveBeenCalled()
+    expect(limiter.take).not.toHaveBeenCalled()
   })
 })
 
@@ -132,7 +153,7 @@ describe('WebSocket upgrades across instances', () => {
       return new Response('upgraded')
     })
     const env = {
-      SOCKET_LIMIT: fakeLimiter(limit),
+      LIMITER: fakeLimiter(limit),
       ROOM: { idFromName: (name: string) => name, get: () => ({ fetch }) },
     } as unknown as Env
     return { env, fetch }
@@ -149,7 +170,7 @@ describe('WebSocket upgrades across instances', () => {
     expect(forwarded.headers.get(ADDRESS_HEADER)).toBe(await addressKey('198.51.100.7'))
   })
 
-  it('past SOCKET_LIMIT are closed with tooManyConnections, without waking the room', async () => {
+  it('past the shared limit are closed with tooManyConnections, without waking the room', async () => {
     const { env, fetch } = setup(1)
     const url = new URL(upgrade().url)
     expect(await (await handleRoomSocket(upgrade(), env, url)).text()).toBe('upgraded')
@@ -314,16 +335,16 @@ describe('the owner key', () => {
     expect(await ownerRefusal(ask(KEY), env, ['GET'], 60_011)).toBeNull()
   })
 
-  it('locks out at once when OWNER_FAIL_LIMIT says so (wrong keys seen by other instances)', async () => {
-    const shared = { ...env, OWNER_FAIL_LIMIT: fakeLimiter(0) } as unknown as Env
+  it('locks out at once when the LimiterDO says so (wrong keys seen by other instances)', async () => {
+    const shared = { ...env, LIMITER: fakeLimiter(0) } as unknown as Env
     expect((await ownerRefusal(ask('wrong'), shared, ['GET'], 0))?.status).toBe(429)
     expect((await ownerRefusal(ask(KEY), shared, ['GET'], 1))?.status).toBe(429)
   })
 
   it('never counts the right key', async () => {
     const limiter = fakeLimiter(0)
-    const shared = { ...env, OWNER_FAIL_LIMIT: limiter } as unknown as Env
+    const shared = { ...env, LIMITER: limiter } as unknown as Env
     expect(await ownerRefusal(ask(KEY), shared)).toBeNull()
-    expect(limiter.limit).not.toHaveBeenCalled()
+    expect(limiter.take).not.toHaveBeenCalled()
   })
 })

@@ -26,8 +26,8 @@ const CODE_ATTEMPTS = 12
 
 /**
  * New rooms one address may open a minute, per Worker instance (e12-t13): a first, free check in
- * memory, before the one shared by every instance (the ROOM_CREATE_LIMIT binding, 5 a minute,
- * e12-t06, wrangler.jsonc), and the only one where that binding is missing
+ * memory, before the one shared by every instance (LimiterDO, 5 a minute, e12-t06), and the only
+ * one where that binding is missing
  */
 const CREATES_PER_ADDRESS = 30
 /** New rooms one Worker instance opens a minute, whoever asks */
@@ -104,7 +104,7 @@ export async function handleRooms(
     const key = await addressKey(address)
     // Local development (npm run dev, the browser tests) opens many rooms from one machine
     const shared = address === null || !isLoopback(address)
-    if (!limit.take(key, now) || (shared && !(await takeShared(env.ROOM_CREATE_LIMIT, key)))) {
+    if (!limit.take(key, now) || (shared && !(await takeShared(env.LIMITER, 'create', key)))) {
       return fail('rate_limited', 429, { 'retry-after': '60' })
     }
     return createRoom(request, env)
@@ -191,7 +191,7 @@ export async function handleRoomSocket(request: Request, env: Env, url: URL): Pr
   // would keep retrying
   const address = clientAddress(request)
   const key = await addressKey(address)
-  if ((address === null || !isLoopback(address)) && !(await takeShared(env.SOCKET_LIMIT, key))) {
+  if ((address === null || !isLoopback(address)) && !(await takeShared(env.LIMITER, 'socket', key))) {
     return refuseSocket(CloseCode.tooManyConnections, 'too many connections')
   }
   // Who the session says this is (e1-t13): the room takes a signed-in person's name from here, not

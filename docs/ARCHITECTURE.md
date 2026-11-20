@@ -63,7 +63,8 @@ worker/
   lobby.ts              LobbyDO（邏輯在 lobby-board.ts）
   errors.ts             POST /api/errors：大小與速率上限，寫進 Worker 日誌
   address.ts            位址雜湊（IPv6 取 /64、SHA-256），濫用防護的 key（e12-t06，docs/SECURITY.md §6）
-  rate-limit.ts         每 instance 的固定視窗＋Cloudflare Rate Limiting binding（建房、WebSocket 升級、擁有者金鑰）
+  rate-limit.ts         每 instance 的固定視窗；SHARED_LIMITS 與 takeShared（建房、WebSocket 升級、擁有者金鑰）
+  limiter.ts            LimiterDO：跨 instance 的濫用限制，依位址雜湊第一個字分 16 片、只在記憶體（e12-t06）
   backup.ts             每日 cron：D1 匯出到 R2（DEPLOY.md §10）
   room.ts               RoomDO（引擎與 realtime 分檔：room-turn.ts、room-realtime.ts）
   auth.ts               token 驗簽、session

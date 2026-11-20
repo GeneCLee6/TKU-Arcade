@@ -66,7 +66,7 @@ export async function ownerRefusal(
   if (until !== undefined) lockedOut.delete(address)
   const given = /^Bearer (.+)$/.exec(request.headers.get('authorization') ?? '')?.[1] ?? ''
   if (sameKey(given, key)) return null
-  if (!failures.take(address, now) || !(await takeShared(env.OWNER_FAIL_LIMIT, address))) {
+  if (!failures.take(address, now) || !(await takeShared(env.LIMITER, 'ownerFail', address))) {
     if (lockedOut.size >= MAX_LOCKED) lockedOut.delete(lockedOut.keys().next().value as string)
     lockedOut.set(address, now + LOCKOUT_MS)
     return tooMany()

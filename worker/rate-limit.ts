@@ -35,18 +35,44 @@ export class FixedWindowLimit {
   }
 }
 
+/** What each shared bucket allows one address a minute (e12-t06, docs/SECURITY.md §6) */
+export const SHARED_LIMITS = {
+  /** New rooms (POST /api/rooms); the PRD's 5 */
+  create: 5,
+  /** WebSocket upgrades (/ws/<id>): every one wakes a room, also one that is not there */
+  socket: 120,
+  /** Wrong owner keys, after which the address is locked out for a minute (worker/owner.ts) */
+  ownerFail: 5,
+} as const
+
+export type SharedBucket = keyof typeof SHARED_LIMITS
+
+/** The part of a shared limiter the Worker uses: worker/limiter.ts `LimiterDO` */
+export interface SharedLimiter {
+  take(bucket: string, key: string, limit: number): Promise<boolean> | boolean
+}
+
+/** The LIMITER binding, as far as `takeShared` needs it */
+export interface LimiterNamespace {
+  idFromName(name: string): DurableObjectId
+  get(id: DurableObjectId): SharedLimiter
+}
+
 /**
- * One take from a Cloudflare Rate Limiting binding (wrangler `ratelimits`, e12-t06): counted for
- * every Worker instance in the same Cloudflare location, which is where one address's requests
- * go. True when allowed; also true without the binding (tests, a config without it) and when the
- * binding fails, since a limiter that is down should not take the site down with it
+ * One take of `bucket` for the hashed address `key` from the LimiterDO shard it belongs to:
+ * counted for every Worker instance in every location. True when allowed; also true without the
+ * binding (tests, a config without it) and when the limiter fails, since a limiter that is down
+ * should not take the site down with it
  */
-export async function takeShared(binding: RateLimit | undefined, key: string): Promise<boolean> {
-  if (!binding) return true
+export async function takeShared(
+  limiter: LimiterNamespace | undefined,
+  bucket: SharedBucket,
+  key: string,
+): Promise<boolean> {
+  if (!limiter) return true
   try {
-    const outcome = await binding.limit({ key })
-    console.log(JSON.stringify({ event: 'rl_debug', key: key.slice(0, 4), outcome }))
-    return outcome.success
+    const shard = limiter.get(limiter.idFromName(`limiter-${key.slice(0, 1)}`))
+    return await shard.take(bucket, key, SHARED_LIMITS[bucket])
   } catch (error) {
     console.error('rate limiter failed', error)
     return true

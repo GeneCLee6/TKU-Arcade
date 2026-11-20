@@ -69,7 +69,7 @@ depends_on: []
 
 ### M1
 
-- [x] `e12-t06` 濫用防護：建房與聊天速率、暱稱過濾、連線上限、管理頁權限 · AC-12.5 · M · ← e1-t01, e1-t12 · 路線圖外提前（2026-11-20，不需要帳號）：Cloudflare Rate Limiting binding（免費方案可用，`wrangler.jsonc` `ratelimits`），以位址雜湊為 key：建房每分鐘 5 間、WebSocket 升級每分鐘 120 次、錯的擁有者金鑰每分鐘 5 次後鎖一分鐘；每房每位址最多 24 條連線（關閉碼 4429）；暱稱濾掉零寬與隱形字元、擋冒充（房主、管理員、系統、admin…）與基本髒話（清單 `shared/nickname-words.ts`），伺服器在 `join` 再檢查一次；聊天的速率與長度 B4 就有
+- [x] `e12-t06` 濫用防護：建房與聊天速率、暱稱過濾、連線上限、管理頁權限 · AC-12.5 · M · ← e1-t01, e1-t12 · 路線圖外提前（2026-11-20，不需要帳號）：Durable Object `LimiterDO`（16 片、只在記憶體；Cloudflare 的 Rate Limiting binding 試過，在這個帳號上一律放行），以位址雜湊為 key：建房每分鐘 5 間、WebSocket 升級每分鐘 120 次、錯的擁有者金鑰每分鐘 5 次後鎖一分鐘；每房每位址最多 24 條連線（關閉碼 4429）；暱稱濾掉零寬與隱形字元、擋冒充（房主、管理員、系統、admin…）與基本髒話（清單 `shared/nickname-words.ts`），伺服器在 `join` 再檢查一次；聊天的速率與長度 B4 就有
 - [x] `e12-t07` 每日指標（房間數、場次）與簡單儀表頁（擁有者） · AC-12.3 · S · ← e12-t04 · I4（#48）：D1 `daily_metrics`，`/stats` 要 `STATS_KEY` secret（DEPLOY.md §12）；AC-12.3 等擁有者設好 secret、看到數字再勾
 
 ### M2

@@ -94,8 +94,8 @@ frame-ancestors 'none'
 
 | 端點 | 限制 | 在哪 |
 | --- | --- | --- |
-| `POST /api/rooms`（開房） | **每位址每分鐘 5 間**，同一個 Cloudflare 機房的所有 instance 共用（binding `ROOM_CREATE_LIMIT`，`e12-t06`）；前面還有每 instance 每位址 30 間、instance 合計 600 間的記憶體限制（`e12-t13`）。超過 429（`retry-after: 60`），大廳 toast「你所在的網路剛開了太多房間」 | `worker/rooms.ts`、`worker/rate-limit.ts` |
-| `/ws/<id>`（WebSocket 升級） | **每位址每分鐘 120 次**（binding `SOCKET_LIMIT`）；超過時接受再以 **4429** `tooManyConnections` 關閉，不叫醒房間 | `worker/rooms.ts` |
+| `POST /api/rooms`（開房） | **每位址每分鐘 5 間**，所有 instance、所有機房共用（`LimiterDO`，`e12-t06`）；前面還有每 instance 每位址 30 間、instance 合計 600 間的記憶體限制（`e12-t13`）。超過 429（`retry-after: 60`），大廳 toast「你所在的網路剛開了太多房間」 | `worker/rooms.ts`、`worker/rate-limit.ts` |
+| `/ws/<id>`（WebSocket 升級） | **每位址每分鐘 120 次**（`LimiterDO`）；超過時接受再以 **4429** `tooManyConnections` 關閉，不叫醒房間 | `worker/rooms.ts` |
 | WebSocket（房內） | 每房 `MAX_CONNECTIONS`（72）條、`MAX_MEMBERS`（64）人；**每房每位址 `MAX_CONNECTIONS_PER_ADDRESS`（24）條**（含旁觀，`e12-t06`），超過 4429 | `RoomHost.admit` |
 | 擁有者金鑰 | 每位址每分鐘錯 5 次後鎖一分鐘（§7） | `worker/owner.ts` |
 | `POST /api/errors` | 每位址每分鐘 10 則、instance 合計 120 則 | `worker/errors.ts` |
@@ -108,8 +108,9 @@ frame-ancestors 'none'
 說明：
 
 - **位址**：`CF-Connecting-IP`，IPv4 整個、IPv6 取 /64（一個家或一支手機拿到整段 /64，可以在裡面換位址），加前綴後 SHA-256，只留前 16 個十六進位字（`worker/address.ts`）。完整位址不存、不寫日誌；雜湊只當 rate limiter 的 key（Cloudflare 那邊只留一分鐘的計數）和房間記憶體裡的連線計數（socket 的 attachment，連線關掉就沒了）。
-- **Rate Limiting binding**（`wrangler.jsonc` `ratelimits`，免費方案可用，`DEPLOY.md` §15）：計數在同一個 Cloudflare 機房內所有 instance 共用、最終一致；同一個位址的請求本來就進同一個機房，所以對「一個位址」是夠的，但不是全球精確的計數。binding 不存在或出錯時放行（限制器壞掉不該把網站一起拖垮），只剩每 instance 的記憶體限制。沒用 Durable Object 計數：每次建房、每次連線都要多一次 DO 請求，算進免費額度。
-- **本機**：127.0.0.1、::1 不經 binding（Cloudflare 不會報這種位址），所以 `npm run dev` 與整套瀏覽器測試不會被擋。
+- **LimiterDO**（`worker/limiter.ts`，DO migration `v2`）：依位址雜湊的第一個字分 16 個物件，每個物件在記憶體裡對每個桶（`create`／`socket`／`ownerFail`，數字在 `worker/rate-limit.ts` 的 `SHARED_LIMITS`）做每分鐘的固定視窗，**不寫儲存**；物件被回收就忘掉，只會讓人早點能再試。所有 instance 與機房都問同一個物件，所以計數精確。物件不存在（沒有 binding）或出錯時放行（限制器壞掉不該把網站一起拖垮），只剩每 instance 的記憶體限制。代價：每次建房、每次 WebSocket 升級、每次錯的金鑰多一次 DO 請求（免費額度每日 10 萬次）。
+- **為什麼不用 Cloudflare 的 Rate Limiting binding**：先做過（`ratelimits`，#110 的第一版）：部署成功、binding 有列出，但預覽站的日誌顯示同一個 key 連打 25 次都回 `success: true`，在這個帳號上沒有作用。它本來也只在單一機房內共用、最終一致。
+- **本機**：127.0.0.1、::1 不經 LimiterDO（Cloudflare 不會報這種位址），所以 `npm run dev` 與整套瀏覽器測試不會被擋。
 - **共用位址**：同一個校園 Wi-Fi 或手機網路的人共用位址。5 間／分鐘、120 次升級／分鐘、每房 24 條是照「一桌朋友在同一個 Wi-Fi」抓的；「再來一局」與換遊戲都不算建房。
 - **聊天以外的文字**：遊戲內的文字輸入都由規則在伺服器限長度、也只在該輪能送（撞詞與搭橋的提示 12 字、撞詞猜答 20 字、光譜的答案 30 字：`shared/games/*/clue.ts`、`answer.ts`），所以不另外限速率；每則訊息還有 `MAX_CLIENT_MESSAGE_CHARS`。沒有題目投稿、卡丁車名牌；卡丁車編輯器的分享碼只在瀏覽器解析。
 - GET 端點沒有限制：它們只讀、回應很小，Cloudflare 的 DDoS 防護在前面；成本儀表板會先看到異常（每日 Workers 請求 80% 警示）。
@@ -120,7 +121,7 @@ frame-ancestors 'none'
 
 - 沒有 `STATS_KEY` secret → 404（站上看不出有這些端點）。
 - 金鑰用 `Authorization: Bearer <key>`，固定時間比對（`e12-t06` 起連長度都不洩漏：時間只看正確金鑰的長度）；**不在網址裡**，所以不會出現在 Worker 日誌或瀏覽器紀錄，Worker 也不 log 標頭；別的網站的頁面不能讓瀏覽器帶這個標頭，所以 PUT 沒有 CSRF 問題（跨站的帶自訂標頭請求要過 CORS preflight，本站不回 CORS 標頭）。
-- **暴力嘗試**（`e12-t06`）：同一個位址一分鐘內錯 5 次（binding `OWNER_FAIL_LIMIT`，或單一 instance 的記憶體計數）之後，這個 instance 一分鐘內對它一律回 429（`retry-after: 60`），**連對的金鑰也一樣**；別的 instance 在它下一次錯的時候就知道（binding 已經超過）。對的金鑰從不計數。`/stats` 顯示「金鑰錯太多次了」。金鑰本身應該是長的隨機字串（`DEPLOY.md` §12）。
+- **暴力嘗試**（`e12-t06`）：同一個位址一分鐘內錯 5 次（`LimiterDO`，或單一 instance 的記憶體計數）之後，這個 instance 一分鐘內對它一律回 429（`retry-after: 60`），**連對的金鑰也一樣**；別的 instance 在它下一次錯的時候就知道（LimiterDO 已經超過）。對的金鑰從不計數。`/stats` 顯示「金鑰錯太多次了」。金鑰本身應該是長的隨機字串（`DEPLOY.md` §12）。
 - 金鑰存在擁有者那台瀏覽器的 localStorage（`/stats` 的「忘記這個瀏覽器的金鑰」可清掉）。
 - Cloudflare 的 API token（成本儀表板）只在 Worker 的 secret，**不進前端、不進 repo**；建議只給 Account Analytics 讀取權限（`DEPLOY.md` §13）。
 
