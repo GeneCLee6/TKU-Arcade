@@ -7,7 +7,7 @@
 // that route with it.
 import type { TrackGuide } from './guide.ts'
 import { LANES_GUIDE } from './lanes.ts'
-import { WHARF_GUIDE } from './wharf.ts'
+import { WHARF_GUIDE, WHARF_ROUTE_GUIDE } from './wharf.ts'
 import { WORKS_GUIDE, WORKS_ROUTE_GUIDE } from './works.ts'
 
 const GUIDES: Readonly<Record<string, TrackGuide>> = {
@@ -17,6 +17,7 @@ const GUIDES: Readonly<Record<string, TrackGuide>> = {
 }
 
 const ROUTE_GUIDES: Readonly<Record<string, TrackGuide>> = {
+  wharf: WHARF_ROUTE_GUIDE,
   works: WORKS_ROUTE_GUIDE,
 }
 

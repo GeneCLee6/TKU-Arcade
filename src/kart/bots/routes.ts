@@ -23,7 +23,7 @@ import { createBotBrain, type BotBrain } from './brain.ts'
 import type { BotSkill } from './skill.ts'
 
 /** A branch is chosen this many main road points before it leaves */
-export const ROUTE_LOOK = 30
+export const ROUTE_LOOK = 16
 
 /** The main road point (x, z) is nearest, and the branch it is coming to or on, if any */
 function approach(track: Track, index: number): number {
@@ -79,8 +79,7 @@ export function createTrackBrain(
     for (const k of failed) {
       if (on !== k && coming !== k) failed.delete(k)
     }
-    const take =
-      on >= 0 || (coming >= 0 && (skill.tricks ?? false) && !failed.has(coming))
+    const take = on >= 0 || (coming >= 0 && (skill.tricks ?? false) && !failed.has(coming))
     // Both every step, so that each sees the kart as it is when it takes over
     const onMain = main(trial, sense)
     const onRoute = branchy(trial, sense)

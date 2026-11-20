@@ -111,7 +111,8 @@ export function roadDepth(
     const sx = b.x - a.x
     const sz = b.z - a.z
     const lengthSq = sx * sx + sz * sz
-    const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((x - a.x) * sx + (z - a.z) * sz) / lengthSq))
+    const t =
+      lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((x - a.x) * sx + (z - a.z) * sz) / lengthSq))
     const distance = Math.hypot(x - (a.x + sx * t), z - (a.z + sz * t))
     const half = (a.width + (b.width - a.width) * t) / 2
     best = Math.max(best, half - distance)
@@ -372,9 +373,16 @@ export function parseBranches(
       problems.push(`${at}.jumps: each a point of its road, once`)
       return
     }
-    drafts.push({ from: from as number, to: to as number, path, jumps: lips.map((lip) => lip + 1), at })
+    drafts.push({
+      from: from as number,
+      to: to as number,
+      path,
+      jumps: lips.map((lip) => lip + 1),
+      at,
+    })
   })
-  if (total > MAX_ALL_POINTS) problems.push(`branches: more than ${MAX_ALL_POINTS} road points in all`)
+  if (total > MAX_ALL_POINTS)
+    problems.push(`branches: more than ${MAX_ALL_POINTS} road points in all`)
   if (problems.length > before) return []
 
   // Spans apart, in order along the lap
@@ -422,7 +430,11 @@ export function parseBranches(
     outer: for (let i = 0; i + 1 < n; i++) {
       for (let k = 0; k < count; k++) {
         // The main road's segments either side of the two ends meet the branch there
-        if ((i === 0 && (k === draft.from || k === draft.from - 1)) || (i === n - 2 && (k === draft.to || k === draft.to - 1))) continue
+        if (
+          (i === 0 && (k === draft.from || k === draft.from - 1)) ||
+          (i === n - 2 && (k === draft.to || k === draft.to - 1))
+        )
+          continue
         if (segmentsCross(path[i]!, path[i + 1]!, road[k]!, road[(k + 1) % count]!)) {
           problems.push(`${at}: crosses the main road`)
           break outer
@@ -458,7 +470,9 @@ export function parseBranches(
     const own: Gate[] = []
     const respawns: Spot[] = []
     if (skipped.length > 0 && (endAt - startAt) / skipped.length < GATE_SPACING) {
-      problems.push(`${at}: too short a clear stretch for the ${skipped.length} gates it stands in for`)
+      problems.push(
+        `${at}: too short a clear stretch for the ${skipped.length} gates it stands in for`,
+      )
       continue
     }
     skipped.forEach((_, index) => {
@@ -507,7 +521,11 @@ export function parseBranches(
       }
     }
     gates.forEach((gate, k) => {
-      if (gateSamples(gate).some((place) => roadDepth(fork.path, false, place.x, place.z) > -GATE_CLEAR)) {
+      if (
+        gateSamples(gate).some(
+          (place) => roadDepth(fork.path, false, place.x, place.z) > -GATE_CLEAR,
+        )
+      ) {
         problems.push(`${at}: touches gates[${k}] (keep the gates of the main road off it)`)
       }
     })
@@ -688,4 +706,28 @@ export function gatesClearOf(
     gates: gates.filter((_, index) => keep[index]),
     respawns: respawns.filter((_, index) => keep[index]),
   }
+}
+
+/**
+ * For a track's author: a branch's mouth on the main road, the main road points from the first whose
+ * kerb on `side` (-1 left, 1 right) the branch has cut away to the first after it that is whole
+ * again. A fence or a shed across the mouth stands along the kerb between them
+ */
+export function branchMouth(
+  road: readonly RoadPoint[],
+  path: readonly RoadPoint[],
+  from: number,
+  side: -1 | 1,
+): [number, number] {
+  let first = -1
+  for (let index = from + 1; index < road.length; index++) {
+    const point = road[index]!
+    const { dx, dz } = pathDirection(road, index, true)
+    const half = (side * point.width) / 2
+    // The road's right, facing along it, is (-dz, dx)
+    const inside = roadDepth(path, false, point.x - dz * half, point.z + dx * half) > -0.5
+    if (inside && first < 0) first = index
+    else if (!inside && first >= 0) return [first, index]
+  }
+  return [from + 1, from + 1]
 }

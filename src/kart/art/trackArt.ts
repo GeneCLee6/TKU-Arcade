@@ -52,6 +52,7 @@ import { buildFestival } from './festival.ts'
 import { buildForks } from './forkArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { buildLocal } from './localArt.ts'
+import { buildWorks } from './worksArt.ts'
 import { localPlan } from './localPlan.ts'
 import { buildOldStreet, inOldStreetRiver, oldStreetTreeFits } from './oldStreetArt.ts'
 import {
@@ -916,6 +917,14 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
         place,
       })
     : null
+
+  // ── The Viaduct Works (2026-11-20): sheds, chimneys, the elevated line, the deck's piers ──
+  if (track.id === 'works') {
+    buildWorks(
+      { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
+      groundAt,
+    )
+  }
 
   // ── The four technical tracks: each one's own landmark (2026-11-18) ──
   const localScenery = local

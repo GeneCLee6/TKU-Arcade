@@ -298,3 +298,48 @@ export function layBranch(
   }
   return { road: laid.points, marks: laid.marks, fits: [first, second] }
 }
+
+/**
+ * A branch round the inside of a hairpin (2026-11-20): from main road point `from`, where a turn of
+ * 180° begins, to `to`, where it ends, a road that peels off the main road's centre line towards the
+ * turn's centre, runs round it `inner` metres from the centre, and peels back, easing in and out over
+ * `ease` radians at each end. `width` wide, as high as the road. Its own points only (a branch's
+ * JSON `road`), about LAY_SAMPLE apart
+ */
+export function layInside(
+  road: readonly RoadPoint[],
+  from: number,
+  to: number,
+  inner: number,
+  width: number,
+  ease = Math.PI / 4,
+): RoadPoint[] {
+  const start = road[from]!
+  const end = road[to]!
+  const centre = { x: (start.x + end.x) / 2, z: (start.z + end.z) / 2 }
+  const outer = Math.hypot(start.x - centre.x, start.z - centre.z)
+  const count = road.length
+  const next = road[(from + 1) % count]!
+  // Which way round: the way the road goes on from `from`
+  const a0 = Math.atan2(start.z - centre.z, start.x - centre.x)
+  const way = Math.sign(
+    (start.x - centre.x) * (next.z - start.z) - (start.z - centre.z) * (next.x - start.x),
+  )
+  const steps = Math.max(8, Math.round((Math.PI * (inner + outer)) / 2 / LAY_SAMPLE))
+  const points: RoadPoint[] = []
+  for (let step = 1; step < steps; step++) {
+    const share = step / steps
+    const angle = a0 + way * Math.PI * share
+    const into = Math.min(1, (Math.PI * share) / ease, (Math.PI * (1 - share)) / ease)
+    const smooth = into * into * (3 - 2 * into)
+    const radius = outer - (outer - inner) * smooth
+    const y = (start.y ?? 0) + ((end.y ?? 0) - (start.y ?? 0)) * share
+    const point = {
+      x: Math.round((centre.x + Math.cos(angle) * radius) * 100) / 100,
+      z: Math.round((centre.z + Math.sin(angle) * radius) * 100) / 100,
+      width,
+    }
+    points.push(start.y === undefined && end.y === undefined ? point : { ...point, y })
+  }
+  return points
+}

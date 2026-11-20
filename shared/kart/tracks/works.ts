@@ -18,11 +18,18 @@
 //   where it goes. Late, it meets the shed's corner.
 //
 // The layout is ours; no other game's track was looked at.
-import { branchPath, gatesClearOf, roadDepth, routeRoad, type BranchJson } from '../branches.ts'
+import {
+  branchMouth,
+  branchPath,
+  gatesClearOf,
+  roadDepth,
+  routeRoad,
+  type BranchJson,
+} from '../branches.ts'
 import { padsAlong, TRACK_FORMAT, type RoadPoint, type TrackJson } from '../track.ts'
 import type { Wall } from '../walls.ts'
 import { circuit } from './circuit.ts'
-import { acrossRoad, fence, guideFor, type TrackGuide } from './guide.ts'
+import { fence, guideFor, type TrackGuide } from './guide.ts'
 import { fitted, lay, LAY_SAMPLE, layBranch, left, line, right } from './lay.ts'
 import { FENCE_HEIGHT, SHED_HEIGHT } from './wharf.ts'
 
@@ -166,20 +173,6 @@ const [deckPath, alleyPath, cutPath] = branches.map((branch) => branchPath(road,
   RoadPoint[],
 ]
 
-/**
- * A branch's mouth: the main road points from the first whose kerb on `side` (-1 left) the branch
- * has cut away to the first after it that is whole again
- */
-function mouth(path: readonly RoadPoint[], from: number, side: -1 | 1): [number, number] {
-  let first = -1
-  for (let index = from + 1; index < road.length; index++) {
-    const kerb = acrossRoad(road, index, (side * road[index]!.width) / 2)
-    const inside = roadDepth(path, false, kerb.x, kerb.z) > -0.5
-    if (inside && first < 0) first = index
-    else if (!inside && first >= 0) return [first, index]
-  }
-  return [from + 1, from + 1]
-}
 /** The point of a branch's own centre line nearest a named place of its laying */
 const nearestOn = (path: readonly RoadPoint[], place: readonly [number, number]) =>
   path.reduce(
@@ -200,8 +193,8 @@ const alongLeftKerb = (first: number, last: number): [number, number][] =>
     first + k,
     -(road[first + k]!.width / 2 - INSET),
   ])
-const deckMouth = mouth(deckPath, deckFrom, -1)
-const cutMouth = mouth(cutPath, cutFrom, -1)
+const deckMouth = branchMouth(road, deckPath, deckFrom, -1)
+const cutMouth = branchMouth(road, cutPath, cutFrom, -1)
 /** The cut's mouth is open only for this many road points; a shed's wall closes the rest */
 const CUT_OPEN = 3
 /** The alley's slot: where it is along the alley, and how far right of its middle */

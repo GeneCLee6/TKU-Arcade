@@ -134,18 +134,3 @@ describe('a track without branches is what it was', () => {
     expect([result.track.id, trackDigest(result.track)]).toEqual(CUSTOM[name])
   })
 })
-
-/** Prints the digests (run on main to take them): vitest run tests/kart/branchGolden.test.ts -t print */
-describe.skipIf(!process.env.PRINT_GOLDEN)('print', () => {
-  it('prints', () => {
-    const ids = process.env.PRINT_GOLDEN!.split(',')
-    for (const id of ids) {
-      const track = raceTrack(id)!
-      console.log(`GOLDEN ${id}: ['${trackDigest(track)}', '${raceDigest(track)}'],`)
-    }
-    for (const name of Object.keys(SPECS)) {
-      const result = customTrack(encodeSpec(customOf(name)))
-      if (result.ok) console.log(`CUSTOM ${name}: ['${result.track.id}', '${trackDigest(result.track)}'],`)
-    }
-  }, 600_000)
-})
