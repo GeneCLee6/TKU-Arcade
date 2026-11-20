@@ -19,8 +19,13 @@ interface Anchor {
 const distance = (a: Touch, b: Touch) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
 
 export interface BoardZoom {
-  /** Give this to the scrolling box around the board */
+  /** The scrolling box around the board, to read */
   viewport: RefObject<HTMLDivElement | null>
+  /**
+   * Give this to the scrolling box as its `ref`. A callback, since the box is remounted when the
+   * layout switches between wide and narrow (900 px) and the two-finger listeners must follow it
+   */
+  attach(element: HTMLDivElement | null): void
   zoom: number
   zoomIn(): void
   zoomOut(): void
@@ -36,6 +41,11 @@ export interface BoardZoom {
  */
 export function useBoardZoom(): BoardZoom {
   const viewport = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState<HTMLDivElement | null>(null)
+  const attach = useCallback((element: HTMLDivElement | null) => {
+    viewport.current = element
+    setBox(element)
+  }, [])
   const [zoom, setZoom] = useState(MIN_ZOOM)
   const anchor = useRef<Anchor | null>(null)
   const pinch = useRef<{ spread: number; zoom: number } | null>(null)
@@ -68,7 +78,7 @@ export function useBoardZoom(): BoardZoom {
   }
 
   useEffect(() => {
-    const element = viewport.current
+    const element = box
     if (!element) return undefined
 
     const onTouchStart = (event: TouchEvent) => {
@@ -101,7 +111,7 @@ export function useBoardZoom(): BoardZoom {
       element.removeEventListener('touchend', onTouchEnd)
       element.removeEventListener('touchcancel', onTouchEnd)
     }
-  }, [anchorAt])
+  }, [anchorAt, box])
 
   const show = useCallback((x: number, y: number) => {
     const element = viewport.current
@@ -114,6 +124,7 @@ export function useBoardZoom(): BoardZoom {
 
   return {
     viewport,
+    attach,
     zoom,
     zoomIn: () => zoomAroundMiddle(zoom * STEP),
     zoomOut: () => zoomAroundMiddle(zoom / STEP),
