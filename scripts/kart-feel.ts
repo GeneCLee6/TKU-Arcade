@@ -7,7 +7,7 @@
 // tracks/guide.ts); the line under each track with a guide is what that is worth.
 // Run: npm run kart:feel   (-- --seeds 5: the mean of five races each; -- --classic: skip the old preset;
 // -- --karts: every vehicle with the same hands too, -- --only-karts: only that, -- --who expert: one driver,
-// -- --vehicles swift,tide: only these vehicles)
+// -- --vehicles swift,tide: only these vehicles; -- --school: the driving school's lessons instead)
 import { isKartId, KART_IDS } from '../shared/kart/karts.ts'
 import { ARCADE_TUNING, KART_TUNING } from '../shared/kart/physics.ts'
 import { trackGuide } from '../shared/kart/tracks/guides.ts'
@@ -15,9 +15,41 @@ import { raceTrack } from '../shared/kart/tracks/registry.ts'
 import { DRIVER_IDS, type Measure } from './kart/drivers.ts'
 import { FEEL_DRIVERS, FEEL_TRACKS, feelRace, vehicleTable } from './kart/feel.ts'
 import { roadShape } from './kart/shape.ts'
+import { createDriver } from '../src/kart/bots/drivers.ts'
+import { runLesson } from '../src/kart/school/headless.ts'
+import { LESSON_IDS } from '../src/kart/school/lessons.ts'
 
 const seedsAt = process.argv.indexOf('--seeds')
 const SEEDS = seedsAt > 0 ? Math.max(1, Number(process.argv[seedsAt + 1]) || 1) : 3
+
+// 2026-11-20 (--school, docs/KART-FEEL.md §17): every lesson of the driving school, each driver's
+// hands, judged as the page judges a player (src/kart/school/): passed or not, the stars, the
+// seconds from GO to the pass, the tries, and what went wrong most. The master passes every one
+if (process.argv.includes('--school')) {
+  console.log(`driving school: the mean of ${SEEDS} run${SEEDS > 1 ? 's' : ''} each (up to 5 tries)`)
+  console.log('lesson    driver   passed  stars  seconds  tries  most often wrong')
+  for (const id of LESSON_IDS) {
+    for (const who of DRIVER_IDS) {
+      const runs = Array.from({ length: SEEDS }, (_, at) =>
+        runLesson(id, (track) => createDriver(FEEL_DRIVERS[who], track, KART_TUNING, (at + 1) * 7), KART_TUNING),
+      )
+      const passed = runs.filter((one) => one.passed)
+      const mean = (values: readonly number[]) =>
+        values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0
+      const wrong = new Map<string, number>()
+      for (const one of runs) {
+        for (const [note, times] of Object.entries(one.judge.mistakes)) {
+          wrong.set(note, (wrong.get(note) ?? 0) + times)
+        }
+      }
+      const most = [...wrong].sort((a, b) => b[1] - a[1])[0]
+      console.log(
+        `${id.padEnd(10)}${who.padEnd(9)}${`${passed.length}/${runs.length}`.padEnd(8)}${mean(runs.map((one) => one.stars)).toFixed(1).padEnd(7)}${(passed.length > 0 ? mean(passed.map((one) => one.seconds)).toFixed(1) : '-').padEnd(9)}${mean(runs.map((one) => one.judge.attempts)).toFixed(1).padEnd(7)}${most ? `${most[0]} ×${most[1]}` : ''}`,
+      )
+    }
+  }
+  process.exit(0)
+}
 
 // 2026-11-18: each track's shape too (scripts/kart/shape.ts): how long it is, how much of it drives
 // as a straight, its longest straight and how often it changes the way it turns

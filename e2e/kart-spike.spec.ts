@@ -899,7 +899,7 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
     'Swift',
     'Hornet',
     'Petrel',
-    // 2026-11-20 (#118): the item series
+    // 2026-11-20 (§4.48): the item series
     'Pelican',
     'Otter',
     'Cormorant',
@@ -1076,6 +1076,7 @@ test('the garage narrows the vehicles by tab, previews the pick, and a bike race
   await expect(page.locator('canvas')).toBeVisible()
   await page.getByTestId('kart-garage-open').click()
   const garage = page.getByTestId('kart-garage')
+  // 2026-11-20 (§4.48): 20 vehicles with the item series, and the drivers
   await expect(garage.getByRole('radio')).toHaveCount(20 + 4)
   // The pick, drawn in 3D: its own canvas, and a switch for its N2O shape
   const preview = garage.getByTestId('kart-preview')
