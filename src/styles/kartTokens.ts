@@ -317,6 +317,20 @@ export const kartParts = {
   envPanel: '#FFFFFF',
 } as const
 
+/**
+ * A night track's light (2026-11-20, nightLights.ts): the headlights' beam and its pool on the road,
+ * the tail lamps' glow behind, the street lamps (a sodium-warm head on a dark post) and their pools,
+ * and the old street's lantern light pooled on the paving
+ */
+export const kartNight = {
+  beam: '#FFF1D2',
+  tailGlow: '#FF2A3C',
+  lampPost: '#2A2C33',
+  lampHead: '#FFE2B0',
+  lampPool: '#FFC98A',
+  lanternPool: '#FF9A5C',
+} as const
+
 export const kartHover = {
   housing: '#2E3138',
   glass: '#132033',

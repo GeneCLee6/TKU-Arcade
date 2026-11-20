@@ -4,7 +4,10 @@
 // (run each on its own port); it says nothing about a phone.
 //
 //   node scripts/kart-fps.mjs [--base http://localhost:5263] [--qualities low,medium,high]
-//        [--bots 7] [--seconds 10] [--mobile]
+//        [--bots 7] [--seconds 10] [--mobile] [--track riverside]
+//
+// 2026-11-20: `--track danhai` (or oldstreet) measures a night track, its headlights and street
+// lamps (ARCHITECTURE.md §4.47)
 import { chromium } from '@playwright/test'
 
 const args = process.argv.slice(2)
@@ -17,6 +20,7 @@ const qualities = option('qualities', 'low,medium,high').split(',')
 const bots = option('bots', '7')
 const seconds = Number(option('seconds', '10'))
 const mobile = args.includes('--mobile')
+const track = option('track', 'riverside')
 
 const browser = await chromium.launch({
   args: [
@@ -44,7 +48,7 @@ for (const quality of qualities) {
   if (await page.getByTestId('kart-menu').isVisible()) await page.getByTestId('kart-menu').click()
   await page.getByTestId('kart-bots-open').click()
   const setup = page.getByTestId('kart-bots-setup')
-  await setup.getByTestId('kart-bots-track').selectOption('riverside')
+  await setup.getByTestId('kart-bots-track').selectOption(track)
   await setup.getByTestId('kart-bots-count').selectOption(bots)
   await setup.getByTestId('kart-bots-difficulty').selectOption('hard')
   await setup.getByTestId('kart-bots-mode').selectOption('items')
@@ -60,7 +64,7 @@ for (const quality of qualities) {
   await page.waitForTimeout(seconds * 1000)
   const drawn = (await frames()) - from
   const fps = drawn / ((Date.now() - started) / 1000)
-  console.log(`${quality.padEnd(6)} ${fps.toFixed(0)} fps (${bots} bots, ${mobile ? '844x390@3' : '1280x720'})`)
+  console.log(`${quality.padEnd(6)} ${fps.toFixed(0)} fps (${track}, ${bots} bots, ${mobile ? '844x390@3' : '1280x720'})`)
   await context.close()
 }
 await browser.close()

@@ -60,6 +60,7 @@ import {
   type BoostReading,
 } from '../boostFx.ts'
 import { buildDriver } from './driverModel.ts'
+import { blendPose, gesturePose, REST, type DriverGesture, type GesturePose } from '../driverGestures.ts'
 import { buildKartBody } from './vehicleBodies.ts'
 import {
   bell,
@@ -109,6 +110,11 @@ export interface KartLook {
   /** A hill track (2026-11-17): whether the kart is in the air, and a count of its landings */
   readonly airborne?: boolean
   readonly landings?: number
+  /**
+   * 2026-11-20 (§4.47, driverGestures.ts): what the driver does besides drive: look round on the
+   * grid, wave, punch the air, cheer. Left out, they drive
+   */
+  readonly gesture?: DriverGesture
 }
 
 export interface KartModel {
@@ -127,6 +133,8 @@ export interface KartModel {
   boost(): BoostReading
   /** `dazed`, 0 to 1: the driver sways, stunned by a hit */
   update(look: KartLook, frameSeconds: number, dazed?: number): void
+  /** How hard it brakes now, 0 to 1, eased (the tail lamps; a night track's red glow behind) */
+  braking(): number
   dispose(): void
 }
 
@@ -537,6 +545,14 @@ export function buildKartModel(
 
   let roll = 0
   let pitch = 0
+  // The driver's gesture (§4.47): which, how long into it, the pose eased toward it, and where in a
+  // looping gesture this driver is, so that a grid of them does not move as one
+  let gesture: DriverGesture | undefined
+  let gestureSeconds = 0
+  let gestured: GesturePose = REST
+  const gestureSeed = Math.random()
+  for (const arm of driver.arms) arm.rotation.order = 'ZXY'
+  const seatedY = driver.torso.position.y
   /** The nose thrown up by a boost that fired, radians, dying away; and the boosts seen so far */
   let rear = 0
   let firedSeen = 0
@@ -562,6 +578,7 @@ export function buildKartModel(
     thrusters,
     nozzles,
     boost: () => reading,
+    braking: () => braking,
     update(look, seconds, dazed = 0) {
       reading = readBoost(reading, look, seconds)
       const speedShare = Math.min(1, Math.abs(look.speed) / 30)
@@ -623,16 +640,36 @@ export function buildKartModel(
         seconds,
       )
       sway += seconds * (dazed > 0 ? 9 : 0)
+      if (look.gesture !== gesture) {
+        gesture = look.gesture
+        gestureSeconds = 0
+      }
+      gestureSeconds += seconds
+      gestured = blendPose(
+        gestured,
+        gesture ? gesturePose(gesture, gestureSeconds, gestureSeed) : REST,
+        1 - Math.exp(-14 * seconds),
+      )
+      const g = gestured
       const { torso, head, arms } = driver
       torso.rotation.z = lean + Math.sin(sway) * 0.3 * dazed
-      torso.rotation.x = crouch + thrown * (bike ? 0.6 : 1) + Math.cos(sway * 0.7) * 0.12 * dazed
-      head.rotation.y = -look.steer * 0.3 - look.drift * 0.15
+      torso.rotation.x =
+        crouch + thrown * (bike ? 0.6 : 1) + Math.cos(sway * 0.7) * 0.12 * dazed + g.torsoBack
+      torso.position.y = seatedY + g.bounce
+      head.rotation.y = -look.steer * 0.3 - look.drift * 0.15 + g.headTurn
       head.rotation.z = Math.sin(sway * 1.3 + 1) * 0.35 * dazed
-      head.rotation.x = -crouch * 0.9 - thrown * 0.5 + Math.cos(sway * 1.1) * 0.2 * dazed
+      head.rotation.x =
+        -crouch * 0.9 - thrown * 0.5 + Math.cos(sway * 1.1) * 0.2 * dazed + g.headUp
       bar.rotation.y = -look.steer * 0.45
-      // The arms stay on the bar: they reach as the torso goes back, and follow the bar round
-      for (const arm of arms) {
-        arm.rotation.set(-thrown * (bike ? 0.5 : 0.9) - 0.3 * dazed, -look.steer * 0.3, 0)
+      // The arms stay on the bar: they reach as the torso goes back, and follow the bar round;
+      // a gesture lifts them off it (raised about the shoulder, then out to the side)
+      for (const [index, arm] of arms.entries()) {
+        const left = index === 0
+        arm.rotation.set(
+          -thrown * (bike ? 0.5 : 0.9) - 0.3 * dazed + (left ? g.leftUp : g.rightUp),
+          -look.steer * 0.3,
+          left ? g.leftOut : -g.rightOut,
+        )
       }
 
       // The lit parts: the thruster mouths by the speed, white-hot in the boost's own colour; the

@@ -4,6 +4,7 @@ import type { KartView } from '../../../shared/games/kart/types.ts'
 import type { Replay } from '../../../shared/kart/replay.ts'
 import { parseLook } from '../../../shared/kart/karts.ts'
 import { useFinishHold } from '../../kart/race/useFinishHold.ts'
+import { useMenuMusic } from '../../kart/audio/useMenuMusic.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
 import { useT } from '../../i18n/useT.ts'
@@ -37,6 +38,8 @@ export default function KartScreen({ room, game }: GameScreenProps) {
   const recording = useRaceRecorder(view, room.realtime)
   // 2026-11-17: the host's browser drives the computer karts, whatever it shows
   useRoomBots(view, room)
+  // 2026-11-20 (§4.46): the quiet song between races; a race claims the music over it
+  useMenuMusic()
   // Watching live: null until chosen, and then the default is whether there is no kart to drive
   const [watchChoice, setWatchChoice] = useState<boolean | null>(null)
   const [replay, setReplay] = useState<Replay | null>(null)

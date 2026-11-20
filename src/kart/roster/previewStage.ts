@@ -18,12 +18,18 @@ import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
 import { kartParts, kartThemes } from '../../styles/kartTokens.ts'
 import { buildKartModel, type KartModel } from '../art/kartModel.ts'
 import { buildKartEnvironment } from '../art/kartParts.ts'
+import type { DriverGesture } from '../driverGestures.ts'
 
 export interface PreviewStage {
   /** Shows this vehicle and driver (again, or another) */
   show(kart: KartId, driver: DriverId): void
   /** Opens or closes the N2O shape */
   boost(on: boolean): void
+  /**
+   * 2026-11-20 (§4.47): the driver does this, the kart standing still (the Grand Prix's podium);
+   * undefined, back to the garage's idle drive
+   */
+  pose(gesture: DriverGesture | undefined): void
   /** What the picture is, for a screen reader */
   label(text: string): void
   dispose(): void
@@ -78,6 +84,7 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
   let model: KartModel | null = null
   let shown: { kart: KartId; driver: DriverId } | null = null
   let boosting = false
+  let gesture: DriverGesture | undefined
   let dragging = false
   let lastX = 0
   let lastY = 0
@@ -141,7 +148,14 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
     )
     camera.lookAt(0, 0.42, 0)
     model?.update(
-      { speed: boosting ? 60 : 14, steer: 0, drift: 0, boosting, ...(boosting ? { boostKind: 'n2o' as const } : {}) },
+      {
+        speed: boosting ? 60 : gesture ? 0 : 14,
+        steer: 0,
+        drift: 0,
+        boosting,
+        ...(boosting ? { boostKind: 'n2o' as const } : {}),
+        ...(gesture ? { gesture } : {}),
+      },
       seconds,
     )
     renderer.render(scene, camera)
@@ -161,6 +175,9 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
     },
     boost(on) {
       boosting = on
+    },
+    pose(next) {
+      gesture = next
     },
     label(text) {
       canvas.setAttribute('aria-label', text)
