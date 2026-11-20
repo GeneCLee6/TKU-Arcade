@@ -48,6 +48,7 @@ import { createCuePlayer } from '../kartAudio.ts'
 import { replayCues } from '../watchSounds.ts'
 import { TeamGauges, TeamScore } from '../race/TeamHud.tsx'
 import { startWatchLoop, type WatchedKart } from './watchLoop.ts'
+import ReplayShare from './ReplayShare.tsx'
 import {
   Fallback,
   MapCorner,
@@ -83,6 +84,12 @@ export interface ReplayViewProps {
   /** Who is watching: the first kart followed, if it raced */
   you: number | null
   onClose: () => void
+  /**
+   * 2026-11-20 (§11.4): the track's revision it was recorded on, where known (opened from a file),
+   * kept when it is saved again; and a line to show over it (the track has changed since)
+   */
+  revision?: number
+  notice?: string | null
 }
 
 /** Every kart at `tick` */
@@ -132,7 +139,14 @@ function orderAt(track: Track, reel: ReplayReel, tick: number): number[] {
   )
 }
 
-export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewProps) {
+export default function ReplayView({
+  replay,
+  nameOf,
+  you,
+  onClose,
+  revision,
+  notice,
+}: ReplayViewProps) {
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
   const tagLayer = useRef<HTMLDivElement>(null)
@@ -369,6 +383,11 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
             <TeamGauges t={t} gauge={teamGauge} />
           </>
         )}
+        {notice && (
+          <Note role="status" data-testid="kart-replay-notice">
+            {notice}
+          </Note>
+        )}
         {reel.start > 0 && <Note>{t('games.kart.replay.partial')}</Note>}
         {recent.map((event) => (
           <Note key={`${event.tick}-${event.by}-${event.item}`}>
@@ -434,6 +453,7 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
           <Button $variant="ghost" $size="sm" onClick={() => command('faster')}>
             {t('games.kart.replay.faster')}
           </Button>
+          <ReplayShare replay={replay} nameOf={nameOf} you={you} revision={revision} size="sm" />
         </Row>
       </WatchControls>
     </WatchPage>

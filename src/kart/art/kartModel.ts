@@ -65,6 +65,9 @@ import { buildKartBody } from './vehicleBodies.ts'
 import {
   bell,
   carbonTexture,
+  createPaintMaterial,
+  markPaint,
+  mergeTree,
   decalTexture,
   flatten,
   hinge,
@@ -135,6 +138,12 @@ export interface KartModel {
   update(look: KartLook, frameSeconds: number, dazed?: number): void
   /** How hard it brakes now, 0 to 1, eased (the tail lamps; a night track's red glow behind) */
   braking(): number
+  /**
+   * 2026-11-20 (docs/KART-PERF.md): far off, the kart is drawn as a few merged meshes standing still
+   * (its shape open or closed as the boost has it, the driver at rest), a draw a material; near, as
+   * itself. Only a model built with `far` (KartDetail) can be far
+   */
+  detail(far: boolean): void
   dispose(): void
 }
 
@@ -154,6 +163,17 @@ export interface KartFinish {
    * developed afterwards (post.ts), which turns the excess into a glow
    */
   readonly glow?: number
+}
+
+/** 2026-11-20 (docs/KART-PERF.md): what a model keeps besides its full self */
+export interface KartDetail {
+  /** A far version to draw at a distance (another racer's kart) */
+  readonly far?: boolean
+  /**
+   * Its shadow cast by one merged stand-in rather than by every part (this browser's own kart,
+   * where the scene has shadows)
+   */
+  readonly shadowProxy?: boolean
 }
 
 /** The racing number, slanted, with a bar under it: white over the driver's colour */
@@ -320,6 +340,7 @@ export function buildKartModel(
   body: KartBody = 'tide',
   driverId: DriverId = 'spade',
   finish: KartFinish = {},
+  extra: KartDetail = {},
 ): KartModel {
   const colours = kartBodies[body]
   const environment = finish.environment ?? null
@@ -342,9 +363,9 @@ export function buildKartModel(
         }),
       )
     : null
-  const colour = (color: string, roughness = 0.35, metalness = 0.55, emissive = 0): Material =>
-    ghostPaint ??
-    own(
+  const colour = (color: string, roughness = 0.35, metalness = 0.55, emissive = 0): Material => {
+    if (ghostPaint) return ghostPaint
+    const material = own(
       new MeshStandardMaterial({
         color,
         roughness,
@@ -356,6 +377,15 @@ export function buildKartModel(
         emissiveIntensity: emissive,
       }),
     )
+    return markPaint(material, {
+      color: material.color.clone(),
+      roughness,
+      metalness,
+      emissive: material.emissive.clone().multiplyScalar(emissive),
+      env: environment ? 1.15 : 0,
+      woven: false,
+    })
+  }
   /** Lit from within: a plain colour, brighter than white by `gain` of what the scene's glow allows */
   const lit = (color: string, gain = 1) =>
     own(
@@ -368,10 +398,12 @@ export function buildKartModel(
       }),
     )
   let carbon: Material | null = ghostPaint
+  // 2026-11-20 (docs/KART-PERF.md): every paint of a moving part drawn as one (kartParts.ts's flatten)
+  let paintAll: Material | undefined
   if (!carbon) {
     const weave = carbonTexture()
     textures.push(weave)
-    carbon = own(
+    const woven = own(
       new MeshStandardMaterial({
         color: kartParts.metal,
         map: weave,
@@ -381,6 +413,15 @@ export function buildKartModel(
         envMapIntensity: 0.9,
       }),
     )
+    carbon = markPaint(woven, {
+      color: woven.color.clone(),
+      roughness: 0.42,
+      metalness: 0.5,
+      emissive: new Color(0, 0, 0),
+      env: environment ? 0.9 : 0,
+      woven: true,
+    })
+    paintAll = own(createPaintMaterial(environment, weave))
   }
   const glowColour = new Color(colours.glow)
   const core = lit(colours.glow)
@@ -521,7 +562,47 @@ export function buildKartModel(
     return [spot.x, spot.y, spot.z]
   })
   // Everything built: one mesh for each material in each moving part
-  flatten(chassis, keep, shadows)
+  flatten(chassis, keep, shadows, paintAll)
+
+  // 2026-11-20 (docs/KART-PERF.md): the far version, closed and open, and the shadow's stand-in, all
+  // made from the parts as they now stand (at rest), riding on the chassis so that they still bob,
+  // bank and pitch
+  const parts: Mesh[] = []
+  chassis.traverse((object) => {
+    if (object instanceof Mesh) parts.push(object)
+  })
+  const farLooks: Group[] = []
+  if (extra.far && !ghost) {
+    const shapes = morphs.length > 0 ? [0, 1] : [0]
+    for (const shape of shapes) {
+      for (const morph of morphs) morph(shape)
+      const look = new Group()
+      for (const mesh of mergeTree(chassis, parts, keep)) look.add(mesh)
+      look.visible = false
+      farLooks.push(look)
+    }
+    for (const morph of morphs) morph(0)
+    for (const look of farLooks) chassis.add(look)
+  }
+  // The shadow's stand-ins, closed and open: drawn into the shadow map only (they write nothing to
+  // the picture), one draw where the parts were one a material and a moving part
+  const stands: Mesh[] = []
+  if (extra.shadowProxy && shadows && !ghost) {
+    const unseen = own(new MeshBasicMaterial({ colorWrite: false, depthWrite: false }))
+    const shapes = morphs.length > 0 ? [0, 1] : [0]
+    for (const shape of shapes) {
+      for (const morph of morphs) morph(shape)
+      for (const stand of mergeTree(chassis, parts, keep, unseen)) {
+        stand.castShadow = true
+        stand.visible = shape === 0
+        stands.push(stand)
+      }
+    }
+    for (const morph of morphs) morph(0)
+    for (const stand of stands) chassis.add(stand)
+    for (const mesh of parts) mesh.castShadow = false
+  }
+  let far = false
 
   // The glow on the road beneath, and the pool of the head lamps ahead: not on a ghost
   let under: Mesh | null = null
@@ -594,6 +675,12 @@ export function buildKartModel(
     nozzles,
     boost: () => reading,
     braking: () => braking,
+    detail(wanted) {
+      if (farLooks.length === 0 || wanted === far) return
+      far = wanted
+      for (const mesh of parts) mesh.visible = !far
+      if (!far) for (const look of farLooks) look.visible = false
+    },
     update(look, seconds, dazed = 0) {
       reading = readBoost(reading, look, seconds)
       const speedShare = Math.min(1, Math.abs(look.speed) / 30)
@@ -622,6 +709,15 @@ export function buildKartModel(
 
       // The change of shape: every part to its place, the body lower
       const open = morphEase(reading.morph)
+      if (stands.length > 1) {
+        const open = reading.morph >= 0.5
+        stands[0]!.visible = !open
+        stands[1]!.visible = open
+      }
+      if (far) {
+        const shown = farLooks.length > 1 && reading.morph >= 0.5 ? 1 : 0
+        farLooks.forEach((look, index) => (look.visible = index === shown))
+      }
       if (reading.morph !== shaped) {
         shaped = reading.morph
         for (const morph of morphs) morph(reading.morph)

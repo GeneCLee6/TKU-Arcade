@@ -97,6 +97,7 @@ import {
   type KartScene,
   type OtherKart,
   type Pose,
+  type RenderStats,
 } from './Scene.ts'
 import type { KartLook } from './art/kartModel.ts'
 import type { HitBurst, ItemCue } from './hitFx.ts'
@@ -343,6 +344,14 @@ export interface SpikeDebug {
   /** On a track: finish line crossings and the next gate (e8-t04) */
   crossings: number
   nextGate: number
+  /**
+   * 2026-11-20 (docs/KART-PERF.md): the last frame's draw calls, triangles and what is held on the
+   * GPU (refreshed twice a second), and the JS time of a frame, milliseconds, averaged
+   */
+  render?: RenderStats
+  jsMs?: number
+  /** The same, summed over every frame drawn so far: calls, triangles and JS milliseconds */
+  totals?: { frames: number; calls: number; triangles: number; jsMs: number }
   /** 2026-11-20 (§4.46): the song and its part asked for this frame, `song:section` */
   music?: string
   /** 2026-11-20 (§4.47), for looking at the drivers: this driver does this whatever the race says */
@@ -645,6 +654,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let loadMs = 0
   const frame = (now: number) => {
     handle = requestAnimationFrame(frame)
+    const workFrom = performance.now()
     if (firstFrameAt === null) {
       firstFrameAt = now
       loadMs = now - loadStarted
@@ -1027,6 +1037,15 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       options.onHud(hud)
     }
 
+    // The JS a frame took, smoothed, and what it drew (docs/KART-PERF.md)
+    const workMs = performance.now() - workFrom
+    debug.jsMs = (debug.jsMs ?? 0) * 0.95 + workMs * 0.05
+    const drawn = scene.drawn()
+    const totals = (debug.totals ??= { frames: 0, calls: 0, triangles: 0, jsMs: 0 })
+    totals.frames++
+    totals.calls += drawn.calls
+    totals.triangles += drawn.triangles
+    totals.jsMs += workMs
     statsFrom ??= now
     statsFrames++
     slowest = Math.max(slowest, frameMs)
@@ -1042,6 +1061,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         rendererName: scene.rendererName,
         gamepad: pad?.id,
       })
+      debug.render = scene.stats()
       statsFrom = now
       statsFrames = 1
       slowest = 0

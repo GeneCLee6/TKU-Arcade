@@ -383,6 +383,10 @@ export function SpikePage({
               >
                 {t(custom ? 'kart.editor.editCopy' : 'kart.editor.open')}
               </Link>
+              {' · '}
+              <Link to="/kart/replay" data-testid="kart-replay-file-link">
+                {t('kart.spike.replayFile')}
+              </Link>
             </>
           )}
           {linked === 'bad' && (

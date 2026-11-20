@@ -7,6 +7,7 @@ import { clueClashScreenMessages } from './clue-clash/i18n.screen.ts'
 import { kartScreenMessages } from './kart/i18n.screen.ts'
 import { kartTeamMessages } from './kart/i18n.team.ts'
 import { kartWatchMessages } from './kart/i18n.watch.ts'
+import { kartReplayFileMessages } from './kart/i18n.replayFile.ts'
 import { kiteScreenMessages } from './kite/i18n.screen.ts'
 import { miseryScreenMessages } from './misery/i18n.screen.ts'
 import { oddWordScreenMessages } from './odd-word/i18n.screen.ts'
@@ -52,6 +53,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...miseryScreenMessages.en,
     ...kartScreenMessages.en,
     ...kartWatchMessages.en,
+    ...kartReplayFileMessages.en,
     ...kartTeamMessages.en,
     ...roomExtraMessages.en,
     ...ownerMessages.en,
@@ -79,6 +81,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...miseryScreenMessages['zh-TW'],
     ...kartScreenMessages['zh-TW'],
     ...kartWatchMessages['zh-TW'],
+    ...kartReplayFileMessages['zh-TW'],
     ...kartTeamMessages['zh-TW'],
     ...roomExtraMessages['zh-TW'],
     ...ownerMessages['zh-TW'],

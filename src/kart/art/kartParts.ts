@@ -19,8 +19,10 @@ import {
   ExtrudeGeometry,
   Group,
   LatheGeometry,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   PMREMGenerator,
   RepeatWrapping,
   Scene,
@@ -391,7 +393,74 @@ export const live = <T extends Object3D>(object: T): T => {
   return object
 }
 
-function mergeInto(meshes: readonly Mesh[]): BufferGeometry {
+/**
+ * 2026-11-20 (docs/KART-PERF.md): what a plain paint is (kartModel.ts's `colour`, and the carbon
+ * weave), kept on its material so that `flatten` can draw every paint of a group as one: the colour,
+ * the roughness and metalness, the glow (already times its intensity), how much of the environment
+ * it reflects and whether the weave is on it. All linear colours
+ */
+export interface PaintLook {
+  readonly color: Color
+  readonly roughness: number
+  readonly metalness: number
+  readonly emissive: Color
+  readonly env: number
+  readonly woven: boolean
+}
+
+/** Marks `material` as a paint that looks like `look` */
+export function markPaint<T extends Material>(material: T, look: PaintLook): T {
+  material.userData.paint = look
+  return material
+}
+
+const paintOf = (material: Material): PaintLook | undefined =>
+  material.userData.paint as PaintLook | undefined
+
+/**
+ * One material for every paint of a kart, each vertex carrying its own colour, roughness,
+ * metalness, glow, reflection and weave: the same shading as a MeshStandardMaterial of each
+ * (three.js's own shader, with those numbers read per vertex rather than per material)
+ */
+export function createPaintMaterial(environment: Texture | null, weave: Texture | null): MeshStandardMaterial {
+  const material = new MeshStandardMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    map: weave,
+    envMap: environment,
+    roughness: 1,
+    metalness: 1,
+  })
+  const varyings = 'varying vec2 vPaintRM;\nvarying vec3 vPaintEmissive;\nvarying vec2 vPaintEnv;'
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>\nattribute vec2 paintRM;\nattribute vec3 paintEmissive;\nattribute vec2 paintEnv;\n${varyings}`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\nvPaintRM = paintRM;\nvPaintEmissive = paintEmissive;\nvPaintEnv = paintEnv;',
+      )
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${varyings}`)
+      .replace(
+        '#include <envmap_physical_pars_fragment>',
+        '#define envMapIntensity vPaintEnv.x\n#include <envmap_physical_pars_fragment>',
+      )
+      .replace(
+        '#include <map_fragment>',
+        '#ifdef USE_MAP\n  diffuseColor *= mix(vec4(1.0), texture2D(map, vMapUv), vPaintEnv.y);\n#endif',
+      )
+      .replace('vec3 totalEmissiveRadiance = emissive;', 'vec3 totalEmissiveRadiance = vPaintEmissive;')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vPaintRM.x;')
+      .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vPaintRM.y;')
+  }
+  material.customProgramCacheKey = () => 'kart-paint'
+  return material
+}
+
+function mergeInto(meshes: readonly Mesh[], painted = false): BufferGeometry {
   let count = 0
   const pieces = meshes.map((mesh) => {
     mesh.updateMatrix()
@@ -404,8 +473,12 @@ function mergeInto(meshes: readonly Mesh[]): BufferGeometry {
   const positions = new Float32Array(count * 3)
   const normals = new Float32Array(count * 3)
   const uvs = new Float32Array(count * 2)
+  const colours = painted ? new Float32Array(count * 3) : null
+  const rms = painted ? new Float32Array(count * 2) : null
+  const glows = painted ? new Float32Array(count * 3) : null
+  const envs = painted ? new Float32Array(count * 2) : null
   let at = 0
-  for (const piece of pieces) {
+  pieces.forEach((piece, index) => {
     const position = piece.getAttribute('position')
     if (!piece.getAttribute('normal')) piece.computeVertexNormals()
     const normal = piece.getAttribute('normal')
@@ -413,24 +486,48 @@ function mergeInto(meshes: readonly Mesh[]): BufferGeometry {
     positions.set(position.array as Float32Array, at * 3)
     normals.set(normal.array as Float32Array, at * 3)
     if (uv) uvs.set(uv.array as Float32Array, at * 2)
+    const look = colours && rms && glows && envs ? paintOf(meshes[index]!.material as Material) : undefined
+    if (look && colours && rms && glows && envs) {
+      for (let vertex = at; vertex < at + position.count; vertex++) {
+        colours[vertex * 3] = look.color.r
+        colours[vertex * 3 + 1] = look.color.g
+        colours[vertex * 3 + 2] = look.color.b
+        rms[vertex * 2] = look.roughness
+        rms[vertex * 2 + 1] = look.metalness
+        glows[vertex * 3] = look.emissive.r
+        glows[vertex * 3 + 1] = look.emissive.g
+        glows[vertex * 3 + 2] = look.emissive.b
+        envs[vertex * 2] = look.env
+        envs[vertex * 2 + 1] = look.woven ? 1 : 0
+      }
+    }
     at += position.count
     piece.dispose()
-  }
+  })
   const merged = new BufferGeometry()
   merged.setAttribute('position', new BufferAttribute(positions, 3))
   merged.setAttribute('normal', new BufferAttribute(normals, 3))
   merged.setAttribute('uv', new BufferAttribute(uvs, 2))
+  if (colours && rms && glows && envs) {
+    merged.setAttribute('color', new BufferAttribute(colours, 3))
+    merged.setAttribute('paintRM', new BufferAttribute(rms, 2))
+    merged.setAttribute('paintEmissive', new BufferAttribute(glows, 3))
+    merged.setAttribute('paintEnv', new BufferAttribute(envs, 2))
+  }
   return merged
 }
 
 /**
  * Merges, in every group under `root`, the meshes that share a material into one. `keep` is told of
- * each merged geometry (to free it later); the parts' own geometries are freed here
+ * each merged geometry (to free it later); the parts' own geometries are freed here. Given `paint`
+ * (2026-11-20), every paint of a group (markPaint) is merged into one mesh of that material, whatever
+ * its own paint was
  */
 export function flatten(
   root: Group,
   keep: (geometry: BufferGeometry) => void,
   shadows: boolean,
+  paint?: Material,
 ): void {
   const groups: Object3D[] = []
   root.traverse((object) => {
@@ -440,13 +537,15 @@ export function flatten(
     const byMaterial = new Map<Material, Mesh[]>()
     for (const child of group.children) {
       if (!(child instanceof Mesh) || child.userData.live || Array.isArray(child.material)) continue
-      const bucket = byMaterial.get(child.material as Material)
+      const own = child.material as Material
+      const key = paint && paintOf(own) ? paint : own
+      const bucket = byMaterial.get(key)
       if (bucket) bucket.push(child)
-      else byMaterial.set(child.material as Material, [child])
+      else byMaterial.set(key, [child])
     }
     for (const [material, meshes] of byMaterial) {
       if (meshes.length < 2) continue
-      const geometry = mergeInto(meshes)
+      const geometry = mergeInto(meshes, material === paint)
       keep(geometry)
       for (const mesh of meshes) {
         group.remove(mesh)
@@ -457,6 +556,57 @@ export function flatten(
       group.add(merged)
     }
   }
+}
+
+/**
+ * 2026-11-20 (docs/KART-PERF.md): `meshes` (all under `root`) as they stand now, merged into as few
+ * meshes as there are materials (or into one, `material` given, its looks ignored: a shadow's
+ * stand-in), placed in `root`'s own frame. Every attribute the meshes of a material share is kept
+ */
+export function mergeTree(
+  root: Object3D,
+  meshes: readonly Mesh[],
+  keep: (geometry: BufferGeometry) => void,
+  material?: Material,
+): Mesh[] {
+  root.updateMatrixWorld(true)
+  const toRoot = new Matrix4().copy(root.matrixWorld).invert()
+  const relative = new Matrix4()
+  const byMaterial = new Map<Material, BufferGeometry[]>()
+  for (const mesh of meshes) {
+    if (Array.isArray(mesh.material)) continue
+    const own = material ?? (mesh.material as Material)
+    const source = mesh.geometry
+    const piece = source.index ? source.toNonIndexed() : source.clone()
+    if (material) for (const name of Object.keys(piece.attributes)) if (name !== 'position') piece.deleteAttribute(name)
+    piece.applyMatrix4(relative.multiplyMatrices(toRoot, mesh.matrixWorld))
+    const list = byMaterial.get(own)
+    if (list) list.push(piece)
+    else byMaterial.set(own, [piece])
+  }
+  const merged: Mesh[] = []
+  for (const [own, pieces] of byMaterial) {
+    const names = Object.keys(pieces[0]!.attributes).filter((name) =>
+      pieces.every((piece) => piece.getAttribute(name)?.itemSize === pieces[0]!.getAttribute(name).itemSize),
+    )
+    const count = pieces.reduce((sum, piece) => sum + piece.getAttribute('position').count, 0)
+    const geometry = new BufferGeometry()
+    for (const name of names) {
+      const size = pieces[0]!.getAttribute(name).itemSize
+      const array = new Float32Array(count * size)
+      let at = 0
+      for (const piece of pieces) {
+        const attribute = piece.getAttribute(name)
+        array.set(attribute.array as Float32Array, at)
+        at += attribute.count * size
+      }
+      geometry.setAttribute(name, new BufferAttribute(array, size))
+    }
+    for (const piece of pieces) piece.dispose()
+    keep(geometry)
+    merged.push(new Mesh(geometry, own))
+  }
+  return merged
 }
 
 // ── A change of shape ───────────────────────────────────────────────────────────────────────────

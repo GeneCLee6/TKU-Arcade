@@ -72,6 +72,8 @@ const en = {
   'kart.spike.contextLost':
     'The browser took the graphics context away. Reload the page to start again.',
   'kart.spike.back': 'Back to the lobby',
+  // 2026-11-20: to /kart/replay (docs/KART-NETCODE.md §11.4)
+  'kart.spike.replayFile': 'Open a replay file',
   'kart.spike.menu': 'Menu',
   'kart.spike.howTo': 'How to drive',
   'kart.spike.showNumbers': 'Show numbers',
@@ -406,6 +408,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.noWebgl': '這個瀏覽器無法執行 WebGL 2，所以測試無法開始。',
   'kart.spike.contextLost': '瀏覽器收回了繪圖資源。請重新整理頁面再開始。',
   'kart.spike.back': '回大廳',
+  'kart.spike.replayFile': '開啟重播檔',
   'kart.spike.menu': '選單',
   'kart.spike.howTo': '怎麼開',
   'kart.spike.showNumbers': '顯示數字',

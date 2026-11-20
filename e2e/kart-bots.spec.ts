@@ -21,7 +21,7 @@ const race = (page: Page): Promise<RaceReading | null> =>
 
 test('one person races a computer kart in an item race, from the menu to the results', async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(240_000)
   await page.setViewportSize({ width: 960, height: 600 })
   await page.addInitScript(() => {
@@ -91,4 +91,24 @@ test('one person races a computer kart in an item race, from the menu to the res
   await expect(results.getByTestId('kart-standings').locator('li')).toHaveCount(2)
   await expect(results).toContainText('(CPU)')
   await expect(results.getByTestId('kart-bots-again')).toBeVisible()
+
+  // 2026-11-20 (docs/KART-NETCODE.md §11.4): the race kept as a file, and opened again from it
+  const save = results.getByTestId('kart-replay-download')
+  await expect(save).toBeEnabled()
+  const [download] = await Promise.all([page.waitForEvent('download'), save.click()])
+  expect(download.suggestedFilename()).toMatch(/^tku-kart-riverside-\d{8}-\d{4}\.tkureplay$/)
+  const file = testInfo.outputPath('race.tkureplay')
+  await download.saveAs(file)
+  await page.goto('/kart/replay')
+  const picker = page.getByTestId('kart-replay-file')
+  await picker.getByTestId('kart-replay-file-input').setInputFiles({
+    name: 'nonsense.tkureplay',
+    mimeType: 'application/octet-stream',
+    buffer: Buffer.from('not a replay at all'),
+  })
+  await expect(picker.getByTestId('kart-replay-problem')).toHaveAttribute('data-problem', 'notReplay')
+  await picker.getByTestId('kart-replay-file-input').setInputFiles(file)
+  await expect(page.getByTestId('kart-replay')).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByTestId('kart-replay')).toContainText('(CPU)')
+  await expect(page.getByTestId('kart-replay-notice')).toHaveCount(0)
 })

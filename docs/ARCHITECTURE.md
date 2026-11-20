@@ -1278,6 +1278,18 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **測試**：`tests/games/kart-items-more.test.ts`（每個新道具的裁定、和泡泡罩／回浪板的互動、團隊賽、打水漂不過終點且每張賽道大多數位置找得到落點、抽籤規則、鸕鶿實際抽到比較多強道具、鵜鶘擋兩次、水獺時間加長、亂報的 `ms`／`hits` 被拒）、`tests/kart/itemsMore.test.ts`（靜電保留噴射、海霧減速、電腦車的效果、特效與音效、觀戰聽得到、重播的回浪板與擋兩次、電腦車何時用）、`tests/kart/karts.test.ts`（拾貝系的預算與上限）。
 
+### 4.49 路線圖外：效能與重播分享（2026-11-20，`feat/kart-perf-replay`）
+
+接 §4.48。量法、成本分析與前後數字在 `docs/KART-PERF.md`；重播檔的格式與防護在 `KART-NETCODE.md` §11.4。這裡記程式的形狀。
+
+- **合批粒子**（`src/kart/art/particles.ts`）：`createParticleBatch(world, { capacity, map, additive })` 是一個 `InstancedBufferGeometry` 的四邊形加一個 `ShaderMaterial`（照 three.js 的 sprite shader：面向鏡頭、`offset.w` 是大小、`spin` 旋轉、`tint` 是顏色與透明度、霧、tone mapping、色彩空間）。用法：每幀 `begin()`、每顆活著的 `add(...)`、`end()`（只上傳用到的範圍；沒有粒子就不畫）。`effects.ts` 每台車兩批（煙；火花＋噴射的火），`hitArt.ts` 兩批（星星；光暈＋閃光）。粒子本身是普通物件（位置、速度、年齡），不再是場景裡的 Sprite。
+- **烤漆合併**（`kartParts.ts`）：`markPaint(material, look)` 在 `colour()` 與碳纖維材質上記下樣子；`flatten(root, keep, shadows, paint)` 把一個群組裡所有記過的材質的 mesh 合成一個、用 `paint`（`createPaintMaterial`：`MeshStandardMaterial`＋`onBeforeCompile`，粗糙度、金屬度、自發光、環境反射強度、碳纖維紋的比例改讀頂點屬性 `paintRM`、`paintEmissive`、`paintEnv`，顏色用 `vertexColors`）。鬼影車（一個材質）不受影響。
+- **遠處的車與陰影替身**（`kartModel.ts` 的第六個參數 `KartDetail`）：`{ far: true }`（別人的車）多做「關」「開」兩份靜止的合併版掛在底盤上，`detail(far)` 切換，更新時照 `reading.morph ≥ 0.5` 選哪份；`Scene.ts` 照鏡頭距離切（`FAR_KART`：低 22、中 32、高 45 m，±2 m）。`{ shadowProxy: true }`（自己的車）把零件合成一個只有位置的 mesh（`colorWrite`／`depthWrite` 關，只投影子；同樣關、開兩份），零件本身不投影子。`mergeTree(root, meshes, keep, material?)` 是兩者共用的合併。
+- **撞牆外框**（`shared/kart/walls.ts`）：`wallBoxes(walls)` 每份牆陣列算一次外框（`WeakMap`，長度變了重算）；`collideWalls` 在算最近點前先比外框＋半徑＋1 mm。只是跳過一定不會推車的牆，順序與結果不變（golden 測試）。
+- **動態解析度**（`src/kart/resolution.ts`，純函式）：`startResolution(top)`／`nextResolution(state, frameSeconds)`；`Scene.ts` 在 `draw`／`watch` 每幀之後呼叫，pixel ratio 變了才 `setPixelRatio`＋`resize`（含後處理的緩衝）。處理器畫圖時不啟用。測試 `tests/kart/resolution.test.ts`。
+- **量測掛鉤**：`KartScene.stats()`（`renderer.info`，`autoReset` 關掉、每幀 `present` 開頭歸零，所以含陰影與後處理的 pass）、`drawn()`（不配置）；`spikeLoop.ts` 的 `__kartSpike.render`／`jsMs`／`totals`。
+- **重播檔**：`shared/kart/replayBlob.ts`（從 `replay.ts` 搬出來的 `encodeReplay`／`decodeReplay`，加上嚴格的 `checkReplayMeta`；房間首屏只錄不打包，所以不帶它）、`shared/kart/replayFile.ts`（`.tkureplay` 容器、deflate-raw、大小限制、連結的 base64url）、`shared/kart/itemIds.ts`（`ITEM_IDS` 本身，讓驗證不用載入道具規則）。介面：`src/kart/watch/ReplayShare.tsx`（下載、複製連結；房間結果是 lazy chunk）、`replayFiles.ts`（檔名、檔案資訊、觸發下載）、`ReplayFilePage.tsx`（路由 `/kart/replay`，lazy）、`ReplayView` 多了 `revision` 與 `notice`；字串在 `shared/games/kart/i18n.replayFile.ts`，由 `src/kart/watch/replayMessages.ts` 在用到時註冊。電腦車比賽（`BotRaceView`）用房間同一個 `useRaceRecorder` 錄，結果畫面有看重播與下載。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

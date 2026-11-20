@@ -899,6 +899,10 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
     'Swift',
     'Hornet',
     'Petrel',
+    // 2026-11-20 (#118): the item series
+    'Pelican',
+    'Otter',
+    'Cormorant',
   ])
   // e10-t05: the garage picks a driver too, and shows the kart's stats
   await page.getByTestId('kart-garage-open').click()
@@ -1072,7 +1076,7 @@ test('the garage narrows the vehicles by tab, previews the pick, and a bike race
   await expect(page.locator('canvas')).toBeVisible()
   await page.getByTestId('kart-garage-open').click()
   const garage = page.getByTestId('kart-garage')
-  await expect(garage.getByRole('radio')).toHaveCount(17 + 4)
+  await expect(garage.getByRole('radio')).toHaveCount(20 + 4)
   // The pick, drawn in 3D: its own canvas, and a switch for its N2O shape
   const preview = garage.getByTestId('kart-preview')
   await expect(preview.locator('canvas')).toBeVisible()

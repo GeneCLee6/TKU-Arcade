@@ -41,6 +41,7 @@ import {
 } from 'three'
 import { kartHover, kartScene } from '../../styles/kartTokens.ts'
 import { BOOST_FX } from '../boostFx.ts'
+import { createParticleBatch } from './particles.ts'
 import type { KartLook, KartModel } from './kartModel.ts'
 
 /** Dust puffs alive at once, at most */
@@ -206,6 +207,40 @@ function softTexture(): CanvasTexture {
   return new CanvasTexture(canvas)
 }
 
+/** A puff, a spark or a piece of fire: where it is, how it moves, how it looks this frame */
+interface Particle {
+  x: number
+  y: number
+  z: number
+  vx: number
+  vy: number
+  vz: number
+  age: number
+  /** Across, metres, this frame; and (the fire) at its start */
+  size: number
+  base: number
+  opacity: number
+  /** How thick (smoke) */
+  thick: number
+  /** Which of its kind's colours */
+  colour: number
+}
+
+const particle = (age: number): Particle => ({
+  x: 0,
+  y: 0,
+  z: 0,
+  vx: 0,
+  vy: 0,
+  vz: 0,
+  age,
+  size: 0,
+  base: 1,
+  opacity: 0,
+  thick: 1,
+  colour: 0,
+})
+
 /**
  * `lite` is for another racer's kart (2026-11-17): the same marks, smoke, sparks and flames from
  * smaller pools, so that a full grid costs little; its marks stay about a fifth as long
@@ -226,54 +261,35 @@ export function createKartEffects(
   const texture = softTexture()
   let clock = 0
 
+  // 2026-11-20 (docs/KART-PERF.md): the smoke, the sparks and the fire are particles in two
+  // batches (particles.ts), one draw each, not a sprite each
+  const smoke = createParticleBatch(world, { capacity: PUFFS, map: texture, additive: false })
+  const glowing = createParticleBatch(world, {
+    capacity: SPARKS + JETS,
+    map: texture,
+    additive: true,
+  })
+
   // ── Dust: a light stream from under the back while drifting ──
-  const puffs: {
-    sprite: Sprite
-    material: SpriteMaterial
-    age: number
-    vx: number
-    vy: number
-    vz: number
-    thick: number
-  }[] = []
-  for (let index = 0; index < PUFFS; index++) {
-    const material = new SpriteMaterial({
-      map: texture,
-      color: kartScene.smoke,
-      transparent: true,
-      depthWrite: false,
-      opacity: 0,
-    })
-    const sprite = new Sprite(material)
-    sprite.visible = false
-    world.add(sprite)
-    puffs.push({ sprite, material, age: PUFF_LIFE, vx: 0, vy: 0, vz: 0, thick: 1 })
-  }
+  const smokeColour = new Color(kartScene.smoke)
+  const puffs: Particle[] = []
+  for (let index = 0; index < PUFFS; index++) puffs.push(particle(PUFF_LIFE))
   let nextPuff = 0
   let puffDue = 0
 
   // ── Sparks: small bright dots thrown out sideways and back, falling ──
-  const sparkMaterials = [
+  /** Their colours: the kart's glow, a spark's, a drift's that has earned its boost, the window's */
+  const sparkColours = [
     kart.glow,
     kartHover.spark,
     kartHover.sparkEarned,
     kartHover.sparkReady,
-  ].map(
-    (color) =>
-      new SpriteMaterial({
-        map: texture,
-        color,
-        transparent: true,
-        depthWrite: false,
-        blending: AdditiveBlending,
-      }),
-  )
-  const sparks: { sprite: Sprite; age: number; vx: number; vy: number; vz: number }[] = []
+  ].map((color) => new Color(color))
+  const sparks: Particle[] = []
   for (let index = 0; index < SPARKS; index++) {
-    const sprite = new Sprite(sparkMaterials[index % 2]!)
-    sprite.visible = false
-    world.add(sprite)
-    sparks.push({ sprite, age: SPARK_LIFE, vx: 0, vy: 0, vz: 0 })
+    const spark = particle(SPARK_LIFE)
+    spark.colour = index % 2
+    sparks.push(spark)
   }
   let nextSpark = 0
   let sparkDue = 0
@@ -440,24 +456,14 @@ export function createKartEffects(
   })
   const ribbonColour = new Color()
   // ── The fire a boost leaves behind: small bright puffs out of each thruster, left in the world ──
-  const jetMaterials = [kartScene.flameCore, kartScene.flame].map(
-    (color) =>
-      new SpriteMaterial({
-        map: texture,
-        color,
-        transparent: true,
-        opacity: 0.4,
-        depthWrite: false,
-        blending: AdditiveBlending,
-      }),
-  )
-  const jets: { sprite: Sprite; age: number; vx: number; vy: number; vz: number; size: number }[] =
-    []
+  /** Every other one the boost's heart colour, the rest its flame's (set each frame) */
+  const jetColours = [new Color(kartScene.flameCore), new Color(kartScene.flame)]
+  const JET_OPACITY = 0.4
+  const jets: Particle[] = []
   for (let index = 0; index < JETS; index++) {
-    const sprite = new Sprite(jetMaterials[index % 2]!)
-    sprite.visible = false
-    world.add(sprite)
-    jets.push({ sprite, age: JET_LIFE, vx: 0, vy: 0, vz: 0, size: 1 })
+    const jet = particle(JET_LIFE)
+    jet.colour = index % 2
+    jets.push(jet)
   }
   let nextJet = 0
   let jetDue = 0
@@ -671,25 +677,20 @@ export function createKartEffects(
         puff.vx = outward * cos + (Math.random() - 0.5) * 0.8
         puff.vz = outward * sin + (Math.random() - 0.5) * 0.8
         puff.vy = 0.7 + Math.random() * 0.9
-        puff.sprite.position.set(
-          corner.x + (Math.random() - 0.5) * 0.5,
-          0.22 + floor,
-          corner.z + (Math.random() - 0.5) * 0.5,
-        )
-        puff.sprite.visible = true
+        puff.x = corner.x + (Math.random() - 0.5) * 0.5
+        puff.y = 0.22 + floor
+        puff.z = corner.z + (Math.random() - 0.5) * 0.5
         nextPuff = (nextPuff + 1) % PUFFS
       }
       for (const puff of puffs) {
         if (puff.age >= PUFF_LIFE) continue
         puff.age += seconds
         const share = Math.min(1, puff.age / PUFF_LIFE)
-        puff.sprite.position.x += puff.vx * seconds
-        puff.sprite.position.y += puff.vy * seconds
-        puff.sprite.position.z += puff.vz * seconds
-        const size = 0.9 + share * 3.6
-        puff.sprite.scale.set(size, size, 1)
-        puff.material.opacity = 0.8 * puff.thick * (1 - share) ** 1.4
-        if (share >= 1) puff.sprite.visible = false
+        puff.x += puff.vx * seconds
+        puff.y += puff.vy * seconds
+        puff.z += puff.vz * seconds
+        puff.size = 0.9 + share * 3.6
+        puff.opacity = 0.8 * puff.thick * (1 - share) ** 1.4
       }
 
       // Sparks: thrown out of the drift's outside corner and back along the kart. Gold once the
@@ -701,7 +702,7 @@ export function createKartEffects(
         corner: { x: number; z: number },
         outward: number,
         back: number,
-        material: SpriteMaterial,
+        colour: number,
       ) => {
         const spark = sparks[nextSpark]!
         spark.age = 0
@@ -709,9 +710,10 @@ export function createKartEffects(
         spark.vx = outward * cos - back * sin
         spark.vz = outward * sin + back * cos
         spark.vy = 1.5 + Math.random() * 2.5
-        spark.sprite.material = material
-        spark.sprite.position.set(corner.x, 0.25 + floor, corner.z)
-        spark.sprite.visible = true
+        spark.colour = colour
+        spark.x = corner.x
+        spark.y = 0.25 + floor
+        spark.z = corner.z
         nextSpark = (nextSpark + 1) % SPARKS
       }
       while (sparkDue >= 1) {
@@ -719,14 +721,13 @@ export function createKartEffects(
         if (ready) {
           const side = nextSpark % 2 === 0 ? 0 : corners.length - 1
           const outward = (side === 0 ? -1 : 1) * (1 + Math.random() * 3)
-          throwSpark(corners[side]!, outward, 4 + Math.random() * 5, sparkMaterials[3]!)
+          throwSpark(corners[side]!, outward, 4 + Math.random() * 5, 3)
           continue
         }
         // The outside of a drift to the right is the left corner
         const corner = corners[look.drift > 0 ? 0 : corners.length - 1]!
         const outward = -Math.sign(look.drift) * (2 + Math.random() * 3)
-        const material = charge === 1 ? sparkMaterials[2]! : sparkMaterials[nextSpark % 2]!
-        throwSpark(corner, outward, 3 + Math.random() * 4, material)
+        throwSpark(corner, outward, 3 + Math.random() * 4, charge === 1 ? 2 : nextSpark % 2)
       }
       // The boost as the model reads it (boostFx.ts): which kind runs, what fired
       const boost = kart.boost()
@@ -761,7 +762,7 @@ export function createKartEffects(
         for (let index = 0; index < Math.round(BURST_SPARKS * (0.5 + burstPower)); index++) {
           const corner = corners[index % corners.length]!
           const fan = (Math.random() - 0.5) * 9
-          throwSpark(corner, fan, 8 + Math.random() * 9, sparkMaterials[index % 2 === 0 ? 1 : 3]!)
+          throwSpark(corner, fan, 8 + Math.random() * 9, index % 2 === 0 ? 1 : 3)
         }
       }
       bursts = boost.fired
@@ -772,20 +773,17 @@ export function createKartEffects(
         while (boostSparkDue >= 1) {
           boostSparkDue -= 1
           const corner = corners[nextSpark % corners.length]!
-          throwSpark(corner, (Math.random() - 0.5) * 5, 5 + Math.random() * 8, sparkMaterials[0]!)
+          throwSpark(corner, (Math.random() - 0.5) * 5, 5 + Math.random() * 8, 0)
         }
       }
       for (const spark of sparks) {
         if (spark.age >= SPARK_LIFE) continue
         spark.age += seconds
         spark.vy -= 14 * seconds
-        const { position } = spark.sprite
-        position.x += spark.vx * seconds
-        position.z += spark.vz * seconds
-        position.y = Math.max(0.12 + floor, position.y + spark.vy * seconds)
-        const size = 0.17 * (1 - Math.min(1, spark.age / SPARK_LIFE)) + 0.04
-        spark.sprite.scale.set(size, size, 1)
-        if (spark.age >= SPARK_LIFE) spark.sprite.visible = false
+        spark.x += spark.vx * seconds
+        spark.z += spark.vz * seconds
+        spark.y = Math.max(0.12 + floor, spark.y + spark.vy * seconds)
+        spark.size = 0.17 * (1 - Math.min(1, spark.age / SPARK_LIFE)) + 0.04
       }
 
       // The ring spreads over the road and fades
@@ -816,8 +814,8 @@ export function createKartEffects(
       }
 
       // The fire left behind the thrusters while a boost runs, in the boost's colours
-      jetMaterials[0]!.color.set(style.core)
-      jetMaterials[1]!.color.set(style.flame)
+      jetColours[0]!.set(style.core)
+      jetColours[1]!.set(style.flame)
       if (look.boosting)
         jetDue +=
           JET_RATE *
@@ -838,24 +836,38 @@ export function createKartEffects(
         jet.vx = spread * cos - back * sin
         jet.vz = spread * sin + back * cos
         jet.vy = (Math.random() - 0.3) * 1.2
-        jet.size =
+        jet.base =
           (0.22 + Math.random() * 0.26) * style.girth * (1 + 0.8 * (1 - burstAge / BURST_SECONDS))
-        jet.sprite.position.set(from.x, ty + 0.34 + floor, from.z)
-        jet.sprite.visible = true
+        jet.x = from.x
+        jet.y = ty + 0.34 + floor
+        jet.z = from.z
         nextJet = (nextJet + 1) % JETS
       }
       for (const jet of jets) {
         if (jet.age >= JET_LIFE) continue
         jet.age += seconds
         const share = Math.min(1, jet.age / JET_LIFE)
-        const { position } = jet.sprite
-        position.x += jet.vx * seconds
-        position.y += jet.vy * seconds
-        position.z += jet.vz * seconds
-        const size = jet.size * (1 - share * 0.85)
-        jet.sprite.scale.set(size, size, 1)
-        if (share >= 1) jet.sprite.visible = false
+        jet.x += jet.vx * seconds
+        jet.y += jet.vy * seconds
+        jet.z += jet.vz * seconds
+        jet.size = jet.base * (1 - share * 0.85)
       }
+      // This frame's particles, as many draws as there are batches: what is still alive
+      smoke.begin()
+      for (const puff of puffs) {
+        if (puff.age < PUFF_LIFE) smoke.add(puff.x, puff.y, puff.z, puff.size, smokeColour, puff.opacity)
+      }
+      smoke.end()
+      glowing.begin()
+      for (const spark of sparks) {
+        if (spark.age < SPARK_LIFE)
+          glowing.add(spark.x, spark.y, spark.z, spark.size, sparkColours[spark.colour]!, 1)
+      }
+      for (const jet of jets) {
+        if (jet.age < JET_LIFE)
+          glowing.add(jet.x, jet.y, jet.z, jet.size, jetColours[jet.colour]!, JET_OPACITY)
+      }
+      glowing.end()
 
       // The flames: lit fast, dying away; long and fat just after a boost fires, settling back
       const lit = boost.heat
@@ -952,14 +964,8 @@ export function createKartEffects(
     },
     heat: () => heat,
     dispose() {
-      for (const puff of puffs) {
-        puff.material.dispose()
-        world.remove(puff.sprite)
-      }
-      for (const spark of sparks) world.remove(spark.sprite)
-      for (const material of sparkMaterials) material.dispose()
-      for (const jet of jets) world.remove(jet.sprite)
-      for (const material of jetMaterials) material.dispose()
+      smoke.dispose()
+      glowing.dispose()
       ringGeometry.dispose()
       ringMaterial.dispose()
       world.remove(ring)
