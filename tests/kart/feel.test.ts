@@ -58,7 +58,8 @@ describe.each(['riverside', 'tamkang', 'guanyin'])('the classic feel on %s', (id
 })
 
 // The old street is the item track: wide, with few corners that take a drift (docs/KART-FEEL.md
-// §5). The expert's cover there is short of the target, and says so
+// §5). The expert's cover there was short of the target; 2026-11-20 (oldstreet@9) a boost pad down
+// the market street brings it to the owner's 70%
 describe('the classic feel on oldstreet, the item track', () => {
   const novice = feelRace('oldstreet', FEEL_DRIVERS.novice, KART_TUNING)
   const expert = feelRace('oldstreet', FEEL_DRIVERS.expert, KART_TUNING)
@@ -66,7 +67,7 @@ describe('the classic feel on oldstreet, the item track', () => {
   it('still tells the two apart, with less room to', () => {
     expect(expert.finished && novice.finished).toBe(true)
     expect(expert.seconds).toBeLessThan(novice.seconds * 0.75)
-    expect(expert.cover).toBeGreaterThanOrEqual(0.35)
+    expect(expert.cover).toBeGreaterThanOrEqual(0.7)
     expect(novice.cover).toBeLessThanOrEqual(0.15)
   })
 })

@@ -1,6 +1,7 @@
 // e8-t05b: where a track's scenery may go, worked out from the track itself, so that no tree or
 // house ever lands on the road whatever the layout. Pure and seeded: the same track always gets the
 // same scenery.
+import { forksOfRoad } from './branches.ts'
 import { createRng } from '../games/rng.ts'
 import type { RoadPoint } from './track.ts'
 
@@ -31,6 +32,15 @@ export function roadClearance(road: readonly RoadPoint[], x: number, z: number):
     const b = road[(index + 1) % road.length]!
     const distance = segmentDistance(a.x, a.z, b.x, b.z, x, z) - Math.max(a.width, b.width) / 2
     if (distance < best) best = distance
+  }
+  // A track with branches (2026-11-20, branches.ts): they are road too
+  for (const path of forksOfRoad(road) ?? []) {
+    for (let index = 0; index + 1 < path.length; index++) {
+      const a = path[index]!
+      const b = path[index + 1]!
+      const distance = segmentDistance(a.x, a.z, b.x, b.z, x, z) - Math.max(a.width, b.width) / 2
+      if (distance < best) best = distance
+    }
   }
   return best
 }

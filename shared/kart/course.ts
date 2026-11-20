@@ -20,7 +20,8 @@ import {
   type KartTuning,
 } from './physics.ts'
 import { settleTerrain, stepOnTerrain, type Terrain, type TerrainEvent } from './terrain.ts'
-import { gateCrossing, type BoostPad, type Gate } from './track.ts'
+import type { GateLine } from './branches.ts'
+import { gateCrossing, type BoostPad, type Gate, type RoadPoint } from './track.ts'
 import { collideWalls, KART_RADIUS, wallClearance, type Wall } from './walls.ts'
 
 /** A place and the way to face there */
@@ -38,7 +39,14 @@ export interface Course {
     readonly gates: readonly Gate[]
     readonly respawns: readonly Spot[]
     readonly laps: number
+    /**
+     * On a track with branches (2026-11-20, branches.ts): for each gate, every line that passes it
+     * (the gate itself first, then each branch's stand-in). Absent on any other track
+     */
+    readonly lines?: readonly (readonly GateLine[])[]
   }
+  /** On a track with branches: each branch's centre line, from main road point to main road point */
+  readonly branches?: readonly (readonly RoadPoint[])[]
   /** Strips on the road that boost whoever drives over them */
   readonly boostPads?: readonly BoostPad[]
   /**
@@ -217,6 +225,7 @@ export function passGates(
   const { gates, respawns } = checkpoints
   const count = gates.length
   const { nextGate, crossings } = progress
+  if (checkpoints.lines) return passLines(progress, from, to, checkpoints.lines, start)
   if (gateCrossing(gates[nextGate]!, from.x, from.z, to.x, to.z) === 1) {
     return {
       nextGate: (nextGate + 1) % count,
@@ -237,6 +246,81 @@ export function passGates(
     }
   }
   return progress
+}
+
+/**
+ * passGates on a track with branches (2026-11-20): the same, but any line of a gate passes it, and
+ * the safe place is the respawn point of the line crossed. Driving back over a gate's line puts the
+ * safe place at the gate before, on the same road where that has a line of its own there
+ */
+function passLines(
+  progress: GateProgress,
+  from: { x: number; z: number },
+  to: { x: number; z: number },
+  lines: readonly (readonly GateLine[])[],
+  start: Spot,
+): GateProgress {
+  const count = lines.length
+  const { nextGate, crossings } = progress
+  const ahead = lines[nextGate]!.find(
+    (line) => gateCrossing(line.gate, from.x, from.z, to.x, to.z) === 1,
+  )
+  if (ahead) {
+    return {
+      nextGate: (nextGate + 1) % count,
+      crossings: nextGate === 0 ? crossings + 1 : crossings,
+      safe: ahead.respawn,
+    }
+  }
+  const behind = (nextGate - 1 + count) % count
+  if (crossings <= 0) return progress
+  const back = lines[behind]!.find(
+    (line) => gateCrossing(line.gate, from.x, from.z, to.x, to.z) === -1,
+  )
+  if (!back) return progress
+  const left = behind === 0 ? crossings - 1 : crossings
+  const before = lines[(behind - 1 + count) % count]!
+  return {
+    nextGate: behind,
+    crossings: left,
+    safe:
+      left === 0 && behind === 0
+        ? start
+        : (before.find((line) => line.route === back.route) ?? before[0]!).respawn,
+  }
+}
+
+/**
+ * Every line that passes gate `gate`: the gate itself, and on a track with branches each branch's
+ * stand-in for it
+ */
+export function linesOf(
+  checkpoints: NonNullable<Course['checkpoints']>,
+  gate: number,
+): readonly GateLine[] {
+  return (
+    checkpoints.lines?.[gate] ?? [
+      { gate: checkpoints.gates[gate]!, respawn: checkpoints.respawns[gate]!, route: 0 },
+    ]
+  )
+}
+
+/** The respawn point of gate `gate` nearest (x, z): its own, or on a track with branches, a branch's */
+export function respawnNear(
+  checkpoints: NonNullable<Course['checkpoints']>,
+  gate: number,
+  x: number,
+  z: number,
+): Spot {
+  const lines = checkpoints.lines?.[gate]
+  if (!lines) return checkpoints.respawns[gate]!
+  let best = lines[0]!.respawn
+  for (const line of lines) {
+    if (Math.hypot(line.respawn.x - x, line.respawn.z - z) < Math.hypot(best.x - x, best.z - z)) {
+      best = line.respawn
+    }
+  }
+  return best
 }
 
 /** Which way the car is going, as a heading (heading 0 faces -z and grows clockwise) */

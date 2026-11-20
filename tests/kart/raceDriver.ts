@@ -11,11 +11,13 @@ export function* driveFrames(
   slot: number,
   metresPerFrame = 2.5,
   firstTick = 0,
+  /** The centre line driven round: the track's road, or (2026-11-20) a route down its branches */
+  road: readonly { readonly x: number; readonly z: number }[] = track.road,
 ): Generator<KartFrame> {
   const start = gridSpot(track, slot)
   // Up to the line from the grid, then round and round the road
   const path: { x: number; z: number }[] = [start]
-  for (let lap = 0; lap < 20; lap++) for (const point of track.road) path.push(point)
+  for (let lap = 0; lap < 20; lap++) for (const point of road) path.push(point)
   let tick = firstTick
   let seq = 0
   let segment = 0

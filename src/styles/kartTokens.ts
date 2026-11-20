@@ -408,6 +408,19 @@ export const oldStreetScene = {
  * own cyan and magenta and an amber); the volcano's upper slopes (straw silver grass, dark rock, a
  * white weather dome, steam).
  */
+/**
+ * 2026-11-20: the Viaduct Works' own scenery (src/kart/art/worksArt.ts): factory sheds and their
+ * roofs, chimneys, the concrete of the elevated line and of the loading deck's piers
+ */
+export const worksScene = {
+  shedWalls: ['#B9A58C', '#8E9AA3', '#A7836A', '#C7C1B4'],
+  shedRoof: '#55606B',
+  chimney: '#9B5A43',
+  chimneyTop: '#2B2B2E',
+  concrete: '#B8B3AA',
+  concreteDark: '#8F8A82',
+} as const
+
 export const localScene = {
   tidePool: '#3F8FA6',
   mangroveRoot: '#4A3A2C',

@@ -28,8 +28,7 @@ import { createRng } from '../../../shared/games/rng.ts'
 import type { KartInput, KartTuning } from '../../../shared/kart/physics.ts'
 import type { Trial } from '../../../shared/kart/timeTrial.ts'
 import type { Track } from '../../../shared/kart/track.ts'
-import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
-import { createBotBrain } from './brain.ts'
+import { createTrackBrain } from './routes.ts'
 import { BOT_SKILLS, type BotSkill } from './skill.ts'
 
 /** A person's hands on top of the pursuit: every number a habit or a failing */
@@ -173,15 +172,8 @@ export function createDriver(
   seed: number,
 ): (trial: Trial) => KartInput {
   const { skill, hands } = driver
-  const brain = createBotBrain(
-    skill,
-    track.road,
-    tuning,
-    seed,
-    track.jumps,
-    track.walls,
-    trackGuide(track.id),
-  )
+  // 2026-11-20: on a track with branches, the choice of road too (routes.ts)
+  const brain = createTrackBrain(skill, track, tuning, seed)
   const rng = createRng(seed * 7919 + 13)
   const between = (range: readonly [number, number]) =>
     Math.round(range[0] + (range[1] - range[0]) * rng.float())

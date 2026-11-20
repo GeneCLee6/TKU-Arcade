@@ -5,6 +5,7 @@
 // 2026-11-17: Guanyin Hill Road, the first with slopes and jumps (terrain.ts)
 // 2026-11-18: four more, each made to tell drivers apart (docs/KART-FEEL.md §10.1)
 // 2026-11-19: two to learn by heart, with shortcuts only a technique opens (docs/KART-FEEL.md §11)
+// 2026-11-20: a third, the first with real branches (shared/kart/branches.ts, docs/KART-FEEL.md §14)
 export const RACE_TRACK_IDS = [
   'riverside',
   'harbour',
@@ -17,6 +18,7 @@ export const RACE_TRACK_IDS = [
   'datun',
   'wharf',
   'lanes',
+  'works',
 ] as const
 
 export type RaceTrackId = (typeof RACE_TRACK_IDS)[number]

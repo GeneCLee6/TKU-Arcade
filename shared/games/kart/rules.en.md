@@ -19,12 +19,13 @@ The controls panel on the Kart page lists the keys, the gamepad buttons and the 
 
 ## Advanced techniques
 
-Some tracks (**Wharf Warehouses**, **Hillside Lanes**) have to be learnt by heart: the road everyone sees is the long way round, and the short way asks for one of these.
+Some tracks (**Wharf Warehouses**, **Hillside Lanes**, **Viaduct Works**) have to be learnt by heart: the road everyone sees is the long way round, and the short way asks for one of these. On some the short way is a road of its own, a **branch** that leaves the road and joins it again further on: its checkpoints count the same, and a reset on it puts you back on it.
 
 - **Drift jump**: begin a drift just *before* a ramp and keep the drift key down. The kart flies the way it was sliding, not the way the road points; in the air the stick swings the nose much further than usual; and it lands already in the drift, turning at once, with a chunk of gauge and the instant boost ready (let go, press forward). A kart that takes off straight lands straight and only then starts to turn: where a ramp leads straight into a hairpin, that is the far wall.
 - **Lift before the crest**: without a drift jump, the only way through a ramp into a corner is to come off the throttle before the ramp. The faster you leave, the further you fly, and a kart in the air cannot brake or turn.
 - **Over the fence**: the low striped fences can be flown over, and only flown over. The lane behind one is reached from the ramp before it, leaving at an angle: a drift jump towards the lane.
 - **Through the slot**: the tall walls (sheds, rows of containers, yard walls) have gaps one kart wide, lined up so that the straight way through is hidden until you are on it. Line up early, do not drift, and go through straight; missing by a metre is a head-on crash. Each slot has a boost pad just behind it.
+- **The blind turn-in**: a branch whose mouth opens only for a moment, behind a wall or over a crest. Be on its side of the road and already turning before you can see it; late, you meet the corner of the wall.
 
 **Expert** computer karts take these shortcuts, and fire perfect instant boosts and keep the combo going; the Easy, Normal and Hard ones keep to the long way round. On the Kart page, `?autopilot=master` shows a driver who takes every shortcut; `?autopilot=expert` drives the same track well without knowing it.
 

@@ -5,6 +5,7 @@
 //
 // Coordinates are metres on the ground plane: x to the right, z towards the viewer, as in
 // physics.ts; heading 0 faces -z and grows clockwise.
+import { forkKerbs, parseBranches, rememberForks, trackLines, type BranchJson, type Fork } from './branches.ts'
 import type { Course, Spot } from './course.ts'
 import { terrainOf, type Terrain } from './terrain.ts'
 import type { Wall } from './walls.ts'
@@ -88,11 +89,18 @@ export interface TrackJson {
    * crossing it forwards takes off from. Left out when there are none
    */
   readonly jumps?: readonly number[]
+  /**
+   * Branches (2026-11-20, branches.ts): roads that leave the main road and join it again later,
+   * each with its own centre line. Left out when there are none
+   */
+  readonly branches?: readonly BranchJson[]
 }
 
 export interface Track extends TrackJson {
   /** The kerbs and `walls` together, as the physics wants them */
   readonly allWalls: readonly Wall[]
+  /** The branches, checked, with their gates worked out (branches.ts); absent without any */
+  readonly forks?: readonly Fork[]
 }
 
 // ── Checking ───────────────────────────────────────────────────────────────────────────────────
@@ -203,7 +211,7 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     problems.push('laps: a whole number from 1 to 20')
   }
 
-  const road = list(json.road, 'road', MAX_ROAD_POINTS, problems, (item, at) => {
+  const roadPoint = (item: unknown, at: string): RoadPoint | null => {
     if (!numbers(item, ['x', 'z', 'width'], at, problems)) return null
     const point = item as unknown as RoadPoint
     if (point.width < 4 || point.width > 90) {
@@ -218,7 +226,8 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     return y === undefined
       ? { x: point.x, z: point.z, width: point.width }
       : { x: point.x, z: point.z, width: point.width, y }
-  })
+  }
+  const road = list(json.road, 'road', MAX_ROAD_POINTS, problems, roadPoint)
   if (road.length < 4) problems.push('road: at least 4 points')
   for (let index = 0; index < road.length; index++) {
     const a = road[index]!
@@ -260,6 +269,21 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
   const walls = list(json.walls ?? [], 'walls', MAX_THINGS, problems, (item, at) =>
     wall(item, at, problems),
   )
+  // Branches (2026-11-20): checked against the main road, its gates and walls, once those are sound
+  const forks =
+    json.branches === undefined || problems.length > 0
+      ? []
+      : parseBranches(
+          json.branches,
+          road,
+          gates,
+          headingOf,
+          roadPoint,
+          MAX_GRADE,
+          problems,
+          jumps,
+          walls,
+        )
   const boostPads = list(json.boostPads ?? [], 'boostPads', MAX_THINGS, problems, (item, at) =>
     numbers(item, ['x', 'z', 'heading', 'length', 'width'], at, problems)
       ? (item as unknown as BoostPad)
@@ -299,8 +323,27 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     itemBoxes,
     decor,
     ...(jumps.length > 0 ? { jumps } : {}),
+    ...(forks.length > 0
+      ? {
+          branches: forks.map(
+            (fork): BranchJson => ({
+              from: fork.from,
+              to: fork.to,
+              road: fork.path.slice(1, -1),
+              ...(fork.jumps.length > 0 ? { jumps: fork.jumps.map((lip) => lip - 1) } : {}),
+            }),
+          ),
+        }
+      : {}),
   }
-  return { track: { ...base, allWalls: [...kerbs(road), ...walls] } }
+  if (forks.length === 0) return { track: { ...base, allWalls: [...kerbs(road), ...walls] } }
+  rememberForks(
+    road,
+    forks.map((fork) => fork.path),
+  )
+  return {
+    track: { ...base, allWalls: [...forkKerbs(road, kerbs(road), forks), ...walls], forks },
+  }
 }
 
 /**
@@ -447,11 +490,23 @@ export const courseOf = (track: Track): Course => {
     checkpoints: { gates: track.gates, respawns: track.respawns, laps: track.laps },
     boostPads: track.boostPads,
     ...(terrain ? { terrain } : {}),
+    // Branches (2026-11-20, branches.ts): each gate's stand-ins, and each branch's centre line
+    ...(track.forks && track.forks.length > 0
+      ? {
+          checkpoints: {
+            gates: track.gates,
+            respawns: track.respawns,
+            laps: track.laps,
+            lines: trackLines(track)!,
+          },
+          branches: track.forks.map((fork) => fork.path),
+        }
+      : {}),
   }
 }
 
 /** The smallest box holding the road and its kerbs, for the minimap */
-export function trackBounds(track: Pick<Track, 'road'>): {
+export function trackBounds(track: Pick<Track, 'road'> & Pick<Partial<Track>, 'forks'>): {
   minX: number
   minZ: number
   maxX: number
@@ -461,7 +516,7 @@ export function trackBounds(track: Pick<Track, 'road'>): {
   let minZ = Infinity
   let maxX = -Infinity
   let maxZ = -Infinity
-  for (const point of track.road) {
+  for (const point of [...track.road, ...(track.forks ?? []).flatMap((fork) => fork.path)]) {
     const half = point.width / 2
     minX = Math.min(minX, point.x - half)
     maxX = Math.max(maxX, point.x + half)

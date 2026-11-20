@@ -13,6 +13,7 @@ import {
   starterSpec,
   tenth,
   TRACK_THEMES,
+  type Bypass,
   type PadPlace,
   type Piece,
   type TrackSpec,
@@ -107,7 +108,20 @@ export default function EditorPage() {
     setCopied(null)
   }
 
-  const setPieces = (pieces: Piece[], select?: number) => change({ ...spec, pieces }, select)
+  // 2026-11-20: a bypass whose pieces are gone, or that would end on the last piece, goes with them
+  const setPieces = (pieces: Piece[], select?: number) => {
+    const bypasses = (spec.bypasses ?? []).filter(
+      (bypass) => bypass.to < pieces.length - 1 && bypass.from <= bypass.to,
+    )
+    change({ ...spec, pieces, bypasses: bypasses.length > 0 ? bypasses : undefined }, select)
+  }
+  const bypassAt = (spec.bypasses ?? []).findIndex((bypass) => bypass.from === at)
+  const setBypasses = (bypasses: Bypass[]) =>
+    change({ ...spec, bypasses: bypasses.length > 0 ? bypasses : undefined })
+  const editBypass = (edit: Partial<Bypass>) =>
+    setBypasses(
+      (spec.bypasses ?? []).map((bypass, index) => (index === bypassAt ? { ...bypass, ...edit } : bypass)),
+    )
   const editPiece = (index: number, edit: Partial<Piece>) =>
     setPieces(spec.pieces.map((one, i) => (i === index ? ({ ...one, ...edit } as Piece) : one)))
 
@@ -548,6 +562,88 @@ export default function EditorPage() {
                   </>
                 )}
               </Form>
+              {/* 2026-11-20: a bypass from this piece, a road of its own beside the road */}
+              <Form data-testid="kart-editor-bypass-form">
+                <SectionTitle as="h3">{t('kart.editor.bypass.title')}</SectionTitle>
+                {bypassAt < 0 ? (
+                  <>
+                    <Hint>{t('kart.editor.bypass.help')}</Hint>
+                    <Button
+                      $size="sm"
+                      $variant="secondary"
+                      onClick={() =>
+                        setBypasses([
+                          ...(spec.bypasses ?? []),
+                          {
+                            from: at,
+                            to: Math.min(at + 1, spec.pieces.length - 2),
+                            side: -1,
+                            offset: 50,
+                            width: 16,
+                          },
+                        ])
+                      }
+                      disabled={
+                        at >= spec.pieces.length - 1 ||
+                        (spec.bypasses ?? []).length >= LIMITS.maxBypasses
+                      }
+                      data-testid="kart-editor-bypass-add"
+                    >
+                      {t('kart.editor.bypass.add')}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <NumberField
+                      label={t('kart.editor.bypass.to')}
+                      value={spec.bypasses![bypassAt]!.to + 1}
+                      min={at + 1}
+                      max={spec.pieces.length - 1}
+                      onValue={(to) => editBypass({ to: Math.round(to) - 1 })}
+                      testId="kart-editor-bypass-to"
+                    />
+                    <Inline>
+                      <span>{t('kart.editor.bypass.side')}</span>
+                      <select
+                        value={spec.bypasses![bypassAt]!.side}
+                        onChange={(event) =>
+                          editBypass({ side: event.target.value === '1' ? 1 : -1 })
+                        }
+                        data-testid="kart-editor-bypass-side"
+                      >
+                        <option value="-1">{t('kart.editor.bypass.left')}</option>
+                        <option value="1">{t('kart.editor.bypass.right')}</option>
+                      </select>
+                    </Inline>
+                    <NumberField
+                      label={t('kart.editor.bypass.offset')}
+                      value={spec.bypasses![bypassAt]!.offset}
+                      min={LIMITS.minBypassOffset}
+                      max={LIMITS.maxBypassOffset}
+                      onValue={(offset) => editBypass({ offset })}
+                      testId="kart-editor-bypass-offset"
+                    />
+                    <NumberField
+                      label={t('kart.editor.bypass.width')}
+                      value={spec.bypasses![bypassAt]!.width}
+                      min={LIMITS.minBypassWidth}
+                      max={LIMITS.maxBypassWidth}
+                      onValue={(width) => editBypass({ width })}
+                      testId="kart-editor-bypass-width"
+                    />
+                    <Button
+                      $size="sm"
+                      $variant="danger"
+                      onClick={() =>
+                        setBypasses((spec.bypasses ?? []).filter((_, index) => index !== bypassAt))
+                      }
+                      data-testid="kart-editor-bypass-remove"
+                    >
+                      {t('kart.editor.bypass.remove')}
+                    </Button>
+                  </>
+                )}
+              </Form>
             </section>
           )}
         </Side>
@@ -723,6 +819,12 @@ const DriveLink = styled(Link)`
   font-size: ${fontSize.sm}px;
   font-weight: 700;
   text-decoration: none;
+`
+
+const Hint = styled.p`
+  margin: 0;
+  color: ${color.muted};
+  font-size: ${fontSize.sm};
 `
 
 const Inline = styled.label`

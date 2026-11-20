@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
 import styled from 'styled-components'
+import type { Fork } from '../../shared/kart/branches.ts'
 import { trackBounds, type Gate, type RoadPoint } from '../../shared/kart/track.ts'
 import type { Wall } from '../../shared/kart/walls.ts'
 import type { KartMessageKey } from '../../shared/kart/i18n.ts'
@@ -25,6 +26,11 @@ interface MinimapProps {
    * `others`. Left out, only this kart is on the map
    */
   dots?: readonly { readonly seat: number; readonly fill: string }[]
+  /**
+   * 2026-11-20: the track's branches (shared/kart/branches.ts), each drawn as a road of its own, and
+   * the next gate's stand-in on each marked with it
+   */
+  forks?: readonly Fork[]
 }
 
 /** Room around the road, metres */
@@ -36,12 +42,21 @@ const MARGIN = 6
  * own coordinates; it does not turn with the car.
  */
 export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
-  { t, road, gates, walls = [], dots = [] },
+  { t, road, gates, walls = [], dots = [], forks },
   ref,
 ) {
-  const box = useMemo(() => trackBounds({ road }), [road])
+  const box = useMemo(() => trackBounds({ road, forks }), [road, forks])
   const car = useRef<SVGGElement>(null)
   const next = useRef<SVGLineElement>(null)
+  const nextOnForks = useRef<SVGPathElement>(null)
+  const forkPaths = useMemo(
+    () =>
+      (forks ?? []).map((fork) => ({
+        d: `M${fork.path.map((point) => `${point.x.toFixed(1)} ${point.z.toFixed(1)}`).join('L')}`,
+        width: fork.path.reduce((sum, point) => sum + point.width, 0) / fork.path.length,
+      })),
+    [forks],
+  )
   const dotLayer = useRef<SVGGElement>(null)
   const path = useMemo(
     () => `M${road.map((point) => `${point.x.toFixed(1)} ${point.z.toFixed(1)}`).join('L')}Z`,
@@ -64,6 +79,14 @@ export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
           next.current.setAttribute('x2', String(gate.bx))
           next.current.setAttribute('y2', String(gate.bz))
         }
+        if (forks && nextOnForks.current) {
+          const stands = forks.flatMap((fork) => {
+            const at = nextGate - fork.first
+            const line = at >= 0 && at < fork.count ? fork.gates[at] : undefined
+            return line ? [`M${line.ax} ${line.az}L${line.bx} ${line.bz}`] : []
+          })
+          nextOnForks.current.setAttribute('d', stands.join(''))
+        }
       },
       others(karts) {
         const layer = dotLayer.current
@@ -77,7 +100,7 @@ export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
         }
       },
     }),
-    [gates],
+    [gates, forks],
   )
 
   const finish = gates[0]
@@ -97,6 +120,17 @@ export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
           strokeWidth={width}
           strokeLinejoin="round"
         />
+        {forkPaths.map((fork, index) => (
+          <path
+            key={index}
+            d={fork.d}
+            fill="none"
+            stroke={kartScene.road}
+            strokeWidth={fork.width}
+            strokeLinejoin="round"
+            data-testid="kart-minimap-branch"
+          />
+        ))}
         <path
           d={path}
           fill="none"
@@ -127,6 +161,7 @@ export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
           />
         )}
         <line ref={next} stroke={kartScene.nextGate} strokeWidth={2.5} />
+        {forks && <path ref={nextOnForks} stroke={kartScene.nextGate} strokeWidth={2.5} />}
         <g ref={dotLayer}>
           {dots.map((dot) => (
             <circle

@@ -49,8 +49,10 @@ import {
 } from './tamkangArt.ts'
 import { buildCornerDressing, buildCornerSigns } from './cornerArt.ts'
 import { buildFestival } from './festival.ts'
+import { buildForks } from './forkArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { buildLocal } from './localArt.ts'
+import { buildWorks } from './worksArt.ts'
 import { localPlan } from './localPlan.ts'
 import { buildOldStreet, inOldStreetRiver, oldStreetTreeFits } from './oldStreetArt.ts'
 import {
@@ -413,6 +415,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       kerbMaterial,
     )
     group.add(shadowed(kerb, false))
+    // A track with branches (2026-11-20): its barriers follow the kerbs the physics has, open at
+    // each branch's mouth (forkArt.ts)
+    if (track.forks) continue
     const wall = new Mesh(
       keep(
         barrier(
@@ -749,6 +754,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     if (roadClearance(track.road, stand.position.x, stand.position.z) > 4) group.add(stand)
   }
 
+  // ── A track with branches (2026-11-20): their roads, and barriers open at their mouths ──
+  buildForks({ track, level, group, textures, keep, own, ownTexture, standard, shadowed, place })
+
   // ── A hill track (2026-11-17): the ground's height field and the jumps' ramps ──
   if (hillAt) {
     const kit = { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place }
@@ -909,6 +917,14 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
         place,
       })
     : null
+
+  // ── The Viaduct Works (2026-11-20): sheds, chimneys, the elevated line, the deck's piers ──
+  if (track.id === 'works') {
+    buildWorks(
+      { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
+      groundAt,
+    )
+  }
 
   // ── The four technical tracks: each one's own landmark (2026-11-18) ──
   const localScenery = local

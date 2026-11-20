@@ -2,7 +2,8 @@
 // for up to eight, how far round each kart is (for the places), the server's judgement of each frame
 // (plausible or not, which gates it crossed, whether a lap ended) and the push two karts give each
 // other. Pure: the Worker and the browser run the same code (docs/KART-NETCODE.md).
-import { passGates, type Spot } from './course.ts'
+import { trackLines } from './branches.ts'
+import { linesOf, passGates, respawnNear, type Spot } from './course.ts'
 import { applyKart, KART_IDS, type KartId } from './karts.ts'
 import { ARCADE_TUNING, KART_TUNING, type KartState } from './physics.ts'
 import { TEAM_BOOST } from './teamBoost.ts'
@@ -59,7 +60,7 @@ export const lapsDone = (crossings: number): number => Math.max(0, crossings - 1
  * to the next one. Sorting by it, biggest first, gives the places of those still racing
  */
 export function raceProgress(
-  track: Pick<Track, 'gates'>,
+  track: Pick<Track, 'gates'> & Pick<Partial<Track>, 'respawns' | 'forks'>,
   crossings: number,
   nextGate: number,
   x: number,
@@ -67,14 +68,25 @@ export function raceProgress(
 ): number {
   const count = track.gates.length
   const passed = gatesPassed(crossings, nextGate, count)
-  const next = track.gates[nextGate % count]!
-  const behind = track.gates[(nextGate - 1 + count) % count]!
-  const mid = (gate: typeof next) => ({ x: (gate.ax + gate.bx) / 2, z: (gate.az + gate.bz) / 2 })
-  const a = mid(behind)
-  const b = mid(next)
-  const span = Math.max(1, Math.hypot(b.x - a.x, b.z - a.z))
-  const left = Math.hypot(b.x - x, b.z - z)
-  return passed + Math.max(0, Math.min(0.999, 1 - left / span))
+  const mid = (gate: Track['gates'][number]) => ({
+    x: (gate.ax + gate.bx) / 2,
+    z: (gate.az + gate.bz) / 2,
+  })
+  const share = (a: { x: number; z: number }, b: { x: number; z: number }) => {
+    const span = Math.max(1, Math.hypot(b.x - a.x, b.z - a.z))
+    const left = Math.hypot(b.x - x, b.z - z)
+    return Math.max(0, Math.min(0.999, 1 - left / span))
+  }
+  // On a track with branches (2026-11-20): the furthest the kart has come from any line of the
+  // gate behind towards any line of the next (it is on the road it has come furthest along), so
+  // that the share does not jump back where the roads part and meet
+  const lines = trackLines(track)
+  if (lines) {
+    const behind = lines[(nextGate - 1 + count) % count]!.map((line) => mid(line.gate))
+    const ahead = lines[nextGate % count]!.map((line) => mid(line.gate))
+    return passed + Math.max(...behind.flatMap((a) => ahead.map((b) => share(a, b))))
+  }
+  return passed + share(mid(track.gates[(nextGate - 1 + count) % count]!), mid(track.gates[nextGate % count]!))
 }
 
 // ── Judging frames on the server ─────────────────────────────────────────────────────────────
@@ -218,14 +230,18 @@ export function judgeFrame(tracked: Tracked, frame: KartFrame, context: JudgeCon
         refusedSince: null,
         nextGate: warp.nextGate,
         crossings: warp.crossings,
-        safe: checkpoints.respawns[(warp.nextGate - 1 + count) % count]!,
+        safe: respawnNear(checkpoints, (warp.nextGate - 1 + count) % count, warp.x, warp.z),
         warp: null,
       },
     }
   }
   if (!resync && last) {
     if (frame.reset) {
-      const spots = [...checkpoints.respawns, gridSpot(track, context.slot)]
+      const spots = [
+        ...checkpoints.respawns,
+        ...(checkpoints.lines ?? []).flatMap((lines) => lines.slice(1).map((line) => line.respawn)),
+        gridSpot(track, context.slot),
+      ]
       if (!near(spots, frame.x, frame.z, RESET_REACH)) return refuse('reset')
     } else {
       const seconds = Math.max((frame.tick - last.tick) / 60, (now - tracked.lastAt) / 1000) + 0.1
@@ -265,13 +281,18 @@ export function judgeFrame(tracked: Tracked, frame: KartFrame, context: JudgeCon
   const counted = gatesPassed(progress.crossings, progress.nextGate, count)
   const forgotten = last === null && lapsDone(frame.crossings) === context.laps
   if (frame.nextGate < count && (claimed === counted + 1 || (forgotten && claimed > counted))) {
-    const passed = checkpoints.gates[(frame.nextGate - 1 + count) % count]!
-    const mid = { x: (passed.ax + passed.bx) / 2, z: (passed.az + passed.bz) / 2 }
-    if (Math.hypot(frame.x - mid.x, frame.z - mid.z) <= CATCH_UP_REACH) {
+    const passedAt = (frame.nextGate - 1 + count) % count
+    // Any line of that gate: on a track with branches, the branch's stand-in too (2026-11-20)
+    const near = linesOf(checkpoints, passedAt).some(
+      ({ gate }) =>
+        Math.hypot(frame.x - (gate.ax + gate.bx) / 2, frame.z - (gate.az + gate.bz) / 2) <=
+        CATCH_UP_REACH,
+    )
+    if (near) {
       progress = {
         nextGate: frame.nextGate,
         crossings: frame.crossings,
-        safe: checkpoints.respawns[(frame.nextGate - 1 + count) % count]!,
+        safe: respawnNear(checkpoints, passedAt, frame.x, frame.z),
       }
       if (lapsDone(progress.crossings) > before && !forgotten) {
         lapAt = Math.round((frame.tick / 60) * 1000)

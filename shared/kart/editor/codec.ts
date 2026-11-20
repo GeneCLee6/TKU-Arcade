@@ -9,6 +9,7 @@ import {
   PAD_PLACES,
   TRACK_THEMES,
   tenth,
+  type Bypass,
   type PadPlace,
   type Piece,
   type TrackSpec,
@@ -74,9 +75,24 @@ export function cleanName(name: string): string {
   return Array.from(plain).slice(0, LIMITS.maxName).join('').trim()
 }
 
-/** The pieces alone, as the code has them: what a track's records are kept by (`specHash`) */
-export const piecesKey = (pieces: readonly Piece[]): string =>
-  JSON.stringify(pieces.map(pieceTuple))
+type BypassTuple = readonly [number, number, number, number, number]
+
+const bypassTuple = (bypass: Bypass): BypassTuple => [
+  bypass.from,
+  bypass.to,
+  bypass.side,
+  tenth(bypass.offset),
+  tenth(bypass.width),
+]
+
+/**
+ * The pieces alone, as the code has them: what a track's records are kept by (`specHash`). With
+ * bypasses (2026-11-20) those too; a layout without any keys exactly as it always did
+ */
+export const piecesKey = (pieces: readonly Piece[], bypasses?: readonly Bypass[]): string =>
+  bypasses && bypasses.length > 0
+    ? JSON.stringify([pieces.map(pieceTuple), bypasses.map(bypassTuple)])
+    : JSON.stringify(pieces.map(pieceTuple))
 
 export function encodeSpec(spec: TrackSpec): string {
   return toBase64Url(
@@ -85,6 +101,7 @@ export function encodeSpec(spec: TrackSpec): string {
       n: cleanName(spec.name),
       t: spec.theme,
       p: spec.pieces.map(pieceTuple),
+      ...(spec.bypasses && spec.bypasses.length > 0 ? { b: spec.bypasses.map(bypassTuple) } : {}),
     }),
   )
 }
@@ -154,7 +171,7 @@ export function decodeSpec(code: string): TrackSpec | null {
     return null
   }
   if (typeof json !== 'object' || json === null || Array.isArray(json)) return null
-  const { v, n, t, p } = json as Record<string, unknown>
+  const { v, n, t, p, b } = json as Record<string, unknown>
   if (v !== CODE_VERSION || typeof n !== 'string' || typeof t !== 'string') return null
   if (!TRACK_THEMES.includes(t as TrackTheme)) return null
   if (!Array.isArray(p) || p.length < LIMITS.minPieces || p.length > LIMITS.maxPieces) return null
@@ -164,15 +181,45 @@ export function decodeSpec(code: string): TrackSpec | null {
     if (!piece) return null
     pieces.push(piece)
   }
-  return { name: cleanName(n), theme: t as TrackTheme, pieces }
+  // Bypasses (2026-11-20): a whole number of pieces each end, inside the loop; checked as a road by build.ts
+  let bypasses: Bypass[] | undefined
+  if (b !== undefined) {
+    if (!Array.isArray(b) || b.length < 1 || b.length > LIMITS.maxBypasses) return null
+    bypasses = []
+    for (const item of b) {
+      const bypass = readBypass(item, pieces.length)
+      if (!bypass) return null
+      bypasses.push(bypass)
+    }
+  }
+  return {
+    name: cleanName(n),
+    theme: t as TrackTheme,
+    pieces,
+    ...(bypasses ? { bypasses } : {}),
+  }
+}
+
+function readBypass(value: unknown, pieces: number): Bypass | null {
+  if (!Array.isArray(value) || value.length !== 5) return null
+  const [from, to, side, offset, width] = value as unknown[]
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null
+  if ((from as number) < 0 || (to as number) < (from as number) || (to as number) >= pieces - 1) {
+    return null
+  }
+  if (side !== -1 && side !== 1) return null
+  const off = numberIn(offset, LIMITS.minBypassOffset, LIMITS.maxBypassOffset)
+  const wide = numberIn(width, LIMITS.minBypassWidth, LIMITS.maxBypassWidth)
+  if (off === null || wide === null) return null
+  return { from: from as number, to: to as number, side, offset: off, width: wide }
 }
 
 /**
  * A short hash of the pieces (cyrb53, base 36): the same layout has the same one, whatever it is
  * called or drawn like, so its records and ghost follow it from link to link
  */
-export function specHash(pieces: readonly Piece[]): string {
-  const text = piecesKey(pieces)
+export function specHash(pieces: readonly Piece[], bypasses?: readonly Bypass[]): string {
+  const text = piecesKey(pieces, bypasses)
   let h1 = 0xdeadbeef
   let h2 = 0x41c6ce57
   for (let index = 0; index < text.length; index++) {

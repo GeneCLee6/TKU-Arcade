@@ -439,6 +439,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
           road={track.road}
           gates={track.gates}
           walls={track.walls}
+          forks={track.forks}
           dots={
             view.teams
               ? others.map((racer) => {

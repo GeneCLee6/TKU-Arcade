@@ -133,10 +133,12 @@ describe('the classic feel is locked too', () => {
 })
 
 // Taken at 7f53e13 (before the terrain), by this file's own functions; the tracks' taken again
-// 2026-11-18 when they were redrawn (the yard's is the one from 7f53e13 still)
+// 2026-11-18 when they were redrawn (the yard's is the one from 7f53e13 still). The old street's
+// taken again 2026-11-20 (oldstreet@9): a boost pad down the market street, which the arcade
+// preset's hard bot drives over (the classic feel's line passes it by: its hash is unchanged)
 const GOLDEN: Record<string, { hash: string; steps: number }> = {
   harbour: { hash: '1343d752', steps: 7058 },
-  oldstreet: { hash: 'fe2840d4', steps: 6097 },
+  oldstreet: { hash: 'ae49e134', steps: 6063 },
 }
 const GOLDEN_ARENA = '72389793'
 

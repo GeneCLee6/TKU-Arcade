@@ -37,6 +37,7 @@ import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TAMKANG } from '../../shared/kart/tracks/tamkang.ts'
 import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
 import { WHARF } from '../../shared/kart/tracks/wharf.ts'
+import { WORKS } from '../../shared/kart/tracks/works.ts'
 import { bumpKart } from '../../shared/kart/race.ts'
 import {
   COUNTDOWN_SECONDS,
@@ -201,6 +202,8 @@ export type SpikeCourse =
   // 2026-11-19: two to learn by heart (docs/KART-FEEL.md §11)
   | 'wharf'
   | 'lanes'
+  // 2026-11-20: the first with real branches (shared/kart/branches.ts)
+  | 'works'
 
 export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'arena',
@@ -216,6 +219,7 @@ export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'datun',
   'wharf',
   'lanes',
+  'works',
 ]
 
 const TRACKS = {
@@ -231,6 +235,7 @@ const TRACKS = {
   datun: DATUN,
   wharf: WHARF,
   lanes: LANES,
+  works: WORKS,
 } as const
 
 /** Where the ghost is, and (for its height on a hill track) how fast it goes there */

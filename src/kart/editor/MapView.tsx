@@ -110,6 +110,24 @@ export const MapView = memo(function MapView({
           data-piece={piece}
         />
       ))}
+      {/* 2026-11-20: each bypass (shared/kart/branches.ts), a road of its own beside the road */}
+      {(track.branches ?? []).map((branch, index) => {
+        const ends = [track.road[branch.from]!, ...branch.road, track.road[branch.to]!]
+        const width = branch.road.reduce((sum, point) => sum + point.width, 0) / branch.road.length
+        return (
+          <path
+            key={`bypass-${index}`}
+            d={`M${ends.map((point) => `${point.x.toFixed(1)} ${point.z.toFixed(1)}`).join('L')}`}
+            fill="none"
+            stroke={kartEditor.road}
+            strokeWidth={width}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            opacity={0.85}
+            data-testid="kart-editor-bypass"
+          />
+        )
+      })}
       {/* Where each piece meets the next */}
       {laid.joints.slice(1, -1).map((joint, index) => (
         <circle key={index} cx={joint.x} cy={joint.z} r={1.6 * scale} fill={kartEditor.joint} />

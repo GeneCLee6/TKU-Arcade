@@ -15,6 +15,7 @@ import type { RaceTrackId } from './list.ts'
 import { RIVERSIDE } from './riverside.ts'
 import { TAMKANG } from './tamkang.ts'
 import { WHARF } from './wharf.ts'
+import { WORKS } from './works.ts'
 
 export const RACE_TRACKS: Readonly<Record<RaceTrackId, TrackJson>> = {
   riverside: RIVERSIDE,
@@ -28,6 +29,7 @@ export const RACE_TRACKS: Readonly<Record<RaceTrackId, TrackJson>> = {
   datun: DATUN,
   wharf: WHARF,
   lanes: LANES,
+  works: WORKS,
 }
 
 const parsed = new Map<string, Track>()

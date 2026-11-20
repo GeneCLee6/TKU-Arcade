@@ -285,7 +285,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
         item={view.mode === 'items' && follow !== null ? (racer?.item ?? null) : undefined}
       />
       <MapCorner>
-        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
+        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} />
       </MapCorner>
       <WatchControls
         t={t}

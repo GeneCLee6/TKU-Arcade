@@ -43,8 +43,8 @@ import {
   type TrialCourse,
 } from '../../../shared/kart/timeTrial.ts'
 import { courseOf, roadDirection, type Track } from '../../../shared/kart/track.ts'
-import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
-import { createBotBrain, pointAhead, type BotBrain } from './brain.ts'
+import { pointAhead, type BotBrain } from './brain.ts'
+import { createTrackBrain } from './routes.ts'
 import { createItemRider, type ItemRider } from './effects.ts'
 import { wantsToUse } from './itemSense.ts'
 import type { BotEntry } from './roster.ts'
@@ -180,15 +180,8 @@ export function createBotRace(options: BotRaceOptions): BotRace {
       entry,
       skill,
       course,
-      brain: createBotBrain(
-        skill,
-        track.road,
-        tuning,
-        options.seed * 31 + seat,
-        track.jumps,
-        track.walls,
-        trackGuide(track.id),
-      ),
+      // 2026-11-20: on a track with branches, the choice of road too (routes.ts)
+      brain: createTrackBrain(skill, track, tuning, options.seed * 31 + seat),
       rider: createItemRider(seat, track, room.state().used),
       team: (() => {
         const state = room.state()

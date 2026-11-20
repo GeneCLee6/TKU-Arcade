@@ -5,18 +5,21 @@
 // room is given (custom.ts). Pure.
 import type { Spot } from '../course.ts'
 import { roadClearance } from '../scenery.ts'
+import { gatesClearOf, type BranchJson } from '../branches.ts'
 import {
   gatesAlong,
   headingOf,
   padsAlong,
+  parseTrack,
   roadDirection,
   TRACK_FORMAT,
+  type RoadPoint,
   type TrackJson,
 } from '../track.ts'
 import { KART_RADIUS } from '../walls.ts'
 import { specHash } from './codec.ts'
 import { layout, wrapAngle, type Laid } from './layout.ts'
-import { LIMITS, type Piece, type TrackSpec } from './spec.ts'
+import { BYPASS_EASE, LIMITS, type Bypass, type Piece, type TrackSpec } from './spec.ts'
 
 /** The loop is closed when the last piece ends this near the start, facing this near its way */
 export const CLOSE_GAP = 2.5
@@ -48,6 +51,7 @@ export type ProblemCode =
   | 'level'
   | 'high'
   | 'steep'
+  | 'bypass'
 
 export interface Problem {
   readonly code: ProblemCode
@@ -139,6 +143,48 @@ function crossings(laid: Laid, at: number[], total: number, max: number): [numbe
     }
   }
   return [...found.values()]
+}
+
+/**
+ * A bypass's road (2026-11-20): the main road's centre line from where piece `from` begins to where
+ * piece `to` ends, moved `offset` to its side, eased out over BYPASS_EASE metres and back in; the
+ * main road points it leaves from and joins again. Null when the pieces leave no room for it
+ */
+export function bypassRoad(
+  laid: Laid,
+  bypass: Bypass,
+): { from: number; to: number; road: RoadPoint[] } | null {
+  const { road, pieceOf } = laid
+  const from = pieceOf.indexOf(bypass.from)
+  const lastOf = pieceOf.lastIndexOf(bypass.to)
+  if (from < 1 || lastOf < 0 || lastOf + 1 >= road.length) return null
+  const to = lastOf + 1
+  const along = [0]
+  for (let index = from + 1; index <= to; index++) {
+    const a = road[index - 1]!
+    const b = road[index]!
+    along.push(along[along.length - 1]! + Math.hypot(b.x - a.x, b.z - a.z))
+  }
+  const total = along[along.length - 1]!
+  if (total < BYPASS_EASE * 2 + 12) return null
+  const points: RoadPoint[] = []
+  for (let index = from + 1; index < to; index++) {
+    const s = along[index - from]!
+    const t = Math.min(1, s / BYPASS_EASE, (total - s) / BYPASS_EASE)
+    const share = t * t * (3 - 2 * t)
+    const point = road[index]!
+    const { dx, dz } = roadDirection(road, index)
+    // The road's right, facing along it, is (-dz, dx)
+    const across = bypass.side * bypass.offset * share
+    const width = Math.round((point.width + (bypass.width - point.width) * Math.min(1, t * 3)) * 10) / 10
+    points.push({
+      x: Math.round((point.x - dz * across) * 100) / 100,
+      z: Math.round((point.z + dx * across) * 100) / 100,
+      width,
+      ...(point.y !== undefined ? { y: point.y } : {}),
+    })
+  }
+  return { from, to, road: points }
 }
 
 /** Raised whenever the physics changes enough that old times on custom tracks mean nothing */
@@ -237,8 +283,26 @@ export function buildSpec(spec: TrackSpec): Built {
     problems.push({ code: 'boxes', pieces: [], params: { max: Math.floor(MAX_BOXES / ROW) } })
   }
 
-  const { gates, respawns } =
+  // Bypasses (2026-11-20): each laid beside the road; the main road's gates kept off where they part
+  const bypasses = spec.bypasses ?? []
+  const branches: BranchJson[] = []
+  const branchOf: Bypass[] = []
+  if (bypasses.length > LIMITS.maxBypasses) {
+    problems.push({ code: 'bypass', pieces: [] })
+  }
+  for (const bypass of bypasses.slice(0, LIMITS.maxBypasses)) {
+    const laidBy = road.length > 3 ? bypassRoad(laid, bypass) : null
+    if (!laidBy) {
+      problems.push({ code: 'bypass', pieces: [bypass.from, bypass.to] })
+      continue
+    }
+    branches.push({ from: laidBy.from, to: laidBy.to, road: laidBy.road })
+    branchOf.push(bypass)
+  }
+  const along =
     road.length > 0 ? gatesAlong(road, GATE_EVERY) : { gates: [], respawns: [] }
+  const { gates, respawns } =
+    branches.length > 0 ? gatesClearOf(road, along.gates, along.respawns, branches) : along
   const padSpots: [number, number][] = []
   const boxes: { x: number; z: number }[] = []
   pieces.forEach((piece, index) => {
@@ -265,7 +329,7 @@ export function buildSpec(spec: TrackSpec): Built {
     }
   })
 
-  const hash = specHash(pieces)
+  const hash = specHash(pieces, spec.bypasses)
   const named = spec.name.trim()
   const track: TrackJson = {
     format: TRACK_FORMAT,
@@ -285,6 +349,24 @@ export function buildSpec(spec: TrackSpec): Built {
     itemBoxes: boxes.slice(0, MAX_BOXES),
     decor: [],
     ...(laid.jumps.length > 0 ? { jumps: laid.jumps } : {}),
+    ...(branches.length > 0 ? { branches } : {}),
+  }
+  // A bypass is checked as any branch is (branches.ts): clear of the road, never across it or
+  // itself or another, its gates clear; the pieces it runs beside are named
+  if (branches.length > 0 && problems.length === 0) {
+    const parsed = parseTrack(track)
+    if ('problems' in parsed) {
+      const named = new Set<number>()
+      for (const problem of parsed.problems) {
+        const which = /^branches[(d+)]/.exec(problem)
+        const bypass = which ? branchOf[Number(which[1])] : undefined
+        if (bypass) named.add(bypasses.indexOf(bypass))
+      }
+      if (named.size === 0) problems.push({ code: 'bypass', pieces: [] })
+      for (const index of named) {
+        problems.push({ code: 'bypass', pieces: [bypasses[index]!.from, bypasses[index]!.to] })
+      }
+    }
   }
   return { track, laid, length: total, problems }
 }

@@ -34,6 +34,7 @@ const en = {
   'kart.course.datun': 'Datun Ridgeline',
   // 2026-11-19: the two to learn by heart (docs/KART-FEEL.md §11)
   'kart.course.wharf': 'Wharf Warehouses',
+  'kart.course.works': 'Viaduct Works',
   'kart.course.lanes': 'Hillside Lanes',
   'kart.race.time': 'Time',
   'kart.race.thisLap': 'Lap',
@@ -356,6 +357,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.course.danhai': '淡海夜城',
   'kart.course.datun': '大屯稜線',
   'kart.course.wharf': '碼頭倉庫',
+  'kart.course.works': '高架廠區',
   'kart.course.lanes': '山城坡巷',
   'kart.race.time': '時間',
   'kart.race.thisLap': '本圈',
