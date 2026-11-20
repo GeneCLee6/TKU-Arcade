@@ -1193,6 +1193,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 - `director.ts` 的 `finishShot`：過線那一刻起，鏡頭在 2.2 秒內從車後繞到車前略偏一側、壓低，之後停在那裡；0.35 秒淡入。減少動態時不轉。
 - `SpikeTrial.celebrating`：過線後 `CELEBRATE_SECONDS` 3.2 秒內。`RaceView` 顯示名次大字（「第 n 名」／「P n」）＋「抵達終點！」＋彩帶與三次火花（`Confetti.tsx`，2D canvas、程式產生、顏色用 `kartTokens.ts` 的 `kartFestival.flags`；減少動態時不畫），之後才是原本的完賽面板。計時賽（`RaceCenter`）顯示「抵達終點！」＋總時間，之後才是成績。
+- **過線後車子不倒車**：完賽後 `stepTrial` 只在車還往前時煞車，停了就放開（原本一直按煞車＝倒車，車在演出時倒退過終點線、圈數被扣回一圈；之前結果立刻出現所以看不出來）。
 - **結果畫面等演出**：`useFinishHold`（`src/kart/race/useFinishHold.ts`）從自己完賽起 3.2 秒內為真；`BotRaceView` 在房間已結束時也先留在比賽畫面，`KartScreen` 在 `game.over` 時也先留在 `RaceView`。最後一個到的人也看得到自己的演出。
 
 **測試**：`tests/kart/raceShow.test.ts`（巡覽填滿 6.5 → 3 秒、從前方開始、接上起跑格鏡頭、每幀移動 < 2 m；終點從車後轉到車前、減少動態不轉；彩帶顏色與時長；結果等 3.2 秒）、`tests/worker/room-realtime.test.ts`（GO＝現在＋`COUNTDOWN_MS`）、`e2e/kart-bots.spec.ts`（巡覽卡片、按鍵跳過、終點慶祝之後才有結果）。

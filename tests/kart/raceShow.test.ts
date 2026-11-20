@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { COUNTDOWN_MS, INTRO_MS } from '../../shared/games/kart/rules.ts'
+import { NO_INPUT } from '../../shared/kart/physics.ts'
 import { gridSpot } from '../../shared/kart/race.ts'
+import { startTrial, stepTrial, type Trial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
+import { courseOf, parseTrack } from '../../shared/kart/track.ts'
+import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import type { Track } from '../../shared/kart/track.ts'
 import {
@@ -55,6 +59,27 @@ describe('the fly round before the countdown', () => {
       before = shot
     }
     expect(introShot(spots, INTRO_TO)).toBeNull()
+  })
+})
+
+describe('after the finish', () => {
+  it('the car stops and stays: it never backs over the line', () => {
+    const oval = parseTrack(TEST_OVAL)
+    if ('problems' in oval) throw new Error(oval.problems.join('; '))
+    const plain = courseOf(oval.track)
+    const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: oval.track.road }
+    let trial = startTrial(course)
+    while (trial.phase === 'countdown') trial = stepTrial(trial, NO_INPUT, course)
+    for (let step = 0; step < 120; step++) trial = stepTrial(trial, { ...NO_INPUT, throttle: true }, course)
+    let finished: Trial = { ...trial, phase: 'finished' }
+    const crossings = finished.run.crossings
+    for (let step = 0; step < 600; step++) {
+      finished = stepTrial(finished, NO_INPUT, course)
+      const { kart } = finished.run
+      expect(kart.vx * Math.sin(kart.heading) - kart.vz * Math.cos(kart.heading)).toBeGreaterThan(-0.5)
+    }
+    expect(Math.hypot(finished.run.kart.vx, finished.run.kart.vz)).toBeLessThan(0.6)
+    expect(finished.run.crossings).toBe(crossings)
   })
 })
 

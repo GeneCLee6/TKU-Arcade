@@ -152,8 +152,13 @@ export function stepTrial(
   rules: KartRules = DEFAULT_RULES,
 ): Trial {
   if (trial.phase === 'finished') {
-    // The car rolls to a stop on its own; nothing counts any more
-    return { ...trial, run: stepRun(trial.run, { ...IDLE, brake: true }, course, tuning, rules) }
+    // The car rolls to a stop on its own; nothing counts any more. Braking only while it still goes
+    // forwards: held on, the brake is reverse, and the car backed over the line during the finish's
+    // show (2026-11-20, §4.44), counting a crossing back
+    const { kart } = trial.run
+    const forward = kart.vx * Math.sin(kart.heading) - kart.vz * Math.cos(kart.heading)
+    const input = forward > 0.5 ? { ...IDLE, brake: true } : IDLE
+    return { ...trial, run: stepRun(trial.run, input, course, tuning, rules) }
   }
   if (trial.phase === 'countdown') {
     // Held on the grid; only the throttle counts, for the start boost. When it was pressed is the
