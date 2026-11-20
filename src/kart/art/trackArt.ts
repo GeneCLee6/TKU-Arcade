@@ -53,7 +53,12 @@ import { buildForks } from './forkArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { buildLocal } from './localArt.ts'
 import { buildWorks } from './worksArt.ts'
+import { buildLanes, lanesPlan } from './lanesArt.ts'
+import { buildSkillCues } from './skillCues.ts'
+import { buildSkillWalls, findSlots, skillStyleOf, wallRuns } from './skillWalls.ts'
+import { buildWharf, wharfPlan } from './wharfArt.ts'
 import { localPlan } from './localPlan.ts'
+import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
 import { buildOldStreet, inOldStreetRiver, oldStreetTreeFits } from './oldStreetArt.ts'
 import {
   ASPHALT_LENGTH,
@@ -341,6 +346,15 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
 
   // 2026-11-18: the four technical tracks' own scenery (localArt.ts); null for any other track
   const local = localPlan(track, level.density)
+  // 2026-11-20: the three tracks to learn by heart, dressed (skillWalls.ts, wharfArt.ts, lanesArt.ts,
+  // worksArt.ts) and their technical places shown (skillCues.ts)
+  const skillStyle = skillStyleOf(track.id)
+  const skillRuns = skillStyle ? wallRuns(track.walls, groundAt) : []
+  const skillSlots = findSlots(skillRuns)
+  const wharfLayout = skillStyle === 'wharf' ? wharfPlan(track, level.density) : null
+  const lanesLayout = skillStyle === 'lanes' ? lanesPlan(track, level.density, skillRuns) : null
+  const skillFits = (x: number, z: number) =>
+    (!wharfLayout || wharfLayout.fits(x, z)) && (!lanesLayout || lanesLayout.fits(x, z))
 
   const { along, length } = roadDistances(track.road)
   const sides = edges(track)
@@ -447,6 +461,8 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       : standard(kartScene.yardWall, textures.brick)
     : null
   for (const extra of track.walls) {
+    // A track to learn by heart draws its fences and tall walls as what they are (below)
+    if (skillStyle && extra.top !== undefined) continue
     const span = Math.hypot(extra.bx - extra.ax, extra.bz - extra.az)
     const midX = (extra.ax + extra.bx) / 2
     const midZ = (extra.az + extra.bz) / 2
@@ -542,7 +558,8 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       (!harbour || harbourTreeFits(x, z)) &&
       (!tamkang || tamkangTreeFits(x, z)) &&
       (!oldStreet || oldStreetTreeFits(x, z)) &&
-      (!local || local.fits(x, z)),
+      (!local || local.fits(x, z)) &&
+      skillFits(x, z),
   })
   const trunks = new InstancedMesh(
     keep(new CylinderGeometry(0.22, 0.32, 2.2, 6)),
@@ -788,7 +805,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
             ? tamkangFestivalFits(x, z)
             : oldStreet
               ? oldStreetTreeFits(x, z)
-              : !inRiver(x) && (!local || local.fits(x, z)),
+              : !inRiver(x) && (!local || local.fits(x, z)) && skillFits(x, z),
     },
   )
 
@@ -919,12 +936,26 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     : null
 
   // ── The Viaduct Works (2026-11-20): sheds, chimneys, the elevated line, the deck's piers ──
-  if (track.id === 'works') {
-    buildWorks(
-      { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
+  const skillKit = { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place }
+  const worksScenery = track.id === 'works' ? buildWorks(skillKit, groundAt) : null
+  // ── The tracks to learn by heart (2026-11-20): their walls, their own quarters, their cues ──
+  const wharfScenery = wharfLayout ? buildWharf(skillKit, wharfLayout) : null
+  if (lanesLayout) {
+    buildLanes(skillKit, lanesLayout, {
+      slots: skillSlots,
       groundAt,
-    )
+      roadHeight: (index) => roadHeights?.[index] ?? 0,
+    })
   }
+  const skillCues = skillStyle
+    ? (buildSkillWalls(skillKit, skillStyle, skillRuns, skillSlots),
+      buildSkillCues(skillKit, {
+        guide: trackGuide(track.id) ?? null,
+        runs: skillRuns,
+        slots: skillSlots,
+        roadHeight: (index) => roadHeights?.[index] ?? 0,
+      }))
+    : null
 
   // ── The four technical tracks: each one's own landmark (2026-11-18) ──
   const localScenery = local
@@ -952,6 +983,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       tamkangScenery?.update(seconds)
       oldStreetScenery?.update(seconds)
       localScenery?.update(seconds)
+      worksScenery?.update(seconds)
+      wharfScenery?.update(seconds)
+      skillCues?.update(seconds)
     },
     dispose() {
       for (const geometry of geometries) geometry.dispose()
