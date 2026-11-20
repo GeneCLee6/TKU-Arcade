@@ -44,7 +44,9 @@ export class FixedWindowLimit {
 export async function takeShared(binding: RateLimit | undefined, key: string): Promise<boolean> {
   if (!binding) return true
   try {
-    return (await binding.limit({ key })).success
+    const outcome = await binding.limit({ key })
+    console.log(JSON.stringify({ event: 'rl_debug', key: key.slice(0, 4), outcome }))
+    return outcome.success
   } catch (error) {
     console.error('rate limiter failed', error)
     return true
