@@ -16,12 +16,18 @@
       // One object per room: members, seats, the running GameModule (ARCHITECTURE.md §3)
       { "name": "ROOM", "class_name": "RoomDO" },
       // One object for the whole deployment: the public room list (e1-t09)
-      { "name": "LOBBY", "class_name": "LobbyDO" }
+      { "name": "LOBBY", "class_name": "LobbyDO" },
+      // The abuse limits shared by every instance, 16 shards by address hash, memory only (e12-t06)
+      { "name": "LIMITER", "class_name": "LimiterDO" }
     ]
   },
   // The free plan only offers SQLite-backed Durable Objects. Migrations only ever add: never edit
   // or remove one that was deployed (DEPLOY.md)
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomDO", "LobbyDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RoomDO", "LobbyDO"] },
+    // e12-t06: the shared abuse limits (worker/limiter.ts)
+    { "tag": "v2", "new_sqlite_classes": ["LimiterDO"] }
+  ],
   // The daily D1 backup to the BACKUPS bucket: 19:00 UTC is 03:00 in Taipei (worker/backup.ts)
   "triggers": { "crons": ["0 19 * * *"] },
   // Production's own database (prompts, results, ...; migrations/). Never give staging or previews
@@ -63,7 +69,8 @@
       "durable_objects": {
         "bindings": [
           { "name": "ROOM", "class_name": "RoomDO" },
-          { "name": "LOBBY", "class_name": "LobbyDO" }
+          { "name": "LOBBY", "class_name": "LobbyDO" },
+          { "name": "LIMITER", "class_name": "LimiterDO" }
         ]
       },
       // One staging database shared by every preview; it never holds anything that matters

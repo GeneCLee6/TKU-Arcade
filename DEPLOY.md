@@ -336,3 +336,19 @@ npx wrangler d1 execute tku-arcade --remote --command   "INSERT INTO game_flags 
 
 預覽站共用 staging D1，所以在一個預覽暫停一款遊戲，所有預覽都會暫停；測完記得打開。
 
+## 15. 濫用防護的速率限制（`e12-t06`）
+
+跨 instance 的限制由 Durable Object `LimiterDO`（`worker/limiter.ts`）計數，**部署時自動生效（DO migration `v2`），Cloudflare 後台不用設定任何東西**：
+
+| 桶 | 限制 |
+| --- | --- |
+| `create` | 每位址每分鐘 5 間新房 |
+| `socket` | 每位址每分鐘 120 次 WebSocket 升級 |
+| `ownerFail` | 每位址每分鐘 5 次錯的擁有者金鑰（之後鎖一分鐘） |
+
+- 依位址雜湊（`worker/address.ts`）的第一個字分 16 個物件；只在記憶體，不寫儲存。正式站與每個預覽是不同的 Worker，各有自己的 LimiterDO。
+- 要改數字：改 `worker/rate-limit.ts` 的 `SHARED_LIMITS`，合併即生效。
+- 本機 `npm run dev`（127.0.0.1／::1）不經過 LimiterDO。
+- 每房每位址 24 條連線是程式常數（`shared/protocol.ts` 的 `MAX_CONNECTIONS_PER_ADDRESS`）。
+- DO migration 只增不改（§7）：`v2` 加了 `LimiterDO`，之後不要改它或拿掉。
+- Cloudflare 的 Rate Limiting binding（`ratelimits`）試過，在這個帳號上一律回 `success: true`，所以沒用（`docs/SECURITY.md` §6）。

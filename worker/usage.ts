@@ -328,7 +328,7 @@ export async function handleUsage(
   now: number = Date.now(),
   fetcher: Fetcher = fetch,
 ): Promise<Response> {
-  const refusal = ownerRefusal(request, env)
+  const refusal = await ownerRefusal(request, env)
   if (refusal) return refusal
   const [lines, alerts] = await Promise.all([
     readUsage(env, now, fetcher),

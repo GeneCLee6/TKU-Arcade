@@ -64,6 +64,30 @@ describe('NicknameForm', () => {
     expect(onSubmit).toHaveBeenCalledWith('😀'.repeat(16))
   })
 
+  it('says as one types that a name passes for the site or a host, or is abuse (e12-t06)', () => {
+    const onSubmit = vi.fn()
+    render(<NicknameForm onSubmit={onSubmit} />)
+    type('Admin')
+    expect(screen.getByRole('alert')).toHaveTextContent('looks like the site or a host')
+    expect(field()).toHaveAttribute('aria-invalid', 'true')
+    submit()
+    expect(onSubmit).not.toHaveBeenCalled()
+    type('fuck')
+    expect(screen.getByRole('alert')).toHaveTextContent('friendlier name')
+    type('a'.repeat(17))
+    expect(screen.getByRole('alert')).toHaveTextContent('Use 1 to 16 characters.')
+    type('Al')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    submit()
+    expect(onSubmit).toHaveBeenCalledWith('Al')
+  })
+
+  it('forgets a stored name the rules no longer allow', () => {
+    localStorage.setItem(KEY, 'Admin')
+    render(<NicknameForm onSubmit={vi.fn()} />)
+    expect(field()).toHaveValue('')
+  })
+
   it('clears the error on typing', () => {
     render(<NicknameForm onSubmit={vi.fn()} />)
     submit()

@@ -19,6 +19,7 @@ import {
   JOIN_TIMEOUT_MS,
   KICK_BAN_MS,
   MAX_CONNECTIONS,
+  MAX_CONNECTIONS_PER_ADDRESS,
   MAX_MEMBERS,
   PROTOCOL_VERSION,
   PROXY_FRAME,
@@ -115,7 +116,8 @@ export type MemberRecord = {
  * One open socket, as the socket itself remembers it through hibernation: with the account its
  * session was signed in to when it opened (e1-t13), from the Worker, never from the browser
  */
-export type OpenSocket = { conn: string; openedAt: number; account?: Account }
+/** `address`: the hashed address the Worker saw (worker/address.ts, e12-t06); absent in old sockets */
+export type OpenSocket = { conn: string; openedAt: number; account?: Account; address?: string }
 
 /** All the room keeps between two wake-ups, apart from the steps, which only a replay reads */
 export type StoredRoom = {
@@ -176,6 +178,8 @@ type Connection = {
   lastSeen: number
   member: string | null
   account: Account | null
+  /** The hashed address it came from (e12-t06), null when unknown */
+  address: string | null
   /** Wrong room passwords this socket has sent (e1-t16); lost on hibernation, which only helps them */
   wrongPasswords?: number
 }
@@ -243,9 +247,15 @@ export class RoomHost {
     this.chatId = this.chat.at(-1)?.id ?? 0
     this.members.clear()
     this.conns.clear()
-    for (const { conn, openedAt, account } of sockets) {
+    for (const { conn, openedAt, account, address } of sockets) {
       // `heartbeat` brings lastSeen up to date before each sweep
-      this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null, account: account ?? null })
+      this.conns.set(conn, {
+        openedAt,
+        lastSeen: openedAt,
+        member: null,
+        account: account ?? null,
+        address: address ?? null,
+      })
     }
     // The alarm may be a game timer's, a long way off: sweeps still come every interval
     const nextSweep = this.deps.now() + SWEEP_INTERVAL_MS
@@ -352,8 +362,8 @@ export class RoomHost {
     }
   }
 
-  /** May this upgrade become a socket of the room? */
-  admit(version: string | null): Admission {
+  /** May this upgrade, from the hashed `address` (null: unknown), become a socket of the room? */
+  admit(version: string | null, address: string | null = null): Admission {
     if (version !== String(PROTOCOL_VERSION)) {
       return { ok: false, code: CloseCode.versionMismatch, reason: 'protocol version mismatch' }
     }
@@ -361,12 +371,27 @@ export class RoomHost {
     if (this.conns.size >= MAX_CONNECTIONS) {
       return { ok: false, code: CloseCode.roomFull, reason: 'room full' }
     }
+    if (address !== null) {
+      let fromThere = 0
+      for (const open of this.conns.values()) if (open.address === address) fromThere++
+      if (fromThere >= MAX_CONNECTIONS_PER_ADDRESS) {
+        return { ok: false, code: CloseCode.tooManyConnections, reason: 'too many connections' }
+      }
+    }
     return { ok: true }
   }
 
-  /** `account`: who the session says this is (e1-t13), null for a guest */
-  opened(conn: string, openedAt: number, account: Account | null = null): void {
-    this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null, account })
+  /**
+   * `account`: who the session says this is (e1-t13), null for a guest. `address`: the hashed
+   * address it came from (e12-t06), null when unknown
+   */
+  opened(
+    conn: string,
+    openedAt: number,
+    account: Account | null = null,
+    address: string | null = null,
+  ): void {
+    this.conns.set(conn, { openedAt, lastSeen: openedAt, member: null, account, address })
     this.sweepAt ??= this.deps.now() + SWEEP_INTERVAL_MS
     this.settleCleanup()
   }

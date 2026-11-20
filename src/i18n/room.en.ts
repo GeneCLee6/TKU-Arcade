@@ -57,6 +57,8 @@ export const roomEn = {
   'room.error.wrong_password': 'That is not the room’s password.',
   'room.error.wrong_status': "That isn't possible at this point in the game.",
   'room.full': 'This room is full.',
+  'room.tooManyConnections':
+    'Too many connections from your network right now. Wait a minute, then try again.',
   'room.host.dissolve': 'Dissolve room',
   'room.host.dissolveBody': 'Everyone will be sent out and the room will be gone for good.',
   'room.host.dissolveTitle': 'Dissolve this room?',

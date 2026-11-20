@@ -71,7 +71,8 @@ export function HomePage() {
     if (id === 'paused') {
       setPaused((games) => [...games, gameId])
       toast(t('lobby.paused'), { tone: 'danger' })
-    } else if (id !== null) navigate(`/r/${id}`)
+    } else if (id === 'rate_limited') toast(t('lobby.tooManyRooms'), { tone: 'danger' })
+    else if (id !== null) navigate(`/r/${id}`)
     else toast(t('lobby.newRoomFailed'), { tone: 'danger' })
   }
 
