@@ -152,6 +152,16 @@ describe('answering', () => {
     expect(screen.getByText('The topics are only in Chinese for now.')).toBeInTheDocument()
   })
 
+  // QA sweep 2026-11: the number and the answer form shared one React key, logged on every answer
+  it('renders the number and the answer form without a duplicate key', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const state = start()
+    show(state, state.answerers[0].seat)
+    const logged = errors.mock.calls.map((call) => String(call[0]))
+    errors.mockRestore()
+    expect(logged.filter((line) => line.includes('same key'))).toEqual([])
+  })
+
   it('gives an answerer their own number, which they can hide', () => {
     const state = start()
     const { seat, number } = state.answerers[0]

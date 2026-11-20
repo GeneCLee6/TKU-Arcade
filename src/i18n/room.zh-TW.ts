@@ -112,7 +112,7 @@ export const roomZhTW: Record<RoomMessageKey, string> = {
   'room.waiting.seat': '座位 {seat}',
   'room.waiting.seats': '座位',
   'room.waiting.sit': '入座',
-  'room.waiting.sitIn': '坐到座位 {seat}',
+  'room.waiting.sitIn': '入座：座位 {seat}',
   'room.waiting.spectators': '旁觀者',
   'room.waiting.standUp': '離開座位',
   'room.waiting.start': '開始遊戲',

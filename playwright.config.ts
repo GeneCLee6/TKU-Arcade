@@ -6,6 +6,8 @@ import { defineConfig } from '@playwright/test'
  */
 export default defineConfig({
   testDir: 'e2e',
+  // The board games' sweep has its own config and server (playwright.sweep.config.ts): it takes minutes
+  testIgnore: 'smoke-games.spec.ts',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
