@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import { KICK_BAN_MS, type RoomMember } from '../../shared/protocol.ts'
 import { hasMessage } from '../i18n/t.ts'
 import { useT } from '../i18n/useT.ts'
-import { memberName } from '../lib/memberName.ts'
+import { botKey, memberName } from '../lib/memberName.ts'
 import { Button } from './Button.tsx'
 import { color, fontSize, radius, space, type ColorName } from '../styles/tokens.ts'
 import { ConfirmButton } from './ConfirmButton.tsx'
@@ -39,7 +39,7 @@ export function MemberEntry({
   const name = memberName(member, gameId)
   if (member.bot) {
     // 2026-11-17: a computer member (shared/protocol.ts 14.): its level, and the host may remove it
-    const levelKey = `games.${gameId}.bot.level.${member.bot.level}` as const
+    const levelKey = botKey(gameId, `level.${member.bot.level}`)
     return (
       <>
         <Name data-testid="bot-member">{name}</Name>
@@ -51,10 +51,10 @@ export function MemberEntry({
             <Button
               $variant="ghost"
               $size="sm"
-              aria-label={t(`games.${gameId}.bot.removeNamed`, { name })}
+              aria-label={t(botKey(gameId, 'removeNamed'), { name })}
               onClick={() => onKick(id)}
             >
-              {t(`games.${gameId}.bot.remove`)}
+              {t(botKey(gameId, 'remove'))}
             </Button>
           </HostActions>
         )}

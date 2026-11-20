@@ -85,3 +85,7 @@ Once the game is over, the **career routes** under the result show every player'
 ## Players
 
 2 to 6 players. A four-player game takes about 20 minutes, a six-player game about 35.
+
+## Computer players
+
+The host can add computer players to free seats in the waiting room, at **Easy** or **Normal**. Normal accepts an offered post when it ranks better than where it stands (counting where the dice lead from it), and buys an office instead of a minor post only when it clearly ranks better and costs at most two thirds of its silver; Easy decides at random.
