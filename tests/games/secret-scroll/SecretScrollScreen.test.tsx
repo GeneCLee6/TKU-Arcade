@@ -167,6 +167,13 @@ describe('the log', () => {
     expect(within(log).getByText('Only you saw: Cy holds Duelist (3).')).toBeInTheDocument()
   })
 
+  // QA sweep 2026-11: axe's scrollable-region-focusable, once the log is long enough to scroll
+  it('can be scrolled from the keyboard', () => {
+    show(position([[2, 4], [6], [3]]), 0)
+    const list = within(screen.getByTestId('scroll-log')).getByRole('list', { name: 'This round' })
+    expect(list).toHaveAttribute('tabindex', '0')
+  })
+
   it('does not tell the others', () => {
     const state = act(position([[2, 4], [6], [3]]), { type: 'play', card: 2, target: 2, guess: null }, 0)
     show(state, 1)

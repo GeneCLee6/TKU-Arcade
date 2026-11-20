@@ -418,8 +418,18 @@ describe('in Traditional Chinese', () => {
     renderRoom(viewOf([al()]))
     expect(screen.getByRole('heading', { name: '座位' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '開始遊戲' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '坐到座位 2' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '入座：座位 2' })).toBeInTheDocument()
     expect(screen.getByText('房主')).toBeInTheDocument()
+  })
+
+  // QA sweep 2026-11: axe's label-content-name-mismatch. A sit button's name must hold what it shows
+  // (「入座」), or voice control cannot press it by what it says
+  it('names a sit button with the word it shows', () => {
+    act(() => setLanguage('zh-TW'))
+    renderRoom(viewOf([al()]))
+    for (const button of screen.getAllByRole('button', { name: /座位 \d/ })) {
+      expect(button.getAttribute('aria-label')).toContain(button.textContent ?? '')
+    }
   })
 })
 

@@ -45,7 +45,8 @@ export function CareerRoutes({
             <Name>{route.name}</Name>
             <Gist>{route.summary}</Gist>
           </Summary>
-          <Turns>
+          {/* A long career scrolls: focusable, so that a keyboard can scroll it too (axe) */}
+          <Turns tabIndex={0} aria-label={route.name}>
             {route.lines.map((line, at) => (
               <li key={at}>
                 <Round>{line.round}</Round>

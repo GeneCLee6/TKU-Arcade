@@ -164,9 +164,9 @@ export default function SpectrumScreen({ room, game }: GameScreenProps) {
           <>
             {role === 'answerer' && own && own.number !== null && own.status !== 'out' && (
               <Pair>
-                <SecretNumber key={view.round} number={own.number} topic={view.topic} />
+                <SecretNumber key={`number-${view.round}`} number={own.number} topic={view.topic} />
                 <AnswerForm
-                  key={view.round}
+                  key={`answer-${view.round}`}
                   sent={own.text}
                   onSend={(text) => room.act({ type: 'submitAnswer', text })}
                 />
