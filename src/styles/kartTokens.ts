@@ -67,6 +67,15 @@ export const kartScene = {
   bolt: '#FFE14D',
   puddle: '#7A5A36',
   puddleDeep: '#4E3820',
+  // 2026-11-20: a mirror's silver ring and its glint; a sea-fog bank's pale grey; a fake box's core,
+  // a dull ember where a real box glows pale (the one tell); a skip's splash, a rally's cheer, static
+  mirror: '#DDE7F2',
+  mirrorGlint: '#9FF3FF',
+  seaFog: '#D7DEE3',
+  decoyCore: '#C2562E',
+  splash: '#8FD8FF',
+  cheer: '#7DFFB0',
+  static: '#C59BFF',
   // A hit (2026-11-17): the four-pointed sparkles thrown up round a stunned kart, the white flash
   // of the moment it is hit, and the pale shards of a shield bubble popping
   hitStar: '#FFE98A',
@@ -242,6 +251,10 @@ export const kartBodies = {
   swift: { main: '#12161C', second: '#2A3340', accent: '#3DC8FF', glow: '#8ADEFF' },
   hornet: { main: '#1B180E', second: '#3D3722', accent: '#FFB800', glow: '#FFD45C' },
   petrel: { main: '#1C1016', second: '#402633', accent: '#FF4D9D', glow: '#FF94C4' },
+  // 2026-11-20: the item series
+  pelican: { main: '#191712', second: '#3B372B', accent: '#F2E6C2', glow: '#FFF4D6' },
+  otter: { main: '#17120F', second: '#3A2C24', accent: '#E07A3F', glow: '#F5A474' },
+  cormorant: { main: '#0E1312', second: '#24302D', accent: '#2BD9A0', glow: '#7AF0C8' },
 } as const
 
 /**

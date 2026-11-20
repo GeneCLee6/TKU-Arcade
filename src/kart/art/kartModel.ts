@@ -263,6 +263,21 @@ const MARKS: Readonly<Record<KartBody, readonly (readonly [Outline, 'accent' | '
     [[[1, 10], [5, 4], [8, 8], [11, 4], [15, 10], [11, 7.4], [8, 11.4], [5, 7.4]], 'accent'],
     [[[7, 12.4], [9, 12.4], [8, 15]], 'ink'],
   ],
+  // 2026-11-20, the item series: `pelican` a beak over its pouch, `otter` a stone held up in two
+  // paws, `cormorant` a hooked head on a long neck
+  pelican: [
+    [[[1, 4], [15, 6], [15, 7.6], [1, 6.4]], 'ink'],
+    [[[3, 7.4], [14, 8.4], [10, 14], [5, 13]], 'accent'],
+  ],
+  otter: [
+    [[[5.4, 3], [10.6, 3], [12, 7], [8, 9.4], [4, 7]], 'accent'],
+    [[[2, 9], [6, 11], [5, 14], [1, 12]], 'ink'],
+    [[[14, 9], [15, 12], [11, 14], [10, 11]], 'ink'],
+  ],
+  cormorant: [
+    [[[4, 15], [6, 4], [12, 1], [15, 4], [12, 3.8], [8.4, 6], [7, 15]], 'accent'],
+    [[[12, 3.8], [15, 4], [13.4, 6.6]], 'ink'],
+  ],
 }
 
 function paintMark(context: CanvasRenderingContext2D, size: number, body: KartBody, accent: string): void {

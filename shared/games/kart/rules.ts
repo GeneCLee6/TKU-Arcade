@@ -18,17 +18,22 @@ import {
   itemBoxes,
   KEEP_EVENTS,
   placeBucket,
+  NO_PERKS,
   rollFor,
+  skipTo,
   type ItemFrame,
+  type ItemPerks,
   type Warp,
 } from '../../kart/items.ts'
-import { loadoutOfByte } from '../../kart/karts.ts'
+import { itemPerksOf, loadoutOfByte } from '../../kart/karts.ts'
 import { decodeFrame } from '../../kart/net.ts'
 import {
+  dropDecoy,
   dropPuddle,
   isShot,
   isShotItem,
   keepShots,
+  layFog,
   sendCloud,
   SHOT_TUNING,
   shotHits,
@@ -120,6 +125,34 @@ const isTime = (value: unknown): value is number =>
 
 const isSeatList = (value: unknown): value is SeatId[] =>
   Array.isArray(value) && value.every((seat) => Number.isInteger(seat))
+
+/** An optional count: absent, or a whole number from `min` to `max` */
+const isOptionalInt = (value: unknown, min: number, max: number): boolean =>
+  value === undefined ||
+  (Number.isInteger(value) && (value as number) >= min && (value as number) <= max)
+
+/**
+ * The racers once `blocked` have had their bubbles stop something (2026-11-20): a bubble that stops
+ * more than one hit (karts.ts) loses one and stays up, and those are `kept`; any other is used up
+ */
+function blockWith(
+  racers: KartRacer[],
+  blocked: readonly SeatId[],
+): { racers: KartRacer[]; kept: SeatId[] } {
+  const kept: SeatId[] = []
+  const next = racers.map((one): KartRacer => {
+    if (!blocked.includes(one.seat)) return one
+    const hits = one.shieldHits ?? 1
+    if (hits > 1) {
+      kept.push(one.seat)
+      return { ...one, shieldHits: hits - 1 }
+    }
+    const rest = { ...one, shieldUntil: 0 }
+    delete rest.shieldHits
+    return rest
+  })
+  return { racers: next, kept }
+}
 
 const isWarp = (value: unknown): value is Warp =>
   isObject(value) &&
@@ -375,10 +408,17 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
           // A thrown or dropped item puts its shot on the road, and nothing else does
           (isShotItem(item)
             ? !isShot(shot) || shot.item !== item || shot.by !== racer.seat || shot.n !== state.used
-            : shot !== null)
+            : shot !== null) ||
+          // 2026-11-20: a longer time, and a bubble that stops more than one hit (karts.ts)
+          !isOptionalInt(a.ms, 1, 60_000) ||
+          !isOptionalInt(a.hits, 1, 3)
         ) {
           return gameError(BAD)
         }
+        const ms = typeof a.ms === 'number' ? a.ms : undefined
+        const hits = typeof a.hits === 'number' ? a.hits : 1
+        // A shield that stopped something is used up (or loses one of its hits, 2026-11-20)
+        const stopped = blockWith(state.racers, blocked)
         const event: KartItemEvent = {
           n: state.used,
           item,
@@ -388,17 +428,20 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
           at,
           warps,
           hit: false,
+          ...(ms !== undefined ? { ms } : {}),
+          ...(stopped.kept.length > 0 ? { kept: stopped.kept } : {}),
         }
-        const racers = state.racers.map((one) => {
-          if (one === racer) {
-            return {
-              ...one,
-              item: null,
-              shieldUntil: item === 'shield' ? at + ITEM_TUNING.shieldMs : one.shieldUntil,
-            }
+        const racers = stopped.racers.map((one): KartRacer => {
+          if (one.seat !== racer.seat) return one
+          const next: KartRacer = { ...one, item: null }
+          if (item === 'shield') {
+            next.shieldUntil = at + (ms ?? ITEM_TUNING.shieldMs)
+            if (hits > 1) next.shieldHits = hits
+            else delete next.shieldHits
           }
-          // A shield that stopped something is used up
-          return blocked.includes(one.seat) ? { ...one, shieldUntil: 0 } : one
+          // 2026-11-20: a mirror up until then
+          if (item === 'mirror') next.mirrorUntil = at + (ms ?? ITEM_TUNING.mirrorMs)
+          return next
         })
         return {
           ...state,
@@ -414,23 +457,66 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         const shot = (state.shots ?? []).find((one) => one.n === a.shot)
         const at = a.at
         if (!racer || done(racer) || !shot || !isTime(at)) return gameError(BAD)
-        // A shield up stops it, and is used up doing it
-        const blocked = racer.shieldUntil > at
+        const base = { n: state.used, item: shot.item, at, warps: [], hit: true }
+        // 2026-11-20: a fog bank fogs whoever drives in, bubble or mirror or not, and stays for the
+        // next kart; each kart once, never its owner
+        if (shot.item === 'fog') {
+          if (shot.by === racer.seat || shot.struck?.includes(racer.seat)) return gameError(BAD)
+          const event: KartItemEvent = { ...base, by: shot.by, targets: [racer.seat], blocked: [] }
+          return {
+            ...state,
+            used: state.used + 1,
+            events: [...state.events, event].slice(-KEEP_EVENTS),
+            shots: keepShots(
+              (state.shots ?? []).map((one) =>
+                one === shot ? { ...one, struck: [...(one.struck ?? []), racer.seat] } : one,
+              ),
+              at,
+            ),
+          }
+        }
+        // 2026-11-20: a mirror up sends it back to whoever threw it, and is used up doing it. A
+        // bubble there stops it; it is never sent back a second time
+        if ((racer.mirrorUntil ?? 0) > at) {
+          const thrower = state.racers.find((one) => one.seat === shot.by)
+          const back = thrower && thrower !== racer && !done(thrower) ? thrower : null
+          const shielded = back !== null && back.shieldUntil > at ? [back.seat] : []
+          const stopped = blockWith(
+            state.racers.map((one) => (one === racer ? { ...one, mirrorUntil: 0 } : one)),
+            shielded,
+          )
+          const event: KartItemEvent = {
+            ...base,
+            by: racer.seat,
+            targets: back ? [back.seat] : [],
+            blocked: shielded,
+            bounced: true,
+            ...(stopped.kept.length > 0 ? { kept: stopped.kept } : {}),
+          }
+          return {
+            ...state,
+            racers: stopped.racers,
+            used: state.used + 1,
+            events: [...state.events, event].slice(-KEEP_EVENTS),
+            shots: keepShots(
+              (state.shots ?? []).filter((one) => one !== shot),
+              at,
+            ),
+          }
+        }
+        // A shield up stops it, and is used up doing it (or loses one of its hits)
+        const blocked = racer.shieldUntil > at ? [racer.seat] : []
+        const stopped = blockWith(state.racers, blocked)
         const event: KartItemEvent = {
-          n: state.used,
-          item: shot.item,
+          ...base,
           by: shot.by,
           targets: [racer.seat],
-          blocked: blocked ? [racer.seat] : [],
-          at,
-          warps: [],
-          hit: true,
+          blocked,
+          ...(stopped.kept.length > 0 ? { kept: stopped.kept } : {}),
         }
         return {
           ...state,
-          racers: state.racers.map((one) =>
-            one === racer && blocked ? { ...one, shieldUntil: 0 } : one,
-          ),
+          racers: stopped.racers,
           used: state.used + 1,
           events: [...state.events, event].slice(-KEEP_EVENTS),
           shots: keepShots(
@@ -726,6 +812,15 @@ function field(state: KartState, tracked: Map<SeatId, Tracked>, track: Track): R
     .sort((a, b) => b.at - a.at || a.seat - b.seat)
 }
 
+/**
+ * What a kart does with items (2026-11-20), by the kart its last frame names: the room's own table
+ * (karts.ts), never anything the kart says about itself beyond which kart it is, which the room also
+ * holds its top speed to
+ */
+export function perksOfFrame(frame: { readonly body: number } | null | undefined): ItemPerks {
+  return frame ? itemPerksOf(loadoutOfByte(frame.body).kart) : NO_PERKS
+}
+
 /** How far (x, z) is from the segment from a to b */
 function distanceToSegment(
   x: number,
@@ -744,7 +839,10 @@ function distanceToSegment(
  * An item frame from `seat`, judged against the state and where the server last saw every kart:
  * the actions it leads to, none when it is refused. A pickup needs the box there, nothing held and
  * the kart near the box on its way; the item is drawn by place. A use needs the item held and, for
- * one that reaches another kart, someone to reach; a shield up stops a harmful one
+ * one that reaches another kart, someone to reach; a shield up stops a harmful one. 2026-11-20: the
+ * kart its frames name may change the draw and how long its own items last (karts.ts's item
+ * series); a skip lands where the room says (`skipTo`), static reaches the front of the field, fog
+ * is laid ahead of the kart in front, a rally lifts the team
  */
 function judgeItem(
   state: KartState,
@@ -767,6 +865,9 @@ function judgeItem(
     racing.findIndex((one) => one.seat === seat),
   )
 
+  // 2026-11-20: what the kart its frames name does with items (karts.ts's item series)
+  const perks = perksOfFrame(last)
+
   if (frame.op === 'pickup') {
     const box = itemBoxes(track)[frame.box]
     if (!box || (racer.item ?? null) !== null || (state.boxes[frame.box] ?? Infinity) > now) {
@@ -778,12 +879,35 @@ function judgeItem(
     // Karts that have finished are ahead of everyone still racing
     const before = state.racers.filter((one) => one.finishMs !== null).length
     const bucket = placeBucket(before + place, before + racing.length)
-    const item = drawItem(bucket, rollFor(state.seed, state.draws))
+    // 2026-11-20: the rally only in a team race, and a kart built for items finds strong ones more
+    // often (karts.ts), by the kart its own frames name
+    const item = drawItem(bucket, rollFor(state.seed, state.draws), {
+      teams: state.teams !== undefined,
+      luck: perks.luck,
+    })
     return [{ t: 'got', seat, box: frame.box, item, at: now }]
   }
 
   const item = frame.item
   if (racer.item !== item) return []
+  /** 2026-11-20: how long it lasts on this kart, when its kart makes it last longer */
+  const lasting = (standard: number): { ms?: number } =>
+    perks.duration === 1 ? {} : { ms: Math.round(standard * perks.duration) }
+  const longer: { ms?: number; hits?: number } =
+    item === 'boost'
+      ? lasting(ITEM_TUNING.boostSeconds * 1000)
+      : item === 'shield'
+        ? {
+            ...lasting(ITEM_TUNING.shieldMs),
+            ...(perks.shieldHits > 1 ? { hits: perks.shieldHits } : {}),
+          }
+        : item === 'tow'
+          ? lasting(ITEM_TUNING.towMs)
+          : item === 'mirror'
+            ? lasting(ITEM_TUNING.mirrorMs)
+            : item === 'rally'
+              ? lasting(ITEM_TUNING.rallySeconds * 1000)
+              : {}
   const applied = (targets: SeatId[], warps: Warp[] = []): KartAction[] => {
     const blocked = HARMFUL_ITEMS.has(item)
       ? targets.filter(
@@ -800,8 +924,20 @@ function judgeItem(
         blocked,
         warps: blocked.length ? [] : warps,
         shot: null,
+        ...longer,
       },
     ]
+  }
+  /** The server lets each kart a use sends somewhere jump there (a swap, a skip) */
+  const letJump = (actions: KartAction[]): KartAction[] => {
+    const action = actions[0]
+    if (action?.t === 'use') {
+      for (const warp of action.warps) {
+        const one = memory.tracked.get(warp.seat)
+        if (one) memory.tracked.set(warp.seat, { ...one, warp })
+      }
+    }
+    return actions
   }
   /** A thrown or dropped item: its shot goes on the road, from where the kart was last seen */
   const thrown = (shot: KartShot, targets: SeatId[] = []): KartAction[] => [
@@ -859,17 +995,45 @@ function judgeItem(
           crossings: own.crossings,
         },
       ]
-      const actions = applied([next.seat], warps)
-      const action = actions[0]
       // Not stopped by a shield: the server lets each kart jump to where it was sent
-      if (action?.t === 'use') {
-        for (const warp of action.warps) {
-          const one = memory.tracked.get(warp.seat)
-          if (one) memory.tracked.set(warp.seat, { ...one, warp })
-        }
-      }
-      return actions
+      return letJump(applied([next.seat], warps))
     }
+    // 2026-11-20, the six more (items.ts, shots.ts)
+    case 'mirror':
+      return applied([])
+    case 'rally': {
+      // Only in a team race: every team-mate still racing, and the kart itself
+      if (!state.teams) return []
+      const mates = state.racers
+        .filter((one) => one.seat !== seat && one.team === racer.team && !done(one))
+        .map((one) => one.seat)
+      return applied(mates)
+    }
+    case 'jam': {
+      // The kart in front of the field (of the other side, in a team race), if in reach
+      const front = foes[0]
+      const at = front?.tracked?.last
+      if (!front || !at || Math.hypot(at.x - last.x, at.z - last.z) > ITEM_TUNING.jamReach) {
+        return []
+      }
+      return applied([front.seat])
+    }
+    case 'fog': {
+      if (!next || !there || distance > SHOT_TUNING.fogReach) return []
+      const target = {
+        x: there.x,
+        z: there.z,
+        heading: there.heading,
+        speed: Math.hypot(there.vx, there.vz),
+      }
+      return thrown(layFog(state.used, thrower, target, now, courseOf(track).walls), [next.seat])
+    }
+    case 'skip': {
+      const warp = skipTo(track, seat, last.x, last.z, own.nextGate, own.crossings)
+      return warp ? letJump(applied([], [warp])) : []
+    }
+    case 'decoy':
+      return thrown(dropDecoy(state.used, thrower, now))
     case 'hail':
       return thrown(throwHail(state.used, thrower, now, courseOf(track).walls))
     case 'puddle':

@@ -83,8 +83,11 @@ describe('the draw', () => {
       const item = drawItem('back', rollFor(42, n))
       counts.set(item, (counts.get(item) ?? 0) + 1)
     }
-    const total = Object.values(ITEM_TABLE.back).reduce((a, b) => a + b, 0)
-    for (const [item, weight] of Object.entries(ITEM_TABLE.back)) {
+    // 2026-11-20: outside a team race the rally is never drawn (items.ts's TEAM_ONLY_ITEMS)
+    const weights = Object.entries(ITEM_TABLE.back).filter(([item]) => item !== 'rally')
+    expect(counts.get('rally')).toBeUndefined()
+    const total = weights.reduce((sum, [, weight]) => sum + weight, 0)
+    for (const [item, weight] of weights) {
       expect((counts.get(item) ?? 0) / 4000).toBeCloseTo(weight / total, 1)
     }
   })

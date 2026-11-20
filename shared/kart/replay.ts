@@ -69,6 +69,13 @@ export interface ReplayEvent {
   readonly blocked: readonly number[]
   /** A shot that hit (e9-t06b), kept since 2026-11-17 so a replay shows the hit; absent for a use */
   readonly hit?: boolean
+  /**
+   * 2026-11-20 (the room's KartItemEvent): a shot a mirror sent back; of `blocked`, the bubbles that
+   * stayed up (they stop two); how long the item lasts on its kart, ms, when longer than standard
+   */
+  readonly bounced?: boolean
+  readonly kept?: readonly number[]
+  readonly ms?: number
 }
 
 /** From `tick` on, `seat` holds `item` (null: nothing) */
@@ -348,8 +355,33 @@ export function shieldsAt(
   const until = new Map<number, number>()
   for (const event of events) {
     if (event.tick > tick) break
-    for (const seat of event.blocked) until.delete(seat)
-    if (event.item === 'shield') until.set(event.by, event.tick + shieldTicks)
+    // 2026-11-20: a bubble that stops two stays up after the first
+    for (const seat of event.blocked) if (!event.kept?.includes(seat)) until.delete(seat)
+    if (event.item === 'shield' && !event.hit) {
+      const ticks = event.ms === undefined ? shieldTicks : Math.round((event.ms / 1000) * 60)
+      until.set(event.by, event.tick + ticks)
+    }
+  }
+  return [...until].filter(([, end]) => end > tick).map(([seat]) => seat)
+}
+
+/**
+ * The seats with a mirror up at `tick` (2026-11-20): raised by a mirror used, gone after its time or
+ * once it has sent a shot back
+ */
+export function mirrorsAt(
+  events: readonly ReplayEvent[],
+  tick: number,
+  mirrorTicks: number,
+): number[] {
+  const until = new Map<number, number>()
+  for (const event of events) {
+    if (event.tick > tick) break
+    if (event.hit && event.bounced) until.delete(event.by)
+    if (event.item === 'mirror' && !event.hit) {
+      const ticks = event.ms === undefined ? mirrorTicks : Math.round((event.ms / 1000) * 60)
+      until.set(event.by, event.tick + ticks)
+    }
   }
   return [...until].filter(([, end]) => end > tick).map(([seat]) => seat)
 }
@@ -405,6 +437,9 @@ export interface RecordedView {
     readonly blocked: readonly number[]
     readonly at: number
     readonly hit?: boolean
+    readonly bounced?: boolean
+    readonly kept?: readonly number[]
+    readonly ms?: number
   }[]
   /** The shots on the road (e9-t06b) */
   readonly shots?: readonly KartShot[]
@@ -466,6 +501,9 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
             targets: [...event.targets],
             blocked: [...event.blocked],
             ...(event.hit ? { hit: true } : {}),
+            ...(event.bounced ? { bounced: true } : {}),
+            ...(event.kept?.length ? { kept: [...event.kept] } : {}),
+            ...(event.ms !== undefined ? { ms: event.ms } : {}),
           })
         }
       }

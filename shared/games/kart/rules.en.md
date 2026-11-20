@@ -34,7 +34,28 @@ Some tracks (**Wharf Warehouses**, **Hillside Lanes**, **Viaduct Works**) have t
 - **Item race**: item boxes on the road. Drive through one to draw an item, by your place: the further back, the stronger. Use it with the item key. You hold one item at a time.
 - **Speed race**: no items, only driving.
 
-The eight items: Tailwind (a boost), Bubble (stops one hit), Tow Line (pulls you to the kart ahead), Headwind (slows everyone ahead), Switcheroo (trades places with the kart ahead), Hailstone (thrown ahead), Thundercloud (chases the kart ahead) and Mud Puddle (dropped behind). A kart that is hit spins and slows for about a second.
+The fourteen items. "Ahead" means the kart just in front of you; in a team race, anything that harms passes your team-mates by.
+
+| Item | What it does | Who gets it most |
+| --- | --- | --- |
+| Tailwind | A boost | Everyone |
+| Bubble | Stops the next harmful item or shot, then pops | The front |
+| Tow Line | Pulls you towards the kart ahead | Middle and back |
+| Headwind | Slows everyone ahead for a few seconds; a Bubble stops it | The back |
+| Switcheroo | Trades places with the kart ahead on the same lap; a Bubble stops it | Middle and back |
+| Hailstone | Thrown straight ahead; stops at a wall | Middle and back |
+| Thundercloud | Chases the kart ahead and strikes when it arrives | The back |
+| Mud Puddle | Dropped behind you; anyone who drives in spins (you too, after a moment) | The front |
+| Rebound | For 8 seconds, the next thrown or dropped item that would hit you goes back to whoever sent it (a Bubble on them stops it). It does nothing against Headwind, Switcheroo or Static. With a Bubble up as well, the Rebound goes first | The front |
+| Sea Fog | A bank of fog appears on the road just ahead of the kart ahead and stays 7 seconds. Driving in clouds your view for about a second and a half and holds you back a little. Not a hit: no Bubble or Rebound stops it, and it never fogs whoever laid it | Middle and back |
+| Skip Stone | Skips you forward to the next gate along the road, with a small push; never over the finish line | The back |
+| Static | The kart in front of the whole field (of the other team, in a team race) cannot fire a boost for 3.5 seconds, and the one burning is cut. A Bubble stops it. Never given to the leader | Middle and back |
+| Rally Flag | Team race only: a short boost for you and every team-mate still racing | Everyone |
+| Fake Box | Looks like an item box (its core glows a dull red, and it turns slower); dropped behind you, it spins whoever drives in. A Bubble stops it | The front |
+
+A kart that is hit spins and slows for about a second. Nothing that reaches a kart ahead is ever given to the leader.
+
+**Item vehicles** (the Beachcomber series in the garage) spend part of their points on items instead of on driving: the Pelican's Bubble stops two hits; the Otter finds the strong items a little more often and its own items last a quarter longer; the Cormorant is the luckiest at the boxes and its Bubble stops two. In a speed race they are simply a little slower. The room decides all of it from the vehicle you picked.
 
 ## Team race
 

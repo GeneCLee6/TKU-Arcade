@@ -10,6 +10,8 @@ export const HAIL_AIM = { distance: 120, angle: 0.12 } as const
 export const PUDDLE_BEHIND = 40
 /** A shield or a puddle with nothing to answer is used anyway after this much longer, ms */
 export const IDLE_USE_MS = 8_000
+/** Fog is laid ahead of the kart in front: not when that kart is right on its nose (better passed), m */
+export const FOG_CLEAR = 30
 
 /** What a bot knows when it decides */
 export interface ItemSituation {
@@ -38,10 +40,17 @@ export interface ItemSituation {
  * boost on a straight, a shield when something is coming, a tow, a swap or a cloud when the kart
  * ahead is in reach, a headwind when anyone is ahead, a hailstone when the kart ahead is lined up,
  * a puddle when someone is close behind. Without it (easy), the item goes as soon as the wait is
- * over, wherever that is
+ * over, wherever that is.
+ *
+ * 2026-11-20, the six more (items.ts): a mirror like a bubble (at once when something is coming); fog
+ * when the kart ahead is in reach and not on top of it; static whenever anyone is ahead (the room
+ * finds the front); a skip on a straight, where landing at the next gate loses nothing, or at once to
+ * get out from under something coming; a rally on a straight, as a boost; a fake box as a puddle
  */
 export function wantsToUse(sense: boolean, s: ItemSituation): boolean {
-  if (sense && s.item === 'shield' && s.threatened) return true
+  if (sense && (s.item === 'shield' || s.item === 'mirror' || s.item === 'skip') && s.threatened) {
+    return true
+  }
   if (s.heldMs < s.waitMs) return false
   if (!sense) return true
   const { ahead } = s
@@ -65,6 +74,18 @@ export function wantsToUse(sense: boolean, s: ItemSituation): boolean {
         Math.abs(ahead.angle) <= HAIL_AIM.angle
       )
     case 'puddle':
+    case 'decoy':
       return (s.behind !== null && s.behind <= PUDDLE_BEHIND) || s.heldMs >= s.waitMs + IDLE_USE_MS
+    case 'mirror':
+      return s.heldMs >= s.waitMs + IDLE_USE_MS
+    case 'fog':
+      return (
+        ahead !== null && ahead.distance <= SHOT_TUNING.fogReach * 0.9 && ahead.distance > FOG_CLEAR
+      )
+    case 'jam':
+      return s.aheadCount > 0
+    case 'skip':
+    case 'rally':
+      return s.straight || s.heldMs >= s.waitMs + IDLE_USE_MS
   }
 }
