@@ -119,6 +119,17 @@ const en = {
   'kart.editor.problem.steep': 'Too steep a slope: at most {rise} m up or down over this length.',
   'kart.editor.problem.bypass':
     'A bypass has no room here: it must leave the road, run clear of it and of itself, and come back.',
+  'kart.editor.bypass.title': 'Bypass',
+  'kart.editor.bypass.help':
+    'A road of its own beside this one, from the start of this piece to the end of a later one: a shortcut, or a long way round.',
+  'kart.editor.bypass.add': 'Add a bypass from here',
+  'kart.editor.bypass.to': 'Joins again after piece',
+  'kart.editor.bypass.side': 'Side',
+  'kart.editor.bypass.left': 'Left',
+  'kart.editor.bypass.right': 'Right',
+  'kart.editor.bypass.offset': 'Distance from the road (m)',
+  'kart.editor.bypass.width': 'Width (m)',
+  'kart.editor.bypass.remove': 'Remove the bypass',
 }
 
 export type KartEditorKey = keyof typeof en
@@ -234,6 +245,16 @@ const zhTW: Record<KartEditorKey, string> = {
   'kart.editor.problem.high': '路面比起終點線高或低超過 {max} m。',
   'kart.editor.problem.steep': '坡太陡了：這個長度最多上下 {rise} m。',
   'kart.editor.problem.bypass': '這條岔路放不下：它要離開主路、不碰主路也不碰自己，再接回來。',
+  'kart.editor.bypass.title': '岔路',
+  'kart.editor.bypass.help': '在這條路旁邊另開一條路，從這一段的開頭到後面某一段的結尾：可以是捷徑，也可以是繞遠路。',
+  'kart.editor.bypass.add': '從這段開一條岔路',
+  'kart.editor.bypass.to': '在第幾段之後接回',
+  'kart.editor.bypass.side': '哪一邊',
+  'kart.editor.bypass.left': '左邊',
+  'kart.editor.bypass.right': '右邊',
+  'kart.editor.bypass.offset': '離主路多遠（公尺）',
+  'kart.editor.bypass.width': '路寬（公尺）',
+  'kart.editor.bypass.remove': '拿掉這條岔路',
 }
 
 export const KART_EDITOR_MESSAGES = { en, 'zh-TW': zhTW }

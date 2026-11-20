@@ -264,16 +264,26 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     spot(item, at, problems),
   )
   if (respawns.length !== gates.length) problems.push('respawns: one for each gate')
-  // Branches (2026-11-20): checked against the main road and its gates, once those are sound
-  const forks =
-    json.branches === undefined || problems.length > 0
-      ? []
-      : parseBranches(json.branches, road, gates, headingOf, roadPoint, MAX_GRADE, problems, jumps)
   const grid = list(json.grid, 'grid', 12, problems, (item, at) => spot(item, at, problems))
   if (grid.length === 0) problems.push('grid: at least one place')
   const walls = list(json.walls ?? [], 'walls', MAX_THINGS, problems, (item, at) =>
     wall(item, at, problems),
   )
+  // Branches (2026-11-20): checked against the main road, its gates and walls, once those are sound
+  const forks =
+    json.branches === undefined || problems.length > 0
+      ? []
+      : parseBranches(
+          json.branches,
+          road,
+          gates,
+          headingOf,
+          roadPoint,
+          MAX_GRADE,
+          problems,
+          jumps,
+          walls,
+        )
   const boostPads = list(json.boostPads ?? [], 'boostPads', MAX_THINGS, problems, (item, at) =>
     numbers(item, ['x', 'z', 'heading', 'length', 'width'], at, problems)
       ? (item as unknown as BoostPad)

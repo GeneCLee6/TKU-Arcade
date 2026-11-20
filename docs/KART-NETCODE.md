@@ -332,3 +332,15 @@ JSON patch 少約 **73–76%**（本機 1.52 → 0.36、預覽站 1.46 → 0.40 
   紅藍版（#102）的團隊加速條快一倍（每秒 30 點，原 14），所以 `tgauge` 與 `tfire` 的 patch 也多：JSON 從 0.37 升到 0.59 kB/s，每人下行多約 0.2 kB/s。壓測機器人不噴紅的、存量一直留著，所以每次滿幾乎都是兩個都變藍（7–8 次滿、43 個藍的）；`OP_TEAM_KEEP` 的路徑由單元測試與本機電腦車賽（`tests/kart/team.test.ts`）涵蓋。
   JSON 那一欄是道具賽＋團隊賽合計（§15 的道具賽單獨約 0.36–0.40 kB/s），團隊賽多出來的量在雜訊範圍內。上行的 `item` 從 0 變成約 2 B/s（道具與團隊噴射的 8 bytes frame）。
 - **測試**：`tests/kart/team.test.ts`、`tests/worker/room-teams.test.ts`、`e2e/kart-team.spec.ts`（§4.31）。
+
+## 18. 岔路：替身閘門與伺服器裁定（2026-11-20，`feat/kart-branch-routes`）
+
+賽道可以有**岔路**（`ARCHITECTURE.md` §4.40）：離開主路、另走一段、再接回的路。房間（`shared/games/kart/rules.ts`）與瀏覽器用同一份賽道 JSON 解析出同樣的東西，所以**協定沒有變**：frame 格式、`PROTOCOL_VERSION`、op、patch 都一樣。
+
+- **替身閘門**：岔路繞過的每個主路閘門，在岔路上有一條替身線（同一個閘門編號）。`courseOf` 把它們放進 `checkpoints.lines`。`judgeFrame` 的逐門計數走 `passGates`，有 `lines` 時「下一門的任一條線往前越過」就算，所以走岔路的車一樣逐門、逐圈被數，不會被當成漏門或逆走；frame 裡的 `nextGate`／`crossings` 意思不變。
+- **復位**：落點在任何一門任何一條線的復位點 30 m 內都採信（以前只有主路的）。
+- **追門**（客戶端比伺服器多一門、而且就在那一門後面）：靠近那一門的任一條線 60 m 內就採信，安全點取最近那條線的復位點。
+- **換位道具**：被交換到岔路上的車，安全點取那一門離它最近的線（`respawnNear`）。
+- **名次**（`raceProgress`）：取「上一門任一條線 → 下一門任一條線」比例最大的那個；岔開與匯合的地方名次不會跳回去。
+- **沒有岔路的賽道**：`lines` 不存在，以上每一處走的都是原來的那一行程式。
+- **壓測**：PR 預覽站 `npm run kart:loadtest -- --bots 6 --track works --laps 3`（壓測機器人沿主路中心線開，它們本來就不會走岔路；岔路的判圈由 `tests/kart/branches.test.ts` 用伺服器同一個 `judgeFrame` 逐 frame 驗：主路、岔路各三圈，每圈時間＝路長／速度，也就是每一門都數到）。數字見 PR。

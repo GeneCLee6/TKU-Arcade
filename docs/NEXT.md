@@ -336,6 +336,12 @@
   - **給擁有者試**：`/kart/spike?track=wharf&autopilot=master`（再換 `expert` 比較）、`track=lanes`；清單在 `KART-FEEL.md` §11.5。規則頁 `/games/kart/rules` 多「進階技巧」。
   - **沒做／待決定**：捷徑是「寬路裡的車道」，不是離開路面的獨立岔路（要改賽道格式）；困難電腦車不會新技巧（要不要教它，等試過再說）；高牆還是素色箱子；貼牆滑行與落地時機噴沒做；山城的差距在目標下緣（8%）。車款依車種調空中手感的介面留在 `TERRAIN_TUNING`（`ARCHITECTURE.md` §4.38），`feat/kart-vehicle-roster` 可以接。
 
+- **路線圖外：真岔路（賽道格式的分支路段）與高架廠區（2026-11-20，`feat/kart-branch-routes`）**。接 #109 的回報「捷徑是寬路裡用牆隔出來的車道，不是離開路面的獨立岔路」。
+  - **格式**（`ARCHITECTURE.md` §4.40）：`TrackJson.branches`：離開主路、另走一段、再接回的路，有自己的中心線、路寬、路緣、高度、跳台。伺服器檢查不自交、不穿過主路、中間要離開主路、範圍不重疊、終點線不在裡面、大小上限（6 條、每條 400 點、全部 2000 點）。路口的路緣切開；分支繞過的閘門在分支上有替身，走分支一樣逐門逐圈（瀏覽器的 `passGates` 與伺服器的 `judgeFrame` 同一套，協定沒變，`KART-NETCODE.md` §18）；分支上復位回分支；地形取所在那條路的高度；逆走、名次、小地圖、箭頭板、場景都認得分支。舊賽道與舊編輯器代碼完全不變（`branchGolden.test.ts` 釘 `fb5f7e1` 的雜湊）。電腦車選路線另寫在 `src/kart/bots/routes.ts`（`brain.ts` 沒動）。編輯器多「岔路」（平行的繞道），伺服器用同一套檢查。
+  - **賽道**：**高架廠區** `works`（暫名，原創河岸工廠區）：裝卸平台（甩尾起跳飛過矮欄上高架）、窄巷（磚牆上 9.5 m 的縫）、盲切（橋頂一過就要切進去）。頂尖比熟練快 **11.4%**；巷弄盃加它。**碼頭倉庫**的倉庫巷改成真岔路（`wharf@2`，頂尖比熟練 11% → 6.6%，照實寫在 `KART-FEEL.md` §13.5）。**老街**市場街加一條加速帶，高手覆蓋率 68% → **73%**（`oldstreet@9`）。
+  - **給擁有者試**：`/kart/spike?track=works&autopilot=master`（再換 `expert`），清單在 `KART-FEEL.md` §13.6。
+  - **沒做／待決定**：分支不能巢狀、不能立體交叉；編輯器的繞道沒有跳台／牆／縫；碼頭倉庫的差距掉到 6.6%；專家電腦車（`feat/kart-expert-bots`）要走分支得有 `tricks`。
+
 - **P1 提前完成（#107，2026-11-19 擁有者要求「其他任務還有什麼沒完成的也一起做」；前提 O2 卡在 F1，P1 本身不需要帳號）**：`e12-t11`、`e12-t15`、`e12-t13`。
   - **功能旗標**（AC-12.7 勾了）：D1 `game_flags`（`migrations/0004`），擁有者在 `/stats` 的「遊戲：開放或暫停」切換，不用重新部署；卡丁車與路線圖外的遊戲都在清單裡（從 `GAME_IDS` 來）。暫停後大廳卡片標「維護中」、建立房間停用、公開房不列出、`POST /api/rooms` 403；**既有房間讓當局玩完**，之後 `start`／`rematch`／`set_game` 回 `game_disabled`，房主可換別款。房間讀旗標快取 30 秒；讀不到旗標表時全部開放。細節 `DEPLOY.md` §14、`ARCHITECTURE.md` §7。
   - **成本儀表板**（AC-12.4 **還沒勾**，等擁有者設 secret 看到數字）：`/stats` 最下面的 Cloudflare 用量表，來源是 GraphQL Analytics API（整個帳號、免費方案的每日／每月額度，`shared/usage.ts`）；每日 cron（和備份同一條）超過 80% 寫 D1 `cost_alerts`（`migrations/0005`）、儀表板紅字、選用 webhook。沒設 secret 時顯示「未設定」。**沒有拿真的 token 跑過**：GraphQL 的資料集與欄位名照 Cloudflare 文件寫，`durableObjectsPeriodicGroups.activeTime` 文件沒列（照記憶），某列「沒有回應」時看 Worker 日誌的 `usage query failed`。`DEPLOY.md` §13。

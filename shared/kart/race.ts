@@ -72,23 +72,21 @@ export function raceProgress(
     x: (gate.ax + gate.bx) / 2,
     z: (gate.az + gate.bz) / 2,
   })
-  // On a track with branches (2026-11-20): the lines of either gate nearest the kart, the road it is on
-  const lines = trackLines(track)
-  const nearestMid = (gate: number) => {
-    const all = lines?.[gate]
-    if (!all) return mid(track.gates[gate]!)
-    let best = mid(all[0]!.gate)
-    for (const line of all) {
-      const here = mid(line.gate)
-      if (Math.hypot(here.x - x, here.z - z) < Math.hypot(best.x - x, best.z - z)) best = here
-    }
-    return best
+  const share = (a: { x: number; z: number }, b: { x: number; z: number }) => {
+    const span = Math.max(1, Math.hypot(b.x - a.x, b.z - a.z))
+    const left = Math.hypot(b.x - x, b.z - z)
+    return Math.max(0, Math.min(0.999, 1 - left / span))
   }
-  const a = nearestMid((nextGate - 1 + count) % count)
-  const b = nearestMid(nextGate % count)
-  const span = Math.max(1, Math.hypot(b.x - a.x, b.z - a.z))
-  const left = Math.hypot(b.x - x, b.z - z)
-  return passed + Math.max(0, Math.min(0.999, 1 - left / span))
+  // On a track with branches (2026-11-20): the furthest the kart has come from any line of the
+  // gate behind towards any line of the next (it is on the road it has come furthest along), so
+  // that the share does not jump back where the roads part and meet
+  const lines = trackLines(track)
+  if (lines) {
+    const behind = lines[(nextGate - 1 + count) % count]!.map((line) => mid(line.gate))
+    const ahead = lines[nextGate % count]!.map((line) => mid(line.gate))
+    return passed + Math.max(...behind.flatMap((a) => ahead.map((b) => share(a, b))))
+  }
+  return passed + share(mid(track.gates[(nextGate - 1 + count) % count]!), mid(track.gates[nextGate % count]!))
 }
 
 // ── Judging frames on the server ─────────────────────────────────────────────────────────────

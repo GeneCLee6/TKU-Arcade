@@ -254,14 +254,7 @@ const lanePads = [
       (index) => [index, WHARF_GUIDE.tech[index]!] as const,
     ),
   ),
-  ...padsAlong(
-    lanePath,
-    [
-      [laneSlot + 2, 0],
-      [laneSlot + 6, 0],
-    ],
-    { length: 12, width: 6 },
-  ),
+  ...padsAlong(lanePath, [[laneSlot + 3, 0]], { length: 12, width: 6 }),
 ]
 const cleared = gatesClearOf(road, made.gates, made.respawns, branches)
 

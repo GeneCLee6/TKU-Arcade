@@ -73,6 +73,10 @@ export const MAX_ALL_POINTS = 2000
 const GATE_SPACING = 2
 /** A gate keeps this far off any other road, metres */
 const GATE_CLEAR = 0.5
+/** gatesClearOf fills a gap of more road points than this between two gates */
+const GATE_GAP = 12
+/** A stand-in's respawn keeps this far from any of the track's own walls, metres */
+const WALL_CLEAR = 4
 /** Kerbs are cut in pieces this long where they cross another road, metres */
 const CLIP_PIECE = 0.25
 
@@ -288,6 +292,20 @@ function segmentsCross(
   return d1 * d2 < 0 && d3 * d4 < 0
 }
 
+/** How far (x, z) is from the nearest of `walls` */
+function nearestWall(walls: readonly Wall[], x: number, z: number): number {
+  let best = Infinity
+  for (const wall of walls) {
+    const sx = wall.bx - wall.ax
+    const sz = wall.bz - wall.az
+    const lengthSq = sx * sx + sz * sz
+    const t =
+      lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((x - wall.ax) * sx + (z - wall.az) * sz) / lengthSq))
+    best = Math.min(best, Math.hypot(x - (wall.ax + sx * t), z - (wall.az + sz * t)))
+  }
+  return best
+}
+
 /** The road point nearest (x, z) */
 function nearestPoint(points: readonly RoadPoint[], x: number, z: number): number {
   let best = 0
@@ -318,6 +336,8 @@ export function parseBranches(
   problems: string[],
   /** The main road's jump lips */
   mainJumps: readonly number[] = [],
+  /** The track's own walls: a stand-in's respawn keeps clear of them */
+  walls: readonly Wall[] = [],
 ): Fork[] {
   if (value === undefined) return []
   if (!Array.isArray(value)) {
@@ -475,8 +495,24 @@ export function parseBranches(
       )
       continue
     }
+    const spacing = (endAt - startAt) / Math.max(1, skipped.length)
     skipped.forEach((_, index) => {
-      const s = startAt + ((endAt - startAt) * (index + 0.5)) / skipped.length
+      // Evenly along the clear stretch, but a few metres off any wall standing on the branch (a
+      // shed's slot): a kart put back there must be able to drive on
+      const even = startAt + spacing * (index + 0.5)
+      let s = even
+      for (let shift = 0; shift <= spacing / 2; shift += 0.5) {
+        const ahead = alongPath(path, along, even + shift)
+        const behind = alongPath(path, along, even - shift)
+        if (nearestWall(walls, ahead.x, ahead.z) >= WALL_CLEAR) {
+          s = even + shift
+          break
+        }
+        if (nearestWall(walls, behind.x, behind.z) >= WALL_CLEAR) {
+          s = even - shift
+          break
+        }
+      }
       const place = alongPath(path, along, s)
       own.push(gateAcross(place.x, place.z, place.dx, place.dz, place.width / 2))
       respawns.push({
@@ -695,16 +731,63 @@ export function gatesClearOf(
   branches: readonly BranchJson[],
 ): { gates: Gate[]; respawns: Spot[] } {
   const paths = branches.map((branch) => branchPath(road, branch))
-  const keep = gates.map(
-    (gate, index) =>
-      index === 0 ||
-      !gateSamples(gate).some((place) =>
-        paths.some((path) => roadDepth(path, false, place.x, place.z) > -GATE_CLEAR - 1),
-      ),
+  const touches = (gate: Gate) =>
+    gateSamples(gate).some((place) =>
+      paths.some((path) => roadDepth(path, false, place.x, place.z) > -GATE_CLEAR - 1),
+    )
+  const count = road.length
+  const across = (index: number) => {
+    const point = road[index]!
+    const { dx, dz } = pathDirection(road, index, true)
+    return {
+      gate: gateAcross(point.x, point.z, dx, dz, point.width / 2),
+      respawn: {
+        x: point.x,
+        z: point.z,
+        heading: Math.round(Math.atan2(dx, -dz) * 1e6) / 1e6,
+      },
+    }
+  }
+  const out: { gate: Gate; respawn: Spot; at: number }[] = []
+  gates.forEach((gate, index) => {
+    const at = nearestPoint(road, (gate.ax + gate.bx) / 2, (gate.az + gate.bz) / 2)
+    if (index === 0 || !touches(gate)) {
+      out.push({ gate, respawn: respawns[index]!, at })
+      return
+    }
+    // Moved along the road to the nearest place clear of every branch, if there is one near
+    for (let shift = 1; shift <= 12; shift++) {
+      for (const way of [1, -1]) {
+        const moved = (at + way * shift + count) % count
+        const one = across(moved)
+        if (touches(one.gate) || out.some((kept) => kept.at === moved)) continue
+        out.push({ ...one, at: moved })
+        return
+      }
+    }
+  })
+  // In driving order from the finish line, each at most once
+  const [first, ...rest] = out
+  rest.sort((a, b) => a.at - b.at)
+  const ordered = [first!, ...rest].filter(
+    (one, index, all) => index === 0 || one.at !== all[index - 1]!.at,
   )
+  // Where moving them left a long gap (a long mouth), one more in the clear stretch between
+  for (let index = 0; index < ordered.length; index++) {
+    const from = ordered[index]!.at
+    const to = index + 1 < ordered.length ? ordered[index + 1]!.at : count
+    if (to - from <= GATE_GAP) continue
+    const clear: number[] = []
+    for (let at = from + 4; at <= to - 4; at++) if (!touches(across(at).gate)) clear.push(at)
+    if (clear.length === 0) continue
+    const at = clear.reduce((best, one) =>
+      Math.abs(one - (from + to) / 2) < Math.abs(best - (from + to) / 2) ? one : best,
+    )
+    ordered.splice(index + 1, 0, { ...across(at), at })
+  }
   return {
-    gates: gates.filter((_, index) => keep[index]),
-    respawns: respawns.filter((_, index) => keep[index]),
+    gates: ordered.map((one) => one.gate),
+    respawns: ordered.map((one) => one.respawn),
   }
 }
 

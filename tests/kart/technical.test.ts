@@ -12,10 +12,10 @@ import { roadClearance } from '../../shared/kart/scenery.ts'
 import { seconds, startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
 import { courseOf, gateCrossing, recordKey, type Track } from '../../shared/kart/track.ts'
 import { RACE_TRACK_IDS, type RaceTrackId } from '../../shared/kart/tracks/list.ts'
-import { trackGuide } from '../../shared/kart/tracks/guides.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { KART_RADIUS, wallClearance } from '../../shared/kart/walls.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
+import { createTrackBrain } from '../../src/kart/bots/routes.ts'
 import { BOT_SKILLS, DIFFICULTIES } from '../../src/kart/bots/skill.ts'
 import { alongRoad } from './trackShape.ts'
 
@@ -34,7 +34,7 @@ const PLAN: Record<
   },
   harbour: { key: 'harbour@12', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
   tamkang: { key: 'tamkang@12', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
-  oldstreet: { key: 'oldstreet@8', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
+  oldstreet: { key: 'oldstreet@9', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
   guanyin: { key: 'guanyin@8', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
   // 2026-11-18, the four new ones (moreTracks.test.ts has what is their own): at most 30% straight
   mangrove: { key: 'mangrove', straight: 0.3, was: 0.3, longest: 280, jumps: 0, hilly: false },
@@ -43,8 +43,11 @@ const PLAN: Record<
   datun: { key: 'datun@2', straight: 0.3, was: 0.3, longest: 200, jumps: 2, hilly: true },
   // 2026-11-19, the two to learn by heart (skillTracks.test.ts has what is their own): a shortcut
   // is a straight line, so they are straighter than the technical four
-  wharf: { key: 'wharf', straight: 0.36, was: 0.36, longest: 220, jumps: 2, hilly: true },
+  // 2026-11-20: the wharf's shed lane is a branch (branches.ts), its records afresh
+  wharf: { key: 'wharf@2', straight: 0.36, was: 0.36, longest: 230, jumps: 2, hilly: true },
   lanes: { key: 'lanes', straight: 0.4, was: 0.4, longest: 220, jumps: 3, hilly: true },
+  // 2026-11-20, the first with branches (branches.test.ts and skillTracks.test.ts have its own)
+  works: { key: 'works', straight: 0.4, was: 0.4, longest: 220, jumps: 1, hilly: true },
 }
 
 const load = (id: RaceTrackId): Track => raceTrack(id)!
@@ -103,8 +106,12 @@ describe.each(RACE_TRACK_IDS)('the redrawn %s', (id) => {
       const next = track.gates[(index + 1) % track.gates.length]!
       const middle = { x: (gate.ax + gate.bx) / 2, z: (gate.az + gate.bz) / 2 }
       const nextMiddle = { x: (next.ax + next.bx) / 2, z: (next.az + next.bz) / 2 }
-      // No further than a few seconds' drive, and reaching kerb to kerb: none can be driven round
-      expect(Math.hypot(nextMiddle.x - middle.x, nextMiddle.z - middle.z)).toBeLessThan(70)
+      // No further than a few seconds' drive, and reaching kerb to kerb: none can be driven round.
+      // 2026-11-20: a track with branches has no gate across a branch's mouth (branches.ts): a gap
+      // where one leaves or joins the road at a shallow angle
+      expect(Math.hypot(nextMiddle.x - middle.x, nextMiddle.z - middle.z)).toBeLessThan(
+        track.forks ? 170 : 70,
+      )
       expect(Math.hypot(gate.bx - gate.ax, gate.bz - gate.az)).toBeGreaterThan(27.9)
       // Driving from this gate's respawn to the next one's crosses the next gate forwards
       const from = track.respawns[index]!
@@ -118,6 +125,32 @@ describe.each(RACE_TRACK_IDS)('the redrawn %s', (id) => {
       }
     })
   })
+
+  it.skipIf(!track.forks)(
+    'has branches of their own: kerbs that never fold, gates and respawns on them, clear of walls',
+    () => {
+      for (const fork of track.forks ?? []) {
+        const { path } = fork
+        expect(Math.min(...path.map((point) => point.width))).toBeGreaterThanOrEqual(10)
+        for (let index = 2; index < path.length - 2; index++) {
+          const a = path[index - 2]!
+          const b = path[index]!
+          const c = path[index + 2]!
+          const ab = Math.hypot(b.x - a.x, b.z - a.z)
+          const bc = Math.hypot(c.x - b.x, c.z - b.z)
+          const ca = Math.hypot(a.x - c.x, a.z - c.z)
+          const cross = Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x))
+          const radius = cross < 1e-6 ? Infinity : (ab * bc * ca) / (2 * cross)
+          expect(radius, `branch point ${index}`).toBeGreaterThan(b.width / 2 + 3)
+        }
+        expect(fork.count).toBeGreaterThanOrEqual(1)
+        fork.respawns.forEach((spot) => {
+          expect(roadClearance(road, spot.x, spot.z)).toBeLessThan(-(KART_RADIUS + 2))
+          expect(wallClearance(track.allWalls, spot.x, spot.z)).toBeGreaterThan(KART_RADIUS + 1)
+        })
+      }
+    },
+  )
 
   it('has a grid of eight on the road behind the line, no two places touching', () => {
     expect(track.grid).toHaveLength(8)
@@ -166,15 +199,9 @@ describe.each(RACE_TRACK_IDS)('the redrawn %s', (id) => {
       const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road }
       const skill = BOT_SKILLS[level]
       for (const seed of [7, 3]) {
-        const brain = createBotBrain(
-          skill,
-          road,
-          KART_TUNING,
-          seed,
-          track.jumps,
-          track.walls,
-          trackGuide(track.id),
-        )
+        // 2026-11-20: the hands that choose the road on a track with branches (routes.ts), the
+        // brain as it always was on any other
+        const brain = createTrackBrain(skill, track, KART_TUNING, seed)
         let trial = startTrial(course)
         let wrong = 0
         let resets = 0
@@ -226,15 +253,7 @@ describe('the computer karts on the technical tracks', () => {
       const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
       const time = (level: (typeof DIFFICULTIES)[number]) => {
         const skill = BOT_SKILLS[level]
-        const brain = createBotBrain(
-          skill,
-          track.road,
-          KART_TUNING,
-          7,
-          track.jumps,
-          track.walls,
-          trackGuide(track.id),
-        )
+        const brain = createTrackBrain(skill, track, KART_TUNING, 7)
         let trial = startTrial(course)
         for (let step = 0; trial.phase !== 'finished' && step < 300 * 60; step++) {
           trial = stepTrial(trial, brain(trial, { speedShare: skill.topSpeedShare }), course)

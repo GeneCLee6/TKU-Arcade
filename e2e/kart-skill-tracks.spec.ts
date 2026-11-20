@@ -20,6 +20,8 @@ const spike = (page: Page): Promise<SpikeReading | null> =>
 const TRACKS = [
   ['wharf', 'Wharf Warehouses'],
   ['lanes', 'Hillside Lanes'],
+  // 2026-11-20: the first with real branches (shared/kart/branches.ts)
+  ['works', 'Viaduct Works'],
 ] as const
 
 const prepare = async (page: Page, small = true) => {
@@ -45,7 +47,9 @@ for (const [id, name] of TRACKS) {
     const map = page.getByRole('img', { name: 'Track map' })
     await expect(map).toBeVisible()
     // The sheds, the rows and the fences are drawn on the map, over the road
-    await expect.poll(() => map.locator('line').count()).toBeGreaterThan(40)
+    // (the works has fewer walls, and its branches drawn as roads of their own)
+    await expect.poll(() => map.locator('line').count()).toBeGreaterThan(id === 'works' ? 8 : 40)
+    if (id === 'works') await expect(page.getByTestId('kart-minimap-branch')).toHaveCount(3)
     await expect(page.getByTestId('kart-race-clock')).toBeVisible({ timeout: 20_000 })
     await expect
       .poll(async () => (await spike(page))?.frames ?? 0, { timeout: 40_000 })
@@ -76,6 +80,7 @@ test('the race against the computer and the Backstreet Cup offer the two tracks'
     'Danhai Night Circuit',
     'Wharf Warehouses',
     'Hillside Lanes',
+    'Viaduct Works',
   ])
 })
 
@@ -86,6 +91,23 @@ test('the driver who knows the wharf lands a drift jump on it', async ({ page })
   await page.goto('/kart/spike?track=wharf&autopilot=master')
   await expect(page.locator('canvas')).toBeVisible()
   // The loading ramp is ten seconds or so from GO; a slow machine drives the same steps, later
+  await expect
+    .poll(async () => (await spike(page))?.state.driftJumps ?? 0, { timeout: 150_000 })
+    .toBeGreaterThanOrEqual(1)
+  expect(errors).toEqual([])
+})
+
+test('the driver who knows the works takes its branches: the map draws them, the laps count', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await prepare(page)
+  await page.goto('/kart/spike?track=works&autopilot=master')
+  await expect(page.locator('canvas')).toBeVisible()
+  // Three branches on the map, each a road of its own
+  await expect(page.getByTestId('kart-minimap-branch')).toHaveCount(3)
+  // The loading deck is entered by a drift jump off the first ramp, a few seconds from GO
   await expect
     .poll(async () => (await spike(page))?.state.driftJumps ?? 0, { timeout: 150_000 })
     .toBeGreaterThanOrEqual(1)

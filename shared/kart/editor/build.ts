@@ -153,7 +153,7 @@ function crossings(laid: Laid, at: number[], total: number, max: number): [numbe
 export function bypassRoad(
   laid: Laid,
   bypass: Bypass,
-): { from: number; to: number; road: RoadPoint[]; easeIn: number; easeOut: number } | null {
+): { from: number; to: number; road: RoadPoint[] } | null {
   const { road, pieceOf } = laid
   const from = pieceOf.indexOf(bypass.from)
   const lastOf = pieceOf.lastIndexOf(bypass.to)
@@ -168,15 +168,9 @@ export function bypassRoad(
   const total = along[along.length - 1]!
   if (total < BYPASS_EASE * 2 + 12) return null
   const points: RoadPoint[] = []
-  let easeIn = to
-  let easeOut = from
   for (let index = from + 1; index < to; index++) {
     const s = along[index - from]!
     const t = Math.min(1, s / BYPASS_EASE, (total - s) / BYPASS_EASE)
-    if (t >= 1) {
-      easeIn = Math.min(easeIn, index)
-      easeOut = Math.max(easeOut, index)
-    }
     const share = t * t * (3 - 2 * t)
     const point = road[index]!
     const { dx, dz } = roadDirection(road, index)
@@ -190,7 +184,7 @@ export function bypassRoad(
       ...(point.y !== undefined ? { y: point.y } : {}),
     })
   }
-  return { from, to, road: points, easeIn, easeOut }
+  return { from, to, road: points }
 }
 
 /** Raised whenever the physics changes enough that old times on custom tracks mean nothing */

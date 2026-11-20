@@ -76,7 +76,12 @@ const laid = lay(
     right(45, 70, W, { mark: 'sweepOut' }),
     fitted(W, { mid: 'pad2' }),
     right(90, 45, 36),
-    line(280, 36),
+    // Home along the river: a swing out round the pumping house and back
+    line(60, 36),
+    left(30, 70, 36),
+    right(60, 70, 36, { mid: 'pumpMid' }),
+    left(30, 70, 36),
+    line(90, 36),
   ],
   { width: 36, height: 0 },
 )
