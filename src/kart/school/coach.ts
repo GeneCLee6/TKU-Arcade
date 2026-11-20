@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): tips during a race, for a technique the player has not
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): tips during a race, for a technique the player has not
 // shown yet. Each tip is given once ever (store.ts keeps which), and a technique the player does
 // unprompted is never tipped: the first instant boost they fire marks its tip as seen. Pure: the
 // page passes each step (spikeLoop.ts's `onStep`) and shows the tip that comes out.

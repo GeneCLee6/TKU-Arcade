@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): what the driving school keeps in this browser: each
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): what the driving school keeps in this browser: each
 // lesson's best stars (or that it was skipped), whether the tips during a race are on, which tips
 // have been given (each is given once), and whether /kart's suggestion to start at the school was
 // answered. localStorage through lib/storage.ts, which never throws: blocked, it all lasts until

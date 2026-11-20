@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): screenshots of the driving school, for looking at with
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): screenshots of the driving school, for looking at with
 // one's own eyes, as kart-ui-shots.mjs is for the rest of the kart's interface: the list of lessons,
 // the suggestion on a first visit to /kart, every lesson a few seconds in (driven by the master's hands, `?autopilot`), and a lesson passed.
 // Drives the real page in Chromium on this machine's GPU, on a desktop and a phone held sideways.

@@ -267,7 +267,7 @@ export const ControlsPanel = memo(function ControlsPanel({
           />
           {t('kart.controls.chainBoosts')}
         </label>
-        {/* 2026-11-20 (§4.49): the tips during a race */}
+        {/* 2026-11-20 (§4.50): the tips during a race */}
         <CoachSwitch t={t} />
       </Rules>
       <VolumeSliders t={t} />

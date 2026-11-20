@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): what the driving school judges, one physics step at a
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): what the driving school judges, one physics step at a
 // time. Pure: the page passes each step as the game loop ran it (spikeLoop.ts's `onStep`), and the
 // tests pass made-up ones. Everything is told from the kart's state before and after the step and
 // the input it ran with, as the physics left it (shared/kart/classic.ts): a drift that earned an

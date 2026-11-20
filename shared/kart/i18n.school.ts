@@ -1,4 +1,4 @@
-// The driving school (2026-11-20; docs/ARCHITECTURE.md §4.49): its lessons, what each asks, what
+// The driving school (2026-11-20; docs/ARCHITECTURE.md §4.50): its lessons, what each asks, what
 // went wrong in a try, the help of the moment, and the tips during a race. Merged into
 // KART_MESSAGES (i18n.ts), so the same check covers them. `en` is the source. In a message,
 // {throttle}, {brake}, {left}, {right}, {drift}, {boost} and {reset} are the player's own controls

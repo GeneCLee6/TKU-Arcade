@@ -10,7 +10,7 @@ export const GAME_META = {
   tictactoe: { minPlayers: 2, maxPlayers: 2, minutes: 2, i18nKey: 'games.tictactoe', unlisted: true },
   // Every turn is one roll, so playing it for someone is fair. The full edition's decisions (C8) are
   // never picked at random: covering a seat then takes the default answer (`proxyActions`, rules.ts)
-  promotion: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.promotion', proxyTurns: true },
+  promotion: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.promotion', proxyTurns: true, computer: true },
   // Listed on the owner's request, 2026-11-12 (the IP-CHECKLIST.md signature lines are still the owner's).
   // No `proxyTurns`: a chip is a decision, and a random one could lose the level
   'silent-table': { minPlayers: 3, maxPlayers: 6, minutes: 20, i18nKey: 'games.silent-table' },
@@ -32,7 +32,8 @@ export const GAME_META = {
   tiles: { minPlayers: 2, maxPlayers: 4, minutes: 30, i18nKey: 'games.tiles' },
   // No `proxyTurns`: every turn is a decision, and a random one could snap a line
   kite: { minPlayers: 2, maxPlayers: 5, minutes: 30, i18nKey: 'games.kite' },
-  traders: { minPlayers: 2, maxPlayers: 4, minutes: 30, i18nKey: 'games.traders' },
+  // `computer`: the room plays computer seats (2026-11-20, GameModule.bot) in these three
+  traders: { minPlayers: 2, maxPlayers: 4, minutes: 30, i18nKey: 'games.traders', computer: true },
   // 2 to 4 is the deck's sweet spot; 5 and 6 work, best with the Beggars (owner's brief 2026-11-14).
   // No `proxyTurns`: every card is a decision
   'secret-scroll': { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.secret-scroll' },
@@ -41,7 +42,7 @@ export const GAME_META = {
   // 2 to 6: the owner's numbers (2026-11-14). The bluffing is on the friends' own voice call
   palace: { minPlayers: 2, maxPlayers: 6, minutes: 15, i18nKey: 'games.palace' },
   // 2 to 9: the owner's numbers (2026-11-14), one full table
-  holdem: { minPlayers: 2, maxPlayers: 9, minutes: 45, i18nKey: 'games.holdem' },
+  holdem: { minPlayers: 2, maxPlayers: 9, minutes: 45, i18nKey: 'games.holdem', computer: true },
   // 2 to 10 (owner's request 2026-11-14). The talking is on the friends' own voice call; no
   // `proxyTurns`: where a card goes is a decision
   misery: { minPlayers: 2, maxPlayers: 10, minutes: 25, i18nKey: 'games.misery' },

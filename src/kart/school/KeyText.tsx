@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): a line of help with the player's own controls in it,
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): a line of help with the player's own controls in it,
 // drawn as key caps (controls.ts says which). A message names a control as {throttle}, {drift} and
 // so on.
 import type { ReactNode } from 'react'

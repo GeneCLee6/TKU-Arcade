@@ -49,3 +49,7 @@ Tap goods on the wharf, or a card or a deck, and confirm in the bar at the botto
 ## Players
 
 2 to 4 players. A game takes about 30 minutes.
+
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats, at **Easy** or **Normal**. They take their own turns after a short pause and see only what a person in their seat would (never anyone's face-down reservation). Normal buys the best card it can afford; otherwise it works towards the card it is closest to, takes the goods that card needs, and reserves it when the wharf does not help. Easy buys when it can and otherwise takes goods more or less at random.

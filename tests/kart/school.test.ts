@@ -39,7 +39,7 @@ import {
   withResult,
 } from '../../src/kart/school/store.ts'
 
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): the driving school. Each lesson's judge is fed made-up
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): the driving school. Each lesson's judge is fed made-up
 // steps of the physics (a kart state before and after, the input), so that what passes a lesson
 // and what each mistake is called are pinned without driving; the progress and the tips' store;
 // and (school.master.test.ts) the master driver passing every lesson for real.

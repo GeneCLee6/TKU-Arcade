@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): the tip of the moment over a race (useCoach.ts), and
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): the tip of the moment over a race (useCoach.ts), and
 // the controls panel's switch that turns the tips off.
 import { useId, useState } from 'react'
 import styled from 'styled-components'

@@ -5,6 +5,8 @@
 // wants. Reaching the target finishes the round; the most points win, fewer cards break a tie.
 //
 // docs/PRD/e22-tamsui-traders.md has the rules and every detail decided here.
+import { tradersBot } from './bot.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import { TRADERS_CARDS, TRADERS_PATRONS } from './bank.ts'
 import { tradersInfo } from './info.ts'
 import { GAME_META } from '../lobby.ts'
@@ -402,6 +404,11 @@ export const TRADERS_DEFAULT_TARGET = 15
 export const traders: GameModule<TradersState, TradersAction, TradersView, TradersOptions> = {
   id: tradersInfo.id,
   meta: GAME_META.traders,
+  // Computer players, played by the room (bot.ts)
+  bots: TABLE_BOTS,
+  bot(view, legal, level, rng) {
+    return tradersBot(view, legal, level, rng)
+  },
   // Hidden (types.ts): settable when a room is made and by `npm run play -- traders --option
   // target=10`, not shown in the waiting room
   options: {

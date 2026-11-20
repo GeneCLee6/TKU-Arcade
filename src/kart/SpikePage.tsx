@@ -117,7 +117,7 @@ export function SpikePage({
   onBotRace?: (setup: BotSetup) => void
   /** 2026-11-17: /kart's menu starts or continues a Grand Prix (src/kart/cup/) */
   onCup?: (run: CupRun) => void
-  /** 2026-11-20 (§4.49): /kart's menu opens the driving school (src/kart/school/) */
+  /** 2026-11-20 (§4.50): /kart's menu opens the driving school (src/kart/school/) */
   onSchool?: () => void
 } = {}) {
   const t: (key: KartMessageKey, params?: MessageParams) => string = useT()
@@ -191,7 +191,7 @@ export function SpikePage({
   const menuId = useId()
   // 2026-11-17: folded on every screen, so that nothing covers the kart and what it leaves behind
   const [helpOpen, setHelpOpen] = useState(false)
-  // 2026-11-20 (§4.49): a tip for a technique not yet used, and, the first time here, the school
+  // 2026-11-20 (§4.50): a tip for a technique not yet used, and, the first time here, the school
   const coach = useCoach()
   const coachStep = coach.onStep
   const [invite, setInvite] = useState(() => !!onSchool && !autopiloted && shouldInvite())
@@ -711,7 +711,7 @@ const WallFlash = styled.div`
   animation: ${flash} 0.5s ease-out;
 `
 
-// 2026-11-20 (§4.49): under the top row on the left, clear of the map and the HUD
+// 2026-11-20 (§4.50): under the top row on the left, clear of the map and the HUD
 const Invite = styled.section`
   ${broadcastSolid}
   /* Under the top row's open menu (its z-index), over the race */

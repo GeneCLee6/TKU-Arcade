@@ -120,6 +120,78 @@ for (const game of GAMES.filter((g) => !pickedGames || pickedGames.includes(g.id
   }
 }
 
+// 2026-11-20: one person and two computer players (GameModule.bot), for each game that has them:
+// the host adds them in the waiting room, the room plays their turns, and the game reaches its end.
+// Hold'em plays on among the computers once the person is out of chips, and a whole game is long, so
+// there the person goes all in every hand and four hands dealt (or the person out) is the check.
+const BOT_GAMES: { id: string; options?: Record<string, unknown> }[] = [
+  { id: 'promotion' },
+  { id: 'traders' },
+  { id: 'holdem', options: { stack: 100, blindUp: 15, timer: 30 } },
+]
+
+for (const game of BOT_GAMES.filter((g) => !pickedGames || pickedGames.includes(g.id))) {
+  for (const screen of SCREENS.filter((s) => s.name === 'desktop' && (!pickedScreens || pickedScreens.includes(s.name)))) {
+    test(`${game.id} on ${screen.name}: one person and two computer players`, async ({ browser }) => {
+      test.setTimeout(420_000)
+      const words = screen.zh ? roomZhTW : roomEn
+      const problems: Problems = { hard: [], soft: [] }
+      const log: PlayLog = { actions: 0, refused: 0 }
+      const seats: Seat[] = []
+      try {
+        seats.push(...(await table(browser, game.id, 1, screen, problems, game.options)))
+        const [host] = seats
+        const page = host.page
+        const add = page.getByRole('button', { name: words['room.bot.add'] })
+        await page.getByTestId('table-bots-level').selectOption('easy')
+        await add.click()
+        await expect.poll(() => Object.values(host.view?.members ?? {}).filter((m) => m.bot).length).toBe(1)
+        await page.getByTestId('table-bots-level').selectOption('normal')
+        await add.click()
+        await expect.poll(() => Object.values(host.view?.members ?? {}).filter((m) => m.bot).length).toBe(2)
+        await expect(page.getByTestId('bot-member')).toHaveCount(2)
+        await checkLayout(page, `${screen.name} waiting room with computers`, problems, screen.zh)
+        await checkAxe(page, `${screen.name} waiting room with computers`, problems)
+
+        await page.getByRole('button', { name: words['room.waiting.start'] }).click()
+        await expect.poll(() => host.view?.room.status).toBe('playing')
+        // Hold'em: all in whenever possible, so that the person's part is over in a few hands
+        const allIn = (n: number) => (game.id === 'holdem' ? n - 1 : 0)
+        const pick = game.id === 'holdem' ? allIn : seeded(seed + game.id.length)
+        const youOut = () => {
+          const view = host.view?.game?.view as { you?: number; players?: { seat: number; out?: boolean }[] } | undefined
+          return view?.players?.find((p) => p.seat === view.you)?.out === true
+        }
+        const handsDealt = () => (host.view?.game?.view as { hand?: number } | undefined)?.hand ?? 0
+        const enough = () => youOut() || (game.id === 'holdem' && handsDealt() >= 4)
+        let nextLook = 20
+        while (!host.view?.game?.over && !enough()) {
+          await playOn(seats, pick, log, (l) => l.actions >= nextLook || enough())
+          await checkLayout(page, `${screen.name} after ${log.actions} moves`, problems, screen.zh)
+          nextLook += 20
+        }
+        // The computers moved: someone other than the person acted
+        expect(host.view?.game).not.toBeNull()
+        if (host.view?.game?.over) {
+          await expect(page.getByRole('region', { name: words['room.result.heading'], exact: true })).toBeVisible({ timeout: 15_000 })
+          await checkLayout(page, `${screen.name} result`, problems, screen.zh)
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message.split('\n')[0] : String(error)
+        problems.hard.push(`failed after ${log.actions} moves: ${message}`)
+        throw error
+      } finally {
+        const report = JSON.stringify({ game: game.id, screen: screen.name, bots: 2, actions: log.actions, ...problems }, null, 2)
+        await test.info().attach('sweep', { contentType: 'application/json', body: report })
+        mkdirSync('tmp/sweep', { recursive: true })
+        writeFileSync(`tmp/sweep/${game.id}-bots-${screen.name}.json`, report)
+        for (const seat of seats) await seat.page.context().close()
+      }
+      expect(problems.hard).toEqual([])
+    })
+  }
+}
+
 async function reloadCheck(
   guest: Seat,
   host: Seat,

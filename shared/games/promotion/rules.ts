@@ -5,6 +5,8 @@
 // That is the simple edition, and the default. The room option `edition: 'full'` plays the full
 // edition instead (C6, rulesFull.ts): `promotion` at the bottom of this file picks one at `init` and
 // tells their states apart by the full one's `edition` field.
+import { promotionBot } from './bot.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import { GAME_META } from '../lobby.ts'
 import { DEFAULT_TURN_LIMIT, promotionInfo } from './info.ts'
 import {
@@ -229,6 +231,11 @@ export const promotion: GameModule<
   id: promotionInfo.id,
   meta: GAME_META.promotion,
   options: PROMOTION_OPTIONS,
+  // Computer players, played by the room (bot.ts): they roll, and answer the full edition's decisions
+  bots: TABLE_BOTS,
+  bot(view, legal, level, rng) {
+    return promotionBot(view, legal, level, rng)
+  },
 
   init(seats, options, rng) {
     // An option missing (a room from before C6) is the simple edition. A full game starts on the

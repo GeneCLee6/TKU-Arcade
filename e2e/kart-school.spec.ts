@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): the driving school. /kart suggests it the first time and
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): the driving school. /kart suggests it the first time and
 // its menu opens it; a lesson shows its goal and the player's own keys; and, driven by the master's
 // hands (`?autopilot`), the first two lessons are passed one after the other, their stars kept.
 // Headless Chromium draws with a software renderer (the flag lets it).

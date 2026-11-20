@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49, docs/KART-FEEL.md §17): the driving school's lessons, one
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50, docs/KART-FEEL.md §17): the driving school's lessons, one
 // technique each, in the order they build on each other. Each says where it is driven, what passes
 // it, how long it may take and how its stars are given. What is judged, step by step, is in
 // judge.ts. The numbers of the stars come from the master driver (`npm run kart:feel -- --school`):

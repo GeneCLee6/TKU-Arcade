@@ -4,7 +4,7 @@ import { createDriver, DRIVERS } from '../../src/kart/bots/drivers.ts'
 import { runLesson } from '../../src/kart/school/headless.ts'
 import { LESSON_IDS } from '../../src/kart/school/lessons.ts'
 
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49, docs/KART-FEEL.md §17): every lesson of the driving
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50, docs/KART-FEEL.md §17): every lesson of the driving
 // school can be passed. The master driver of `npm run kart:feel` (src/kart/bots/drivers.ts: an
 // expert's hands and the tracks known by heart) drives each one, judged step by step as the page
 // judges a player, and passes it first time with three stars. A novice's hands (late, shaky, no

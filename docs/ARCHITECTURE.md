@@ -108,6 +108,7 @@ docs/                   本資料夾
 - **隱藏選項**（C6 起）：欄位加 `hidden: true`、只放在模組的 schema（`rules.ts`），不放 `info.ts`，等待室的表單就看不到。建房時 `POST /api/rooms` 的 `options` 可以設它；房主之後改其他選項時，`RoomHost.setOptions` 用 `keepHidden` 保留房間原本的值（表單送來的同名欄位不算數）。`catalog.test.ts` 要求模組與 info 的欄位除了隱藏的以外完全相同。陞官圖的 `edition` 在 C7 打開，現在沒有遊戲用 `hidden`。欄位另外可以有 `showIf`（另一個欄位是某個值才顯示）與 select 選項的 `hintKey`（C7）。
 - **一個模組兩個版本**（陞官圖，C6 起）：註冊的 `promotion` 在 `init` 依 `edition` 選版本，之後用 state 有沒有 `edition: 'full'` 分辨（簡化版的 state 沒有這個欄位，所以舊局照舊）；簡化版是 `promotionSimple`、完整版是 `rulesFull.ts`。完整版的圖版 `boardFull.ts`、規則 `rulesFull.ts` 只在 Worker：`catalog.test.ts` 擋瀏覽器靜態 import 它們。C7：`screens.ts` 的 `gameScreen(gameId, view)` 依 `view.edition` 給完整版自己的 lazy 畫面 `src/games/promotion/full/FullScreen.tsx`，它直接 import `boardFull.ts`（只有資料）；`catalog.test.ts` 只准 `src/games/promotion/full/` import 它。C8：**規則分版**，完整版的 state 有 `rulesVersion: 2` 才照第二套規則與圖版（`fullBoard(2)`，236 格），沒有的（C6／C7 開的局）照第一套下完，所以部署不會改到進行中的局；兩套都在 `boardFull.ts` 與 `rulesFull.ts`，第一套有指紋測試。新的動作 `accept`／`decline`／`skip`／`buy` 與 `state.pending`、`timers`（`decide-<n>`）、`skipAction` 與 `proxyActions` 的預設答案。瀏覽器不再靜態 import `boardFull.ts`：完整版畫面先畫 dock 與座位，`full/fullData.ts` 用動態 import 在首屏之後拿圖版資料（`catalog.test.ts` 擋靜態 import、只准這一處動態 import；`npm run budget` 另列「首屏之後」的大小）。
 - **文字**：模組只送 i18n key（`TextRef`），字串放 `shared/games/<id>/i18n.ts`，key 為 `games.<id>.*`，登記到 `GAME_MESSAGES`。
+- **電腦玩家**（2026-11-20，選用）：寫 `bot(view, legal, level, rng)`（只拿那個座位的 view 與合法動作），加上 `bots: TABLE_BOTS` 與 `lobby.ts` 的 `computer: true`，房間就會在 DO 裡替電腦座位下（§4.49）。
 
 執行的程式都在 `shared/games/match.ts`：`startMatch`、`applyAction`、`projectGame`（一個 viewer 會收到的全部內容，即協定的 `RoomView.game`）、`replayMatch`。RoomDO、重播與測試共用，所以測到的就是實際跑的。
 
@@ -1278,9 +1279,27 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **測試**：`tests/games/kart-items-more.test.ts`（每個新道具的裁定、和泡泡罩／回浪板的互動、團隊賽、打水漂不過終點且每張賽道大多數位置找得到落點、抽籤規則、鸕鶿實際抽到比較多強道具、鵜鶘擋兩次、水獺時間加長、亂報的 `ms`／`hits` 被拒）、`tests/kart/itemsMore.test.ts`（靜電保留噴射、海霧減速、電腦車的效果、特效與音效、觀戰聽得到、重播的回浪板與擋兩次、電腦車何時用）、`tests/kart/karts.test.ts`（拾貝系的預算與上限）。
 
-### 4.49 路線圖外：駕訓班（教學模式）與比賽中的技巧提示（2026-11-20，`feat/kart-tutorial`）
+### 4.49 路線圖外：桌遊電腦玩家（德州撲克、陞官圖、滬尾商行）（2026-11-20，`feat/boardgame-bots`）
 
-接 §4.48。擁有者 2026-11-20：「繼續開發」。卡丁車要練的技巧已經很多（`KART-FEEL.md` §3、§11、§14、§15），新玩家很難自己發現。這一批做一個「駕訓班」（暫名），十堂課一堂一招，再加上比賽中的一次性提示。程式全在 `src/kart/school/`（自己的 lazy chunk），共用檔只有小插入。
+擁有者：「桌遊都要真人湊齊人數」。三款加電腦玩家，一個人或人數不夠也能開局。和卡丁車的電腦車（§4.21，房主的瀏覽器在跑）不同：回合制遊戲在 **RoomDO 裡直接算**，不靠任何瀏覽器。
+
+- **介面**（`shared/games/types.ts`）：`GameModule.bot?(view, legal, level, rng): A | null`，選用。拿到的就是那個座位的瀏覽器會拿到的東西：自己的 `view`（`projectFor`，隱藏資訊照樣裁掉）與 `legal`，**拿不到 state**，所以電腦不會作弊。`rng` 是房間的（不是遊戲的），選了什麼照樣進動作紀錄，重播仍是「種子＋動作」。回 null 或回被拒的動作，房間改挑一個隨機合法動作，所以電腦玩家不可能卡住一局。也會在不是它的回合時被問（`legal` 是空的），這時要便宜、通常回 null（德州撲克用來從暫離回來）。名字與難度沿用 `GameModule.bots = { levels, names }`，三款共用 `shared/games/tableBots.ts`：難度 `easy`／`normal`，九個原創名字（白鷺、榕樹……，字串在 `room.bot.name.*`）。`GameMeta.computer: true`（`lobby.ts`）讓瀏覽器不用載模組就知道要顯示「加電腦玩家」；測試保證它和 `bot` 一致。其他遊戲之後要接，就寫一個 `bot` 加上這兩個欄位。
+- **房間怎麼跑**（`worker/room-host.ts`）：每次 `change` 後與 `restore` 後 `settleBots()` 找「座位順序第一個現在有事做的電腦座位」，記下 `botTurn = { key, at }`（`key` 是種子＋步數＋座位，`at` 是現在＋0.6–1.5 秒的隨機「思考」時間，`BOT_THINK_MS`），`nextAlarm()` 把它算進 alarm；alarm 的 `sweep()` 在 timer 之後 `playBot(now)`：用那個座位的 projection 問 `bot`、`playAction` 以那個座位的身分送進 `reduce`（和真人一樣被裁判），接受後再 settle 下一個。`botTurn` 只在記憶體：被趕出記憶體後 `restore` 重新給一個思考時間。同一座位連下兩步（德州撲克先同意停、再下注）也各自等一次。
+- **沒有人在房間就暫停**：沒有任何真人連著 socket 時 `botTurn` 是 null，電腦不會對著空房間打完一局；有人回來（`join` 是一次 `change`）就接著下。德州撲克的行動計時照走，電腦可能因此被判暫離，所以 `bot` 在不是它回合時看到自己 `away` 會回 `away: false` 回來。
+- **權限**：只有房主能加（等待中或結束後、放最低空位、`ready`／`online` 恆為 true、和卡丁車同一個 `add_bot`）；房主在等待室能移除（`kick`，不記 ban），遊戲中不行；**電腦不能是房主**（`transfer` 要對方有 socket，`replaceAbsentHost` 只挑在線真人）；房主不能替房間在跑的電腦座位送動作（`isBotSeatFor` 對有 `bot` 的遊戲一律 false）。
+- **再來一局、換遊戲**：再來一局時電腦和大家一起重編座位、照樣上桌。換遊戲時，新遊戲的 `bots` 有它的難度與名字才留（三款之間互換會留；換成卡丁車或沒有電腦玩家的遊戲就拿掉），座位數變少而沒有位子的電腦直接拿掉（不會變成旁觀的電腦）。
+- **畫面**：等待室在房主畫面多一個「電腦玩家」區塊（`src/components/TableBots.tsx`，lazy chunk，難度＋按鈕）；座位列表的電腦顯示「白鷺（電腦）」與難度、房主的移除鈕（`MemberEntry`，`botKey` 先找遊戲自己的 `games.<id>.bot.*`、沒有就用房間的 `room.bot.*`）；遊戲畫面直接用 `member.name`，所以 `RoomPage` 交給畫面的 view 先把電腦成員的名字換成讀得懂的（`withBotNames`）。
+- **三款的策略**（都只看自己的 view）：
+  - **德州撲克**（`shared/games/holdem/bot.ts`）：翻牌前用公開的 Chen 起手牌分數；翻牌後用看不到的牌（牌堆＋別人的手牌）模擬 60 次發完公牌與對手的牌估勝率（對手最多模擬 3 位，再多用次方折算），和底池賠率比。普通：弱牌棄、中等跟、強牌加注（池的一半到一池，偶爾全下）、籌碼少於 10 BB 時好牌全下、少量詐唬。簡單：常跟注、很少加注、不看賠率。有人按「這手打完就停」時電腦在下一次輪到時同意（沒有別人在投就收回）。
+  - **陞官圖**（`shared/games/promotion/bot.ts`）：擲骰就是擲骰；完整版的抉擇：授職看「那格的品級＋一擲之後平均品級的一半」比現在那格好才接受；捐納只花得起「三分之二銀兩以內」、而且明顯比雜職好（分數差 > 2）才捐，否則就任雜職。簡單：抉擇隨機。
+  - **滬尾商行**（`shared/games/traders/bot.ts`）：貪婪＋短前瞻。買得起就買價值最高的（分數 × 1.5、貴客還差的那一色、前期的永久折扣）；買不起就挑「價值 ÷（還差幾個）^1.5」最高的目標，拿最能補缺口的貨（第二目標要的算 0.3）；拿貨幫不上或手上快滿就保留目標（順便拿金）；超過十個時退目標最不需要的、金最後退。簡單：買得起七成會買、其他隨機拿貨。
+  - 強度（兩人、30 個種子，普通對簡單）：德州撲克 28：2、滬尾商行 29：1、陞官圖完整版 21：9（陞官圖大多是運氣）。
+- **德州撲克的已知限制**：真人出局之後，剩下的電腦會打到分出勝負（看不出誰是人）；盲注會升級就快很多，房主也可以直接「結束遊戲」。
+- **測試**：`tests/games/table-bots.test.ts`（三款各種人數、兩種難度與混合、多個種子全電腦對局都能結束；電腦只用合法動作——德州撲克的同意停與回來除外，那兩個本來任何時候都收；同一個 view 不管隱藏的牌怎麼換都下同一步；別人蓋著保留的牌不會被當目標；`GameMeta.computer` 與 `bot` 一致；各策略的單元測試）、`tests/worker/room-table-bots.test.ts`（加入與移除的權限、換遊戲、電腦不能當房主、0.6–1.5 秒才動且不早一毫秒、問 `bot` 時只給那個座位的 view、房主不能替它下、沒人時暫停回來接著下、hibernation、再來一局、一人＋兩電腦三款各玩完一局）、巡檢 `e2e/smoke-games.spec.ts` 多一組「一人＋兩個電腦玩家」（桌機，三款）。
+
+### 4.50 路線圖外：駕訓班（教學模式）與比賽中的技巧提示（2026-11-20，`feat/kart-tutorial`）
+
+接 §4.48（§4.49 是同一天平行的桌遊電腦玩家）。擁有者 2026-11-20：「繼續開發」。卡丁車要練的技巧已經很多（`KART-FEEL.md` §3、§11、§14、§15），新玩家很難自己發現。這一批做一個「駕訓班」（暫名），十堂課一堂一招，再加上比賽中的一次性提示。程式全在 `src/kart/school/`（自己的 lazy chunk），共用檔只有小插入。
 
 **入口**：`/kart` 選單多一顆「駕訓班」；第一次進 `/kart`（沒回答過、也沒上過任何一課）左上角會出現建議卡「去駕訓班／不用了」，回答一次就不再出現（`store.ts` 的 `shouldInvite`）。網址 `/kart?school` 直接進課程列表，`?school=<課 id>` 直接進那一課（重新整理停在原地）；`?autopilot` 讓頂尖駕駛（`drivers.ts` 的 `master`）來開，給 e2e 與展示用。`KartPlay.tsx` 多一種 `Playing`（`school`），和對戰電腦、大獎賽一樣 lazy 載入 `SchoolView.tsx`。
 

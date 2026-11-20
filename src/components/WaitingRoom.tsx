@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import styled from 'styled-components'
+import { getGameCard } from '../../shared/games/lobby.ts'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
@@ -44,6 +45,8 @@ const RoomPasswordSetting = lazy(() => import('./RoomPasswordSetting.tsx'))
 const RoomGarage = lazy(() => import('../kart/roster/RoomGarage.tsx'))
 // 2026-11-17: the host's computer karts, the same way
 const RoomBots = lazy(() => import('../kart/bots/RoomBots.tsx'))
+// 2026-11-20: computer players for a game the room plays them in (GameMeta.computer), the same way
+const TableBots = lazy(() => import('./TableBots.tsx'))
 // 2026-11-18: the sides of a team race, the same way, only when the room is set to one
 const RoomTeams = lazy(() => import('../kart/team/RoomTeams.tsx'))
 
@@ -158,6 +161,11 @@ export function WaitingRoom({
         {view.room.gameId === 'kart' && isHost && onAddBot && (
           <Suspense>
             <RoomBots free={view.room.maxSeats - seated.length} onAdd={onAddBot} />
+          </Suspense>
+        )}
+        {getGameCard(view.room.gameId)?.meta.computer && isHost && onAddBot && (
+          <Suspense>
+            <TableBots free={view.room.maxSeats - seated.length} onAdd={onAddBot} />
           </Suspense>
         )}
       </Column>

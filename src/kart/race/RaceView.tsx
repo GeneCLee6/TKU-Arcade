@@ -277,7 +277,7 @@ export default function RaceView({
     tuning: applyKart(loadTuning().tuning, loadout.body),
     enabled: true,
   }))
-  // 2026-11-20 (§4.49): a tip for a technique not yet used (not for a kart driving itself)
+  // 2026-11-20 (§4.50): a tip for a technique not yet used (not for a kart driving itself)
   const coach = useCoach()
   const coachStep = coach.onStep
 

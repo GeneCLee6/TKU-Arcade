@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): the player's own controls, as they know them: the key
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): the player's own controls, as they know them: the key
 // they bound, the gamepad button, or the on-screen button (§4.25), by whichever they last drove
 // with. KeyText.tsx draws them as key caps.
 import { useEffect, useState } from 'react'

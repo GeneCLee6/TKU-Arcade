@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): the tips during a race (coach.ts), for the time trial
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): the tips during a race (coach.ts), for the time trial
 // and the race screens: `useCoach` gives the game loop its `onStep` and the page the tip to show
 // (CoachTip.tsx). A tip shows for a few seconds, once ever, and not at all with the tips turned off.
 import { useCallback, useEffect, useRef, useState } from 'react'

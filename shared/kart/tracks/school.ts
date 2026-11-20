@@ -1,4 +1,4 @@
-// 2026-11-20 (owner: "keep going"; docs/ARCHITECTURE.md §4.49): the driving school's own two
+// 2026-11-20 (owner: "keep going"; docs/ARCHITECTURE.md §4.50): the driving school's own two
 // tracks (src/kart/school/), laid corner by corner (shared/kart/tracks/lay.ts). Original and plain on purpose: wide
 // (30 m), flat, no walls, corners of every kind a drift is learnt on.
 //

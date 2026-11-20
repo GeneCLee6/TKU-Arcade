@@ -1,7 +1,7 @@
 // /kart (e8-t14): the time trial, and from its menu a race against the computer (owner 2026-11-17;
 // docs/ARCHITECTURE.md §4.20) or a Grand Prix (§4.24). Each is its own lazy chunk, loaded only when
 // one starts. A Grand Prix under way (and not left for the menu) opens again on a reload. 2026-11-20
-// (§4.49): and the driving school.
+// (§4.50): and the driving school.
 import { lazy, Suspense, useState } from 'react'
 import styled from 'styled-components'
 import { useT } from '../../i18n/useT.ts'
@@ -13,7 +13,7 @@ import type { BotSetup } from './setup.ts'
 
 const BotRaceView = lazy(() => import('./BotRaceView.tsx'))
 const CupView = lazy(() => import('../cup/CupView.tsx'))
-// 2026-11-20 (§4.49): the driving school, its own chunk too
+// 2026-11-20 (§4.50): the driving school, its own chunk too
 const SchoolView = lazy(() => import('../school/SchoolView.tsx'))
 
 type Playing =

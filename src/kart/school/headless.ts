@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.49): a lesson of the driving school run without a screen,
+// 2026-11-20 (docs/ARCHITECTURE.md §4.50): a lesson of the driving school run without a screen,
 // step by step as the page runs it, with a driver's hands on the kart (src/kart/bots/drivers.ts).
 // `npm run kart:feel -- --school` and the tests show with it that the master driver passes every
 // lesson, and how fast: the stars' numbers (lessons.ts) are set from that. Pure.

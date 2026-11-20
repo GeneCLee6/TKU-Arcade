@@ -1,4 +1,4 @@
-// 2026-11-20 (owner: "keep going"; docs/ARCHITECTURE.md §4.49, docs/KART-FEEL.md §17): the driving
+// 2026-11-20 (owner: "keep going"; docs/ARCHITECTURE.md §4.50, docs/KART-FEEL.md §17): the driving
 // school, its own lazy chunk, opened from /kart's menu (or /kart?school, ?school=<lesson>). Ten
 // lessons, one technique each (lessons.ts), each driven in the time trial's own loop (spikeLoop.ts)
 // on a short track of its own or the first stretch of a race track. The page shows the goal, the
