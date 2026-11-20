@@ -36,6 +36,7 @@ export const en = {
   'lobby.newRoom': 'New room',
   'lobby.paused': 'Paused for maintenance. Back soon.',
   'lobby.newRoomFailed': "Couldn't create the room. Try again.",
+  'lobby.tooManyRooms': 'Too many new rooms from your network. Wait a minute, then try again.',
   'lobby.players.exact': '{count} players',
   'lobby.players.range': '{min}–{max} players',
   // D1: public rooms, the error screens and the unknown path
@@ -60,6 +61,8 @@ export const en = {
   'notFound.home': 'Back to the lobby',
   'nickname.dialogTitle': 'Choose a nickname',
   'nickname.invalid': 'Use 1 to {max} characters.',
+  'nickname.reserved': 'That name looks like the site or a host. Pick another.',
+  'nickname.blocked': 'Please pick a friendlier name.',
   'nickname.label': 'Nickname',
   'nickname.submit': 'Continue',
   'room.backToLobby': 'Back to the lobby',

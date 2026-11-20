@@ -94,7 +94,8 @@ describe('normalizeName', () => {
   it('refuses a name with nothing visible in it', () => {
     expect(normalizeName('​')).toBeNull()
     expect(normalizeName(' ​ ﻿ ')).toBeNull()
-    expect(normalizeName('a​b')).toBe('a​b')
+    // e12-t06: an invisible character inside a name is dropped, so `ab` and `a​b` are one
+    expect(normalizeName('a​b')).toBe('ab')
   })
 
   it('stores names in NFC, and measures them after that', () => {

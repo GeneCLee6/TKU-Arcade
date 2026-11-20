@@ -50,6 +50,14 @@ export interface Env {
   CF_ACCOUNT_ID?: string
   /** Which allowances the dashboard measures against: `free` (the default) or `paid` (a var) */
   COST_PLAN?: string
+  /**
+   * Rate limits shared by every Worker instance in a Cloudflare location (e12-t06, wrangler
+   * `ratelimits`, docs/SECURITY.md §6), keyed by a hashed address (worker/address.ts): new rooms,
+   * WebSocket upgrades, and wrong owner keys. Without them only the per-instance limits apply
+   */
+  ROOM_CREATE_LIMIT?: RateLimit
+  SOCKET_LIMIT?: RateLimit
+  OWNER_FAIL_LIMIT?: RateLimit
   /** Optional: where a new 80% alert is also posted as JSON (a Discord or Slack webhook; a secret) */
   ALERT_WEBHOOK_URL?: string
 }

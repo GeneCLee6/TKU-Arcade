@@ -497,7 +497,7 @@ describe('signed-in names (e1-t13)', () => {
 describe('starting a game', () => {
   it('only the host may', () => {
     const world = room()
-    const host = world.join('Host')
+    const host = world.join('Hana')
     const other = world.join('Other')
     other.send({ t: 'start' })
     expect(other.errors).toEqual([{ t: 'error', code: 'forbidden' }])
@@ -511,7 +511,7 @@ describe('starting a game', () => {
 
   it('needs minPlayers seated', () => {
     const world = room()
-    const host = world.join('Host')
+    const host = world.join('Hana')
     host.send({ t: 'start' })
     expect(host.errors).toEqual([{ t: 'error', code: 'not_enough_players' }])
     expect(world.stored().game).toBeNull()
@@ -2325,7 +2325,7 @@ describe('clean-up (e1-t10)', () => {
 
   it('forgets a kick once it has run out, keeping those that have not', () => {
     const world = room()
-    const host = world.join('Host')
+    const host = world.join('Hana')
     const first = world.join('First')
     const second = world.join('Second')
     host.send({ t: 'kick', member: first.you })

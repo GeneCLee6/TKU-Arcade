@@ -1,17 +1,19 @@
 import { getGame } from '../shared/games/index.ts'
 import type { OptionValues } from '../shared/games/types.ts'
 import {
+  CloseCode,
   normalizePassword,
   type CreateRoomResponse,
   type RoomCodeResponse,
 } from '../shared/protocol.ts'
 import { isRoomCode, newRoomCode } from '../shared/room-code.ts'
 import { isRoomId, newRoomId } from '../shared/room-id.ts'
+import { ADDRESS_HEADER, addressKey, clientAddress, isLoopback } from './address.ts'
 import type { Env } from './app.ts'
 import { ACCOUNT_HEADER, encodeAccountHeader, sessionAccount } from './auth.ts'
 import { isGameEnabled } from './flags.ts'
 import { LOBBY_NAME } from './lobby-board.ts'
-import { FixedWindowLimit } from './rate-limit.ts'
+import { FixedWindowLimit, takeShared } from './rate-limit.ts'
 
 /** Tries this many fresh ids before giving up (a collision at ~59 bits is not expected at all) */
 const CREATE_ATTEMPTS = 3
@@ -23,9 +25,9 @@ const MAX_CREATE_BODY_CHARS = 4_096
 const CODE_ATTEMPTS = 12
 
 /**
- * New rooms one address may open a minute, per Worker instance (e12-t13). Far above what a person
- * does, and above a browser test run from one machine; it only blunts a script. The PRD's 5 a
- * minute, counted across instances, is e12-t06's
+ * New rooms one address may open a minute, per Worker instance (e12-t13): a first, free check in
+ * memory, before the one shared by every instance (the ROOM_CREATE_LIMIT binding, 5 a minute,
+ * e12-t06, wrangler.jsonc), and the only one where that binding is missing
  */
 const CREATES_PER_ADDRESS = 30
 /** New rooms one Worker instance opens a minute, whoever asks */
@@ -98,7 +100,11 @@ export async function handleRooms(
 ): Promise<Response> {
   if (url.pathname === '/api/rooms') {
     if (request.method !== 'POST') return fail('method_not_allowed', 405, { allow: 'POST' })
-    if (!limit.take(request.headers.get('cf-connecting-ip') ?? 'unknown', now)) {
+    const address = clientAddress(request)
+    const key = await addressKey(address)
+    // Local development (npm run dev, the browser tests) opens many rooms from one machine
+    const shared = address === null || !isLoopback(address)
+    if (!limit.take(key, now) || (shared && !(await takeShared(env.ROOM_CREATE_LIMIT, key)))) {
       return fail('rate_limited', 429, { 'retry-after': '60' })
     }
     return createRoom(request, env)
@@ -180,12 +186,30 @@ export async function handleRoomSocket(request: Request, env: Env, url: URL): Pr
   // one here. Non-browser clients (no Origin) could forge any header anyway
   const origin = request.headers.get('Origin')
   if (origin !== null && origin !== url.origin) return fail('forbidden_origin', 403)
+  // Sockets opened a minute by one address, anywhere on the site (e12-t06): each one wakes a room,
+  // also one that is not there. Refused with a close the page explains, not a failed upgrade it
+  // would keep retrying
+  const address = clientAddress(request)
+  const key = await addressKey(address)
+  if ((address === null || !isLoopback(address)) && !(await takeShared(env.SOCKET_LIMIT, key))) {
+    return refuseSocket(CloseCode.tooManyConnections, 'too many connections')
+  }
   // Who the session says this is (e1-t13): the room takes a signed-in person's name from here, not
   // from `join`. A Durable Object cannot be reached from outside, so this header only ever comes
   // from this line; whatever a browser sent under that name is dropped
   const headers = new Headers(request.headers)
   headers.delete(ACCOUNT_HEADER)
+  // Same for the hashed address, which the room counts sockets by (MAX_CONNECTIONS_PER_ADDRESS)
+  headers.set(ADDRESS_HEADER, key)
   const account = await sessionAccount(request, env)
   if (account) headers.set(ACCOUNT_HEADER, encodeAccountHeader(account))
   return roomStub(env, match[1]).fetch(new Request(request, { headers }))
+}
+
+/** An upgrade that is accepted only to be closed at once with `code`, which the page understands */
+export function refuseSocket(code: number, reason: string): Response {
+  const { 0: client, 1: server } = new WebSocketPair()
+  server.accept()
+  server.close(code, reason)
+  return new Response(null, { status: 101, webSocket: client })
 }

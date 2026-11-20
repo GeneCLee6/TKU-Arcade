@@ -76,6 +76,7 @@
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
 import { normalizeChatText, type ChatMessage } from './chat.ts'
+import { acceptableName } from './nickname.ts'
 import type { GameError, GameProjection, OptionValues, SeatId } from './games/types.ts'
 import type { JsonValue, PatchOp } from './patch.ts'
 
@@ -105,6 +106,12 @@ export const SWEEP_INTERVAL_MS = 15_000
 export const MAX_MEMBERS = 64
 /** Sockets open at once: every member, and a few that have not joined yet */
 export const MAX_CONNECTIONS = MAX_MEMBERS + 8
+/**
+ * Sockets one address (an IPv4 address, or an IPv6 /64) may hold open in one room (e12-t06), so
+ * that a script cannot take every place. Well above one household or a club's shared campus Wi-Fi
+ * at one table; past it, CloseCode.tooManyConnections
+ */
+export const MAX_CONNECTIONS_PER_ADDRESS = 24
 /** How long a room stays with nobody in it, or finished with nothing happening, before it is deleted */
 export const ROOM_CLEANUP_MS = 10 * 60_000
 
@@ -134,6 +141,11 @@ export const CloseCode = {
   dissolved: 4412,
   /** A message that does not parse */
   badMessage: 4422,
+  /**
+   * Too many sockets from this address (e12-t06): in this room (MAX_CONNECTIONS_PER_ADDRESS), or
+   * opened in the last minute anywhere on the site (worker/rooms.ts)
+   */
+  tooManyConnections: 4429,
 } as const
 
 // ── The room as one person sees it ───────────────────────────────────────────────────────────
@@ -569,15 +581,32 @@ function parseObject(raw: string, maxChars: number): Record<string, unknown> | n
 // else's (U+202A–202E, U+2066–2069)
 const UNSAFE_NAME_CHARS = /[\p{Cc}‪-‮⁦-⁩]/gu
 
+// Characters that show as nothing (e12-t06), so that a name is not blank and two that look the same
+// are not told apart by one: soft hyphen, zero-width space and non-joiner, direction marks, word
+// joiner and invisible operators, the Hangul and Braille blanks, the byte order mark, tag
+// characters. The zero-width joiner is kept where it builds an emoji, see LONE_JOINER
+const INVISIBLE_NAME_CHARS =
+  /\u034F|[\u00AD\u061C\u115F\u1160\u17B4\u17B5\u180E\u200B\u200C\u200E\u200F\u2060-\u2064\u206A-\u206F\u2800\u3164\uFEFF\uFFA0\u{E0000}-\u{E007F}]/gu
+// A zero-width joiner that is not between two parts of an emoji
+const LONE_JOINER =
+  /(?<![\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F])\u200D|\u200D(?!\p{Extended_Pictographic})/gu
+
 /**
- * A nickname as the room stores it: unsafe characters removed, runs of whitespace collapsed,
- * trimmed; null when nothing is left or it is too long. The browser uses it before sending, the
- * server again on receipt.
+ * A nickname as the room stores it: unsafe and invisible characters removed, runs of whitespace
+ * (the full-width space too) collapsed to one space, trimmed; null when nothing is left or it is
+ * too long. The browser uses it before sending, the server again on receipt. What the name may
+ * not say is shared/nickname.ts
  */
 export function normalizeName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   // NFC last: removing a character can bring together two that compose
-  const name = raw.replace(UNSAFE_NAME_CHARS, '').replace(/\s+/g, ' ').trim().normalize('NFC')
+  const name = raw
+    .replace(UNSAFE_NAME_CHARS, '')
+    .replace(INVISIBLE_NAME_CHARS, '')
+    .replace(LONE_JOINER, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .normalize('NFC')
   // Only zero-width characters would look like nobody at all in the seat list
   if (name.replace(/[\p{Cf}\s]/gu, '') === '' || [...name].length > MAX_NAME_CHARS) return null
   return name
@@ -633,7 +662,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   const value = parseObject(raw, MAX_CLIENT_MESSAGE_CHARS)
   switch (value?.t) {
     case 'join': {
-      const name = normalizeName(value.name)
+      // Also refused: a name that passes for the site or is abuse (e12-t06, shared/nickname.ts)
+      const name = acceptableName(value.name)
       if (name === null) return null
       // A malformed token is someone new, not an error: the browser may hold an old one
       const password = normalizePassword(value.password)

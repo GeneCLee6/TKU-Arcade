@@ -733,6 +733,7 @@ describe('reconnecting', () => {
       [CloseCode.roomNotFound, 'notFound'],
       [CloseCode.versionMismatch, 'versionMismatch'],
       [CloseCode.roomFull, 'full'],
+      [CloseCode.tooManyConnections, 'tooManyConnections'],
       [CloseCode.replaced, 'replaced'],
       [CloseCode.badMessage, 'disconnected'],
     ])('%i ends as %s, with nothing left running', (code, end) => {

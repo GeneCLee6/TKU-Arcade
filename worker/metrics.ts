@@ -37,7 +37,7 @@ const noStore = { 'cache-control': 'no-store' }
 
 /** GET /api/stats with `Authorization: Bearer <STATS_KEY>`: the last STATS_DAYS days of counts */
 export async function handleStats(request: Request, env: Env, now = Date.now()): Promise<Response> {
-  const refusal = ownerRefusal(request, env)
+  const refusal = await ownerRefusal(request, env)
   if (refusal) return refusal
   const since = metricDay(now - (STATS_DAYS - 1) * 86_400_000)
   const { results } = await env.DB.prepare(

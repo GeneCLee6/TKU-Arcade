@@ -34,3 +34,19 @@ export class FixedWindowLimit {
     return true
   }
 }
+
+/**
+ * One take from a Cloudflare Rate Limiting binding (wrangler `ratelimits`, e12-t06): counted for
+ * every Worker instance in the same Cloudflare location, which is where one address's requests
+ * go. True when allowed; also true without the binding (tests, a config without it) and when the
+ * binding fails, since a limiter that is down should not take the site down with it
+ */
+export async function takeShared(binding: RateLimit | undefined, key: string): Promise<boolean> {
+  if (!binding) return true
+  try {
+    return (await binding.limit({ key })).success
+  } catch (error) {
+    console.error('rate limiter failed', error)
+    return true
+  }
+}

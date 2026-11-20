@@ -20,6 +20,7 @@ const en = {
   'room.extra.stats.key': 'Stats key',
   'room.extra.stats.open': 'Show',
   'room.extra.stats.denied': 'That key does not open the stats.',
+  'room.extra.stats.throttled': 'Too many wrong keys. Wait a minute, then try again.',
   'room.extra.stats.off':
     'The stats are off on this site: set the STATS_KEY secret to turn them on.',
   'room.extra.stats.failed': 'The stats could not be loaded. Try again in a moment.',
@@ -92,6 +93,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'room.extra.stats.key': '指標金鑰',
   'room.extra.stats.open': '顯示',
   'room.extra.stats.denied': '這個金鑰打不開指標。',
+  'room.extra.stats.throttled': '金鑰錯太多次了，請等一分鐘再試。',
   'room.extra.stats.off': '這個網站沒有開指標：設定 STATS_KEY secret 才會打開。',
   'room.extra.stats.failed': '指標載入失敗，等一下再試。',
   'room.extra.stats.since': '從 {since} 起，台灣時間。只有數字，沒有房間、沒有名字。',

@@ -49,6 +49,14 @@
     "AUTH_BRIDGE_URL": "https://tku-bridge-table.genelee-pro.workers.dev",
     "LONGTALK_URL": "https://longtalk.genelee-pro.workers.dev"
   },
+  // Abuse limits shared by every Worker instance in a Cloudflare location (e12-t06, docs/SECURITY.md
+  // §6), keyed by a hash of the address: new rooms, WebSocket upgrades, wrong owner keys. Available
+  // on the free plan; `namespace_id` is any number unique in the account (previews use their own)
+  "ratelimits": [
+    { "name": "ROOM_CREATE_LIMIT", "namespace_id": "1201", "simple": { "limit": 5, "period": 60 } },
+    { "name": "SOCKET_LIMIT", "namespace_id": "1202", "simple": { "limit": 120, "period": 60 } },
+    { "name": "OWNER_FAIL_LIMIT", "namespace_id": "1203", "simple": { "limit": 5, "period": 60 } }
+  ],
   // LongTalk, reached Worker to Worker: a fetch to its workers.dev address from here would be refused
   "services": [{ "binding": "LONGTALK", "service": "longtalk" }],
   // Staging and pull request previews (DEPLOY.md): separate Workers, so each has its own Durable
@@ -79,6 +87,12 @@
       // write no backups
       "r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "tku-arcade-assets" }],
       "vars": { "APP_VERSION": "local", "LONGTALK_URL": "https://longtalk.genelee-pro.workers.dev" },
+      // Same limits as production, in namespaces of their own (shared by every preview)
+      "ratelimits": [
+        { "name": "ROOM_CREATE_LIMIT", "namespace_id": "2201", "simple": { "limit": 5, "period": 60 } },
+        { "name": "SOCKET_LIMIT", "namespace_id": "2202", "simple": { "limit": 120, "period": 60 } },
+        { "name": "OWNER_FAIL_LIMIT", "namespace_id": "2203", "simple": { "limit": 5, "period": 60 } }
+      ],
       // Previews open voice rooms on production LongTalk: they are empty rooms that clean themselves up
       "services": [{ "binding": "LONGTALK", "service": "longtalk" }]
     }
