@@ -385,9 +385,10 @@ describe.each(SKILL_TRACKS)('%s, a track to learn by heart', (id) => {
     }
     const gap = 1 - mean(master.map((run) => run.seconds)) / mean(expert.map((run) => run.seconds))
     // The owner's mark: 8 to 10% or more (measured: the wharf 12%, the lanes 8%). 2026-11-20: the
-    // wharf's shed lane became a branch, a road of its own (branches.ts), and gives less than the
-    // lane inside a wide road did: 6 to 7%
-    expect(gap).toBeGreaterThan(id === 'wharf' ? 0.055 : 0.065)
+    // wharf's shed lane became a branch, a road of its own (branches.ts), and gave less than the
+    // lane inside a wide road did (6.6%); revision 3 gave it back: the road round the shed reaches
+    // 30 m further out and the lane, peeled off and turning square, is half its length (11.9%)
+    expect(gap).toBeGreaterThan(id === 'wharf' ? 0.1 : 0.065)
     // Both boost most of the way round: it is the line that tells them apart, not the gauge
     for (const run of master) expect(run.cover).toBeGreaterThan(0.6)
   }, 120_000)
@@ -395,8 +396,9 @@ describe.each(SKILL_TRACKS)('%s, a track to learn by heart', (id) => {
   it('a novice still finishes it, slowly', () => {
     for (const run of runs('novice', [7, 14])) {
       expect(run.finished).toBe(true)
-      // 2026-11-20: the wharf's novice is put back now and then all round the lap (seed 14: ten)
-      expect(run.resets).toBeLessThanOrEqual(id === 'wharf' ? 10 : 8)
+      // 2026-11-20: the wharf's novice was put back now and then all round the lap (seed 14: ten);
+      // since revision 3, twice
+      expect(run.resets).toBeLessThanOrEqual(8)
       expect(run.seconds).toBeLessThan(200)
     }
   }, 120_000)
