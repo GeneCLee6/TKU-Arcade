@@ -52,3 +52,7 @@ Set by the host in the waiting room.
 ## Players
 
 2 to 9 players. With the blinds fixed, a game goes on until one player has every chip or everyone agrees to stop; blinds that go up bring it to an end sooner.
+
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats, at **Easy** or **Normal**. They play their own turns after a short pause and only know what a person in their seat would: their own two cards, the board and the chips. Normal folds weak hands, weighs the price of a call against how often it wins, and raises strong ones; Easy calls a lot. A computer player agrees to stop after the hand once someone else has asked to. Once every person at the table is out of chips, the computers play on until one has every chip; the host can end the game instead.

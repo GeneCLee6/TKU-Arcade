@@ -7,6 +7,8 @@
 // everyone still playing agrees to stop after a hand (standings by chips).
 //
 // docs/PRD/e24-holdem.md has the rules and every detail decided here.
+import { holdemBot } from './bot.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import { bestHand, fullDeck, type Hand } from '../../poker/hand.ts'
 import { holdemInfo } from './info.ts'
 import { GAME_META } from '../lobby.ts'
@@ -574,6 +576,11 @@ function sitOutNow(state: HoldemState, seat: SeatId): HoldemState {
 export const holdem: GameModule<HoldemState, HoldemAction, HoldemView, HoldemOptions> = {
   ...holdemInfo,
   meta: GAME_META.holdem,
+  // Computer players, played by the room (bot.ts)
+  bots: TABLE_BOTS,
+  bot(view, legal, level, rng) {
+    return holdemBot(view, legal, level, rng)
+  },
 
   init(seats, options, rng) {
     const players: HoldemPlayer[] = seats.map((seat) => ({
