@@ -8,6 +8,7 @@ import { displayType } from '../styles/esports.ts'
 import { broadcast, digits, slam, splitShadow, ticker } from './ui/broadcast.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import type { SpikeTrial } from './spikeLoop.ts'
+import { Celebration } from './ui/RaceShow.tsx'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -111,6 +112,10 @@ export function RaceCenter({
         <StartHint data-testid="kart-start-hint">{t('kart.race.startHint')}</StartHint>
       </>
     )
+  }
+  // 2026-11-20 (§4.43): the finish's show first, the results after it
+  if (trial.phase === 'finished' && trial.total !== null && trial.celebrating) {
+    return <Celebration big={t('kart.race.finish')} line={formatTime(trial.total)} />
   }
   if (trial.phase === 'finished' && trial.total !== null) {
     const best = Math.min(...trial.lapTimes)

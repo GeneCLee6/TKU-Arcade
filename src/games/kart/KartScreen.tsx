@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import type { KartView } from '../../../shared/games/kart/types.ts'
 import type { Replay } from '../../../shared/kart/replay.ts'
 import { parseLook } from '../../../shared/kart/karts.ts'
+import { useFinishHold } from '../../kart/race/useFinishHold.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
 import { useT } from '../../i18n/useT.ts'
@@ -50,6 +51,8 @@ export default function KartScreen({ room, game }: GameScreenProps) {
   const lookOf = (seat: number) =>
     parseLook(Object.values(room.view.members).find((one) => one.seat === seat)?.look)
   const me = view.racers.find((racer) => racer.seat === view.you)
+  // §4.43: the finish's show plays out before the room's results
+  const holding = useFinishHold(me?.finishMs != null)
   const watching = watchChoice ?? (!me || me.out)
   const loading = <Loading role="status">{t('games.kart.race.loading')}</Loading>
 
@@ -65,7 +68,7 @@ export default function KartScreen({ room, game }: GameScreenProps) {
       </Suspense>
     )
   }
-  if (!game.over && me && !me.out && recording.realtime) {
+  if ((!game.over || holding) && me && !me.out && recording.realtime) {
     return (
       <Suspense fallback={loading}>
         <RaceView

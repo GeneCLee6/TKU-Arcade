@@ -52,7 +52,14 @@ import {
 } from '../../shared/kart/timeTrial.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
 import { startRun, stepRun, type Run, type Spot } from '../../shared/kart/course.ts'
-import { countdownShot } from './director.ts'
+import {
+  CELEBRATE_SECONDS,
+  countdownShot,
+  finishShot,
+  inIntro,
+  introShot,
+  type CameraShot,
+} from './director.ts'
 import {
   actionKeys,
   activeControls,
@@ -284,6 +291,10 @@ export interface SpikeTrial {
   /** The best run in this kart on this track, seconds, and whether this run set it */
   readonly kartBestRun: number | null
   readonly newKartBestRun: boolean
+  /** 2026-11-20 (§4.43): a race's fly round the grid before the countdown, not skipped */
+  readonly intro: boolean
+  /** ... and the finish's show, for CELEBRATE_SECONDS after crossing the line */
+  readonly celebrating: boolean
 }
 
 const sameTrial = (a: SpikeTrial | undefined, b: SpikeTrial): boolean =>
@@ -297,7 +308,9 @@ const sameTrial = (a: SpikeTrial | undefined, b: SpikeTrial): boolean =>
   a.newBestRun === b.newBestRun &&
   a.recordKart === b.recordKart &&
   a.kartBestRun === b.kartBestRun &&
-  a.newKartBestRun === b.newKartBestRun
+  a.newKartBestRun === b.newKartBestRun &&
+  a.intro === b.intro &&
+  a.celebrating === b.celebrating
 
 /** What tests and a curious owner can read from the console. It stays after the loop stops. */
 export interface SpikeDebug {
@@ -583,6 +596,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
 
   // Whether a shot of director.ts's was last given to the scene
   let directed = false
+  // §4.43: the fly round skipped (any key or touch), and when this kart crossed the line
+  let skipped = false
+  let finishedAt: number | null = null
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
 
   let firstFrameAt: number | null = null
@@ -688,6 +704,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         } else if (trial.phase !== 'countdown' && was === 'racing' && recorder) {
           recordStep(recorder, trial.steps, run.kart)
         }
+        // The finish's show (§4.43): the camera swings round, the page celebrates
+        if (was === 'racing' && trial.phase === 'finished') finishedAt = now
         if (was === 'racing' && trial.phase === 'finished' && recorder) {
           const ghost: Ghost = {
             ...finishRecording(recorder, trial.steps, trial.laps),
@@ -815,16 +833,25 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       for (const cue of hitFrame.cues) audio.cue(cue)
     }
     if (net) scene.others(net.others(), frameMs / 1000)
-    // 2026-11-20: the countdown starts on the whole grid, and glides down behind this kart
-    const shot =
-      net?.gridSpots && trial?.phase === 'countdown'
-        ? countdownShot(
-            net.gridSpots(),
-            net.countdown(),
-            reducedMotion?.matches ?? false,
-            current.y ?? 0,
-          )
-        : null
+    // 2026-11-20: the countdown starts on the whole grid, and glides down behind this kart; before
+    // it, unless skipped, a fly round the grid (§4.43); at the finish the camera swings to the front
+    const reduced = reducedMotion?.matches ?? false
+    const left = net && trial?.phase === 'countdown' ? net.countdown() : null
+    const introNow = !!net?.gridSpots && trial?.phase === 'countdown' && inIntro(left) && !skipped
+    let shot: CameraShot | null = null
+    if (trial?.phase === 'finished' && finishedAt !== null) {
+      shot = finishShot(
+        { x: pose.x, z: pose.z, heading: current.heading, y: current.y },
+        (now - finishedAt) / 1000,
+        reduced,
+      )
+    } else if (net?.gridSpots && trial?.phase === 'countdown') {
+      const spots = net.gridSpots()
+      shot =
+        introNow && !reduced && left !== null
+          ? introShot(spots, left, current.y ?? 0)
+          : countdownShot(spots, left, reduced, current.y ?? 0)
+    }
     if (shot || directed) scene.shot(shot)
     directed = shot !== null
     if (net?.props) scene.items(net.props(pose), frameMs / 1000)
@@ -900,6 +927,11 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         kartBestRun:
           news ? seconds(news.kartRunSteps) : kartBestRun === null ? null : seconds(kartBestRun),
         newKartBestRun: news?.kartBestRun ?? false,
+        intro: introNow,
+        celebrating:
+          trial.phase === 'finished' &&
+          finishedAt !== null &&
+          now - finishedAt < CELEBRATE_SECONDS * 1000,
       }
       if (!sameTrial(lastTrial, view)) {
         lastTrial = view
@@ -939,9 +971,14 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   const ownsKey = (code: string, bindings: Bindings) =>
     isBoundKey(bindings, code) || code.startsWith('Arrow')
 
+  // §4.43: any key or touch skips the fly round on this screen (GO stays the room's)
+  const skip = () => {
+    if (trial?.phase === 'countdown') skipped = true
+  }
   const onKeyDown = (event: KeyboardEvent) => {
     // Sound may start only after a gesture: the first key is one
     audio.unlock()
+    skip()
     const { bindings, enabled } = options.controls()
     // Ctrl itself boosts (ALWAYS_KEYS), and an arrow pressed while Ctrl is held still steers
     const ctrlChord =
@@ -985,6 +1022,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     debug.running = false
     cancelAnimationFrame(handle)
     window.removeEventListener('keydown', onKeyDown)
+    window.removeEventListener('pointerdown', skip)
     window.removeEventListener('keyup', onKeyUp)
     window.removeEventListener('beforeunload', onBeforeUnload)
     window.removeEventListener('blur', onBlur)
@@ -1004,12 +1042,15 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       run = trial.run
       recorder = null
       news = null
+      finishedAt = null
+      skipped = false
       previous = run.kart
       lastTrial = undefined
       scene.snapCamera(run.kart.heading)
     },
   })
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('pointerdown', skip)
   window.addEventListener('keyup', onKeyUp)
   window.addEventListener('beforeunload', onBeforeUnload)
   window.addEventListener('blur', onBlur)

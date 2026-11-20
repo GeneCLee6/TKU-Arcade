@@ -1137,6 +1137,31 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **測試**：`tests/kart/startWindow.test.ts`（新）、`tests/kart/gridStart.test.ts`（新）、`e2e/kart-bots.spec.ts`（倒數中就看得到電腦車）。
 
+### 4.43 路線圖外：比賽演出（開場巡覽、名次變動、最後一圈、終點慶祝）（2026-11-20，`feat/kart-race-show`）
+
+接 §4.42。之前評估離商業作品還差的「演出」：開場、名次變動、終點。都是畫面，規則與裁定不變；`prefers-reduced-motion` 時簡化。
+
+**開場巡覽**
+
+- 房間的倒數 `COUNTDOWN_MS` 從 4 秒改成 `INTRO_MS` 2.5 秒＋4 秒＝**6.5 秒**（`shared/games/kart/rules.ts`）：GO 仍是房間的同一個時刻，只是排好之後多等 2.5 秒。協定、frame、裁定都不變；單機對戰電腦／大獎賽用的是同一個 rules，所以也有。
+- `director.ts` 的 `introShot(spots, left)`：剩 6.5 → 3 秒時，鏡頭從起跑格**前方高處**（看著車頭）繞一側到**後方**，最後 25% 的時間平滑接上 §4.42 的起跑格鏡頭，「3」出現時剛好接上倒數鏡頭。`inIntro(left)`＝剩餘 > 3 秒。
+- **跳過**：`spikeLoop.ts` 在倒數中收到任何按鍵或 `pointerdown` 就 `skipped`，之後直接用起跑格鏡頭；GO 不變（是房間的），只影響自己的畫面。減少動態時不飛，直接是起跑格鏡頭。
+- 畫面：`SpikeTrial.intro` 為真時 `RaceView` 不顯示數字與起跑提示，改顯示 `IntroCard`（`src/kart/ui/RaceShow.tsx`）：賽道名（自訂賽道沒有）、圈數、「按任意鍵跳過」（觸控「點一下跳過」）。
+- 計時賽沒有 `net`，不巡覽。
+
+**名次變動與最後一圈**（`RaceView.tsx`）
+
+- 比賽中名次一變：數字放大彈回、變綠（上升）或紅（下降），名次框下方出現上／下三角形 1.6 秒（`PlaceArrow`，形狀而已，文字在 `aria-label`「升到第 n 名」）。三角形是絕對定位，名次框不會變寬撞到旁邊的按鈕。
+- 進入最後一圈（圈數 > 1）：「最後一圈」大字橫幅 2.4 秒（`FinalLapBanner`）。
+
+**終點慶祝**
+
+- `director.ts` 的 `finishShot`：過線那一刻起，鏡頭在 2.2 秒內從車後繞到車前略偏一側、壓低，之後停在那裡；0.35 秒淡入。減少動態時不轉。
+- `SpikeTrial.celebrating`：過線後 `CELEBRATE_SECONDS` 3.2 秒內。`RaceView` 顯示名次大字（「第 n 名」／「P n」）＋「抵達終點！」＋彩帶與三次火花（`Confetti.tsx`，2D canvas、程式產生、顏色用 `kartTokens.ts` 的 `kartFestival.flags`；減少動態時不畫），之後才是原本的完賽面板。計時賽（`RaceCenter`）顯示「抵達終點！」＋總時間，之後才是成績。
+- **結果畫面等演出**：`useFinishHold`（`src/kart/race/useFinishHold.ts`）從自己完賽起 3.2 秒內為真；`BotRaceView` 在房間已結束時也先留在比賽畫面，`KartScreen` 在 `game.over` 時也先留在 `RaceView`。最後一個到的人也看得到自己的演出。
+
+**測試**：`tests/kart/raceShow.test.ts`（巡覽填滿 6.5 → 3 秒、從前方開始、接上起跑格鏡頭、每幀移動 < 2 m；終點從車後轉到車前、減少動態不轉；彩帶顏色與時長；結果等 3.2 秒）、`tests/worker/room-realtime.test.ts`（GO＝現在＋`COUNTDOWN_MS`）、`e2e/kart-bots.spec.ts`（巡覽卡片、按鍵跳過、終點慶祝之後才有結果）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

@@ -20,6 +20,7 @@ import { displayType } from '../../styles/esports.ts'
 import { broadcast } from '../ui/broadcast.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import RaceView from '../race/RaceView.tsx'
+import { useFinishHold } from '../race/useFinishHold.ts'
 import { botSeats, createBotRace } from './botRace.ts'
 import { createLocalRoom } from './localRoom.ts'
 import { drawBots, type BotEntry } from './roster.ts'
@@ -134,8 +135,12 @@ function BotRound({
     () => (action: JsonValue) => game.room.act(action as KartAction, game.playerSeat),
     [game],
   )
+  // §4.43: the finish's show plays out before the results
+  const holding = useFinishHold(
+    view.racers.find((racer) => racer.seat === game.playerSeat)?.finishMs != null,
+  )
 
-  if (view.phase === 'finished') {
+  if (view.phase === 'finished' && !holding) {
     const result = kart.result(game.room.state())
     const { standings } = result
     const order = standings.map((line) => line.seat)

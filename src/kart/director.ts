@@ -92,3 +92,104 @@ export function countdownShot(
   const shot = gridShot(spots, y)
   return shot ? { ...shot, blend } : null
 }
+
+// ── The race's show (2026-11-20, docs/ARCHITECTURE.md §4.43) ────────────────────────────────────
+//
+// Before the countdown the camera flies once round the grid: from high up the road ahead, looking
+// back at the karts' faces, round one side to behind them, where it settles on the grid shot for the
+// 3, 2, 1. Anyone may skip it on their own screen (spikeLoop.ts). At the finish the camera swings
+// round from behind this kart to in front of it, low, and stays there.
+
+/** The fly round lasts from this much countdown left ... */
+export const INTRO_FROM = 6.5
+/** ... to this much, where the 3 comes */
+export const INTRO_TO = 3
+/** How far from the middle of the grid it flies, and how high (start, end), metres */
+export const INTRO_RADIUS = 27
+export const INTRO_UP: readonly [number, number] = [12, 7]
+/** The share of the fly round spent flying; the rest settles on the grid shot */
+const INTRO_FLY = 0.75
+
+const lerp = (a: number, b: number, share: number) => a + (b - a) * share
+const lerpPoint = (a: Point3, b: Point3, share: number): Point3 => ({
+  x: lerp(a.x, b.x, share),
+  y: lerp(a.y, b.y, share),
+  z: lerp(a.z, b.z, share),
+})
+
+/** Whether `left` seconds of countdown are still in the fly round */
+export const inIntro = (left: number | null): boolean => left !== null && left > INTRO_TO
+
+/** The fly round's shot with `left` seconds of countdown left; null outside it */
+export function introShot(spots: readonly Spot[], left: number, y = 0): CameraShot | null {
+  const grid = gridShot(spots, y)
+  const pole = spots[0]
+  if (!grid || !pole || left <= INTRO_TO) return null
+  const share = Math.max(0, Math.min(1, (INTRO_FROM - left) / (INTRO_FROM - INTRO_TO)))
+  const forward = forwardOf(pole.heading)
+  const side = { x: -forward.z, z: forward.x }
+  const middle = {
+    x: spots.reduce((sum, spot) => sum + spot.x, 0) / spots.length,
+    z: spots.reduce((sum, spot) => sum + spot.z, 0) / spots.length,
+  }
+  const fly = smooth(Math.min(1, share / INTRO_FLY), 0, 1)
+  // Round from ahead (0) by the side to behind (π)
+  const angle = Math.PI * fly
+  const around = {
+    x: forward.x * Math.cos(angle) + side.x * Math.sin(angle),
+    z: forward.z * Math.cos(angle) + side.z * Math.sin(angle),
+  }
+  const flying: Omit<CameraShot, 'blend'> = {
+    eye: {
+      x: middle.x + around.x * INTRO_RADIUS,
+      y: y + lerp(INTRO_UP[0], INTRO_UP[1], fly),
+      z: middle.z + around.z * INTRO_RADIUS,
+    },
+    target: { x: middle.x, y: y + 0.5, z: middle.z },
+  }
+  const settle = smooth(share, INTRO_FLY, 1)
+  return {
+    eye: lerpPoint(flying.eye, grid.eye, settle),
+    target: lerpPoint(flying.target, grid.target, settle),
+    blend: 1,
+  }
+}
+
+/** The finish: the swing round to the front takes this long, seconds */
+export const FINISH_SWING = 2.2
+/** ... ending this far from the kart, this high, this many radians off dead ahead */
+export const FINISH_BACK = 6.5
+export const FINISH_UP: readonly [number, number] = [2.6, 1.4]
+export const FINISH_END_ANGLE = 0.35
+/** And comes in over this long */
+const FINISH_EASE_IN = 0.35
+
+/**
+ * The finish's shot, `since` seconds after crossing the line, of the kart at `kart`: from behind it
+ * round to its front. With less motion asked for, none: the chase camera stays
+ */
+export function finishShot(
+  kart: { readonly x: number; readonly z: number; readonly heading: number; readonly y?: number },
+  since: number,
+  reducedMotion = false,
+): CameraShot | null {
+  if (reducedMotion || since < 0) return null
+  const forward = forwardOf(kart.heading)
+  const side = { x: -forward.z, z: forward.x }
+  const swing = smooth(Math.min(1, since / FINISH_SWING), 0, 1)
+  // π: straight behind; FINISH_END_ANGLE: ahead and a little to the side
+  const angle = lerp(Math.PI, FINISH_END_ANGLE, swing)
+  const y = kart.y ?? 0
+  return {
+    eye: {
+      x: kart.x + (forward.x * Math.cos(angle) + side.x * Math.sin(angle)) * FINISH_BACK,
+      y: y + lerp(FINISH_UP[0], FINISH_UP[1], swing),
+      z: kart.z + (forward.z * Math.cos(angle) + side.z * Math.sin(angle)) * FINISH_BACK,
+    },
+    target: { x: kart.x, y: y + 0.9, z: kart.z },
+    blend: smooth(Math.min(1, since / FINISH_EASE_IN), 0, 1),
+  }
+}
+
+/** The finish's show (the big place, the confetti) lasts this long before the results, seconds */
+export const CELEBRATE_SECONDS = 3.2
