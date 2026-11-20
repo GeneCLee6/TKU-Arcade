@@ -23,6 +23,8 @@ import {
   parseLook,
   STAT_MAX,
   STAT_MIN,
+  itemPerksOf,
+  itemPointsOf,
 } from '../../shared/kart/karts.ts'
 import { encodeFrame, type KartFrame } from '../../shared/kart/net.ts'
 import { INITIAL_KART, KART_TUNING, NO_INPUT, stepKart } from '../../shared/kart/physics.ts'
@@ -52,10 +54,10 @@ const ONLY_KARTS = KARTS.filter((one) => one.kind === 'kart')
 const BIKES = KARTS.filter((one) => one.kind === 'bike')
 
 describe('the vehicles and four drivers (e10-t05, and the series and bikes of 2026-11-19)', () => {
-  it('has seventeen vehicles: fourteen karts and three bikes, and four drivers', () => {
+  it('has twenty vehicles: seventeen karts and three bikes, and four drivers', () => {
     expect(KARTS.map((one) => one.id)).toEqual([...KART_IDS])
     expect(new Set(KART_IDS).size).toBe(KART_IDS.length)
-    expect(ONLY_KARTS).toHaveLength(14)
+    expect(ONLY_KARTS).toHaveLength(17)
     expect(BIKES).toHaveLength(3)
     expect(DRIVER_IDS).toHaveLength(4)
   })
@@ -98,7 +100,15 @@ describe('the vehicles and four drivers (e10-t05, and the series and bikes of 20
         for (const stat of KART_STATS) expect(Math.abs(kart.stats[stat]), kart.id).toBeLessThanOrEqual(1)
         continue
       }
+      // 2026-11-20: the item series is built for items: it spends points on them, none on a stat
+      if (kart.series === 'item') {
+        expect(itemPointsOf(kart.id), kart.id).toBeGreaterThan(0)
+        for (const stat of BUDGET_STATS) expect(kart.stats[stat], kart.id).toBeLessThanOrEqual(1)
+        continue
+      }
       expect(kart.stats[lead[kart.series]], kart.id).toBeGreaterThan(0)
+      // ... and only the item series spends on items
+      expect(itemPointsOf(kart.id), kart.id).toBe(0)
     }
     // A bike is light, whatever else it is
     for (const bike of BIKES) expect(bike.stats.weight, bike.id).toBeLessThan(0)
@@ -106,7 +116,8 @@ describe('the vehicles and four drivers (e10-t05, and the series and bikes of 20
 
   it('makes every kart a trade-off: its points sum to zero, and none is best or worst at everything', () => {
     for (const { id, stats } of KARTS) {
-      const sum = BUDGET_STATS.reduce((total, stat) => total + stats[stat], 0)
+      // 2026-11-20: a point spent on items (the item series) is a point of the same budget
+      const sum = BUDGET_STATS.reduce((total, stat) => total + stats[stat], 0) + itemPointsOf(id)
       expect(sum, id).toBe(0)
       for (const stat of KART_STATS) {
         expect(stats[stat], `${id} ${stat}`).toBeGreaterThanOrEqual(STAT_MIN)
@@ -372,5 +383,35 @@ describe('a bike (2026-11-19): numbers on the same physics, not physics of its o
     const bike = bumpKart(still, [{ ...close, mass: kartMass('whale') }], kartMass('petrel'), kartRadius('petrel'))
     const whale = bumpKart(still, [{ ...close, mass: kartMass('petrel'), radius: kartRadius('petrel') }], kartMass('whale'))
     expect(Math.abs(bike.kart.x)).toBeGreaterThan(Math.abs(whale.kart.x) * 1.5)
+  })
+})
+
+describe('the item series (2026-11-20)', () => {
+  const ITEM_SERIES = KARTS.filter((one) => one.series === 'item')
+
+  it('has three karts, one of each tier, whose perks stay small', () => {
+    expect(ITEM_SERIES.map((one) => one.id)).toEqual(['pelican', 'otter', 'cormorant'])
+    expect(ITEM_SERIES.map((one) => one.tier)).toEqual(['entry', 'advanced', 'expert'])
+    for (const one of ITEM_SERIES) {
+      const perks = itemPerksOf(one.id)
+      expect(perks.luck).toBeLessThanOrEqual(2)
+      expect(perks.duration).toBeLessThanOrEqual(1.5)
+      expect(perks.shieldHits).toBeLessThanOrEqual(2)
+      // The same top speed as the standard kart: the trade is paid elsewhere
+      expect(one.stats.speed).toBe(0)
+    }
+  })
+
+  it('gives every other vehicle no perks at all', () => {
+    for (const one of KARTS.filter((kart) => kart.series !== 'item')) {
+      expect(itemPerksOf(one.id), one.id).toEqual({ luck: 0, duration: 1, shieldHits: 1 })
+    }
+  })
+
+  it('reads the perks the same from a frame byte as from the id', () => {
+    for (const one of ITEM_SERIES) {
+      const byte = loadoutByte(one.id, 'club')
+      expect(itemPerksOf(loadoutOfByte(byte).kart)).toEqual(itemPerksOf(one.id))
+    }
   })
 })

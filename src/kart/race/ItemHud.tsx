@@ -32,6 +32,18 @@ const ICON_PATHS: Record<ItemId, string> = {
   // A flat puddle with a splash
   puddle:
     'M4 23 C4 19 12 18 16 19 C21 20 28 19 28 23 C28 27 4 27 4 23 Z M12 13 L10 9 M16 12 V7 M20 13 L22 9',
+  // 2026-11-20. A round mirror on a handle, and an arrow turning back off it
+  mirror: 'M13 3 A8 8 0 1 1 12.99 3 Z M13 19 V29 M9 8 L7 12 M29 15 A7 7 0 0 0 23 8 M23 4 V8 H27',
+  // Three drifting lines of fog
+  fog: 'M4 10 C8 7 12 13 16 10 C20 7 24 13 28 10 M4 17 C8 14 12 20 16 17 C20 14 24 20 28 17 M4 24 C8 21 12 27 16 24 C20 21 24 27 28 24',
+  // A stone skipping over water: hops getting shorter, and the stone
+  skip: 'M2 26 Q6 16 10 26 Q13 19 16 26 Q18 21 20 26 M25 22 A3 3 0 1 1 24.99 22 Z M2 29 H30',
+  // A spark crossed out: no boost
+  jam: 'M16 3 A13 13 0 1 1 15.99 3 Z M18 7 L12 16 H19 L14 25 M7 7 L25 25',
+  // A flag waving on its pole
+  rally: 'M8 29 V4 M8 5 C14 2 18 9 25 6 V16 C18 19 14 12 8 15',
+  // A box seen from a corner, standing a little crooked
+  decoy: 'M6 12 L16 6 L26 12 V23 L16 29 L6 23 Z M6 12 L16 18 L26 12 M16 18 V29',
 }
 
 export const ItemIcon = memo(function ItemIcon({ item }: { item: ItemId }) {

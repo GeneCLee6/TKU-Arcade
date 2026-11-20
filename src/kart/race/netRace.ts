@@ -21,18 +21,21 @@ import type { Run } from '../../../shared/kart/course.ts'
 import { encodeItemFrame, ITEM_TUNING, itemBoxes, type ItemId } from '../../../shared/kart/items.ts'
 import {
   boostKart,
+  fogStep,
   headwindStep,
+  jamStep,
   stunStep,
   towStep,
   warpRun,
 } from '../../../shared/kart/itemEffects.ts'
 import {
   foreseeHit,
+  isStunItem,
   SHOT_TUNING,
   shotLive,
   shotPosition,
   type Fix,
-  type ShotItem,
+  type StunItem,
 } from '../../../shared/kart/shots.ts'
 import { gridSpot, raceProgress } from '../../../shared/kart/race.ts'
 import { foeShots } from '../../../shared/kart/team.ts'
@@ -125,7 +128,7 @@ export interface RaceNetOptions {
   /** The item key pressed with `item` held, as the use goes to the room */
   readonly onItemPress?: (item: ItemId) => void
   /** #86: this browser foresaw a hit on its own kart, stunned for `ms` (the room still judges) */
-  readonly onForeseenHit?: (item: ShotItem, ms: number) => void
+  readonly onForeseenHit?: (item: StunItem, ms: number) => void
   /**
    * 2026-11-20: the kart and driver a seat has picked (a member's `look`, a computer kart's), to draw
    * it on its place on the grid before any frame of its own has come; null when not known
@@ -241,6 +244,9 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   let headwindUntil = 0
   /** Hit by a shot (e9-t06b): stunned until then, by the server's clock */
   let stunUntil = 0
+  /** 2026-11-20: static (no boost fires) and fog (held back a little) until then */
+  let jamUntil = 0
+  let fogUntil = 0
   // 2026-11-17: how the hits look and sound (hitFx.ts), from the same events
   const feed = createHitFeed(seat, seen)
   let lastHeld = options.view().racers.find((racer) => racer.seat === seat)?.item ?? null
@@ -304,10 +310,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       const reached = event.targets.includes(seat) && !event.blocked.includes(seat)
       // A shot that hit this kart (e9-t06b): stunned, and a tow let go
       if (event.hit) {
-        if (
-          reached &&
-          (event.item === 'hail' || event.item === 'cloud' || event.item === 'puddle')
-        ) {
+        if (reached && event.item === 'fog') fogUntil = event.at + SHOT_TUNING.fogBlindMs
+        if (reached && isStunItem(event.item)) {
           const confirmed = confirmsForeseen(event, seat, foreseen)
           if (confirmed >= 0) {
             // Stunned since it was foreseen
@@ -322,12 +326,25 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
         continue
       }
       if (event.by === seat) {
-        if (event.item === 'boost') next = { ...next, kart: boostKart(next.kart) }
+        if (event.item === 'boost') {
+          const seconds = (event.ms ?? ITEM_TUNING.boostSeconds * 1000) / 1000
+          next = { ...next, kart: boostKart(next.kart, seconds) }
+        }
         if (event.item === 'tow') {
-          towUntil = event.at + ITEM_TUNING.towMs
+          towUntil = event.at + (event.ms ?? ITEM_TUNING.towMs)
           towSeat = event.targets[0] ?? null
         }
+        // 2026-11-20: a skip lands with a little push (its jump is the warp, below)
+        if (event.item === 'skip') {
+          next = { ...next, kart: boostKart(next.kart, ITEM_TUNING.skipBoostSeconds) }
+        }
       }
+      // 2026-11-20: a rally lifts the kart that raised it and its team-mates
+      if (event.item === 'rally' && (event.by === seat || reached)) {
+        const seconds = (event.ms ?? ITEM_TUNING.rallySeconds * 1000) / 1000
+        next = { ...next, kart: boostKart(next.kart, seconds) }
+      }
+      if (reached && event.item === 'jam') jamUntil = event.at + ITEM_TUNING.jamMs
       if (reached && event.item === 'headwind') {
         headwindUntil = event.at + ITEM_TUNING.headwindMs
         towUntil = 0
@@ -409,7 +426,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
         seat,
         from,
         to,
-        me?.shieldUntil ?? 0,
+        // A mirror up (2026-11-20) sends it back: nothing to foresee either
+        Math.max(me?.shieldUntil ?? 0, me?.mirrorUntil ?? 0),
         foreseenShots,
       )
       if (shot) {
@@ -430,6 +448,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     const dt = STEP_SECONDS
     if (server < headwindUntil) next = { ...next, kart: headwindStep(next.kart, dt) }
     if (server < stunUntil) next = { ...next, kart: stunStep(next.kart, dt) }
+    if (server < jamUntil) next = { ...next, kart: jamStep(next.kart) }
+    if (server < fogUntil) next = { ...next, kart: fogStep(next.kart, dt) }
     if (server < towUntil && towSeat !== null) {
       const target = poses.find((pose) => pose.seat === towSeat && !pose.stale)
       if (target) next = { ...next, kart: towStep(next.kart, target, dt) }
@@ -623,10 +643,16 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       if (view.mode !== 'items') return { boxes: [], shields: [], shots: [] }
       const at = roughNow()
       const now = performance.now()
-      const shields = view.racers
-        .filter((racer) => (racer.shieldUntil ?? 0) > at)
-        .map((racer) => (racer.seat === seat ? pose : poses.find((one) => one.seat === racer.seat)))
-        .filter((one): one is { x: number; z: number } & typeof pose => one !== undefined)
+      const whereUp = (until: (racer: KartRacer) => number) =>
+        view.racers
+          .filter((racer) => until(racer) > at)
+          .map((racer) =>
+            racer.seat === seat ? pose : poses.find((one) => one.seat === racer.seat),
+          )
+          .filter((one): one is { x: number; z: number } & typeof pose => one !== undefined)
+      const shields = whereUp((racer) => racer.shieldUntil ?? 0)
+      // 2026-11-20: a mirror up, as a ring round its kart
+      const mirrors = whereUp((racer) => racer.mirrorUntil ?? 0)
       return {
         boxes: boxes.map((box, i) => ({
           x: box.x,
@@ -634,6 +660,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           shown: (view.boxes[i] ?? Infinity) <= at && (asked.get(i) ?? 0) <= now,
         })),
         shields,
+        mirrors,
         // e9-t06b: the shots on the road; a cloud flies at its target as this browser sees it
         shots: (view.shots ?? [])
           .filter((shot) => shotLive(shot, at))

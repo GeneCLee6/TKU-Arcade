@@ -65,3 +65,56 @@ const Banner = styled.p`
     animation-name: ${fade};
   }
 `
+
+/**
+ * 2026-11-20: driven into a bank of sea fog (shared/kart/shots.ts): the screen clouds over from the
+ * edges for `ms`, thickest at first and thinning out; the middle of the road stays readable through
+ * it (never fully white), so nobody drives blind
+ */
+export const FogVeil = memo(function FogVeil({ t, ms }: { t: Translate; ms: number }) {
+  return (
+    <Fog role="status" data-testid="kart-fogged" style={{ animationDuration: `${ms}ms` }}>
+      <FogWord>{t('games.kart.item.fogged')}</FogWord>
+    </Fog>
+  )
+})
+
+const thin = keyframes`
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  60% { opacity: 0.75; }
+  100% { opacity: 0; }
+`
+
+const Fog = styled.div`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 55% 45% at 50% 62%,
+    color-mix(in srgb, ${color.surface} 18%, transparent) 0%,
+    color-mix(in srgb, ${color.surface} 62%, transparent) 70%,
+    color-mix(in srgb, ${color.surface} 82%, transparent) 100%
+  );
+  backdrop-filter: blur(3px);
+  animation: ${thin} ease-out forwards;
+
+  /* No fade: a steady veil, gone when it unmounts */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0.7;
+  }
+`
+
+const FogWord = styled.p`
+  ${displayType}
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  translate: -50% 0;
+  margin: 0;
+  color: ${color.muted};
+  font-size: ${fontSize.lg}px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+`

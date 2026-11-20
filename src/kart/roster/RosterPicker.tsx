@@ -60,6 +60,14 @@ const TIER_ORDER: { readonly [T in KartTier]: number } = { entry: 0, advanced: 1
 /** A bike's three differences, as tags (karts.ts's KIND_TRAITS says them in numbers) */
 const BIKE_TAGS = ['kart.tag.narrow', 'kart.tag.lean', 'kart.tag.light'] as const
 
+/** 2026-11-20: what a machine of the item series spends on items, as tags (karts.ts's ItemPoints) */
+const perkTags = (spec: KartSpec) =>
+  [
+    (spec.items?.luck ?? 0) > 0 && ('kart.perk.luck' as const),
+    (spec.items?.duration ?? 0) > 0 && ('kart.perk.duration' as const),
+    (spec.items?.shield ?? 0) > 0 && ('kart.perk.shield' as const),
+  ].filter((key) => key !== false)
+
 export interface RosterPickerProps {
   t: RosterT
   kart: KartId
@@ -132,6 +140,11 @@ export function RosterPicker({ t, kart, driver, onKart, onDriver, preview }: Ros
           <Tag>{t(`kart.trait.${spec.series}`)}</Tag>
           <Tag>{t(`kart.tier.${spec.tier}`)}</Tag>
           {spec.kind === 'bike' && BIKE_TAGS.map((key) => <Tag key={key}>{t(key)}</Tag>)}
+          {perkTags(spec).map((key) => (
+            <Tag key={key} data-perk={key}>
+              {t(key)}
+            </Tag>
+          ))}
         </Tags>
       </Picked>
       <Blurb data-testid="kart-blurb">{t(`kart.blurb.${kart}`)}</Blurb>
@@ -175,6 +188,9 @@ export function RosterPicker({ t, kart, driver, onKart, onDriver, preview }: Ros
       </Choices>
       <Blurb>{t(`kart.driverBlurb.${driver}`)}</Blurb>
       {spec.kind === 'bike' && <Note data-testid="kart-bike-note">{t('kart.roster.bikeNote')}</Note>}
+      {spec.series === 'item' && (
+        <Note data-testid="kart-series-item-note">{t('kart.roster.itemNote')}</Note>
+      )}
       <Note>{t('kart.roster.note')}</Note>
     </Picker>
   )

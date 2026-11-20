@@ -50,8 +50,14 @@ export function watchCuesOf(event: FxEvent, follow: number | null, where: Where)
     if (volume >= QUIETEST) heard.push({ cue, volume })
   }
   if (event.hit) {
+    // 2026-11-20: a mirror turning a shot back rings where it is; fog closes round who drove in
+    if (event.bounced) at(event.by, { kind: 'bounce' })
     const target = event.targets[0]
     if (target === undefined) return heard
+    if (event.item === 'fog') {
+      at(target, { kind: 'fogged' })
+      return heard
+    }
     const stopped = event.blocked.includes(target)
     at(target, { kind: stopped ? 'pop' : 'hit' })
     // The followed kart's shot landed on someone: its thrower's ding
@@ -62,6 +68,10 @@ export function watchCuesOf(event: FxEvent, follow: number | null, where: Where)
   }
   at(event.by, { kind: 'use', item: event.item })
   for (const seat of event.blocked) at(seat, { kind: 'pop' })
+  // 2026-11-20: static crackles on whoever it reached
+  if (event.item === 'jam') {
+    for (const seat of event.targets) if (!event.blocked.includes(seat)) at(seat, { kind: 'jammed' })
+  }
   return heard
 }
 

@@ -8,7 +8,7 @@
 // recorded events (ticks turned into ms). No three.js and no WebAudio here: Scene.ts and
 // kartAudio.ts draw and play what this decides.
 import type { ItemId } from '../../shared/kart/items.ts'
-import { isShotItem, SHOT_TUNING, type ShotItem } from '../../shared/kart/shots.ts'
+import { isStunItem, SHOT_TUNING, type StunItem } from '../../shared/kart/shots.ts'
 
 /** An item event as the room keeps it (KartItemEvent), or a replay's with its time in ms */
 export interface FxEvent {
@@ -20,7 +20,15 @@ export interface FxEvent {
   readonly at: number
   /** A shot that hit (e9-t06b); a use otherwise */
   readonly hit?: boolean
+  /** 2026-11-20: a shot a mirror sent back (`by` the mirror's kart, `targets` the thrower) */
+  readonly bounced?: boolean
 }
+
+/**
+ * 2026-11-20: the other moments an item shows on a kart, each a burst of its own: a mirror turning a
+ * shot back, fog closing round a kart, a skip landing, a rally's lift, static crackling on a kart
+ */
+export type FlashLook = 'bounce' | 'fog' | 'splash' | 'cheer' | 'static'
 
 /** What a kart shows: a spin and hop after a hit, or a bubble popping */
 export type HitEffect =
@@ -30,9 +38,10 @@ export type HitEffect =
       readonly at: number
       /** As long as the stun */
       readonly ms: number
-      readonly item: ShotItem
+      readonly item: StunItem
     }
   | { readonly kind: 'pop'; readonly seat: number; readonly at: number }
+  | { readonly kind: 'flash'; readonly look: FlashLook; readonly seat: number; readonly at: number }
 
 /** A sound for this browser's racer: an item taken or used, a hit taken or landed, a bubble popped */
 export type ItemCue =
@@ -41,6 +50,10 @@ export type ItemCue =
   | { readonly kind: 'hit' }
   | { readonly kind: 'landed' }
   | { readonly kind: 'pop' }
+  /** 2026-11-20: this racer's mirror sent a shot back; fog closed round it; static jammed it */
+  | { readonly kind: 'bounce' }
+  | { readonly kind: 'fogged' }
+  | { readonly kind: 'jammed' }
 
 /** The model's offset from where the physics has it: turned round, lifted, rolled */
 export interface SpinPose {
@@ -69,17 +82,35 @@ export const SHAKE = 0.32
 
 /** The effects one event leaves on the karts */
 export function effectsOf(event: FxEvent): HitEffect[] {
+  const flash = (look: FlashLook, seat: number): HitEffect => ({
+    kind: 'flash',
+    look,
+    seat,
+    at: event.at,
+  })
   if (event.hit) {
     const seat = event.targets[0]
-    if (seat === undefined) return []
-    if (event.blocked.includes(seat)) return [{ kind: 'pop', seat, at: event.at }]
-    if (!isShotItem(event.item)) return []
+    // 2026-11-20: a mirror flashes where it turned the shot back
+    const bounce = event.bounced ? [flash('bounce', event.by)] : []
+    if (seat === undefined) return bounce
+    if (event.blocked.includes(seat)) return [...bounce, { kind: 'pop', seat, at: event.at }]
+    if (event.item === 'fog') return [flash('fog', seat)]
+    if (!isStunItem(event.item)) return bounce
     return [
+      ...bounce,
       { kind: 'spin', seat, at: event.at, ms: SHOT_TUNING.stunMs[event.item], item: event.item },
     ]
   }
   // A headwind or a swap stopped by a bubble pops it too
-  return event.blocked.map((seat) => ({ kind: 'pop', seat, at: event.at }) as const)
+  const effects: HitEffect[] = event.blocked.map(
+    (seat) => ({ kind: 'pop', seat, at: event.at }) as const,
+  )
+  const reached = event.targets.filter((seat) => !event.blocked.includes(seat))
+  // 2026-11-20: a skip lands with a splash, a rally lifts the whole team, static crackles
+  if (event.item === 'skip') effects.push(flash('splash', event.by))
+  if (event.item === 'rally') effects.push(...[event.by, ...reached].map((one) => flash('cheer', one)))
+  if (event.item === 'jam') effects.push(...reached.map((one) => flash('static', one)))
+  return effects
 }
 
 /** The sounds one event makes for the racer in `seat` (null: watching, no sounds) */
@@ -87,15 +118,26 @@ export function cuesOf(event: FxEvent, seat: number | null): ItemCue[] {
   if (seat === null) return []
   const cues: ItemCue[] = []
   if (event.hit) {
+    // 2026-11-20: this racer's mirror sent it back
+    if (event.bounced && event.by === seat) cues.push({ kind: 'bounce' })
     const target = event.targets[0]
     if (target === undefined) return cues
     const stopped = event.blocked.includes(target)
+    if (event.item === 'fog') {
+      if (target === seat) cues.push({ kind: 'fogged' })
+      return cues
+    }
     if (target === seat) cues.push({ kind: stopped ? 'pop' : 'hit' })
     else if (event.by === seat && !stopped) cues.push({ kind: 'landed' })
     return cues
   }
   if (event.by === seat) cues.push({ kind: 'use', item: event.item })
   if (event.blocked.includes(seat)) cues.push({ kind: 'pop' })
+  else if (event.by !== seat && event.targets.includes(seat)) {
+    // 2026-11-20: a team-mate's rally is heard; static on this kart crackles
+    if (event.item === 'rally') cues.push({ kind: 'use', item: 'rally' })
+    if (event.item === 'jam') cues.push({ kind: 'jammed' })
+  }
   return cues
 }
 
@@ -192,7 +234,7 @@ export function liveStart(
 
 /** A hit this browser foresaw on its own kart before the room said so (netRace.ts) */
 export interface Foreseen {
-  readonly item: ShotItem
+  readonly item: StunItem
   /** When, by the server's clock */
   readonly at: number
 }
@@ -236,7 +278,7 @@ export interface HitFeed {
    * This browser's own kart was hit by `item` at `at` before the room said so (#86): it spins now,
    * the hit sounds on the next read, and the room's hit, when it comes, does not start it again
    */
-  foresee(item: ShotItem, at: number): void
+  foresee(item: StunItem, at: number): void
   /** The effects showing or about to */
   readonly effects: readonly HitEffect[]
 }
@@ -297,7 +339,7 @@ export function createHitFeed(
 
 /** A burst of particles to start this frame, at a kart: sparkles for a hit, shards for a pop */
 export interface HitBurst {
-  readonly kind: 'star' | 'pop'
+  readonly kind: 'star' | 'pop' | FlashLook
   readonly x: number
   readonly z: number
 }
@@ -319,7 +361,9 @@ export function hitFrameOf(
   const bursts: HitBurst[] = []
   for (const effect of started) {
     const at = where(effect.seat)
-    if (at) bursts.push({ kind: effect.kind === 'spin' ? 'star' : 'pop', x: at.x, z: at.z })
+    if (!at) continue
+    const kind = effect.kind === 'spin' ? 'star' : effect.kind === 'pop' ? 'pop' : effect.look
+    bursts.push({ kind, x: at.x, z: at.z })
   }
   return { spins, bursts, shake: own === null ? { x: 0, y: 0 } : shakeAt(showing, own, now) }
 }

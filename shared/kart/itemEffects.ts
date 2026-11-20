@@ -7,9 +7,48 @@ import { KART_TUNING, type KartState } from './physics.ts'
 import { SHOT_TUNING } from './shots.ts'
 import type { Track } from './track.ts'
 
-/** The boost: the physics' own, so that it looks, sounds and stacks as any other */
-export function boostKart(kart: KartState): KartState {
-  return { ...kart, boostSeconds: Math.max(kart.boostSeconds, ITEM_TUNING.boostSeconds) }
+/**
+ * The boost: the physics' own, so that it looks, sounds and stacks as any other. `seconds` for a
+ * kart built for items (its event says how long, 2026-11-20) or a rally's or a skip's smaller push
+ */
+export function boostKart(kart: KartState, seconds: number = ITEM_TUNING.boostSeconds): KartState {
+  return { ...kart, boostSeconds: Math.max(kart.boostSeconds, seconds) }
+}
+
+/**
+ * A jammed step (2026-11-20, static): no boost can be fired, and the one burning is cut. The kart's
+ * charges are kept for later: the boost key reads as already held, so a press now fires nothing
+ * (physics.ts and classic.ts fire a charge only on a fresh press)
+ */
+export function jamStep(kart: KartState): KartState {
+  const calm =
+    kart.boostHeld &&
+    kart.boostSeconds === 0 &&
+    kart.stackSeconds === 0 &&
+    (kart.teamSeconds ?? 0) === 0
+  if (calm) return kart
+  return {
+    ...kart,
+    boostHeld: true,
+    boostSeconds: 0,
+    stackSeconds: 0,
+    ...(kart.teamSeconds ? { teamSeconds: 0 } : {}),
+  }
+}
+
+/** The top speed in fog (2026-11-20), m/s */
+export const FOG_TOP_SPEED = KART_TUNING.topSpeed * SHOT_TUNING.fogTopFactor
+
+/**
+ * A fogged step (2026-11-20): the damp air holds the kart to the fog's top speed, eased down; a
+ * boost still pushes it past (fog is weather, not a blow: nothing is blown out)
+ */
+export function fogStep(kart: KartState, seconds: number): KartState {
+  if (kart.boostSeconds > 0 || kart.miniSeconds > 0 || (kart.teamSeconds ?? 0) > 0) return kart
+  const speed = Math.hypot(kart.vx, kart.vz)
+  if (speed <= FOG_TOP_SPEED) return kart
+  const share = Math.max(FOG_TOP_SPEED / speed, 1 - ITEM_TUNING.headwindDrag * 0.5 * seconds)
+  return { ...kart, vx: kart.vx * share, vz: kart.vz * share }
 }
 
 /** A headwind's step: every boost blown out, and the speed brought down to the headwind's top */

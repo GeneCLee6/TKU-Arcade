@@ -52,8 +52,8 @@ describe('the garage (e10-t05)', () => {
     const cards = () => within(screen.getAllByRole('radiogroup')[0]!).getAllByRole('radio')
     const ids = () => cards().map((card) => card.getAttribute('data-kart'))
     const tabs = within(screen.getByRole('tablist')).getAllByRole('tab')
-    // All, the bikes, five series, three tiers
-    expect(tabs).toHaveLength(10)
+    // All, the bikes, six series (2026-11-20: the item series), three tiers
+    expect(tabs).toHaveLength(11)
     expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
 
     fireEvent.click(screen.getByRole('tab', { name: 'Bikes' }))
@@ -66,8 +66,18 @@ describe('the garage (e10-t05)', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Tailwind' }))
     expect(ids()).toEqual(['marlin', 'ray', 'heron', 'hornet'])
+    // 2026-11-20: the item series, with its perks as tags and a note
+    fireEvent.click(screen.getByRole('tab', { name: 'Beachcomber' }))
+    expect(ids()).toEqual(['pelican', 'otter', 'cormorant'])
+    fireEvent.click(screen.getByRole('radio', { name: /Cormorant/ }))
+    expect(onKart).toHaveBeenCalledWith('cormorant')
     fireEvent.click(screen.getByRole('tab', { name: 'Expert' }))
-    expect(ids()).toEqual(KARTS.filter((one) => one.tier === 'expert').map((one) => one.id))
+    // Karts first, then bikes
+    const experts = KARTS.filter((one) => one.tier === 'expert')
+    expect(ids()).toEqual([
+      ...experts.filter((one) => one.kind === 'kart').map((one) => one.id),
+      ...experts.filter((one) => one.kind === 'bike').map((one) => one.id),
+    ])
     fireEvent.click(screen.getByRole('tab', { name: 'All' }))
     expect(ids()).toHaveLength(KART_IDS.length)
   })
@@ -87,6 +97,13 @@ describe('the garage (e10-t05)', () => {
       'data-value',
       '1',
     )
+  })
+
+  it('shows what an item vehicle spends on items, and says what that costs (2026-11-20)', () => {
+    render(<RosterPicker t={en} kart="cormorant" driver="club" onKart={vi.fn()} onDriver={vi.fn()} />)
+    const tags = Array.from(screen.getByTestId('kart-tags').children, (tag) => tag.textContent)
+    expect(tags).toEqual(['Kart', 'Beachcomber', 'Items', 'Expert', 'Strong items more often', 'Bubble stops two'])
+    expect(screen.getByTestId('kart-series-item-note')).toHaveTextContent('race without items')
   })
 
   it('has a name and a line about every vehicle, in both languages', () => {

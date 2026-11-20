@@ -165,6 +165,11 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
                 .filter((racer) => (racer.shieldUntil ?? 0) > now)
                 .map((racer) => karts.find((kart) => kart.id === racer.seat))
                 .filter((kart) => kart !== undefined),
+              // 2026-11-20: a mirror up
+              mirrors: room.racers
+                .filter((racer) => (racer.mirrorUntil ?? 0) > now)
+                .map((racer) => karts.find((kart) => kart.id === racer.seat))
+                .filter((kart) => kart !== undefined),
               // e9-t06b: the shots on the road; a cloud flies at its target as this browser sees it
               shots: (room.shots ?? [])
                 .filter((shot) => shotLive(shot, now))

@@ -3,6 +3,7 @@ import styled, { css, keyframes } from 'styled-components'
 import type { KartAction, KartItemEvent, KartView } from '../../../shared/games/kart/types.ts'
 import { actionKeys } from '../../../shared/kart/input.ts'
 import { TARGETED_ITEMS, type ItemId } from '../../../shared/kart/items.ts'
+import { SHOT_TUNING } from '../../../shared/kart/shots.ts'
 import { KART_MESSAGES, type KartMessageKey } from '../../../shared/kart/i18n.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import type { JsonValue } from '../../../shared/patch.ts'
@@ -29,7 +30,7 @@ import { startSpikeLoop, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
 import { autopilot, driftingAutopilot } from './autopilot.ts'
 import { ITEM_SLOT_PORTRAIT_TOP, ItemNote, ItemSlot } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
-import { StunHud } from './HitHud.tsx'
+import { FogVeil, StunHud } from './HitHud.tsx'
 import { createRaceNet, type NameTag, type RaceNet } from './netRace.ts'
 import { teamColor } from '../team/teamColor.ts'
 import { TeamPanel, TeamScore, TeamVeil } from './TeamHud.tsx'
@@ -82,7 +83,31 @@ function noteFor(
   const first = event.targets[0]
   // A shot that hit someone (e9-t06b)
   if (event.hit) {
+    // 2026-11-20: a mirror sent it back: `by` is the mirror's kart, `first` the thrower
+    if (event.bounced) {
+      if (event.by === seat) {
+        return first === undefined
+          ? { text: t('games.kart.item.youBouncedNone', { item }), bad: false }
+          : { text: t('games.kart.item.youBounced', { name: nameOf(first), item }), bad: false }
+      }
+      if (first === seat && !event.blocked.includes(seat)) {
+        return { text: t('games.kart.item.hitBounced', { name: nameOf(event.by), item }), bad: true }
+      }
+      if (first === seat) {
+        return {
+          text: t('games.kart.item.yourBubble', { name: nameOf(event.by), item }),
+          bad: false,
+        }
+      }
+      return null
+    }
     if (first === undefined) return null
+    // 2026-11-20: driven into someone's sea fog
+    if (event.item === 'fog') {
+      return first === seat
+        ? { text: t('games.kart.item.hitFog', { name: nameOf(event.by) }), bad: true }
+        : null
+    }
     const stopped = event.blocked.includes(first)
     if (first === seat) {
       if (stopped)
@@ -123,6 +148,21 @@ function noteFor(
         return first === undefined
           ? null
           : { text: t('games.kart.item.youCloud', { name: nameOf(first) }), bad: false }
+      // 2026-11-20
+      case 'mirror':
+        return { text: t('games.kart.item.youMirror'), bad: false }
+      case 'fog':
+        return first === undefined
+          ? null
+          : { text: t('games.kart.item.youFog', { name: nameOf(first) }), bad: false }
+      case 'skip':
+        return { text: t('games.kart.item.youSkip'), bad: false }
+      case 'jam':
+        return first === undefined
+          ? null
+          : { text: t('games.kart.item.youJam', { name: nameOf(first) }), bad: false }
+      case 'rally':
+        return { text: t('games.kart.item.youRally'), bad: false }
       default:
         return null
     }
@@ -141,6 +181,10 @@ function noteFor(
       return { text: t('games.kart.item.hitTow', { name: by }), bad: true }
     case 'cloud':
       return { text: t('games.kart.item.cloudComing', { name: by }), bad: true }
+    case 'jam':
+      return { text: t('games.kart.item.hitJam', { name: by }), bad: true }
+    case 'rally':
+      return { text: t('games.kart.item.hitRally', { name: by }), bad: false }
     default:
       return null
   }
@@ -184,6 +228,8 @@ export default function RaceView({
   const [unstable, setUnstable] = useState(false)
   const [note, setNote] = useState<{ text: string; bad: boolean; id: number }>()
   const [stun, setStun] = useState<{ ms: number; id: number }>()
+  /** 2026-11-20: driven into sea fog: the view clouds over a moment */
+  const [fog, setFog] = useState<number>()
   const seenEvents = useRef(view.used)
   const pressed = useRef<{ item: ItemId; at: number } | null>(null)
   /** #86: when this browser last foresaw a hit on its kart (performance.now), shown at once */
@@ -327,6 +373,9 @@ export default function RaceView({
       const next = noteFor(event, seat, tRef.current, nameRef.current)
       if (next) setNote((last) => ({ ...next, id: (last?.id ?? 0) + 1 }))
       // 2026-11-17: hit by a shot: the HUD says so while the kart spins
+      if (event.hit && event.item === 'fog' && event.targets[0] === seat) {
+        setFog((last) => (last ?? 0) + 1)
+      }
       const spin = effectsOf(event).find((one) => one.kind === 'spin' && one.seat === seat)
       // (already up if this browser foresaw it, #86)
       if (spin?.kind === 'spin' && performance.now() - foreseenAt.current > FORESEEN_LATE_MS) {
@@ -361,6 +410,12 @@ export default function RaceView({
     const timer = window.setTimeout(() => setNote(undefined), NOTE_MS)
     return () => window.clearTimeout(timer)
   }, [note])
+
+  useEffect(() => {
+    if (fog === undefined) return
+    const timer = window.setTimeout(() => setFog(undefined), SHOT_TUNING.fogBlindMs)
+    return () => window.clearTimeout(timer)
+  }, [fog])
 
   useEffect(() => {
     if (!stun) return
@@ -497,6 +552,9 @@ export default function RaceView({
       </TopLeft>
       {view.mode === 'items' && <ItemSlot t={t} item={me?.item ?? null} keyName={itemKey} />}
       {stun && <StunHud key={`stun-${stun.id}`} t={t} ms={stun.ms} />}
+      {fog !== undefined && (
+        <FogVeil key={`fog-${fog}`} t={t} ms={SHOT_TUNING.fogBlindMs} />
+      )}
       {hud.boosting && <BoostVeil aria-hidden="true" data-testid="kart-boost-veil" />}
       {hud.teamBoosting && <TeamVeil aria-hidden="true" data-testid="kart-team-veil" />}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}

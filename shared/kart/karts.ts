@@ -35,6 +35,14 @@
 // technique its number in KART_TUNING as usual and read it from the tuning the step is handed. A
 // vehicle then scales it with a line in `KIND_TRAITS` (every bike) or in its own `traits` (one
 // machine), and nothing in the technique's code knows about vehicles.
+//
+// 2026-11-20 (docs/ARCHITECTURE.md §4.48): a sixth series, built for the item race (`item`). Its
+// machines spend points of the same budget on how they do with items instead of on driving
+// (`ItemPoints`): more often a strong item, their own items lasting longer, a bubble that stops a
+// second hit. So in a race without items they are simply a little slower everywhere: the trade is
+// what they are for. The room reads these from the kart a frame names (rules.ts), as it reads the
+// top speed.
+import type { ItemPerks } from './items.ts'
 import type { KartTuning } from './physics.ts'
 
 export const KART_IDS = [
@@ -57,6 +65,10 @@ export const KART_IDS = [
   'swift',
   'hornet',
   'petrel',
+  // 2026-11-20: the item series, three karts
+  'pelican',
+  'otter',
+  'cormorant',
 ] as const
 export type KartId = (typeof KART_IDS)[number]
 
@@ -67,7 +79,7 @@ export const KART_TIERS = ['entry', 'advanced', 'expert'] as const
 export type KartTier = (typeof KART_TIERS)[number]
 
 /** What a vehicle is built for: the stat it buys, and what it pays with */
-export const KART_SERIES = ['allround', 'sprint', 'speed', 'drift', 'heavy'] as const
+export const KART_SERIES = ['allround', 'sprint', 'speed', 'drift', 'heavy', 'item'] as const
 export type KartSeries = (typeof KART_SERIES)[number]
 
 /** A hover kart, or a hover bike (2026-11-19) */
@@ -90,6 +102,17 @@ export const BUDGET_STATS = ['speed', 'acceleration', 'handling', 'charge'] as c
 export const STAT_MIN = -2
 export const STAT_MAX = 2
 
+/**
+ * What a machine of the item series (2026-11-20) spends of its budget on items, each point one point
+ * of a stat: `luck` (0 to 2) makes the strong items likelier, `duration` (0 to 2) makes its own
+ * timed items last a quarter longer a point, `shield` (0 or 1) lets its bubble stop one hit more
+ */
+export interface ItemPoints {
+  readonly luck?: number
+  readonly duration?: number
+  readonly shield?: number
+}
+
 export interface KartSpec {
   readonly id: KartId
   readonly kind: KartKind
@@ -98,6 +121,8 @@ export interface KartSpec {
   readonly stats: { readonly [S in KartStat]: number }
   /** This machine's own multipliers, after its kind's */
   readonly traits?: KartTraits
+  /** The item series only: what it spends on items */
+  readonly items?: ItemPoints
 }
 
 /** What every vehicle of a kind shares */
@@ -294,6 +319,34 @@ export const KARTS: readonly KartSpec[] = [
     tier: 'expert',
     stats: { speed: 0, acceleration: -1, handling: -1, charge: 2, weight: -2 },
   },
+  // 2026-11-20, the item series: a point of the budget a point of items. The pelican's bubble
+  // stops two hits, and it pays in the gauge; big and easy to place
+  {
+    id: 'pelican',
+    kind: 'kart',
+    series: 'item',
+    tier: 'entry',
+    stats: { speed: 0, acceleration: 0, handling: 1, charge: -2, weight: 1 },
+    items: { shield: 1 },
+  },
+  // Finds the strong items a little more often, and its own last longer; light and loose
+  {
+    id: 'otter',
+    kind: 'kart',
+    series: 'item',
+    tier: 'advanced',
+    stats: { speed: 0, acceleration: 1, handling: -1, charge: -2, weight: -1 },
+    items: { luck: 1, duration: 1 },
+  },
+  // The most luck there is, and a bubble that stops two; a little behind at everything to drive
+  {
+    id: 'cormorant',
+    kind: 'kart',
+    series: 'item',
+    tier: 'expert',
+    stats: { speed: 0, acceleration: -1, handling: -1, charge: -1, weight: 0 },
+    items: { luck: 2, shield: 1 },
+  },
 ]
 
 export const DEFAULT_KART: KartId = 'tide'
@@ -371,6 +424,25 @@ export function applyKart(base: KartTuning, id: KartId): KartTuning {
     spec.traits,
   )
   return kind.radius === KART_BODY_RADIUS ? tuned : { ...tuned, bodyRadius: kind.radius }
+}
+
+/** The item points a machine spends (2026-11-20): 0 for every machine outside the item series */
+export function itemPointsOf(id: KartId): number {
+  const items = kartSpec(id).items
+  return (items?.luck ?? 0) + (items?.duration ?? 0) + (items?.shield ?? 0)
+}
+
+/** A quarter longer per point of `duration` */
+export const DURATION_STEP = 0.25
+
+/** What a machine's item points do (items.ts reads them): nothing for a machine without any */
+export function itemPerksOf(id: KartId): ItemPerks {
+  const items = kartSpec(id).items
+  return {
+    luck: items?.luck ?? 0,
+    duration: 1 + DURATION_STEP * (items?.duration ?? 0),
+    shieldHits: 1 + (items?.shield ?? 0),
+  }
 }
 
 /** A kart's mass in a bump, the standard kart's being 1: its weight stat, times its kind's */
