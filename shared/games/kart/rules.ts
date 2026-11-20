@@ -839,7 +839,10 @@ function distanceToSegment(
  * An item frame from `seat`, judged against the state and where the server last saw every kart:
  * the actions it leads to, none when it is refused. A pickup needs the box there, nothing held and
  * the kart near the box on its way; the item is drawn by place. A use needs the item held and, for
- * one that reaches another kart, someone to reach; a shield up stops a harmful one
+ * one that reaches another kart, someone to reach; a shield up stops a harmful one. 2026-11-20: the
+ * kart its frames name may change the draw and how long its own items last (karts.ts's item
+ * series); a skip lands where the room says (`skipTo`), static reaches the front of the field, fog
+ * is laid ahead of the kart in front, a rally lifts the team
  */
 function judgeItem(
   state: KartState,

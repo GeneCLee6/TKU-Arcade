@@ -99,7 +99,8 @@ import {
   type Pose,
 } from './Scene.ts'
 import type { KartLook } from './art/kartModel.ts'
-import type { ItemCue } from './hitFx.ts'
+import type { HitBurst, ItemCue } from './hitFx.ts'
+import type { ShotItem } from '../../shared/kart/shots.ts'
 import type { TouchSource } from './touch/touchSource.ts'
 
 const STATS_EVERY_MS = 500
@@ -343,6 +344,17 @@ export interface SpikeDebug {
   fx?: BoostKind | null
   /** The same, for the camera: turned this many radians round the kart, this far back, this high */
   view?: { orbit?: number; back?: number; up?: number } | null
+  /**
+   * 2026-11-20, the same for the items (scripts/kart-shots.mjs `--items`): boxes, bubbles, mirrors
+   * and shots to draw, placed relative to this kart (metres ahead and to its right), and bursts to
+   * start once (taken and cleared on the next frame). Looks only
+   */
+  items?: {
+    readonly shields?: readonly { ahead: number; right: number }[]
+    readonly mirrors?: readonly { ahead: number; right: number }[]
+    readonly shots?: readonly { item: ShotItem; ahead: number; right: number; n?: number }[]
+    readonly bursts?: readonly { kind: HitBurst['kind']; ahead: number; right: number }[]
+  } | null
 }
 
 declare global {
@@ -855,6 +867,32 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     if (shot || directed) scene.shot(shot)
     directed = shot !== null
     if (net?.props) scene.items(net.props(pose), frameMs / 1000)
+    else if (debug.items) {
+      // Placed relative to this kart: `ahead` along its nose, `right` across
+      const place = (one: { ahead: number; right: number }) => ({
+        x: pose.x + Math.sin(current.heading) * one.ahead + Math.cos(current.heading) * one.right,
+        z: pose.z - Math.cos(current.heading) * one.ahead + Math.sin(current.heading) * one.right,
+      })
+      const wanted = debug.items
+      scene.items(
+        {
+          boxes: [],
+          shields: (wanted.shields ?? []).map(place),
+          mirrors: (wanted.mirrors ?? []).map(place),
+          shots: (wanted.shots ?? []).map((one, n) => ({
+            n: one.n ?? n,
+            item: one.item,
+            ...place(one),
+          })),
+        },
+        frameMs / 1000,
+      )
+      const bursts = (wanted.bursts ?? []).map((one) => ({ kind: one.kind, ...place(one) }))
+      if (bursts.length > 0) {
+        scene.hits({ spins: new Map(), bursts }, frameMs / 1000)
+        debug.items = { ...wanted, bursts: [] }
+      } else scene.hits({ spins: new Map(), bursts: [] }, frameMs / 1000)
+    }
     scene.draw(
       pose,
       { heading: current.heading, vx: current.vx, vz: current.vz, boosting, skidding },
