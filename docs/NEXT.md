@@ -343,6 +343,11 @@
   - **安全複查**（結論 `docs/SECURITY.md`）：WebSocket 的 Origin 檢查原本就是「只准同源」，預覽各自同源，不用改，預覽站實測擋外部來源與正式站來源；新加 CSP（`_headers` 由 build 寫出，inline script 用 sha256；style 留 `'unsafe-inline'` 給 styled-components）與 `nosniff`、`Referrer-Policy`、`Permissions-Policy`、COOP、`X-Frame-Options`；`e2e/csp.spec.ts` 在預覽站開大廳、規則、`/stats`、一局陞官圖、卡丁車 WebGL＋音效，0 筆 CSP 違規；`npm audit` 0 個弱點，沒升級（可升清單在 SECURITY.md §5）；建房原本沒有速率限制，加了每 instance 每位址每分鐘 30 間（PRD 的 5 間跨 instance 仍是 `e12-t06`）。
   - **順手修**：`PRD/README.md` 的 E3（4／4 → 4／5，AC-3.5 沒勾）與 E7（5／8 → 4／8）照 epic 檔實際勾選重數，合計改成 40／71、117／139。
   - **要擁有者做的**：見 §2 的三列（`STATS_KEY` 若還沒設、`CF_ANALYTICS_TOKEN`＋`CF_ACCOUNT_ID`、警示管道）。
+- **路線圖外：第四級電腦車「專家」、幽靈車改存 IndexedDB（2026-11-20，`feat/kart-expert-bots`）**。擁有者要高手與新手有鑑別度；#105、#109 回報困難電腦車不會新技巧、走遠路。
+  - **專家**（`src/kart/bots/expert.ts`、`ARCHITECTURE.md` §4.40、`KART-FEEL.md` §13）：完美時機、連段、N2O 不斷、甩尾起跳、坡頂收油、飛越矮欄、穿縫、背圖捷徑；同車款極速上限、rubber band 照舊。出現在單機對戰電腦、大獎賽、團隊賽隊友、多人房加電腦車。每張圖專家 < 困難 < 普通 < 簡單；碼頭比困難快 14%、山城 8%，和頂尖腳本差 0.1%／1.1%；十一張加總撞牆比困難少。
+  - **簡單／普通／困難三級完全沒動。困難級要不要學新技巧仍待擁有者**（§2）。
+  - **幽靈車**：軌跡搬到 IndexedDB，紀錄（時間、車、最快圈）留 localStorage；舊的 localStorage 幽靈第一次讀時自動搬、搬完刪；沒有 IndexedDB 時不存新幽靈、紀錄照存；上限 320 筆，超過先清最舊的各車幽靈。
+  - **給擁有者試**：`KART-FEEL.md` §13.3。
 
 - **`e12-t06` 濫用防護提前完成（2026-11-20，擁有者要求「其他沒完成的也開多 agent 一起做」；F3 的另一半，不需要帳號）**：AC-12.5 勾了。細節與數字在 `docs/SECURITY.md` §6、§7、§9。
   - **跨 instance 的速率**：Durable Object `LimiterDO`（`worker/limiter.ts`，DO migration `v2`），依位址雜湊的第一個字分 16 片，固定視窗只在記憶體、不寫儲存。key 是位址的雜湊（`worker/address.ts`：`CF-Connecting-IP`，IPv6 取 /64，SHA-256 前 16 個十六進位字），**完整位址不存、不記**。建房每位址每分鐘 **5 間**（原本每 instance 30 間的記憶體限制留著當第一道）；WebSocket 升級每位址每分鐘 **120 次**（超過時接受再以 **4429** 關閉，頁面說「你所在的網路目前連線太多」，有重試鈕）；本機（127.0.0.1／::1）不經 LimiterDO，`npm run dev` 與瀏覽器測試不受影響。LimiterDO 出錯時放行（fail open）。**先試過 Cloudflare 的 Rate Limiting binding（`ratelimits`）**：部署成功、預覽站日誌看到每次都回 `success: true`（同一個 key 連 25 次），在這個帳號上沒有作用，所以換成 DO（多一次 DO 請求，算進免費額度的每日 10 萬次）。
@@ -356,6 +361,7 @@
 
 | 問題 | 在哪一批之前 | 建議 |
 | --- | --- | --- |
+| 卡丁車困難級電腦車要不要學新技巧（完美時機、甩尾起跳、穿縫、背圖捷徑）：目前只有第四級「專家」會（`KART-FEEL.md` §13） | 不擋 | 先開過專家再決定；要教就把 `expert.ts` 的部分欄位併進 `BOT_SKILLS.hard` |
 | ~~Q1 產品名稱~~ | — | 已拍板：TKU Arcade |
 | ~~E7 瀏覽器語言自動切換~~ | — | 已拍板：初次依瀏覽器語言，之後以使用者為準 |
 | ~~Q2 帳號共用方式~~ | — | 已拍板（2026-11-09）：牌桌簽 token、本站驗簽 |

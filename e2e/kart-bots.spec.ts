@@ -35,6 +35,13 @@ test('one person races a computer kart in an item race, from the menu to the res
   await expect(setup).toBeVisible()
   await setup.getByTestId('kart-bots-track').selectOption('riverside')
   await setup.getByTestId('kart-bots-count').selectOption('1')
+  // 2026-11-20 (§4.40): four levels, the expert the fourth
+  await expect(setup.getByTestId('kart-bots-difficulty').locator('option')).toHaveText([
+    'Easy',
+    'Normal',
+    'Hard',
+    'Expert',
+  ])
   await setup.getByTestId('kart-bots-difficulty').selectOption('easy')
   await setup.getByTestId('kart-bots-mode').selectOption('items')
   await setup.getByTestId('kart-bots-laps').selectOption('1')

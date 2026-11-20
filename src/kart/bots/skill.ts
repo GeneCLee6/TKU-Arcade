@@ -4,6 +4,7 @@
 // is its own kart's top speed. Pure.
 
 import { BOT_LEVELS, type BotLevel } from '../../../shared/games/kart/bots.ts'
+import { EXPERT_SKILL } from './expert.ts'
 
 export const DIFFICULTIES = BOT_LEVELS
 export type Difficulty = BotLevel
@@ -65,7 +66,8 @@ export interface BotSkill {
   readonly itemSense: boolean
   // 2026-11-18, the gauge by the quality of the drift (docs/KART-FEEL.md §5): the hands of the
   // scripted drivers `npm run kart:feel` measures with (scripts/kart/drivers.ts). The three
-  // difficulties leave them all out, and drive as they always did
+  // difficulties leave them all out, and drive as they always did; the expert (2026-11-20,
+  // expert.ts) has them, as the master driver does
   /** The foot stays down, as a player's does: no easing off at the kart's own top speed */
   readonly flatOut?: boolean
   /**
@@ -135,6 +137,8 @@ export const BOT_SKILLS: Readonly<Record<Difficulty, BotSkill>> = {
     itemDelayMs: [300, 1_200],
     itemSense: true,
   },
+  // 2026-11-20: the fourth level, with every technique the hard one was never taught (expert.ts)
+  expert: EXPERT_SKILL,
 }
 
 /**
