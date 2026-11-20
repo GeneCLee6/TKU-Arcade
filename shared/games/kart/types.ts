@@ -40,6 +40,13 @@ export type KartRacer = {
   /** Its shield is up until then, by the server's clock (ms since the epoch); 0 for none */
   shieldUntil: number
   /**
+   * 2026-11-20: how many more hits its shield stops (a kart built for items may have a bubble that
+   * stops two, karts.ts); absent is one
+   */
+  shieldHits?: number
+  /** 2026-11-20: its mirror is up until then (server clock); absent or 0 for none */
+  mirrorUntil?: number
+  /**
    * A team race only (2026-11-18, shared/kart/team.ts): its team, how many of its charges may be
    * blue (all it can hold when its team's gauge fills; fewer once it says it held fewer, or fires
    * one), the blue ones it has fired so far, and until when (the server's clock) the last burns
@@ -70,8 +77,22 @@ export type KartItemEvent = {
   blocked: SeatId[]
   /** When, by the server's clock */
   at: number
-  /** A swap: where each kart goes */
+  /** A swap: where each kart goes (2026-11-20: a skip too, the kart itself) */
   warps: Warp[]
+  /**
+   * 2026-11-20: how long the item lasts on the kart that used it, ms (a boost, a rally's lift, a
+   * tow, a bubble or a mirror), when the kart it is on makes it last longer (karts.ts); absent is
+   * the standard time (items.ts)
+   */
+  ms?: number
+  /** 2026-11-20: of `blocked`, those whose bubble stopped it and is still up (it stops two) */
+  kept?: SeatId[]
+  /**
+   * 2026-11-20: a shot that a mirror sent back: `by` is the kart whose mirror it was, `targets` the
+   * kart that threw it (empty when that one is done or threw at itself), `blocked` the same if a
+   * bubble stopped it there
+   */
+  bounced?: boolean
   /**
    * A shot that hit (e9-t06b): `targets` is the kart it hit, `blocked` the same if a shield stopped
    * it, and `by` who threw it. False when the item was used (a cloud's `targets` is whom it chases)
@@ -132,6 +153,10 @@ export type KartAction =
       warps: Warp[]
       /** A thrown or dropped item: the shot it put on the road (e9-t06b); null for the others */
       shot: KartShot | null
+      /** 2026-11-20: how long it lasts on the kart, ms, when its kart makes it last longer */
+      ms?: number
+      /** 2026-11-20: a shield: the hits it stops, when more than one */
+      hits?: number
     }
   /** System: shot `shot` hit `seat` at server time `at`; a shield up then stops it (e9-t06b) */
   | { t: 'hit'; seat: SeatId; shot: number; at: number }

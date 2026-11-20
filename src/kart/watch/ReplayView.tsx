@@ -13,6 +13,7 @@ import {
   openReplay,
   sampleAt,
   seekPlayhead,
+  mirrorsAt,
   shieldsAt,
   shotsAt,
   stepSpeed,
@@ -74,6 +75,7 @@ const UI_MS = 100
 /** An item used shows this long after its moment, ticks */
 const NOTE_TICKS = 2 * TICKS_PER_SECOND
 const SHIELD_TICKS = msToTicks(ITEM_TUNING.shieldMs)
+const MIRROR_TICKS = msToTicks(ITEM_TUNING.mirrorMs)
 
 export interface ReplayViewProps {
   replay: Replay
@@ -242,6 +244,10 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
               ? {
                   boxes: [],
                   shields: shieldsAt(reel.replay.events, tick, SHIELD_TICKS)
+                    .map((seat) => karts.find((kart) => kart.id === seat))
+                    .filter((kart) => kart !== undefined),
+                  // 2026-11-20
+                  mirrors: mirrorsAt(reel.replay.events, tick, MIRROR_TICKS)
                     .map((seat) => karts.find((kart) => kart.id === seat))
                     .filter((kart) => kart !== undefined),
                   shots: shotsAt(

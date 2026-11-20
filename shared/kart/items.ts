@@ -7,6 +7,13 @@
 // Five direct items (L4) and three thrown or dropped ones (L5, e9-t06b; shots.ts). Names and looks
 // are working titles of our own, to be settled with the kart's world (e10-t01).
 //
+// 2026-11-20 (docs/ARCHITECTURE.md §4.45): six more, one of each kind the table lacked, all our own
+// names, effects and looks: a ward that turns the next shot back on whoever sent it (`mirror`), a
+// bank of sea fog laid on the road ahead of the kart in front (`fog`, a shot: shots.ts), a skip
+// forward to the next gate (`skip`), static that keeps the kart in front from firing its boosts
+// (`jam`), a flag that gives the whole team a lift (`rally`, a team race only) and a box that only
+// looks like an item box (`decoy`, a shot). Each is judged by the room like the rest.
+//
 // Pure and shared: the browser and the Worker read the same boxes, frames and table.
 import { KART_TUNING } from './physics.ts'
 import { respawnNear, type Spot } from './course.ts'
@@ -21,6 +28,13 @@ export const ITEM_IDS = [
   'hail',
   'cloud',
   'puddle',
+  // 2026-11-20: appended, so that the eight before keep their numbers on the wire
+  'mirror',
+  'fog',
+  'skip',
+  'jam',
+  'rally',
+  'decoy',
 ] as const
 export type ItemId = (typeof ITEM_IDS)[number]
 
@@ -31,12 +45,34 @@ export const isItemId = (value: unknown): value is ItemId =>
  * Items that need another kart to reach when used, or the room refuses them; the rest are for the
  * kart itself or go on the road (hail and puddles: shots.ts)
  */
-export const TARGETED_ITEMS: ReadonlySet<ItemId> = new Set(['tow', 'headwind', 'swap', 'cloud'])
+export const TARGETED_ITEMS: ReadonlySet<ItemId> = new Set([
+  'tow',
+  'headwind',
+  'swap',
+  'cloud',
+  'jam',
+  'fog',
+])
 /**
  * Of the direct ones, those that harm as they are used: a shield stops them, and is used up doing
  * it. The shots harm later, when they hit, and a shield is judged then (shots.ts)
  */
-export const HARMFUL_ITEMS: ReadonlySet<ItemId> = new Set(['headwind', 'swap'])
+export const HARMFUL_ITEMS: ReadonlySet<ItemId> = new Set(['headwind', 'swap', 'jam'])
+/** Items only a team race hands out (team.ts): the rally lifts a team, and a lone kart has none */
+export const TEAM_ONLY_ITEMS: ReadonlySet<ItemId> = new Set(['rally'])
+/**
+ * The items that catch up most, which a kart built for items (karts.ts, `luck`) finds more often.
+ * Never one the leader is handed (the front of the table has none of these but the mirror)
+ */
+export const STRONG_ITEMS: ReadonlySet<ItemId> = new Set([
+  'tow',
+  'headwind',
+  'swap',
+  'cloud',
+  'jam',
+  'skip',
+  'mirror',
+])
 
 // ── Numbers ──────────────────────────────────────────────────────────────────────────────────
 
@@ -64,7 +100,43 @@ export const ITEM_TUNING = {
   headwindDrag: 2.5,
   /** Swap: with the kart just ahead, on the same lap and no further than this, metres */
   swapReach: 260,
+  /**
+   * Mirror (2026-11-20): up this long, ms; the next shot that would hit the kart goes back to whoever
+   * sent it instead. It does nothing against a headwind, a swap or static (a bubble's job)
+   */
+  mirrorMs: 8_000,
+  /**
+   * Skip: to the next gate ahead (or the one after) whose respawn point is at least `skipMin` and at
+   * most `skipReach` metres away; never over the finish line, so the lap count stays the room's
+   */
+  skipMin: 18,
+  skipReach: 110,
+  /** Skip: a little push on landing, s of the physics' boost */
+  skipBoostSeconds: 0.6,
+  /** Jam: the kart in front cannot fire a boost for this long, ms, and the one burning is cut */
+  jamMs: 3_500,
+  jamReach: 600,
+  /** Rally: every team-mate still racing (and the kart itself) gets this much boost, s */
+  rallySeconds: 1.3,
 } as const
+
+/**
+ * A kart built for items (karts.ts's item series) changes a few of these; the rest are everyone's.
+ * The room reads them from the kart its frames name, and puts the result in the item's event
+ */
+export interface ItemPerks {
+  /** Each point makes the strong items (STRONG_ITEMS) this much more likely: weight × (1 + 0.3 × luck) */
+  readonly luck: number
+  /** The kart's own timed items (boost, shield, tow, mirror, rally) last this many times as long */
+  readonly duration: number
+  /** Hits a bubble stops before it pops: 1 for everyone else */
+  readonly shieldHits: number
+}
+
+export const NO_PERKS: ItemPerks = { luck: 0, duration: 1, shieldHits: 1 }
+
+/** How much more likely a strong item is per point of luck */
+export const LUCK_STEP = 0.3
 
 /** Item events kept in the game's state for the browsers to read; older ones are dropped */
 export const KEEP_EVENTS = 16
@@ -197,11 +269,40 @@ export type PlaceBucket = 'front' | 'middle' | 'back'
  * not shares; tune freely (a test checks that every item can come out of some place, and nothing
  * that reaches a kart ahead, hail included, is ever given to the leader)
  */
+// 2026-11-20: the six new ones. The leader gets the mirror and the decoy (both answer whoever is
+// behind it) and, in a team race, the rally; static and fog reach the kart in front, so never the
+// leader; the skip catches up most and is commonest at the back.
 export const ITEM_TABLE: Readonly<Record<PlaceBucket, Readonly<Partial<Record<ItemId, number>>>>> =
   {
-    front: { boost: 5, shield: 4, puddle: 3 },
-    middle: { boost: 4, shield: 2, tow: 3, swap: 1, hail: 3, puddle: 2, cloud: 1 },
-    back: { boost: 3, shield: 1, tow: 3, headwind: 3, swap: 2, hail: 2, cloud: 3 },
+    front: { boost: 5, shield: 4, puddle: 3, mirror: 2, decoy: 2, rally: 2 },
+    middle: {
+      boost: 4,
+      shield: 2,
+      tow: 3,
+      swap: 1,
+      hail: 3,
+      puddle: 2,
+      cloud: 1,
+      mirror: 1,
+      fog: 2,
+      skip: 2,
+      jam: 1,
+      decoy: 1,
+      rally: 2,
+    },
+    back: {
+      boost: 3,
+      shield: 1,
+      tow: 3,
+      headwind: 3,
+      swap: 2,
+      hail: 2,
+      cloud: 3,
+      fog: 2,
+      skip: 3,
+      jam: 2,
+      rally: 2,
+    },
   }
 
 /** Which part of the field a place (0 is first) out of `racing` is in */
@@ -211,10 +312,29 @@ export function placeBucket(place: number, racing: number): PlaceBucket {
   return 'middle'
 }
 
-/** One item from the bucket's weights, by `roll` in [0, 1) */
-export function drawItem(bucket: PlaceBucket, roll: number): ItemId {
+/** What else a draw depends on: a team race (the rally), and the kart's luck (karts.ts) */
+export interface DrawOptions {
+  readonly teams?: boolean
+  readonly luck?: number
+}
+
+/** Each item's weight in a bucket, for a draw with `options` */
+export function drawWeights(
+  bucket: PlaceBucket,
+  options: DrawOptions = {},
+): [ItemId, number][] {
   const weights = ITEM_TABLE[bucket]
-  const entries = ITEM_IDS.map((id) => [id, weights[id] ?? 0] as const).filter(([, w]) => w > 0)
+  const luck = Math.max(0, options.luck ?? 0)
+  return ITEM_IDS.map((id): [ItemId, number] => {
+    if (TEAM_ONLY_ITEMS.has(id) && !options.teams) return [id, 0]
+    const weight = weights[id] ?? 0
+    return [id, STRONG_ITEMS.has(id) ? weight * (1 + LUCK_STEP * luck) : weight]
+  }).filter(([, w]) => w > 0)
+}
+
+/** One item from the bucket's weights, by `roll` in [0, 1) */
+export function drawItem(bucket: PlaceBucket, roll: number, options: DrawOptions = {}): ItemId {
+  const entries = drawWeights(bucket, options)
   const total = entries.reduce((sum, [, w]) => sum + w, 0)
   let left = Math.max(0, Math.min(0.999_999, roll)) * total
   for (const [id, weight] of entries) {
@@ -256,6 +376,46 @@ export function safeBehind(track: Track, nextGate: number, x?: number, z?: numbe
   return x === undefined || z === undefined
     ? checkpoints.respawns[gate]!
     : respawnNear(checkpoints, gate, x, z)
+}
+
+// ── Where a skip lands (2026-11-20) ──────────────────────────────────────────────────────────
+
+/**
+ * Where a skip takes kart `seat`, seen at (x, z) with `nextGate` the next gate to cross: onto the
+ * respawn point of that gate, or of the one or two after, whichever is the first at least skipMin
+ * away; no further than skipReach. It lands facing along the road with that gate counted, as a swap
+ * lands (warpRun). Never onto or over the finish line (gate 0): the room counts laps, and a skip is
+ * no shortcut to one. Null when there is nowhere to land
+ */
+export function skipTo(
+  track: Track,
+  seat: number,
+  x: number,
+  z: number,
+  nextGate: number,
+  crossings: number,
+): Warp | null {
+  const checkpoints = courseOf(track).checkpoints!
+  const count = checkpoints.gates.length
+  if (count < 3) return null
+  for (let k = 0; k < 3; k++) {
+    const gate = (nextGate + k) % count
+    if (gate === 0) return null
+    const spot = respawnNear(checkpoints, gate, x, z)
+    const distance = Math.hypot(spot.x - x, spot.z - z)
+    if (distance > ITEM_TUNING.skipReach) return null
+    if (distance >= ITEM_TUNING.skipMin) {
+      return {
+        seat,
+        x: spot.x,
+        z: spot.z,
+        heading: spot.heading,
+        nextGate: (gate + 1) % count,
+        crossings,
+      }
+    }
+  }
+  return null
 }
 
 /** The top speed a tow may reach, m/s */

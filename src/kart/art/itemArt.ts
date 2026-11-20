@@ -4,10 +4,14 @@
 // spinning low over the road; a thundercloud three dark puffs with a yellow bolt hanging under them,
 // high up; a mud puddle a flat brown disc with a darker middle. Made once per scene; the boxes are
 // shown or hidden as the room says they are there, the bubbles and shots pooled and moved every frame.
+// 2026-11-20: a mirror a thin silver ring circling its kart with a bright glint on it; a bank of sea
+// fog a low ring of big pale puffs churning slowly over the road, as wide as it reaches; a fake box
+// the item box's shell over a dull ember core, turning slower and a little lower (the one tell).
 import type { ShotItem } from '../../../shared/kart/shots.ts'
 import {
   BoxGeometry,
   ConeGeometry,
+  TorusGeometry,
   CylinderGeometry,
   Group,
   IcosahedronGeometry,
@@ -38,6 +42,7 @@ export interface ItemArt {
     shields: readonly { x: number; z: number }[],
     seconds: number,
     shots?: readonly ShotLook[],
+    mirrors?: readonly { x: number; z: number }[],
   ): void
   dispose(): void
 }
@@ -49,6 +54,9 @@ const HAIL_RADIUS = 0.6
 const HAIL_HEIGHT = 0.9
 const CLOUD_HEIGHT = 4.2
 const PUDDLE_RADIUS = 1.9
+const MIRROR_RADIUS = 2.0
+/** The fog's puffs: how many round the ring and in the middle */
+const FOG_PUFFS = 9
 
 /** A lit material that glows a little in its own colour */
 const glowing = (colour: string, glow: number) =>
@@ -93,9 +101,38 @@ export function createItemArt(
   const boltMaterial = glowing(kartScene.bolt, 0.9)
   const puddleMaterial = glowing(kartScene.puddle, 0.05)
   const puddleDeepMaterial = glowing(kartScene.puddleDeep, 0.05)
+  // 2026-11-20
+  const ring = new TorusGeometry(MIRROR_RADIUS, 0.06, 6, 40)
+  const glint = new IcosahedronGeometry(0.22, 0)
+  const mirrorMaterial = glowing(kartScene.mirror, 0.6)
+  const glintMaterial = glowing(kartScene.mirrorGlint, 1)
+  const fogMaterial = new MeshLambertMaterial({
+    color: kartScene.seaFog,
+    emissive: kartScene.seaFog,
+    emissiveIntensity: 0.35,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+  })
+  const decoyCoreMaterial = glowing(kartScene.decoyCore, 0.5)
   const makeShot = (item: ShotItem): Group => {
     const group = new Group()
-    if (item === 'hail') {
+    if (item === 'fog') {
+      // A ring of big puffs, a few in the middle: wide as it reaches (shots.ts's fogRadius)
+      for (let i = 0; i < FOG_PUFFS; i++) {
+        const middle = i >= FOG_PUFFS - 3
+        const angle = (i / (FOG_PUFFS - 3)) * Math.PI * 2
+        const mesh = new Mesh(puff, fogMaterial)
+        const out = middle ? 1.8 * (i - FOG_PUFFS + 2) : 5.2
+        mesh.position.set(Math.sin(angle) * out, middle ? 2.4 : 1.6, Math.cos(angle) * out)
+        mesh.scale.set(middle ? 3.2 : 2.6, middle ? 2.2 : 1.8, middle ? 3.2 : 2.6)
+        group.add(mesh)
+      }
+    } else if (item === 'decoy') {
+      const outer = new Mesh(shell, shellMaterial)
+      outer.rotation.set(Math.PI / 4, 0, Math.atan(Math.SQRT1_2))
+      group.add(outer, new Mesh(core, decoyCoreMaterial))
+    } else if (item === 'hail') {
       group.add(new Mesh(hailBall, hailMaterial))
     } else if (item === 'cloud') {
       const puffs: [number, number, number, number][] = [
@@ -126,10 +163,11 @@ export function createItemArt(
 
   const boxes: Group[] = []
   const bubbles: Mesh[] = []
+  const rings: Group[] = []
   let time = 0
 
   return {
-    update(looks, shields, seconds, shots = []) {
+    update(looks, shields, seconds, shots = [], mirrors = []) {
       time += seconds
       while (boxes.length < looks.length) {
         const group = new Group()
@@ -169,6 +207,26 @@ export function createItemArt(
         mesh.scale.setScalar(1 + Math.sin(time * 5) * 0.03)
       })
 
+      // 2026-11-20: a mirror's ring circling its kart, tilted, a glint running round it
+      while (rings.length < mirrors.length) {
+        const group = new Group()
+        const hoop = new Mesh(ring, mirrorMaterial)
+        const spark = new Mesh(glint, glintMaterial)
+        spark.position.x = MIRROR_RADIUS
+        hoop.add(spark)
+        group.add(hoop)
+        scene.add(group)
+        rings.push(group)
+      }
+      rings.forEach((group, index) => {
+        const at = mirrors[index]
+        group.visible = at !== undefined
+        if (!at) return
+        group.position.set(at.x, 1 + ground(at.x, at.z), at.z)
+        const hoop = group.children[0]!
+        hoop.rotation.set(Math.PI / 2 + Math.sin(time * 2) * 0.35, 0, time * 3)
+      })
+
       const live = new Set<number>()
       for (const shot of shots) {
         live.add(shot.n)
@@ -187,6 +245,18 @@ export function createItemArt(
             shot.z,
           )
           group.rotation.y = time * 0.6
+        } else if (shot.item === 'fog') {
+          group.position.set(shot.x, ground(shot.x, shot.z), shot.z)
+          group.rotation.y = time * 0.25 + shot.n
+          group.scale.y = 1 + Math.sin(time * 1.3 + shot.n) * 0.08
+        } else if (shot.item === 'decoy') {
+          // Like a box, but slower and a little lower
+          group.position.set(
+            shot.x,
+            BOX_HEIGHT - 0.15 + Math.sin(time * 1.1 + shot.n) * 0.1 + ground(shot.x, shot.z),
+            shot.z,
+          )
+          group.rotation.y = time * 0.9 + shot.n
         } else {
           group.position.set(shot.x, 0.04 + ground(shot.x, shot.z), shot.z)
         }
@@ -200,10 +270,17 @@ export function createItemArt(
     dispose() {
       for (const group of boxes) scene.remove(group)
       for (const mesh of bubbles) scene.remove(mesh)
+      for (const group of rings) scene.remove(group)
       for (const group of shotGroups.values()) scene.remove(group)
       shotGroups.clear()
-      for (const geometry of [hailBall, puff, bolt, puddleDisc, puddleMiddle]) geometry.dispose()
+      for (const geometry of [hailBall, puff, bolt, puddleDisc, puddleMiddle, ring, glint]) {
+        geometry.dispose()
+      }
       for (const material of [
+        mirrorMaterial,
+        glintMaterial,
+        fogMaterial,
+        decoyCoreMaterial,
         hailMaterial,
         cloudMaterial,
         boltMaterial,

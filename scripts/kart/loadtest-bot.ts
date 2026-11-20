@@ -38,12 +38,14 @@ import { encodeItemFrame, ITEM_TUNING, itemBoxes, type ItemFrame } from '../../s
 import { createTeamRider } from '../../shared/kart/teamRider.ts'
 import {
   boostKart,
+  fogStep,
   headwindStep,
+  jamStep,
   stunStep,
   towStep,
   warpRun,
 } from '../../shared/kart/itemEffects.ts'
-import { SHOT_TUNING } from '../../shared/kart/shots.ts'
+import { isStunItem, SHOT_TUNING } from '../../shared/kart/shots.ts'
 import {
   gridSpot,
   judgeFrame,
@@ -167,6 +169,9 @@ export class Bot {
   private towSeat: number | null = null
   private headwindUntil = 0
   private stunUntil = 0
+  // 2026-11-20: static and fog, as netRace.ts
+  private jamUntil = 0
+  private fogUntil = 0
   // A team race: the team boosts this kart may fire, as netRace.ts
   private readonly teamRider = createTeamRider()
   private pickups = 0
@@ -561,19 +566,31 @@ export class Bot {
       this.seen = event.n + 1
       const reached = event.targets.includes(this.seat) && !event.blocked.includes(this.seat)
       if (event.hit) {
-        if (reached && (event.item === 'hail' || event.item === 'cloud' || event.item === 'puddle')) {
+        if (reached && isStunItem(event.item)) {
           this.stunUntil = event.at + SHOT_TUNING.stunMs[event.item]
           this.towUntil = 0
         }
+        if (reached && event.item === 'fog') this.fogUntil = event.at + SHOT_TUNING.fogBlindMs
         continue
       }
       if (event.by === this.seat) {
-        if (event.item === 'boost') run = { ...run, kart: boostKart(run.kart) }
+        if (event.item === 'boost') {
+          const seconds = (event.ms ?? ITEM_TUNING.boostSeconds * 1000) / 1000
+          run = { ...run, kart: boostKart(run.kart, seconds) }
+        }
         if (event.item === 'tow') {
-          this.towUntil = event.at + ITEM_TUNING.towMs
+          this.towUntil = event.at + (event.ms ?? ITEM_TUNING.towMs)
           this.towSeat = event.targets[0] ?? null
         }
+        if (event.item === 'skip') {
+          run = { ...run, kart: boostKart(run.kart, ITEM_TUNING.skipBoostSeconds) }
+        }
       }
+      if (event.item === 'rally' && (event.by === this.seat || reached)) {
+        const seconds = (event.ms ?? ITEM_TUNING.rallySeconds * 1000) / 1000
+        run = { ...run, kart: boostKart(run.kart, seconds) }
+      }
+      if (reached && event.item === 'jam') this.jamUntil = event.at + ITEM_TUNING.jamMs
       if (reached && event.item === 'headwind') {
         this.headwindUntil = event.at + ITEM_TUNING.headwindMs
         this.towUntil = 0
@@ -615,6 +632,8 @@ export class Bot {
     const dt = STEP_SECONDS
     if (server < this.headwindUntil) run = { ...run, kart: headwindStep(run.kart, dt) }
     if (server < this.stunUntil) run = { ...run, kart: stunStep(run.kart, dt) }
+    if (server < this.jamUntil) run = { ...run, kart: jamStep(run.kart) }
+    if (server < this.fogUntil) run = { ...run, kart: fogStep(run.kart, dt) }
     if (server < this.towUntil && this.towSeat !== null) {
       const target = this.others.get(this.towSeat)
       if (target) run = { ...run, kart: towStep(run.kart, target, dt) }

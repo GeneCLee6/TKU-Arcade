@@ -74,6 +74,28 @@ export const USE_SOUNDS: Record<ItemId, readonly Voice[]> = {
   cloud: [noise('lowpass', 260, 120, 0.7, 0.55), tone('sine', 70, 55, 0.6, 0.18)],
   // A plop
   puddle: [tone('sine', 420, 90, 0.22, 0.3), noise('lowpass', 700, 200, 0.15, 0.2)],
+  // 2026-11-20. A glassy ring: two high tones a fifth apart, shimmering down
+  mirror: [tone('sine', 1568, 1480, 0.4, 0.14), tone('sine', 2349, 2217, 0.35, 0.08, 0.03)],
+  // A soft low hiss rolling in
+  fog: [noise('lowpass', 900, 300, 0.8, 0.35, 0.7), tone('sine', 110, 90, 0.6, 0.08)],
+  // A skip across water: three quick ticks rising, then a splash
+  skip: [
+    tone('triangle', 600, 760, 0.06, 0.16),
+    tone('triangle', 760, 920, 0.06, 0.16, 0.09),
+    tone('triangle', 920, 1100, 0.06, 0.16, 0.18),
+    noise('bandpass', 2000, 600, 0.25, 0.3, 1, 0.26),
+  ],
+  // A dry crackle with a buzzing tone under it
+  jam: [noise('highpass', 4000, 2500, 0.4, 0.3, 2), tone('square', 95, 90, 0.4, 0.05)],
+  // A cheerful two-note call going up, twice
+  rally: [
+    tone('triangle', 523, 523, 0.12, 0.18),
+    tone('triangle', 784, 784, 0.18, 0.18, 0.12),
+    tone('triangle', 659, 659, 0.12, 0.14, 0.3),
+    tone('triangle', 1047, 1047, 0.22, 0.14, 0.42),
+  ],
+  // A hollow thunk of a box set down
+  decoy: [tone('sine', 220, 160, 0.18, 0.3), noise('lowpass', 500, 200, 0.1, 0.18)],
 }
 
 /** The other cues: an item taken, a hit taken, a hit landed, a bubble popped */
@@ -86,6 +108,12 @@ export const CUE_SOUNDS = {
   landed: [tone('sine', 1175, 1175, 0.22, 0.14)],
   // A short snap and a falling squeak
   pop: [noise('highpass', 3000, 6000, 0.05, 0.45), tone('sine', 1400, 380, 0.14, 0.2)],
+  // 2026-11-20. A bright ping and a ring going up: yours sent it back
+  bounce: [tone('sine', 1320, 1760, 0.12, 0.18), tone('sine', 2640, 2640, 0.25, 0.08, 0.08)],
+  // A muffled whoosh closing in
+  fogged: [noise('lowpass', 1400, 250, 0.6, 0.4, 0.6)],
+  // A short buzz, cut off
+  jammed: [tone('square', 140, 120, 0.25, 0.08), noise('highpass', 3500, 3000, 0.2, 0.2, 3)],
 } satisfies Record<Exclude<ItemCue['kind'], 'use'>, readonly Voice[]>
 
 export const voicesOf = (cue: ItemCue): readonly Voice[] =>

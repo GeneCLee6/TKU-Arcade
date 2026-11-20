@@ -111,6 +111,8 @@ export interface ItemProps {
   readonly boxes: readonly ItemBoxLook[]
   readonly shields: readonly { readonly x: number; readonly z: number }[]
   readonly shots: readonly ShotLook[]
+  /** 2026-11-20: the karts with a mirror up */
+  readonly mirrors?: readonly { readonly x: number; readonly z: number }[]
 }
 
 /**
@@ -580,7 +582,7 @@ export function createKartScene(
     },
     items(props, frameSeconds) {
       itemArt ??= createItemArt(scene, roadHeight)
-      itemArt.update(props.boxes, props.shields, frameSeconds, props.shots)
+      itemArt.update(props.boxes, props.shields, frameSeconds, props.shots, props.mirrors)
     },
     hits(frame, frameSeconds) {
       spins = frame.spins

@@ -172,7 +172,7 @@ describe('the item race room (e9-t05)', () => {
     expect(send(state, memory, 0, { op: 'pickup', box: 200, tick: 600 }).actions).toEqual([])
   })
 
-  it('draws by place: the leader only ever gets a boost, a shield or a puddle', () => {
+  it('draws by place: the leader only ever gets a boost, a shield, a puddle, a mirror or a fake box', () => {
     const memory = kart.realtime!.memory()
     let state = racing(3)
     const box = itemBoxes(track)[4]!
@@ -189,7 +189,8 @@ describe('the item race room (e9-t05)', () => {
       if (got?.t !== 'got') throw new Error('no item')
       seen.add(got.item)
     }
-    expect([...seen].sort()).toEqual(['boost', 'puddle', 'shield'])
+    // 2026-11-20: the mirror and the fake box too (and the rally, in a team race only)
+    expect([...seen].sort()).toEqual(['boost', 'decoy', 'mirror', 'puddle', 'shield'])
   })
 
   it('checks every got and use it is handed', () => {

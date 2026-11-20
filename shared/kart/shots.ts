@@ -11,17 +11,34 @@
 //
 // A hit stuns the kart (itemEffects.ts's `stunStep`). A bubble up stops the hit, and both are gone.
 //
+// 2026-11-20 (docs/ARCHITECTURE.md §4.45), two more:
+//
+//   fog     Sea Fog       a bank of fog laid on the road ahead of the kart in front; it lies a while,
+//                         and every kart but its owner that drives in is fogged for a moment (its
+//                         view clouds over and the damp air holds it back a little). Not a blow: no
+//                         bubble or mirror stops it, and it stays for the next kart
+//   decoy   Fake Box      dropped behind like a puddle, and made to look like an item box
+//
+// A mirror up (items.ts) sends a stunning shot back to whoever threw it.
+//
 // Pure and shared: the browser and the Worker read the same shots.
 import { KART_RADIUS, type Wall } from './walls.ts'
 
 /** A seat in the room (shared/games/types.ts's SeatId) */
 type SeatId = number
 
-export const SHOT_ITEMS = ['hail', 'cloud', 'puddle'] as const
+export const SHOT_ITEMS = ['hail', 'cloud', 'puddle', 'fog', 'decoy'] as const
 export type ShotItem = (typeof SHOT_ITEMS)[number]
 
 export const isShotItem = (value: unknown): value is ShotItem =>
   typeof value === 'string' && (SHOT_ITEMS as readonly string[]).includes(value)
+
+/** The shots that stun whoever they hit: all but the fog */
+export type StunItem = Exclude<ShotItem, 'fog'>
+export const isStunItem = (value: unknown): value is StunItem => isShotItem(value) && value !== 'fog'
+
+/** Shots that lie still on the road where they were dropped */
+const LYING: ReadonlySet<ShotItem> = new Set(['puddle', 'decoy', 'fog'])
 
 export const SHOT_TUNING = {
   /** Hail: speed on top of the thrower's own forward speed, m/s, and how far it flies at most, m */
@@ -49,8 +66,29 @@ export const SHOT_TUNING = {
   graceMs: 1_500,
   /** At most this many shots on the road; the oldest goes first */
   maxShots: 24,
+  /**
+   * Fog (2026-11-20): laid this far ahead of the kart in front along its way, s of its speed (at
+   * least fogLeadMin metres), stopped short of a wall; it lies there this long, this wide, ms and m
+   */
+  fogLeadSeconds: 0.9,
+  fogLeadMin: 25,
+  fogMs: 7_000,
+  fogRadius: 7,
+  /** Fog: the kart in front, if it is no further than this, m */
+  fogReach: 320,
+  /** Fogged: the view clouds over this long, ms, and the top speed is held to this share meanwhile */
+  fogBlindMs: 1_600,
+  fogTopFactor: 0.82,
+  /** Decoy: dropped like a puddle; its radius, m (a box's), and how long it lies, ms */
+  decoyRadius: 1.3,
+  decoyMs: 25_000,
   /** How long a hit stuns, ms, by item */
-  stunMs: { hail: 1_100, cloud: 1_500, puddle: 1_000 } satisfies Record<ShotItem, number>,
+  stunMs: {
+    hail: 1_100,
+    cloud: 1_500,
+    puddle: 1_000,
+    decoy: 1_000,
+  } satisfies Record<StunItem, number>,
   /** Stunned: held to this share of the top speed, brought down at this share per second */
   stunTopFactor: 0.25,
   stunDrag: 5,
@@ -74,6 +112,8 @@ export type KartShot = {
   until: number
   /** The kart a cloud chases; null for the others */
   target: SeatId | null
+  /** Fog (2026-11-20): the karts it has fogged already, each once; absent for the others */
+  struck?: SeatId[]
 }
 
 /** A kart's position at a moment, by the server's clock */
@@ -90,7 +130,9 @@ export function isShot(value: unknown): value is KartShot {
     isShotItem(shot.item) &&
     Number.isInteger(shot.by) &&
     ['at', 'x', 'z', 'vx', 'vz', 'until'].every((key) => isNumber(shot[key])) &&
-    (shot.target === null || Number.isInteger(shot.target))
+    (shot.target === null || Number.isInteger(shot.target)) &&
+    (shot.struck === undefined ||
+      (Array.isArray(shot.struck) && shot.struck.every((seat) => Number.isInteger(seat))))
   )
 }
 
@@ -169,6 +211,43 @@ export function dropPuddle(n: number, kart: Thrower, at: number): KartShot {
   }
 }
 
+/** A fake item box dropped behind `kart` at `at` (2026-11-20): where a puddle would be */
+export function dropDecoy(n: number, kart: Thrower, at: number): KartShot {
+  return { ...dropPuddle(n, kart, at), item: 'decoy', until: at + SHOT_TUNING.decoyMs }
+}
+
+/**
+ * A bank of fog laid ahead of `target` (where the room last saw it, heading `heading` at `speed`)
+ * by `kart` at `at` (2026-11-20): fogLeadSeconds of its speed on, at least fogLeadMin, and short of
+ * the first wall that way by the fog's radius
+ */
+export function layFog(
+  n: number,
+  kart: Thrower,
+  target: { readonly x: number; readonly z: number; readonly heading: number; readonly speed: number },
+  at: number,
+  walls: readonly Wall[],
+): KartShot {
+  const dx = Math.sin(target.heading)
+  const dz = -Math.cos(target.heading)
+  const wanted = Math.max(SHOT_TUNING.fogLeadMin, target.speed * SHOT_TUNING.fogLeadSeconds)
+  const room = rayToWall(walls, target.x, target.z, dx, dz, wanted + SHOT_TUNING.fogRadius)
+  const lead = Math.max(0, Math.min(wanted, room - SHOT_TUNING.fogRadius))
+  return {
+    n,
+    item: 'fog',
+    by: kart.seat,
+    at,
+    x: target.x + dx * lead,
+    z: target.z + dz * lead,
+    vx: 0,
+    vz: 0,
+    until: at + SHOT_TUNING.fogMs,
+    target: null,
+    struck: [],
+  }
+}
+
 /** A thundercloud sent from `kart` after `target`, `distance` metres away: it strikes on arrival */
 export function sendCloud(
   n: number,
@@ -221,6 +300,18 @@ export function shotPosition(
 
 // ── Hits ─────────────────────────────────────────────────────────────────────────────────────
 
+/** How far from its centre a shot reaches, m (a cloud strikes its target, wherever) */
+export const SHOT_RADIUS: Record<ShotItem, number> = {
+  hail: SHOT_TUNING.hailRadius,
+  cloud: 0,
+  puddle: SHOT_TUNING.puddleRadius,
+  fog: SHOT_TUNING.fogRadius,
+  decoy: SHOT_TUNING.decoyRadius,
+}
+
+/** Whether a shot lies still where it was put (a puddle, a decoy, a fog bank) */
+export const lyingShot = (item: ShotItem): boolean => LYING.has(item)
+
 /**
  * The least distance between two points moving in straight lines over `seconds`: one starts `gap`
  * (x, z) from the other and moves at `relative` (vx, vz) to it
@@ -255,15 +346,18 @@ export function shotHits(
     return seat === shot.target && to.at >= shot.until && to.at <= shot.until + SHOT_TUNING.graceMs
   }
   if (shot.item === 'hail' && seat === shot.by) return false
+  // A fog bank never fogs its owner, and each other kart only once
+  if (shot.item === 'fog' && (seat === shot.by || shot.struck?.includes(seat))) return false
   const start = Math.max(shot.at, from?.at ?? to.at)
-  // The owner of a puddle is safe from it until it is armed
+  // The owner of a puddle (or a decoy) is safe from it until it is armed
   const opens =
-    shot.item === 'puddle' && seat === shot.by ? shot.at + SHOT_TUNING.puddleArmMs : start
+    (shot.item === 'puddle' || shot.item === 'decoy') && seat === shot.by
+      ? shot.at + SHOT_TUNING.puddleArmMs
+      : start
   const t0 = Math.max(start, opens)
   const t1 = Math.min(to.at, shot.until)
   if (t1 < t0) return false
-  const reach =
-    KART_RADIUS + (shot.item === 'hail' ? SHOT_TUNING.hailRadius : SHOT_TUNING.puddleRadius) - slack
+  const reach = KART_RADIUS + SHOT_RADIUS[shot.item] - slack
   // The kart's straight path from `from` to `to`, at t0, and its velocity
   const span = from ? (to.at - from.at) / 1000 : 0
   const kvx = from && span > 0 ? (to.x - from.x) / span : 0
@@ -282,14 +376,15 @@ export function shotHits(
  * the room judges the kart's 20 Hz frames at the time they arrive, the browser its own 60 Hz steps
  * now, so a shot that only grazes may go either way. A puddle lies still, so only the paths differ
  */
-export const FORESEE_SLACK = { hail: 0.5, puddle: 0.3 } as const
+export const FORESEE_SLACK = { hail: 0.5, puddle: 0.3, decoy: 0.3 } as const
 
 /**
  * The shot this browser can tell will hit its own kart `seat` on its way from `from` to `to` (its
  * own steps, by the server's clock as it reckons it), before the room says so; null for none. Not
  * with a bubble up (the room would pop it), nor a shot in `skip` (already foreseen). A cloud strikes
  * the kart it chases when its time is up, so that one is certain; hail and puddles need `slack`.
- * Only foreseen: the room still judges, and a hit it never confirms is simply not repeated
+ * Only foreseen: the room still judges, and a hit it never confirms is simply not repeated. A mirror
+ * up (2026-11-20) counts as a bubble here: the room sends the shot back, so nothing hits
  */
 export function foreseeHit(
   shots: readonly KartShot[],
@@ -298,13 +393,21 @@ export function foreseeHit(
   to: Fix,
   shieldUntil: number,
   skip: ReadonlySet<number> = new Set(),
-): KartShot | null {
+): (KartShot & { item: StunItem }) | null {
   if (shieldUntil > to.at) return null
   return (
     shots.find(
-      (shot) =>
+      (shot): shot is KartShot & { item: StunItem } =>
+        // A fog bank only clouds the view (2026-11-20): nothing to foresee
+        shot.item !== 'fog' &&
         !skip.has(shot.n) &&
-        shotHits(shot, seat, from, to, shot.item === 'cloud' ? 0 : FORESEE_SLACK[shot.item]),
+        shotHits(
+          shot,
+          seat,
+          from,
+          to,
+          shot.item === 'cloud' ? 0 : FORESEE_SLACK[shot.item],
+        ),
     ) ?? null
   )
 }
