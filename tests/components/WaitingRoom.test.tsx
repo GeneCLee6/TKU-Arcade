@@ -498,3 +498,50 @@ describe('computer members (2026-11-17)', () => {
     expect(memberName(al(), 'kart')).toBe('Al')
   })
 })
+
+describe('computer players of a table game (2026-11-20)', () => {
+  const egret = member('cpu', { name: 'egret', seat: 2, ready: true, bot: { level: 'normal', name: 'egret' } })
+  const holdemView = (members: RoomMember[]) => {
+    const view = { ...viewOf(members, 2, 4) }
+    view.room = { ...view.room, gameId: 'holdem' }
+    return view
+  }
+  const withAdd = (view: RoomView, you: string, onAddBot: (level: string) => void) => (
+    <ToastProvider>
+      <WaitingRoom
+        roomId={ROOM}
+        view={view}
+        you={you}
+        onSit={vi.fn()}
+        onReady={vi.fn()}
+        onStart={vi.fn()}
+        onKick={vi.fn()}
+        onTransfer={vi.fn()}
+        onDissolve={vi.fn()}
+        onSetGame={vi.fn()}
+        onSetOptions={vi.fn()}
+        onAddBot={onAddBot}
+      />
+    </ToastProvider>
+  )
+
+  it('names it and its level through the room strings, with the host’s way to remove it', () => {
+    const { onKick } = renderRoom(holdemView([al(), egret]))
+    const row = rowOf('Egret (CPU)')
+    expect(within(row).getByText('Normal')).toBeInTheDocument()
+    fireEvent.click(within(row).getByRole('button', { name: 'Remove Egret (CPU)' }))
+    expect(onKick).toHaveBeenCalledWith('cpu')
+  })
+
+  it('offers the host a level and a button to add one, and nobody else', async () => {
+    const onAddBot = vi.fn()
+    const { unmount } = render(withAdd(holdemView([al(), bo()]), 'Al', onAddBot))
+    const add = await screen.findByRole('button', { name: 'Add a computer player' })
+    fireEvent.change(screen.getByTestId('table-bots-level'), { target: { value: 'easy' } })
+    fireEvent.click(add)
+    expect(onAddBot).toHaveBeenCalledWith('easy')
+    unmount()
+    render(withAdd(holdemView([al(), bo()]), 'Bo', onAddBot))
+    expect(screen.queryByRole('button', { name: 'Add a computer player' })).toBeNull()
+  })
+})

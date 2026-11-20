@@ -16,10 +16,15 @@ export function botKey(gameId: string, rest: string): TextKey {
 export function memberName(member: Pick<RoomMember, 'name' | 'bot'>, gameId: string): string {
   const bot = member.bot
   if (!bot) return member.name
-  const nameKey = botKey(gameId, `name.${bot.name}`)
-  const tagKey = botKey(gameId, 'tag')
-  const name = hasMessage(nameKey) ? t(nameKey) : member.name
-  return hasMessage(tagKey) ? t(tagKey, { name }) : name
+  // The game's own strings, else the room's when the name is one of the room's, else the bare id
+  for (const prefix of [`games.${gameId}.bot`, 'room.bot']) {
+    const nameKey = `${prefix}.name.${bot.name}` as TextKey
+    if (!hasMessage(nameKey)) continue
+    const tagKey = `${prefix}.tag` as TextKey
+    const name = t(nameKey)
+    return hasMessage(tagKey) ? t(tagKey, { name }) : name
+  }
+  return member.name
 }
 
 /**
