@@ -155,10 +155,23 @@ export async function checkLayout(page: Page, where: string, problems: Problems,
 
 const BLOCKING = new Set(['serious', 'critical'])
 
+/** One rule on one element: what is compared between the two passes */
+const nodeKey = (id: string, target: unknown) => `${id} ${JSON.stringify(target)}`
+
 export async function checkAxe(page: Page, where: string, problems: Problems): Promise<void> {
   const { violations } = await new AxeBuilder({ page }).analyze()
-  for (const violation of violations) {
-    if (!BLOCKING.has(violation.impact ?? '')) continue
+  const blocking = violations.filter((violation) => BLOCKING.has(violation.impact ?? ''))
+  if (blocking.length === 0) return
+  // The sweep plays fast: a step can change while axe is reading a node, so it may pair the new
+  // text colour with the old fill (a pair that is never drawn). A real violation stays on the
+  // page; one born of that race does not. Look again once the page is still and keep only what
+  // both passes saw on the same element.
+  await page.waitForTimeout(400)
+  const again = await new AxeBuilder({ page }).analyze()
+  const seen = new Set(again.violations.flatMap((v) => v.nodes.map((node) => nodeKey(v.id, node.target))))
+  for (const violation of blocking) {
+    violation.nodes = violation.nodes.filter((node) => seen.has(nodeKey(violation.id, node.target)))
+    if (violation.nodes.length === 0) continue
     const nodes = violation.nodes
       .slice(0, 3)
       .map((node) => `${node.html.slice(0, 80)} (${(node.failureSummary ?? '').split('\n').slice(1).join(' ').slice(0, 160)})`)
