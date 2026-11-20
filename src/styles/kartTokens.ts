@@ -419,6 +419,78 @@ export const worksScene = {
   chimneyTop: '#2B2B2E',
   concrete: '#B8B3AA',
   concreteDark: '#8F8A82',
+  // 2026-11-20, dressed (docs/KART-WORLD.md §6.3): the sawtooth roofs' north lights, the foundry,
+  // the pipe racks, the conveyor, the deck's railings and the alley's brick and spray paint
+  glazing: '#8FB8CC',
+  foundry: '#5B4B44',
+  foundryGlow: '#FF8A3D',
+  pipes: ['#7E8C96', '#B5532F', '#3F7F6A'],
+  rack: '#4A4F55',
+  conveyor: '#3A3F45',
+  belt: '#202124',
+  brick: '#8E4A36',
+  graffiti: ['#22E6FF', '#FF3DC8', '#FFB02E', '#7CFF6B', '#8A5CFF', '#F4F4F4'],
+  steam: '#FFFFFF',
+} as const
+
+/**
+ * 2026-11-20: what shows the way on the tracks to learn by heart (src/kart/art/skillCues.ts): the
+ * way through (a slot, a branch's mouth) in one colour, the drift jumps in another, the warning
+ * stripes on a fence a flier clears and on a wall's end
+ */
+export const skillCue = {
+  path: '#22E6FF',
+  jump: '#FFB02E',
+  hazard: '#F2C230',
+  hazardDark: '#1B1B1F',
+  post: '#2B2D33',
+} as const
+
+/** 2026-11-20: the Wharf Warehouses' own scenery (src/kart/art/wharfArt.ts) */
+export const wharfScene = {
+  containers: ['#C0392B', '#1F6FB2', '#2E8B57', '#E67E22', '#7D3C98', '#D4AC0D', '#2F7F9E', '#8C3B2E'],
+  shedWalls: ['#B8C2C9', '#9FB0A6', '#C9B79C', '#D6D2C8'],
+  shedRoof: '#4F5A63',
+  door: '#39424A',
+  number: '#F4F4F4',
+  numberBack: '#1F3A5F',
+  crane: '#D9442B',
+  craneWhite: '#F4F1EA',
+  craneDark: '#2B2D33',
+  quay: '#B9B2A6',
+  quayEdge: '#F2C230',
+  quayFace: '#6E6A62',
+  bollard: '#2B2D33',
+  bollardCap: '#F2C230',
+  sea: '#3B87B5',
+  hulls: ['#B83A2E', '#1F4E79', '#2F6B4F'],
+  deckhouse: '#F4F1EA',
+  funnel: '#C8323C',
+  boatTrim: '#2B2D33',
+} as const
+
+/** 2026-11-20: the Hillside Lanes' own scenery (src/kart/art/lanesArt.ts) */
+export const lanesScene = {
+  brick: '#A9452E',
+  pillar: '#8E3A26',
+  tile: '#3E3A38',
+  tileEdge: '#5A524C',
+  plaster: ['#EADFC9', '#DCCBA8', '#E6D3C3', '#D5D9CF'],
+  window: '#2C2F3A',
+  door: '#5A3A24',
+  wood: '#6B4A2E',
+  lantern: '#E5322D',
+  lanternGlow: '#FF5A3D',
+  tassel: '#F2C230',
+  stone: '#A29D92',
+  stoneDark: '#6E6A62',
+  water: '#2E6F8C',
+  pot: '#B5552F',
+  leaf: '#3E8E3A',
+  leafLight: '#6DB33F',
+  pole: '#7A6A58',
+  wire: '#202124',
+  rail: '#4A4440',
 } as const
 
 export const localScene = {

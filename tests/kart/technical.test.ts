@@ -43,8 +43,9 @@ const PLAN: Record<
   datun: { key: 'datun@2', straight: 0.3, was: 0.3, longest: 200, jumps: 2, hilly: true },
   // 2026-11-19, the two to learn by heart (skillTracks.test.ts has what is their own): a shortcut
   // is a straight line, so they are straighter than the technical four
-  // 2026-11-20: the wharf's shed lane is a branch (branches.ts), its records afresh
-  wharf: { key: 'wharf@2', straight: 0.36, was: 0.36, longest: 230, jumps: 2, hilly: true },
+  // 2026-11-20: the wharf's shed lane is a branch (branches.ts), its records afresh; then (revision
+  // 3) the road round the shed reaches further out and the lane is half as long as it
+  wharf: { key: 'wharf@3', straight: 0.36, was: 0.36, longest: 230, jumps: 2, hilly: true },
   lanes: { key: 'lanes', straight: 0.4, was: 0.4, longest: 220, jumps: 3, hilly: true },
   // 2026-11-20, the first with branches (branches.test.ts and skillTracks.test.ts have its own)
   works: { key: 'works', straight: 0.4, was: 0.4, longest: 220, jumps: 1, hilly: true },

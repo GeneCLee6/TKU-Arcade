@@ -36,6 +36,17 @@ const SWEEP_WIDTH = 84
 const SWEEP_RADIUS = 60
 /** The shed's hairpin (2026-11-20): wider round, its lane a road of its own across inside it */
 const SHED_RADIUS = 76
+/**
+ * Revision 3 (2026-11-20): the shed's hairpin reaches this much further out, metres, on both its
+ * straights, so the road round the shed is 60 m longer while the lane behind it is not
+ */
+const SHED_REACH = 30
+/**
+ * The shed's lane peels off the road this many degrees round a wide curve, then turns square behind
+ * the shed and square again onto the road, round this radius
+ */
+const LANE_MOUTH = 20
+const LANE_RADIUS = 32
 /** A fence that can be flown over stands this high, metres */
 export const FENCE_HEIGHT = 1.5
 /** A wall nothing flies over (a shed, a row of containers) is drawn and stands this high */
@@ -51,9 +62,9 @@ const laid = lay(
     line(30, 32),
     right(180, 34, 34),
     // The shed: a wide left-hander, a lane behind the shed
-    line(70, 40, { mark: 'shedIn' }),
+    line(70 + SHED_REACH, 40, { mark: 'shedIn' }),
     left(180, SHED_RADIUS, 40, { mark: 'shedOut', mid: 'shedMid' }),
-    line(60, 34),
+    line(60 + SHED_REACH, 34),
     right(90, 40, 32),
     line(36, 32, { mark: 'rowsIn' }),
     // The container rows: four square corners, a slot through each row
@@ -121,18 +132,21 @@ const quayIn = at('quayIn')
 const quayOut = at('quayOut')
 
 // The shed's lane: a branch inside the hairpin, from the straight before it to the one after
-const laneFrom = shedIn - 10
-const laneTo = shedOut + 7
+const laneFrom = shedIn - 10 - Math.round(SHED_REACH / LAY_SAMPLE)
+const laneTo = shedOut + 7 + Math.round(SHED_REACH / LAY_SAMPLE)
 const LANE = 28
 const laneLaid = layBranch(
   road,
   laneFrom,
   laneTo,
   [
-    left(42, 40, LANE),
+    // Peeled off the kerb, then square behind the shed, straight down its back wall, and square
+    // onto the road again: the corners are tight, the way short
+    left(LANE_MOUTH, 60, LANE),
     fitted(LANE, { mid: 'laneMouth' }),
-    left(116, 34, LANE, { mid: 'laneMid' }),
-    fitted(LANE),
+    left(90 - LANE_MOUTH, LANE_RADIUS, LANE),
+    fitted(LANE, { mid: 'laneMid' }),
+    left(90, LANE_RADIUS, LANE),
   ],
   LANE,
 )
@@ -264,7 +278,7 @@ export const WHARF: TrackJson = {
   // A working name (2026-11-19): the owner may rename it (docs/KART-WORLD.md §6)
   name: { en: 'Wharf Warehouses', 'zh-TW': '碼頭倉庫' },
   // 2: the shed's lane is a branch (2026-11-20)
-  revision: 2,
+  revision: 3,
   theme: 'day',
   laps: 3,
   road,
