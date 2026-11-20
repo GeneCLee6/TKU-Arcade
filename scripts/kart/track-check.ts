@@ -21,6 +21,7 @@ const drivers: [string, BotSkill][] = [
   ['easy', BOT_SKILLS.easy],
   ['normal', BOT_SKILLS.normal],
   ['hard', BOT_SKILLS.hard],
+  ['expert-cpu', BOT_SKILLS.expert],
   ['novice', FEEL_DRIVERS.novice.skill],
   ['average', FEEL_DRIVERS.average.skill],
   ['expert', FEEL_DRIVERS.expert.skill],

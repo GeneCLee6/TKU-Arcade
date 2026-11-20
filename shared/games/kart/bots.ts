@@ -4,7 +4,8 @@
 // (`kart.bots.name.<id>` and `games.kart.bot.name.<id>`), like every name in the kart's world until
 // KART-WORLD.md settles them (e10-t01). Pure: no strings to show, only ids.
 
-export const BOT_LEVELS = ['easy', 'normal', 'hard'] as const
+// 2026-11-20: 'expert', the fourth (src/kart/bots/expert.ts)
+export const BOT_LEVELS = ['easy', 'normal', 'hard', 'expert'] as const
 export type BotLevel = (typeof BOT_LEVELS)[number]
 
 export const BOT_NAMES = [
