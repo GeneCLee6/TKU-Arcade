@@ -49,6 +49,12 @@ test('one person races a computer kart in an item race, from the menu to the res
   await setup.getByTestId('kart-bots-start').click()
 
   await expect(page.getByTestId('kart-race')).toBeVisible({ timeout: 30_000 })
+  // 2026-11-20 (§4.43): the fly round the grid first, with the track and the laps, skipped by a key
+  const intro = page.getByTestId('kart-intro')
+  await expect(intro).toBeVisible({ timeout: 30_000 })
+  await expect(intro).toContainText('Laps: 1')
+  await page.keyboard.press('KeyM')
+  await expect(intro).toBeHidden()
   await expect
     .poll(async () => (await race(page))?.counted ?? false, { timeout: 30_000 })
     .toBe(true)
@@ -78,7 +84,8 @@ test('one person races a computer kart in an item race, from the menu to the res
   await expect
     .poll(async () => (await race(page))?.pickups ?? 0, { timeout: 90_000 })
     .toBeGreaterThan(0)
-  // One lap, then the results: both karts, the bot by its name
+  // One lap: the finish's show (the place, the confetti), then the results with both karts
+  await expect(page.getByTestId('kart-celebration')).toBeVisible({ timeout: 180_000 })
   const results = page.getByTestId('kart-bots-results')
   await expect(results).toBeVisible({ timeout: 180_000 })
   await expect(results.getByTestId('kart-standings').locator('li')).toHaveCount(2)

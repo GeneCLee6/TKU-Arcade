@@ -3,7 +3,7 @@ import styled, { css, keyframes } from 'styled-components'
 import type { KartAction, KartItemEvent, KartView } from '../../../shared/games/kart/types.ts'
 import { actionKeys } from '../../../shared/kart/input.ts'
 import { TARGETED_ITEMS, type ItemId } from '../../../shared/kart/items.ts'
-import { KART_MESSAGES } from '../../../shared/kart/i18n.ts'
+import { KART_MESSAGES, type KartMessageKey } from '../../../shared/kart/i18n.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import type { JsonValue } from '../../../shared/patch.ts'
 import '../../games/kart/messages.ts'
@@ -33,6 +33,13 @@ import { StunHud } from './HitHud.tsx'
 import { createRaceNet, type NameTag, type RaceNet } from './netRace.ts'
 import { teamColor } from '../team/teamColor.ts'
 import { TeamPanel, TeamScore, TeamVeil } from './TeamHud.tsx'
+import {
+  Celebration,
+  FinalLapBanner,
+  IntroCard,
+  PlaceArrow,
+} from '../ui/RaceShow.tsx'
+import { placeBump } from '../ui/placeBump.ts'
 import { TouchControls } from '../touch/TouchControls.tsx'
 import { useTouchControls } from '../touch/useTouchControls.ts'
 import { touchBottom, touchCorner, touchSpace } from '../touch/touchLayout.ts'
@@ -51,6 +58,9 @@ const EMPTY_HUD: SpikeHud = {
 const CALLOUT_MS = 900
 /** An item's note stays this long */
 const NOTE_MS = 2_200
+/** §4.43: a place gained or lost shows for this long, and the final lap's banner for this long, ms */
+const PLACE_SHIFT_MS = 1_600
+const FINAL_LAP_MS = 2_400
 /** A use the room has not answered by now found no one to reach */
 const NO_TARGET_MS = 900
 /** Hit by a shot: a buzz this long on a phone driven by touch */
@@ -358,6 +368,31 @@ export default function RaceView({
     return () => window.clearTimeout(timer)
   }, [stun])
 
+  // §4.43: a place gained or lost while racing, and the final lap
+  const [placeShift, setPlaceShift] = useState<{ up: boolean; id: number }>()
+  const [finalLapOver, setFinalLapOver] = useState(false)
+  const lastPlace = useRef(0)
+  const racing = trial?.phase === 'racing'
+  const placeNow = order.indexOf(seat) + 1
+  useEffect(() => {
+    const before = lastPlace.current
+    lastPlace.current = placeNow
+    if (!racing || before === 0 || placeNow === 0 || placeNow === before) return
+    setPlaceShift((last) => ({ up: placeNow < before, id: (last?.id ?? 0) + 1 }))
+  }, [placeNow, racing])
+  useEffect(() => {
+    if (!placeShift) return
+    const timer = window.setTimeout(() => setPlaceShift(undefined), PLACE_SHIFT_MS)
+    return () => window.clearTimeout(timer)
+  }, [placeShift])
+  const onFinalLap = racing && trial.laps > 1 && trial.lap === trial.laps
+  useEffect(() => {
+    if (!onFinalLap) return
+    const timer = window.setTimeout(() => setFinalLapOver(true), FINAL_LAP_MS)
+    return () => window.clearTimeout(timer)
+  }, [onFinalLap])
+  const finalLap = onFinalLap && !finalLapOver
+
   useEffect(() => {
     if (!callout) return
     const timer = window.setTimeout(() => setCallout(undefined), CALLOUT_MS)
@@ -405,6 +440,9 @@ export default function RaceView({
       )
     : null
   const others = view.racers.filter((racer) => racer.seat !== seat)
+  // The track's name on the fly round's card; a custom track has none of its own here
+  const courseKey = `kart.course.${view.track}`
+  const courseTitle = courseKey in KART_MESSAGES.en ? t(courseKey as KartMessageKey) : null
 
   return (
     <Page
@@ -427,8 +465,27 @@ export default function RaceView({
       </Tags>
       <TouchControls t={t} touch={touch} items={view.mode === 'items'} />
       <TopLeft>
-        <PlacePanel data-testid="kart-place" aria-label={t('games.kart.race.position')}>
-          <PlaceNumber>{t('games.kart.race.place', { place: place || 1, total })}</PlaceNumber>
+        <PlacePanel
+          data-testid="kart-place"
+          data-shift={placeShift ? (placeShift.up ? 'up' : 'down') : undefined}
+          aria-label={t('games.kart.race.position')}
+        >
+          <PlaceNumber
+            key={placeShift ? `place-${placeShift.id}` : 'place'}
+            $shift={placeShift ? placeShift.up : null}
+          >
+            {t('games.kart.race.place', { place: place || 1, total })}
+          </PlaceNumber>
+          {placeShift && (
+            <PlaceArrow
+              key={`arrow-${placeShift.id}`}
+              $up={placeShift.up}
+              role="img"
+              aria-label={t(placeShift.up ? 'games.kart.race.placeUp' : 'games.kart.race.placeDown', {
+                place,
+              })}
+            />
+          )}
         </PlacePanel>
         {score && <TeamScore t={t} totals={score.totals} mine={mySide} />}
         {note && <ItemNote key={`note-${note.id}`} text={note.text} bad={note.bad} />}
@@ -470,10 +527,26 @@ export default function RaceView({
       {view.phase === 'countdown' && !counting && (
         <Center role="status">{t('games.kart.race.ready')}</Center>
       )}
-      {trial && (counting || (trial.phase === 'racing' && trial.wrongWay)) && (
-        <RaceCenter t={t} trial={trial} onRestart={() => {}} />
+      {trial?.intro && (
+        <IntroCard
+          title={courseTitle}
+          laps={t('kart.race.introLaps', { count: view.laps })}
+          skip={t(touch.shown ? 'kart.race.introSkipTouch' : 'kart.race.introSkip')}
+        />
       )}
-      {finished && (
+      {trial &&
+        !trial.intro &&
+        (counting || (trial.phase === 'racing' && trial.wrongWay)) && (
+          <RaceCenter t={t} trial={trial} onRestart={() => {}} />
+        )}
+      {finalLap && !finished && <FinalLapBanner text={t('kart.race.finalLap')} />}
+      {finished && trial?.celebrating && (
+        <Celebration
+          big={t('games.kart.race.placeBig', { place: place || 1 })}
+          line={t('kart.race.finish')}
+        />
+      )}
+      {finished && !trial?.celebrating && (
         <Finish role="status" data-testid="kart-finish">
           <FinishTitle>{t('games.kart.race.finishedPlace', { place: place || 1 })}</FinishTitle>
           <Standings view={view} order={order} nameOf={nameOf} />
@@ -596,10 +669,11 @@ const PlacePanel = styled.div`
   padding: ${space.xs}px ${space.md}px;
 `
 
-const PlaceNumber = styled.span`
+const PlaceNumber = styled.span<{ $shift: boolean | null }>`
   ${displayType}
   color: ${color.text};
   font-size: ${fontSize.xl}px;
+  ${({ $shift }) => ($shift === null ? '' : placeBump($shift))}
 `
 
 const pulse = keyframes`

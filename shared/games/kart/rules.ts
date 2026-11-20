@@ -85,8 +85,13 @@ import type {
 
 /** How long the room waits for everyone's track to load before it starts anyway */
 export const LOAD_WAIT_MS = 25_000
-/** From everyone on the grid to GO: a moment to settle, then 3, 2, 1 */
-export const COUNTDOWN_MS = 4_000
+/**
+ * 2026-11-20 (the race's show, docs/ARCHITECTURE.md §4.43): the camera's fly round the grid before
+ * the countdown, which anyone may skip on their own screen; GO is the room's and does not move
+ */
+export const INTRO_MS = 2_500
+/** From everyone on the grid to GO: the fly round, a moment to settle, then 3, 2, 1 */
+export const COUNTDOWN_MS = INTRO_MS + 4_000
 /** After the first kart finishes, the others have this long */
 export const CLOSE_AFTER_FINISH_MS = 30_000
 /** A kart not heard from this long during the race drops out */

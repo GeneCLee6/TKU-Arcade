@@ -56,7 +56,10 @@ test('two people on opposite sides and a computer kart race a team race', async 
     // The team HUD: the gauge, the kart's own charges (none yet, so none blue) and both sides' score
     await expect(page.getByTestId('kart-team-panel')).toBeVisible()
     await expect(page.getByRole('meter', { name: 'Team gauge' })).toBeVisible()
-    await expect(page.getByTestId('kart-stored')).toHaveAttribute('data-blue', '0')
+    await expect(page.getByTestId('kart-stored')).toHaveAttribute('data-blue', '0', {
+      // GO first: the team's charges are counted from the start (6.5 s of countdown, §4.44)
+      timeout: 20_000,
+    })
     await expect(page.getByTestId('kart-team-score')).toBeVisible()
   }
   for (const page of [ann, bob]) {
