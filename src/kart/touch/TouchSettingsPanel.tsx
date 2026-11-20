@@ -12,6 +12,7 @@ import {
 import { Button } from '../../components/Button.tsx'
 import type { MessageParams } from '../../i18n/t.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
+import { VolumeSliders } from '../audio/VolumeSliders.tsx'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -130,6 +131,7 @@ export const TouchSettingsPanel = memo(function TouchSettingsPanel({
         <span>{t('kart.touch.vibrate')}</span>
       </Check>
       {unsaved && <Note role="status">{t('kart.touch.notSaved')}</Note>}
+      <VolumeSliders t={t} />
       <Help>
         <HelpTitle>{t('kart.touch.howTo')}</HelpTitle>
         <p>{t('kart.touch.help')}</p>

@@ -23,6 +23,7 @@ import { Button } from '../components/Button.tsx'
 import type { MessageParams } from '../i18n/t.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
 import { keyLabel, padLabel, readGamepad } from './devices.ts'
+import { VolumeSliders } from './audio/VolumeSliders.tsx'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -266,6 +267,7 @@ export const ControlsPanel = memo(function ControlsPanel({
           {t('kart.controls.chainBoosts')}
         </label>
       </Rules>
+      <VolumeSliders t={t} />
     </Panel>
   )
 })

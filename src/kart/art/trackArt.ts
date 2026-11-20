@@ -97,6 +97,10 @@ export const themeOf = (track: Pick<Track, 'id' | 'theme'>): KartTheme =>
           ? kartThemes.night
           : kartThemes.day
 
+/** A track raced at night (2026-11-20, §4.47): headlights on, street lights pooled on the road */
+export const isNightTrack = (track: Pick<Track, 'id' | 'theme'>): boolean =>
+  themeOf(track) === kartThemes.night
+
 /** What a track's own scenery (harbourArt.ts) builds with: shared, and freed with the rest */
 export interface ArtKit {
   readonly track: Track
