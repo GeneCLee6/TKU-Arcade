@@ -184,6 +184,9 @@ type Connection = {
   wrongPasswords?: number
 }
 
+/** How long a computer player the room moves (`GameModule.bot`) seems to think before each move */
+export const BOT_THINK_MS = { min: 600, max: 1500 } as const
+
 /** Wrong passwords one socket may send before it is closed (e1-t16) */
 export const PASSWORD_TRIES = 5
 
@@ -221,6 +224,13 @@ export class RoomHost {
     null
   /** While the clock's actions are being applied: they change the game, which asks again */
   private clocking = false
+  /**
+   * The computer seat the room will move next, for a game whose module plays them (`GameModule.bot`,
+   * 2026-11-20), and when: a moment after its turn came, so that it reads as thinking. In memory
+   * only: after an eviction `settleBots` gives the turn a fresh moment. `key` tells one turn from the
+   * next (the game, how many steps in, the seat)
+   */
+  private botTurn: { key: string; at: number } | null = null
 
   constructor(deps: RoomHostDeps) {
     this.deps = deps
@@ -273,6 +283,7 @@ export class RoomHost {
       )
     }
     this.settleCleanup()
+    this.settleBots()
   }
 
   // ── Before joining ─────────────────────────────────────────────────────────────────────────
@@ -555,6 +566,8 @@ export class RoomHost {
   /** Whether `member` may move `seat` for the computer: the host, for a computer member's seat */
   private isBotSeatFor(member: MemberRecord, seat: number): boolean {
     if (member.id !== this.room?.hostId || member.bot) return false
+    // The room plays these itself (`GameModule.bot`): nobody moves them from a browser
+    if (this.deps.games(this.room.gameId)?.bot) return false
     return [...this.members.values()].some((other) => other.bot && other.seat === seat)
   }
 
@@ -676,6 +689,7 @@ export class RoomHost {
       }
     }
     this.fireTimers(now)
+    this.playBot(now)
     this.markAbsent(now)
     this.replaceAbsentHost()
     this.removeAbsentSpectators()
@@ -695,7 +709,10 @@ export class RoomHost {
    */
   nextAlarm(): number | null {
     const timerAt = this.game && this.room?.status === 'playing' ? nextTimerAt(this.game) : null
-    const times = [this.sweepAt, timerAt, this.cleanupAt()].filter((at) => at !== null)
+    const botAt = this.botTurn?.at ?? null
+    const times = [this.sweepAt, timerAt, botAt, this.cleanupAt()].filter(
+      (at): at is number => at !== null && Number.isFinite(at),
+    )
     return times.length > 0 ? Math.min(...times) : null
   }
 
@@ -1221,17 +1238,26 @@ export class RoomHost {
       room.maxSeats = module.meta.maxPlayers
       room.status = 'waiting'
       this.deps.storage.saveRoom(room)
-      // A game without computer seats has no computer members
-      if (!module.bots) {
-        for (const other of [...this.members.values()]) {
-          if (other.bot) this.members.delete(other.id)
-        }
+      // A game without computer seats has no computer members, and one whose computer players are
+      // other ones (another level or name: the kart's and the table games') has none of these
+      const bots = module.bots
+      for (const other of [...this.members.values()]) {
+        const fits =
+          other.bot !== undefined &&
+          bots !== undefined &&
+          bots.levels.includes(other.bot.level) &&
+          bots.names.includes(other.bot.name)
+        if (other.bot && !fits) this.members.delete(other.id)
       }
       // After the new maxSeats: those without a seat in this game take one that is left, if any
       const others = [...this.members.values()]
       const homeless = others.filter((other) => other.seat !== null && other.seat >= room.maxSeats)
       for (const other of homeless) other.seat = null
       for (const other of homeless) other.seat = this.lowestFreeSeat()
+      // A computer member left without a seat would only watch: it goes
+      for (const other of homeless) {
+        if (other.bot && other.seat === null) this.members.delete(other.id)
+      }
       for (const other of others) other.ready = false
       this.saveMembers()
     })
@@ -1338,6 +1364,107 @@ export class RoomHost {
     this.deps.storage.dropSteps(steps)
   }
 
+  // ── Computer players the room moves (2026-11-20) ─────────────────────────────────────────
+
+  /**
+   * Brings `botTurn` in line with the game after anything that may have changed it: the computer
+   * seat whose turn it is, a moment from when its turn came; none when no computer seat can move,
+   * the game's module does not play them, or nobody is in the room to watch (they wait for someone
+   * to come back rather than play on to an empty room)
+   */
+  private settleBots(): void {
+    const seat = this.botSeatToMove()
+    if (seat === null) {
+      this.botTurn = null
+      return
+    }
+    const game = this.game as StoredGame
+    const key = `${game.seed}:${game.steps}:${seat}`
+    if (this.botTurn?.key === key) return
+    // 0.6 to 1.5 s: long enough to read as a move, short enough not to drag
+    const spread = BOT_THINK_MS.max - BOT_THINK_MS.min + 1
+    const think = BOT_THINK_MS.min + createRng(this.deps.newSeed()).int(spread)
+    this.botTurn = { key, at: this.deps.now() + think }
+  }
+
+  /** The first computer seat (in seat order) that has something to do now, or null */
+  private botSeatToMove(): number | null {
+    const room = this.room
+    const game = this.game
+    if (room?.status !== 'playing' || !game) return null
+    const module = this.deps.games(game.gameId)
+    if (!module?.bot) return null
+    const members = [...this.members.values()]
+    if (!members.some((member) => !member.bot && member.conn !== null)) return null
+    const seats = members
+      .filter((member) => member.bot && member.seat !== null)
+      .map((member) => member.seat as number)
+      .filter((seat) => game.seats.some((one) => one.id === seat))
+      .sort((a, b) => a - b)
+    for (const seat of seats) {
+      try {
+        if (module.legalActions(game.match.state, seat).length > 0) return seat
+        // Out of turn, a policy may still have something to say (holdem's coming back from sitting
+        // out): asked with what its browser would get, and a throwaway Rng
+        const projection = projectFor(module, game, seat)
+        const level = members.find((member) => member.seat === seat)?.bot?.level ?? ''
+        if (projection && module.bot(projection.view, [], level, createRng(0)) !== null) return seat
+      } catch (error) {
+        console.error(`game ${game.gameId}: legalActions threw`, error)
+        return null
+      }
+    }
+    return null
+  }
+
+  /**
+   * The computer seat's move, once its moment has come: its policy picks from exactly what its
+   * browser would get (`projectFor`), and the action goes in as that seat's, like anyone's. A policy
+   * that throws, answers nothing or answers something refused gets a random legal action instead, so
+   * a computer player can never hold a game up
+   */
+  private playBot(now: number): void {
+    const due = this.botTurn
+    const room = this.room
+    const game = this.game
+    if (!due || due.at > now || !room || !game) return
+    const seat = this.botSeatToMove()
+    const module = this.deps.games(game.gameId)
+    const member = [...this.members.values()].find((one) => one.bot && one.seat === seat)
+    const projection = seat === null || !module ? null : projectFor(module, game, seat)
+    if (seat === null || !module?.bot || !member?.bot || !projection) {
+      this.botTurn = null
+      return
+    }
+    const rng = createRng(this.deps.newSeed())
+    let action: JsonValue | null = null
+    try {
+      action = module.bot(projection.view, projection.legal, member.bot.level, rng)
+    } catch (error) {
+      console.error(`game ${game.gameId}: bot threw`, error)
+    }
+    let outcome: ActionOutcome | null =
+      action === null ? null : playAction(module, game, action, seat, now)
+    if (outcome?.kind !== 'accepted') {
+      if (outcome?.kind === 'refused') {
+        console.error(`game ${game.gameId}: bot action refused: ${outcome.error.gameError}`)
+      }
+      outcome =
+        projection.legal.length > 0
+          ? playAction(module, game, rng.pick(projection.legal), seat, now)
+          : null
+    }
+    if (outcome?.kind === 'accepted') {
+      // A fresh moment for whatever comes next, even the same seat again (holdem's vote, then its bet)
+      this.botTurn = null
+      this.accept(room, game.steps, outcome)
+      return
+    }
+    // Not even a legal action went in: a module bug. No more tries until something else changes
+    console.error(`game ${game.gameId}: no computer move was accepted`)
+    this.botTurn = { key: due.key, at: Number.POSITIVE_INFINITY }
+  }
+
   // ── Telling the sockets ────────────────────────────────────────────────────────────────────
 
   /**
@@ -1356,6 +1483,7 @@ export class RoomHost {
     mutate()
     this.rev++
     this.deps.storage.saveRev(this.rev)
+    this.settleBots()
     const viewAfter = this.viewBuilder()
     for (const [conn, previous] of before) {
       const member = this.conns.get(conn)?.member

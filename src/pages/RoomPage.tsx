@@ -20,7 +20,7 @@ import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
 import { Link } from '../lib/router.tsx'
 import { useCompact } from '../lib/useMediaQuery.ts'
 import { useRoom } from '../lib/useRoom.ts'
-import { memberName } from '../lib/memberName.ts'
+import { memberName, withBotNames } from '../lib/memberName.ts'
 import { useParams } from '../lib/useRouter.ts'
 import { clippedFill, displayType, monoType, SLANT, slantClip } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
@@ -193,7 +193,8 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
   // From here on the room itself says: the summary was read before this person joined
   const { view, you } = session
   const parts: RoomParts = {
-    view,
+    // Computer members by the names people read (the screens show `member.name` as it is)
+    view: withBotNames(view),
     you,
     timers: room.timers,
     onSit: room.sit,

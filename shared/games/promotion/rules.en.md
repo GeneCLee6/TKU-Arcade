@@ -47,3 +47,7 @@ With four six-sided dice, count how many show a red face. The 1 and the 4 are re
 ## Players
 
 Two to six players. Games with more players run longer. If someone drops out, the host can skip their turns or roll for them, since no turn holds a decision.
+
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats, at **Easy** or **Normal**. They roll on their own turn after a short pause. In the full edition, Normal takes an offered post or buys an office only when it stands better for it; Easy decides those on a coin flip.

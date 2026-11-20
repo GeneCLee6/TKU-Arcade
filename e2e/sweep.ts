@@ -186,6 +186,7 @@ export async function table(
   count: number,
   screen: Screen,
   problems: Problems,
+  options?: Record<string, unknown>,
 ): Promise<Seat[]> {
   const seats: Seat[] = []
   const names = ['Ann', 'Bob', 'Cy', 'Dee', 'Eve', 'Fay']
@@ -195,7 +196,7 @@ export async function table(
     watchConsole(page, seat.name, problems)
     await seat.relay()
     if (index === 0) {
-      const response = await page.request.post('/api/rooms', { data: { gameId } })
+      const response = await page.request.post('/api/rooms', { data: options ? { gameId, options } : { gameId } })
       expect(response.ok(), `create a ${gameId} room`).toBe(true)
       const { id } = (await response.json()) as { id: string }
       await page.goto(`/r/${id}`)

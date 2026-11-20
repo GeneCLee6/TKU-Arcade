@@ -262,6 +262,12 @@ export type GameMeta = {
    * trial, 2026-11-14)
    */
   tryAlone?: string
+  /**
+   * The room plays computer seats for this game itself (`GameModule.bot`, 2026-11-20): the waiting
+   * room offers the host to add them. Here, not only on the module, because the browser never
+   * loads a module (tests/games/table-bots.test.ts keeps the two in step)
+   */
+  computer?: true
 }
 
 /**
@@ -351,6 +357,23 @@ export interface GameModule<
    * them when the host goes
    */
   bots?: { levels: readonly string[]; names: readonly string[] }
+
+  /**
+   * A computer seat's move, worked out by the room itself (2026-11-20, docs/ARCHITECTURE.md "電腦玩家"):
+   * with this, the room plays its computer members in the Durable Object, a moment after their turn
+   * comes, instead of leaving them to the host's browser (`bots` above names and levels them either
+   * way). It gets exactly what that seat's browser would: its own `view` and its `legal` actions,
+   * never the state, so a computer player knows no more than a person in its seat. `rng` is the
+   * room's, not the game's: what was chosen goes into the steps like anyone's action. Answer one of
+   * `legal` (or another action `reduce` accepts from that seat, such as holdem's vote to stop), or
+   * null to let the room pick one of `legal` at random. Must not throw; the room survives it if it
+   * does. Pure, like the rest of the module.
+   *
+   * Asked on the seat's turn, and also with `legal` empty, out of turn, after every change, where
+   * it must be cheap and answer null unless the seat has something to do anyway (holdem's coming
+   * back from sitting out after its clock ran out while nobody was watching).
+   */
+  bot?(view: V, legal: readonly A[], level: string, rng: Rng): A | null
 }
 
 /**
