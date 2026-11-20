@@ -52,6 +52,7 @@ import {
 } from '../../shared/kart/timeTrial.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
 import { startRun, stepRun, type Run, type Spot } from '../../shared/kart/course.ts'
+import { countdownShot } from './director.ts'
 import {
   actionKeys,
   activeControls,
@@ -349,6 +350,11 @@ export interface SpikeNet {
   readonly laps: number
   /** Seconds to GO by the room's shared clock; null while the start is not set yet */
   countdown(): number | null
+  /**
+   * 2026-11-20: every racer's place on the grid, the pole first: the countdown's camera starts with
+   * the whole grid in view (director.ts)
+   */
+  readonly gridSpots?: () => readonly Spot[]
   /** After each step: the race so far, the input it ran with, and whether the kart was reset */
   afterStep(trial: Trial, input: KartInput, reset: boolean): void
   /** The other karts as drawn now, to bump into (e9-t09) */
@@ -574,6 +580,10 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let statsFrom: number | undefined
   let statsFrames = 0
   let slowest = 0
+
+  // Whether a shot of director.ts's was last given to the scene
+  let directed = false
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
 
   let firstFrameAt: number | null = null
   let loadMs = 0
@@ -805,6 +815,18 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       for (const cue of hitFrame.cues) audio.cue(cue)
     }
     if (net) scene.others(net.others(), frameMs / 1000)
+    // 2026-11-20: the countdown starts on the whole grid, and glides down behind this kart
+    const shot =
+      net?.gridSpots && trial?.phase === 'countdown'
+        ? countdownShot(
+            net.gridSpots(),
+            net.countdown(),
+            reducedMotion?.matches ?? false,
+            current.y ?? 0,
+          )
+        : null
+    if (shot || directed) scene.shot(shot)
+    directed = shot !== null
     if (net?.props) scene.items(net.props(pose), frameMs / 1000)
     scene.draw(
       pose,

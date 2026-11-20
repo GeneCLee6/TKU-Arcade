@@ -88,7 +88,7 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
   boostMaxSeconds: { group: 'boost', min: 1, max: 12, step: 0.25, unit: 'seconds' },
   padBoostSeconds: { group: 'boost', min: 0, max: 4, step: 0.05, unit: 'seconds' },
 
-  startWindow: { group: 'technique', min: 0.05, max: 1, step: 0.05, unit: 'seconds' },
+  startWindow: { group: 'technique', min: 0.05, max: 2, step: 0.05, unit: 'seconds' },
   startBoostDuration: { group: 'technique', min: 0, max: 4, step: 0.05, unit: 'seconds' },
   startStallSeconds: { group: 'technique', min: 0, max: 2, step: 0.05, unit: 'seconds' },
   releaseWindow: { group: 'technique', min: 0.05, max: 1, step: 0.05, unit: 'seconds' },
@@ -396,11 +396,26 @@ export interface StoredTuning {
 }
 
 /** Reads what the page stored; anything broken gives the standard preset */
+/**
+ * 2026-11-20: the classic feel's start boost window was widened (0.5 s to 1 s before GO, 0.1 s to
+ * 0.25 s after it). Numbers saved from the panel before that carry the old defaults; those are taken
+ * as the new ones, so that a saved tuning does not keep the narrow window nobody chose
+ */
+function widenedStart(tuning: KartTuning): KartTuning {
+  if (tuning.model !== MODEL_CLASSIC) return tuning
+  return {
+    ...tuning,
+    ...(tuning.startWindow === 0.5 ? { startWindow: KART_TUNING.startWindow } : {}),
+    ...(tuning.startLate === 0.1 ? { startLate: KART_TUNING.startLate } : {}),
+  }
+}
+
 export function parseStoredTuning(stored: string | null): StoredTuning {
   if (stored === null) return { tuning: KART_TUNING, preset: 'standard' }
   const parsed = parseTuning(stored)
   if (!parsed.ok) return { tuning: KART_TUNING, preset: 'standard' }
-  return { tuning: parsed.tuning, preset: presetOf(parsed.tuning) }
+  const tuning = widenedStart(parsed.tuning)
+  return { tuning, preset: presetOf(tuning) }
 }
 
 const DRIFT_ENTRY_STEPS = 6

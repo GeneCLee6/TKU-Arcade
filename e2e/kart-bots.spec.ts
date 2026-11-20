@@ -10,6 +10,7 @@ test.setTimeout(240_000)
 
 interface RaceReading {
   counted: boolean
+  countdown: number | null
   others: number
   crossings: number
   pickups: number
@@ -51,6 +52,16 @@ test('one person races a computer kart in an item race, from the menu to the res
   await expect
     .poll(async () => (await race(page))?.counted ?? false, { timeout: 30_000 })
     .toBe(true)
+  // 2026-11-20: on its place on the grid and drawn there during the countdown, before GO
+  await expect
+    .poll(
+      async () => {
+        const reading = await race(page)
+        return (reading?.countdown ?? 0) > 0 ? (reading?.others ?? 0) : -1
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(1)
   // The bot's kart, drawn from the frames it sends the room
   await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 30_000 }).toBe(1)
   await expect(page.getByTestId('kart-item')).toBeVisible()

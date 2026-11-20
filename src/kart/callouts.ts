@@ -22,6 +22,8 @@ export type CalloutKind =
   | 'start'
   | 'quick'
   | 'stall'
+  // 2026-11-20: the throttle pressed just after the start boost's grace
+  | 'startLate'
   // 2026-11-18, the timing of the instant boost (docs/KART-FEEL.md §3.2): perfect, or late
   | 'perfect'
   | 'late'
@@ -72,9 +74,14 @@ export function calloutBetween(before: KartState, after: KartState): Callout | u
 
 /** How the car left the grid, worth a callout at GO; undefined for a plain start */
 export const calloutAtStart = (start: TrialStart): Callout | undefined =>
-  start === 'none'
-    ? undefined
-    : { kind: start === 'boost' ? 'start' : start === 'quick' ? 'quick' : 'stall', count: 0 }
+  start === 'none' ? undefined : { kind: START_CALLOUTS[start], count: 0 }
+
+const START_CALLOUTS = {
+  boost: 'start',
+  quick: 'quick',
+  stall: 'stall',
+  late: 'startLate',
+} as const satisfies Record<Exclude<TrialStart, 'none'>, CalloutKind>
 
 const RANK: Record<CalloutKind, number> = {
   drift: 0,
@@ -91,6 +98,7 @@ const RANK: Record<CalloutKind, number> = {
   start: 7,
   quick: 7,
   stall: 7,
+  startLate: 7,
   perfect: 5,
   late: 3,
   driftJump: 6,
