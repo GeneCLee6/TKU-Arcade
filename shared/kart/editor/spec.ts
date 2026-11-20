@@ -67,12 +67,31 @@ export type Piece = Straight | Turn | Slope | Jump
 /** The jump ramp's length, from the road to its lip, metres */
 export const RAMP_LENGTH = 14
 
+/**
+ * A bypass (2026-11-20, shared/kart/branches.ts): a road of its own beside the main road, from where
+ * piece `from` begins to where piece `to` ends, `offset` metres to one side of the middle (eased
+ * out and back in over BYPASS_EASE metres at each end), `width` wide
+ */
+export interface Bypass {
+  readonly from: number
+  readonly to: number
+  /** -1 left of the road, 1 right */
+  readonly side: -1 | 1
+  readonly offset: number
+  readonly width: number
+}
+
 export interface TrackSpec {
   /** What its maker called it; may be empty (the page then says "untitled") */
   readonly name: string
   readonly theme: TrackTheme
   readonly pieces: readonly Piece[]
+  /** Bypasses (2026-11-20); left out when there are none, as every older code has them */
+  readonly bypasses?: readonly Bypass[]
 }
+
+/** A bypass eases out from the road and back in over this many metres at each end */
+export const BYPASS_EASE = 70
 
 /** The limits a piece and a track are held to: the editor's controls and the checks use the same */
 export const LIMITS = {
@@ -104,6 +123,12 @@ export const LIMITS = {
   maxJump: 200,
   minJumpHeight: 1,
   maxJumpHeight: 4,
+  // Bypasses (2026-11-20)
+  maxBypasses: 3,
+  minBypassOffset: 20,
+  maxBypassOffset: 90,
+  minBypassWidth: 10,
+  maxBypassWidth: 30,
 } as const
 
 /** Rounds to the tenth that every number in a spec is kept to */

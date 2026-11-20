@@ -4,6 +4,7 @@
 // facing the karts that come at it and pointing the way it goes: the corner reads from far off, and
 // the boards rushing by are what makes it feel fast. Worked out from the road alone, so every track
 // has them, a custom one from the editor too. Pure: the same road, the same boards.
+import { routeRoad, type Fork } from './branches.ts'
 import { roadClearance } from './scenery.ts'
 import type { RoadPoint } from './track.ts'
 
@@ -280,4 +281,24 @@ export function gatePosts(road: readonly RoadPoint[]): GatePost[] {
     }
   }
   return posts
+}
+
+/**
+ * The arrow boards along a track's branches (2026-11-20, branches.ts): each branch's corners, worked
+ * out on the route down that branch alone and kept where they stand beside the branch, clear of
+ * every road. Each with the road's height there. None on a track without branches
+ */
+export function branchCornerSigns(
+  track: { readonly road: readonly RoadPoint[]; readonly forks?: readonly Fork[] },
+  share = 1,
+): (CornerSign & { readonly y: number })[] {
+  return (track.forks ?? []).flatMap((_, k) => {
+    const route = routeRoad(track, [k])
+    return cornerSigns(route.road, share).flatMap((sign) =>
+      route.from[sign.index]!.fork === k &&
+      roadClearance(track.road, sign.x, sign.z) >= SIGN_OFFSET * 0.6
+        ? [{ ...sign, y: route.road[sign.index]!.y ?? 0 }]
+        : [],
+    )
+  })
 }

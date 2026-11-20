@@ -380,7 +380,7 @@ export default function ReplayView({ replay, nameOf, you, onClose }: ReplayViewP
         }
       />
       <MapCorner>
-        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} />
+        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} />
       </MapCorner>
       <WatchControls
         t={t}

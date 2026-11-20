@@ -11,6 +11,7 @@ import {
   MeshLambertMaterial,
   PlaneGeometry,
 } from 'three'
+import { pathDirection } from '../../../shared/kart/branches.ts'
 import { groundAt, terrainOf, type Terrain } from '../../../shared/kart/terrain.ts'
 import { roadDirection, trackBounds, type Track } from '../../../shared/kart/track.ts'
 import { kartScene } from '../../styles/kartTokens.ts'
@@ -33,13 +34,23 @@ const MARGIN = 260
  */
 function groundTerrain(terrain: Terrain): Terrain {
   const points = terrain.points.map((point) => ({ ...point }))
+  const forks = terrain.forks?.map((fork) => fork.map((point) => ({ ...point })))
   const count = points.length
   for (const lip of terrain.lips) {
+    // A branch's ramp (2026-11-20): on its own centre line, which is open at both ends
+    if (lip.fork !== undefined) {
+      const line = forks?.[lip.fork]
+      if (!line) continue
+      const foot = line[Math.max(0, lip.index - 2)]!.y
+      line[Math.max(0, lip.index - 1)]!.y = foot
+      line[lip.index]!.y = foot
+      continue
+    }
     const foot = points[(lip.index - 2 + count) % count]!.y
     points[(lip.index - 1 + count) % count]!.y = foot
     points[lip.index]!.y = foot
   }
-  return { points, lips: [] }
+  return forks ? { points, lips: [], forks, halves: terrain.halves ?? [] } : { points, lips: [] }
 }
 
 /**
@@ -112,17 +123,22 @@ export function buildJumpRamps(kit: ArtKit): Mesh[] {
   const { track, keep, own, textures } = kit
   const terrain = terrainOf(track)
   if (!terrain || terrain.lips.length === 0) return []
-  const { road } = track
-  const count = road.length
   const top: { p: number[]; uv: number[]; i: number[] } = { p: [], uv: [], i: [] }
   const sides: { p: number[]; uv: number[]; i: number[] } = { p: [], uv: [], i: [] }
   for (const lip of terrain.lips) {
-    const foot = (lip.index - 2 + count) % count
-    const rampPoints = [foot, (lip.index - 1 + count) % count, lip.index]
+    // A branch's ramp (2026-11-20) stands on the branch's own, open centre line
+    const branch = lip.fork === undefined ? null : track.forks?.[lip.fork]
+    if (lip.fork !== undefined && !branch) continue
+    const road = branch ? branch.path : track.road
+    const count = road.length
+    const step = (index: number) =>
+      branch ? Math.max(0, index) : ((index % count) + count) % count
+    const foot = step(lip.index - 2)
+    const rampPoints = [foot, step(lip.index - 1), lip.index]
     const base = road[foot]!.y ?? 0
     const edges = rampPoints.map((index) => {
       const point = road[index]!
-      const { dx, dz } = roadDirection(road, index)
+      const { dx, dz } = branch ? pathDirection(road, index, false) : roadDirection(road, index)
       const half = point.width / 2 - 0.9
       const y = (point.y ?? 0) + 0.12
       return {

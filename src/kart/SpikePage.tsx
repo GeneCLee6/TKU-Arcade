@@ -552,7 +552,7 @@ export function SpikePage({
               }}
             />
           )}
-          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} walls={track.walls} />
+          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} walls={track.walls} />
         </MapCorner>
       )}
       <TouchControls t={t} touch={touch} />

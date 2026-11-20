@@ -38,6 +38,7 @@ import {
   type KartState,
   type KartTuning,
 } from './physics.ts'
+import { pathDirection, type Fork } from './branches.ts'
 import { gateCrossing, roadDirection, type Gate, type RoadPoint } from './track.ts'
 
 /** The terrain's own numbers, apart from KART_TUNING so that the tuning panel and presets stay as they were */
@@ -77,8 +78,10 @@ export type TerrainTuning = { readonly [K in keyof typeof TERRAIN_TUNING]: numbe
 
 /** A jump lip: the line across the road the car leaves the ground from */
 export interface Lip {
-  /** The road point it is at */
+  /** The road point it is at (of its branch's centre line, on a branch) */
   readonly index: number
+  /** On a track with branches (2026-11-20): the branch it is on; absent on the main road */
+  readonly fork?: number
   readonly x: number
   readonly z: number
   /** The road's direction there, unit */
@@ -92,23 +95,41 @@ export interface Lip {
   readonly gate: Gate
 }
 
+export interface TerrainPoint {
+  readonly x: number
+  readonly z: number
+  readonly y: number
+}
+
 export interface Terrain {
   /** The centre line with heights, as the track has it; missing heights are 0 */
-  readonly points: readonly { readonly x: number; readonly z: number; readonly y: number }[]
+  readonly points: readonly TerrainPoint[]
   readonly lips: readonly Lip[]
+  /**
+   * On a track with branches (2026-11-20, branches.ts): each branch's centre line with heights and
+   * half widths, and the main road's half widths. The ground is then the road a place is deepest
+   * inside, not merely the nearest centre line (two roads run side by side). Absent on any other
+   */
+  readonly forks?: readonly (readonly (TerrainPoint & { readonly half: number })[])[]
+  readonly halves?: readonly number[]
+}
+
+type TerrainSource = {
+  readonly road: readonly RoadPoint[]
+  readonly jumps?: readonly number[]
+  readonly forks?: readonly Pick<Fork, 'path' | 'jumps'>[]
 }
 
 /** Whether a track has any terrain: a height on any road point, or a jump */
-export const hasTerrain = (track: {
-  readonly road: readonly RoadPoint[]
-  readonly jumps?: readonly number[]
-}): boolean => (track.jumps?.length ?? 0) > 0 || track.road.some((point) => point.y !== undefined)
+export const hasTerrain = (track: TerrainSource): boolean =>
+  (track.jumps?.length ?? 0) > 0 ||
+  track.road.some((point) => point.y !== undefined) ||
+  (track.forks ?? []).some(
+    (fork) => fork.jumps.length > 0 || fork.path.some((point) => point.y !== undefined),
+  )
 
 /** The terrain of a track; null for a flat one, which then never comes here */
-export function terrainOf(track: {
-  readonly road: readonly RoadPoint[]
-  readonly jumps?: readonly number[]
-}): Terrain | null {
+export function terrainOf(track: TerrainSource): Terrain | null {
   if (!hasTerrain(track)) return null
   const { road } = track
   const points = road.map((point) => ({ x: point.x, z: point.z, y: point.y ?? 0 }))
@@ -133,7 +154,39 @@ export function terrainOf(track: {
       },
     }
   })
-  return { points, lips }
+  const forks = track.forks ?? []
+  if (forks.length === 0) return { points, lips }
+  forks.forEach((fork, k) => {
+    for (const index of fork.jumps) {
+      const point = fork.path[index]!
+      const { dx, dz } = pathDirection(fork.path, index, false)
+      const half = point.width / 2
+      lips.push({
+        index,
+        fork: k,
+        x: point.x,
+        z: point.z,
+        dx,
+        dz,
+        y: point.y ?? 0,
+        half,
+        gate: {
+          ax: point.x + dz * (half + 1),
+          az: point.z - dx * (half + 1),
+          bx: point.x - dz * (half + 1),
+          bz: point.z + dx * (half + 1),
+        },
+      })
+    }
+  })
+  return {
+    points,
+    lips,
+    halves: road.map((point) => point.width / 2),
+    forks: forks.map((fork) =>
+      fork.path.map((point) => ({ x: point.x, z: point.z, y: point.y ?? 0, half: point.width / 2 })),
+    ),
+  }
 }
 
 export interface Ground {
@@ -151,6 +204,7 @@ export interface Ground {
  * and that segment's slope. The road being flat across, the slope points along the road
  */
 export function groundAt(terrain: Terrain, x: number, z: number): Ground {
+  if (terrain.forks) return groundOfRoads(terrain, terrain.forks, x, z)
   const { points } = terrain
   const count = points.length
   let best = Infinity
@@ -172,6 +226,49 @@ export function groundAt(terrain: Terrain, x: number, z: number): Ground {
     ground = { y: a.y + (b.y - a.y) * t, gx: rise * sx, gz: rise * sz, distance: 0 }
   }
   return { ...ground, distance: Math.sqrt(best) }
+}
+
+/**
+ * The ground on a track with branches: of the road (x, z) is deepest inside, the nearest segment's
+ * height and slope; `distance` is still to the nearest centre line
+ */
+function groundOfRoads(
+  terrain: Terrain,
+  forks: NonNullable<Terrain['forks']>,
+  x: number,
+  z: number,
+): Ground {
+  let bestDepth = -Infinity
+  let nearest = Infinity
+  let ground: Ground = { y: terrain.points[0]?.y ?? 0, gx: 0, gz: 0, distance: Infinity }
+  const visit = (
+    points: readonly TerrainPoint[],
+    half: (index: number) => number,
+    closed: boolean,
+  ) => {
+    const count = points.length
+    const last = closed ? count : count - 1
+    for (let index = 0; index < last; index++) {
+      const a = points[index]!
+      const b = points[(index + 1) % count]!
+      const sx = b.x - a.x
+      const sz = b.z - a.z
+      const lengthSq = sx * sx + sz * sz
+      if (lengthSq === 0) continue
+      const t = Math.max(0, Math.min(1, ((x - a.x) * sx + (z - a.z) * sz) / lengthSq))
+      const distance = Math.hypot(x - (a.x + sx * t), z - (a.z + sz * t))
+      nearest = Math.min(nearest, distance)
+      const depth = half(index) + (half((index + 1) % count) - half(index)) * t - distance
+      if (depth <= bestDepth) continue
+      bestDepth = depth
+      const rise = (b.y - a.y) / lengthSq
+      ground = { y: a.y + (b.y - a.y) * t, gx: rise * sx, gz: rise * sz, distance: 0 }
+    }
+  }
+  const halves = terrain.halves ?? []
+  visit(terrain.points, (index) => halves[index] ?? 0, true)
+  for (const fork of forks) visit(fork, (index) => fork[index]!.half, false)
+  return { ...ground, distance: nearest }
 }
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value))

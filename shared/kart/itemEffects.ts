@@ -80,7 +80,7 @@ export function warpRun(run: Run, warp: Warp, track: Track): Run {
     },
     nextGate: warp.nextGate,
     crossings: warp.crossings,
-    safe: safeBehind(track, warp.nextGate),
+    safe: safeBehind(track, warp.nextGate, warp.x, warp.z),
     candidate: null,
     candidateSeconds: 0,
     resets: run.resets + 1,

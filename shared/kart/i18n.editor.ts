@@ -117,6 +117,8 @@ const en = {
     'The loop ends {gap} m off the height it starts at: the climbs and falls must add up to zero.',
   'kart.editor.problem.high': 'The road climbs or falls more than {max} m from the start line.',
   'kart.editor.problem.steep': 'Too steep a slope: at most {rise} m up or down over this length.',
+  'kart.editor.problem.bypass':
+    'A bypass has no room here: it must leave the road, run clear of it and of itself, and come back.',
 }
 
 export type KartEditorKey = keyof typeof en
@@ -231,6 +233,7 @@ const zhTW: Record<KartEditorKey, string> = {
   'kart.editor.problem.level': '繞一圈回來高度差了 {gap} m：上坡和下坡加起來要是零。',
   'kart.editor.problem.high': '路面比起終點線高或低超過 {max} m。',
   'kart.editor.problem.steep': '坡太陡了：這個長度最多上下 {rise} m。',
+  'kart.editor.problem.bypass': '這條岔路放不下：它要離開主路、不碰主路也不碰自己，再接回來。',
 }
 
 export const KART_EDITOR_MESSAGES = { en, 'zh-TW': zhTW }

@@ -18,6 +18,7 @@ import {
 } from 'three'
 import {
   apexKerbs,
+  branchCornerSigns,
   brakeBoards,
   cornerSigns,
   gatePosts,
@@ -74,7 +75,11 @@ function arrowTexture(way: -1 | 1): CanvasTexture {
  */
 export function buildCornerSigns(kit: ArtKit, heightAt: (index: number) => number): void {
   const { track, level, group, keep, own, ownTexture, standard, shadowed, place } = kit
-  const signs = cornerSigns(track.road, level.density)
+  // 2026-11-20: and along each branch, at the branch's own heights
+  const signs = [
+    ...cornerSigns(track.road, level.density).map((sign) => ({ ...sign, y: heightAt(sign.index) })),
+    ...branchCornerSigns(track, level.density),
+  ]
   if (signs.length === 0) return
   const boardGeometry = keep(new PlaneGeometry(BOARD_WIDTH, BOARD_HEIGHT))
   for (const way of [-1, 1] as const) {
@@ -94,7 +99,7 @@ export function buildCornerSigns(kit: ArtKit, heightAt: (index: number) => numbe
         boards,
         index,
         sign.x,
-        heightAt(sign.index) + BOARD_FOOT + BOARD_HEIGHT / 2,
+        sign.y + BOARD_FOOT + BOARD_HEIGHT / 2,
         sign.z,
         [1, 1, 1],
         -sign.heading,
@@ -125,7 +130,7 @@ export function buildCornerSigns(kit: ArtKit, heightAt: (index: number) => numbe
         posts,
         index * 2 + slot,
         at.x,
-        heightAt(sign.index) + (BOARD_FOOT + BOARD_HEIGHT * 0.5) / 2,
+        sign.y + (BOARD_FOOT + BOARD_HEIGHT * 0.5) / 2,
         at.z,
         [1, 1, 1],
         -sign.heading,

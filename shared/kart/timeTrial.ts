@@ -24,6 +24,7 @@ import {
   type KartRules,
   type KartTuning,
 } from './physics.ts'
+import { placeOnTrack } from './branches.ts'
 import { roadDirection, type RoadPoint } from './track.ts'
 
 /** 3, 2, 1, then GO */
@@ -121,10 +122,15 @@ export function goingBackwards(
   z: number,
   vx: number,
   vz: number,
+  /** On a track with branches (2026-11-20): each branch's centre line; the road the car is on counts */
+  branches?: readonly (readonly RoadPoint[])[],
 ): boolean {
   const speed = Math.hypot(vx, vz)
   if (speed < WRONG_WAY_SPEED) return false
-  const { dx, dz } = roadDirection(road, nearestRoadPoint(road, x, z))
+  const { dx, dz } =
+    branches && branches.length > 0
+      ? placeOnTrack(road, branches, x, z)
+      : roadDirection(road, nearestRoadPoint(road, x, z))
   return (vx * dx + vz * dz) / speed < WRONG_WAY_DOT
 }
 
@@ -196,7 +202,14 @@ export function stepTrial(
     laps = [...laps, steps - lapStartedAt]
     lapStartedAt = steps
   }
-  const backwards = goingBackwards(course.road, run.kart.x, run.kart.z, run.kart.vx, run.kart.vz)
+  const backwards = goingBackwards(
+    course.road,
+    run.kart.x,
+    run.kart.z,
+    run.kart.vx,
+    run.kart.vz,
+    course.branches,
+  )
   const wrongSeconds = backwards ? trial.wrongSeconds + STEP_SECONDS : 0
   const finished = laps.length >= course.checkpoints.laps
   return {

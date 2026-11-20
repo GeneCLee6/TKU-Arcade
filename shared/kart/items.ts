@@ -9,7 +9,7 @@
 //
 // Pure and shared: the browser and the Worker read the same boxes, frames and table.
 import { KART_TUNING } from './physics.ts'
-import type { Spot } from './course.ts'
+import { respawnNear, type Spot } from './course.ts'
 import { courseOf, type Track } from './track.ts'
 
 export const ITEM_IDS = [
@@ -245,11 +245,17 @@ export type Warp = {
   crossings: number
 }
 
-/** The respawn point behind gate `nextGate`: where a reset puts a kart after a swap */
-export function safeBehind(track: Track, nextGate: number): Spot {
+/**
+ * The respawn point behind gate `nextGate`: where a reset puts a kart after a swap. On a track with
+ * branches (2026-11-20), that gate's respawn point nearest (x, z), where the swap put it
+ */
+export function safeBehind(track: Track, nextGate: number, x?: number, z?: number): Spot {
   const checkpoints = courseOf(track).checkpoints!
   const count = checkpoints.gates.length
-  return checkpoints.respawns[(nextGate - 1 + count) % count]!
+  const gate = (nextGate - 1 + count) % count
+  return x === undefined || z === undefined
+    ? checkpoints.respawns[gate]!
+    : respawnNear(checkpoints, gate, x, z)
 }
 
 /** The top speed a tow may reach, m/s */
