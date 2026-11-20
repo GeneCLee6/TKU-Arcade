@@ -1,6 +1,6 @@
-# SECURITY — 安全複查（P1，`e12-t13`）
+# SECURITY — 安全複查（P1，`e12-t13`）與濫用防護（`e12-t06`）
 
-2026-11-19 的複查結論。範圍：WebSocket 來源檢查、CSP 與其他安全標頭、依賴、房間 API 的速率限制、擁有者端點的權限。下一次複查（或新增對外端點、外部資源）時照這份的表格逐項重看。
+2026-11-19 的複查結論，2026-11-20 補上 `e12-t06` 的濫用防護（§6、§7、§9）。範圍：WebSocket 來源檢查、CSP 與其他安全標頭、依賴、房間 API 的速率限制、擁有者端點的權限。下一次複查（或新增對外端點、外部資源）時照這份的表格逐項重看。
 
 ## 1. 結論一覽
 
@@ -10,8 +10,10 @@
 | CSP | 原本沒有 | 加上（§3），`_headers` 由 build 產生 |
 | 其他安全標頭 | 原本沒有 | `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Cross-Origin-Opener-Policy`、`X-Frame-Options`（§4） |
 | 依賴 | `npm audit`：0 個弱點 | 沒有安全更新要做，沒升級（§5） |
-| 建房速率 | 原本沒有限制 | 每個 Worker instance 每個位址每分鐘 30 間（§6）；PRD 的「每 IP 每分鐘 5 間、跨 instance」仍是 `e12-t06` |
-| 擁有者端點 | `/api/stats` 要 `STATS_KEY` | 新的 `/api/admin/flags`、`/api/admin/usage` 共用同一個檢查（`worker/owner.ts`）（§7） |
+| 建房速率 | 原本沒有限制 | 每個 Worker instance 每個位址每分鐘 30 間（§6）；`e12-t06` 加上跨 instance 的每位址每分鐘 5 間 |
+| 連線上限 | 每房 72 條／64 人 | `e12-t06`：每房每位址 24 條、每位址每分鐘 120 次升級（§6） |
+| 暱稱 | 濾控制字元、方向覆寫、長度 | `e12-t06`：再濾零寬與隱形字元、擋冒充與基本髒話，伺服器端也檢查（§9） |
+| 擁有者端點 | `/api/stats` 要 `STATS_KEY` | 新的 `/api/admin/flags`、`/api/admin/usage` 共用同一個檢查（`worker/owner.ts`）；`e12-t06` 加上錯 5 次鎖一分鐘、比對不洩漏長度（§7） |
 
 ## 2. WebSocket 來源檢查
 
@@ -88,23 +90,29 @@ frame-ancestors 'none'
 
 建議在沒有其他分支開著的時候開一個小 PR 一次升 patch／minor（`npm update`），跑完整 CI 與 e2e。
 
-## 6. 速率限制現況
+## 6. 速率限制與連線上限現況
 
 | 端點 | 限制 | 在哪 |
 | --- | --- | --- |
-| `POST /api/rooms`（開房） | **每個 Worker instance、每個位址每分鐘 30 間，instance 合計 600 間**，超過 429（`retry-after: 60`）。這批加的 | `worker/rooms.ts`、`worker/rate-limit.ts` |
+| `POST /api/rooms`（開房） | **每位址每分鐘 5 間**，所有 instance、所有機房共用（`LimiterDO`，`e12-t06`）；前面還有每 instance 每位址 30 間、instance 合計 600 間的記憶體限制（`e12-t13`）。超過 429（`retry-after: 60`），大廳 toast「你所在的網路剛開了太多房間」 | `worker/rooms.ts`、`worker/rate-limit.ts` |
+| `/ws/<id>`（WebSocket 升級） | **每位址每分鐘 120 次**（`LimiterDO`）；超過時接受再以 **4429** `tooManyConnections` 關閉，不叫醒房間 | `worker/rooms.ts` |
+| WebSocket（房內） | 每房 `MAX_CONNECTIONS`（72）條、`MAX_MEMBERS`（64）人；**每房每位址 `MAX_CONNECTIONS_PER_ADDRESS`（24）條**（含旁觀，`e12-t06`），超過 4429 | `RoomHost.admit` |
+| 擁有者金鑰 | 每位址每分鐘錯 5 次後鎖一分鐘（§7） | `worker/owner.ts` |
 | `POST /api/errors` | 每位址每分鐘 10 則、instance 合計 120 則 | `worker/errors.ts` |
-| 聊天 | 每人每 10 秒 10 則 | `shared/chat.ts`、`RoomHost` |
+| 聊天 | 每人每 10 秒 10 則、每則 500 字 | `shared/chat.ts`、`RoomHost` |
 | 表情 | 每人間隔 `REACTION_MIN_MS` | `RoomHost` |
 | 房間密碼 | 錯 `PASSWORD_TRIES` 次關掉 socket | `RoomHost` |
-| WebSocket | 每房 `MAX_CONNECTIONS` 條、`MAX_MEMBERS` 人 | `RoomHost.admit` |
 | `GET /api/lobby`、`GET /api/rooms/<id>`、`GET /api/codes/<code>`、`GET /api/flags` | **沒有** | — |
 | `/api/telemetry` | 只收區間計數，見 `worker/telemetry.ts` | — |
 
 說明：
 
-- 記憶體裡的固定視窗：每個 instance 各算各的，instance 重啟就忘，所以不精確；它只防一個位址的腳本灌爆免費額度，不需要儲存，位址也不落地。30 間遠高於真人，也高於從一台電腦跑整套 Playwright（e2e 一個 worker 一分鐘開不到十幾間房）。
-- PRD 的「每 IP 每分鐘 5 間、跨 instance」與暱稱過濾、管理頁權限的其餘部分仍是 `e12-t06`（M1，未做）。要做跨 instance 的精確限制可以用 Cloudflare 的 Rate Limiting binding（`ratelimits`）或 LobbyDO 計數。
+- **位址**：`CF-Connecting-IP`，IPv4 整個、IPv6 取 /64（一個家或一支手機拿到整段 /64，可以在裡面換位址），加前綴後 SHA-256，只留前 16 個十六進位字（`worker/address.ts`）。完整位址不存、不寫日誌；雜湊只當 rate limiter 的 key（Cloudflare 那邊只留一分鐘的計數）和房間記憶體裡的連線計數（socket 的 attachment，連線關掉就沒了）。
+- **LimiterDO**（`worker/limiter.ts`，DO migration `v2`）：依位址雜湊的第一個字分 16 個物件，每個物件在記憶體裡對每個桶（`create`／`socket`／`ownerFail`，數字在 `worker/rate-limit.ts` 的 `SHARED_LIMITS`）做每分鐘的固定視窗，**不寫儲存**；物件被回收就忘掉，只會讓人早點能再試。所有 instance 與機房都問同一個物件，所以計數精確。物件不存在（沒有 binding）或出錯時放行（限制器壞掉不該把網站一起拖垮），只剩每 instance 的記憶體限制。代價：每次建房、每次 WebSocket 升級、每次錯的金鑰多一次 DO 請求（免費額度每日 10 萬次）。
+- **為什麼不用 Cloudflare 的 Rate Limiting binding**：先做過（`ratelimits`，#110 的第一版）：部署成功、binding 有列出，但預覽站的日誌顯示同一個 key 連打 25 次都回 `success: true`，在這個帳號上沒有作用。它本來也只在單一機房內共用、最終一致。
+- **本機**：127.0.0.1、::1 不經 LimiterDO（Cloudflare 不會報這種位址），所以 `npm run dev` 與整套瀏覽器測試不會被擋。
+- **共用位址**：同一個校園 Wi-Fi 或手機網路的人共用位址。5 間／分鐘、120 次升級／分鐘、每房 24 條是照「一桌朋友在同一個 Wi-Fi」抓的；「再來一局」與換遊戲都不算建房。
+- **聊天以外的文字**：遊戲內的文字輸入都由規則在伺服器限長度、也只在該輪能送（撞詞與搭橋的提示 12 字、撞詞猜答 20 字、光譜的答案 30 字：`shared/games/*/clue.ts`、`answer.ts`），所以不另外限速率；每則訊息還有 `MAX_CLIENT_MESSAGE_CHARS`。沒有題目投稿、卡丁車名牌；卡丁車編輯器的分享碼只在瀏覽器解析。
 - GET 端點沒有限制：它們只讀、回應很小，Cloudflare 的 DDoS 防護在前面；成本儀表板會先看到異常（每日 Workers 請求 80% 警示）。
 
 ## 7. 擁有者端點
@@ -112,7 +120,8 @@ frame-ancestors 'none'
 `/api/stats`、`/api/admin/flags`（GET／PUT）、`/api/admin/usage` 都走 `worker/owner.ts` 的 `ownerRefusal`：
 
 - 沒有 `STATS_KEY` secret → 404（站上看不出有這些端點）。
-- 金鑰用 `Authorization: Bearer <key>`，固定時間比對；別的網站的頁面不能讓瀏覽器帶這個標頭，所以 PUT 沒有 CSRF 問題（跨站的帶自訂標頭請求要過 CORS preflight，本站不回 CORS 標頭）。
+- 金鑰用 `Authorization: Bearer <key>`，固定時間比對（`e12-t06` 起連長度都不洩漏：時間只看正確金鑰的長度）；**不在網址裡**，所以不會出現在 Worker 日誌或瀏覽器紀錄，Worker 也不 log 標頭；別的網站的頁面不能讓瀏覽器帶這個標頭，所以 PUT 沒有 CSRF 問題（跨站的帶自訂標頭請求要過 CORS preflight，本站不回 CORS 標頭）。
+- **暴力嘗試**（`e12-t06`）：同一個位址一分鐘內錯 5 次（`LimiterDO`，或單一 instance 的記憶體計數）之後，這個 instance 一分鐘內對它一律回 429（`retry-after: 60`），**連對的金鑰也一樣**；別的 instance 在它下一次錯的時候就知道（LimiterDO 已經超過）。對的金鑰從不計數。`/stats` 顯示「金鑰錯太多次了」。金鑰本身應該是長的隨機字串（`DEPLOY.md` §12）。
 - 金鑰存在擁有者那台瀏覽器的 localStorage（`/stats` 的「忘記這個瀏覽器的金鑰」可清掉）。
 - Cloudflare 的 API token（成本儀表板）只在 Worker 的 secret，**不進前端、不進 repo**；建議只給 Account Analytics 讀取權限（`DEPLOY.md` §13）。
 
@@ -125,3 +134,28 @@ PR 預覽站（`tku-arcade-pr-107`）：
 - CSP 沒擋任何東西：`e2e/csp.spec.ts`（`BASE_URL=<預覽> npx playwright test e2e/csp.spec.ts`）開大廳（等 Google Fonts 載完）、規則頁、`/stats`、兩個人經 WebSocket 開一局陞官圖、卡丁車 `/kart/spike` 低畫質 WebGL 自動駕駛並按鍵啟動 Web Audio，收集 console 的 CSP 訊息與 `securitypolicyviolation` 事件：**三個情境都是 0 筆**。反向驗證：同一頁面硬塞一段 inline script 與一個往 `example.com` 的 fetch，兩者都被擋、也都被收集到，表示監聽有效。
 
 本機（`vite` dev，真的 workerd `RoomDO` 與本機 D1，`STATS_KEY` 放 `.dev.vars`）測功能旗標：暫停卡丁車後 `POST /api/rooms` 403、大廳卡片標「維護中」且按鈕停用、`/stats` 按「重新開放」恢復；井字棋房開局後暫停，等過 30 秒快取，**當局照常下完到 `ended`**，「再來一局」回 `game_disabled`，換成陞官圖成功、換回井字棋回 `game_disabled`。預覽站沒有 `STATS_KEY`（每個預覽是新 Worker，沒有 secret），所以預覽站只驗了 `/api/admin/flags` 回 404、`/api/flags` 回空清單。
+
+## 9. 暱稱（`e12-t06`）
+
+`shared/protocol.ts` 的 `normalizeName`（瀏覽器送出前與伺服器收到時都跑）：
+
+- 刪控制字元、方向覆寫（原本就有），再刪**看不見的字元**：軟連字號、零寬空格與零寬不連字、方向標記、word joiner 與隱形運算子、韓文填充字、點字空白、BOM、tag 字元。零寬連字（ZWJ）只留在 emoji 中間（👩‍💻）。
+- 空白（含**全形空白**）收成一個半形空白、去頭尾；剩下沒有可見字元或超過 16 個字（code point）就不收。
+
+`shared/nickname.ts` 的 `nameProblem`，清單在 `shared/nickname-words.ts`（可以直接改；英文先做 NFKC 與小寫，`ＡＤＭＩＮ` 等於 `admin`）：
+
+- **冒充**：英文詞（admin、moderator、system、host、owner、official、tkuarcade…）要整個名字去掉非字母後剛好是那個字才擋（`admin_01`、`[System]` 擋；`Badminton`、`Hostess` 不擋）；中文詞（房主、管理員、系統、站長、官方、客服…）出現在名字任何地方就擋。
+- **髒話**：英文整個單字（shit、bitch…，`shiitake` 不擋）或任何位置都不會是正常字的（fuck、nigger…，含 `f.u.c.k`）；中文的明顯罵人詞組（幹你娘、操你媽、雞掰…）。**單字「幹」不擋**（幹部、能幹）。清單刻意短：它進每個人的首屏，而且擋到正常名字比漏掉創意拼法更糟；真的有人亂取名，房主可以踢。
+- 表單邊打邊提示（`nickname.reserved`／`nickname.blocked`／長度）；伺服器在 `join` 用同一套檢查（`acceptableName`），不過就當協定錯誤關閉（4422），因為正常的頁面送不出這種名字。localStorage 裡存的舊暱稱不合規時會重新問。登入帳號的名字來自牌桌、不經這個檢查。
+- 測試：`tests/worker/abuse.test.ts`（擋與不擋的例子都列了）、`tests/components/NicknameForm.test.tsx`。
+
+
+## 10. 實測（#110）
+
+PR 預覽站（`tku-arcade-pr-110`），從一台電腦（同一個 IPv6 /64）：
+
+- **建房**：連續 7 次 `POST /api/rooms` → `201 ×5、429 ×2`，429 帶 `Retry-After: 60`。第一版用 Rate Limiting binding 時同樣的測試是 25 次全部 201（日誌裡每次 `success: true`），所以換成 `LimiterDO`。
+- **WebSocket 升級**：對一個不存在的房間連續開 125 條 → 120 條 4404（找不到房間）、5 條 **4429**。
+- **每房每位址**：同一個房間開 26 條並送 `join` → 24 條留著、第 25、26 條 **4429**。
+- **暱稱**：`join` 送 `系統`、`Admin` → 4422；`A` + 零寬空格 + `l` → 正常加入。
+- **擁有者金鑰**：預覽沒有 `STATS_KEY`（端點 404），鎖定只有單元測試。

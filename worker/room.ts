@@ -16,6 +16,7 @@ import {
 } from '../shared/protocol.ts'
 import { parseAccount } from '../shared/account.ts'
 import type { Env } from './app.ts'
+import { ADDRESS_HEADER } from './address.ts'
 import { ACCOUNT_HEADER, decodeAccountHeader } from './auth.ts'
 import { LOBBY_NAME, lobbyReportDue, type LobbyReport } from './lobby-board.ts'
 import { RoomHost, type MemberRecord, type OpenSocket, type RoomRecord } from './room-host.ts'
@@ -201,7 +202,9 @@ export class RoomDO extends DurableObject<Env> {
       return new Response('Expected WebSocket', { status: 426 })
     }
     const { 0: client, 1: server } = new WebSocketPair()
-    const admission = this.host.admit(new URL(request.url).searchParams.get('v'))
+    // The Worker hashed the address and put it here (worker/rooms.ts); a browser's own is dropped there
+    const address = request.headers.get(ADDRESS_HEADER)
+    const admission = this.host.admit(new URL(request.url).searchParams.get('v'), address)
     if (!admission.ok) {
       // A hibernatable socket closed before the 101 goes out stays open in workerd, so a refused
       // one is a plain socket, closed once the upgrade is done
@@ -216,10 +219,11 @@ export class RoomDO extends DurableObject<Env> {
       conn: crypto.randomUUID(),
       openedAt: Date.now(),
       ...(account ? { account } : {}),
+      ...(address ? { address } : {}),
     }
     this.ctx.acceptWebSocket(server, [attachment.conn])
     server.serializeAttachment(attachment)
-    this.host.opened(attachment.conn, attachment.openedAt, account)
+    this.host.opened(attachment.conn, attachment.openedAt, account, address)
     await this.settle()
     return new Response(null, { status: 101, webSocket: client })
   }

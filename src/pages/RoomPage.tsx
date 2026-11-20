@@ -145,6 +145,10 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         )
       case 'full':
         return <Problem message={t('room.full')} />
+      case 'tooManyConnections':
+        return (
+          <Problem message={t('room.tooManyConnections')} action={<RetryButton onClick={retry} />} />
+        )
       case 'replaced':
         return <Problem message={t('room.replaced')} />
       case 'kicked':

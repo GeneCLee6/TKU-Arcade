@@ -34,6 +34,7 @@ export const zhTW: Messages = {
   'lobby.newRoom': '建立房間',
   'lobby.paused': '維護中暫停開放，稍後回來。',
   'lobby.newRoomFailed': '無法建立房間，請再試一次。',
+  'lobby.tooManyRooms': '你所在的網路剛開了太多房間，請等一分鐘再試。',
   'lobby.players.exact': '{count} 人',
   'lobby.players.range': '{min}–{max} 人',
   // D1：公開房、錯誤畫面與未知路徑
@@ -58,6 +59,8 @@ export const zhTW: Messages = {
   'notFound.home': '回到大廳',
   'nickname.dialogTitle': '取個暱稱',
   'nickname.invalid': '請輸入 1 到 {max} 個字。',
+  'nickname.reserved': '這個名字像是網站或房主，請換一個。',
+  'nickname.blocked': '請換一個友善一點的名字。',
   'nickname.label': '暱稱',
   'nickname.submit': '繼續',
   'room.backToLobby': '回到大廳',

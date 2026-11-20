@@ -19,6 +19,7 @@ type Loaded =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'denied' }
+  | { status: 'throttled' }
   | { status: 'off' }
   | { status: 'failed' }
   | { status: 'ready'; stats: StatsResponse }
@@ -28,6 +29,7 @@ async function fetchStats(key: string): Promise<Loaded> {
     const response = await fetch('/api/stats', { headers: { authorization: `Bearer ${key}` } })
     if (response.status === 404) return { status: 'off' }
     if (response.status === 403) return { status: 'denied' }
+    if (response.status === 429) return { status: 'throttled' }
     if (!response.ok) return { status: 'failed' }
     const stats = (await response.json()) as StatsResponse
     return Array.isArray(stats.rows) ? { status: 'ready', stats } : { status: 'failed' }
@@ -89,7 +91,9 @@ export function StatsPage() {
       <TopBar />
       <Main>
         <h1>{t('room.extra.stats.title')}</h1>
-        {(loaded.status === 'idle' || loaded.status === 'denied') && (
+        {(loaded.status === 'idle' ||
+          loaded.status === 'denied' ||
+          loaded.status === 'throttled') && (
           <form
             onSubmit={(event) => {
               event.preventDefault()
@@ -113,6 +117,9 @@ export function StatsPage() {
             </FieldRow>
             {loaded.status === 'denied' && (
               <FieldError role="alert">{t('room.extra.stats.denied')}</FieldError>
+            )}
+            {loaded.status === 'throttled' && (
+              <FieldError role="alert">{t('room.extra.stats.throttled')}</FieldError>
             )}
           </form>
         )}

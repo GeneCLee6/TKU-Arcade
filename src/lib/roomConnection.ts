@@ -22,6 +22,7 @@ export type RoomEnd =
   | 'versionMismatch'
   | 'notFound'
   | 'full'
+  | 'tooManyConnections'
   | 'connectionLost'
   | 'disconnected'
   | 'replaced'
@@ -134,6 +135,8 @@ function finalEnd(code: number): RoomEnd | null {
       return 'notFound'
     case CloseCode.roomFull:
       return 'full'
+    case CloseCode.tooManyConnections:
+      return 'tooManyConnections'
     default:
       return null
   }

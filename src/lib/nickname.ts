@@ -1,4 +1,4 @@
-import { normalizeName } from '../../shared/protocol.ts'
+import { acceptableName } from '../../shared/nickname.ts'
 import { readStored, writeStored } from './storage.ts'
 
 const STORAGE_KEY = 'tku-arcade.nickname'
@@ -8,7 +8,7 @@ let unsaved: string | null = null
 
 /** The stored nickname, or null when there is none or it no longer passes (hand-edited, old rules) */
 export function readNickname(): string | null {
-  return normalizeName(readStored(STORAGE_KEY)) ?? unsaved
+  return acceptableName(readStored(STORAGE_KEY)) ?? unsaved
 }
 
 /** What the person typed, normalized. Never the name the server answers: `Al (2)` would stick */
