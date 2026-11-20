@@ -6,6 +6,7 @@ import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { trackGuide } from '../../shared/kart/tracks/guides.ts'
 import { RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
 import type { KartMode } from '../../shared/games/kart/types.ts'
+import { DRIVERS, measure } from '../../scripts/kart/drivers.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
 import { botSeats, createBotRace } from '../../src/kart/bots/botRace.ts'
 import { IDLE_USE_MS, wantsToUse, type ItemSituation } from '../../src/kart/bots/itemSense.ts'
@@ -75,9 +76,58 @@ describe.each(RACE_TRACK_IDS)('bots alone on %s', (id) => {
   it('are faster the harder they are, lap for lap on average', () => {
     const lap = (difficulty: Difficulty) =>
       runs[difficulty].reduce((sum, run) => sum + run.total, 0) / (SEEDS.length * 3)
+    // 2026-11-20: the expert (expert.ts) above them all
+    expect(lap('expert')).toBeLessThan(lap('hard'))
     expect(lap('hard')).toBeLessThan(lap('normal'))
     expect(lap('normal')).toBeLessThan(lap('easy'))
   })
+})
+
+// 2026-11-20 (docs/ARCHITECTURE.md §4.40): the expert computer kart drives as the scripted master
+// does (src/kart/bots/drivers.ts), on the tracks to learn by heart too
+describe.each(['wharf', 'lanes'])('the expert computer kart on %s', (id) => {
+  it('laps within 5% of the master', () => {
+    const track = trackOf(id)
+    const expert = SEEDS.reduce((sum, seed) => sum + solo(track, 'expert', seed).total, 0)
+    const master = SEEDS.reduce(
+      (sum, seed) => sum + measure(track, DRIVERS.master, KART_TUNING, seed).seconds,
+      0,
+    )
+    expect(Math.abs(expert - master) / master).toBeLessThanOrEqual(0.05)
+  }, 60_000)
+})
+
+describe('the expert computer kart and the rubber band', () => {
+  it('eases off ahead of the people, its foot flat down or not', () => {
+    const track = trackOf('riverside')
+    const plain = courseOf(track)
+    const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
+    // Steps it lifts off on the straight, no boost burning, going faster than the share allows
+    const lifts = (speedShare: number) => {
+      const brain = createBotBrain(
+        BOT_SKILLS.expert,
+        track.road,
+        KART_TUNING,
+        1,
+        track.jumps,
+        track.walls,
+        trackGuide(track.id),
+      )
+      let trial = startTrial(course)
+      let count = 0
+      for (let step = 0; trial.phase !== 'finished' && step < 400 * 60; step++) {
+        const input = brain(trial, { speedShare })
+        const { kart } = trial.run
+        const calm = kart.boostSeconds === 0 && kart.miniSeconds === 0 && !kart.drifting
+        if (trial.phase === 'racing' && calm && !input.throttle) count++
+        trial = stepTrial(trial, input, course)
+      }
+      return count
+    }
+    const eased = bandedShare(BOT_SKILLS.expert.topSpeedShare, RUBBER_BAND.fullLead)
+    expect(eased).toBeLessThan(1)
+    expect(lifts(eased)).toBeGreaterThan(lifts(1) + 100)
+  }, 60_000)
 })
 
 /** A race of bots alone in a room of this browser's, on a counter for a clock */
