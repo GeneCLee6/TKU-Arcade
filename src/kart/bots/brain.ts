@@ -548,7 +548,9 @@ export function createBotBrain(
       kart.miniSeconds === 0 &&
       (kart.launchSeconds ?? 0) === 0 &&
       (kart.teamSeconds ?? 0) === 0
-    const cruising = calm && !skill.flatOut && speed > t.topSpeed * Math.min(1, sense.speedShare)
+    // The foot flat down (the scripted drivers, the expert) unless the rubber band eases it off
+    const flat = skill.flatOut === true && sense.speedShare >= 1
+    const cruising = calm && !flat && speed > t.topSpeed * Math.min(1, sense.speedShare)
     const gripSteer = clampSteer(noseWant / gripTurn)
     // Hands that do not mean to fire a dash that waits never press the throttle afresh by chance
     // (easing off at their own top speed and coming back on): the throttle stays as it was

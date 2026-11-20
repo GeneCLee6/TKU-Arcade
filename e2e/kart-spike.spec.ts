@@ -1004,6 +1004,15 @@ test('a kept best run shows as the record, its ghost racing along', async ({ pag
   await expect(page.getByTestId('kart-record')).toHaveText('1:00.000')
   // Some frames with the ghost drawn: a slow software renderer manages few
   await expect.poll(() => framesOf(page), { timeout: 15_000 }).toBeGreaterThan(30)
+  // 2026-11-20 (§4.40): the ghost localStorage kept has moved to IndexedDB, and is gone from there
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('tku-arcade.kart.ghost.test-oval')))
+    .toBeNull()
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('tku-arcade.kart.bestRun.test-oval')!),
+    ),
+  ).toEqual({ total: 3600 })
   expect(errors).toEqual([])
 })
 
@@ -1050,7 +1059,9 @@ for (const [width, height] of [
 }
 
 // 2026-11-19: seventeen vehicles under tabs, a 3D preview of the pick, and the bikes
-test('the garage narrows the vehicles by tab, previews the pick, and a bike races', async ({ page }) => {
+test('the garage narrows the vehicles by tab, previews the pick, and a bike races', async ({
+  page,
+}) => {
   test.setTimeout(90_000)
   const errors = watchConsole(page)
   await page.addInitScript(() => {

@@ -46,8 +46,9 @@ export function useImmersive(target: RefObject<HTMLElement | null>): ImmersiveCo
     const onChange = () => {
       if (!document.fullscreenElement) setMode('off')
     }
+    // An open dialog (the square's drawer) takes that Esc for itself: only it closes
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') exit()
+      if (event.key === 'Escape' && !document.querySelector('dialog[open]')) exit()
     }
     document.addEventListener('fullscreenchange', onChange)
     window.addEventListener('keydown', onKey)

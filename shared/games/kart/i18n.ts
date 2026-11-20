@@ -48,6 +48,7 @@ const en = {
   'games.kart.bot.level.easy': 'Easy',
   'games.kart.bot.level.normal': 'Normal',
   'games.kart.bot.level.hard': 'Hard',
+  'games.kart.bot.level.expert': 'Expert',
   'games.kart.bot.add': 'Add a computer kart',
   'games.kart.bot.full': 'Every seat is taken.',
   'games.kart.bot.note':
@@ -105,6 +106,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.bot.level.easy': '簡單',
   'games.kart.bot.level.normal': '普通',
   'games.kart.bot.level.hard': '困難',
+  'games.kart.bot.level.expert': '專家',
   'games.kart.bot.add': '加一台電腦車',
   'games.kart.bot.full': '座位都滿了。',
   'games.kart.bot.note':

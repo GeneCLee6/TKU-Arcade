@@ -401,35 +401,36 @@ describe.each(SKILL_TRACKS)('%s, a track to learn by heart', (id) => {
     }
   }, 120_000)
 
-  it('the master does what the guide asks: every drift jump landed, every slot gone through', () => {
-    const plain = courseOf(track)
-    const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road }
-    const brain = createBotBrain(
-      DRIVERS.master.skill,
-      road,
-      KART_TUNING,
-      7,
-      track.jumps,
-      track.walls,
-      guide,
-    )
-    let trial = startTrial(course)
-    const through = new Set<number>()
-    for (let step = 0; trial.phase !== 'finished' && step < 200 * 60; step++) {
-      trial = stepTrial(trial, brain(trial, { speedShare: 1 }), course)
-      const { kart } = trial.run
-      guide.slots.forEach((slot, index) => {
-        const middle = acrossRoad(road, slot.index, slot.across)
-        if (Math.hypot(kart.x - middle.x, kart.z - middle.z) < SLOT / 2) through.add(index)
-      })
-    }
-    expect(trial.phase).toBe('finished')
-    expect(trial.run.resets).toBe(0)
-    expect(trial.run.kart.driftJumps).toBe(guide.cues.length * track.laps)
-    expect(through.size).toBe(guide.slots.length)
-  }, 60_000)
+  // 2026-11-20: and the expert computer kart, which drives the master's line (src/kart/bots/expert.ts)
+  it.each([
+    ['the master', DRIVERS.master.skill],
+    ['the expert computer kart', BOT_SKILLS.expert],
+  ] as const)(
+    '%s does what the guide asks: every drift jump landed, every slot gone through',
+    (_, skill) => {
+      const plain = courseOf(track)
+      const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road }
+      const brain = createBotBrain(skill, road, KART_TUNING, 7, track.jumps, track.walls, guide)
+      let trial = startTrial(course)
+      const through = new Set<number>()
+      for (let step = 0; trial.phase !== 'finished' && step < 200 * 60; step++) {
+        trial = stepTrial(trial, brain(trial, { speedShare: 1 }), course)
+        const { kart } = trial.run
+        guide.slots.forEach((slot, index) => {
+          const middle = acrossRoad(road, slot.index, slot.across)
+          if (Math.hypot(kart.x - middle.x, kart.z - middle.z) < SLOT / 2) through.add(index)
+        })
+      }
+      expect(trial.phase).toBe('finished')
+      expect(trial.run.resets).toBe(0)
+      expect(trial.run.kart.driftJumps).toBe(guide.cues.length * track.laps)
+      expect(through.size).toBe(guide.slots.length)
+    },
+    60_000,
+  )
 
-  it.each(DIFFICULTIES)(
+  // The three levels the owner has yet to teach the guide to (the expert, above, knows it)
+  it.each(DIFFICULTIES.filter((level) => level !== 'expert'))(
     'a %s computer kart keeps to the safe line: no drift jump, no slot',
     (level) => {
       const plain = courseOf(track)
@@ -472,7 +473,7 @@ describe('a jump into a corner', () => {
   }, 60_000)
 })
 
-// 2026-11-20 (docs/KART-FEEL.md §12, docs/ARCHITECTURE.md §4.40): the shortcuts that are roads of
+// 2026-11-20 (docs/KART-FEEL.md §14, docs/ARCHITECTURE.md §4.41): the shortcuts that are roads of
 // their own (shared/kart/branches.ts). The Viaduct Works has three, each asking for its own hands;
 // the wharf's shed lane is one. The driver who knows them takes every one of them every lap; the
 // computer karts, who do not, never do; and the gap between the two is the owner's mark.

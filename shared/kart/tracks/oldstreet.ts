@@ -221,7 +221,7 @@ export const OLDSTREET: TrackJson = {
     [span.first + 4, ALLEY_PAD],
     [span.last - 4, ALLEY_PAD],
     // 2026-11-20: one down the middle of the market street, where nothing else is worth a drift
-    // (the expert's boost cover reaches 70%; docs/KART-FEEL.md §12)
+    // (the expert's boost cover reaches 70%; docs/KART-FEEL.md §14)
     [PAD_MARKET, 0],
   ]),
   // The item race reads these (shared/kart/items.ts): rows across the wide parts, a row in the

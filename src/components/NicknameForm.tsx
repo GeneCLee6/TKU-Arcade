@@ -1,4 +1,5 @@
 import { useId, useState, type ChangeEvent, type FormEvent } from 'react'
+import { nameIssue, type NameIssue } from '../../shared/nickname.ts'
 import { MAX_NAME_CHARS, normalizeName } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import { readNickname, writeNickname } from '../lib/nickname.ts'
@@ -20,13 +21,16 @@ export function NicknameForm({ onSubmit }: { onSubmit: (name: string) => void })
   const inputId = useId()
   const errorId = useId()
   const [value, setValue] = useState(() => readNickname() ?? '')
-  const [invalid, setInvalid] = useState(false)
+  // Shown as one types (e12-t06), except an empty box, which is only a problem once sent
+  const [issue, setIssue] = useState<NameIssue | null>(null)
+  const invalid = issue !== null
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
+    const found = nameIssue(value)
     const name = normalizeName(value)
-    if (name === null) {
-      setInvalid(true)
+    if (found !== null || name === null) {
+      setIssue(found ?? 'empty')
       return
     }
     writeNickname(name)
@@ -35,7 +39,8 @@ export function NicknameForm({ onSubmit }: { onSubmit: (name: string) => void })
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     setValue(event.target.value)
-    setInvalid(false)
+    const found = nameIssue(event.target.value)
+    setIssue(found === 'empty' ? null : found)
   }
 
   // No maxLength: it counts UTF-16 units, so it would cut off a valid name of 16 emoji
@@ -55,9 +60,13 @@ export function NicknameForm({ onSubmit }: { onSubmit: (name: string) => void })
         />
         <Button type="submit">{t('nickname.submit')}</Button>
       </FieldRow>
-      {invalid && (
+      {issue !== null && (
         <FieldError id={errorId} role="alert">
-          {t('nickname.invalid', { max: MAX_NAME_CHARS })}
+          {issue === 'reserved'
+            ? t('nickname.reserved')
+            : issue === 'blocked'
+              ? t('nickname.blocked')
+              : t('nickname.invalid', { max: MAX_NAME_CHARS })}
         </FieldError>
       )}
     </form>

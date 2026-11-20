@@ -1,4 +1,4 @@
-// 2026-11-20 (owner: "shortcuts only the skilled get through"; docs/ARCHITECTURE.md §4.40): branches
+// 2026-11-20 (owner: "shortcuts only the skilled get through"; docs/ARCHITECTURE.md §4.41): branches
 // in the track format. A road of its own off the main road and back: checked (never across itself
 // or the main road, clear of it between its ends, its gates clear, within its limits), its kerbs
 // cut open where it meets the main road, its gates standing in for the main road's it goes round,

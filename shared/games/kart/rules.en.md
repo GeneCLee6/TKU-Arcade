@@ -27,7 +27,7 @@ Some tracks (**Wharf Warehouses**, **Hillside Lanes**, **Viaduct Works**) have t
 - **Through the slot**: the tall walls (sheds, rows of containers, yard walls) have gaps one kart wide, lined up so that the straight way through is hidden until you are on it. Line up early, do not drift, and go through straight; missing by a metre is a head-on crash. Each slot has a boost pad just behind it.
 - **The blind turn-in**: a branch whose mouth opens only for a moment, behind a wall or over a crest. Be on its side of the road and already turning before you can see it; late, you meet the corner of the wall.
 
-The computer karts keep to the long way round. On the Kart page, `?autopilot=master` shows a driver who takes every shortcut; `?autopilot=expert` drives the same track well without knowing it.
+**Expert** computer karts take these shortcuts, and fire perfect instant boosts and keep the combo going; the Easy, Normal and Hard ones keep to the long way round. On the Kart page, `?autopilot=master` shows a driver who takes every shortcut; `?autopilot=expert` drives the same track well without knowing it.
 
 ## Modes
 
@@ -49,7 +49,7 @@ The results show which team won, the two totals, and every kart's side, time and
 
 ## Computer karts
 
-The host can add computer karts at three levels to free seats. The host's browser drives them, so they leave the race if the host does. On the Kart page you can also race the computer alone, as a single race, a team race with computer team-mates, or a Grand Prix of several tracks.
+The host can add computer karts to free seats at four levels: Easy, Normal, Hard and Expert. An Expert kart knows every technique on this page (perfect timing, combos, the drift jump, lifting at the crest, the slots, the shortcuts you learn by heart), but it is held to its kart's top speed like everyone: no cheating. The host's browser drives them, so they leave the race if the host does. On the Kart page you can also race the computer alone, as a single race, a team race with computer team-mates, or a Grand Prix of several tracks.
 
 ## Watching
 

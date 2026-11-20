@@ -12,8 +12,11 @@ import {
 import {
   keepIfBetter,
   loadBestLap,
+  loadBestRun,
   loadGhost,
+  loadKartBestRun,
   loadKartGhost,
+  type RunRecord,
   type GhostPick,
   type RecordNews,
 } from './records.ts'
@@ -496,10 +499,23 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   // overall best and this kart's own best, the pick says which one races along
   const kartId: KartId = options.body ?? DEFAULT_KART
   const pick: GhostPick = options.ghostPick ?? 'overall'
-  let best: Ghost | null = track && !net ? loadGhost(recordKey(track)) : null
-  let kartBest: Ghost | null = track && !net ? loadKartGhost(recordKey(track), kartId) : null
+  // 2026-11-20 (§4.40): the records at once, from localStorage; the ghosts a moment later, from
+  // IndexedDB (records.ts), unless this run has set a new record by then
+  const keyOfRecords = track && !net ? recordKey(track) : null
+  let bestRun: RunRecord | null = keyOfRecords ? loadBestRun(keyOfRecords) : null
+  let kartBestRun: number | null = keyOfRecords ? loadKartBestRun(keyOfRecords, kartId) : null
+  let best: Ghost | null = null
+  let kartBest: Ghost | null = null
+  if (keyOfRecords) {
+    void loadGhost(keyOfRecords).then((ghost) => {
+      if (ghost && ghost.total === bestRun?.total) best ??= ghost
+    })
+    void loadKartGhost(keyOfRecords, kartId).then((ghost) => {
+      if (ghost && ghost.total === kartBestRun) kartBest ??= ghost
+    })
+  }
   const chased = (): Ghost | null => (pick === 'off' ? null : pick === 'kart' ? kartBest : best)
-  let bestLap: number | null = track && !net ? loadBestLap(recordKey(track)) : null
+  let bestLap: number | null = keyOfRecords ? loadBestLap(keyOfRecords) : null
   let recorder: GhostRecorder | null = null
   let news: RecordNews | null = null
   const scene = createKartScene(
@@ -668,8 +684,14 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
             kart: kartId,
           }
           news = keepIfBetter(ghost)
-          if (news.bestRun) best = ghost
-          if (news.kartBestRun) kartBest = ghost
+          if (news.bestRun) {
+            best = ghost
+            bestRun = { total: ghost.total, kart: kartId }
+          }
+          if (news.kartBestRun) {
+            kartBest = ghost
+            kartBestRun = ghost.total
+          }
           bestLap = news.lapSteps
         }
       } else {
@@ -848,12 +870,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         lapTimes: trial.laps.map(seconds),
         wrongWay: trial.wrongWay,
         total: trial.phase === 'finished' ? seconds(trial.steps) : null,
-        bestRun: news ? seconds(news.runSteps) : best ? seconds(best.total) : null,
+        bestRun: news ? seconds(news.runSteps) : bestRun ? seconds(bestRun.total) : null,
         bestLap: bestLap === null ? null : seconds(bestLap),
         newBestRun: news?.bestRun ?? false,
         newBestLap: news?.bestLap ?? false,
-        recordKart: best ? (best.kart ?? 'unknown') : null,
-        kartBestRun: news ? seconds(news.kartRunSteps) : kartBest ? seconds(kartBest.total) : null,
+        recordKart: bestRun ? (bestRun.kart ?? 'unknown') : null,
+        kartBestRun:
+          news ? seconds(news.kartRunSteps) : kartBestRun === null ? null : seconds(kartBestRun),
         newKartBestRun: news?.kartBestRun ?? false,
       }
       if (!sameTrial(lastTrial, view)) {

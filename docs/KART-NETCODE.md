@@ -335,7 +335,7 @@ JSON patch 少約 **73–76%**（本機 1.52 → 0.36、預覽站 1.46 → 0.40 
 
 ## 18. 岔路：替身閘門與伺服器裁定（2026-11-20，`feat/kart-branch-routes`）
 
-賽道可以有**岔路**（`ARCHITECTURE.md` §4.40）：離開主路、另走一段、再接回的路。房間（`shared/games/kart/rules.ts`）與瀏覽器用同一份賽道 JSON 解析出同樣的東西，所以**協定沒有變**：frame 格式、`PROTOCOL_VERSION`、op、patch 都一樣。
+賽道可以有**岔路**（`ARCHITECTURE.md` §4.41）：離開主路、另走一段、再接回的路。房間（`shared/games/kart/rules.ts`）與瀏覽器用同一份賽道 JSON 解析出同樣的東西，所以**協定沒有變**：frame 格式、`PROTOCOL_VERSION`、op、patch 都一樣。
 
 - **替身閘門**：岔路繞過的每個主路閘門，在岔路上有一條替身線（同一個閘門編號）。`courseOf` 把它們放進 `checkpoints.lines`。`judgeFrame` 的逐門計數走 `passGates`，有 `lines` 時「下一門的任一條線往前越過」就算，所以走岔路的車一樣逐門、逐圈被數，不會被當成漏門或逆走；frame 裡的 `nextGate`／`crossings` 意思不變。
 - **復位**：落點在任何一門任何一條線的復位點 30 m 內都採信（以前只有主路的）。

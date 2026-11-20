@@ -1,6 +1,6 @@
 // 2026-11-20 (owner: "shortcuts only the skilled get through"; #109 noted that its shortcuts were
 // lanes inside a wide road set apart by walls, not roads of their own): branches, docs/
-// ARCHITECTURE.md §4.40. A track may have, besides its closed centre line, branches: a road that
+// ARCHITECTURE.md §4.41. A track may have, besides its closed centre line, branches: a road that
 // leaves the main road at one road point, runs on its own (its own centre line, widths, heights,
 // jumps and kerbs) and joins the main road again at a later road point. Everything that went by the
 // one centre line takes the branches into account here:

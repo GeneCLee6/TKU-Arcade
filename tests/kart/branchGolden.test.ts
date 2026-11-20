@@ -1,4 +1,4 @@
-// 2026-11-20 (branches, docs/ARCHITECTURE.md §4.40): a track without branches, and a track made in
+// 2026-11-20 (branches, docs/ARCHITECTURE.md §4.41): a track without branches, and a track made in
 // the editor without a bypass, is exactly what it was. The digests below were taken on main at
 // fb5f7e1, BEFORE branches came in: every unchanged built-in track's checked JSON (its walls, gates,
 // respawns, grid, terrain), the hard computer kart's three laps on it with its own guide (every

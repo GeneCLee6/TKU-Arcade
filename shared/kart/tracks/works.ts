@@ -1,5 +1,5 @@
 // 2026-11-20 (owner: "drift before the ramp, know the map by heart, shortcuts only the skilled get
-// through: our maps should show that style"; docs/KART-FEEL.md §12). The third of the tracks to be
+// through: our maps should show that style"; docs/KART-FEEL.md §14). The third of the tracks to be
 // learnt by heart, and the first with real branches (shared/kart/branches.ts): roads of their own
 // that leave the main road and join it again. A working name: Viaduct Works (高架廠區), an original
 // riverside factory quarter under an elevated line: sheds, a foundry yard, loading decks. Laid

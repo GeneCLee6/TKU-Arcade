@@ -54,6 +54,7 @@ export const roomZhTW: Record<RoomMessageKey, string> = {
   'room.error.wrong_password': '房間密碼不對。',
   'room.error.wrong_status': '遊戲現在的階段不能這麼做。',
   'room.full': '這個房間已滿。',
+  'room.tooManyConnections': '你所在的網路目前連線太多，請等一分鐘再試。',
   'room.host.dissolve': '解散房間',
   'room.host.dissolveBody': '所有人都會離開，房間也會永久消失。',
   'room.host.dissolveTitle': '要解散這個房間嗎？',

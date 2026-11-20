@@ -4,6 +4,7 @@ import { checkUsage } from './usage.ts'
 import { withSecurityHeaders } from './security.ts'
 
 // The Durable Object classes must be exported from the Worker's entry module
+export { LimiterDO } from './limiter.ts'
 export { LobbyDO } from './lobby.ts'
 export { RoomDO } from './room.ts'
 

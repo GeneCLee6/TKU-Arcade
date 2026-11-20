@@ -10,14 +10,15 @@ import type {
 import { isRoomId } from '../../shared/room-id.ts'
 
 /**
- * The new room's id; `paused` when the owner has paused that game (e12-t11); null when it could not
- * be created for any other reason (the toast is the same)
+ * The new room's id; `paused` when the owner has paused that game (e12-t11); `rate_limited` when
+ * this address opened too many rooms in the last minute (e12-t06); null when it could not be
+ * created for any other reason (the toast is the same)
  */
 export async function createRoom(
   gameId: string,
   isPublic: boolean,
   signal?: AbortSignal,
-): Promise<string | 'paused' | null> {
+): Promise<string | 'paused' | 'rate_limited' | null> {
   const request: CreateRoomRequest = isPublic ? { gameId, public: true } : { gameId }
   try {
     const response = await fetch('/api/rooms', {
@@ -27,6 +28,7 @@ export async function createRoom(
       signal,
     })
     if (response.status === 403) return 'paused'
+    if (response.status === 429) return 'rate_limited'
     if (!response.ok) return null
     const { id } = (await response.json()) as CreateRoomResponse
     return isRoomId(id) ? id : null

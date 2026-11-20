@@ -62,6 +62,9 @@ worker/
   index.ts              路由、靜態資產、/api、/ws
   lobby.ts              LobbyDO（邏輯在 lobby-board.ts）
   errors.ts             POST /api/errors：大小與速率上限，寫進 Worker 日誌
+  address.ts            位址雜湊（IPv6 取 /64、SHA-256），濫用防護的 key（e12-t06，docs/SECURITY.md §6）
+  rate-limit.ts         每 instance 的固定視窗；SHARED_LIMITS 與 takeShared（建房、WebSocket 升級、擁有者金鑰）
+  limiter.ts            LimiterDO：跨 instance 的濫用限制，依位址雜湊第一個字分 16 片、只在記憶體（e12-t06）
   backup.ts             每日 cron：D1 匯出到 R2（DEPLOY.md §10）
   room.ts               RoomDO（引擎與 realtime 分檔：room-turn.ts、room-realtime.ts）
   auth.ts               token 驗簽、session
@@ -1027,15 +1030,47 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 1. 名稱（車系與 11 台車）都是暫名，等擁有者拍板。
 2. **公平性是用駕駛腳本量的，不是人**（`KART-FEEL.md` §12.4 照實寫了腳本的偏差：它對「操控」點數的反應和人相反）。摩托車窄車身的好處，腳本只吃到「少擦牆」，不會刻意鑽縫；人可能吃到更多，所以定案的摩托車在高手腳本手上刻意偏慢。要擁有者實際開過再調 `KIND_TRAITS`。
 3. 既有六台之間本來就有差距（同一個量法 3–4 秒／場），這一批沒有動它們的數值（紀錄與幽靈車依車款存）。
-4. 每台車各存一份幽靈車：17 台 × 9 張賽道全部開過約 4.6 MB，接近 localStorage 上限；存不進去時不會壞（`storage.ts` 不丟例外），只是那筆紀錄關頁面就沒了。真的遇到再做「只留最近用的幾台」。
+4. 每台車各存一份幽靈車：17 台 × 9 張賽道全部開過約 4.6 MB，接近 localStorage 上限；存不進去時不會壞（`storage.ts` 不丟例外），只是那筆紀錄關頁面就沒了。真的遇到再做「只留最近用的幾台」。**2026-11-20 已解決**：幽靈車改存 IndexedDB，紀錄留 localStorage（§4.40）。
 5. 還開著的舊頁面會把第 17 台車（海燕）畫成別台，重新整理就好（`KART-NETCODE.md` §12）。
 6. 摩托車沒有專屬的引擎聲、沒有後輪滑胎之類的專屬特效；道具命中判定仍用卡丁車的圓。
 7. 沒有「道具型」車系：重裝型（礁岩系）在車陣與道具賽最吃香，但沒有改道具機率或效果的車款參數；要做的話在 `KartTraits` 之外另加（道具邏輯在伺服器，不讀 tuning）。
 8. 3D 預覽在等待室會一直以 60 fps 畫（分頁在背景時瀏覽器自己停）；低階手機若嫌重，之後可改成捲出畫面就停。
 
-### 4.40 路線圖外：真岔路（賽道格式的分支路段）、高架廠區、碼頭倉庫的倉庫巷、老街 70%（2026-11-20，`feat/kart-branch-routes`）
+### 4.40 路線圖外：第四級電腦車「專家」、幽靈車改存 IndexedDB（2026-11-20，`feat/kart-expert-bots`）
 
-擁有者（2026-11-19）：「我覺得太容易變成高手了……之前像城鎮手指，有捷徑但是要技術好才過得去這種，我覺得我們的地圖要展現出這種風格出來。」#109 做了技術，但回報「捷徑是寬路裡用牆隔出來的車道，不是離開路面的獨立岔路；那要改賽道格式」。這一批改了格式。手感、操作與數字在 `KART-FEEL.md` §13；這裡記程式怎麼做的。只學「捷徑要技術才過得去」這個風格，沒有對照或重現任何現成地圖（`IP-CHECKLIST.md`）。
+#105、#109 都回報「困難電腦車沒學新打法、走遠路，會的人在新圖上穩贏它 8–11%」，要不要教困難級等擁有者開過再定。所以**不改三級**（`BOT_SKILLS.easy/normal/hard` 的數值與行為一個都沒動，三級既有的測試照舊），另加第四級 **專家**（`expert`，暫名 Expert／專家）。
+
+**專家（`src/kart/bots/expert.ts`）**
+
+- 就是 `kart:feel` 的「頂尖」腳本（`drivers.ts` 的 `master`）拿掉人的手（不抖、不恍神），甩尾門檻稍改（見下）：完美時機瞬間加速、連段、能噴就噴（`boostAt` 0.6）、只對夠大的彎甩並且甩滿（`cornerTurn`／`holdSeconds`）、雙噴、直線點甩、疊噴、必拿起跑加速；`tricks`＋`shortcuts`：有導引（`shared/kart/tracks/guide.ts`）的賽道走技術線，甩尾起跳、坡頂收油、飛越矮欄、穿縫；沒有導引的賽道（含自訂賽道）就是「高手」腳本的開法。
+- **不作弊**：同一套物理、同一台車的數字，`topSpeedShare` 1（只到自己這台車的極速，噴射照常超過，和玩家一樣）。
+- **rubber band 照舊**：`brain.ts` 唯一的改動是 `flatOut`（油門踩到底）只在 rubber band 給的比例是 1 時生效；領先玩家時照 `bandedShare` 鬆油門。腳本永遠傳 1，所以三級與駕駛腳本的行為不變（`tests/kart/bots.test.ts` 量了專家在領先時確實變慢）。
+- **出現的地方**：`shared/games/kart/bots.ts` 的 `BOT_LEVELS` 加 `'expert'`，一處改全部跟著：單機對戰電腦、大獎賽、團隊賽隊友（這三個都讀 `DIFFICULTIES`）、多人房加電腦車（`RoomBots.tsx` 讀 `BOT_LEVELS`；伺服器 `room-host.ts` 用 `rules.ts` 的 `bots.levels` 驗，房主代跑時 `roomBots.ts` 的 `isDifficulty` 認得它）。字串 `kart.bots.difficulty.expert`、`games.kart.bot.level.expert`。
+- 獨立模組：`feat/kart-branch-routes` 可能改 `brain.ts` 的路線選擇；專家只是一組 `BotSkill`，不碰路線程式。
+
+**量到的（三個種子平均每圈秒數，單人三圈）**：見 `KART-FEEL.md` §13。每張圖專家 < 困難 < 普通 < 簡單；碼頭、山城和頂尖腳本差 0.1%、1.1%。和頂尖腳本只差兩個習慣：`cornerTurn` 0.7（頂尖 0.5）、`driftAt` 0.95（頂尖 0.9），十一張加總一樣快、撞牆從 110 降到 78 次（困難 95）。
+
+**幽靈車改存 IndexedDB（`src/kart/ghostStore.ts`、`records.ts`）**
+
+- #108 量到 17 台 × 9 張全開過幽靈車約 4.6 MB，接近 localStorage 上限，存不進去時那筆紀錄關頁就沒了。現在：
+  - **紀錄**留在 localStorage，每筆幾十 bytes：`bestRun.<track>`（`{"total":步數,"kart":車}`）、`kartBestRun.<kart>.<track>`（步數）、`bestLap.*`／`kartBestLap.*`（不變）。紀錄**一定存得下**，和幽靈車存不存得下無關。
+  - **幽靈車軌跡**存 IndexedDB `tku-arcade-kart` → store `ghosts`（key `overall|<track>` 或 `kart|<kart>|<track>`，帶 `savedAt` 索引）。`keepIfBetter` 仍是同步的（馬上回報破紀錄），軌跡在背景寫；`loadGhost`／`loadKartGhost` 變成 async，`spikeLoop.ts` 先用紀錄顯示 HUD，幽靈車讀到再出現（期間若已破紀錄就不覆蓋）。
+  - 只比賽「紀錄自己那一圈」的幽靈：存幽靈失敗時，舊的、比紀錄慢的幽靈不會冒充。
+- **遷移**：第一次要讀幽靈時，把 localStorage 的 `ghost.<track>`、`kartGhost.<kart>.<track>` 搬進 IndexedDB（同時補上對應的紀錄鍵），**每筆搬成功才刪**；壞掉的那筆直接刪；搬失敗的留著下次再搬。一頁只跑一次。
+- **沒有 IndexedDB**（部分私密視窗、封鎖網站資料、開不起來）：不存新幽靈，紀錄照存；舊的 localStorage 幽靈留在原地照樣能比，被新紀錄取代時才刪。所有 IndexedDB 呼叫都在 try/catch 裡。
+- **容量**：每張圖保留總最佳＋每台車最佳；上限 `MAX_GHOSTS` 320 筆（17 台＋總最佳 × 11 張 = 198，留給自訂賽道）；超過時、或瀏覽器丟 `QuotaExceededError`（先清最舊的 25% 再試一次），**先清最舊的各車幽靈，最後才清賽道總最佳**；被清掉的只有軌跡，紀錄還在。
+- 大獎賽進度、調參、幽靈選擇（`ghostPick`）等其他 localStorage 都沒動。
+- 測試：`tests/kart/ghost.test.ts` 用 `fake-indexeddb`（新 devDependency）跑真的 IndexedDB 實作，另有記憶體版 `memoryGhostStore(capacity)` 模擬滿了；`e2e/kart-spike.spec.ts` 在瀏覽器裡確認舊幽靈搬走、紀錄鍵補上。
+
+**限制**
+
+1. 困難級要不要學新技巧，仍待擁有者（NEXT §1）。專家十一張加總撞牆比困難少，但砲台、河畔、大屯比困難多（`KART-FEEL.md` §13.2）；沒有卡死或逆走。
+2. 專家在沒有導引的賽道（含自訂賽道）不會走技術捷徑，因為不知道捷徑在哪。
+3. 幽靈車一頁搬一次；搬家期間（第一次讀，通常 < 1 秒）HUD 已有紀錄，幽靈晚一點出現。
+
+### 4.41 路線圖外：真岔路（賽道格式的分支路段）、高架廠區、碼頭倉庫的倉庫巷、老街 70%（2026-11-20，`feat/kart-branch-routes`）
+
+擁有者（2026-11-19）：「我覺得太容易變成高手了……之前像城鎮手指，有捷徑但是要技術好才過得去這種，我覺得我們的地圖要展現出這種風格出來。」#109 做了技術，但回報「捷徑是寬路裡用牆隔出來的車道，不是離開路面的獨立岔路；那要改賽道格式」。這一批改了格式。手感、操作與數字在 `KART-FEEL.md` §14；這裡記程式怎麼做的。只學「捷徑要技術才過得去」這個風格，沒有對照或重現任何現成地圖（`IP-CHECKLIST.md`）。
 
 **格式**（`shared/kart/branches.ts`，新；`track.ts`）
 
@@ -1066,7 +1101,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **賽道**
 
-- **高架廠區** `works`（新，`shared/kart/tracks/works.ts`）：三條岔路，見 `KART-FEEL.md` §13。`worksArt.ts` 畫廠房、煙囪、北邊一條高架線（橋墩避開路面）、裝卸平台底下的橋墩；顏色在 `kartTokens.ts` 的 `worksScene`。巷弄盃加它（四張）。
+- **高架廠區** `works`（新，`shared/kart/tracks/works.ts`）：三條岔路，見 `KART-FEEL.md` §14。`worksArt.ts` 畫廠房、煙囪、北邊一條高架線（橋墩避開路面）、裝卸平台底下的橋墩；顏色在 `kartTokens.ts` 的 `worksScene`。巷弄盃加它（四張）。
 - **碼頭倉庫** `wharf@2`：倉庫那條「寬路裡的後巷」改成真的岔路（倉庫髮夾的內側穿過去）；髮夾改成 40 m 寬、半徑 76 m，主路那段不再是 84 m 寬。其餘捷徑（裝卸坡、貨櫃列、碼頭坡）照舊。
 - **老街** `oldstreet@9`：市場街中間一條加速帶（高手覆蓋率 68% → 73%）。
 

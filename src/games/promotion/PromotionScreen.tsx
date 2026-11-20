@@ -57,7 +57,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
   const reducedMotion = useReducedMotion()
   useEffect(loadBoardFont, [])
   const zoom = useBoardZoom()
-  const { viewport, show, zoom: zoomLevel } = zoom
+  const { viewport, attach, show, zoom: zoomLevel } = zoom
 
   const frame = useRef<HTMLDivElement>(null)
   const turnPanel = useRef<HTMLDivElement>(null)
@@ -295,7 +295,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
           )}
 
           <BoardArea ref={boxRef}>
-            <Viewport ref={viewport} $zoomed={zoom.zoom > MIN_ZOOM}>
+            <Viewport ref={attach} $zoomed={zoom.zoom > MIN_ZOOM}>
               <PromotionBoard
                 layout={layout}
                 pieces={pieces}

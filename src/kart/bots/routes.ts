@@ -1,4 +1,4 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.40): which way round a track with branches the computer's
+// 2026-11-20 (docs/ARCHITECTURE.md §4.41): which way round a track with branches the computer's
 // hands go (shared/kart/branches.ts). The brain (brain.ts) drives one closed centre line; on such a
 // track there are two: the main road, and the route down every branch (`routeRoad`). Each has a
 // brain of its own, with the main road's guide or the route's (shared/kart/tracks/guides.ts), and

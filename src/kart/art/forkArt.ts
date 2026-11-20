@@ -1,4 +1,4 @@
-// 2026-11-20: the art of a track's branches (shared/kart/branches.ts, docs/ARCHITECTURE.md §4.40):
+// 2026-11-20: the art of a track's branches (shared/kart/branches.ts, docs/ARCHITECTURE.md §4.41):
 // each branch's asphalt and painted kerbs along its own centre line, at its own heights, and the
 // crash barriers on every kerb of the track as the physics has them (the main road's open at each
 // branch's mouth). A track without branches never comes here: trackArt.ts draws its barriers as one

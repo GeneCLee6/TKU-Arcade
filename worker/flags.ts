@@ -49,7 +49,7 @@ export async function handleAdminFlags(
   env: Env,
   now = Date.now(),
 ): Promise<Response> {
-  const refusal = ownerRefusal(request, env, ['GET', 'PUT'])
+  const refusal = await ownerRefusal(request, env, ['GET', 'PUT'])
   if (refusal) return refusal
   if (request.method === 'PUT') {
     let body: unknown
