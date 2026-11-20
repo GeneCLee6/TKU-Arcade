@@ -241,6 +241,8 @@ const Step = styled.li<{ $state: 'now' | 'done' | 'later' }>`
 
   & > span {
     display: inline-block;
+    /* The text carries its step's own fill too, so a contrast check reads the pair that is drawn */
+    background: ${(p) => (p.$state === 'now' ? color.accent : color.raised)};
     transform: skewX(calc(-1 * ${SLANT}));
   }
 `
