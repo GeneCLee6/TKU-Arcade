@@ -43,6 +43,8 @@ import {
 import { placeBump } from '../ui/placeBump.ts'
 import { TouchControls } from '../touch/TouchControls.tsx'
 import { useTouchControls } from '../touch/useTouchControls.ts'
+import { CoachTip } from '../school/CoachTip.tsx'
+import { useCoach } from '../school/useCoach.ts'
 import { touchBottom, touchCorner, touchSpace } from '../touch/touchLayout.ts'
 
 registerMessages(KART_MESSAGES)
@@ -275,6 +277,9 @@ export default function RaceView({
     tuning: applyKart(loadTuning().tuning, loadout.body),
     enabled: true,
   }))
+  // 2026-11-20 (§4.50): a tip for a technique not yet used (not for a kart driving itself)
+  const coach = useCoach()
+  const coachStep = coach.onStep
 
   useEffect(() => {
     if (!stage.current || !track || failure) return
@@ -319,6 +324,7 @@ export default function RaceView({
         onTrial: setTrial,
         onClock: (total, lap) => clock.current?.set(total, lap),
         touch: touchSource,
+        ...(autopiloted ? {} : { onStep: (step) => coachStep(step, settings.tuning) }),
         net: autopiloted
           ? {
               ...net.net,
@@ -339,7 +345,7 @@ export default function RaceView({
       net.stop()
       raceNet.current = null
     }
-  }, [realtime, track, seat, slot, failure, settings, autopiloted, drifts, loadout, touchSource])
+  }, [realtime, track, seat, slot, failure, settings, autopiloted, drifts, loadout, touchSource, coachStep])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -558,6 +564,7 @@ export default function RaceView({
       {hud.boosting && <BoostVeil aria-hidden="true" data-testid="kart-boost-veil" />}
       {hud.teamBoosting && <TeamVeil aria-hidden="true" data-testid="kart-team-veil" />}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
+      <CoachTip t={t} coach={coach} bindings={settings.bindings} touch={touch.shown} />
       <MapCorner $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}>
         {trial && <RaceClock ref={clock} t={t} trial={trial} />}
         <Minimap

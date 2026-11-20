@@ -469,6 +469,23 @@ export interface SpikeOptions {
   readonly net?: SpikeNet
   /** 2026-11-17: the on-screen buttons of a phone (src/kart/touch/), driving along with the keys */
   readonly touch?: TouchSource
+  /**
+   * 2026-11-20 (§4.50): after each physics step, the step as it ran: the driving school judges a
+   * lesson by it, and its coach gives a tip in a race (src/kart/school/). Only reads
+   */
+  readonly onStep?: (step: SpikeStep) => void
+}
+
+/** One physics step, for `onStep` */
+export interface SpikeStep {
+  readonly before: KartState
+  readonly after: KartState
+  readonly input: KartInput
+  /** The race after the step; null off a track */
+  readonly trial: Trial | null
+  /** How hard the kart went into a wall in this step and the one before, m/s */
+  readonly hit: number
+  readonly hitBefore: number
 }
 
 const sameHud = (a: SpikeHud | undefined, b: SpikeHud): boolean =>
@@ -799,6 +816,14 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       }
       debug.input = input
       if (net && trial) net.afterStep(trial, input, run.resets !== before.resets)
+      options.onStep?.({
+        before: before.kart,
+        after: run.kart,
+        input,
+        trial,
+        hit: run.hitSpeed,
+        hitBefore: before.hitSpeed,
+      })
     }
     const current = run.kart
     debug.tick += clock.steps
