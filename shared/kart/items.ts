@@ -19,24 +19,9 @@ import { KART_TUNING } from './physics.ts'
 import { respawnNear, type Spot } from './course.ts'
 import { courseOf, type Track } from './track.ts'
 
-export const ITEM_IDS = [
-  'boost',
-  'shield',
-  'tow',
-  'headwind',
-  'swap',
-  'hail',
-  'cloud',
-  'puddle',
-  // 2026-11-20: appended, so that the eight before keep their numbers on the wire
-  'mirror',
-  'fog',
-  'skip',
-  'jam',
-  'rally',
-  'decoy',
-] as const
-export type ItemId = (typeof ITEM_IDS)[number]
+// 2026-11-20: the list itself in itemIds.ts, which a replay's check reads without the rest of this
+import { ITEM_IDS, type ItemId } from './itemIds.ts'
+export { ITEM_IDS, type ItemId }
 
 export const isItemId = (value: unknown): value is ItemId =>
   typeof value === 'string' && (ITEM_IDS as readonly string[]).includes(value)

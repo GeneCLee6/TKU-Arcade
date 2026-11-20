@@ -5,15 +5,9 @@
 // 2026-11-20, the new items' moments in the same sprites: a mirror turning a shot back flashes silver
 // shards; fog closing round a kart a few slow grey puffs; a skip landing a ring of blue splash; a
 // rally green sparkles rising; static small violet sparks crackling close round the kart.
-import {
-  AdditiveBlending,
-  CanvasTexture,
-  Sprite,
-  SpriteMaterial,
-  type Scene,
-  type Texture,
-} from 'three'
+import { CanvasTexture, Color, type Scene, type Texture } from 'three'
 import { kartScene } from '../../styles/kartTokens.ts'
+import { createParticleBatch } from './particles.ts'
 
 import type { HitBurst } from '../hitFx.ts'
 
@@ -170,8 +164,12 @@ function glowTexture(): CanvasTexture {
 }
 
 interface Bit {
-  sprite: Sprite
-  material: SpriteMaterial
+  x: number
+  y: number
+  z: number
+  /** Whether it is a soft glow (else a sparkle), and its colour */
+  glow: boolean
+  readonly colour: Color
   age: number
   life: number
   size: number
@@ -179,9 +177,28 @@ interface Bit {
   vy: number
   vz: number
   spin: number
+  /** How far it has turned */
+  turn: number
   /** The ground under it (a hill track, 2026-11-17): it never falls below this */
   floor: number
 }
+
+const bit = (): Bit => ({
+  x: 0,
+  y: 0,
+  z: 0,
+  glow: false,
+  colour: new Color(),
+  age: 1,
+  life: 0,
+  size: 0,
+  vx: 0,
+  vy: 0,
+  vz: 0,
+  spin: 0,
+  turn: 0,
+  floor: 0.1,
+})
 
 /** `ground` gives the road's height at a place: 0 everywhere on a flat track */
 export function createHitArt(
@@ -191,58 +208,28 @@ export function createHitArt(
   const sparkle = sparkleTexture()
   const glow = glowTexture()
   const textures: Texture[] = [sparkle, glow]
-  const material = (map: Texture, color: string) =>
-    new SpriteMaterial({
-      map,
-      color,
-      transparent: true,
-      depthWrite: false,
-      blending: AdditiveBlending,
-    })
+  // 2026-11-20 (docs/KART-PERF.md): drawn in two batches (particles.ts), the sparkles and the glows,
+  // a draw each rather than one a bit
+  const sparkles = createParticleBatch(scene, { capacity: BITS, map: sparkle, additive: true })
+  const glows = createParticleBatch(scene, { capacity: BITS + FLASHES, map: glow, additive: true })
   const bits: Bit[] = []
-  for (let i = 0; i < BITS; i++) {
-    const own = material(sparkle, kartScene.hitStar)
-    const sprite = new Sprite(own)
-    sprite.visible = false
-    scene.add(sprite)
-    bits.push({
-      sprite,
-      material: own,
-      age: 1,
-      life: 0,
-      size: 0,
-      vx: 0,
-      vy: 0,
-      vz: 0,
-      spin: 0,
-      floor: 0.1,
-    })
-  }
+  for (let i = 0; i < BITS; i++) bits.push(bit())
   const flashes: Bit[] = []
   for (let i = 0; i < FLASHES; i++) {
-    const own = material(glow, kartScene.hitFlash)
-    const sprite = new Sprite(own)
-    sprite.visible = false
-    scene.add(sprite)
-    flashes.push({
-      sprite,
-      material: own,
-      age: 1,
-      life: 0,
-      size: 0,
-      vx: 0,
-      vy: 0,
-      vz: 0,
-      spin: 0,
-      floor: 0.1,
-    })
+    const flash = bit()
+    flash.glow = true
+    flash.colour.set(kartScene.hitFlash)
+    flashes.push(flash)
   }
   let nextBit = 0
   let nextFlash = 0
+  /** Whether any bit or flash may still show: nothing is drawn or walked through once all are out */
+  let live = false
 
   const launch = (burst: HitBurst) => {
     const style = STYLES[burst.kind]
     const base = ground(burst.x, burst.z)
+    live = true
     for (let i = 0; i < style.count; i++) {
       const bit = bits[nextBit]!
       nextBit = (nextBit + 1) % bits.length
@@ -255,58 +242,66 @@ export function createHitArt(
       bit.vz = Math.cos(angle) * out
       bit.vy = style.up[0] + Math.random() * style.up[1]
       bit.spin = (Math.random() - 0.5) * 8
-      bit.material.map = style.glow ? glow : sparkle
-      bit.material.color.set(style.colour)
+      bit.glow = style.glow
+      bit.colour.set(style.colour)
       bit.floor = 0.1 + base
-      bit.sprite.position.set(burst.x, style.height + base, burst.z)
-      bit.sprite.visible = true
+      bit.x = burst.x
+      bit.y = style.height + base
+      bit.z = burst.z
     }
     const flash = flashes[nextFlash]!
     nextFlash = (nextFlash + 1) % flashes.length
     flash.age = 0
     flash.life = FLASH_LIFE
     flash.size = style.flashSize
-    flash.material.color.set(style.flash)
-    flash.sprite.position.set(burst.x, 1 + base, burst.z)
-    flash.sprite.visible = true
+    flash.colour.set(style.flash)
+    flash.x = burst.x
+    flash.y = 1 + base
+    flash.z = burst.z
   }
 
   return {
     update(bursts, seconds) {
       for (const burst of bursts) launch(burst)
+      if (!live) return
+      live = false
+      sparkles.begin()
+      glows.begin()
       for (const bit of bits) {
-        if (!bit.sprite.visible) continue
+        if (bit.age >= bit.life) continue
         bit.age += seconds
-        if (bit.age >= bit.life) {
-          bit.sprite.visible = false
-          continue
-        }
+        if (bit.age >= bit.life) continue
+        live = true
         bit.vy -= GRAVITY * seconds
-        bit.sprite.position.x += bit.vx * seconds
-        bit.sprite.position.y = Math.max(bit.floor, bit.sprite.position.y + bit.vy * seconds)
-        bit.sprite.position.z += bit.vz * seconds
+        bit.x += bit.vx * seconds
+        bit.y = Math.max(bit.floor, bit.y + bit.vy * seconds)
+        bit.z += bit.vz * seconds
         const left = 1 - bit.age / bit.life
-        bit.material.opacity = left
-        bit.material.rotation += bit.spin * seconds
-        bit.sprite.scale.setScalar(bit.size * (0.6 + left * 0.4))
+        bit.turn += bit.spin * seconds
+        ;(bit.glow ? glows : sparkles).add(
+          bit.x,
+          bit.y,
+          bit.z,
+          bit.size * (0.6 + left * 0.4),
+          bit.colour,
+          left,
+          bit.turn,
+        )
       }
       for (const flash of flashes) {
-        if (!flash.sprite.visible) continue
+        if (flash.age >= flash.life) continue
         flash.age += seconds
-        if (flash.age >= flash.life) {
-          flash.sprite.visible = false
-          continue
-        }
+        if (flash.age >= flash.life) continue
+        live = true
         const p = flash.age / flash.life
-        flash.material.opacity = 1 - p
-        flash.sprite.scale.setScalar(flash.size * (0.5 + p))
+        glows.add(flash.x, flash.y, flash.z, flash.size * (0.5 + p), flash.colour, 1 - p)
       }
+      sparkles.end()
+      glows.end()
     },
     dispose() {
-      for (const bit of [...bits, ...flashes]) {
-        scene.remove(bit.sprite)
-        bit.material.dispose()
-      }
+      sparkles.dispose()
+      glows.dispose()
       for (const texture of textures) texture.dispose()
     },
   }

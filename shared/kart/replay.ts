@@ -595,59 +595,6 @@ export function shotsAt(
     }))
 }
 
-// ── One blob: for a file, a message or R2 later ──────────────────────────────────────────────
-
-/** First byte of a packed replay; the version follows */
-export const REPLAY_MAGIC = 0x52
-export const REPLAY_VERSION = 1
-
-/**
- * A replay as one array of bytes: magic, version, the JSON of everything but the karts (u32 length
- * first), then each kart: u8 seat, u32 length, its samples
- */
-export function encodeReplay(replay: Replay): Uint8Array {
-  const { karts, ...rest } = replay
-  const meta = new TextEncoder().encode(JSON.stringify(rest))
-  const size = 2 + 4 + meta.length + karts.reduce((sum, kart) => sum + 5 + kart.bytes.length, 0)
-  const bytes = new Uint8Array(size)
-  const view = new DataView(bytes.buffer)
-  bytes[0] = REPLAY_MAGIC
-  bytes[1] = REPLAY_VERSION
-  view.setUint32(2, meta.length, true)
-  bytes.set(meta, 6)
-  let at = 6 + meta.length
-  for (const kart of karts) {
-    view.setUint8(at, kart.seat)
-    view.setUint32(at + 1, kart.bytes.length, true)
-    bytes.set(kart.bytes, at + 5)
-    at += 5 + kart.bytes.length
-  }
-  return bytes
-}
-
-/** The replay in these bytes, or null for anything else */
-export function decodeReplay(bytes: Uint8Array): Replay | null {
-  if (bytes.byteLength < 6 || bytes[0] !== REPLAY_MAGIC || bytes[1] !== REPLAY_VERSION) return null
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  const metaLength = view.getUint32(2, true)
-  if (6 + metaLength > bytes.byteLength) return null
-  let meta: Omit<Replay, 'karts'>
-  try {
-    meta = JSON.parse(new TextDecoder().decode(bytes.subarray(6, 6 + metaLength)))
-  } catch {
-    return null
-  }
-  const karts: { seat: number; bytes: Uint8Array }[] = []
-  let at = 6 + metaLength
-  while (at + 5 <= bytes.byteLength) {
-    const length = view.getUint32(at + 1, true)
-    if (at + 5 + length > bytes.byteLength) return null
-    karts.push({ seat: view.getUint8(at), bytes: bytes.slice(at + 5, at + 5 + length) })
-    at += 5 + length
-  }
-  return { ...meta, karts }
-}
-
 // ── Playing it back ──────────────────────────────────────────────────────────────────────────
 
 /** A replay ready to play: each kart's samples decoded, and where the timeline starts and ends */

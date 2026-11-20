@@ -3,7 +3,7 @@
 // bots drive in it (botRace.ts); the player races on the very screen of a room's race (RaceView),
 // which cannot tell the difference. At the finish, the standings as the room judged them, and a
 // way to race again or change the settings.
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 import { kart } from '../../../shared/games/kart/rules.ts'
 import type { KartAction } from '../../../shared/games/kart/types.ts'
@@ -26,6 +26,12 @@ import { createLocalRoom } from './localRoom.ts'
 import { drawBots, type BotEntry } from './roster.ts'
 import { botTrackId, type BotSetup } from './setup.ts'
 import { useMenuMusic } from '../audio/useMenuMusic.ts'
+import { useRaceRecorder } from '../../games/kart/useRaceRecorder.ts'
+import type { Replay } from '../../../shared/kart/replay.ts'
+import ReplayShare from '../watch/ReplayShare.tsx'
+
+// 2026-11-20 (docs/KART-NETCODE.md §11.4): the race again, as in a room
+const ReplayView = lazy(() => import('../watch/ReplayView.tsx'))
 
 registerMessages(KART_MESSAGES)
 
@@ -97,6 +103,10 @@ function BotRound({
     return { seed, entries, playerSeat, room, realtime: room.realtimeFor(playerSeat) }
   })
   const [view, setView] = useState(() => game.room.view(game.playerSeat))
+  // 2026-11-20: recorded as a room's race is, for its replay and its file
+  const recording = useRaceRecorder(view, game.realtime)
+  const [replay, setReplay] = useState<Replay | null>(null)
+  const [watching, setWatching] = useState(false)
 
   useEffect(() => {
     const track = raceTrack(botTrackId(setup))
@@ -149,6 +159,19 @@ function BotRound({
     const order = standings.map((line) => line.seat)
     const me = view.racers.find((racer) => racer.seat === game.playerSeat)
     const place = order.indexOf(game.playerSeat) + 1
+    if (!replay && recording.recorder.hasFrames()) setReplay(recording.recorder.replay())
+    if (watching && replay) {
+      return (
+        <Suspense fallback={<p role="status">{t('kart.bots.loading')}</p>}>
+          <ReplayView
+            replay={replay}
+            nameOf={nameOf}
+            you={game.playerSeat}
+            onClose={() => setWatching(false)}
+          />
+        </Suspense>
+      )
+    }
     return (
       <Results data-testid="kart-bots-results">
         <Card>
@@ -164,6 +187,19 @@ function BotRound({
             </TeamLine>
           )}
           <Standings view={view} order={order} nameOf={nameOf} />
+          {replay && (
+            <Actions>
+              <Button
+                type="button"
+                $variant="secondary"
+                onClick={() => setWatching(true)}
+                data-testid="kart-replay-open"
+              >
+                {t('games.kart.replay.watch')}
+              </Button>
+              <ReplayShare replay={replay} nameOf={nameOf} you={game.playerSeat} />
+            </Actions>
+          )}
           <Actions>
             {cup ? (
               <Button
@@ -198,7 +234,7 @@ function BotRound({
     <>
       <RaceView
         view={view}
-        realtime={game.realtime}
+        realtime={recording.realtime ?? game.realtime}
         act={act}
         nameOf={nameOf}
         lookOf={(seat) => game.entries[seat] ?? null}

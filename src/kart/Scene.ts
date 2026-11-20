@@ -27,6 +27,7 @@ import {
   type KartLights,
 } from './art/nightLights.ts'
 import { QUALITY, type Quality } from './quality.ts'
+import { nextResolution, startResolution } from './resolution.ts'
 import { createKartEffects, type KartEffects } from './art/effects.ts'
 import { buildKartEnvironment } from './art/kartParts.ts'
 import { createPost, type PostFrame } from './post.ts'
@@ -79,6 +80,12 @@ const CAMERA_RISE = 7
 const OVERHEAD_UP = 55
 const OVERHEAD_BACK = 18
 const MAX_PIXEL_RATIO = 2
+/**
+ * 2026-11-20 (docs/KART-PERF.md): beyond this many metres from the camera another kart is drawn as
+ * its far version, by the quality: the higher, the further, so that the change is a few pixels
+ */
+const FAR_KART: Record<Quality, number> = { low: 22, medium: 32, high: 45 }
+const FAR_GIVE = 2
 /** Walls are drawn this high and this thick; the physics sees only their centre line */
 const WALL_HEIGHT = 1.1
 const WALL_THICKNESS = 0.5
@@ -132,6 +139,17 @@ export interface HitFrame {
   readonly shake?: { readonly x: number; readonly y: number }
 }
 
+/** What a frame cost to draw (KartScene.stats) */
+export interface RenderStats {
+  readonly calls: number
+  readonly triangles: number
+  readonly geometries: number
+  readonly textures: number
+  readonly programs: number
+  /** Device pixels per CSS pixel drawn now */
+  readonly pixelRatio: number
+}
+
 /** Where a point of the world is on the canvas, in CSS pixels from its top left; null off screen */
 export type ScreenPoint = { readonly x: number; readonly y: number } | null
 
@@ -170,6 +188,13 @@ export interface KartScene {
   project(points: readonly (readonly [number, number, number])[]): ScreenPoint[]
   /** `{width}x{height}` of the drawing buffer */
   drawingBuffer(): string
+  /**
+   * 2026-11-20 (docs/KART-PERF.md): what the last frame cost the GPU, every pass of it counted
+   * (the scene, the shadow map, the picture's development), and what is held on it
+   */
+  stats(): RenderStats
+  /** The last frame's draw calls and triangles alone, without allocating */
+  drawn(): { readonly calls: number; readonly triangles: number }
   /** Frees everything on the GPU and takes the canvas out of the page */
   dispose(): void
 }
@@ -207,6 +232,7 @@ export function createKartScene(
   driver: DriverId = 'spade',
 ): KartScene {
   const settings = QUALITY[quality]
+  const farAt = FAR_KART[quality]
   const software = softwareRenderer()
   const postLevel = software ? 'off' : settings.post
   const renderer = new WebGLRenderer({
@@ -214,13 +240,19 @@ export function createKartScene(
     antialias: settings.antialias && postLevel === 'off',
     powerPreference: 'high-performance',
   })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO, settings.pixelRatio))
+  const topRatio = Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO, settings.pixelRatio)
+  renderer.setPixelRatio(topRatio)
+  // 2026-11-20 (resolution.ts): fewer pixels when the frames cannot keep up; not where the processor
+  // draws (the browser tests), which never keeps up and whose pictures should stay as they are
+  let resolution = software ? null : startResolution(topRatio)
   // 2026-11-18: bloom, a tone curve and (high) a vignette, heat shimmer and a boost's streak
   const post = createPost(renderer, postLevel, settings.antialias ? 4 : 0)
   // A track's art casts shadows near the car when the quality allows (e8-t06)
   const shadows = track !== undefined && settings.shadowMap > 0
   renderer.shadowMap.enabled = shadows
   renderer.shadowMap.type = PCFShadowMap
+  // Counted over every pass of a frame, not just the last one (stats())
+  renderer.info.autoReset = false
   renderer.domElement.style.display = 'block'
   container.append(renderer.domElement)
 
@@ -292,7 +324,7 @@ export function createKartScene(
     : buildKartEnvironment(renderer, theme.skyTop, theme.skyHorizon)
   const finish: KartFinish = { environment, glow: post?.glow ?? 1 }
   // The hover kart and its driver (e8-t07, 2026-11-14), with its sparks, trails and boost flames
-  const kart = buildKartModel(shadows, false, body, driver, finish)
+  const kart = buildKartModel(shadows, false, body, driver, finish, { shadowProxy: true })
   const car = kart.group
   scene.add(car)
   const effects = createKartEffects(scene, kart, false, finish.glow)
@@ -353,6 +385,7 @@ export function createKartScene(
   let time = 0
   /** Draws the frame: developed (post.ts) where the quality has it, else straight to the screen */
   const present = (boost: number, frameSeconds: number, shimmer: boolean) => {
+    renderer.info.reset()
     if (!post) {
       renderer.render(scene, camera)
       return
@@ -412,6 +445,16 @@ export function createKartScene(
     camera.updateProjectionMatrix()
   }
   resize()
+  /** The frame rate's say on the pixel ratio (resolution.ts) */
+  const tune = (frameSeconds: number) => {
+    if (!resolution) return
+    const next = nextResolution(resolution, frameSeconds)
+    const changed = next.ratio !== resolution.ratio
+    resolution = next
+    if (!changed) return
+    renderer.setPixelRatio(next.ratio)
+    resize()
+  }
   const observer = new ResizeObserver(resize)
   observer.observe(container)
 
@@ -502,6 +545,7 @@ export function createKartScene(
         )
 
       present(motion ? Math.min(1, rig.boost + (rig.kick ?? 0) * 0.6) : 0, frameSeconds, motion)
+      tune(frameSeconds)
     },
     watch(pose, chased, frameSeconds, overhead) {
       const { x, z } = pose
@@ -539,6 +583,7 @@ export function createKartScene(
         )
       }
       present(motion ? rig.boost : 0, frameSeconds, false)
+      tune(frameSeconds)
     },
     view(view) {
       looking = view
@@ -580,7 +625,7 @@ export function createKartScene(
           model = undefined
         }
         if (!model) {
-          model = buildKartModel(false, false, other.body, other.driver, finish)
+          model = buildKartModel(false, false, other.body, other.driver, finish, { far: true })
           otherKarts.set(other.id, model)
           scene.add(model.group)
           otherEffects.set(other.id, createKartEffects(scene, model, true, finish.glow))
@@ -593,6 +638,11 @@ export function createKartScene(
           }
         }
         model.group.position.set(other.x, 0, other.z)
+        // 2026-11-20 (docs/KART-PERF.md): far off, its few-draw version (with a little give, so that
+        // a kart at the edge does not flick between the two)
+        const away = Math.hypot(other.x - camera.position.x, other.z - camera.position.z)
+        if (away > farAt + FAR_GIVE) model.detail(true)
+        else if (away < farAt - FAR_GIVE) model.detail(false)
         const lift = liftOf(other, Math.abs(other.look.speed))
         spinModel(model.group, other.heading, spins.get(other.id), lift)
         model.update(other.look, frameSeconds, dazedBy(spins.get(other.id)))
@@ -638,6 +688,15 @@ export function createKartScene(
       })
     },
     drawingBuffer: () => `${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`,
+    drawn: () => renderer.info.render,
+    stats: () => ({
+      calls: renderer.info.render.calls,
+      triangles: renderer.info.render.triangles,
+      geometries: renderer.info.memory.geometries,
+      textures: renderer.info.memory.textures,
+      programs: renderer.info.programs?.length ?? 0,
+      pixelRatio: renderer.getPixelRatio(),
+    }),
     dispose() {
       observer.disconnect()
       for (const geometry of [groundGeometry, grid.geometry, wallGeometry]) {

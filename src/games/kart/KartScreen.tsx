@@ -24,6 +24,8 @@ const SpectateView = lazy(() => import('../../kart/watch/SpectateView.tsx'))
 const ReplayView = lazy(() => import('../../kart/watch/ReplayView.tsx'))
 // 2026-11-17: the waiting room's garage, opened from the results to race the rematch in another kart
 const RoomGarage = lazy(() => import('../../kart/roster/RoomGarage.tsx'))
+// 2026-11-20 (docs/KART-NETCODE.md §11.4): the replay as a file or a link, a small chunk of its own
+const ReplayShare = lazy(() => import('../../kart/watch/ReplayShare.tsx'))
 
 /**
  * The race room's screen (e9-t07, e9-t08, e9-t10). A racer gets the race full screen, from the grid
@@ -44,6 +46,8 @@ export default function KartScreen({ room, game }: GameScreenProps) {
   const [watchChoice, setWatchChoice] = useState<boolean | null>(null)
   const [replay, setReplay] = useState<Replay | null>(null)
   const [garage, setGarage] = useState(false)
+  // The race as recorded, made once the race is over (for the file)
+  const [finished, setFinished] = useState<Replay | null>(null)
   const nameOf = (seat: number) => {
     const member = Object.values(room.view.members).find((one) => one.seat === seat)
     return member
@@ -86,6 +90,8 @@ export default function KartScreen({ room, game }: GameScreenProps) {
     )
   }
   const canReplay = game.over && recording.recorder.hasFrames()
+  if (canReplay && !finished) setFinished(recording.recorder.replay())
+  if (!game.over && finished) setFinished(null)
   const canChange = game.over && me !== undefined && room.onSetLook !== undefined
   return (
     <>
@@ -102,6 +108,11 @@ export default function KartScreen({ room, game }: GameScreenProps) {
                 >
                   {t('games.kart.replay.watch')}
                 </Button>
+              )}
+              {canReplay && finished && (
+                <Suspense fallback={null}>
+                  <ReplayShare replay={finished} nameOf={nameOf} you={view.you} />
+                </Suspense>
               )}
               {canChange && (
                 <Button

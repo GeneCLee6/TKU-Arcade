@@ -5,9 +5,7 @@ import {
   advancePlayhead,
   createKartTape,
   createReplayRecorder,
-  decodeReplay,
   decodeTape,
-  encodeReplay,
   heldAt,
   lapsAt,
   openReplay,
@@ -26,6 +24,7 @@ import {
   type RecordedView,
   type ReplaySample,
 } from '../../shared/kart/replay.ts'
+import { decodeReplay, encodeReplay } from '../../shared/kart/replayBlob.ts'
 
 const frame = (tick: number, extra: Partial<KartFrame> = {}): KartFrame => ({
   tick,

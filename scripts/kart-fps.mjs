@@ -4,10 +4,16 @@
 // (run each on its own port); it says nothing about a phone.
 //
 //   node scripts/kart-fps.mjs [--base http://localhost:5263] [--qualities low,medium,high]
-//        [--bots 7] [--seconds 10] [--mobile] [--track riverside]
+//        [--bots 7] [--seconds 10] [--warmup 0] [--mobile] [--track riverside]
 //
 // 2026-11-20: `--track danhai` (or oldstreet) measures a night track, its headlights and street
 // lamps (ARCHITECTURE.md §4.47)
+//
+// 2026-11-20 (docs/KART-PERF.md): `--track all` runs every built-in track; `--screens
+// desktop,phone,small` picks the sizes (1280x720@1, 844x390@3, 667x375@2; `--mobile` is `phone`);
+// each line also says the frame's draw calls, triangles, the geometries and textures held on the GPU
+// and the JS time of a frame (window.__kartSpike.render / jsMs). `--json out.json` keeps the rows.
+import { writeFileSync } from 'node:fs'
 import { chromium } from '@playwright/test'
 
 const args = process.argv.slice(2)
@@ -19,8 +25,22 @@ const base = option('base', 'http://localhost:5263')
 const qualities = option('qualities', 'low,medium,high').split(',')
 const bots = option('bots', '7')
 const seconds = Number(option('seconds', '10'))
-const mobile = args.includes('--mobile')
-const track = option('track', 'riverside')
+// Seconds of the race let run before counting: the grid spreads out (docs/KART-PERF.md)
+const warmup = Number(option('warmup', '0'))
+const TRACKS = [
+  'riverside', 'harbour', 'tamkang', 'oldstreet', 'guanyin', 'mangrove',
+  'fort', 'danhai', 'datun', 'wharf', 'lanes', 'works',
+]
+const SCREENS = {
+  desktop: { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, label: '1280x720@1' },
+  phone: { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, label: '844x390@3' },
+  small: { viewport: { width: 667, height: 375 }, deviceScaleFactor: 2, label: '667x375@2' },
+}
+const trackOption = option('track', 'riverside')
+const tracks = trackOption === 'all' ? TRACKS : trackOption.split(',')
+const screens = option('screens', args.includes('--mobile') ? 'phone' : 'desktop').split(',')
+const jsonOut = option('json', '')
+const rows = []
 
 const browser = await chromium.launch({
   args: [
@@ -32,10 +52,15 @@ const browser = await chromium.launch({
     '--disable-gpu-vsync',
   ],
 })
+for (const screenName of screens) {
+for (const track of tracks) {
 for (const quality of qualities) {
+  const screen = SCREENS[screenName]
+  if (!screen) throw new Error(`No screen ${screenName}`)
   const context = await browser.newContext({
-    viewport: mobile ? { width: 844, height: 390 } : { width: 1280, height: 720 },
-    deviceScaleFactor: mobile ? 3 : 1,
+    viewport: screen.viewport,
+    deviceScaleFactor: screen.deviceScaleFactor,
+    hasTouch: screenName !== 'desktop',
   })
   const page = await context.newPage()
   await page.addInitScript((level) => {
@@ -58,13 +83,39 @@ for (const quality of qualities) {
   await page.waitForFunction(() => (window.__kartSpike?.tick ?? 0) > 60, undefined, {
     timeout: 60_000,
   })
-  const frames = () => page.evaluate(() => window.__kartSpike.frames)
-  const from = await frames()
+  if (warmup > 0) await page.waitForTimeout(warmup * 1000)
+  const totals = () => page.evaluate(() => ({ ...window.__kartSpike.totals }))
+  const from = await totals()
   const started = Date.now()
   await page.waitForTimeout(seconds * 1000)
-  const drawn = (await frames()) - from
+  const to = await totals()
+  const drawn = to.frames - from.frames
   const fps = drawn / ((Date.now() - started) / 1000)
-  console.log(`${quality.padEnd(6)} ${fps.toFixed(0)} fps (${track}, ${bots} bots, ${mobile ? '844x390@3' : '1280x720'})`)
+  // Averaged over the frames counted, where the build keeps totals (2026-11-20)
+  const mean = (key) => (to[key] === undefined ? undefined : (to[key] - from[key]) / drawn)
+  const stats = await page.evaluate(() => ({
+    render: window.__kartSpike.render ?? null,
+    jsMs: window.__kartSpike.jsMs ?? null,
+    heap: performance.memory ? performance.memory.usedJSHeapSize / 1e6 : null,
+  }))
+  const r = stats.render && { ...stats.render, calls: Math.round(mean('calls') ?? stats.render.calls), triangles: mean('triangles') ?? stats.render.triangles }
+  if (mean('jsMs') !== undefined) stats.jsMs = mean('jsMs')
+  const row = {
+    screen: screen.label, track, quality, fps: Math.round(fps),
+    calls: r?.calls, triangles: r?.triangles, geometries: r?.geometries, textures: r?.textures,
+    programs: r?.programs, pixelRatio: r?.pixelRatio,
+    jsMs: stats.jsMs === null ? null : Number(stats.jsMs.toFixed(2)),
+    heapMB: stats.heap === null ? null : Number(stats.heap.toFixed(0)),
+  }
+  rows.push(row)
+  console.log(
+    `${quality.padEnd(6)} ${String(row.fps).padStart(4)} fps  ${track.padEnd(9)} ${screen.label.padEnd(10)}` +
+      (r ? `  calls ${r.calls}  tris ${(r.triangles / 1000).toFixed(0)}k  geo ${r.geometries}  tex ${r.textures}  prog ${r.programs}  pr ${r.pixelRatio}` : '') +
+      (row.jsMs !== null ? `  js ${row.jsMs} ms` : '') + (row.heapMB !== null ? `  heap ${row.heapMB} MB` : ''),
+  )
   await context.close()
 }
+}
+}
+if (jsonOut) writeFileSync(jsonOut, JSON.stringify(rows, null, 2))
 await browser.close()

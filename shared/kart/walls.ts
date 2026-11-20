@@ -47,6 +47,30 @@ export interface WallResult {
   readonly touching: boolean
 }
 
+/**
+ * 2026-11-20 (docs/KART-PERF.md): each wall's box (min x, min z, max x, max z), worked out once per
+ * list of walls. A car further than its radius (and a millimetre more, for rounding) outside a
+ * wall's box is further than its radius from the wall, so that wall is passed over without working
+ * out its nearest point: exactly as before, with the same walls pushing in the same order, only
+ * without the arithmetic for the walls far away (most of a track's, every step, for every kart)
+ */
+const boxesOf = new WeakMap<readonly Wall[], Float64Array>()
+const BOX_SLACK = 1e-3
+
+function wallBoxes(walls: readonly Wall[]): Float64Array {
+  let boxes = boxesOf.get(walls)
+  if (boxes && boxes.length === walls.length * 4) return boxes
+  boxes = new Float64Array(walls.length * 4)
+  walls.forEach((wall, index) => {
+    boxes![index * 4] = Math.min(wall.ax, wall.bx)
+    boxes![index * 4 + 1] = Math.min(wall.az, wall.bz)
+    boxes![index * 4 + 2] = Math.max(wall.ax, wall.bx)
+    boxes![index * 4 + 3] = Math.max(wall.az, wall.bz)
+  })
+  boxesOf.set(walls, boxes)
+  return boxes
+}
+
 /** The point of the segment nearest to (x, z) */
 function nearest(wall: Wall, x: number, z: number): { x: number; z: number } {
   const dx = wall.bx - wall.ax
@@ -91,6 +115,7 @@ export function collideWalls(
   // A car in the air is over every wall whose top it has cleared
   const height = (after.air ?? 0) > 0 ? (after.y ?? 0) : -Infinity
 
+  const boxes = wallBoxes(walls)
   let x = before.x
   let z = before.z
   let vx = after.vx
@@ -111,8 +136,17 @@ export function collideWalls(
       z += (vz * dt) / checks
     }
     for (let pass = 0; pass < PASSES; pass++) {
-      for (const wall of walls) {
+      for (let index = 0; index < walls.length; index++) {
+        const wall = walls[index]!
         if (wall.top !== undefined && height >= wall.top) continue
+        const reach = radius + BOX_SLACK
+        if (
+          x < boxes[index * 4]! - reach ||
+          z < boxes[index * 4 + 1]! - reach ||
+          x > boxes[index * 4 + 2]! + reach ||
+          z > boxes[index * 4 + 3]! + reach
+        )
+          continue
         const point = nearest(wall, x, z)
         const awayX = x - point.x
         const awayZ = z - point.z
