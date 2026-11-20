@@ -8,6 +8,7 @@ import { RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
 import type { KartMode } from '../../shared/games/kart/types.ts'
 import { DRIVERS, measure } from '../../scripts/kart/drivers.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
+import { createTrackBrain } from '../../src/kart/bots/routes.ts'
 import { botSeats, createBotRace } from '../../src/kart/bots/botRace.ts'
 import { IDLE_USE_MS, wantsToUse, type ItemSituation } from '../../src/kart/bots/itemSense.ts'
 import { createLocalRoom } from '../../src/kart/bots/localRoom.ts'
@@ -35,15 +36,8 @@ function solo(track: Track, difficulty: Difficulty, seed: number) {
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
   const skill = BOT_SKILLS[difficulty]
-  const brain = createBotBrain(
-    skill,
-    track.road,
-    KART_TUNING,
-    seed,
-    track.jumps,
-    track.walls,
-    trackGuide(track.id),
-  )
+  // 2026-11-20: the hands that choose the road on a track with branches (routes.ts)
+  const brain = createTrackBrain(skill, track, KART_TUNING, seed)
   let trial = startTrial(course)
   let wrongWays = 0
   for (let step = 0; trial.phase !== 'finished' && step < 400 * 60; step++) {

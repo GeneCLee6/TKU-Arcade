@@ -1093,7 +1093,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 **路線與電腦車**（`src/kart/bots/routes.ts`，新；`brain.ts` 沒動）
 
 - `routeRoad(track, taken)`：主線接上選定的分支，變成一條封閉中心線（附 `from`：每點來自主線還是哪條分支、`main`：主線路點對應到路線的哪一點）。
-- `createTrackBrain(skill, track, tuning, seed)`：沒有分支＝`createBotBrain(...)` 原樣（逐步相同，測試擋）。有分支：兩顆腦，一顆開主線（主線導引 `trackGuide`），一顆開「每條分支都走」的路線（路線導引 `routeGuide`，`guides.ts` 新的表）。**每一步兩顆都算**（讓接手的那顆看到的是真實車況），選一個輸出：車在分支上（`forkAt`）→ 路線腦；在分支前 16 個路點內且 `skill.tricks` 且這條沒失敗過 → 路線腦；否則主線腦。接近或在分支上被復位＝這條「失敗」，直到過了它才再試（甩尾起跳不夠的車不會一直撞欄）。三種難度電腦車沒有 `tricks`，永遠走主線（專家難度那邊若給 `tricks`，就會走分支）。`botRace.ts`、`drivers.ts`（`kart:feel`、`?autopilot=`）都改用它。
+- `createTrackBrain(skill, track, tuning, seed)`：沒有分支＝`createBotBrain(...)` 原樣（逐步相同，測試擋）。有分支：兩顆腦，一顆開主線（主線導引 `trackGuide`），一顆開「每條分支都走」的路線（路線導引 `routeGuide`，`guides.ts` 新的表）。**每一步兩顆都算**（讓接手的那顆看到的是真實車況），選一個輸出：車在分支上（`forkAt`）→ 路線腦；在分支前 16 個路點內且 `skill.tricks` 且這條沒失敗過 → 路線腦；否則主線腦。接近或在分支上被復位＝這條「失敗」，直到過了它才再試（甩尾起跳不夠的車不會一直撞欄）。簡單／普通／困難沒有 `tricks`，永遠走主線；**專家**（#111）有，每條分支都走（`skillTracks.test.ts` 釘住：兩個種子三圈、每圈每條、零逆走零復位）。`botRace.ts`、`drivers.ts`（`kart:feel`、`?autopilot=`）都改用它。
 
 **畫面**：`forkArt.ts`（新）畫每條分支的柏油與路緣漆（開放的帶子，比主路高一點並用 polygon offset，重疊處不閃）；有分支的賽道主線的護欄改成照 `allWalls` 的路緣逐段畫（一個 mesh），岔路口真的開著。`cornerSigns.ts` 的 `branchCornerSigns` 在分支自己的彎外側立箭頭板。小地圖多畫分支（`Minimap` 的 `forks`），下一個閘門的替身也標出來。觀戰、重播用同一份賽道，自動有。
 

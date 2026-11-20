@@ -522,13 +522,15 @@ describe.each(BRANCH_TRACKS)('%s, its branches', (id) => {
     expect(taken.size).toBe(forks.length * track.laps)
   }, 60_000)
 
-  it.each(DIFFICULTIES)('a %s computer kart keeps to the main road, two seeds, never the wrong way', (level) => {
+  // The expert computer kart (expert.ts) knows the techniques: it takes every branch too
+  it.each(DIFFICULTIES)('a %s computer kart, two seeds, never the wrong way: down the branches only if it knows how', (level) => {
+    const skill = BOT_SKILLS[level]
     for (const seed of [5, 9]) {
-      const { trial, taken, wrong } = drive(BOT_SKILLS[level], seed)
+      const { trial, taken, wrong } = drive(skill, seed)
       expect(trial.phase, `seed ${seed}`).toBe('finished')
       expect(wrong, `seed ${seed}`).toBe(0)
       expect(trial.run.resets, `seed ${seed}`).toBe(0)
-      expect(taken.size, `seed ${seed}`).toBe(0)
+      expect(taken.size, `seed ${seed}`).toBe(skill.tricks ? forks.length * track.laps : 0)
     }
   }, 120_000)
 })
