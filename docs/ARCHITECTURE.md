@@ -1109,6 +1109,34 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **限制（照實寫）**：(1) 碼頭倉庫的頂尖 vs 熟練從 11% 掉到約 6–7%：真岔路比「寬路裡的後巷」窄、要轉的角度大，頂尖腳本在那裡沒有以前快；測試門檻相應放寬到 5.5%。(2) 分支不能從分支再分（巢狀）、不能立體交叉（高架只是比旁邊高，不會從主路上面跨過去）。(3) 編輯器的繞道只是「平移的平行路」，沒有跳台、牆或縫。(4) 頂尖腳本的路線是「每條都走」，沒有「這圈太慢就不走」的判斷；專家電腦車要走分支，得在那個分支加 `tricks`。
 
+### 4.42 路線圖外：倒數時全員排在起跑格上、起跑加速放寬（2026-11-20，`feat/kart-grid-start`）
+
+擁有者（2026-11-20）：「要像跑跑一樣倒數321時，全部車手一起排成一排，目前是只能看的到自己車子，起步噴射範圍要給寬一點，我常常按了但沒噴成功」。原因、新規則與數字在 `KART-FEEL.md` §15、線上的部分在 `KART-NETCODE.md` §19；這裡記程式怎麼做的。
+
+**GO 前別人的車**（`src/kart/race/netRace.ts`）
+
+- `onGrid(poses, view)`：房間在 `loading`／`countdown`、本機算的剩餘秒數還 > 0 時，把 `view.racers` 裡除了自己、還沒退賽的每一台放在 `gridSpot(track, slot)`（`slot`＝在 `racers` 裡的位置，房間的格位就是這個），速度 0、不 stale。車款與車手：最新 frame 的車 byte；沒有 frame 時 `RaceNetOptions.lookOf(seat)`，再沒有就用預設車。`others()`、名牌（`drawn`）、小地圖都用這份；GO 之後照舊用 `remotes.ts` 的插值。
+- `lookOf`：`RaceView` 的新 prop。多人房（`KartScreen`）從成員的 `look`（`parseLook`）；對戰電腦／大獎賽（`BotRaceView`）從電腦車名單的 `kart`／`driver`。
+- **倒數的 frame tick**：`send` 在倒數時用 `countdown()` 讀到的房間剩餘秒數（不是比賽那個「準備」時停在 3 的倒數），GO 還沒定就不送；`botRace.ts` 的 `sendFrame` 用房間的 `goAt` 同樣處理。tick 不再停住，別人的 `remotes.ts` 不會在「3」「2」把它標成 stale。
+
+**倒數鏡頭**（`src/kart/director.ts`，新，純函式）
+
+- `gridShot(spots)`：桿位的前進方向上，最後一格再往後 `GRID_SHOT_BACK` 11 m、高 `GRID_SHOT_UP` 6.5 m、橫向在整個格的中間；看向桿位前 6 m。所有格位都在鏡頭前方 ±25° 內（測試釘住）。
+- `countdownBlend(left)`：剩餘秒數 ≥ `GLIDE_FROM` 2.1（或還沒定 GO）＝1，到 `GLIDE_TO` 1.05 平滑（smoothstep）降到 0；減少動態時剩 `CUT_AT` 1.6 秒一刀切。
+- `KartScene.shot(shot | null)`（`Scene.ts`）：追車鏡頭照常算完，再把位置與注視點各自往 `shot.eye`／`shot.target` 內插 `blend`。調參用的 `view`（看車的角度）優先。
+- `spikeLoop.ts`：有 `SpikeNet.gridSpots`（新，選填；`netRace` 給每個格位）而且在倒數時，每幀 `scene.shot(countdownShot(...))`；之後給一次 null。計時賽沒有 `net`，不變。
+
+**起跑加速**（`shared/kart/timeTrial.ts`、`physics.ts`、`touch.ts`、`tuning.ts`）
+
+- 經典手感 `startWindow` 0.5 → **1** 秒、`startLate` 0.1 → **0.25** 秒（面板上限 1 → 2 秒）。
+- `TrialStart` 多 `'late'`：經典手感、還沒起跑加速、GO 後超過 `startLate` 但在 `START_LATE_TELL` 0.75 秒內第一次新按下 → `'late'`（沒有加速，只有提示）。
+- 「新按下」＝油門按著、不是自動油門、而且（上一步沒按著，或這一步有 `throttleTap`）。
+- `KartInput.autoThrottle`（新，選填，物理不讀）：`touchInput` 只有自動油門撐著時標記；`mergeInputs` 只有兩邊都只是自動油門（或沒按）時保留。
+- `parseStoredTuning`：經典手感存的值剛好是舊預設（0.5／0.1）就換成新預設（`widenedStart`），其他自己改過的值照留。
+- 提示（`callouts.ts`、`Hud.tsx`）：`quick` 的字改「太早」，新的 `startLate`「太晚」（紅）；倒數提示「數到 1 時按住前進：完美起跑」。
+
+**測試**：`tests/kart/startWindow.test.ts`（新）、`tests/kart/gridStart.test.ts`（新）、`e2e/kart-bots.spec.ts`（倒數中就看得到電腦車）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

@@ -14,6 +14,12 @@
 // KART-FEEL.md): pressed in the last `startWindow` before GO and held, or pressed afresh within
 // `startLate` after it, the full start boost (the engine's pull times `startAccelFactor` for
 // `startBoostDuration`); held from earlier, `startEarlyShare` of it. Never a stall.
+//
+// Wider (2026-11-20, owner: "the start boost window should be wider, I often press and get nothing"):
+// the whole of the "1" (`startWindow` 1 s) and `startLate` 0.25 s after GO, which a press in answer
+// to the GO itself can make. A fresh press after that, while the car is still leaving the grid
+// (`START_LATE_TELL`), is told as too late; the automatic throttle of the on-screen buttons
+// (KartInput.autoThrottle) is no press at all, so it never earns a start boost by itself.
 import { resetRun, startRun, stepRun, type Course, type Run } from './course.ts'
 import {
   DEFAULT_RULES,
@@ -32,6 +38,8 @@ export const COUNTDOWN_SECONDS = 3
 /** Going against the road at least this fast, for this long, is going the wrong way */
 export const WRONG_WAY_SPEED = 3
 export const WRONG_WAY_SECONDS = 1
+/** A fresh press up to this long past the late grace is told as too late (the classic feel) */
+export const START_LATE_TELL = 0.75
 /** How much against the road: the direction of travel is more than ~110° from the road's */
 const WRONG_WAY_DOT = -0.35
 
@@ -39,9 +47,10 @@ export type TrialPhase = 'countdown' | 'racing' | 'finished'
 
 /**
  * How the car left the grid: nothing special, a start boost, a stall from a jump start (the arcade
- * feel), or the smaller start boost of a throttle held from too early (the classic feel)
+ * feel), the smaller start boost of a throttle held from too early (the classic feel), or a throttle
+ * pressed just too late for one (the classic feel: nothing comes of it but the word)
  */
-export type TrialStart = 'none' | 'boost' | 'stall' | 'quick'
+export type TrialStart = 'none' | 'boost' | 'stall' | 'quick' | 'late'
 
 export interface Trial {
   readonly phase: TrialPhase
@@ -183,16 +192,22 @@ export function stepTrial(
 
   let before = trial.run
   let start = trial.start
-  // The classic feel: the throttle pressed afresh just after GO is still on time
+  // The classic feel: the throttle pressed afresh just after GO is still on time; a little later it
+  // is too late, and says so. The automatic throttle is not a press; a tap of GAS over it is
   if (
     tuning.model === MODEL_CLASSIC &&
     start === 'none' &&
-    trial.steps < Math.round(tuning.startLate / STEP_SECONDS) &&
     input.throttle &&
-    !before.kart.throttleHeld
+    !input.autoThrottle &&
+    (!before.kart.throttleHeld || input.throttleTap === true)
   ) {
-    start = 'boost'
-    before = { ...before, kart: launch(before.kart, tuning.startBoostDuration) }
+    const lateSteps = Math.round(tuning.startLate / STEP_SECONDS)
+    if (trial.steps < lateSteps) {
+      start = 'boost'
+      before = { ...before, kart: launch(before.kart, tuning.startBoostDuration) }
+    } else if (trial.steps < lateSteps + Math.round(START_LATE_TELL / STEP_SECONDS)) {
+      start = 'late'
+    }
   }
   const run = stepRun(before, input, course, tuning, rules)
   const steps = trial.steps + 1

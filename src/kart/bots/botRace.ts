@@ -284,8 +284,13 @@ export function createBotRace(options: BotRaceOptions): BotRace {
   const sendFrame = (bot: Bot, input: KartInput, reset: boolean, at: number) => {
     const { trial } = bot
     const kart = trial.run.kart
+    // On the grid the tick is the room's countdown as it is (2026-11-20, as netRace.ts): the race's
+    // is held at 3 through the "ready" second, and a tick that stands still leaves the kart stale
+    const goAt = room.state().goAt
+    const waiting = trial.phase === 'countdown'
+    if (waiting && goAt === null) return
     const frame: KartFrame = {
-      tick: trial.phase === 'countdown' ? -Math.round(trial.countdown * 60) : trial.steps,
+      tick: waiting ? -Math.round(Math.max(0, ((goAt ?? at) - at) / 1000) * 60) : trial.steps,
       x: kart.x,
       z: kart.z,
       heading: kart.heading,

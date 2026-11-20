@@ -45,6 +45,12 @@ export interface KartInput {
    * press. The arcade feel ignores it
    */
   readonly throttleTap?: boolean
+  /**
+   * 2026-11-20: the throttle is down only because the on-screen buttons' automatic throttle holds it
+   * (shared/kart/touch.ts), not because anyone pressed it: no start boost comes of it. The physics
+   * ignores it
+   */
+  readonly autoThrottle?: boolean
   /** Fires a stored boost when it goes from up to down (held down, it fires only once) */
   readonly boost: boolean
   /**
@@ -503,8 +509,11 @@ export const KART_TUNING = {
   padBoostSeconds: 1.2,
 
   // The start boost (timeTrial.ts)
-  /** The throttle pressed this long before GO, or less, and held: the full start boost */
-  startWindow: 0.5,
+  /**
+   * The throttle pressed this long before GO, or less, and held: the full start boost. The whole of
+   * the "1" (2026-11-20, owner: "wider, I often press and get nothing"; it was 0.5 s)
+   */
+  startWindow: 1,
   /** Its length, multiplying the engine's pull by startAccelFactor */
   startBoostDuration: 1.5,
   startAccelFactor: 1.9,
@@ -512,8 +521,8 @@ export const KART_TUNING = {
   startTopSpeedFactor: 1.15,
   /** Held from earlier than the window: this share of the start boost, and no stall */
   startEarlyShare: 0.5,
-  /** Pressed afresh within this long after GO still counts as on time */
-  startLate: 0.1,
+  /** Pressed afresh within this long after GO still counts as on time: a press in answer to GO (was 0.1 s) */
+  startLate: 0.25,
 
   // The dash (the instant boost out of a drift) and its chain
   /**

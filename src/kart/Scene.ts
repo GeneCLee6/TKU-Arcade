@@ -52,6 +52,7 @@ import {
   startRig,
   type Chased,
 } from './camera.ts'
+import type { CameraShot } from './director.ts'
 
 const GROUND_SIZE = 400
 const GRID_CELL = 5
@@ -141,6 +142,11 @@ export interface KartScene {
    * radians round the kart, `back` metres away and `up` metres high; null puts it back
    */
   view(view: { orbit?: number; back?: number; up?: number } | null): void
+  /**
+   * 2026-11-20 (director.ts): a camera placed by hand, blended with the chase camera by its `blend`
+   * (the grid during the countdown); null for the chase camera alone
+   */
+  shot(shot: CameraShot | null): void
   /** Puts the camera straight behind the car at once, as after a reset */
   snapCamera(heading: number, y?: number): void
   /** Where the best run's ghost is now (e8-t11), or null to hide it */
@@ -315,6 +321,7 @@ export function createKartScene(
   }
   let cameraY = 0
   let looking: { orbit?: number; back?: number; up?: number } | null = null
+  let directed: CameraShot | null = null
   const projected = new Vector3()
   /** Stunned by a hit (hitFx.ts): the driver sways for as long as the kart spins */
   const dazedBy = (spin: SpinPose | undefined) => (spin && (spin.yaw !== 0 || spin.lift !== 0) ? 1 : 0)
@@ -447,7 +454,21 @@ export function createKartScene(
         )
       }
       if (looking) camera.lookAt(x, 0.6 + cameraY, z)
-      else
+      else if (directed && directed.blend > 0) {
+        // The chase camera blended into the director's shot (the grid in the countdown)
+        const b = Math.min(1, directed.blend)
+        const { eye, target } = directed
+        camera.position.set(
+          camera.position.x + (eye.x - camera.position.x) * b,
+          camera.position.y + (eye.y - camera.position.y) * b,
+          camera.position.z + (eye.z - camera.position.z) * b,
+        )
+        camera.lookAt(
+          x + sin * CAMERA_LOOK_AHEAD + (target.x - x - sin * CAMERA_LOOK_AHEAD) * b,
+          CAMERA_LOOK_UP + cameraY + (target.y - CAMERA_LOOK_UP - cameraY) * b,
+          z - cos * CAMERA_LOOK_AHEAD + (target.z - z + cos * CAMERA_LOOK_AHEAD) * b,
+        )
+      } else
         camera.lookAt(
           x + sin * CAMERA_LOOK_AHEAD,
           CAMERA_LOOK_UP + cameraY,
@@ -495,6 +516,9 @@ export function createKartScene(
     },
     view(view) {
       looking = view
+    },
+    shot(shot) {
+      directed = shot
     },
     snapCamera(heading, y) {
       rig = startRig(heading)

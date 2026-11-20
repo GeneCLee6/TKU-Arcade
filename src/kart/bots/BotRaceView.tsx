@@ -188,7 +188,13 @@ function BotRound({
   const me = view.racers.find((racer) => racer.seat === game.playerSeat)
   return (
     <>
-      <RaceView view={view} realtime={game.realtime} act={act} nameOf={nameOf} />
+      <RaceView
+        view={view}
+        realtime={game.realtime}
+        act={act}
+        nameOf={nameOf}
+        lookOf={(seat) => game.entries[seat] ?? null}
+      />
       <QuitCorner>
         <Button type="button" $variant="secondary" $size="sm" onClick={onMenu}>
           {t('kart.bots.quit')}
