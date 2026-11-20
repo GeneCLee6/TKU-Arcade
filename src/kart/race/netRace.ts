@@ -45,6 +45,8 @@ import type { RoomRealtime } from '../../lib/useRoom.ts'
 import {
   kartMass,
   kartRadius,
+  DEFAULT_DRIVER,
+  DEFAULT_KART,
   loadoutByte,
   loadoutOfByte,
   type DriverId,
@@ -123,6 +125,32 @@ export interface RaceNetOptions {
   readonly onItemPress?: (item: ItemId) => void
   /** #86: this browser foresaw a hit on its own kart, stunned for `ms` (the room still judges) */
   readonly onForeseenHit?: (item: ShotItem, ms: number) => void
+  /**
+   * 2026-11-20: the kart and driver a seat has picked (a member's `look`, a computer kart's), to draw
+   * it on its place on the grid before any frame of its own has come; null when not known
+   */
+  readonly lookOf?: (seat: number) => { kart: KartBody; driver: DriverId } | null
+}
+
+/** A kart on the grid with no frame of its own yet (onGrid): standing still, the default kart */
+const GRID_FRAME: KartFrame = {
+  tick: 0,
+  x: 0,
+  z: 0,
+  heading: 0,
+  vx: 0,
+  vz: 0,
+  reset: false,
+  drifting: false,
+  boosting: false,
+  skidding: false,
+  finished: false,
+  driftDirection: 0,
+  steer: 0,
+  body: loadoutByte(DEFAULT_KART, DEFAULT_DRIVER),
+  crossings: 0,
+  nextGate: 0,
+  seq: 0,
 }
 
 /** Two of this kart's own steps further apart than this are not one straight path, ms */
@@ -408,10 +436,17 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     return next
   }
 
+  /** Seconds to the room's GO, as last read by the countdown; null while not set */
+  let left: number | null = null
+
   const send = (trial: Trial, input: KartInput, reset: boolean) => {
     const kart = trial.run.kart
+    // On the grid the tick is the room's countdown as it is, not the race's (held at 3 through the
+    // "ready" second): one frame after another, the others' clocks learn this one's (remotes.ts)
+    const waiting = trial.phase === 'countdown'
+    if (waiting && left === null) return
     const frame: KartFrame = {
-      tick: trial.phase === 'countdown' ? -Math.round(trial.countdown * 60) : trial.steps,
+      tick: waiting ? -Math.round(Math.max(0, left ?? 0) * 60) : trial.steps,
       x: kart.x,
       z: kart.z,
       heading: kart.heading,
@@ -435,13 +470,49 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     if (realtime.send(encodeFrame(frame))) debug.sent++
   }
 
+  /**
+   * 2026-11-20 (owner: "at 3-2-1 all the racers should be lined up; now I can only see my own"): up
+   * to GO every other racer still in it is drawn standing on its own place on the grid (the room's
+   * order is the grid's), whether or not its frames have come: held there anyway, it has nowhere
+   * else to be. Its kart and driver from its frames, else from what it picked
+   */
+  const onGrid = (drawn: RemotePose[], view: KartView): RemotePose[] => {
+    if (!(view.phase === 'loading' || view.phase === 'countdown')) return drawn
+    if (left !== null && left <= 0) return drawn
+    const out: RemotePose[] = []
+    view.racers.forEach((racer, slot) => {
+      if (racer.seat === seat || racer.out) return
+      const spot = gridSpot(track, slot)
+      const from = drawn.find((pose) => pose.seat === racer.seat)
+      const look = options.lookOf?.(racer.seat)
+      const frame: KartFrame = from?.frame ?? {
+        ...GRID_FRAME,
+        x: spot.x,
+        z: spot.z,
+        heading: spot.heading,
+        body: look ? loadoutByte(look.kart, look.driver) : GRID_FRAME.body,
+      }
+      out.push({
+        seat: racer.seat,
+        x: spot.x,
+        z: spot.z,
+        heading: spot.heading,
+        vx: 0,
+        vz: 0,
+        frame,
+        stale: false,
+      })
+    })
+    return out
+  }
+
   const net: SpikeNet = {
     start: gridSpot(track, options.slot),
     laps: options.laps,
     countdown() {
       const goAt = options.goAt()
       const now = serverNow()
-      const left = goAt === null || now === null ? null : (goAt - now) / 1000
+      left = goAt === null || now === null ? null : (goAt - now) / 1000
       debug.countdown = left
       if (left !== null && left > 0) debug.counted = true
       return left
@@ -466,10 +537,11 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           const { kart } = loadoutOfByte(pose.frame.body)
           return { ...pose, mass: kartMass(kart), radius: kartRadius(kart) }
         }),
+    gridSpots: () => options.view().racers.map((_, slot) => gridSpot(track, slot)),
     others() {
-      poses = remotes.poses(performance.now() / 1000)
-      debug.others = poses.filter((pose) => !pose.stale).length
       const view = options.view()
+      poses = onGrid(remotes.poses(performance.now() / 1000), view)
+      debug.others = poses.filter((pose) => !pose.stale).length
       const at = roughNow()
       // A team race: whose team boost burns now, by the room's word (their flames are blue)
       const burning = view.teams

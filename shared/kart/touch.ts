@@ -142,8 +142,10 @@ export function touchInput(
   const gas = on('throttle')
   const drift = held.has('drift')
   const brake = held.has('brake')
-  let throttle = gas || (drift && !brake)
-  if (settings.autoThrottle && moment.racing && !brake && !moment.burstWaiting) throttle = true
+  const pressed = gas || (drift && !brake)
+  const automatic =
+    settings.autoThrottle && moment.racing && !brake && !moment.burstWaiting && !pressed
+  const throttle = pressed || automatic
   const steer =
     settings.steer === 'slider'
       ? clamp(reading.slider, -1, 1)
@@ -153,6 +155,8 @@ export function touchInput(
     throttle,
     // A tap of GAS shorter than a step is still a fresh press (the classic feel's instant boost)
     ...(tapped.has('throttle') ? { throttleTap: true } : {}),
+    // Held by the automatic throttle alone: no start boost comes of it (timeTrial.ts)
+    ...(automatic ? { autoThrottle: true } : {}),
     brake,
     steer,
     drift,
@@ -171,6 +175,12 @@ export function mergeInputs(a: KartInput, b: KartInput): KartInput {
     drift: a.drift || b.drift,
     boost: a.boost || b.boost,
     ...(a.throttleTap || b.throttleTap ? { throttleTap: true } : {}),
+    // Only when nothing but an automatic throttle holds it
+    ...((a.throttle || b.throttle) &&
+    (!a.throttle || a.autoThrottle) &&
+    (!b.throttle || b.autoThrottle)
+      ? { autoThrottle: true }
+      : {}),
     reset: (a.reset ?? false) || (b.reset ?? false),
     item: (a.item ?? false) || (b.item ?? false),
   }

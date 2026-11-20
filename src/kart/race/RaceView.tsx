@@ -15,7 +15,7 @@ import type { RoomRealtime } from '../../lib/useRoom.ts'
 import { displayType, monoType } from '../../styles/esports.ts'
 import { broadcast, ticker } from '../ui/broadcast.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import { applyKart } from '../../../shared/kart/karts.ts'
+import { applyKart, type DriverId, type KartId } from '../../../shared/kart/karts.ts'
 import { isTeamId, scoreTeams, type TeamId } from '../../../shared/kart/team.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
 import type { Callout } from '../callouts.ts'
@@ -145,6 +145,8 @@ export interface RaceViewProps {
   nameOf: (seat: number) => string
   /** After the finish: watch the others instead (e9-t10) */
   onWatch?: () => void
+  /** 2026-11-20: the kart and driver each seat picked, to draw it on the grid before its frames come */
+  lookOf?: (seat: number) => { kart: KartId; driver: DriverId } | null
 }
 
 /**
@@ -154,7 +156,14 @@ export interface RaceViewProps {
  * unstable connection are shown on top. At the finish it shows this kart's place and waits for the
  * others; the room's result panel takes over when the server says the race is over.
  */
-export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceViewProps) {
+export default function RaceView({
+  view,
+  realtime,
+  act,
+  nameOf,
+  onWatch,
+  lookOf,
+}: RaceViewProps) {
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
   const [failure, setFailure] = useState(() => !supportsWebGL2())
@@ -184,11 +193,13 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
   const actRef = useRef(act)
   const tRef = useRef(t)
   const nameRef = useRef(nameOf)
+  const lookRef = useRef(lookOf)
   useLayoutEffect(() => {
     latest.current = view
     actRef.current = act
     tRef.current = t
     nameRef.current = nameOf
+    lookRef.current = lookOf
   })
   // Testing a room alone: a second tab can drive itself
   const [autopiloted] = useState(() => new URLSearchParams(window.location.search).has('autopilot'))
@@ -221,6 +232,7 @@ export default function RaceView({ view, realtime, act, nameOf, onWatch }: RaceV
       goAt: () => latest.current.goAt,
       laps: latest.current.laps,
       view: () => latest.current,
+      lookOf: (one) => lookRef.current?.(one) ?? null,
       onItemPress: (item) => {
         pressed.current = TARGETED_ITEMS.has(item) ? { item, at: performance.now() } : null
       },

@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import styled from 'styled-components'
 import type { KartView } from '../../../shared/games/kart/types.ts'
 import type { Replay } from '../../../shared/kart/replay.ts'
+import { parseLook } from '../../../shared/kart/karts.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
 import { useT } from '../../i18n/useT.ts'
@@ -45,6 +46,9 @@ export default function KartScreen({ room, game }: GameScreenProps) {
       ? memberName(member, room.view.room.gameId)
       : t('room.waiting.seat', { seat: seat + 1 })
   }
+  // 2026-11-20: what each seat picked, to draw it on the grid before its frames come
+  const lookOf = (seat: number) =>
+    parseLook(Object.values(room.view.members).find((one) => one.seat === seat)?.look)
   const me = view.racers.find((racer) => racer.seat === view.you)
   const watching = watchChoice ?? (!me || me.out)
   const loading = <Loading role="status">{t('games.kart.race.loading')}</Loading>
@@ -69,6 +73,7 @@ export default function KartScreen({ room, game }: GameScreenProps) {
           realtime={recording.realtime}
           act={room.act}
           nameOf={nameOf}
+          lookOf={lookOf}
           onWatch={() => setWatchChoice(true)}
         />
       </Suspense>

@@ -1109,9 +1109,37 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **限制（照實寫）**：(1) 碼頭倉庫的頂尖 vs 熟練從 11% 掉到約 6–7%：真岔路比「寬路裡的後巷」窄、要轉的角度大，頂尖腳本在那裡沒有以前快；測試門檻相應放寬到 5.5%。(2) 分支不能從分支再分（巢狀）、不能立體交叉（高架只是比旁邊高，不會從主路上面跨過去）。(3) 編輯器的繞道只是「平移的平行路」，沒有跳台、牆或縫。(4) 頂尖腳本的路線是「每條都走」，沒有「這圈太慢就不走」的判斷；專家電腦車要走分支，得在那個分支加 `tricks`。
 
+### 4.42 路線圖外：倒數時全員排在起跑格上、起跑加速放寬（2026-11-20，`feat/kart-grid-start`）
+
+擁有者（2026-11-20）：「要像跑跑一樣倒數321時，全部車手一起排成一排，目前是只能看的到自己車子，起步噴射範圍要給寬一點，我常常按了但沒噴成功」。原因、新規則與數字在 `KART-FEEL.md` §15、線上的部分在 `KART-NETCODE.md` §19；這裡記程式怎麼做的。
+
+**GO 前別人的車**（`src/kart/race/netRace.ts`）
+
+- `onGrid(poses, view)`：房間在 `loading`／`countdown`、本機算的剩餘秒數還 > 0 時，把 `view.racers` 裡除了自己、還沒退賽的每一台放在 `gridSpot(track, slot)`（`slot`＝在 `racers` 裡的位置，房間的格位就是這個），速度 0、不 stale。車款與車手：最新 frame 的車 byte；沒有 frame 時 `RaceNetOptions.lookOf(seat)`，再沒有就用預設車。`others()`、名牌（`drawn`）、小地圖都用這份；GO 之後照舊用 `remotes.ts` 的插值。
+- `lookOf`：`RaceView` 的新 prop。多人房（`KartScreen`）從成員的 `look`（`parseLook`）；對戰電腦／大獎賽（`BotRaceView`）從電腦車名單的 `kart`／`driver`。
+- **倒數的 frame tick**：`send` 在倒數時用 `countdown()` 讀到的房間剩餘秒數（不是比賽那個「準備」時停在 3 的倒數），GO 還沒定就不送；`botRace.ts` 的 `sendFrame` 用房間的 `goAt` 同樣處理。tick 不再停住，別人的 `remotes.ts` 不會在「3」「2」把它標成 stale。
+
+**倒數鏡頭**（`src/kart/director.ts`，新，純函式）
+
+- `gridShot(spots)`：桿位的前進方向上，最後一格再往後 `GRID_SHOT_BACK` 11 m、高 `GRID_SHOT_UP` 6.5 m、橫向在整個格的中間；看向桿位前 6 m。所有格位都在鏡頭前方 ±25° 內（測試釘住）。
+- `countdownBlend(left)`：剩餘秒數 ≥ `GLIDE_FROM` 2.1（或還沒定 GO）＝1，到 `GLIDE_TO` 1.05 平滑（smoothstep）降到 0；減少動態時剩 `CUT_AT` 1.6 秒一刀切。
+- `KartScene.shot(shot | null)`（`Scene.ts`）：追車鏡頭照常算完，再把位置與注視點各自往 `shot.eye`／`shot.target` 內插 `blend`。調參用的 `view`（看車的角度）優先。
+- `spikeLoop.ts`：有 `SpikeNet.gridSpots`（新，選填；`netRace` 給每個格位）而且在倒數時，每幀 `scene.shot(countdownShot(...))`；之後給一次 null。計時賽沒有 `net`，不變。
+
+**起跑加速**（`shared/kart/timeTrial.ts`、`physics.ts`、`touch.ts`、`tuning.ts`）
+
+- 經典手感 `startWindow` 0.5 → **1** 秒、`startLate` 0.1 → **0.25** 秒（面板上限 1 → 2 秒）。
+- `TrialStart` 多 `'late'`：經典手感、還沒起跑加速、GO 後超過 `startLate` 但在 `START_LATE_TELL` 0.75 秒內第一次新按下 → `'late'`（沒有加速，只有提示）。
+- 「新按下」＝油門按著、不是自動油門、而且（上一步沒按著，或這一步有 `throttleTap`）。
+- `KartInput.autoThrottle`（新，選填，物理不讀）：`touchInput` 只有自動油門撐著時標記；`mergeInputs` 只有兩邊都只是自動油門（或沒按）時保留。
+- `parseStoredTuning`：經典手感存的值剛好是舊預設（0.5／0.1）就換成新預設（`widenedStart`），其他自己改過的值照留。
+- 提示（`callouts.ts`、`Hud.tsx`）：`quick` 的字改「太早」，新的 `startLate`「太晚」（紅）；倒數提示「數到 1 時按住前進：完美起跑」。
+
+**測試**：`tests/kart/startWindow.test.ts`（新）、`tests/kart/gridStart.test.ts`（新）、`e2e/kart-bots.spec.ts`（倒數中就看得到電腦車）。
+
 ### 4.43 路線圖外：背圖賽道的地標場景與技術點提示、碼頭倉庫的倉庫巷重設計（2026-11-20，`feat/kart-skill-scenery`）
 
-擁有者要「越來越逼真、越帥」、電競感（#104），以及要背地圖的技術賽道。#109 回報「高牆是素色箱子（貨櫃色／紅磚），沒有個別地標場景」，#113 回報碼頭倉庫的頂尖比熟練從 11% 掉到 6.6%。這一批只畫場景、只動碼頭倉庫一段路線；**碰撞幾何（牆、縫、矮欄的位置與高度）一點都沒改**，手感與數字在 `KART-FEEL.md` §15。（編號跳過 §4.42：同一天平行的 `feat/kart-grid-start` 用它。）
+擁有者要「越來越逼真、越帥」、電競感（#104），以及要背地圖的技術賽道。#109 回報「高牆是素色箱子（貨櫃色／紅磚），沒有個別地標場景」，#113 回報碼頭倉庫的頂尖比熟練從 11% 掉到 6.6%。這一批只畫場景、只動碼頭倉庫一段路線；**碰撞幾何（牆、縫、矮欄的位置與高度）一點都沒改**，手感與數字在 `KART-FEEL.md` §16。
 
 **牆照它是什麼來畫**（`src/kart/art/skillWalls.ts`，新）：`trackArt.ts` 的牆迴圈在 `skillStyleOf(track.id)` 是 `wharf`／`lanes`／`works` 時跳過有 `top` 的牆，改交給這裡。`wallRuns` 把每面牆換成畫的資料（兩端、長度、方向、地面、`top − 地面`；低於 4 m 是矮欄）；`findSlots` 從牆找縫：兩面高牆的**自由端**（不和別面牆共用的端點，所以島的轉角不算）相距 6–13 m、而且兩端都朝對方（同一直線）。不靠導引，所以高架廠區窄巷的縫（在分支上、導引沒有）也找得到；`skillArt.test.ts` 釘住碼頭倉庫與山城坡巷導引上的每一個縫都找得到、廠區一個。
 
@@ -1138,7 +1166,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **效能**（Playwright、`--use-angle=d3d11` 真 GPU、1280 × 720、中畫質、自動駕駛 10 秒）：每幀 draw call 碼頭倉庫 203 → 215、山城坡巷 213 → 228、高架廠區 249 → 242；幀數在量測雜訊內（70 → 79、70 → 73、67.5 → 64）。卡丁車 chunk 391 → 403.0 kB gzip（上限 600）。貨櫃、燈、箭頭、盆栽、燈籠用 instancing，其他用 `Batch` 合併；低畫質照 `level.density` 少放倉庫、房子、貨櫃堆。
 
-**碼頭倉庫 `wharf@3`**（`shared/kart/tracks/wharf.ts`）：倉庫那個左迴轉的進出兩條直線各加長 30 m（`SHED_REACH`），迴轉往外推 30 m、主路那段多 60 m；分支的起訖點跟著往外移，所以在地上的位置不變。分支改成：沿路緣 20° 的緩彎離開（半徑 60 m）、直角左轉（半徑 32 m）到倉庫背面、沿背牆一條直線、再直角左轉接回。主路那段 399 m、分支 201 m（以前 339／256 m）。格式照 #113 的 `branches`，伺服器檢查照舊；`revision` 3。數字與試過的其他設計在 `KART-FEEL.md` §15。
+**碼頭倉庫 `wharf@3`**（`shared/kart/tracks/wharf.ts`）：倉庫那個左迴轉的進出兩條直線各加長 30 m（`SHED_REACH`），迴轉往外推 30 m、主路那段多 60 m；分支的起訖點跟著往外移，所以在地上的位置不變。分支改成：沿路緣 20° 的緩彎離開（半徑 60 m）、直角左轉（半徑 32 m）到倉庫背面、沿背牆一條直線、再直角左轉接回。主路那段 399 m、分支 201 m（以前 339／256 m）。格式照 #113 的 `branches`，伺服器檢查照舊；`revision` 3。數字與試過的其他設計在 `KART-FEEL.md` §16。
 
 **測試**：`skillArt.test.ts`（新：三張圖才換畫法、每面有 `top` 的牆都畫到、導引的每個縫都找得到、廠區的縫寬、倉庫在髮夾裡且離兩條路都 > 4 m、倉庫與貨櫃堆不在路上、海在每條路以東 30 m 以外、樹不長在倉庫裡、水井找得到且不在路上、房子不在路上）；`skillTracks.test.ts` 的碼頭倉庫門檻調回 10%、新手復位上限回 8；`technical.test.ts` 的紀錄 key `wharf@3`。`branchGolden.test.ts` 不動（舊九張與編輯器代碼不變）。
 
