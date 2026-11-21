@@ -268,6 +268,12 @@ export type GameMeta = {
    * loads a module (tests/games/table-bots.test.ts keeps the two in step)
    */
   computer?: true
+  /**
+   * The host may start only once every person seated but the host has said they are ready
+   * (`ready`), and someone whose socket drops is not ready any more (2026-11-21, the kart's waiting
+   * room: shared/protocol.ts 8.). A computer seat is always ready. Without it `ready` only informs
+   */
+  readyCheck?: true
 }
 
 /**

@@ -77,8 +77,16 @@ export interface TrackJson {
   readonly gates: readonly Gate[]
   /** Where a car goes back to after passing each gate: one for each gate */
   readonly respawns: readonly Spot[]
-  /** The starting grid, pole first; at least one place */
+  /**
+   * The starting grid, pole first; at least one place. Since 2026-11-21 one row across the road,
+   * every place the same distance behind the line (startLine.ts)
+   */
   readonly grid: readonly Spot[]
+  /**
+   * Where a kart racing alone starts (the time trial, 2026-11-21): the pole's place from when the grid
+   * went two by two, so that the times and ghosts set from there still stand. Left out: `grid[0]`
+   */
+  readonly solo?: Spot
   /** Walls beyond the two kerbs, which the road gives by itself */
   readonly walls: readonly Wall[]
   readonly boostPads: readonly BoostPad[]
@@ -266,6 +274,7 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
   if (respawns.length !== gates.length) problems.push('respawns: one for each gate')
   const grid = list(json.grid, 'grid', 12, problems, (item, at) => spot(item, at, problems))
   if (grid.length === 0) problems.push('grid: at least one place')
+  const solo = json.solo === undefined ? null : spot(json.solo, 'solo', problems)
   const walls = list(json.walls ?? [], 'walls', MAX_THINGS, problems, (item, at) =>
     wall(item, at, problems),
   )
@@ -318,6 +327,7 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     gates,
     respawns,
     grid,
+    ...(solo ? { solo } : {}),
     walls,
     boostPads,
     itemBoxes,
@@ -486,7 +496,7 @@ export const courseOf = (track: Track): Course => {
   }
   return {
     walls: track.allWalls,
-    start: track.grid[0]!,
+    start: track.solo ?? track.grid[0]!,
     checkpoints: { gates: track.gates, respawns: track.respawns, laps: track.laps },
     boostPads: track.boostPads,
     ...(terrain ? { terrain } : {}),

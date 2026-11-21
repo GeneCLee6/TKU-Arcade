@@ -15,8 +15,8 @@ export const MEDAL_TABLE: Readonly<Record<string, MedalTimes>> = {
   wharf: { laps: 3, bronze: 114.2, silver: 92.3, gold: 81.4, platinum: 77.5 },
   lanes: { laps: 3, bronze: 106.6, silver: 83, gold: 75.7, platinum: 73.7 },
   works: { laps: 3, bronze: 109.8, silver: 94.6, gold: 82.3, platinum: 80.5 },
-  'ch-needle': { laps: 3, bronze: 64.4, silver: 60.7, gold: 47.6, platinum: 45.1 },
-  'ch-hop': { laps: 3, bronze: 61.5, silver: 57.4, gold: 55.1, platinum: 53.4 },
+  'ch-needle': { laps: 3, bronze: 64.3, silver: 60.6, gold: 48.2, platinum: 45.5 },
+  'ch-hop': { laps: 3, bronze: 61, silver: 57.1, gold: 54.9, platinum: 53.5 },
 }
 
 /**
@@ -32,12 +32,12 @@ export const MISSION_PACE: Readonly<Record<string, number>> = {
   hops: 59.4,
   slots: 31.4,
   cover: 50.4,
-  needle: 31.7,
+  needle: 32.2,
   branches: 82.2,
   fog: 74,
-  hopyard: 37,
-  bikeneedle: 33.7,
+  hopyard: 36.9,
+  bikeneedle: 33.5,
   goldlap: 26.5,
-  blindneedle: 47.6,
+  blindneedle: 48.1,
   combo15: 71.7,
 }

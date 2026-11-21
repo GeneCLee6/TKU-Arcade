@@ -44,7 +44,8 @@ export async function joinRoom(page: Page, url: string, nickname: string): Promi
   await page.goto(url)
   await page.getByRole('textbox', { name: 'Nickname' }).fill(nickname)
   await page.getByRole('textbox', { name: 'Nickname' }).press('Enter')
-  await expect(page.getByRole('heading', { name: 'Seats' })).toBeVisible()
+  // The race room's waiting room has its own (src/kart/lobby/KartLobby.tsx)
+  await expect(page.getByRole('heading', { name: /^(Seats|Starting line-up)$/ })).toBeVisible()
 }
 
 /** A running game of two, as seen by the host. Starts by clicking: other specs test the keyboard */

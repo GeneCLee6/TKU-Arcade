@@ -6,23 +6,29 @@
 import { useState } from 'react'
 import styled from 'styled-components'
 import { BOT_LEVELS, type BotLevel } from '../../../shared/games/kart/bots.ts'
-import { DRIVER_IDS, KART_IDS, lookOf } from '../../../shared/kart/karts.ts'
 import { Button } from '../../components/Button.tsx'
 import { Heading, Muted, Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
+import { randomLook } from './botLook.ts'
 import { color, space } from '../../styles/tokens.ts'
 
 export interface RoomBotsProps {
   /** Seats nobody holds */
   free: number
   onAdd(level: string, look?: string): void
+  /** 2026-11-21: the level, kept by the waiting room (its place cards add one too); else its own */
+  level?: BotLevel
+  onLevel?(level: BotLevel): void
 }
 
-const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)] as T
-
-export default function RoomBots({ free, onAdd }: RoomBotsProps) {
+export default function RoomBots({ free, onAdd, level: given, onLevel }: RoomBotsProps) {
   const t = useT()
-  const [level, setLevel] = useState<BotLevel>('normal')
+  const [own, setOwn] = useState<BotLevel>('normal')
+  const level = given ?? own
+  const setLevel = (next: BotLevel) => {
+    setOwn(next)
+    onLevel?.(next)
+  }
   return (
     <Section data-testid="kart-room-bots">
       <Heading>{t('games.kart.bot.title')}</Heading>
@@ -44,7 +50,7 @@ export default function RoomBots({ free, onAdd }: RoomBotsProps) {
         <Button
           $variant="secondary"
           disabled={free <= 0}
-          onClick={() => onAdd(level, lookOf(pick(KART_IDS), pick(DRIVER_IDS)))}
+          onClick={() => onAdd(level, randomLook())}
           data-testid="kart-room-bots-add"
         >
           {t('games.kart.bot.add')}

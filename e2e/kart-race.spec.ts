@@ -41,9 +41,20 @@ test('two people race each other in one room, from the countdown to the results'
   await joinRoom(ann, `/r/${id}?autopilot`, 'Ann')
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
   // e10-t05: Bob picks a kart and a driver in the waiting room, and Ann sees it
+  // 2026-11-21: the garage opens over the waiting room; Ann sees the pick on Bob's place card
+  await bob.getByTestId('kart-lobby-garage').click()
   await bob.getByTestId('kart-room-garage').getByRole('radio', { name: /Egret/ }).click()
   await bob.getByTestId('kart-room-garage').getByRole('radio', { name: 'Club' }).click()
-  await expect(ann.getByTestId('kart-picks')).toContainText('Egret with Club')
+  await bob.getByRole('button', { name: 'Close' }).click()
+  const bobsPlace = ann.locator('[data-testid="kart-lobby-place"]', { hasText: 'Bob' })
+  await expect(bobsPlace).toContainText('Egret')
+  await expect(bobsPlace).toContainText('Club')
+  // Not ready yet: Ann's Start waits and says for whom
+  await expect(ann.getByRole('button', { name: 'Start game' })).toBeDisabled()
+  await expect(ann.getByTestId('kart-lobby-waiting')).toHaveText('Waiting for Bob to get ready')
+  // 2026-11-21: the race waits for everyone to be ready (shared/protocol.ts 8.)
+  await bob.getByTestId('kart-lobby-ready').click()
+  await expect(ann.getByTestId('kart-lobby-waiting')).toHaveText('Everyone is ready')
   await ann.getByRole('button', { name: 'Start game' }).click()
 
   for (const page of [ann, bob]) await expect(page.getByTestId('kart-race')).toBeVisible()
@@ -132,6 +143,9 @@ test('two people and a computer kart race one lap in one room', async ({ browser
     await expect(page.getByTestId('bot-member')).toHaveText(/\(CPU\)$/)
   }
   const botName = (await ann.getByTestId('bot-member').textContent()) ?? ''
+  // 2026-11-21: the race waits for everyone to be ready (shared/protocol.ts 8.)
+  await bob.getByTestId('kart-lobby-ready').click()
+  await expect(ann.getByTestId('kart-lobby-waiting')).toHaveText('Everyone is ready')
   await ann.getByRole('button', { name: 'Start game' }).click()
 
   for (const page of [ann, bob]) await expect(page.getByTestId('kart-race')).toBeVisible()

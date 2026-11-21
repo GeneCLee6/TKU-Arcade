@@ -23,7 +23,7 @@ export const UNLOCK_PASSES = 4
  * - cover: at least `target` per cent of the race in a boost;
  * - place: against the computer, finish in the first `target`;
  * - elimination: against the computer, the last to finish each lap is out; win the last lap;
- * - chase: one computer kart ahead on the grid, at its best: finish before it
+ * - chase: one computer kart at its best (the expert), one on one: finish before it
  */
 export type MissionKind =
   | 'finish'

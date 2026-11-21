@@ -53,7 +53,14 @@ export const GAME_META = {
   'clue-clash': { minPlayers: 3, maxPlayers: 7, minutes: 20, i18nKey: 'games.clue-clash' },
   // One player can open a room alone: to try the track, or to wait on the grid for friends. No
   // proxy turns: there are no turns
-  kart: { minPlayers: 1, maxPlayers: 8, minutes: 5, i18nKey: 'games.kart', tryAlone: '/kart' },
+  kart: {
+    minPlayers: 1,
+    maxPlayers: 8,
+    minutes: 5,
+    i18nKey: 'games.kart',
+    tryAlone: '/kart',
+    readyCheck: true,
+  },
 } as const satisfies Record<string, GameMeta>
 
 export type GameId = keyof typeof GAME_META

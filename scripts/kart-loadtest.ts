@@ -137,6 +137,13 @@ async function main(): Promise<number> {
       () => racers.every((bot) => bot.me()?.seat !== null && bot.me()?.seat !== undefined),
       10_000,
     )
+    // 2026-11-21: the race room starts only once everyone but the host is ready (protocol.ts 8.)
+    for (const bot of racers.slice(1)) bot.sendJson({ t: 'ready', ready: true })
+    await waitFor(
+      'every bot ready',
+      () => racers.slice(1).every((bot) => bot.me()?.ready === true),
+      10_000,
+    )
     // Everyone's clock settled before the countdown, as a browser's is while it loads the track
     await pause(1_500)
     host.sendJson({ t: 'start' })

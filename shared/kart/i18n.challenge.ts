@@ -79,7 +79,7 @@ const en = {
   'kart.challenge.goal.place1': 'Win against {bots} computer karts',
   'kart.challenge.goal.elimination':
     'Against {bots} computer karts, the last over the line each lap is out: win the final lap',
-  'kart.challenge.goal.chase': 'Finish ahead of the computer ace who starts in front of you',
+  'kart.challenge.goal.chase': 'Beat the computer ace, one on one, a kart that drives at its very best',
   'kart.challenge.rule.noCrash': 'Not a single crash',
   'kart.challenge.rule.noN2O': 'No N2O',
   'kart.challenge.rule.noReset': 'No reset',
@@ -201,7 +201,7 @@ const zhTW: Record<KartChallengeKey, string> = {
   'kart.challenge.goal.place': '對 {bots} 台電腦車跑進前 {target} 名',
   'kart.challenge.goal.place1': '對 {bots} 台電腦車拿第一',
   'kart.challenge.goal.elimination': '對 {bots} 台電腦車，每圈最後過線的出局：贏下最後一圈',
-  'kart.challenge.goal.chase': '比排在你前面起跑的電腦王牌先過終點',
+  'kart.challenge.goal.chase': '一對一，比全力開的電腦王牌先過終點',
   'kart.challenge.rule.noCrash': '一次都不能撞牆',
   'kart.challenge.rule.noN2O': '不能用 N2O',
   'kart.challenge.rule.noReset': '不能重設',

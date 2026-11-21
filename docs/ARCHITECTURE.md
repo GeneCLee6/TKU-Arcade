@@ -1409,23 +1409,40 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **CSP 不變**：`worker-src 'self'`、`manifest-src 'self'` 本來就有；service worker 自己的 fetch 也受同一份 CSP（`connect-src 'self'`），所以它只碰同源請求。
 - **測試**：`tests/pwa.test.ts` 在假的全域、Cache Storage 與網路上跑真的 `sw.js`（安裝留下 shell 與離線頁、離線頁不是轉址且帶 CSP、只在頁面說的時候接手、舊快取刪掉、API／WebSocket／POST／別的網域不碰、頁面永遠走網路、雜湊檔第一次之後從快取、錯誤與 HTML 不留、Range 不碰），外掛的 shell、版本與範本；`e2e/pwa.spec.ts`（manifest 與圖示可讀、註冊、快取內容、離線頁與 0 個 CSP 違規、再試一次回到大廳、API 不經 service worker；只有 build 出來的站有 service worker，dev server 上跳過）。更新流程在 `vite preview` 手動驗過（兩次 build 之間要重開 preview：它的資產 etag 是開機時算的，同一個 preview 裡 `sw.js` 換了也回 304）。
 
+### 4.57 路線圖外：同一條起跑線（2026-11-21，`feat/kart-room-lobby`）
+
+擁有者：「賽道不要這樣有人前後，不公平，一開始就全部車要在同一起跑線上。」起跑格從「兩兩一排往後排」（竿位線後 10 m、最後一排 34.5 m）改成**一排並排**，全部在線後 10 m：`shared/kart/startLine.ts` 的 `lineGrid(centre, width)`，間距依路寬（≤ 4 m、≥ 3.2 m）、從中間往外排、太窄時鋸齒（內建與編輯器賽道都用不到）。手畫賽道、老街、測試橢圓、編輯器都改用它。計時賽另有 `TrackJson.solo`＝舊竿位，所以紀錄、鬼影、`revision` 不動；倒數鏡頭依排寬退後。細節與測試在 `KART-NETCODE.md` §20。
+
+### 4.58 路線圖外：卡丁車等待室（2026-11-21，`feat/kart-room-lobby`）
+
+擁有者：「進入遊戲大廳介面要……可以看到每個人角色正面還有開什麼車，還有背景圖案，還需要按準備。」只改卡丁車房；桌遊的等待室不動。
+
+- **進入點**：`WaitingRoom.tsx` 在 `gameId === 'kart'` 時改畫 lazy 的 `src/kart/lobby/KartLobby.tsx`（自己的 chunk；房間首屏不變）；右欄的邀請、密碼、遊戲與規則、解散、聊天照舊，由 `WaitingRoom` 傳進去（`side`）。外層留 `data-room-columns`，頁面寬度規則不變。
+- **出賽陣容**：8 格（640 px 以上 4×2、以下 2×4）。每格：號位、房主皇冠、電腦／難度標籤、「你」、隊色（團隊賽，`assignTeams` 與開賽時同一套分法）、車手**正面**的 3D 小圖、名字、車款與車手、車系與等級、大字狀態（準備完成＝綠色亮框；房主；還沒準備；離線）；房主看得到踢出／轉移房主／移除電腦。空位顯示「空位」、入座，房主在**第一個**空位有「加電腦車」（房間就是放在那裡）。手機上準備／開始列放在陣容上面。
+- **3D 小圖只有一個 WebGL context**（`lobbyStage.ts`，three.js 在卡片出來後才 lazy 載入）：一個不在頁面上的 renderer 輪流畫每一格（220×180、pixel ratio ≤ 1.5），畫完 `drawImage` 到該格自己的 2D canvas。桌機每 33 ms 畫全部可見的格、手機（粗指標或寬 < 700）每次兩格；不在畫面內（IntersectionObserver）或分頁隱藏就不畫；`prefers-reduced-motion` 每格只畫一次、靜止。鏡頭在車前方左右緩慢擺動；車手用 #117 的動作：平常 `idle`，按下準備那 2.2 秒 `cheer`。沒有 WebGL 時格子照樣有文字與車色光暈，只是沒有圖。
+- **背景**（`LobbyBackdrop.tsx`）：程式畫的 SVG，依賽道主題（`src/kart/art/themeName.ts`，`trackArt.ts` 的 `themeOf` 也改讀它）用該賽道的天空色、太陽或月亮、夜晚星星與窗燈、白天雲；山稜與天際線形狀由賽道 id 決定（同一張賽道每次一樣）；賽道俯視輪廓在下方發光。換賽道就換。顏色在 `kartTokens.ts` 的 `kartLobby`。
+- **賽道卡**（`TrackCard.tsx`）：名稱、俯視小地圖（含起終點線與線上 8 個點）、圈數、模式、賽制、「所有車並排在同一條起跑線上出發」。賽道 JSON 從 `tracks/registry.ts` 的 chunk 來（比賽本來就要）。之後若車庫有「推薦車款」可以加在這裡。
+- **準備**：非房主有「準備／取消準備」（`aria-pressed`）；房主的「開始遊戲」在有人沒準備時 disabled，下面寫「等 A、B 按準備」（`Intl.ListFormat`）。規則在伺服器（`KART-NETCODE.md` §20）：`GameMeta.readyCheck`、`not_ready`、斷線清準備；換車保留準備。`readiness.ts` 的 `waitingOn` 與 `worker/room-host.ts` 的 `notReady` 同一個判斷。
+- **車庫**：「車庫」按鈕開 `Dialog`，裡面是原本的 `RosterPicker`＋`KartPreview`（車庫開著時才多一個 WebGL context）。選車的同步改成 `src/kart/roster/useRoomLook.ts`，車庫關著也照樣告訴房間。賽後的車庫（`KartScreen.tsx`）照舊用 `RoomGarage.tsx` 的預設匯出。
+- **測試**：`tests/kart/lobby.test.tsx`（8 格、狀態、皇冠、電腦、加電腦只在第一個空位、開始要等準備、準備／取消、賽道卡、背景主題）、`tests/worker/room-bots.test.ts`「the race room waits for everyone to be ready」（`not_ready`、換車保留、取消、斷線清掉、踢掉後可開、桌遊不受影響）、e2e `kart-race`／`kart-team`／`kart-editor`／`kart-loading`（Bob 按準備後才開始）。
+
 ### 4.59 路線圖外：挑戰模式（計時獎牌與任務關卡）（2026-11-21，`feat/kart-challenges`）
 
-擁有者 2026-11-21：「要多設計多一點有挑戰性的關卡」；之前也要實力鑑別度、背地圖、反直覺技巧（`KART-FEEL.md` §11、§14）。這一批做「挑戰」模式（暫名）：每張賽道的**計時獎牌**與 24 個**任務關卡**，外加兩張只在挑戰模式出現的原創短賽道。程式全在 `src/kart/challenge/`（自己的 lazy chunk），共用檔只有小插入。（編號跳過 §4.57、§4.58：留給同一天平行的 `feat/kart-meta-flagship`、`feat/kart-room-lobby`。）
+擁有者 2026-11-21：「要多設計多一點有挑戰性的關卡」；之前也要實力鑑別度、背地圖、反直覺技巧（`KART-FEEL.md` §11、§14）。這一批做「挑戰」模式（暫名）：每張賽道的**計時獎牌**與 24 個**任務關卡**，外加兩張只在挑戰模式出現的原創短賽道。程式全在 `src/kart/challenge/`（自己的 lazy chunk），共用檔只有小插入。（§4.57、§4.58 是同一天平行的 `feat/kart-room-lobby`。）
 
 **入口**：`/kart` 選單多一顆「挑戰」（`SpikePage` 的 `onChallenge`）；`KartPlay.tsx` 多一種 `Playing`（`challenge`），lazy 載入 `ChallengeView.tsx`。網址 `/kart?challenge`（任務列表）、`?challenge=medals`（獎牌牆）、`?challenge=<任務 id>`、`?challenge=medal-<賽道 id>`，重新整理停在原地；`?autopilot` 讓頂尖駕駛（`drivers.ts` 的 `master`）來開（e2e 與展示）。
 
-**任務**（`missions.ts`）：每關一張賽道＋一個條件，四章（入門、技術、高手、魔王）各 6 關；前一章過 4 關（`UNLOCK_PASSES`）下一章才開（`store.ts` 的 `chapterOpen`）。條件種類（`MissionKind`）：`finish`（跑完，加規則）、`combo`／`perfects`／`driftJumps`（連段長度、完美瞬間加速次數、甩尾起跳次數，圈數內達到）、`slots`（每圈依序穿過導引的每道門）、`branches`（每圈走遍每條真岔路）、`cover`（全程加速覆蓋率 ≥ N%）、`place`（對電腦前 N 名）、`elimination`（淘汰賽）、`chase`（追上排在前面起跑的專家電腦車）。規則（`MissionRules`）：`noCrash`、`noN2O`、`noReset`、`boostStart`；另有 `limit`（時限，**用賽道的獎牌時間換算**：某面獎牌 × 任務圈數／賽道圈數 × slack）、`vehicle`（指定車款，例如摩托車）、`fog`（全程海霧）、`bots`（電腦車數與難度）。反向賽道沒做：跳台與甩尾起跳的落點、導引、岔路都有方向，反過來要重畫，不是資料翻轉。「倒車賽段」也沒做（物理的倒車只是低速後退，沒有可判的賽段）。
+**任務**（`missions.ts`）：每關一張賽道＋一個條件，四章（入門、技術、高手、魔王）各 6 關；前一章過 4 關（`UNLOCK_PASSES`）下一章才開（`store.ts` 的 `chapterOpen`）。條件種類（`MissionKind`）：`finish`（跑完，加規則）、`combo`／`perfects`／`driftJumps`（連段長度、完美瞬間加速次數、甩尾起跳次數，圈數內達到）、`slots`（每圈依序穿過導引的每道門）、`branches`（每圈走遍每條真岔路）、`cover`（全程加速覆蓋率 ≥ N%）、`place`（對電腦前 N 名）、`elimination`（淘汰賽）、`chase`（一對一贏過專家電腦車）。規則（`MissionRules`）：`noCrash`、`noN2O`、`noReset`、`boostStart`；另有 `limit`（時限，**用賽道的獎牌時間換算**：某面獎牌 × 任務圈數／賽道圈數 × slack）、`vehicle`（指定車款，例如摩托車）、`fog`（全程海霧）、`bots`（電腦車數與難度）。反向賽道沒做：跳台與甩尾起跳的落點、導引、岔路都有方向，反過來要重畫，不是資料翻轉。「倒車賽段」也沒做（物理的倒車只是低速後退，沒有可判的賽段）。
 
 **判定**（`judge.ts`，純函式，測試用合成的步驟與房間）：
 - 單人任務走時間賽的迴圈（`spikeLoop.ts`）。`spikeLoop` 多三個選填參數：`laps`（這一趟跑幾圈；和賽道圈數不同時不存紀錄、不存幽靈車）、`keepRecords: false`（任務一律不存，免得有限制的成績變成賽道紀錄）、`ghost`（指定一台幽靈車，取代紀錄裡的）。每個物理步經 `onStep` 轉成 `Sample`（多了重設次數與所在岔路 `forkAt`），`judgeStep(mission, judge, sample, context)`：重撞牆（`hit ≥ wallBreakSpeed` 的那一步）、噴 N2O（存量減少且 `boostSeconds > 0`）、重設次數增加、GO 後 `startLate + START_LATE_TELL` 還不是 `start === 'boost'`，都是立即失敗；計數達標立即過關；穿縫沿用駕訓班的 `gateLines` 與 ±5.5 m 判定（`school/judge.ts` 的 `GATE_HALF`），每圈循環；岔路每過一圈檢查這圈有沒有每條都走過（位元）；覆蓋率在終點判；超過時限或比賽結束仍未達標＝失敗，原因留在 `why`。
-- 對電腦的任務走對戰電腦那一套（`createLocalRoom`、`createBotRace`、`RaceView`，`mode: 'race'` 不開道具）。`RaceView` 多一個選填的 `onStep`（和教練提示一起掛），用 `ruleBroken` 判 `noN2O` 等規則；名次、淘汰由 `judgeRace(mission, racers, playerSeat)` 從房間的 `lapMs`／`finishMs` 判：`eliminations` 每圈（最後一圈除外）淘汰還在場上最後過線的那台，只剩一台還沒過線時立刻判它出局（不等它真的過線）；`place`／`chase` 在玩家過線時算名次，或已經有太多台先到就提前判失敗；淘汰賽只算還在場上的車。出局的電腦車照樣在跑（只是不算），畫面左上的任務面板列出出局者。起跑格與一般對戰電腦相同（玩家在最後）：`feat/kart-room-lobby` 若改成並排，合併時再看追逐賽要不要給電腦車讓位。
+- 對電腦的任務走對戰電腦那一套（`createLocalRoom`、`createBotRace`、`RaceView`，`mode: 'race'` 不開道具）。`RaceView` 多一個選填的 `onStep`（和教練提示一起掛），用 `ruleBroken` 判 `noN2O` 等規則；名次、淘汰由 `judgeRace(mission, racers, playerSeat)` 從房間的 `lapMs`／`finishMs` 判：`eliminations` 每圈（最後一圈除外）淘汰還在場上最後過線的那台，只剩一台還沒過線時立刻判它出局（不等它真的過線）；`place`／`chase` 在玩家過線時算名次，或已經有太多台先到就提前判失敗；淘汰賽只算還在場上的車。出局的電腦車照樣在跑（只是不算），畫面左上的任務面板列出出局者。起跑格與一般對戰電腦相同：合併 `feat/kart-room-lobby`（§4.57）之後全部車並排在同一條起跑線，所以追逐賽是一對一的正面對決，不再是「追前面的車」；計時賽與單人任務用 `solo` 竿位，獎牌時間不受影響。
 
 **獎牌**（`medals.ts`、`medalTable.ts`）：12 張內建賽道各有銅、銀、金與隱藏的白金（拿到金牌才顯示）。時間是**量出來的**：`npm run kart:medals`（`scripts/kart-medals.ts`）用 `kart:feel` 的駕駛（`average`、`expert`、有導引的賽道再加 `master`）各跑三個種子三圈，`calibrate` 算出：金＝頂尖（每個種子取專家與頂尖較快者）最慢的一場；銀＝max(專家最慢 × 1.01, 金 × 1.04)；銅＝max(一般最慢 × 1.01, 銀 × 1.06)；白金＝頂尖最快 × 0.98；都取到 0.1 秒。接著單人任務各讓頂尖（頂尖過不了的用專家）跑三個種子，最慢的通過秒數寫進 `MISSION_PACE`，星等＝通過時間 ≤ 該秒數 × 1.12（三星）／× 1.35（兩星），有時限的任務兩星要比時限快 3%、三星再快 5%；沒有 pace 的任務（對電腦、沒有駕駛過得了的）用賽道銀牌／銅牌換算。結果寫回 `medalTable.ts`（產生的檔，不手改）。**物理或賽道改了就重跑**（`tests/kart/challenge.medals.test.ts` 會擋：頂尖拿不到金、專家拿不到銀時失敗）。
 - **目標幽靈車**：獎牌計時賽可選「跟某面獎牌的幽靈車一起跑」。執行時用頂尖駕駛的手在那張賽道上跑一趟（`headless.ts` 的 `targetGhost`，約一兩百毫秒），再 `retimed` 把整段播放時間縮放成剛好那面獎牌的秒數：路線是頂尖的，速度是獎牌的。不存成靜態資料（物理一改就要重錄）。
 - 計時賽本身照常存賽道紀錄與自己的幽靈車（獎牌趟就是一般的三圈時間賽，用標準調校）。
 
-**挑戰專用賽道**（`shared/kart/tracks/challenge.ts`，用 `lay.ts` 鋪，**不在 `RACE_TRACK_IDS`**，房間與對戰電腦選不到；`missionTrack` 認得它們）：針眼巷 `ch-needle`（約 0.9 km、18 m 寬，一個 S、三個連續髮夾、兩道橫跨路面的牆各留一個 9 m 的門，偏左；導引登記在 `guides.ts`，兩條線都穿門）與跳台場 `ch-hop`（約 0.95 km、6 m 落差，三個落差跳台各接一個彎，回程一個長高速彎）。量測：針眼巷頂尖 46–47.5 秒、專家撞第二道牆重設三次（60 秒）、一般 50–53 秒；跳台場專家 55 秒、一般 60 秒（`KART-FEEL.md` §19）。
+**挑戰專用賽道**（`shared/kart/tracks/challenge.ts`，用 `lay.ts` 鋪，**不在 `RACE_TRACK_IDS`**，房間與對戰電腦選不到；`missionTrack` 認得它們）：針眼巷 `ch-needle`（約 0.9 km、18 m 寬，一個 S、三個連續髮夾、兩道橫跨路面的牆各留一個 9 m 的門，偏左；導引登記在 `guides.ts`，兩條線都穿門）與跳台場 `ch-hop`（約 0.95 km、6 m 落差，三個落差跳台各接一個彎，回程一個長高速彎）。量測：針眼巷頂尖 46.5–48 秒、專家撞第二道牆重設三次（60 秒）、一般 50–59 秒；跳台場專家 55 秒、一般 59–60 秒（`KART-FEEL.md` §19）。
 
 **畫面**（`ChallengeView.tsx`、文字在 `goals.ts`）：首頁兩個分頁：任務（四章、每章過幾關或怎麼解鎖、每關名稱＋目標＋規則＋賽道與圈數、最佳星等、開始）與獎牌牆（12 張賽道的牌、最佳時間、四面獎牌的目標時間、白金未解鎖顯示 ???）。任務中左上是任務面板（章節、賽道、圈數、目標、規則、進度 `count / target`、星等規則），右上重來／所有挑戰；海霧任務整個畫面蓋一層只留前方小窗的霧；對電腦的任務面板放在 `RaceView` 名次下面、多「出局：…」。結果卡：過關／這次沒過、星等、時間或名次、失敗原因（`kart.challenge.why.<原因>`）、下一關（下一章還沒開就不顯示）／再試一次／所有挑戰。賽道名用房間的 `games.kart.track.<id>`（`ChallengeView` 自己註冊 `kartMessages`）。
 
