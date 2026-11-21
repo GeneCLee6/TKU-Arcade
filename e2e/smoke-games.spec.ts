@@ -141,7 +141,7 @@ const BOT_GAMES: BotGame[] = [
 for (const game of BOT_GAMES.filter((g) => !pickedGames || pickedGames.includes(g.id))) {
   for (const screen of SCREENS.filter((s) => s.name === 'desktop' && (!pickedScreens || pickedScreens.includes(s.name)))) {
     test(`${game.id} on ${screen.name}: one person and two computer players`, async ({ browser }) => {
-      test.setTimeout(420_000)
+      test.setTimeout(process.env.SWEEP_BOTS_FULL ? 1_500_000 : 420_000)
       const words = screen.zh ? roomZhTW : roomEn
       const problems: Problems = { hard: [], soft: [] }
       const log: PlayLog = { actions: 0, refused: 0 }
@@ -171,6 +171,8 @@ for (const game of BOT_GAMES.filter((g) => !pickedGames || pickedGames.includes(
           return view?.players?.find((p) => p.seat === view.you)?.out === true
         }
         const enough = () => {
+          // SWEEP_BOTS_FULL=1: every game to its very end (for a check on a preview site, not the CI)
+          if (process.env.SWEEP_BOTS_FULL) return false
           const view = host.view?.game?.view as Record<string, unknown> | undefined
           // Out of a secret-scroll round is not out of the game
           if (game.id !== 'secret-scroll' && youOut()) return true
