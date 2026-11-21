@@ -410,14 +410,14 @@ export interface SpikeOptions {
    */
   readonly onStep?: (step: SpikeStep) => void
   /**
-   * 2026-11-21 (§4.59, the challenge mode): a time trial of this many laps instead of the track's
+   * 2026-11-21 (§4.60, the challenge mode): a time trial of this many laps instead of the track's
    * own. A run of other laps keeps no record and no ghost (they are the track's own laps' alone)
    */
   readonly laps?: number
-  /** 2026-11-21 (§4.59): false keeps no record and no ghost of this run (a mission with a handicap) */
+  /** 2026-11-21 (§4.60): false keeps no record and no ghost of this run (a mission with a handicap) */
   readonly keepRecords?: boolean
   /**
-   * 2026-11-21 (§4.59): this ghost races along instead of the picked one (a medal's target, its
+   * 2026-11-21 (§4.60): this ghost races along instead of the picked one (a medal's target, its
    * time already in it); null for none
    */
   readonly ghost?: Ghost | null

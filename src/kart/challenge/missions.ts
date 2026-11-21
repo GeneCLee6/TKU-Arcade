@@ -1,4 +1,4 @@
-// 2026-11-21 (owner: "design more challenging levels"; docs/ARCHITECTURE.md §4.59, docs/KART-FEEL.md
+// 2026-11-21 (owner: "design more challenging levels"; docs/ARCHITECTURE.md §4.60, docs/KART-FEEL.md
 // §19): the challenge mode's missions, each one track and one condition, in four chapters that open
 // one after the other. What each condition means step by step is in judge.ts; the stars and the
 // time limits that hang on a track's pace come from `npm run kart:medals` (medalTable.ts), so that

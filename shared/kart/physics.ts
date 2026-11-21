@@ -591,6 +591,12 @@ export type KartTuning = { readonly [K in keyof typeof KART_TUNING]: number } & 
    * shows nor saves it
    */
   readonly bodyRadius?: number
+  /**
+   * The kart's mass against the standard kart's 1, when it is not 1 (2026-11-21, karts.ts's
+   * kartMass): how hard a slope works on it (terrain.ts's `slopeWeight`). Not a number of the feel
+   * either: the tuning panel neither shows nor saves it
+   */
+  readonly mass?: number
 }
 
 /** The arcade feel (before 2026-11-17), the "arcade (old)" preset: bit for bit what it always drove */

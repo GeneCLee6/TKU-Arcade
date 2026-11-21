@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// 2026-11-21 (docs/ARCHITECTURE.md §4.59): the challenge mode. /kart's menu opens it; the missions
+// 2026-11-21 (docs/ARCHITECTURE.md §4.60): the challenge mode. /kart's menu opens it; the missions
 // are listed by chapter, the later chapters shut; the medal wall shows every track's targets with
 // the hidden one; and a mission, driven by the master's hands (`?autopilot`), is passed and its
 // stars kept. Headless Chromium draws with a software renderer (the flag lets it).

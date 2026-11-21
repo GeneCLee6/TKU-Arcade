@@ -3,6 +3,7 @@ import { setSoundOn, useSoundOn } from '../lib/sound.ts'
 import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
 import { KART_BODIES, loadBody, loadDriver, saveBody, saveDriver, type KartBody } from './bodies.ts'
 import { applyKart, type DriverId } from '../../shared/kart/karts.ts'
+import { trackMeta } from '../../shared/kart/meta.ts'
 import { GaragePanel } from './roster/GaragePanel.tsx'
 import styled, { css, keyframes } from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
@@ -119,7 +120,7 @@ export function SpikePage({
   onCup?: (run: CupRun) => void
   /** 2026-11-20 (§4.50): /kart's menu opens the driving school (src/kart/school/) */
   onSchool?: () => void
-  /** 2026-11-21 (§4.59): /kart's menu opens the challenge mode (src/kart/challenge/) */
+  /** 2026-11-21 (§4.60): /kart's menu opens the challenge mode (src/kart/challenge/) */
   onChallenge?: () => void
 } = {}) {
   const t: (key: KartMessageKey, params?: MessageParams) => string = useT()
@@ -163,6 +164,7 @@ export function SpikePage({
     const asked = new URLSearchParams(window.location.search).get('track')
     return courses.find((one) => one === asked) ?? (play ? 'riverside' : 'arena')
   })
+  const courseMeta = course === 'custom' ? null : trackMeta(course)
   const track = useMemo(
     () => (course === 'custom' ? (custom?.track ?? null) : spikeTrack(course)),
     [course, custom],
@@ -555,6 +557,14 @@ export function SpikePage({
               ))}
             </select>
           </CourseLabel>
+          {courseMeta && open !== 'garage' && (
+            // 2026-11-21 (docs/KART-META.md): the track's quickest three, the flagship aside
+            <CourseMeta data-testid="kart-course-meta" data-track={course}>
+              {t('kart.meta.line', {
+                karts: courseMeta.podium.map((one) => t(`kart.body.${one}`)).join(' · '),
+              })}
+            </CourseMeta>
+          )}
           {!play && (
             <Button
               $variant="secondary"
@@ -677,6 +687,7 @@ export function SpikePage({
           onKart={pickGarageBody}
           onDriver={pickGarageDriver}
           onClose={closeGarage}
+          track={course === 'custom' ? undefined : course}
         />
       )}
       {open === 'bots' && onBotRace && (
@@ -909,6 +920,16 @@ const CourseLabel = styled.label`
     border: 1px solid ${color.border};
     font: inherit;
   }
+`
+
+const CourseMeta = styled.span`
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 ${space.sm}px;
+  color: ${color.muted};
+  background: color-mix(in srgb, ${color.bg} 55%, transparent);
+  font-size: ${fontSize.sm}px;
 `
 
 const Bottom = styled.div<{ $touch: boolean }>`

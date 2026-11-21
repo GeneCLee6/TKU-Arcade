@@ -1,4 +1,4 @@
-// 2026-11-21 (owner: "design more challenging levels"; docs/ARCHITECTURE.md §4.59, docs/KART-WORLD.md
+// 2026-11-21 (owner: "design more challenging levels"; docs/ARCHITECTURE.md §4.60, docs/KART-WORLD.md
 // §6): the challenge mode's own two tracks (src/kart/challenge/), laid corner by corner (lay.ts).
 // Short and mean on purpose, and only in the challenge mode: they are not in RACE_TRACK_IDS, so no
 // room and no race against the computer can be set to them. Working names; the layouts are ours,

@@ -1,4 +1,4 @@
-// 2026-11-21 (owner: "design more challenging levels"; docs/ARCHITECTURE.md §4.59, docs/KART-FEEL.md
+// 2026-11-21 (owner: "design more challenging levels"; docs/ARCHITECTURE.md §4.60, docs/KART-FEEL.md
 // §19): the challenge mode, its own lazy chunk, opened from /kart's menu (or /kart?challenge,
 // ?challenge=<mission>). Two halves:
 //

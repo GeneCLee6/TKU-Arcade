@@ -1,4 +1,4 @@
-// 2026-11-21 (docs/ARCHITECTURE.md §4.59): what the challenge mode judges. Pure, like the driving
+// 2026-11-21 (docs/ARCHITECTURE.md §4.60): what the challenge mode judges. Pure, like the driving
 // school's judge (src/kart/school/judge.ts): a mission on its own (a time trial) is judged one
 // physics step at a time from the kart's state before and after the step, the input it ran with
 // and the race as the time trial left it (spikeLoop.ts's `onStep`); a mission against the computer

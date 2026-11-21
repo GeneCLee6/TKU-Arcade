@@ -44,7 +44,7 @@ import {
   withStars,
 } from '../../src/kart/challenge/store.ts'
 
-// 2026-11-21 (docs/ARCHITECTURE.md §4.59): the challenge mode's pure parts. The missions and their
+// 2026-11-21 (docs/ARCHITECTURE.md §4.60): the challenge mode's pure parts. The missions and their
 // chapters, the judge of a mission driven alone (step by step, from made-up steps) and of one
 // against the computer (from made-up rooms), the medals, and what is kept in this browser.
 

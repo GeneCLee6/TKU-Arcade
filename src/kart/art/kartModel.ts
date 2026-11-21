@@ -298,6 +298,11 @@ const MARKS: Readonly<Record<KartBody, readonly (readonly [Outline, 'accent' | '
     [[[4, 15], [6, 4], [12, 1], [15, 4], [12, 3.8], [8.4, 6], [7, 15]], 'accent'],
     [[[12, 3.8], [15, 4], [13.4, 6.6]], 'ink'],
   ],
+  // 2026-11-21, the first season's flagship: `kite` spread wings over its forked tail
+  kite: [
+    [[[1, 6], [8, 3], [15, 6], [11, 7.4], [8, 6.4], [5, 7.4]], 'accent'],
+    [[[6.4, 7.4], [9.6, 7.4], [11, 15], [8, 11.6], [5, 15]], 'ink'],
+  ],
 }
 
 function paintMark(context: CanvasRenderingContext2D, size: number, body: KartBody, accent: string): void {

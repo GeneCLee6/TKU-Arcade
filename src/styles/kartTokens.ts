@@ -255,6 +255,8 @@ export const kartBodies = {
   pelican: { main: '#191712', second: '#3B372B', accent: '#F2E6C2', glow: '#FFF4D6' },
   otter: { main: '#17120F', second: '#3A2C24', accent: '#E07A3F', glow: '#F5A474' },
   cormorant: { main: '#0E1312', second: '#24302D', accent: '#2BD9A0', glow: '#7AF0C8' },
+  // 2026-11-21: the first season's flagship, platinum on black with a violet glow
+  kite: { main: '#0D0C12', second: '#3A3848', accent: '#E9E4FF', glow: '#A98BFF' },
 } as const
 
 /**

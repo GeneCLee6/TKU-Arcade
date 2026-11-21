@@ -1426,9 +1426,20 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **車庫**：「車庫」按鈕開 `Dialog`，裡面是原本的 `RosterPicker`＋`KartPreview`（車庫開著時才多一個 WebGL context）。選車的同步改成 `src/kart/roster/useRoomLook.ts`，車庫關著也照樣告訴房間。賽後的車庫（`KartScreen.tsx`）照舊用 `RoomGarage.tsx` 的預設匯出。
 - **測試**：`tests/kart/lobby.test.tsx`（8 格、狀態、皇冠、電腦、加電腦只在第一個空位、開始要等準備、準備／取消、賽道卡、背景主題）、`tests/worker/room-bots.test.ts`「the race room waits for everyone to be ready」（`not_ready`、換車保留、取消、斷線清掉、踢掉後可開、桌遊不受影響）、e2e `kart-race`／`kart-team`／`kart-editor`／`kart-loading`（Bob 按準備後才開始）。
 
-### 4.59 路線圖外：挑戰模式（計時獎牌與任務關卡）（2026-11-21，`feat/kart-challenges`）
+### 4.59 路線圖外：賽道特性決定最快車、賽季旗艦（2026-11-21，`feat/kart-meta-flagship`）
 
-擁有者 2026-11-21：「要多設計多一點有挑戰性的關卡」；之前也要實力鑑別度、背地圖、反直覺技巧（`KART-FEEL.md` §11、§14）。這一批做「挑戰」模式（暫名）：每張賽道的**計時獎牌**與 24 個**任務關卡**，外加兩張只在挑戰模式出現的原創短賽道。程式全在 `src/kart/challenge/`（自己的 lazy chunk），共用檔只有小插入。（§4.57、§4.58 是同一天平行的 `feat/kart-room-lobby`。）
+擁有者要「每個時期一台公定最快的車」，以及「哪一台車跑哪一張圖最快，分上下坡、急彎、直線」。完整數字在 `KART-META.md`。
+
+- **坡道上的重量**（`shared/kart/terrain.ts` 的 `slopeWeight`、`TERRAIN_TUNING.slopeMass*`）：坡度超過 3% 的部分，極速再變動 5 ×（質量 − 1）× 超過的坡度（±6% 封頂）。`applyKart` 把 `kartMass` 放進 `KartTuning.mass`（和 `bodyRadius` 一樣，調參面板不顯示也不存）；標準重量不放，所以標準車與平面賽道一個 bit 都沒變（`flatGolden`、`branchGolden` 原封不動，`revision` 不動）。只算陡的部分，是因為閉合賽道爬升＝下降，正比於坡度的效果整圈抵銷。
+- **賽道特性與矩陣**（`scripts/kart/meta.ts`，純函式）：`trackTraits`（急彎數／km、直線比例、最長直線、爬升、上下坡比例與平均坡度）、`raceMatrix`（每格九場的中位數）、`ranking`、`podiums`、`winCounts`、`without`、`fairness`（旗艦以外沒有一台在每張或過半的圖第一）、`flagshipLead`。`npm run kart:meta`（`scripts/kart-meta.ts`）每張賽道開一個子行程平行跑。
+- **推薦是靜態的**（`shared/kart/meta.ts` 的 `TRACK_META`：前三名＋特性標籤）：車庫（`RosterPicker` 的 `track`，`/kart` 與等待室都傳）、`/kart` 的賽道選單、對電腦的設定面板顯示。比賽要跑幾分鐘，所以測試只擋資料形狀。
+- **賽季**（`shared/kart/karts.ts`）：`KART_TIERS` 多 `flagship`；`KartSpec.season`；`KART_SEASONS`（每季的旗艦與退役後的等級／數值／倍率）、`CURRENT_SEASON`、`inSeason`（`kartSpec` 都經過它：過季的旗艦換成退役版）、`seasonFlagship`、`isFlagship`。沒有時間機制，換季是一次發版。
+- **黑鳶 `kite`**：`KART_IDS` 第 21 個（loadout byte 5 bit，可到 32）；數值超出預算，代價是 `FLAGSHIP_TRAITS`；`speedCapFor` 讀它的參數，所以伺服器上限自動包含。造型 `src/kart/art/flagshipBodies.ts`，新的 lazy 家族 `flagship`（`bodyLoad.ts`），色票 `kartBodies.kite`，標誌在 `kartModel.ts` 的 `MARKS`。
+- **測試**：`tests/kart/slopeWeight.test.ts`（重量與坡道）、`tests/kart/meta.test.ts`（矩陣純邏輯、賽道特性、靜態推薦的形狀與公平、賽季與退役）、`tests/kart/flagship.test.ts`（頂尖腳本在漁港開旗艦比白鷺快、新手在山城開雨燕比旗艦快、速度上限）；`karts.test.ts` 的預算與極速 3% 規則改成只管非旗艦車。
+
+### 4.60 路線圖外：挑戰模式（計時獎牌與任務關卡）（2026-11-21，`feat/kart-challenges`）
+
+擁有者 2026-11-21：「要多設計多一點有挑戰性的關卡」；之前也要實力鑑別度、背地圖、反直覺技巧（`KART-FEEL.md` §11、§14）。這一批做「挑戰」模式（暫名）：每張賽道的**計時獎牌**與 24 個**任務關卡**，外加兩張只在挑戰模式出現的原創短賽道。程式全在 `src/kart/challenge/`（自己的 lazy chunk），共用檔只有小插入。（§4.57、§4.58 是同一天平行的 `feat/kart-room-lobby`，§4.59 是 `feat/kart-meta-flagship`。）
 
 **入口**：`/kart` 選單多一顆「挑戰」（`SpikePage` 的 `onChallenge`）；`KartPlay.tsx` 多一種 `Playing`（`challenge`），lazy 載入 `ChallengeView.tsx`。網址 `/kart?challenge`（任務列表）、`?challenge=medals`（獎牌牆）、`?challenge=<任務 id>`、`?challenge=medal-<賽道 id>`，重新整理停在原地；`?autopilot` 讓頂尖駕駛（`drivers.ts` 的 `master`）來開（e2e 與展示）。
 
@@ -1446,7 +1457,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **畫面**（`ChallengeView.tsx`、文字在 `goals.ts`）：首頁兩個分頁：任務（四章、每章過幾關或怎麼解鎖、每關名稱＋目標＋規則＋賽道與圈數、最佳星等、開始）與獎牌牆（12 張賽道的牌、最佳時間、四面獎牌的目標時間、白金未解鎖顯示 ???）。任務中左上是任務面板（章節、賽道、圈數、目標、規則、進度 `count / target`、星等規則），右上重來／所有挑戰；海霧任務整個畫面蓋一層只留前方小窗的霧；對電腦的任務面板放在 `RaceView` 名次下面、多「出局：…」。結果卡：過關／這次沒過、星等、時間或名次、失敗原因（`kart.challenge.why.<原因>`）、下一關（下一章還沒開就不顯示）／再試一次／所有挑戰。賽道名用房間的 `games.kart.track.<id>`（`ChallengeView` 自己註冊 `kartMessages`）。
 
-**首屏**：挑戰的字串併進 `KART_MESSAGES`（和駕訓班一樣，`check-i18n` 才擋得到），房間的卡丁車首屏 137.9 → 139.5 kB（警告線 140 以下）；畫面與判定在自己的 lazy chunk，卡丁車合計 503.2 kB（合併 main 後，上限 600）。
+**首屏**：挑戰的字串併進 `KART_MESSAGES`（和駕訓班一樣，`check-i18n` 才擋得到），房間的卡丁車首屏 137.9 → 139.7 kB（含 #130）（警告線 140 以下）；畫面與判定在自己的 lazy chunk，卡丁車合計 506.2 kB（合併 main 後，上限 600）。
 
 **進度**（`store.ts`，localStorage `tku-arcade.kart.challenge`，經 `lib/storage.ts` 不丟例外，JSON 解析 try/catch，壞資料當沒有）：`medals`（每張賽道最佳獎牌）、`best`（獎牌趟最佳秒數）、`stars`（每關最佳星等）。
 

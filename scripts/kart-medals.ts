@@ -1,4 +1,4 @@
-// 2026-11-21 (docs/KART-FEEL.md §19, docs/ARCHITECTURE.md §4.59): the challenge mode's medal times
+// 2026-11-21 (docs/KART-FEEL.md §19, docs/ARCHITECTURE.md §4.60): the challenge mode's medal times
 // and mission paces, measured. Every built-in track and every challenge track is raced three laps by
 // the drivers of `npm run kart:feel` (scripts/kart/drivers.ts: the average driver, the expert, the
 // master who knows a track by heart), three seeds each; src/kart/challenge/medals.ts's `calibrate`

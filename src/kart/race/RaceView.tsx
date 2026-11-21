@@ -207,7 +207,7 @@ export interface RaceViewProps {
   /** 2026-11-20: the kart and driver each seat picked, to draw it on the grid before its frames come */
   lookOf?: (seat: number) => { kart: KartId; driver: DriverId } | null
   /**
-   * 2026-11-21 (§4.59): after each physics step of this kart, the step as it ran: the challenge
+   * 2026-11-21 (§4.60): after each physics step of this kart, the step as it ran: the challenge
    * mode judges a mission's rules by it (no N2O, no crash). Only reads
    */
   onStep?: (step: SpikeStep) => void

@@ -1,4 +1,4 @@
-// 2026-11-21 (docs/ARCHITECTURE.md §4.59): screenshots of the challenge mode, for looking at with
+// 2026-11-21 (docs/ARCHITECTURE.md §4.60): screenshots of the challenge mode, for looking at with
 // one's own eyes: the missions by chapter, the medal wall, a medal's setup, and a few missions a
 // few seconds in (driven by the master's hands, `?autopilot`). Drives the real page in Chromium on
 // this machine's GPU.

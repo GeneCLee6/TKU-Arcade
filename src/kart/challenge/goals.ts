@@ -1,4 +1,4 @@
-// 2026-11-21 (docs/ARCHITECTURE.md §4.59): a mission's goal and rules in words, and a track's name,
+// 2026-11-21 (docs/ARCHITECTURE.md §4.60): a mission's goal and rules in words, and a track's name,
 // for the challenge mode's pages (ChallengeView.tsx).
 import type { KartMessageKey } from '../../../shared/kart/i18n.ts'
 import type { MessageParams } from '../../i18n/t.ts'

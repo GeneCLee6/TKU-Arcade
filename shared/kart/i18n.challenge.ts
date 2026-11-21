@@ -1,4 +1,4 @@
-// The challenge mode (2026-11-21; docs/ARCHITECTURE.md §4.59): its chapters, its missions (working
+// The challenge mode (2026-11-21; docs/ARCHITECTURE.md §4.60): its chapters, its missions (working
 // titles of our own, docs/KART-WORLD.md §6), what each asks, why a run failed, and the medals of the
 // time trial. Merged into KART_MESSAGES (i18n.ts), so the same check covers them. `en` is the source.
 const en = {

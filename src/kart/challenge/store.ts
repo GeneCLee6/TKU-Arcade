@@ -1,4 +1,4 @@
-// 2026-11-21 (docs/ARCHITECTURE.md §4.59): what the challenge mode keeps in this browser: each
+// 2026-11-21 (docs/ARCHITECTURE.md §4.60): what the challenge mode keeps in this browser: each
 // track's best medal and best time, each mission's best stars. localStorage through lib/storage.ts,
 // which never throws (blocked, it all lasts until the page closes); a stored value that is not
 // what this file wrote reads as nothing stored.

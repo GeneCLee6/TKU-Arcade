@@ -1,4 +1,4 @@
-// 2026-11-21 (docs/ARCHITECTURE.md §4.59, docs/KART-FEEL.md §19): the time trial's medals, and what
+// 2026-11-21 (docs/ARCHITECTURE.md §4.60, docs/KART-FEEL.md §19): the time trial's medals, and what
 // a mission's stars and time limit come to on its track. The times are measured, not chosen:
 // `npm run kart:medals` (scripts/kart-medals.ts) races the drivers of `npm run kart:feel` (src/kart/
 // bots/drivers.ts: the average driver, the expert who drives well, the master who knows the track

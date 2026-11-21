@@ -1,4 +1,4 @@
-// 2026-11-21 (docs/ARCHITECTURE.md §4.59): a challenge run without a screen, step by step as the
+// 2026-11-21 (docs/ARCHITECTURE.md §4.60): a challenge run without a screen, step by step as the
 // page runs it: a mission on its own with a driver's hands on the kart (src/kart/bots/drivers.ts),
 // and the time trial of a track for its medals. `npm run kart:medals` and the tests use it. Pure.
 import { forkAt } from '../../../shared/kart/branches.ts'
