@@ -19,7 +19,7 @@
 import type { ItemId } from './items.ts'
 import { FLAG_BOOSTING, FLAG_DRIFTING, FLAG_FINISHED, FLAG_RESET, FLAG_SKIDDING } from './net.ts'
 import type { KartFrame } from './net.ts'
-import { shotPosition, type KartShot, type ShotItem } from './shots.ts'
+import type { KartShot } from './shots.ts'
 import { TEAM_BOOST_MS } from './team.ts'
 
 /** Physics steps a second: a frame's tick counts these from GO */
@@ -574,25 +574,6 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
   }
   recorder.view(first)
   return recorder
-}
-
-/**
- * The shots on the road at `tick` (e9-t06b), where each is; a cloud flies at its target's kart as
- * the replay has it (`kartAt`)
- */
-export function shotsAt(
-  shots: readonly KartShot[] | undefined,
-  tick: number,
-  kartAt: (seat: number) => { readonly x: number; readonly z: number } | null,
-): { n: number; item: ShotItem; x: number; z: number }[] {
-  const ms = (tick * 1000) / TICKS_PER_SECOND
-  return (shots ?? [])
-    .filter((shot) => ms >= shot.at && ms <= shot.until)
-    .map((shot) => ({
-      n: shot.n,
-      item: shot.item,
-      ...shotPosition(shot, ms, shot.target === null ? null : kartAt(shot.target)),
-    }))
 }
 
 // ── Playing it back ──────────────────────────────────────────────────────────────────────────

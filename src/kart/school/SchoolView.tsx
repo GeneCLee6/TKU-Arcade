@@ -31,8 +31,11 @@ import { BoostVeil, CalloutText, Hud } from '../Hud.tsx'
 import { KART_COMPACT } from '../layout.ts'
 import { loadQuality } from '../quality.ts'
 import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
-import { supportsWebGL2 } from '../Scene.ts'
-import { startSpikeLoop, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
+import { supportsWebGL2 } from '../webgl.ts'
+import type { SpikeHud, SpikeTrial } from '../spikeLoop.ts'
+import { RACE_ENGINE } from '../load/kartLoad.ts'
+import { KartLoading } from '../load/KartLoading.tsx'
+import { useKartLoad } from '../load/useKartLoad.ts'
 import { TouchControls } from '../touch/TouchControls.tsx'
 import { touchBottom, touchSpace } from '../touch/touchLayout.ts'
 import { useTouchControls } from '../touch/useTouchControls.ts'
@@ -290,9 +293,15 @@ function LessonScreen({
   const [shown, setShown] = useState<Shown>(() => shownOf(startJudge(), lesson))
   const liveRef = useRef<LiveHint | null>(null)
   const reported = useRef(false)
+  // 2026-11-21 (§4.52): the engine and the kart, fetched before the lesson's scene is built
+  const load = useKartLoad(
+    { engine: RACE_ENGINE, track, bodies: [setup.body], music: true },
+    `${track.id}|${setup.body}`,
+  )
+  const engine = load.engine
 
   useEffect(() => {
-    if (!stage.current || failure) return
+    if (!stage.current || failure || !engine) return
     let pilot: ((trial: Trial) => KartInput) | null = null
     const newPilot = () =>
       autopiloted ? createDriver(DRIVERS.master, track, setup.controls.tuning, 7) : null
@@ -309,7 +318,7 @@ function LessonScreen({
     }
     let stop: (() => void) | undefined
     try {
-      stop = startSpikeLoop(stage.current, {
+      stop = engine.startSpikeLoop(stage.current, {
         controls: () => setup.controls,
         onStats: () => {},
         onHud: setHud,
@@ -344,7 +353,7 @@ function LessonScreen({
       queueMicrotask(() => setFailure(true))
     }
     return () => stop?.()
-  }, [failure, track, lesson, context, setup, touchSource, autopiloted])
+  }, [failure, track, lesson, context, setup, touchSource, autopiloted, engine])
 
   // A try that went wrong: a moment to read why, and the run starts again from the grid
   useEffect(() => {
@@ -408,6 +417,17 @@ function LessonScreen({
       data-done={shown.done || undefined}
     >
       <Stage ref={stage} role="img" aria-label={t('kart.spike.canvas')} />
+      {!engine && (
+        <KartLoading
+          t={t}
+          track={name}
+          progress={load.progress}
+          failed={load.failed}
+          onRetry={load.retry}
+          bindings={setup.controls.bindings}
+          touch={touch.shown}
+        />
+      )}
       <LessonPanel aria-labelledby="kart-school-name">
         <LessonTag>{t('kart.school.lessonNumber', { n: number })}</LessonTag>
         <LessonName id="kart-school-name">{name}</LessonName>

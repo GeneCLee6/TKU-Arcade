@@ -25,8 +25,11 @@ import { BoostVeil, CALLOUT_CLEAR, CalloutText, Hud } from '../Hud.tsx'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
-import { supportsWebGL2 } from '../Scene.ts'
-import { startSpikeLoop, type SpikeHud, type SpikeTrial } from '../spikeLoop.ts'
+import { supportsWebGL2 } from '../webgl.ts'
+import type { SpikeHud, SpikeTrial } from '../spikeLoop.ts'
+import { RACE_ENGINE } from '../load/kartLoad.ts'
+import { KartLoading } from '../load/KartLoading.tsx'
+import { useKartLoad } from '../load/useKartLoad.ts'
 import { autopilot, driftingAutopilot } from './autopilot.ts'
 import { ITEM_SLOT_PORTRAIT_TOP, ItemNote, ItemSlot } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
@@ -280,9 +283,20 @@ export default function RaceView({
   // 2026-11-20 (§4.50): a tip for a technique not yet used (not for a kart driving itself)
   const coach = useCoach()
   const coachStep = coach.onStep
+  // 2026-11-21 (§4.52): the engine, the track's own scenery, the vehicles on the grid and the song,
+  // fetched before the scene is built; the room hears "drawn and on the grid" only after that
+  const [gridBodies] = useState(() => [
+    loadout.body,
+    ...view.racers.map((racer) => lookOf?.(racer.seat)?.kart).filter((kart) => kart !== undefined),
+  ])
+  const load = useKartLoad(
+    track ? { engine: RACE_ENGINE, track, bodies: gridBodies, music: true } : null,
+    `${track?.id}|${gridBodies.join()}`,
+  )
+  const engine = load.engine
 
   useEffect(() => {
-    if (!stage.current || !track || failure) return
+    if (!stage.current || !track || failure || !engine) return
     const net = createRaceNet({
       realtime,
       track,
@@ -310,7 +324,7 @@ export default function RaceView({
     })
     let stop: (() => void) | undefined
     try {
-      stop = startSpikeLoop(stage.current, {
+      stop = engine.startSpikeLoop(stage.current, {
         controls: () => settings,
         onStats: () => {},
         onHud: setHud,
@@ -345,7 +359,7 @@ export default function RaceView({
       net.stop()
       raceNet.current = null
     }
-  }, [realtime, track, seat, slot, failure, settings, autopiloted, drifts, loadout, touchSource, coachStep])
+  }, [realtime, track, seat, slot, failure, settings, autopiloted, drifts, loadout, touchSource, coachStep, engine])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -512,6 +526,18 @@ export default function RaceView({
       style={touch.shown ? touchSpace(touch.settings) : undefined}
     >
       <Stage ref={stage} role="img" aria-label={t('games.kart.race.canvas')} />
+      {!engine && (
+        <KartLoading
+          t={t}
+          track={courseTitle}
+          progress={load.progress}
+          failed={load.failed}
+          onRetry={load.retry}
+          bindings={settings.bindings}
+          touch={touch.shown}
+          note={view.phase === 'loading' ? t('games.kart.race.waiting', { ready, total }) : null}
+        />
+      )}
       <Tags ref={tagLayer} aria-hidden="true">
         {others.map((racer) => (
           <Tag

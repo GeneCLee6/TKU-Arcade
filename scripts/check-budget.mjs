@@ -5,7 +5,8 @@
 // page's language (src/i18n/messages.<language>.ts, counted in the heavier of the two), plus for a
 // board game the lazy room page, the game's room details (shared/games/<id>/info.ts and i18n.ts) and
 // the game's lazy chunk with their static imports; what a screen loads after it has painted is listed
-// after it, not counted (C8). Reads Vite's manifest, so run it after `npm run build`; paths are
+// after it, not counted (C8); the kart's pages and race engine are reported, not limited (2026-11-21).
+// Reads Vite's manifest, so run it after `npm run build`; paths are
 // relative to the current directory. `npm run budget -- --chunks` also lists each line's chunks.
 //
 // The guards that keep the room for new games (2026-11-15): the lobby (entry and language) has its
@@ -149,7 +150,33 @@ function withLanguage(keys, game) {
   return heaviest
 }
 
+// 2026-11-21 (docs/KART-PERF.md §7): what a kart page loads before it can show anything (its loading
+// screen and menu), and what its race then fetches: the engine, and each track's own scenery on top.
+// Reported, not limited: all of it is inside the kart's line
+const KART_PAGE = 'src/kart/bots/KartPlay.tsx'
+const KART_ENGINE = 'src/kart/spikeLoop.ts'
+const kartReport = []
+if (manifest[KART_PAGE]) {
+  kartReport.push({ name: 'first screen of /kart', keys: withLanguage(collectAll([...entries, KART_PAGE])).keys })
+}
+if (manifest[KART_ENGINE]?.isDynamicEntry) {
+  const engine = collectAll([KART_ENGINE])
+  for (const key of mainKeys) engine.delete(key)
+  kartReport.push({ name: `a race's engine (${KART_ENGINE})`, keys: engine })
+  for (const scenery of lazyEntriesUnder('src/kart/art/').filter((key) => /Art\.ts$/.test(key))) {
+    const keys = collectAll([scenery])
+    for (const key of collectAll([KART_ENGINE])) keys.delete(key)
+    kartReport.push({ name: `  + ${scenery}`, keys })
+  }
+}
+
 let failed = false
+for (const { name, keys } of kartReport) {
+  console.log(`info ${name}: ${(gzipSize(keys) / KB).toFixed(1)} kB gzip (not limited)`)
+  if (SHOW_CHUNKS) {
+    for (const chunk of chunkSizes(keys)) console.log(`       ${chunk.size} B  ${chunk.file}`)
+  }
+}
 for (const budget of budgets) {
   const { name, limit, game } = budget
   const { keys, language, size } =

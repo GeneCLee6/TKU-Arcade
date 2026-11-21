@@ -16,7 +16,6 @@ import {
   sampleIndex,
   seekPlayhead,
   shieldsAt,
-  shotsAt,
   stepSpeed,
   teamBurnsAt,
   teamGaugesAt,
@@ -24,6 +23,7 @@ import {
   type RecordedView,
   type ReplaySample,
 } from '../../shared/kart/replay.ts'
+import { shotsAt } from '../../shared/kart/replayShots.ts'
 import { decodeReplay, encodeReplay } from '../../shared/kart/replayBlob.ts'
 
 const frame = (tick: number, extra: Partial<KartFrame> = {}): KartFrame => ({

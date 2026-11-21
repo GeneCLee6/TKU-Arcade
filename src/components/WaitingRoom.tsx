@@ -155,7 +155,12 @@ export function WaitingRoom({
         )}
         {view.room.gameId === 'kart' && me && onSetLook && (
           <Suspense>
-            <RoomGarage members={view.members} you={you} onSetLook={onSetLook} />
+            <RoomGarage
+              members={view.members}
+              you={you}
+              onSetLook={onSetLook}
+              track={String(view.room.options.track ?? '')}
+            />
           </Suspense>
         )}
         {view.room.gameId === 'kart' && isHost && onAddBot && (

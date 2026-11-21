@@ -84,8 +84,19 @@ export default defineConfig({
         // splits it five ways by which lazy pages share what, and the budget pays for every split:
         // a gzip stream of its own and the import and export names between them, about 2.4 kB on
         // every line (docs/NEXT.md, D4). The lazy chunks still hold only what they add.
+        //
+        // 2026-11-21 (docs/KART-PERF.md §7): three.js as one chunk. A track's scenery and a family of
+        // vehicles (their own lazy chunks) import only its core classes, which would otherwise split
+        // it in two and lose a few kB of compression; every page that needs any of it needs all of it.
         rolldownOptions: {
-          output: { codeSplitting: { groups: [{ name: 'app', tags: ['$initial'] }] } },
+          output: {
+            codeSplitting: {
+              groups: [
+                { name: 'app', tags: ['$initial'] },
+                { name: 'three', test: /[\\/]node_modules[\\/]three[\\/]/ },
+              ],
+            },
+          },
         },
       },
     },

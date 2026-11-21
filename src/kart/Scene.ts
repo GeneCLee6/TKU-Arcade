@@ -38,11 +38,14 @@ import {
   type KartLook,
   type KartModel,
 } from './art/kartModel.ts'
-import type { DriverId } from '../../shared/kart/karts.ts'
+import { DEFAULT_KART, type DriverId } from '../../shared/kart/karts.ts'
+import { loadBodies } from './art/bodyLoad.ts'
+import { bodyReady } from './art/vehicleBodies.ts'
 import type { KartBody } from './bodies.ts'
 import { createItemArt, type ItemArt, type ItemBoxLook, type ShotLook } from './art/itemArt.ts'
 import { createHitArt, type HitArt, type HitBurst } from './art/hitArt.ts'
 import { OWN_KART, type SpinPose } from './hitFx.ts'
+import { softwareRenderer } from './webgl.ts'
 
 const STILL: KartLook = { speed: 0, steer: 0, drift: 0, boosting: false }
 /** How far the heat shimmer behind a thruster reaches, as a share of the screen's height */
@@ -199,28 +202,8 @@ export interface KartScene {
   dispose(): void
 }
 
-/** Asks for a throwaway context, so that a browser without WebGL 2 never reaches three.js */
-export function supportsWebGL2(): boolean {
-  const probe = document.createElement('canvas').getContext('webgl2')
-  if (!probe) return false
-  probe.getExtension('WEBGL_lose_context')?.loseContext()
-  return true
-}
-
-/**
- * Whether WebGL here is drawn by the processor rather than a graphics card (a browser with its
- * hardware acceleration off, a virtual machine, the browser tests): the picture is then drawn
- * straight to the screen whatever the quality and the karts' paint reflects nothing, since
- * developing the picture (post.ts) and making the environment map cost such a renderer dearly
- */
-export function softwareRenderer(): boolean {
-  const probe = document.createElement('canvas').getContext('webgl2')
-  if (!probe) return false
-  const info = probe.getExtension('WEBGL_debug_renderer_info')
-  const name = info ? String(probe.getParameter(info.UNMASKED_RENDERER_WEBGL)) : ''
-  probe.getExtension('WEBGL_lose_context')?.loseContext()
-  return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name)
-}
+// 2026-11-21: in webgl.ts, so that a page can ask before three.js is here
+export { softwareRenderer, supportsWebGL2 } from './webgl.ts'
 
 /** Builds the scene inside `container`, with `walls` and, for a track, its art. Throws when three.js cannot start. */
 export function createKartScene(
@@ -615,7 +598,11 @@ export function createKartScene(
       for (const other of karts) {
         seen.add(other.id)
         let model = otherKarts.get(other.id)
-        if (model && (model.body !== other.body || model.driver !== other.driver)) {
+        // 2026-11-21 (bodyLoad.ts): a body whose family is not here yet is drawn as the default
+        // kart meanwhile, and again as itself once the family has come
+        const body = bodyReady(other.body) ? other.body : DEFAULT_KART
+        if (body !== other.body) void loadBodies([other.body]).catch(() => {})
+        if (model && (model.body !== body || model.driver !== other.driver)) {
           scene.remove(model.group)
           otherEffects.get(other.id)?.dispose()
           otherEffects.delete(other.id)
@@ -625,7 +612,7 @@ export function createKartScene(
           model = undefined
         }
         if (!model) {
-          model = buildKartModel(false, false, other.body, other.driver, finish, { far: true })
+          model = buildKartModel(false, false, body, other.driver, finish, { far: true })
           otherKarts.set(other.id, model)
           scene.add(model.group)
           otherEffects.set(other.id, createKartEffects(scene, model, true, finish.glow))
