@@ -146,6 +146,7 @@ function kartRoom() {
   expect(world.host.create('abcdefghij', 'kart', { track: 'riverside', laps: 1 }, false)).toBe(true)
   const ann = world.join('Ann')
   const bob = world.join('Bob')
+  bob.send({ t: 'ready', ready: true })
   return { world, ann, bob }
 }
 
@@ -368,6 +369,7 @@ describe('when the host goes (2026-11-17)', () => {
     world.host.create('abcdefghij', 'kart', { track: 'riverside', laps: 1 }, false)
     const ann = world.join('Ann')
     const bob = world.join('Bob')
+    bob.send({ t: 'ready', ready: true })
     bob.send({ t: 'sit', seat: null })
     ann.send({ t: 'add_bot', level: 'easy' })
     ann.send({ t: 'start' })
@@ -393,5 +395,65 @@ describe('a host coming back (2026-11-17)', () => {
     back.send({ t: 'join', name: 'Ann', token: ann.token })
     expect(back.view?.members[ann.you]?.host).toBe(true)
     expect(bob.race.racers.map((racer) => racer.out)).toEqual([false, false, true])
+  })
+})
+
+// 2026-11-21 (shared/protocol.ts 8., GameMeta.readyCheck): a race starts only once everyone seated
+// but the host has pressed Ready; the computer karts always have
+describe('the race room waits for everyone to be ready (2026-11-21)', () => {
+  function freshRoom() {
+    const world = new World()
+    expect(world.host.create('abcdefghij', 'kart', { track: 'riverside', laps: 1 }, false)).toBe(true)
+    const ann = world.join('Ann')
+    const bob = world.join('Bob')
+    return { world, ann, bob }
+  }
+
+  it('refuses the start while someone seated is not ready, and takes it once they are', () => {
+    const { ann, bob } = freshRoom()
+    ann.send({ t: 'add_bot', level: 'easy' })
+    ann.send({ t: 'start' })
+    expect(ann.errors).toEqual(['not_ready'])
+    expect(ann.view?.room.status).toBe('waiting')
+    bob.send({ t: 'ready', ready: true })
+    // Changing kart keeps it
+    bob.send({ t: 'set_look', look: 'heron.club' })
+    expect(ann.view?.members[bob.you]?.ready).toBe(true)
+    ann.send({ t: 'start' })
+    expect(ann.view?.room.status).toBe('playing')
+  })
+
+  it('takes a ready back, and asks nothing of the host alone with computer karts', () => {
+    const { ann, bob } = freshRoom()
+    bob.send({ t: 'ready', ready: true })
+    bob.send({ t: 'ready', ready: false })
+    ann.send({ t: 'start' })
+    expect(ann.errors).toEqual(['not_ready'])
+    bob.send({ t: 'sit', seat: null })
+    ann.send({ t: 'add_bot', level: 'easy' })
+    ann.send({ t: 'start' })
+    expect(ann.view?.room.status).toBe('playing')
+  })
+
+  it('is not ready once its socket drops, and the host may remove them', () => {
+    const { world, ann, bob } = freshRoom()
+    bob.send({ t: 'ready', ready: true })
+    world.disconnect(bob)
+    expect(ann.view?.members[bob.you]).toMatchObject({ ready: false, online: false })
+    ann.send({ t: 'start' })
+    expect(ann.errors).toEqual(['not_ready'])
+    ann.send({ t: 'kick', member: bob.you })
+    ann.send({ t: 'start' })
+    expect(ann.view?.room.status).toBe('playing')
+  })
+
+  it('leaves other games as they were: ready only informs', () => {
+    const world = new World()
+    expect(world.host.create('abcdefghij', 'tictactoe', undefined, false)).toBe(true)
+    const xia = world.join('Xia')
+    world.join('Ou')
+    xia.send({ t: 'start' })
+    expect(xia.errors).toEqual([])
+    expect(xia.view?.room.status).toBe('playing')
   })
 })

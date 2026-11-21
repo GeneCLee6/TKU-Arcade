@@ -84,6 +84,9 @@ test('a race room on a track from the editor: pasted by the host, raced by two',
   for (const page of [ann, bob]) {
     await expect(page.getByTestId('kart-custom-summary').first()).toContainText('Test Loop')
   }
+  // 2026-11-21: the race waits for everyone to be ready (shared/protocol.ts 8.)
+  await bob.getByTestId('kart-lobby-ready').click()
+  await expect(ann.getByTestId('kart-lobby-waiting')).toHaveText('Everyone is ready')
   await ann.getByRole('button', { name: 'Start game' }).click()
   for (const page of [ann, bob]) await expect(page.getByTestId('kart-race')).toBeVisible()
   for (const page of [ann, bob]) {

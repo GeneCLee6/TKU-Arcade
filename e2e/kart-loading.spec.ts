@@ -78,6 +78,9 @@ test('a room counts down only once everyone has built the scene', async ({ brows
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
   await ann.getByTestId('kart-room-bots-add').click()
   await expect(ann.getByTestId('bot-member')).toHaveText(/\(CPU\)$/)
+  // 2026-11-21: the race waits for everyone to be ready (shared/protocol.ts 8.)
+  await bob.getByTestId('kart-lobby-ready').click()
+  await expect(ann.getByTestId('kart-lobby-waiting')).toHaveText('Everyone is ready')
   await ann.getByRole('button', { name: 'Start game' }).click()
 
   // Bob is still loading: Ann is on the grid, waiting, and nothing counts down

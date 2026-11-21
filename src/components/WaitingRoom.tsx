@@ -41,14 +41,11 @@ export interface WaitingRoomProps {
 
 // e1-t16: its own chunk, with its strings
 const RoomPasswordSetting = lazy(() => import('./RoomPasswordSetting.tsx'))
-// e10-t05: the kart room's garage, its own chunk, only in a kart room
-const RoomGarage = lazy(() => import('../kart/roster/RoomGarage.tsx'))
-// 2026-11-17: the host's computer karts, the same way
-const RoomBots = lazy(() => import('../kart/bots/RoomBots.tsx'))
-// 2026-11-20: computer players for a game the room plays them in (GameMeta.computer), the same way
+// 2026-11-21: the race room's own waiting room (place cards, Ready, the track; its garage, computer
+// karts and teams inside it), its own chunk, only in a kart room (src/kart/lobby/KartLobby.tsx)
+const KartLobby = lazy(() => import('../kart/lobby/KartLobby.tsx'))
+// 2026-11-20: computer players for a game the room plays them in (GameMeta.computer), its own chunk
 const TableBots = lazy(() => import('./TableBots.tsx'))
-// 2026-11-18: the sides of a team race, the same way, only when the room is set to one
-const RoomTeams = lazy(() => import('../kart/team/RoomTeams.tsx'))
 
 export function WaitingRoom({
   roomId,
@@ -87,6 +84,57 @@ export function WaitingRoom({
       gameId={view.room.gameId}
     />
   )
+
+  // The right-hand column: the same in every room
+  const side = (
+    <>
+      {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
+      <Invite roomId={roomId} code={view.room.code ?? null}>
+        {(isHost || view.room.password !== undefined) && (
+          <Suspense>
+            <RoomPasswordSetting
+              password={view.room.password ?? null}
+              onSet={isHost ? onSetPassword : undefined}
+            />
+          </Suspense>
+        )}
+      </Invite>
+
+      <GameSetup
+        room={view.room}
+        isHost={isHost}
+        onSetGame={onSetGame}
+        onSetOptions={onSetOptions}
+      />
+
+      {isHost && (
+        <Actions>
+          <DissolveButton onDissolve={onDissolve} />
+        </Actions>
+      )}
+      {aside}
+    </>
+  )
+
+  if (view.room.gameId === 'kart' && onSetLook && onAddBot && onSetTeam) {
+    return (
+      <Suspense fallback={<p role="status">{t('common.loading')}</p>}>
+        <KartLobby
+          view={view}
+          you={you}
+          onSit={onSit}
+          onReady={onReady}
+          onStart={onStart}
+          onKick={onKick}
+          onTransfer={onTransfer}
+          onSetLook={onSetLook}
+          onAddBot={onAddBot}
+          onSetTeam={onSetTeam}
+          side={side}
+        />
+      </Suspense>
+    )
+  }
 
   return (
     // Two columns when wide: who is here and starting on the left, inviting and setting up on the right.
@@ -147,27 +195,6 @@ export function WaitingRoom({
           )}
         </StartBar>
 
-        {/* Below the start bar, so that on a phone it does not push Start out of reach */}
-        {view.room.gameId === 'kart' && view.room.options.teams === 'teams' && me && onSetTeam && (
-          <Suspense>
-            <RoomTeams members={view.members} you={you} onSetTeam={onSetTeam} />
-          </Suspense>
-        )}
-        {view.room.gameId === 'kart' && me && onSetLook && (
-          <Suspense>
-            <RoomGarage
-              members={view.members}
-              you={you}
-              onSetLook={onSetLook}
-              track={String(view.room.options.track ?? '')}
-            />
-          </Suspense>
-        )}
-        {view.room.gameId === 'kart' && isHost && onAddBot && (
-          <Suspense>
-            <RoomBots free={view.room.maxSeats - seated.length} onAdd={onAddBot} />
-          </Suspense>
-        )}
         {getGameCard(view.room.gameId)?.meta.computer && isHost && onAddBot && (
           <Suspense>
             <TableBots free={view.room.maxSeats - seated.length} onAdd={onAddBot} />
@@ -175,33 +202,7 @@ export function WaitingRoom({
         )}
       </Column>
 
-      <Column>
-        {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
-        <Invite roomId={roomId} code={view.room.code ?? null}>
-          {(isHost || view.room.password !== undefined) && (
-            <Suspense>
-              <RoomPasswordSetting
-                password={view.room.password ?? null}
-                onSet={isHost ? onSetPassword : undefined}
-              />
-            </Suspense>
-          )}
-        </Invite>
-
-        <GameSetup
-          room={view.room}
-          isHost={isHost}
-          onSetGame={onSetGame}
-          onSetOptions={onSetOptions}
-        />
-
-        {isHost && (
-          <Actions>
-            <DissolveButton onDissolve={onDissolve} />
-          </Actions>
-        )}
-        {aside}
-      </Column>
+      <Column>{side}</Column>
     </Layout>
   )
 }

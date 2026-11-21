@@ -36,7 +36,8 @@ export async function createRoom(page: Page, nickname: string): Promise<void> {
   await page.getByRole('textbox', { name: 'Nickname' }).fill(nickname)
   await page.getByRole('textbox', { name: 'Nickname' }).press('Enter')
   await page.waitForURL(/\/r\//)
-  await expect(page.getByRole('heading', { name: 'Seats' })).toBeVisible()
+  // The race room's waiting room has its own (src/kart/lobby/KartLobby.tsx)
+  await expect(page.getByRole('heading', { name: /^(Seats|Starting line-up)$/ })).toBeVisible()
 }
 
 /** Into someone else's room through its link, and seated: the room seats whoever joins */
