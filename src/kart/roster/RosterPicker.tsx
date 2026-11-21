@@ -182,7 +182,7 @@ export function RosterPicker({
               {one.kind === 'bike'
                 ? `${t('kart.kind.bike')} · ${t(`kart.tier.${one.tier}`)}`
                 : `${t(`kart.trait.${one.series}`)} · ${t(`kart.tier.${one.tier}`)}`}
-              {picks.includes(one.id) && <PickMark>{` · ${t('kart.meta.pick')}`}</PickMark>}
+              {picks.includes(one.id) && <PickMark>{` · ${t('kart.meta.pickShort')}`}</PickMark>}
             </Tier>
           </Choice>
         ))}

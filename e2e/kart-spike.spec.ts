@@ -1076,8 +1076,9 @@ test('the garage narrows the vehicles by tab, previews the pick, and a bike race
   await expect(page.locator('canvas')).toBeVisible()
   await page.getByTestId('kart-garage-open').click()
   const garage = page.getByTestId('kart-garage')
-  // 2026-11-20 (§4.48): 20 vehicles with the item series, and the drivers
-  await expect(garage.getByRole('radio')).toHaveCount(20 + 4)
+  // 2026-11-20 (§4.48): 20 vehicles with the item series, 2026-11-21 the season flagship, and the
+  // drivers
+  await expect(garage.getByRole('radio')).toHaveCount(21 + 4)
   // The pick, drawn in 3D: its own canvas, and a switch for its N2O shape
   const preview = garage.getByTestId('kart-preview')
   await expect(preview.locator('canvas')).toBeVisible()
@@ -1101,6 +1102,42 @@ test('the garage narrows the vehicles by tab, previews the pick, and a bike race
   // The bike races: the page keeps it, and the scene draws on
   await expect(page.getByTestId('kart-body')).toHaveValue('swift')
   await expect(page.getByTestId('kart-preview')).toHaveCount(0)
+  await expect(page.getByTestId('kart-countdown')).toBeVisible({ timeout: 15_000 })
+  await expect.poll(() => framesOf(page), { timeout: 30_000 }).toBeGreaterThan(10)
+  expect(errors).toEqual([])
+})
+
+// 2026-11-21 (docs/KART-META.md): the track's quickest three in the menu and the garage, and the
+// season flagship, which races
+test('the garage recommends the track’s quickest karts, and the season flagship races', async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  const errors = watchConsole(page)
+  await page.addInitScript(() => {
+    localStorage.setItem('tku-arcade.kart.quality', 'low')
+    localStorage.setItem('tku-arcade.kart.body', 'tide')
+  })
+  await page.goto('/kart?track=harbour')
+  await expect(page.locator('canvas')).toBeVisible()
+  await expect(page.getByTestId('kart-course-meta')).toContainText('Egret · Hornet · Humpback')
+  await page.getByTestId('kart-garage-open').click()
+  const garage = page.getByTestId('kart-garage')
+  const meta = garage.getByTestId('kart-meta')
+  await expect(meta).toHaveAttribute('data-track', 'harbour')
+  await expect(meta.locator('[data-meta-pick]')).toHaveCount(3)
+  await expect(garage.locator('[data-kart="heron"]')).toHaveAttribute('data-pick', 'true')
+  // A pick from the three picks that kart
+  await meta.locator('[data-meta-pick="hornet"]').click()
+  await expect(garage.getByTestId('kart-preview')).toHaveAttribute('data-kart', 'hornet')
+  // The flagship: its tier, its season and what it costs
+  await garage.getByRole('radio', { name: /Black Kite/ }).click()
+  await expect(garage.getByTestId('kart-tags')).toContainText('Season flagship')
+  await expect(garage.getByTestId('kart-season')).toHaveText('Season 1')
+  await expect(garage.getByTestId('kart-flagship-note')).toBeVisible()
+  await expect(garage.getByTestId('kart-preview').locator('canvas')).toBeVisible()
+  await page.getByRole('button', { name: 'Close the garage' }).click()
+  await expect(page.getByTestId('kart-body')).toHaveValue('kite')
   await expect(page.getByTestId('kart-countdown')).toBeVisible({ timeout: 15_000 })
   await expect.poll(() => framesOf(page), { timeout: 30_000 }).toBeGreaterThan(10)
   expect(errors).toEqual([])

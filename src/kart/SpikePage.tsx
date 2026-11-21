@@ -549,7 +549,7 @@ export function SpikePage({
               ))}
             </select>
           </CourseLabel>
-          {courseMeta && (
+          {courseMeta && open !== 'garage' && (
             // 2026-11-21 (docs/KART-META.md): the track's quickest three, the flagship aside
             <CourseMeta data-testid="kart-course-meta" data-track={course}>
               {t('kart.meta.line', {
