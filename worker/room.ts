@@ -11,6 +11,7 @@ import {
   HEARTBEAT_PING,
   HEARTBEAT_PONG,
   newSeatToken,
+  type QuickBots,
   type RoomSummary,
   type ServerMessage,
 } from '../shared/protocol.ts'
@@ -38,11 +39,15 @@ const DELETE_BATCH = 128
 /** How long the paused games (e12-t11) read from D1 are trusted before a game may start on them */
 const FLAGS_TTL_MS = 30_000
 
-/** Whether this message may start a game (shared/protocol.ts): parsed, so no spelling slips past */
-function startsAGame(data: string): boolean {
+/**
+ * Whether this message may start a game (shared/protocol.ts): parsed, so no spelling slips past.
+ * `onJoin`: the room starts its game when its first person joins (a room opened with computer
+ * players, RoomHost.startsOnJoin), so a join may too
+ */
+function startsAGame(data: string, onJoin: boolean): boolean {
   try {
     const t = (JSON.parse(data) as { t?: unknown } | null)?.t
-    return t === 'start' || t === 'rematch' || t === 'set_game'
+    return t === 'start' || t === 'rematch' || t === 'set_game' || (onJoin && t === 'join')
   } catch {
     return false
   }
@@ -151,8 +156,9 @@ export class RoomDO extends DurableObject<Env> {
     isPublic: boolean,
     code: string | null = null,
     password: string | null = null,
+    bots: QuickBots | null = null,
   ): Promise<boolean> {
-    const created = this.host.create(id, gameId, options, isPublic, code, password)
+    const created = this.host.create(id, gameId, options, isPublic, code, password, bots)
     // A room nobody ever joins is cleaned up too
     await this.settle()
     return created
@@ -233,7 +239,7 @@ export class RoomDO extends DurableObject<Env> {
     // Normally answered by the auto-response without waking the object
     if (data === HEARTBEAT_PING) ws.send(HEARTBEAT_PONG)
     else if (typeof data === 'string') {
-      if (startsAGame(data)) await this.readFlags()
+      if (startsAGame(data, this.host.startsOnJoin())) await this.readFlags()
       this.host.message(conn, data)
     }
     else this.host.binary(conn, data)

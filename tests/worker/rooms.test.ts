@@ -69,6 +69,7 @@ describe('POST /api/rooms', () => {
       false,
       expect.any(String),
       null,
+      null,
     )
   })
 
@@ -90,6 +91,7 @@ describe('POST /api/rooms', () => {
         expected,
         expect.any(String),
         null,
+        null,
       )
     }
   })
@@ -99,7 +101,7 @@ describe('POST /api/rooms', () => {
     const res = await handleRequest(post(JSON.stringify({ gameId: 'tictactoe' })), env)
     const { id, code } = (await res.json()) as { id: string; code: string }
     expect(isRoomCode(code)).toBe(true)
-    expect(room.create).toHaveBeenCalledWith(id, 'tictactoe', undefined, false, code, null)
+    expect(room.create).toHaveBeenCalledWith(id, 'tictactoe', undefined, false, code, null, null)
     expect(lobby.codes.get(code)).toBe(id)
   })
 
@@ -114,6 +116,7 @@ describe('POST /api/rooms', () => {
       'tictactoe',
       undefined,
       false,
+      null,
       null,
       null,
     )
@@ -140,6 +143,7 @@ describe('POST /api/rooms', () => {
       'tictactoe',
       undefined,
       false,
+      null,
       null,
       null,
     )
@@ -284,6 +288,7 @@ describe('a room password at creation', () => {
       false,
       expect.any(String),
       'tamsui',
+      null,
     )
   })
 
@@ -296,6 +301,71 @@ describe('a room password at creation', () => {
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'bad_password' })
     expect(room.create).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-11-21: the lobby's "Play the computer"
+describe('computer players at creation', () => {
+  // Each from an address of its own: the in-memory limit counts every test's rooms
+  let address = 0
+  const create = (body: unknown) => {
+    const { env, room } = setup()
+    const request = new Request('https://x/api/rooms', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'cf-connecting-ip': `203.0.113.${++address}` },
+    })
+    return handleRequest(request, env).then((res) => ({ res, room }))
+  }
+
+  it('hands the room a count and a level that fit the game, and never makes it public', async () => {
+    const { res, room } = await create({
+      gameId: 'holdem',
+      public: true,
+      bots: { count: 2, level: 'easy' },
+    })
+    expect(res.status).toBe(201)
+    expect(room.create).toHaveBeenCalledWith(
+      expect.any(String),
+      'holdem',
+      undefined,
+      false,
+      expect.any(String),
+      null,
+      { count: 2, level: 'easy' },
+    )
+  })
+
+  it('refuses computer players that do not fit, rather than drop them', async () => {
+    const bad: unknown[] = [
+      // Not a game the room plays computer seats in
+      { gameId: 'tictactoe', bots: { count: 1, level: 'normal' } },
+      { gameId: 'kart', bots: { count: 1, level: 'normal' } },
+      { gameId: 'spectrum', bots: { count: 3, level: 'normal' } },
+      // A level the game does not have
+      { gameId: 'holdem', bots: { count: 1, level: 'expert' } },
+      // None, half a one, or more than the table holds
+      { gameId: 'holdem', bots: { count: 0, level: 'normal' } },
+      { gameId: 'holdem', bots: { count: 1.5, level: 'normal' } },
+      { gameId: 'holdem', bots: { count: '1', level: 'normal' } },
+      { gameId: 'traders', bots: { count: 4, level: 'normal' } },
+      { gameId: 'holdem', bots: { count: 9, level: 'normal' } },
+      { gameId: 'holdem', bots: 'two' },
+      { gameId: 'holdem', bots: null },
+    ]
+    for (const body of bad) {
+      const { res, room } = await create(body)
+      expect(res.status, JSON.stringify(body)).toBe(400)
+      expect(await res.json()).toEqual({ error: 'bad_bots' })
+      expect(room.create).not.toHaveBeenCalled()
+    }
+  })
+
+  it('takes the most a table holds', async () => {
+    for (const [gameId, count] of [['holdem', 8], ['promotion', 5], ['traders', 3]] as const) {
+      const { res } = await create({ gameId, bots: { count, level: 'normal' } })
+      expect(res.status, gameId).toBe(201)
+    }
   })
 })
 

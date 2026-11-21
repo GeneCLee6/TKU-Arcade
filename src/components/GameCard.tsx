@@ -43,6 +43,10 @@ export function GameCard({ game, disabled, paused = false, onNewRoom }: GameCard
       <Facts>
         <span>{players}</span>
         <span>{t('lobby.minutes', { minutes })}</span>
+        {/* 2026-11-21: the room plays computer seats, or (the kart) its own page races the computer */}
+        {(game.meta.computer === true || game.meta.tryAlone !== undefined) && (
+          <ComputerTag>{t('lobby.computerTag')}</ComputerTag>
+        )}
       </Facts>
       <Summary>{t(`${i18nKey}.summary`)}</Summary>
       {hasRules(game.id) && (
@@ -68,6 +72,22 @@ const Paused = styled.p`
   color: ${color.danger};
   font-size: ${fontSize.sm}px;
   font-weight: 700;
+`
+
+// Text in the text colour, the game's hue only as the mark before it
+const ComputerTag = styled.span`
+  color: ${color.text};
+  font-weight: 700;
+
+  &::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: ${space.xs}px;
+    background: ${color.accent};
+    rotate: 45deg;
+  }
 `
 
 const Facts = styled.p`

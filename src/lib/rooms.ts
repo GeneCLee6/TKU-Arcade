@@ -3,6 +3,7 @@ import type {
   CreateRoomResponse,
   FlagsResponse,
   LobbyResponse,
+  QuickBots,
   RoomCodeResponse,
   RoomListing,
   RoomSummary,
@@ -14,12 +15,21 @@ import { isRoomId } from '../../shared/room-id.ts'
  * this address opened too many rooms in the last minute (e12-t06); null when it could not be
  * created for any other reason (the toast is the same)
  */
+/**
+ * `bots` (2026-11-21, the lobby's "Play the computer"): a private room with that many computer
+ * players, whose game starts as soon as this person joins
+ */
 export async function createRoom(
   gameId: string,
   isPublic: boolean,
   signal?: AbortSignal,
+  bots?: QuickBots,
 ): Promise<string | 'paused' | 'rate_limited' | null> {
-  const request: CreateRoomRequest = isPublic ? { gameId, public: true } : { gameId }
+  const request: CreateRoomRequest = bots
+    ? { gameId, bots }
+    : isPublic
+      ? { gameId, public: true }
+      : { gameId }
   try {
     const response = await fetch('/api/rooms', {
       method: 'POST',

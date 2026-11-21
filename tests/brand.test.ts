@@ -10,7 +10,6 @@ import icon512 from '../public/icon-512.png?inline'
 import iconMaskable from '../public/icon-maskable-512.png?inline'
 import manifestText from '../public/manifest.webmanifest?raw'
 import offlineHtml from '../public/offline.html?raw'
-import serviceWorker from '../public/sw.js?raw'
 import favicon from '../public/favicon.svg?raw'
 import topBar from '../src/components/TopBar.tsx?raw'
 import { palette } from '../src/styles/tokens.ts'
@@ -70,6 +69,7 @@ describe('the logo files', () => {
 describe('the app manifest', () => {
   const manifest = JSON.parse(manifestText) as {
     name: string
+    short_name: string
     start_url: string
     display: string
     background_color: string
@@ -78,7 +78,9 @@ describe('the app manifest', () => {
   }
 
   it('makes the site installable: a name, a start page, standalone, and the icons on disk', () => {
-    expect(manifest.name).toBe('TKU Arcade')
+    // Both names (2026-11-21); the home screen's label is the short one
+    expect(manifest.name).toBe('TKU Arcade 淡江遊樂場')
+    expect(manifest.short_name).toBe('TKU Arcade')
     expect(manifest.start_url.startsWith('/')).toBe(true)
     expect(manifest.display).toBe('standalone')
     const icons = manifest.icons.map((icon) => [icon.src, icon.sizes, icon.purpose])
@@ -99,9 +101,5 @@ describe('the app manifest', () => {
     for (const colour of colours) expect(tokenValues, colour).toContain(colour)
   })
 
-  it('has a service worker that caches only the offline page, never the app', () => {
-    expect(serviceWorker).toContain("'/offline.html'")
-    expect(serviceWorker).toContain("request.mode === 'navigate'")
-    expect(serviceWorker).not.toMatch(/cache\.put|\/assets\//)
-  })
+  // The service worker itself: tests/pwa.test.ts
 })

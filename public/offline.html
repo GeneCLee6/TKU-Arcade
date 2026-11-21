@@ -21,7 +21,10 @@
       img { width: 72px; height: 72px; }
       h1 { font-size: 24px; margin: 16px 0 8px; }
       p { margin: 4px 0; color: #a6aed6; }
-      button {
+      a {
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
         margin-top: 20px;
         min-height: 44px;
         padding: 0 24px;
@@ -39,7 +42,9 @@
       <h1>需要網路 · You are offline</h1>
       <p>TKU Arcade 要連上網路才能開房和玩。</p>
       <p lang="en">TKU Arcade needs a connection to open rooms and play.</p>
-      <button type="button" onclick="location.reload()">再試一次 · Try again</button>
+      <!-- A link to this same address, not a script: the site's Content-Security-Policy allows no
+           inline script, and following it is the retry -->
+      <a href="" role="button">再試一次 · Try again</a>
     </main>
   </body>
 </html>

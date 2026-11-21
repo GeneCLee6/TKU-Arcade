@@ -17,6 +17,7 @@ import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { createRoom, fetchPausedGames } from '../lib/rooms.ts'
 import { useNavigate } from '../lib/useRouter.ts'
+import type { QuickBots } from '../../shared/protocol.ts'
 import { clippedFill, displayType, slantClip } from '../styles/esports.ts'
 import { color, font, fontSize, space } from '../styles/tokens.ts'
 
@@ -29,6 +30,10 @@ const PublicRooms = lazy(() =>
   import('../components/PublicRooms.tsx').then(({ PublicRooms }) => ({ default: PublicRooms })),
 )
 
+// 2026-11-21: "Play the computer", after the first paint too: every game's first screen shares the
+// lobby's entry chunk, so the lobby's own extras stay out of it
+const QuickPlay = lazy(() => import('../components/QuickPlay.tsx'))
+
 /** The lobby: the games, a link box and the public rooms (e1-t02, e1-t09) */
 export function HomePage() {
   const t = useT()
@@ -40,8 +45,9 @@ export function HomePage() {
   // Signed in (e1-t13): the account's name, fixed; the room takes it from the session anyway
   const account = useAccount()?.account ?? null
   const nickname = account?.name ?? guestName
-  // The nickname dialog is open; `gameId` is the "New room" waiting for it, null for a plain change
-  const [asking, setAsking] = useState<{ gameId: string | null } | null>(null)
+  // The nickname dialog is open; `gameId` is the "New room" waiting for it (with `bots` for a game
+  // against the computer), null for a plain change
+  const [asking, setAsking] = useState<{ gameId: string | null; bots?: QuickBots } | null>(null)
   const [creating, setCreating] = useState(false)
   // Off by default: nobody's room shows up in front of strangers unless they asked for that
   const [listPublicly, setListPublicly] = useState(false)
@@ -61,11 +67,11 @@ export function HomePage() {
     return () => controller.abort()
   }, [])
 
-  const create = async (gameId: string) => {
+  const create = async (gameId: string, bots?: QuickBots) => {
     const controller = new AbortController()
     inFlight.current = controller
     setCreating(true)
-    const id = await createRoom(gameId, listPublicly, controller.signal)
+    const id = await createRoom(gameId, listPublicly, controller.signal, bots)
     if (controller.signal.aborted) return
     setCreating(false)
     if (id === 'paused') {
@@ -76,14 +82,14 @@ export function HomePage() {
     else toast(t('lobby.newRoomFailed'), { tone: 'danger' })
   }
 
-  const handleNewRoom = (gameId: string) => {
-    if (nickname === null) setAsking({ gameId })
-    else void create(gameId)
+  const handleNewRoom = (gameId: string, bots?: QuickBots) => {
+    if (nickname === null) setAsking({ gameId, bots })
+    else void create(gameId, bots)
   }
 
   const handleNickname = (name: string) => {
     setNickname(name)
-    if (asking?.gameId != null) void create(asking.gameId)
+    if (asking?.gameId != null) void create(asking.gameId, asking.bots)
     setAsking(null)
   }
 
@@ -125,6 +131,9 @@ export function HomePage() {
           </Intro>
           <HeroArt />
         </Hero>
+        <Suspense>
+          <QuickPlay disabled={creating} paused={paused} onPlay={handleNewRoom} />
+        </Suspense>
         {/* The games first: on a phone a list of rooms must not push "New room" off the screen */}
         <section>
           <SectionTitle>{t('lobby.games')}</SectionTitle>

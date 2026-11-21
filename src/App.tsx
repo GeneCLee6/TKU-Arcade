@@ -3,6 +3,7 @@ import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { ToastProvider } from './components/Toast.tsx'
 import { loadRoomStrings } from './i18n/roomStrings.ts'
 import { useT } from './i18n/useT.ts'
+import { useUpdateReady } from './lib/installApp.ts'
 import { BrowserRouter, Route, Routes } from './lib/router.tsx'
 import { useLocation } from './lib/useRouter.ts'
 import { HomePage } from './pages/HomePage.tsx'
@@ -48,6 +49,18 @@ const KartSpikePage = lazy(() =>
   import('./kart/SpikePage.tsx').then(({ SpikePage }) => ({ default: SpikePage })),
 )
 
+// 2026-11-21: a new version is out (the service worker has it): only then is its prompt loaded
+const UpdatePrompt = lazy(() => import('./components/UpdatePrompt.tsx'))
+
+function NewVersion() {
+  const ready = useUpdateReady()
+  return ready ? (
+    <Suspense>
+      <UpdatePrompt />
+    </Suspense>
+  ) : null
+}
+
 function RouteLoading() {
   const t = useT()
   return <p role="status">{t('common.loading')}</p>
@@ -82,6 +95,7 @@ export function App() {
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>
+      <NewVersion />
     </ToastProvider>
   )
 }

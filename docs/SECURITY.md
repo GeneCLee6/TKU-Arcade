@@ -50,7 +50,7 @@ frame-ancestors 'none'
 - **字型**：Google Fonts（`src/styles/webFonts.ts`、陞官圖的 `boardFont.ts`／`fullFont.ts`）：CSS 從 `fonts.googleapis.com`、檔案從 `fonts.gstatic.com`。
 - **connect**：只有本站。CSP Level 3 的 `'self'` 包含同主機的 `ws:`／`wss:`，房間 socket 不用另外寫。成本儀表板查 Cloudflare GraphQL 是 Worker 端，不經瀏覽器。
 - **卡丁車**：WebGL 不受 CSP 管，shader 不是 script；音效是 Web Audio 合成（`src/kart/kartAudio.ts`），不下載音檔；材質是程式產生的 canvas。`img-src`／`media-src` 的 `data:`、`blob:` 是給 canvas 與將來的 R2 資產留的。
-- **Service worker**（`public/sw.js`）：同源，`worker-src 'self'`。
+- **Service worker**（`scripts/pwa/sw.js`，build 寫成 `/sw.js`，`ARCHITECTURE.md` §4.56）：同源，`worker-src 'self'`；manifest 是 `manifest-src 'self'`，CSP 沒有為它放寬。它自己的 fetch 也受同一份 CSP（`connect-src 'self'`），所以只處理同源的 GET：頁面永遠走網路（離線才回離線頁）、`/assets/*` 雜湊檔 cache-first；**`/api/*`、`/ws/*`、非 GET 與別的網域完全不攔**，房間與帳號的回應不會進快取。離線頁的副本保留原本的安全標頭；離線頁沒有任何 script（「再試一次」是連結）。新版本等使用者按「重新整理」才接手，頁面本身從不讀快取，所以不會被舊版卡住。
 - **不嵌入、不被嵌入**：`frame-ancestors 'none'`（加上舊瀏覽器用的 `X-Frame-Options: DENY`）；LongTalk 語音房是開新分頁，不是 iframe。
 - **form-action `'self'`**：站內的表單都是 JS 送出；登入是導向牌桌的連結（導覽，不受 `form-action` 管）。
 

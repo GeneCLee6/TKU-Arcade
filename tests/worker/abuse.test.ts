@@ -125,6 +125,31 @@ describe('new rooms across instances', () => {
     expect((await handleRooms(post('127.0.0.1'), env, url, limit, 0)).status).toBe(400)
     expect(limiter.take).not.toHaveBeenCalled()
   })
+
+  // 2026-11-21: the lobby's "Play the computer" is one room, made by one POST, so it counts once
+  it('count a room opened with computer players once, against the same 5', async () => {
+    const limiter = fakeLimiter()
+    const room = { create: vi.fn(async () => true) }
+    const lobby = { claimCode: vi.fn(async () => null) }
+    const env = {
+      LIMITER: limiter,
+      ROOM: { idFromName: (name: string) => name, get: () => room },
+      LOBBY: { idFromName: (name: string) => name, get: () => lobby },
+    } as unknown as Env
+    const limit = new FixedWindowLimit(30, 600)
+    const quick = (i: number) =>
+      new Request('https://x/api/rooms', {
+        method: 'POST',
+        body: JSON.stringify(
+          i % 2 === 0 ? { gameId: 'holdem', bots: { count: 1, level: 'normal' } } : { gameId: 'holdem' },
+        ),
+        headers: { 'cf-connecting-ip': '198.51.100.9' },
+      })
+    const statuses: number[] = []
+    for (let i = 0; i < 6; i++) statuses.push((await handleRooms(quick(i), env, url, limit, i)).status)
+    expect(statuses).toEqual([201, 201, 201, 201, 201, 429])
+    expect(room.create).toHaveBeenCalledTimes(5)
+  })
 })
 
 describe('WebSocket upgrades across instances', () => {

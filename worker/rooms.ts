@@ -1,4 +1,5 @@
 import { getGame } from '../shared/games/index.ts'
+import { parseQuickBots } from '../shared/games/quickBots.ts'
 import type { OptionValues } from '../shared/games/types.ts'
 import {
   CloseCode,
@@ -138,13 +139,20 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
     options,
     public: isPublic,
     password,
+    bots: rawBots,
   } = (typeof body === 'object' && body !== null ? body : {}) as {
     gameId?: unknown
     options?: unknown
     public?: unknown
     password?: unknown
+    bots?: unknown
   }
-  if (typeof gameId !== 'string' || !getGame(gameId)) return fail('unknown_game', 400)
+  const module = typeof gameId === 'string' ? getGame(gameId) : null
+  if (typeof gameId !== 'string' || !module) return fail('unknown_game', 400)
+  // The lobby's "Play the computer" (2026-11-21): computer players seated from the start, and the
+  // game under way once its person joins. Refused, not dropped, when they do not fit the game
+  const bots = rawBots === undefined ? null : parseQuickBots(module, rawBots)
+  if (rawBots !== undefined && bots === null) return fail('bad_bots', 400)
   // Paused by the owner (e12-t11, worker/flags.ts)
   if (!(await isGameEnabled(env.DB, gameId))) return fail('game_disabled', 403)
   // A password that is there but no good (too long, only spaces) is refused, not dropped silently
@@ -161,9 +169,11 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
       id,
       gameId,
       plainOptions(options),
-      isPublic === true,
+      // A room with computer players is one person's game: never listed for strangers
+      isPublic === true && bots === null,
       code,
       normalizePassword(password),
+      bots,
     )
     if (created) {
       const created: CreateRoomResponse = { id, code }
