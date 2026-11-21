@@ -7,7 +7,8 @@ import { clippedFill, displayType, monoType, SLANT } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import type { Callout } from './callouts.ts'
 import { streak, ticker } from './ui/broadcast.ts'
-import { HUD_STEPS, type SpikeHud } from './spikeLoop.ts'
+import { HUD_STEPS } from './hudSteps.ts'
+import type { SpikeHud } from './spikeLoop.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 

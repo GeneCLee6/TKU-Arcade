@@ -5,7 +5,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { KART_ROSTER_MESSAGES } from '../../../shared/kart/i18n.roster.ts'
-import { lookOf, parseLook, type DriverId, type KartId } from '../../../shared/kart/karts.ts'
+import { isKartId, lookOf, parseLook, type DriverId, type KartId } from '../../../shared/kart/karts.ts'
 import type { RoomMember } from '../../../shared/protocol.ts'
 import { Heading, Section } from '../../components/roomParts.ts'
 import { registerMessages } from '../../i18n/t.ts'
@@ -13,6 +13,7 @@ import { memberName } from '../../lib/memberName.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { loadBody, loadDriver, saveBody, saveDriver } from '../bodies.ts'
+import { prefetchKart, RACE_ENGINE } from '../load/kartLoad.ts'
 import { RosterPicker } from './RosterPicker.tsx'
 
 registerMessages(KART_ROSTER_MESSAGES)
@@ -25,9 +26,14 @@ export interface RoomGarageProps {
   members: Record<string, RoomMember>
   you: string
   onSetLook(look: string | null): void
+  /**
+   * 2026-11-21 (docs/ARCHITECTURE.md §4.52): the room's track, once picked: its race (the engine,
+   * the track's scenery, the karts picked, the song) is fetched in the background meanwhile
+   */
+  track?: string
 }
 
-export default function RoomGarage({ members, you, onSetLook }: RoomGarageProps) {
+export default function RoomGarage({ members, you, onSetLook, track }: RoomGarageProps) {
   const t = useT()
   const [kart, setKart] = useState<KartId>(loadBody)
   const [driver, setDriver] = useState<DriverId>(loadDriver)
@@ -42,6 +48,12 @@ export default function RoomGarage({ members, you, onSetLook }: RoomGarageProps)
   const seated = Object.values(members)
     .filter((member) => member.seat !== null)
     .sort((a, b) => (a.seat as number) - (b.seat as number))
+  const grid = [kart, ...seated.map((member) => parseLook(member.look)?.kart)].join()
+  useEffect(() => {
+    if (!track) return
+    const bodies = grid.split(',').filter(isKartId)
+    prefetchKart({ engine: RACE_ENGINE, track: { id: track }, bodies, music: true })
+  }, [track, grid])
 
   return (
     <Section data-testid="kart-room-garage">

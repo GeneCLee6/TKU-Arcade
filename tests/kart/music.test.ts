@@ -19,7 +19,15 @@ import {
   sectionFor,
   stepSeconds,
 } from '../../src/kart/audio/sequencer.ts'
-import { SONGS, songFor, TRACK_SONGS, type SongId } from '../../src/kart/audio/songs.ts'
+import {
+  loadedSong,
+  loadSong,
+  SONG_IDS,
+  songFor,
+  TRACK_SONGS,
+  type Song,
+  type SongId,
+} from '../../src/kart/audio/songs.ts'
 import {
   DEFAULT_VOLUMES,
   forgetVolumesForTest,
@@ -28,6 +36,12 @@ import {
   saveVolumes,
 } from '../../src/kart/audio/volumes.ts'
 import { ambienceFor, crowdLevel, CROWD_GONE, CROWD_NEAR, nextIn, TRACK_AMBIENCE } from '../../src/kart/audio/ambience.ts'
+
+// 2026-11-21: each song is a lazy chunk (songs.ts); fetched here, all of them
+const SONGS = Object.fromEntries(
+  await Promise.all(SONG_IDS.map(async (id) => [id, await loadSong(id)] as const)),
+) as Record<SongId, Song>
+
 
 // 2026-11-20 (§4.46): the soundtrack's sequencer, its parts, the songs' data, the volumes, the ambience
 
@@ -251,5 +265,14 @@ describe('the ambience', () => {
     expect(nextIn('gulls', () => 0)).toBe(3)
     expect(nextIn('gulls', () => 1)).toBe(8)
     expect(nextIn('machines', () => 0.5)).toBe(1.6)
+  })
+})
+
+describe('songs as lazy chunks (2026-11-21)', () => {
+  it('lists every song once and keeps one fetched', async () => {
+    expect(new Set(SONG_IDS).size).toBe(SONG_IDS.length)
+    expect(Object.keys(SONGS).sort()).toEqual([...SONG_IDS].sort())
+    for (const id of SONG_IDS) expect(loadedSong(id)).toBe(SONGS[id])
+    expect(await loadSong('neon')).toBe(SONGS.neon)
   })
 })

@@ -16,7 +16,9 @@ import {
 } from 'three'
 import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
 import { kartParts, kartThemes } from '../../styles/kartTokens.ts'
+import { loadBodies } from '../art/bodyLoad.ts'
 import { buildKartModel, type KartModel } from '../art/kartModel.ts'
+import { bodyReady } from '../art/vehicleBodies.ts'
 import { buildKartEnvironment } from '../art/kartParts.ts'
 import type { DriverGesture } from '../driverGestures.ts'
 
@@ -162,17 +164,32 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
   }
   frame = requestAnimationFrame(draw)
 
+  const show = (kart: KartId, driver: DriverId): void => {
+    if (shown && shown.kart === kart && shown.driver === driver) return
+    const asked = { kart, driver }
+    shown = asked
+    // 2026-11-21 (bodyLoad.ts): a family not fetched yet comes first; the last pick wins
+    if (!bodyReady(kart)) {
+      void loadBodies([kart]).then(
+        () => {
+          if (disposed || shown !== asked) return
+          shown = null
+          show(kart, driver)
+        },
+        () => {},
+      )
+      return
+    }
+    if (model) {
+      scene.remove(model.group)
+      model.dispose()
+    }
+    model = buildKartModel(false, false, kart, driver, { environment })
+    scene.add(model.group)
+  }
+
   return {
-    show(kart, driver) {
-      if (shown && shown.kart === kart && shown.driver === driver) return
-      shown = { kart, driver }
-      if (model) {
-        scene.remove(model.group)
-        model.dispose()
-      }
-      model = buildKartModel(false, false, kart, driver, { environment })
-      scene.add(model.group)
-    },
+    show,
     boost(on) {
       boosting = on
     },

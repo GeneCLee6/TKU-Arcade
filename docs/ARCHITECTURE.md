@@ -1363,6 +1363,21 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **量測掛鉤**：`KartScene.stats()`（`renderer.info`，`autoReset` 關掉、每幀 `present` 開頭歸零，所以含陰影與後處理的 pass）、`drawn()`（不配置）；`spikeLoop.ts` 的 `__kartSpike.render`／`jsMs`／`totals`。
 - **重播檔**：`shared/kart/replayBlob.ts`（從 `replay.ts` 搬出來的 `encodeReplay`／`decodeReplay`，加上嚴格的 `checkReplayMeta`；房間首屏只錄不打包，所以不帶它）、`shared/kart/replayFile.ts`（`.tkureplay` 容器、deflate-raw、大小限制、連結的 base64url）、`shared/kart/itemIds.ts`（`ITEM_IDS` 本身，讓驗證不用載入道具規則）。介面：`src/kart/watch/ReplayShare.tsx`（下載、複製連結；房間結果是 lazy chunk）、`replayFiles.ts`（檔名、檔案資訊、觸發下載）、`ReplayFilePage.tsx`（路由 `/kart/replay`，lazy）、`ReplayView` 多了 `revision` 與 `notice`；字串在 `shared/games/kart/i18n.replayFile.ts`，由 `src/kart/watch/replayMessages.ts` 在用到時註冊。電腦車比賽（`BotRaceView`）用房間同一個 `useRaceRecorder` 錄，結果畫面有看重播與下載。
 
+### 4.52 路線圖外：賽道場景、車款、配樂拆成 lazy chunk；載入畫面與預先下載（2026-11-21，`feat/kart-lazy-chunks`）
+
+接 §4.51。數字在 `docs/KART-PERF.md` §7。原則：**建場景本身照舊是同步的**（`createKartScene`、`buildTrackArt`、`buildKartModel` 不變），改的是「建之前先把要的東西載完」；物理、伺服器裁定、協定都沒動。
+
+- **載入器**（`src/kart/load/kartLoad.ts`，沒有 three.js）：`RACE_ENGINE`（`spikeLoop.ts`：計時賽、電腦車、房間比賽、大獎賽、駕訓班）、`WATCH_ENGINE`（`watch/watchLoop.ts`：觀戰、重播、重播檔）、`SCENE_ENGINE`（`Scene.ts`）三個「引擎槽」，各自只下載一次、失敗會忘掉（再要一次就重抓）。`loadKart(plan, onProgress)` 同時下載 plan 的四樣：引擎、賽道專屬場景、車系、這張賽道的歌，回報加權進度（引擎 8、場景 2、每個車系 1、歌 1）；`peekKartLoad(plan)` 全部到齊就直接給引擎（第二場同賽道不會閃載入畫面）；`prefetchKart(plan)` 在瀏覽器閒置時背景下載、錯誤留給載入畫面。React 用 `useKartLoad(plan, key)`（`engine`、`progress`、`failed`、`retry`）。
+- **入口**：`RaceView`（房間、電腦車、大獎賽）、`SchoolView`、`SpikePage`（`/kart`）、`SpectateView`、`ReplayView`（含 `/kart/replay`）的迴圈 effect 都等 `engine` 不是 null 才呼叫 `engine.startSpikeLoop`／`engine.startWatchLoop`；這些頁面本身不再靜態 import 引擎（`supportsWebGL2` 搬到 `webgl.ts`、`SPIKE_COURSES`／`spikeTrack` 搬到 `courses.ts`、`HUD_STEPS` 搬到 `hudSteps.ts`，原處 re-export）。編輯器的 3D 預覽（`editor/View3D.tsx`）本來就是自己的 chunk，先 `await loadTrackScenery` 再建。`/kart` 車庫的 3D 預覽改成 lazy（`GaragePanel`），選單不再帶 three.js。
+- **房間的「畫好賽道」**（`KART-NETCODE.md` §3）：`RaceView` 在 `startSpikeLoop` 之後才送 `loaded`，現在 `startSpikeLoop` 要等全部載完，所以「大家都畫好（或等了 25 秒）→ 倒數」的意思不變：慢的人還在載入畫面時，別人的畫面顯示「等大家到起跑格（n／m）」、房間不會倒數（`e2e/kart-loading.spec.ts` 用網路節流驗）。25 秒的保底在伺服器，照舊。
+- **賽道專屬場景**（`src/kart/art/trackScenery.ts`）：`loadTrackScenery(track)`／`loadedScenery(track)`；`harbour`、`tamkang`、`oldstreet` 各一個模組，`works`／`wharf`／`lanes` 是各自的模組加共用的 `skillWalls`＋`skillCues`（與 `skillKit`），`mangrove`／`fort`／`danhai`／`datun` 是 `localPlan`＋`localArt`；其他（河濱、觀音、測試橢圓、編輯器做的、駕訓班）沒有自己的，立即可用。`buildTrackArt(track, level, scenery = loadedScenery(track))` 從 `TrackScenery` 拿函式；沒載到就畫成普通賽道並在 console 報錯（不會當掉）。festival、cornerArt、forkArt、hillArt 每張賽道都用，跟引擎一起。**新賽道有專屬場景就加進 `LOADERS`**（`tests/kart/lazyChunks.test.ts` 擋清單）。
+- **車款**（`src/kart/art/bodyLoad.ts`）：`BODY_FAMILY` 每台車屬於哪個車系（`first` 跟引擎；`more`、`bike`、`item` 各一個 chunk），`loadBodies(ids)`、`bodiesLoaded`、`bodyMakers`（`vehicleBodies.ts` 註冊第一批）。比賽前載入畫面先載「起跑格上已知的車」（自己的、`lookOf` 的每個座位、大獎賽的電腦車）；之後才出現、車系還沒到的車（觀戰、重播、frame 才知道的），`Scene.others` 先畫成預設車、背景載入、到了再換成本人。車庫預覽（`previewStage.show`）先載車系再畫。**新車要加進 `BODY_FAMILY`**（測試對照每個車系檔案匯出的清單）。
+- **配樂**（`src/kart/audio/songs.ts` 與 `songBook/`）：每首歌一個檔（`songBook/<id>.ts`，共用 `scales.ts`），`loadSong`／`loadedSong`／`SONG_IDS`；`TRACK_SONGS`、`songFor` 照舊。`musicPlayer` 要播的歌還沒到就先靜音、到了再開始（載入畫面已經先載好了；選單的 lounge 由播放器自己載）。
+- **載入畫面**（`src/kart/load/KartLoading.tsx`，#104 的轉播風格：`broadcastSolid` 面板、斜標籤「下一場」）：賽道名、一則技巧提示（駕訓班的 `kart.school.tip.*`，照玩家的按鍵；觀戰沒有）、進度條（`role="progressbar"`）與百分比；房間裡多一行「等大家到起跑格（n／m）」。失敗時顯示錯誤、「重試」（只重抓還沒到的）與「重新整理頁面」。字串在 `shared/kart/i18n.load.ts`（併進 `KART_MESSAGES`，載入畫面自己也註冊，因為觀戰不帶卡丁車的整包字串）。`data-testid="kart-loading"`、`data-percent`、`data-failed`。
+- **預先下載**：等待室的「車款與車手」（`RoomGarage`，多了 `track` prop，`WaitingRoom` 傳房間的賽道選項）在選定賽道後背景下載那場比賽（引擎、場景、座位上選的車、歌）；比賽結果的換車面板同樣；大獎賽（`CupView`）在每場之前的卡片下載這一場，比賽中下載下一場。
+- **房間首屏**：`KART_RADIUS`（`shared/kart/kartRadius.ts`）、`CELEBRATE_SECONDS`（`src/kart/race/celebrate.ts`）、`shotsAt`（`shared/kart/replayShots.ts`）搬成葉子模組，首屏不再帶物理與導播。
+- **預算腳本**：`npm run budget` 多三種 `info` 行（不設上限）：`/kart` 首屏、比賽引擎、每張賽道專屬場景的大小。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

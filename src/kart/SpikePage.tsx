@@ -26,18 +26,14 @@ import {
   saveTuning,
 } from './devices.ts'
 import { BoostVeil, CalloutText, Hud } from './Hud.tsx'
-import { supportsWebGL2 } from './Scene.ts'
+import { supportsWebGL2 } from './webgl.ts'
 import { Minimap, type MinimapHandle } from './Minimap.tsx'
 import { RaceCenter, RaceClock, type RaceClockHandle } from './RaceOverlay.tsx'
-import {
-  SPIKE_COURSES,
-  spikeTrack,
-  startSpikeLoop,
-  type SpikeCourse,
-  type SpikeHud,
-  type SpikeStats,
-  type SpikeTrial,
-} from './spikeLoop.ts'
+import type { SpikeHud, SpikeStats, SpikeTrial } from './spikeLoop.ts'
+import { SPIKE_COURSES, spikeTrack, type SpikeCourse } from './courses.ts'
+import { RACE_ENGINE } from './load/kartLoad.ts'
+import { KartLoading } from './load/KartLoading.tsx'
+import { useKartLoad } from './load/useKartLoad.ts'
 import { KART_COMPACT } from './layout.ts'
 import { TuningPanel } from './TuningPanel.tsx'
 import { BotSetupPanel } from './bots/BotSetupPanel.tsx'
@@ -196,10 +192,18 @@ export function SpikePage({
   const coachStep = coach.onStep
   const [invite, setInvite] = useState(() => !!onSchool && !autopiloted && shouldInvite())
 
+  // 2026-11-21 (docs/ARCHITECTURE.md §4.52): the engine, the track's own scenery, the kart and the
+  // song, fetched before the scene is built (the page itself comes without three.js)
+  const load = useKartLoad(
+    { engine: RACE_ENGINE, track, bodies: [body], music: true },
+    `${course}|${track?.id}|${body}`,
+  )
+  const engine = load.engine
+
   useEffect(() => {
-    if (!stage.current) return
+    if (!stage.current || !engine) return
     try {
-      return startSpikeLoop(stage.current, {
+      return engine.startSpikeLoop(stage.current, {
         controls: () => controls.current,
         onStats: setStats,
         onHud: setHud,
@@ -230,7 +234,7 @@ export function SpikePage({
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, track, autopiloted, pilot, quality, body, driver, ghostPick, touchSource, coachStep])
+  }, [course, track, autopiloted, pilot, quality, body, driver, ghostPick, touchSource, coachStep, engine])
 
   const switchCourse = (next: PlayCourse) => {
     const url = new URL(window.location.href)
@@ -383,6 +387,17 @@ export function SpikePage({
   return (
     <Page style={touch.shown ? touchSpace(touch.settings) : undefined}>
       <Stage ref={stage} role="img" aria-label={t('kart.spike.canvas')} />
+      {!engine && (
+        <KartLoading
+          t={t}
+          track={course === 'custom' ? customName : t(`kart.course.${course}`)}
+          progress={load.progress}
+          failed={load.failed}
+          onRetry={load.retry}
+          bindings={bindings}
+          touch={touch.shown}
+        />
+      )}
       <TopRow ref={topRow}>
         <Panel>
           <Link to="/">{t('kart.spike.back')}</Link>

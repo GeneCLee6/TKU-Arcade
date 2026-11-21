@@ -24,7 +24,7 @@ import {
   type SongNote,
   type StepClock,
 } from './sequencer.ts'
-import { SONGS, type Song, type SongId } from './songs.ts'
+import { loadedSong, loadSong, type Song, type SongId } from './songs.ts'
 
 export interface MusicRequest {
   readonly song: SongId
@@ -59,9 +59,8 @@ const claims: { request: MusicRequest | null; race: boolean }[] = []
 let timer: ReturnType<typeof setInterval> | null = null
 let playing: Playing | null = null
 
-function startSong(bus: KartBus, id: SongId, section: MusicSection): Playing {
+function startSong(bus: KartBus, id: SongId, song: Song, section: MusicSection): Playing {
   const { context } = bus
-  const song = SONGS[id]
   const out = context.createGain()
   out.gain.value = 0.0001
   out.gain.setTargetAtTime(1, context.currentTime, 0.15)
@@ -288,7 +287,15 @@ function tick(): void {
   }
   if (!playing || playing.id !== wanted.song) {
     if (playing) fadeOut(playing, context)
-    playing = startSong(bus, wanted.song, wanted.section)
+    // 2026-11-21 (songs.ts): a song still on its way (the loading screen fetches it first) starts
+    // when it comes
+    const song = loadedSong(wanted.song)
+    if (!song) {
+      playing = null
+      void loadSong(wanted.song).then(tick, () => {})
+      return
+    }
+    playing = startSong(bus, wanted.song, song, wanted.section)
     if (wanted.section !== 'intro' && wanted.section !== 'menu' && wanted.section !== 'outro') crash(bus, playing, playing.clock.at)
   }
   const now = playing

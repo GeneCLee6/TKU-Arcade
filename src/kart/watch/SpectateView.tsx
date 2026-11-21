@@ -12,18 +12,22 @@ import { runningScore } from '../../../shared/kart/team.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import { cycleSeat, watchOrder, type WatchCommand } from '../../../shared/kart/watch.ts'
 import '../../games/kart/messages.ts'
+import { hasMessage, type TextKey } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { createRemotes } from '../race/remotes.ts'
-import { supportsWebGL2 } from '../Scene.ts'
+import { supportsWebGL2 } from '../webgl.ts'
 import { createHitFeed, hitFrameOf } from '../hitFx.ts'
 import { createCuePlayer } from '../kartAudio.ts'
 import { createWatchEars } from '../watchSounds.ts'
 import { unlockOnGesture } from './watchDom.ts'
 import { createServerClock } from './serverClock.ts'
-import { startWatchLoop, type WatchedKart } from './watchLoop.ts'
+import type { WatchedKart } from './watchLoop.ts'
+import { WATCH_ENGINE } from '../load/kartLoad.ts'
+import { KartLoading } from '../load/KartLoading.tsx'
+import { useKartLoad } from '../load/useKartLoad.ts'
 import {
   Fallback,
   MapCorner,
@@ -63,6 +67,13 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
   const minimap = useRef<MinimapHandle>(null)
   const [failure, setFailure] = useState(() => !supportsWebGL2())
   const track = useMemo(() => raceTrack(view.track), [view.track])
+  // 2026-11-21 (§4.52): the engine and the track's own scenery, fetched before the scene is built
+  // (the karts' families come as they show)
+  const load = useKartLoad(track ? { engine: WATCH_ENGINE, track } : null, track?.id ?? '')
+  const engine = load.engine
+  // The room's name for it, where the room's details are here (a custom track: none)
+  const courseKey = `games.kart.track.${track?.id}`
+  const courseTitle = hasMessage(courseKey) ? t(courseKey as TextKey) : null
   const [order, setOrder] = useState<number[]>(() => view.racers.map((racer) => racer.seat))
   // A racer watching after the finish starts on someone else
   const [follow, setFollow] = useState<number | null>(null)
@@ -90,7 +101,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
   useWatchKeys(command)
 
   useEffect(() => {
-    if (!stage.current || !track || failure) return
+    if (!stage.current || !track || failure || !engine) return
     const remotes = createRemotes()
     const clock = createServerClock(realtime)
     const stopListening = realtime.listen((data) => {
@@ -108,7 +119,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
     const stopUnlock = unlockOnGesture(player)
     let stop: (() => void) | undefined
     try {
-      stop = startWatchLoop(stage.current, {
+      stop = engine.startWatchLoop(stage.current, {
         track,
         quality: loadQuality(),
         frame() {
@@ -214,7 +225,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       stopUnlock()
       player.dispose()
     }
-  }, [realtime, track, failure])
+  }, [realtime, track, failure, engine])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -263,6 +274,15 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
         role="img"
         aria-label={t('games.kart.watch.canvas', { name: name ?? '' })}
       />
+      {!engine && (
+        <KartLoading
+          t={t}
+          track={courseTitle}
+          progress={load.progress}
+          failed={load.failed}
+          onRetry={load.retry}
+        />
+      )}
       <TagLayer ref={tagLayer} aria-hidden="true">
         {view.racers.map((one) => (
           <NameTag key={one.seat} data-tag={one.seat} style={{ display: 'none' }}>

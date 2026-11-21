@@ -6,6 +6,7 @@ import { KART_EDITOR_MESSAGES, type KartEditorKey } from './i18n.editor.ts'
 import { KART_CUP_MESSAGES, type KartCupKey } from './i18n.cup.ts'
 import { KART_ROSTER_MESSAGES, type KartRosterKey } from './i18n.roster.ts'
 import { KART_TOUCH_MESSAGES, type KartTouchKey } from './i18n.touch.ts'
+import { KART_LOAD_MESSAGES, type KartLoadKey } from './i18n.load.ts'
 import { KART_SCHOOL_MESSAGES, type KartSchoolKey } from './i18n.school.ts'
 
 const en = {
@@ -354,6 +355,7 @@ export type KartMessageKey =
   | KartCupKey
   | KartTouchKey
   | KartSchoolKey
+  | KartLoadKey
 
 const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.title': '卡丁車物理測試',
@@ -692,6 +694,7 @@ export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartMessageKey, string
     ...KART_CUP_MESSAGES.en,
     ...KART_TOUCH_MESSAGES.en,
     ...KART_SCHOOL_MESSAGES.en,
+    ...KART_LOAD_MESSAGES.en,
   },
   'zh-TW': {
     ...zhTW,
@@ -701,5 +704,6 @@ export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartMessageKey, string
     ...KART_CUP_MESSAGES['zh-TW'],
     ...KART_TOUCH_MESSAGES['zh-TW'],
     ...KART_SCHOOL_MESSAGES['zh-TW'],
+    ...KART_LOAD_MESSAGES['zh-TW'],
   },
 }

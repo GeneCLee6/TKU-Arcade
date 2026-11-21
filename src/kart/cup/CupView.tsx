@@ -3,7 +3,7 @@
 // the next race, the standings so far and the field; each race is a race against the computer
 // (BotRaceView) with the cup's own opponents; after the last, the podium. Every step is kept in this
 // browser (store.ts) before it shows.
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { Button } from '../../components/Button.tsx'
 import { useT } from '../../i18n/useT.ts'
@@ -28,9 +28,12 @@ import {
 } from './cupRun.ts'
 import type { CupLine } from './points.ts'
 import { clearCupRun, keepCupBest, saveCupRun } from './store.ts'
+import { cupOf } from './cups.ts'
 import { Trophy } from './Trophy.tsx'
 import { useMenuMusic } from '../audio/useMenuMusic.ts'
+import { isKartId } from '../../../shared/kart/karts.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
+import { prefetchKart, RACE_ENGINE } from '../load/kartLoad.ts'
 
 // 2026-11-20 (§4.47): the player's own driver on the podium, celebrating (three.js, fetched then)
 const KartPreview = lazy(() => import('../roster/KartPreview.tsx'))
@@ -67,6 +70,15 @@ export default function CupView({ run: first, onMenu }: CupViewProps) {
   }, [run.entries, you, t])
 
   const track = currentTrack(run)
+  // 2026-11-21 (docs/ARCHITECTURE.md §4.52): the race to come, fetched while this card is up (and the
+  // one after it, during a race), so that its loading screen is gone at once
+  const upcoming = run.phase === 'racing' ? cupOf(run.setup.cup).tracks[run.results.length + 1] : track
+  const grid = run.entries.map((entry) => entry.kart).join()
+  useEffect(() => {
+    if (!upcoming) return
+    const bodies = [loadBody(), ...(grid.split(',').filter(isKartId))]
+    prefetchKart({ engine: RACE_ENGINE, track: { id: upcoming }, bodies, music: true })
+  }, [upcoming, grid])
   if (run.phase === 'racing' && track) {
     return (
       <BotRaceView

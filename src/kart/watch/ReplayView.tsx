@@ -37,17 +37,21 @@ import {
 import { Button } from '../../components/Button.tsx'
 import { raceTime } from '../../games/kart/raceTime.ts'
 import '../../games/kart/messages.ts'
+import { hasMessage, type TextKey } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
-import { supportsWebGL2 } from '../Scene.ts'
+import { supportsWebGL2 } from '../webgl.ts'
 import { crossed, effectsOf, hitFrameOf } from '../hitFx.ts'
 import { createCuePlayer } from '../kartAudio.ts'
 import { replayCues } from '../watchSounds.ts'
 import { TeamGauges, TeamScore } from '../race/TeamHud.tsx'
-import { startWatchLoop, type WatchedKart } from './watchLoop.ts'
+import type { WatchedKart } from './watchLoop.ts'
+import { WATCH_ENGINE } from '../load/kartLoad.ts'
+import { KartLoading } from '../load/KartLoading.tsx'
+import { useKartLoad } from '../load/useKartLoad.ts'
 import ReplayShare from './ReplayShare.tsx'
 import {
   Fallback,
@@ -154,6 +158,13 @@ export default function ReplayView({
   const [failure, setFailure] = useState(() => !supportsWebGL2())
   const reel = useMemo(() => openReplay(replay), [replay])
   const track = useMemo(() => raceTrack(replay.track), [replay.track])
+  // 2026-11-21 (§4.52): the engine and the track's own scenery, fetched before the scene is built
+  // (the karts' families come as they show)
+  const load = useKartLoad(track ? { engine: WATCH_ENGINE, track } : null, track?.id ?? '')
+  const engine = load.engine
+  // The room's name for it, where the room's details are here (a custom track: none)
+  const courseKey = `games.kart.track.${track?.id}`
+  const courseTitle = hasMessage(courseKey) ? t(courseKey as TextKey) : null
   const [shown, setShown] = useState<Playhead>(() => ({
     tick: reel.start,
     playing: true,
@@ -209,7 +220,7 @@ export default function ReplayView({
   useWatchKeys(command)
 
   useEffect(() => {
-    if (!stage.current || !track || failure) return
+    if (!stage.current || !track || failure || !engine) return
     let stop: (() => void) | undefined
     // 2026-11-17: the recorded hits spin their karts; a burst only when playing through its moment
     const fxEvents = reel.replay.events.map((event) => ({
@@ -224,7 +235,7 @@ export default function ReplayView({
     /** The playhead as the last frame left it: moved since, it was dragged or jumped */
     let lastTick: number | null = null
     try {
-      stop = startWatchLoop(stage.current, {
+      stop = engine.startWatchLoop(stage.current, {
         track,
         quality: loadQuality(),
         frame(seconds) {
@@ -298,7 +309,7 @@ export default function ReplayView({
       stopUnlock()
       player.dispose()
     }
-  }, [track, reel, failure])
+  }, [track, reel, failure, engine])
 
   // The controls follow the playhead a few times a second, not every frame
   useEffect(() => {
@@ -361,6 +372,15 @@ export default function ReplayView({
         role="img"
         aria-label={t('games.kart.watch.canvas', { name: name ?? '' })}
       />
+      {!engine && (
+        <KartLoading
+          t={t}
+          track={courseTitle}
+          progress={load.progress}
+          failed={load.failed}
+          onRetry={load.retry}
+        />
+      )}
       <TagLayer ref={tagLayer} aria-hidden="true">
         {seats.map((seat) => (
           <NameTag key={seat} data-tag={seat} style={{ display: 'none' }}>
