@@ -15,7 +15,6 @@ import {
   seekPlayhead,
   mirrorsAt,
   shieldsAt,
-  shotsAt,
   stepSpeed,
   teamBurnsAt,
   teamGaugesAt,
@@ -25,6 +24,7 @@ import {
   type Replay,
   type ReplayReel,
 } from '../../../shared/kart/replay.ts'
+import { shotsAt } from '../../../shared/kart/replayShots.ts'
 import { runningScore } from '../../../shared/kart/team.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import type { Track } from '../../../shared/kart/track.ts'

@@ -22,7 +22,8 @@
 // A mirror up (items.ts) sends a stunning shot back to whoever threw it.
 //
 // Pure and shared: the browser and the Worker read the same shots.
-import { KART_RADIUS, type Wall } from './walls.ts'
+import { KART_RADIUS } from './kartRadius.ts'
+import type { Wall } from './walls.ts'
 
 /** A seat in the room (shared/games/types.ts's SeatId) */
 type SeatId = number

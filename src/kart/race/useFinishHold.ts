@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CELEBRATE_SECONDS } from '../director.ts'
+import { CELEBRATE_SECONDS } from './celebrate.ts'
 
 /**
  * 2026-11-20 (the race's show, docs/ARCHITECTURE.md §4.43): true from this racer's finish for as long

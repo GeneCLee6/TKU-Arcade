@@ -4,6 +4,7 @@
 // A wall is a line segment seen from above, with no thickness and no side: the car is a circle of
 // KART_RADIUS that may not come closer to it than that. Segments are the simplest thing a track JSON
 // (e8-t04, J4) can list; a track's walls turn into these.
+import { KART_RADIUS } from './kartRadius.ts'
 import { STEP_SECONDS, type KartState, type KartTuning } from './physics.ts'
 
 export interface Wall {
@@ -18,8 +19,7 @@ export interface Wall {
   readonly top?: number
 }
 
-/** The car seen from above, as a circle: half its length, so the nose stops at the wall's face */
-export const KART_RADIUS = 1.2
+export { KART_RADIUS }
 
 /**
  * The car moves at most this far between two checks for walls. Under half the radius, the centre can
