@@ -19,9 +19,11 @@ export interface GaragePanelProps {
   onKart(kart: KartId): void
   onDriver(driver: DriverId): void
   onClose(): void
+  /** The track on /kart (2026-11-21): its quickest vehicles are recommended */
+  track?: string
 }
 
-export function GaragePanel({ t, kart, driver, onKart, onDriver, onClose }: GaragePanelProps) {
+export function GaragePanel({ t, kart, driver, onKart, onDriver, onClose, track }: GaragePanelProps) {
   const ids = useId()
   const title = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
@@ -49,6 +51,7 @@ export function GaragePanel({ t, kart, driver, onKart, onDriver, onClose }: Gara
         driver={driver}
         onKart={onKart}
         onDriver={onDriver}
+        track={track}
         preview={
           <Suspense fallback={null}>
             <KartPreview

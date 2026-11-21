@@ -50,8 +50,13 @@ function flatOut(id: (typeof KART_IDS)[number]): number {
 }
 
 const OLD_SIX = ['tide', 'comet', 'ray', 'crab', 'heron', 'flyfish'] as const
-const ONLY_KARTS = KARTS.filter((one) => one.kind === 'kart')
-const BIKES = KARTS.filter((one) => one.kind === 'bike')
+// 2026-11-21: a season's flagship stands apart, over the budget on purpose (tests/kart/meta.test.ts
+// and flagship.test.ts hold it); every rule here is for the others
+const REGULAR = KARTS.filter((one) => one.tier !== 'flagship')
+const REGULAR_IDS = REGULAR.map((one) => one.id)
+const REGULAR_TIERS = KART_TIERS.filter((tier) => tier !== 'flagship')
+const ONLY_KARTS = REGULAR.filter((one) => one.kind === 'kart')
+const BIKES = REGULAR.filter((one) => one.kind === 'bike')
 
 describe('the vehicles and four drivers (e10-t05, and the series and bikes of 2026-11-19)', () => {
   it('has twenty vehicles: seventeen karts and three bikes, and four drivers', () => {
@@ -86,8 +91,8 @@ describe('the vehicles and four drivers (e10-t05, and the series and bikes of 20
       expect(members.length, series).toBeGreaterThanOrEqual(2)
       expect(new Set(members.map((one) => one.tier)).size, series).toBe(members.length)
     }
-    expect(BIKES.map((one) => one.tier).sort()).toEqual([...KART_TIERS].sort())
-    for (const tier of KART_TIERS) {
+    expect(BIKES.map((one) => one.tier).sort()).toEqual([...REGULAR_TIERS].sort())
+    for (const tier of REGULAR_TIERS) {
       expect(KARTS.filter((one) => one.tier === tier).length, tier).toBeGreaterThanOrEqual(5)
     }
   })
@@ -115,7 +120,7 @@ describe('the vehicles and four drivers (e10-t05, and the series and bikes of 20
   })
 
   it('makes every kart a trade-off: its points sum to zero, and none is best or worst at everything', () => {
-    for (const { id, stats } of KARTS) {
+    for (const { id, stats } of REGULAR) {
       // 2026-11-20: a point spent on items (the item series) is a point of the same budget
       const sum = BUDGET_STATS.reduce((total, stat) => total + stats[stat], 0) + itemPointsOf(id)
       expect(sum, id).toBe(0)
@@ -144,10 +149,10 @@ describe('the vehicles and four drivers (e10-t05, and the series and bikes of 20
     for (const key of ['boostTopSpeedFactor', 'miniTopSpeedFactor', 'startTopSpeedFactor'] as const) {
       for (const share of ratio(key)) expect(share, key).toBe(1)
     }
-    const tops = ratio('topSpeed')
+    const tops = ratioOf(REGULAR_IDS, 'topSpeed')
     expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(0.03 + 1e-9)
     // Measured on the physics, not only read off the table
-    const speeds = KART_IDS.map(flatOut)
+    const speeds = REGULAR_IDS.map(flatOut)
     expect(Math.max(...speeds) / Math.min(...speeds)).toBeLessThan(1.035)
   })
 

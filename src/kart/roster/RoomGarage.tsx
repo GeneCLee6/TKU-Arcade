@@ -70,6 +70,7 @@ export default function RoomGarage({ members, you, onSetLook, track }: RoomGarag
           saveDriver(next)
           setDriver(next)
         }}
+        track={track}
         preview={
           <Suspense fallback={null}>
             <KartPreview

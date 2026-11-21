@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { MAX_LAPS } from '../../../shared/games/kart/info.ts'
 import type { KartMessageKey } from '../../../shared/kart/i18n.ts'
+import { trackMeta } from '../../../shared/kart/meta.ts'
 import { RACE_TRACK_IDS, type RaceTrackId } from '../../../shared/kart/tracks/list.ts'
 import { Button } from '../../components/Button.tsx'
 import type { MessageParams } from '../../i18n/t.ts'
@@ -90,6 +91,16 @@ export function BotSetupPanel({ t, onStart, onClose, custom, onGrandPrix }: BotS
             ))}
           </select>
         </Field>
+        {setup.track !== 'custom' && trackMeta(setup.track) && (
+          // 2026-11-21 (docs/KART-META.md): the track's quickest three, the flagship aside
+          <Note data-testid="kart-bots-track-meta">
+            {t('kart.meta.line', {
+              karts: trackMeta(setup.track)!
+                .podium.map((one) => t(`kart.body.${one}`))
+                .join(' · '),
+            })}
+          </Note>
+        )}
         <Field>
           <span>{t('kart.bots.count')}</span>
           <select

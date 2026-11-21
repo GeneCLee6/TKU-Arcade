@@ -10,6 +10,10 @@
 // for) and each tier (how demanding it is). The picked vehicle has its tags (series, character,
 // tier, and a bike's three differences), and room above them for a 3D preview (`preview`: the
 // caller's, KartPreview.tsx, since this file stays free of three.js).
+//
+// 2026-11-21 (docs/KART-META.md): given the track (`track`), what that track asks of a vehicle and
+// its quickest three (shared/kart/meta.ts), each a button that picks it, and a tag on their cards.
+// The season flagship has its own tier, its season on its tags and a note on what it costs.
 import { useId, useState, type ReactNode } from 'react'
 import styled from 'styled-components'
 import {
@@ -29,6 +33,7 @@ import {
   type KartTier,
 } from '../../../shared/kart/karts.ts'
 import type { KartRosterKey } from '../../../shared/kart/i18n.roster.ts'
+import { trackMeta } from '../../../shared/kart/meta.ts'
 import type { MessageParams } from '../../i18n/t.ts'
 import { clippedFill, displayType, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
@@ -55,7 +60,12 @@ const inTab = (spec: KartSpec, tab: RosterTab): boolean =>
   tab === `series.${spec.series}` ||
   tab === `tier.${spec.tier}`
 
-const TIER_ORDER: { readonly [T in KartTier]: number } = { entry: 0, advanced: 1, expert: 2 }
+const TIER_ORDER: { readonly [T in KartTier]: number } = {
+  entry: 0,
+  advanced: 1,
+  expert: 2,
+  flagship: 3,
+}
 
 /** A bike's three differences, as tags (karts.ts's KIND_TRAITS says them in numbers) */
 const BIKE_TAGS = ['kart.tag.narrow', 'kart.tag.lean', 'kart.tag.light'] as const
@@ -76,17 +86,31 @@ export interface RosterPickerProps {
   onDriver(driver: DriverId): void
   /** The picked vehicle drawn in 3D (KartPreview.tsx), above its tags; none, and there is no picture */
   preview?: ReactNode
+  /** The track about to be raced (2026-11-21): its quickest vehicles are recommended */
+  track?: string
 }
 
-export function RosterPicker({ t, kart, driver, onKart, onDriver, preview }: RosterPickerProps) {
+export function RosterPicker({
+  t,
+  kart,
+  driver,
+  onKart,
+  onDriver,
+  preview,
+  track,
+}: RosterPickerProps) {
   const ids = useId()
   const spec = kartSpec(kart)
+  const meta = trackMeta(track)
+  const picks: readonly KartId[] = meta?.podium ?? []
   const [tab, setTab] = useState<RosterTab>('all')
   const tabLabel = (one: RosterTab): string =>
     // A series' or a tier's tab is named by its own key: `kart.series.<id>`, `kart.tier.<id>`
     one === 'all' || one === 'bike' ? t(`kart.roster.tab.${one}`) : t(`kart.${one}`)
   // Within a tab: the karts before the bikes, each by tier, as the table has them
-  const shown = KARTS.filter((one) => inTab(one, tab)).sort(
+  const shown = KARTS.map((one) => kartSpec(one.id))
+    .filter((one) => inTab(one, tab))
+    .sort(
     (a, b) =>
       (a.kind === 'bike' ? 1 : 0) - (b.kind === 'bike' ? 1 : 0) ||
       TIER_ORDER[a.tier] - TIER_ORDER[b.tier],
@@ -95,6 +119,34 @@ export function RosterPicker({ t, kart, driver, onKart, onDriver, preview }: Ros
     <Picker data-testid="kart-roster">
       <Label id={`${ids}kart`}>{t('kart.roster.kart')}</Label>
       {preview}
+      {meta && (
+        <Meta data-testid="kart-meta" data-track={track}>
+          <Label>{t('kart.meta.title')}</Label>
+          <Tags data-testid="kart-meta-character">
+            {meta.character.map((one) => (
+              <Tag key={one} data-character={one}>
+                {t(`kart.meta.trait.${one}`)}
+              </Tag>
+            ))}
+          </Tags>
+          <MetaPicks>
+            {meta.podium.map((one, place) => (
+              <MetaPick
+                key={one}
+                type="button"
+                aria-pressed={one === kart}
+                onClick={() => onKart(one)}
+                data-meta-pick={one}
+              >
+                <Place aria-hidden="true">{place + 1}</Place>
+                <Swatch aria-hidden="true" style={{ background: kartBodies[one].accent }} />
+                <ChoiceName>{t(`kart.body.${one}`)}</ChoiceName>
+              </MetaPick>
+            ))}
+          </MetaPicks>
+          <Note>{t('kart.meta.flagship')}</Note>
+        </Meta>
+      )}
       <Tabs role="tablist" aria-label={t('kart.roster.filter')} data-testid="kart-tabs">
         {ROSTER_TABS.map((one) => (
           <Tab
@@ -121,6 +173,8 @@ export function RosterPicker({ t, kart, driver, onKart, onDriver, preview }: Ros
             onClick={() => onKart(one.id)}
             data-kart={one.id}
             data-kind={one.kind}
+            data-tier={one.tier}
+            {...(picks.includes(one.id) ? { 'data-pick': 'true' } : {})}
           >
             <Swatch aria-hidden="true" style={{ background: kartBodies[one.id].accent }} />
             <ChoiceName>{t(`kart.body.${one.id}`)}</ChoiceName>
@@ -128,6 +182,7 @@ export function RosterPicker({ t, kart, driver, onKart, onDriver, preview }: Ros
               {one.kind === 'bike'
                 ? `${t('kart.kind.bike')} · ${t(`kart.tier.${one.tier}`)}`
                 : `${t(`kart.trait.${one.series}`)} · ${t(`kart.tier.${one.tier}`)}`}
+              {picks.includes(one.id) && <PickMark>{` · ${t('kart.meta.pick')}`}</PickMark>}
             </Tier>
           </Choice>
         ))}
@@ -138,7 +193,11 @@ export function RosterPicker({ t, kart, driver, onKart, onDriver, preview }: Ros
           <Tag $strong>{t(`kart.kind.${spec.kind}`)}</Tag>
           <Tag>{t(`kart.series.${spec.series}`)}</Tag>
           <Tag>{t(`kart.trait.${spec.series}`)}</Tag>
-          <Tag>{t(`kart.tier.${spec.tier}`)}</Tag>
+          <Tag $flagship={spec.tier === 'flagship'}>{t(`kart.tier.${spec.tier}`)}</Tag>
+          {spec.tier === 'flagship' && spec.season !== undefined && (
+            <Tag data-testid="kart-season">{t('kart.season', { season: spec.season })}</Tag>
+          )}
+          {picks.includes(kart) && <Tag data-testid="kart-picked-meta">{t('kart.meta.pick')}</Tag>}
           {spec.kind === 'bike' && BIKE_TAGS.map((key) => <Tag key={key}>{t(key)}</Tag>)}
           {perkTags(spec).map((key) => (
             <Tag key={key} data-perk={key}>
@@ -190,6 +249,9 @@ export function RosterPicker({ t, kart, driver, onKart, onDriver, preview }: Ros
       {spec.kind === 'bike' && <Note data-testid="kart-bike-note">{t('kart.roster.bikeNote')}</Note>}
       {spec.series === 'item' && (
         <Note data-testid="kart-series-item-note">{t('kart.roster.itemNote')}</Note>
+      )}
+      {spec.tier === 'flagship' && (
+        <Note data-testid="kart-flagship-note">{t('kart.roster.flagshipNote')}</Note>
       )}
       <Note>{t('kart.roster.note')}</Note>
     </Picker>
@@ -264,12 +326,13 @@ const Tags = styled.div`
   gap: ${space.xs}px;
 `
 
-const Tag = styled.span<{ $strong?: boolean }>`
+const Tag = styled.span<{ $strong?: boolean; $flagship?: boolean }>`
   ${monoType}
   padding: 2px ${space.sm}px;
   color: ${(p) => (p.$strong ? color.onAccent : color.text)};
   background: ${(p) => (p.$strong ? color.accent : color.raised)};
-  box-shadow: ${(p) => (p.$strong ? 'none' : `inset 0 0 0 1px ${color.line}`)};
+  box-shadow: ${(p) =>
+    p.$strong ? 'none' : `inset 0 0 0 ${p.$flagship ? 2 : 1}px ${p.$flagship ? color.accent : color.line}`};
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -376,4 +439,58 @@ const Segment = styled.span<{ $on: boolean }>`
 const Note = styled.p`
   margin: 0;
   color: ${color.muted};
+`
+
+// 2026-11-21: the track's quickest three
+const Meta = styled.div`
+  display: grid;
+  gap: ${space.xs}px;
+`
+
+const MetaPicks = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: ${space.xs}px;
+`
+
+const MetaPick = styled.button`
+  ${clippedFill(cutClip(6), color.raised)}
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: ${space.xs}px;
+  min-height: 44px;
+  padding: ${space.xs}px;
+  color: ${color.text};
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+
+  &:hover::before {
+    background: ${color.raisedHover};
+  }
+
+  &[aria-pressed='true']::before {
+    background: color-mix(in srgb, ${color.accent} 18%, ${color.raised});
+    box-shadow: inset 0 0 0 2px ${color.accent};
+  }
+
+  /* The swatch is shorter here: one row */
+  & > span:nth-child(2) {
+    grid-row: auto;
+    height: 22px;
+  }
+`
+
+const Place = styled.span`
+  ${monoType}
+  color: ${color.accent};
+  font-size: 12px;
+  font-weight: 700;
+`
+
+const PickMark = styled.span`
+  color: ${color.accent};
 `

@@ -7,7 +7,7 @@ import type { KartId } from '../../../shared/kart/karts.ts'
 import type { BodyFit, BodyKit } from './kartParts.ts'
 
 export type BodyMaker = (kit: BodyKit, chassis: Object3D) => BodyFit
-export type BodyFamily = 'first' | 'more' | 'bike' | 'item'
+export type BodyFamily = 'first' | 'more' | 'bike' | 'item' | 'flagship'
 
 /** Each vehicle's family (a test holds it to the files' own lists) */
 export const BODY_FAMILY: Readonly<Record<KartId, BodyFamily>> = {
@@ -31,6 +31,8 @@ export const BODY_FAMILY: Readonly<Record<KartId, BodyFamily>> = {
   pelican: 'item',
   otter: 'item',
   cormorant: 'item',
+  // 2026-11-21: the season flagships (flagshipBodies.ts)
+  kite: 'flagship',
 }
 
 const LOADERS: Readonly<
@@ -39,6 +41,7 @@ const LOADERS: Readonly<
   more: () => import('./moreBodies.ts').then((family) => family.MORE_BODIES),
   bike: () => import('./bikeBodies.ts').then((family) => family.BIKE_BODIES),
   item: () => import('./itemBodies.ts').then((family) => family.ITEM_BODIES),
+  flagship: () => import('./flagshipBodies.ts').then((family) => family.FLAGSHIP_BODIES),
 }
 
 const makers = new Map<KartId, BodyMaker>()

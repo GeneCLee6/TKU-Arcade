@@ -69,6 +69,7 @@ describe("the vehicles' families", () => {
       more: (await import('../../src/kart/art/moreBodies.ts')).MORE_BODIES,
       bike: (await import('../../src/kart/art/bikeBodies.ts')).BIKE_BODIES,
       item: (await import('../../src/kart/art/itemBodies.ts')).ITEM_BODIES,
+      flagship: (await import('../../src/kart/art/flagshipBodies.ts')).FLAGSHIP_BODIES,
     }
     for (const [family, bodies] of Object.entries(files)) {
       expect(Object.keys(bodies).sort()).toEqual(
