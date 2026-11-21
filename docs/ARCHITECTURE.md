@@ -1429,6 +1429,8 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **畫面**（`ChallengeView.tsx`、文字在 `goals.ts`）：首頁兩個分頁：任務（四章、每章過幾關或怎麼解鎖、每關名稱＋目標＋規則＋賽道與圈數、最佳星等、開始）與獎牌牆（12 張賽道的牌、最佳時間、四面獎牌的目標時間、白金未解鎖顯示 ???）。任務中左上是任務面板（章節、賽道、圈數、目標、規則、進度 `count / target`、星等規則），右上重來／所有挑戰；海霧任務整個畫面蓋一層只留前方小窗的霧；對電腦的任務面板放在 `RaceView` 名次下面、多「出局：…」。結果卡：過關／這次沒過、星等、時間或名次、失敗原因（`kart.challenge.why.<原因>`）、下一關（下一章還沒開就不顯示）／再試一次／所有挑戰。賽道名用房間的 `games.kart.track.<id>`（`ChallengeView` 自己註冊 `kartMessages`）。
 
+**首屏**：挑戰的字串併進 `KART_MESSAGES`（和駕訓班一樣，`check-i18n` 才擋得到），房間的卡丁車首屏 137.9 → 139.5 kB（警告線 140 以下）；畫面與判定在自己的 lazy chunk，卡丁車合計 493.3 kB（上限 600）。
+
 **進度**（`store.ts`，localStorage `tku-arcade.kart.challenge`，經 `lib/storage.ts` 不丟例外，JSON 解析 try/catch，壞資料當沒有）：`medals`（每張賽道最佳獎牌）、`best`（獎牌趟最佳秒數）、`stars`（每關最佳星等）。
 
 **驗證**：`tests/kart/challenge.test.ts`（任務資料：24 關、每章 6 關、每關有名字、對電腦只在比賽賽道；兩張挑戰賽道過 `parseTrack`、不在 `RACE_TRACK_IDS`；判定的每種條件、規則與時限；淘汰順序、名次、追逐；獎牌校準公式、每張賽道銅 > 銀 > 金 > 白金、時限與星等；目標幽靈車縮放；進度存取、壞資料、章節解鎖）、`tests/kart/challenge.medals.test.ts`（河畔、紅樹林、碼頭倉庫：頂尖拿金、專家至少銀、一般至少銅、新手沒有；頂尖過得了七個技術任務且至少兩星；新手過不了甩尾起跳、穿縫、岔路、十連段）、`e2e/kart-challenge.spec.ts`（選單入口、章節鎖、獎牌牆與隱藏白金；`?autopilot` 完成「完美五發」、星等存進 localStorage）。截圖：`scripts/kart-challenge-shots.mjs`（真 GPU）。

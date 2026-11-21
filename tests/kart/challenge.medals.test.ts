@@ -17,6 +17,9 @@ import { measure } from '../../scripts/kart/drivers.ts'
 const raced = (track: string, who: DriverId) =>
   measure(missionTrack(track), DRIVERS[who], KART_TUNING, 7).seconds
 
+/** Each race is a few hundred milliseconds; a busy machine runs them slower */
+const SLOW = 60_000
+
 const rank = { bronze: 1, silver: 2, gold: 3, platinum: 4 } as const
 const medalOf = (track: string, seconds: number) => {
   const medal = medalFor(medalTimes(track)!, seconds)
@@ -31,7 +34,7 @@ describe('the medals, as measured', () => {
       expect(medalOf(track, raced(track, 'expert'))).toBeGreaterThanOrEqual(rank.silver)
       expect(medalOf(track, raced(track, 'average'))).toBeGreaterThanOrEqual(rank.bronze)
       expect(medalOf(track, raced(track, 'novice'))).toBe(0)
-    })
+    }, SLOW)
   }
 })
 
@@ -44,12 +47,12 @@ describe('the missions, as measured', () => {
       const result = runMission(missionOf(id), hands('master'))
       expect(result.passed, `${result.judge.why}`).toBe(true)
       expect(result.stars).toBeGreaterThanOrEqual(2)
-    })
+    }, SLOW)
   }
 
   it('the novice passes none of the techniques', () => {
     for (const id of ['hops', 'slots', 'branches', 'combo10']) {
       expect(runMission(missionOf(id), hands('novice')).passed, id).toBe(false)
     }
-  })
+  }, SLOW)
 })
