@@ -255,7 +255,7 @@ export default function KartLobby({
         </Column>
       </Layout>
       <Dialog open={garage} onClose={() => setGarage(false)} title={t('kart.roster.title')}>
-        <RoomGarage look={look} />
+        <RoomGarage look={look} track={trackId} />
       </Dialog>
     </Stage>
   )

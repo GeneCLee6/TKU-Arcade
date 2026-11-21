@@ -69,13 +69,15 @@ export const KART_IDS = [
   'pelican',
   'otter',
   'cormorant',
+  // 2026-11-21: the first season's flagship (KART_SEASONS)
+  'kite',
 ] as const
 export type KartId = (typeof KART_IDS)[number]
 
 export const DRIVER_IDS = ['spade', 'heart', 'diamond', 'club'] as const
 export type DriverId = (typeof DRIVER_IDS)[number]
 
-export const KART_TIERS = ['entry', 'advanced', 'expert'] as const
+export const KART_TIERS = ['entry', 'advanced', 'expert', 'flagship'] as const
 export type KartTier = (typeof KART_TIERS)[number]
 
 /** What a vehicle is built for: the stat it buys, and what it pays with */
@@ -123,6 +125,8 @@ export interface KartSpec {
   readonly traits?: KartTraits
   /** The item series only: what it spends on items */
   readonly items?: ItemPoints
+  /** A season's flagship (2026-11-21): the season it leads (KART_SEASONS) */
+  readonly season?: number
 }
 
 /** What every vehicle of a kind shares */
@@ -170,6 +174,26 @@ export const KIND_TRAITS: { readonly [K in KartKind]: KindSpec } = {
       wallScrapeDrag: 1.3,
     },
   },
+}
+
+/**
+ * What makes the first season's flagship what it is (2026-11-21, docs/KART-META.md §3), on top of
+ * its stats (over the budget: top speed, acceleration and drift charge two points each). It is a
+ * touch faster still on a straight (`topSpeed`, so its top speed is 3.5% over the standard, the
+ * other vehicles' spread being 3%). And it is a handful: the steering follows the stick at once and
+ * turns sharper (a hand that shakes, shakes the kart), a drift lets go of its slip slower (a drift
+ * held too long swings on past the corner), and a wall takes far more of its speed and its gauge.
+ * Measured, not guessed: the master driver is quickest in it on most tracks, by about 1.4%; a
+ * novice is not (npm run kart:meta)
+ */
+export const FLAGSHIP_TRAITS: KartTraits = {
+  topSpeed: 1.015,
+  steerResponse: 2.2,
+  turnRate: 1.08,
+  driftRecoverRate: 0.8,
+  wallImpactLoss: 1.6,
+  wallScrapeDrag: 1.5,
+  wallGaugeKeep: 0.4,
 }
 
 /**
@@ -347,7 +371,79 @@ export const KARTS: readonly KartSpec[] = [
     stats: { speed: 0, acceleration: -1, handling: -1, charge: -1, weight: 0 },
     items: { luck: 2, shield: 1 },
   },
+  // 2026-11-21, the first season's flagship (KART_SEASONS): over the budget on purpose, and a
+  // handful to drive
+  {
+    id: 'kite',
+    kind: 'kart',
+    series: 'speed',
+    tier: 'flagship',
+    season: 1,
+    stats: { speed: 2, acceleration: 2, handling: 0, charge: 2, weight: 0 },
+    traits: FLAGSHIP_TRAITS,
+  },
 ]
+
+// ── Seasons (2026-11-21, docs/KART-WORLD.md §4.4) ──────────────────────────────────────────────
+
+/**
+ * A season and its flagship: one machine over the budget, the quickest there is in exact hands (by
+ * a little) and the hardest to drive. When the next season begins (its entry added here and
+ * CURRENT_SEASON raised), the old flagship rejoins the others: its tier, its stats and its traits
+ * become the `retired` ones, back within the budget like everyone's. Only the data: no clock moves
+ * a season on, a release does. Unlocking waits for accounts (F1): every flagship is open for now
+ */
+export interface KartSeason {
+  readonly season: number
+  readonly flagship: KartId
+  /** What it becomes once its season is over */
+  readonly retired: {
+    readonly tier: Exclude<KartTier, 'flagship'>
+    readonly stats: KartSpec['stats']
+    readonly traits?: KartTraits
+  }
+}
+
+export const KART_SEASONS: readonly KartSeason[] = [
+  {
+    season: 1,
+    flagship: 'kite',
+    // Back within the budget: still a top-speed machine, still sharp, no longer over the points
+    retired: {
+      tier: 'expert',
+      stats: { speed: 2, acceleration: 1, handling: -2, charge: -1, weight: -1 },
+      traits: { steerResponse: 1.3, wallImpactLoss: 1.2 },
+    },
+  },
+]
+
+/** The season now: its flagship is the one over the budget */
+export const CURRENT_SEASON = 1
+
+/**
+ * A machine as it stands in season `now`: a flagship of an earlier season in its retired form, any
+ * other as it is
+ */
+export function inSeason(spec: KartSpec, now: number = CURRENT_SEASON): KartSpec {
+  if (spec.season === undefined || spec.season >= now) return spec
+  const season = KART_SEASONS.find((one) => one.season === spec.season)
+  if (!season) return spec
+  const { season: _over, ...rest } = spec
+  return {
+    ...rest,
+    tier: season.retired.tier,
+    stats: season.retired.stats,
+    ...(season.retired.traits ? { traits: season.retired.traits } : {}),
+  }
+}
+
+/** The flagship of season `now`, if it has one */
+export const seasonFlagship = (now: number = CURRENT_SEASON): KartId | undefined =>
+  KART_SEASONS.find((one) => one.season === now)?.flagship
+
+/** Whether a machine is the flagship of season `now` */
+export const isFlagship = (id: KartId, now: number = CURRENT_SEASON): boolean =>
+  seasonFlagship(now) === id
 
 export const DEFAULT_KART: KartId = 'tide'
 export const DEFAULT_DRIVER: DriverId = 'spade'
@@ -369,8 +465,9 @@ export const isKartId = (value: unknown): value is KartId =>
 export const isDriverId = (value: unknown): value is DriverId =>
   DRIVER_IDS.some((id) => id === value)
 
+/** A machine as it stands this season (`inSeason`) */
 export function kartSpec(id: KartId): KartSpec {
-  return KARTS.find((kart) => kart.id === id) ?? KARTS[0]!
+  return inSeason(KARTS.find((kart) => kart.id === id) ?? KARTS[0]!)
 }
 
 /** A vehicle's kind: a kart or a bike */
@@ -423,7 +520,10 @@ export function applyKart(base: KartTuning, id: KartId): KartTuning {
     ),
     spec.traits,
   )
-  return kind.radius === KART_BODY_RADIUS ? tuned : { ...tuned, bodyRadius: kind.radius }
+  // 2026-11-21: and its mass, when it is not the standard kart's, for the slopes (terrain.ts)
+  const mass = kartMass(id)
+  const weighed = mass === 1 ? tuned : { ...tuned, mass }
+  return kind.radius === KART_BODY_RADIUS ? weighed : { ...weighed, bodyRadius: kind.radius }
 }
 
 /** The item points a machine spends (2026-11-20): 0 for every machine outside the item series */

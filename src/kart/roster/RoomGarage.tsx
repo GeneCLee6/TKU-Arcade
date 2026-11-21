@@ -23,7 +23,7 @@ registerMessages(KART_ROSTER_MESSAGES)
 const KartPreview = lazy(() => import('./KartPreview.tsx'))
 
 /** The picker itself, with its 3D preview: inside the waiting room's garage dialog */
-export function RoomGarage({ look }: { look: RoomLook }) {
+export function RoomGarage({ look, track }: { look: RoomLook; track?: string }) {
   const t = useT()
   const { kart, driver } = look
   return (
@@ -34,6 +34,7 @@ export function RoomGarage({ look }: { look: RoomLook }) {
         driver={driver}
         onKart={look.setKart}
         onDriver={look.setDriver}
+        track={track}
         preview={
           <Suspense fallback={null}>
             <KartPreview
@@ -70,7 +71,7 @@ export default function RoomGaragePanel({ members, you, onSetLook, track }: Room
   return (
     <Section>
       <Heading>{t('kart.roster.title')}</Heading>
-      <RoomGarage look={look} />
+      <RoomGarage look={look} track={track} />
       <Subheading>{t('kart.roster.others')}</Subheading>
       <Picks data-testid="kart-picks">
         {seated.map((member) => {
