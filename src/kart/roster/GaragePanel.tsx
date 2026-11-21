@@ -1,14 +1,16 @@
 // e10-t05: /kart's garage, a panel over the track like the tuning panel: the kart and driver to race
 // with, and the kart's stats. Escape closes it.
-import { useEffect, useId, useRef } from 'react'
+import { lazy, Suspense, useEffect, useId, useRef } from 'react'
 import styled from 'styled-components'
 import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
 import { Button } from '../../components/Button.tsx'
 import { displayType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { broadcastSolid } from '../ui/broadcast.ts'
-import KartPreview from './KartPreview.tsx'
 import { RosterPicker, type RosterT } from './RosterPicker.tsx'
+
+// 2026-11-21 (docs/ARCHITECTURE.md §4.52): three.js comes when the garage opens, not with /kart's menu
+const KartPreview = lazy(() => import('./KartPreview.tsx'))
 
 export interface GaragePanelProps {
   t: RosterT
@@ -48,13 +50,15 @@ export function GaragePanel({ t, kart, driver, onKart, onDriver, onClose }: Gara
         onKart={onKart}
         onDriver={onDriver}
         preview={
-          <KartPreview
-            kart={kart}
-            driver={driver}
-            label={t('kart.roster.preview', { kart: t(`kart.body.${kart}`) })}
-            hint={t('kart.roster.previewHint')}
-            morphLabel={t('kart.roster.morph')}
-          />
+          <Suspense fallback={null}>
+            <KartPreview
+              kart={kart}
+              driver={driver}
+              label={t('kart.roster.preview', { kart: t(`kart.body.${kart}`) })}
+              hint={t('kart.roster.previewHint')}
+              morphLabel={t('kart.roster.morph')}
+            />
+          </Suspense>
         }
       />
     </Panel>

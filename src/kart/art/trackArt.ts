@@ -32,34 +32,12 @@ import {
 import { roadClearance, roadDistances, scatter } from '../../../shared/kart/scenery.ts'
 import { roadDirection, trackBounds, type Track } from '../../../shared/kart/track.ts'
 import { kartScene, kartThemes, type KartTheme } from '../../styles/kartTokens.ts'
-import {
-  buildHarbour,
-  HARBOUR_COAST,
-  HARBOUR_SHORE,
-  harbourGround,
-  harbourTreeFits,
-  inHarbourSea,
-} from './harbourArt.ts'
-import {
-  buildTamkang,
-  inTamkangRiver,
-  tamkangFestivalFits,
-  tamkangGround,
-  tamkangTreeFits,
-} from './tamkangArt.ts'
 import { buildCornerDressing, buildCornerSigns } from './cornerArt.ts'
 import { buildFestival } from './festival.ts'
 import { buildForks } from './forkArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
-import { buildLocal } from './localArt.ts'
-import { buildWorks } from './worksArt.ts'
-import { buildLanes, lanesPlan } from './lanesArt.ts'
-import { buildSkillCues } from './skillCues.ts'
-import { buildSkillWalls, findSlots, skillStyleOf, wallRuns } from './skillWalls.ts'
-import { buildWharf, wharfPlan } from './wharfArt.ts'
-import { localPlan } from './localPlan.ts'
 import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
-import { buildOldStreet, inOldStreetRiver, oldStreetTreeFits } from './oldStreetArt.ts'
+import { loadedScenery, type TrackScenery } from './trackScenery.ts'
 import {
   ASPHALT_LENGTH,
   BARRIER_LENGTH,
@@ -305,15 +283,28 @@ function sunDisc(
   return mesh
 }
 
-export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
+/**
+ * Builds `track`'s art. Its own quarter (trackScenery.ts) must have been fetched first
+ * (`loadTrackScenery`); without it the track is drawn as a plain one, and says so in the console
+ */
+export function buildTrackArt(
+  track: Track,
+  level: ArtLevel,
+  scenery: TrackScenery | null = loadedScenery(track),
+): TrackArt {
   const group = new Group()
   const textures = trackTextures(level.anisotropy)
   const theme = themeOf(track)
-  const harbour = track.id === 'harbour'
+  if (!scenery) console.error(`kart: ${track.id}'s scenery was not loaded before its scene`)
+  const quarter: TrackScenery = scenery ?? {}
+  const harbourArt = track.id === 'harbour' ? (quarter.harbour ?? null) : null
+  const harbour = harbourArt !== null
   // The campus on its hilltop (2026-11-14): its own ground, falling away beyond the campus
-  const tamkang = track.id === 'tamkang'
+  const tamkangArt = track.id === 'tamkang' ? (quarter.tamkang ?? null) : null
+  const tamkang = tamkangArt !== null
   // N2's item track: a night market by the river (oldStreetArt.ts)
-  const oldStreet = track.id === 'oldstreet'
+  const oldStreetArt = track.id === 'oldstreet' ? (quarter.oldStreet ?? null) : null
+  const oldStreet = oldStreetArt !== null
   const geometries: BufferGeometry[] = []
   const materials: Material[] = []
   const extraTextures: Texture[] = []
@@ -325,9 +316,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   /** How high the ground is: flat but for the harbour's hillside, the campus and a hill track */
   // (2026-11-18: the campus track climbs a hill of its own, an embankment standing on the campus)
   const groundAt = harbour
-    ? harbourGround
+    ? harbourArt.harbourGround
     : tamkang
-      ? (x: number, z: number) => tamkangGround(x, z) + Math.max(0, hillAt?.(x, z) ?? 0)
+      ? (x: number, z: number) => tamkangArt.tamkangGround(x, z) + Math.max(0, hillAt?.(x, z) ?? 0)
       : (hillAt ?? (() => 0))
   /** The road's height at each point: none on a flat track */
   const roadHeights = hillAt ? track.road.map((point) => point.y ?? 0) : null
@@ -349,14 +340,17 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   }
 
   // 2026-11-18: the four technical tracks' own scenery (localArt.ts); null for any other track
-  const local = localPlan(track, level.density)
+  const local = quarter.local ? quarter.local.plan.localPlan(track, level.density) : null
   // 2026-11-20: the three tracks to learn by heart, dressed (skillWalls.ts, wharfArt.ts, lanesArt.ts,
   // worksArt.ts) and their technical places shown (skillCues.ts)
-  const skillStyle = skillStyleOf(track.id)
-  const skillRuns = skillStyle ? wallRuns(track.walls, groundAt) : []
-  const skillSlots = findSlots(skillRuns)
-  const wharfLayout = skillStyle === 'wharf' ? wharfPlan(track, level.density) : null
-  const lanesLayout = skillStyle === 'lanes' ? lanesPlan(track, level.density, skillRuns) : null
+  const skillArt = quarter.skill ?? null
+  const skillStyle = skillArt ? skillArt.walls.skillStyleOf(track.id) : null
+  const skillRuns = skillArt && skillStyle ? skillArt.walls.wallRuns(track.walls, groundAt) : []
+  const skillSlots = skillArt ? skillArt.walls.findSlots(skillRuns) : []
+  const wharfLayout =
+    skillStyle === 'wharf' && quarter.wharf ? quarter.wharf.wharfPlan(track, level.density) : null
+  const lanesLayout =
+    skillStyle === 'lanes' && quarter.lanes ? quarter.lanes.lanesPlan(track, level.density, skillRuns) : null
   const skillFits = (x: number, z: number) =>
     (!wharfLayout || wharfLayout.fits(x, z)) && (!lanesLayout || lanesLayout.fits(x, z))
 
@@ -370,9 +364,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
   const centreZ = (box.minZ + box.maxZ) / 2
   const groundSize = 2400
   // At the harbour the land ends at the quay and the beach; the sea lies lower, beyond them
-  const groundNorth = harbour ? HARBOUR_COAST : centreZ - groundSize / 2
+  const groundNorth = harbour ? harbourArt.HARBOUR_COAST : centreZ - groundSize / 2
   const groundDepth = centreZ + groundSize / 2 - groundNorth
-  const groundWest = harbour ? HARBOUR_SHORE : centreX - groundSize / 2
+  const groundWest = harbour ? harbourArt.HARBOUR_SHORE : centreX - groundSize / 2
   const groundWidth = centreX + groundSize / 2 - groundWest
   const ground = new Mesh(
     keep(new PlaneGeometry(groundWidth, groundDepth)),
@@ -559,9 +553,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     spacing: 4.5,
     fits: (x, z) =>
       !inRiver(x) &&
-      (!harbour || harbourTreeFits(x, z)) &&
-      (!tamkang || tamkangTreeFits(x, z)) &&
-      (!oldStreet || oldStreetTreeFits(x, z)) &&
+      (!harbour || harbourArt.harbourTreeFits(x, z)) &&
+      (!tamkang || tamkangArt.tamkangTreeFits(x, z)) &&
+      (!oldStreet || oldStreetArt.oldStreetTreeFits(x, z)) &&
       (!local || local.fits(x, z)) &&
       skillFits(x, z),
   })
@@ -652,18 +646,18 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     for (let index = 0; index < instances.count; index++) {
       instances.getMatrixAt(index, matrix)
       // At the harbour, the hills out in the sea are low islands, so that the horizon stays open
-      if (harbour && inHarbourSea(matrix.elements[12]!, matrix.elements[14]!, 40)) {
+      if (harbour && harbourArt.inHarbourSea(matrix.elements[12]!, matrix.elements[14]!, 40)) {
         matrix.scale(new Vector3(0.45, 0.22, 0.45))
       }
       // At the campus, none stands in the river: the mountain across it is its own (tamkangArt.ts)
       if (
-        (tamkang && inTamkangRiver(matrix.elements[12]!, matrix.elements[14]!, 160)) ||
-        (oldStreet && inOldStreetRiver(matrix.elements[12]!, matrix.elements[14]!, 160))
+        (tamkang && tamkangArt.inTamkangRiver(matrix.elements[12]!, matrix.elements[14]!, 160)) ||
+        (oldStreet && oldStreetArt.inOldStreetRiver(matrix.elements[12]!, matrix.elements[14]!, 160))
       ) {
         matrix.scale(new Vector3(0.001, 0.001, 0.001))
       }
       // The y scale is the cone's height; its centre sits half of that up, on the ground
-      const base = tamkang ? tamkangGround(matrix.elements[12]!, matrix.elements[14]!) : 0
+      const base = tamkang ? tamkangArt.tamkangGround(matrix.elements[12]!, matrix.elements[14]!) : 0
       matrix.elements[13] = matrix.elements[5]! / 2 - 2 + base
       instances.setMatrixAt(index, matrix)
     }
@@ -804,11 +798,11 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
       groundAt,
       fits: (x, z) =>
         harbour
-          ? !inHarbourSea(x, z, 8)
+          ? !harbourArt.inHarbourSea(x, z, 8)
           : tamkang
-            ? tamkangFestivalFits(x, z)
+            ? tamkangArt.tamkangFestivalFits(x, z)
             : oldStreet
-              ? oldStreetTreeFits(x, z)
+              ? oldStreetArt.oldStreetTreeFits(x, z)
               : !inRiver(x) && (!local || local.fits(x, z)) && skillFits(x, z),
     },
   )
@@ -893,7 +887,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
 
   // ── The harbour: its sea, quay, breakwaters, lighthouse, boats and hillside town ──
   const harbourScenery = harbour
-    ? buildHarbour({
+    ? harbourArt.buildHarbour({
         track,
         level,
         group,
@@ -909,7 +903,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
 
   // ── The campus: its hillside, landmarks, town, river and mountain ──
   const tamkangScenery = tamkang
-    ? buildTamkang({
+    ? tamkangArt.buildTamkang({
         track,
         level,
         group,
@@ -925,7 +919,7 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
 
   // ── The old street: its river, stalls, lanterns, shophouses and temple ──
   const oldStreetScenery = oldStreet
-    ? buildOldStreet({
+    ? oldStreetArt.buildOldStreet({
         track,
         level,
         group,
@@ -941,19 +935,20 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
 
   // ── The Viaduct Works (2026-11-20): sheds, chimneys, the elevated line, the deck's piers ──
   const skillKit = { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place }
-  const worksScenery = track.id === 'works' ? buildWorks(skillKit, groundAt) : null
+  const worksScenery = track.id === 'works' && quarter.works ? quarter.works.buildWorks(skillKit, groundAt) : null
   // ── The tracks to learn by heart (2026-11-20): their walls, their own quarters, their cues ──
-  const wharfScenery = wharfLayout ? buildWharf(skillKit, wharfLayout) : null
-  if (lanesLayout) {
-    buildLanes(skillKit, lanesLayout, {
+  const wharfScenery = wharfLayout && quarter.wharf ? quarter.wharf.buildWharf(skillKit, wharfLayout) : null
+  if (lanesLayout && quarter.lanes) {
+    quarter.lanes.buildLanes(skillKit, lanesLayout, {
       slots: skillSlots,
       groundAt,
       roadHeight: (index) => roadHeights?.[index] ?? 0,
     })
   }
-  const skillCues = skillStyle
-    ? (buildSkillWalls(skillKit, skillStyle, skillRuns, skillSlots),
-      buildSkillCues(skillKit, {
+  const skillCues =
+    skillArt && skillStyle
+    ? (skillArt.walls.buildSkillWalls(skillKit, skillStyle, skillRuns, skillSlots),
+      skillArt.cues.buildSkillCues(skillKit, {
         guide: trackGuide(track.id) ?? null,
         runs: skillRuns,
         slots: skillSlots,
@@ -962,8 +957,9 @@ export function buildTrackArt(track: Track, level: ArtLevel): TrackArt {
     : null
 
   // ── The four technical tracks: each one's own landmark (2026-11-18) ──
-  const localScenery = local
-    ? buildLocal(
+  const localScenery =
+    local && quarter.local
+    ? quarter.local.art.buildLocal(
         { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
         local,
         groundAt,

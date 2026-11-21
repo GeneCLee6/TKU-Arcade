@@ -191,5 +191,4 @@ export function finishShot(
   }
 }
 
-/** The finish's show (the big place, the confetti) lasts this long before the results, seconds */
-export const CELEBRATE_SECONDS = 3.2
+export { CELEBRATE_SECONDS } from './race/celebrate.ts'

@@ -130,7 +130,12 @@ export default function KartScreen({ room, game }: GameScreenProps) {
       >
         {canChange && garage && room.onSetLook && (
           <Suspense fallback={loading}>
-            <RoomGarage members={room.view.members} you={room.you} onSetLook={room.onSetLook} />
+            <RoomGarage
+              members={room.view.members}
+              you={room.you}
+              onSetLook={room.onSetLook}
+              track={view.track}
+            />
           </Suspense>
         )}
         {!game.over && (

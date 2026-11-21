@@ -57,121 +57,47 @@ export interface Song {
   readonly sound: SongSound
 }
 
-const MAJOR = [0, 2, 4, 5, 7, 9, 11]
-const MINOR = [0, 2, 3, 5, 7, 8, 10]
-const PHRYGIAN = [0, 1, 3, 5, 7, 8, 10]
+/** Every song, the menus' quiet one last */
+export const SONG_IDS: readonly SongId[] = ['breeze', 'sunset', 'neon', 'folk', 'steel', 'ridge', 'lounge']
 
-export const SONGS: Record<SongId, Song> = {
-  // Golden Riverbank, the mangroves: light and bright. D major, a skipping bass, off-beat hats
-  breeze: {
-    bpm: 124,
-    root: 62,
-    scale: MAJOR,
-    chords: [0, 4, 5, 3],
-    kick: 'x...x...x...x...',
-    snare: '....x.......x...',
-    hat: '..x...x...x...xx',
-    bass: '0..0..4.0..7..4.',
-    lead: ['7.9.b-9.7-4-....', '8.6.4-6.8-b-....', '9.7.5-7.9-c-b-9-', 'a-9-7-5-7-------'],
-    leadOctave: 0,
-    bassOctave: 1,
-    sound: { bass: 'triangle', bassCutoff: 900, lead: 'triangle', leadRing: 0.32, pad: 'sawtooth', padCutoff: 1400, perc: 'clap', echo: 0.25 },
-  },
-  // The harbour, the fort: a sunset groove, laid back, with a lilt
-  sunset: {
-    bpm: 108,
-    root: 55,
-    scale: MAJOR,
-    chords: [0, 3, 1, 4],
-    kick: 'x.....x...x.....',
-    snare: '....x.......x..x',
-    hat: 'x.x.x.x.x.x.x.xo',
-    bass: '0..0..4.7..4..2.',
-    lead: ['....4-7-9---7-4-', '5-7-a---c-a-7---', '....8-5-3---5-8-', '6-8-b---8-6-4---'],
-    leadOctave: 1,
-    bassOctave: 1,
-    sound: { bass: 'sine', bassCutoff: 700, lead: 'square', leadRing: 0, pad: 'triangle', padCutoff: 1800, chord: 'seventh', swing: 0.14, echo: 0.3 },
-  },
-  // The old street's night market, Danhai's night town: an electronic city, an arpeggio racing on
-  neon: {
-    bpm: 128,
-    root: 57,
-    scale: MINOR,
-    chords: [0, 5, 2, 6],
-    kick: 'x...x...x...x...',
-    snare: '....x.......x...',
-    hat: 'xxoxxxoxxxoxxxox',
-    bass: '0.7.0.7.0.7.0.7.',
-    arp: '0247024702470247',
-    lead: ['7---9-b-9-7-4---', '9---7-5-7-------', '6---9-6-4-2-4---', '8---a-8-6-------'],
-    leadOctave: 0,
-    bassOctave: 1,
-    sound: { bass: 'sawtooth', bassCutoff: 520, lead: 'sawtooth', leadRing: 0, pad: 'sawtooth', padCutoff: 900, arp: 'square', perc: 'clap', echo: 0.35 },
-  },
-  // The hillside lanes, the campus: a folk tune on the pentatonic notes, a woodblock and a big drum
-  folk: {
-    bpm: 100,
-    root: 60,
-    scale: MAJOR,
-    chords: [0, 5, 3, 4],
-    kick: 'x.......x.x.....',
-    snare: '................',
-    hat: '....x.......x...',
-    perc: 'x..x..x.x..x..x.',
-    bass: '0...4...0...4...',
-    lead: ['7.9.7.4.2...4.2.', '5...7.9.c...9.7.', '5.7.5.2.0...2...', '4.5.4.1.4-------'],
-    leadOctave: 0,
-    bassOctave: 1,
-    sound: { bass: 'triangle', bassCutoff: 800, lead: 'triangle', leadRing: 0.4, pad: 'triangle', padCutoff: 1200, perc: 'wood', echo: 0.2 },
-  },
-  // The viaduct works, the wharf: an industrial beat, a phrygian growl, a clank on the off-beats
-  steel: {
-    bpm: 116,
-    root: 52,
-    scale: PHRYGIAN,
-    chords: [0, 0, 1, 6],
-    kick: 'x..x..x.x..x....',
-    snare: '....x.......x...',
-    hat: 'x.x.x.x.x.x.x.x.',
-    perc: '..x.......x..x..',
-    bass: '0.00..0.00..0.1.',
-    lead: ['7-------8---7---', '5-----3-1-------', '8-------a---8---', '6-----5-3-------'],
-    leadOctave: 1,
-    bassOctave: 1,
-    sound: { bass: 'square', bassCutoff: 420, lead: 'square', leadRing: 0, pad: 'sawtooth', padCutoff: 700, perc: 'metal', echo: 0.3 },
-  },
-  // Guanyin's hill road, the Datun ridge: a mountain-road rock, power chords and a driving bass
-  ridge: {
-    bpm: 140,
-    root: 52,
-    scale: MINOR,
-    chords: [0, 5, 6, 0],
-    kick: 'x.x...x.x.x...x.',
-    snare: '....x.......x...',
-    hat: 'x.x.x.x.x.x.x.x.',
-    perc: '...............x',
-    bass: '0.0.0.0.0.0.4.7.',
-    lead: ['7-7-9-a-b---9-7-', '9---7-5-7-------', 'a---8-6-8-a-b-a-', '7-------9-7-4-2-'],
-    leadOctave: 1,
-    bassOctave: 1,
-    sound: { bass: 'sawtooth', bassCutoff: 650, lead: 'sawtooth', leadRing: 0, pad: 'sawtooth', padCutoff: 1600, chord: 'power', perc: 'tom', echo: 0.2 },
-  },
-  // The menus and the results: quiet, slow, seventh chords and a soft arpeggio
-  lounge: {
-    bpm: 82,
-    root: 53,
-    scale: MAJOR,
-    chords: [0, 3, 5, 4],
-    kick: 'x.......x.......',
-    snare: '................',
-    hat: '..x...x...x...x.',
-    bass: '0.......4.......',
-    arp: '0.2.4.6.7.6.4.2.',
-    lead: ['........9-----7-', '5---------------', '........b-----9-', '8-------........'],
-    leadOctave: 1,
-    bassOctave: 1,
-    sound: { bass: 'sine', bassCutoff: 600, lead: 'triangle', leadRing: 0.9, pad: 'triangle', padCutoff: 1100, chord: 'seventh', arp: 'triangle', swing: 0.12, echo: 0.4 },
-  },
+// 2026-11-21 (docs/ARCHITECTURE.md §4.52): each song is a lazy chunk of its own (songBook/), fetched
+// for the track that plays it (the loading screen, useMenuMusic.ts); musicPlayer.ts starts a song once
+// it is here
+const LOADERS: Readonly<Record<SongId, () => Promise<{ readonly SONG: Song }>>> = {
+  breeze: () => import('./songBook/breeze.ts'),
+  sunset: () => import('./songBook/sunset.ts'),
+  neon: () => import('./songBook/neon.ts'),
+  folk: () => import('./songBook/folk.ts'),
+  steel: () => import('./songBook/steel.ts'),
+  ridge: () => import('./songBook/ridge.ts'),
+  lounge: () => import('./songBook/lounge.ts'),
+}
+const loadedSongs = new Map<SongId, Song>()
+const loadingSongs = new Map<SongId, Promise<Song>>()
+
+/** `id` if it is here; null while it is not */
+export const loadedSong = (id: SongId): Song | null => loadedSongs.get(id) ?? null
+
+/** Fetches `id`, once; a failed fetch is forgotten, so that asking again tries again */
+export function loadSong(id: SongId): Promise<Song> {
+  const done = loadedSongs.get(id)
+  if (done) return Promise.resolve(done)
+  let pending = loadingSongs.get(id)
+  if (!pending) {
+    pending = LOADERS[id]().then(
+      ({ SONG }) => {
+        loadedSongs.set(id, SONG)
+        loadingSongs.delete(id)
+        return SONG
+      },
+      (error: unknown) => {
+        loadingSongs.delete(id)
+        throw error
+      },
+    )
+    loadingSongs.set(id, pending)
+  }
+  return pending
 }
 
 /** Each race track's song (docs/KART-WORLD.md §6.3) */

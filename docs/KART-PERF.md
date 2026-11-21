@@ -121,12 +121,38 @@ npm run build && node scripts/kart-fps.mjs --base http://localhost:<port> \
 
 | 候選 | 大小 | 結論 |
 | --- | --- | --- |
-| 各賽道專屬場景（tamkangArt 6.0、harbourArt 5.9、oldStreetArt 3.8、localArt＋localPlan 4.8、worksArt 2.8、lanesArt 2.7、festival 2.6、wharfArt 2.5、skillKit／skillWalls／skillCues 7.3、cornerArt 1.8） | 合計約 40 kB（同一個 chunk 裡壓縮後約 30 kB） | **值得，但這次不做**。一場比賽只用到其中一兩個，可省進比賽首屏約 25 kB（約 kartModel＋Scene 的 11%）。要先把 `createKartScene` 改成非同步（或每個入口先 `await` 載入賽道場景）：入口有 `startSpikeLoop`（計時賽、電腦車、房間比賽、大獎賽）、`startWatchLoop`（觀戰、重播）、編輯器 3D 預覽，漏一個就是少了場景。列在 NEXT 當下一步 |
+| 各賽道專屬場景（tamkangArt 6.0、harbourArt 5.9、oldStreetArt 3.8、localArt＋localPlan 4.8、worksArt 2.8、lanesArt 2.7、festival 2.6、wharfArt 2.5、skillKit／skillWalls／skillCues 7.3、cornerArt 1.8） | 合計約 40 kB（同一個 chunk 裡壓縮後約 30 kB） | **2026-11-21 做了，見 §7**。當時的評估：值得，但這次不做。一場比賽只用到其中一兩個，可省進比賽首屏約 25 kB（約 kartModel＋Scene 的 11%）。要先把 `createKartScene` 改成非同步（或每個入口先 `await` 載入賽道場景）：入口有 `startSpikeLoop`（計時賽、電腦車、房間比賽、大獎賽）、`startWatchLoop`（觀戰、重播）、編輯器 3D 預覽，漏一個就是少了場景。列在 NEXT 當下一步 |
 | 車款模型（kartBodies 4.1、moreBodies 3.9、bikeBodies 1.8、itemBodies 1.5） | 約 11 kB | 不拆：一場 8 台車通常橫跨好幾個系列，省不到多少，還多一次往返 |
 | 音樂與環境音（songs、sequencer、musicPlayer、ambience） | 約 6 kB，`musicPlayer` 已經是自己的 chunk | 不拆：已經夠小 |
 | three.js 本身 | 約 120 kB | 不能拆：第一幀就要 |
 
-## 6. 之後再量
+## 7. 拆 lazy chunk：建場景改成先載完再建（2026-11-21，`feat/kart-lazy-chunks`）
+
+擁有者 2026-11-21：「繼續開發」。房間的卡丁車首屏 146.4／150 kB 長期黃色警告；之後還有新賽道、新車、新配樂要加。做法與程式的形狀在 `ARCHITECTURE.md` §4.52；這裡記數字。
+
+**房間首屏**（不改行為，只搬模組）：首屏的錄影器 `useRaceRecorder` → `replay.ts` → `shots.ts` 只為了一個 `KART_RADIUS` 就把整個物理（`physics.ts`、`classic.ts`、`walls.ts`，6.5 kB）帶進首屏；`useFinishHold` 只為了 `CELEBRATE_SECONDS` 帶進整個導播（0.8 kB）；`replay.ts` 的 `shotsAt`（只有播放用）帶進投射物的路徑（1.6 kB）。改成 `shared/kart/kartRadius.ts`、`src/kart/race/celebrate.ts`、`shared/kart/replayShots.ts` 三個葉子模組（原本的地方 re-export，物理與 golden 不變）。
+
+**比賽**：引擎（three.js＋場景＋迴圈）、賽道專屬場景（10 張賽道各自的區塊）、車款模型（第一批 6 台跟引擎，另外三個車系各一個 chunk）、配樂（7 首各一個 chunk）都是 lazy chunk，進比賽前在載入畫面一起下載，到齊才建場景。
+
+`npm run build && npm run budget -- --chunks`（gzip，zh-TW）：
+
+| | 前（`a5bb590`） | 後 |
+| --- | --- | --- |
+| 房間的卡丁車首屏 `KartScreen`（上限 150，警告線 140） | **146.4 kB**（warn） | **137.9 kB**（ok） |
+| 單機 `/kart` 首屏（選單；之前三.js 與整個引擎都在裡面） | **456.0 kB** | **226.8 kB**（載入畫面與選單先出來，引擎隨後） |
+| `/kart` 開一場河濱計時賽，總共下載 | 456.0 kB | 433.3 kB |
+| 房間進比賽總共下載：河濱（沒有專屬場景） | 481.9 kB | 461.4 kB |
+| 同上：漁港 | 481.9 kB | 467.0 kB |
+| 同上：高架廠區（技術賽道，場景最多） | 481.9 kB | 470.8 kB |
+| 同上：紅樹林（四張在地賽道之一） | 481.9 kB | 466.0 kB |
+| 卡丁車全部 chunk 合計（上限 600） | 450.0 kB | 474.8 kB |
+| chunk 數 | 約 73 | 約 110 |
+
+- 各賽道專屬場景（後）：漁港 5.6、淡江 5.8、老街 3.6、在地四張 2.8＋共用的 plan 1.8、碼頭 5.8、巷弄 5.9、廠區 6.0（後三張共用 skillKit／skillWalls／skillCues）kB；車系：moreBodies 4.0、bikeBodies 1.8、itemBodies 1.5 kB；每首歌約 0.3 kB。
+- **合計多了約 25 kB**：拆成多個 chunk 每個都從頭壓縮，共用的字典沒了（平均每多一個 chunk 約 0.6 kB），加上載入器、載入畫面、預先下載約 3 kB。玩家實際下載的只會少：進一場比賽少 11–20 kB，`/kart` 的第一個畫面少一半。three.js 本身用 `vite.config.ts` 的 `codeSplitting.groups` 固定成一個 chunk（`three`）：賽道場景與車系只 import 它的核心類別，打包器原本會把它切成兩塊、多約 1 kB。
+- 試過沒用的：把 skillKit／skillWalls／skillCues 與在地賽道的 plan／art 用 `codeSplitting.groups` 各併成一塊——group 預設連相依一起拉，結果把 three.js 整個拉進去（170 kB），不能用。
+
+## 8. 之後再量
 
 - 改了畫面（新賽道、新車、新特效）就跑一次 §1 的指令，前後各一份 JSON，貼到 PR。看 draw calls 與 JS ms；fps 只在同一台、沒有別的工作時才比。
 - **實機**：擁有者手上的手機開 `/kart/spike`，統計面板的 fps、drawing buffer；或接 USB 用 Chrome 的 `chrome://inspect` 看 `__kartSpike.render` 與 `jsMs`。
