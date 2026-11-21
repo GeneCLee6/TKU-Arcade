@@ -124,16 +124,24 @@ for (const game of GAMES.filter((g) => !pickedGames || pickedGames.includes(g.id
 // the host adds them in the waiting room, the room plays their turns, and the game reaches its end.
 // Hold'em plays on among the computers once the person is out of chips, and a whole game is long, so
 // there the person goes all in every hand and four hands dealt (or the person out) is the check.
-const BOT_GAMES: { id: string; options?: Record<string, unknown> }[] = [
+// 2026-11-21, the four more: short games, or a set part of one (`enough`, on the person's view), to
+// keep the CI's time down: the first round over and the next one started by the person (the
+// computers leave that button to the people), or ten turns of tiles
+type BotGame = { id: string; options?: Record<string, unknown>; enough?: (view: Record<string, unknown>) => boolean }
+const BOT_GAMES: BotGame[] = [
   { id: 'promotion' },
   { id: 'traders' },
-  { id: 'holdem', options: { stack: 100, blindUp: 15, timer: 30 } },
+  { id: 'holdem', options: { stack: 100, blindUp: 15, timer: 30 }, enough: (view) => Number(view.hand ?? 0) >= 4 },
+  { id: 'palace', options: { window: 10 } },
+  { id: 'secret-scroll', options: { length: 'short' }, enough: (view) => Number(view.round ?? 1) >= 2 },
+  { id: 'wasabi', options: { goal: 1 } },
+  { id: 'tiles', options: { clock: 60 }, enough: (view) => Number(view.turnNo ?? 0) >= 10 },
 ]
 
 for (const game of BOT_GAMES.filter((g) => !pickedGames || pickedGames.includes(g.id))) {
   for (const screen of SCREENS.filter((s) => s.name === 'desktop' && (!pickedScreens || pickedScreens.includes(s.name)))) {
     test(`${game.id} on ${screen.name}: one person and two computer players`, async ({ browser }) => {
-      test.setTimeout(420_000)
+      test.setTimeout(process.env.SWEEP_BOTS_FULL ? 1_500_000 : 420_000)
       const words = screen.zh ? roomZhTW : roomEn
       const problems: Problems = { hard: [], soft: [] }
       const log: PlayLog = { actions: 0, refused: 0 }
@@ -162,8 +170,14 @@ for (const game of BOT_GAMES.filter((g) => !pickedGames || pickedGames.includes(
           const view = host.view?.game?.view as { you?: number; players?: { seat: number; out?: boolean }[] } | undefined
           return view?.players?.find((p) => p.seat === view.you)?.out === true
         }
-        const handsDealt = () => (host.view?.game?.view as { hand?: number } | undefined)?.hand ?? 0
-        const enough = () => youOut() || (game.id === 'holdem' && handsDealt() >= 4)
+        const enough = () => {
+          // SWEEP_BOTS_FULL=1: every game to its very end (for a check on a preview site, not the CI)
+          if (process.env.SWEEP_BOTS_FULL) return false
+          const view = host.view?.game?.view as Record<string, unknown> | undefined
+          // Out of a secret-scroll round is not out of the game
+          if (game.id !== 'secret-scroll' && youOut()) return true
+          return view !== undefined && game.enough?.(view) === true
+        }
         let nextLook = 20
         while (!host.view?.game?.over && !enough()) {
           await playOn(seats, pick, log, (l) => l.actions >= nextLook || enough())

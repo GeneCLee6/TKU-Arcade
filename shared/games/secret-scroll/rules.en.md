@@ -58,6 +58,10 @@ Set by the host in the waiting room.
 
 If a player is away on their turn, the host can skip them: they fold, show their cards, and are out of that round.
 
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats, at **Easy** or **Normal**. They play after a short pause and know only what a person in their seat would: their own hand, the cards that have gone face up this round, and what their own Spy and Duelist showed them. Normal counts which cards are still unseen: its Constable names the likeliest card (or the one it has seen), it duels only when it will probably win, and it holds on to high cards as the deck runs dry. Easy plays any card, though never throws away the Scroll by choice. After a round, a person starts the next one (or the clock does); the computers never press it for you.
+
 ## Players
 
 2 to 6 players; best with 2 to 4. A game takes about 20 minutes.

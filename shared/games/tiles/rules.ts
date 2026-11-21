@@ -9,7 +9,9 @@
 // left the table, nothing came from anywhere but the rack); the sets are checked when the turn ends.
 //
 // docs/PRD/e23-clubroom-tiles.md has the rules and every detail decided here.
+import { tilesBot } from './bot.ts'
 import { tilesInfo } from './info.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import {
   allTiles,
   checkArrangement,
@@ -191,6 +193,15 @@ function play(state: TilesState, draft: TileTable, added: readonly number[]): Ti
 export const tiles: GameModule<TilesState, TilesAction, TilesView, TilesOptions> = {
   ...tilesInfo,
   meta: GAME_META.tiles,
+  // Computer players, played by the room (bot.ts): a whole turn in one `commit` with its sets, or a
+  // draw; the next round is the people's to start
+  bots: TABLE_BOTS,
+  bot(view, legal, level, rng) {
+    return tilesBot(view, legal, level, rng)
+  },
+  botLeaves(action) {
+    return action.type === 'next'
+  },
 
   init(seats, options, rng) {
     const players = seats.map((seat) => seat.id)

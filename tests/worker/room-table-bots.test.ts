@@ -1,13 +1,17 @@
 // Computer players the room moves itself (2026-11-20, `GameModule.bot`, docs/ARCHITECTURE.md
-// "電腦玩家"): hold'em, promotion and traders. The host adds and removes them in the waiting room;
-// the room moves each a moment after its turn comes, from its seat's own view; nobody moves them from
-// a browser; they wait while nobody is in the room, and come through hibernation, a rematch and a
-// new host. RoomHost on a fake clock, fake sockets and a storage kept as JSON, as in
+// "電腦玩家"): hold'em, promotion and traders; 2026-11-21 palace, secret-scroll, wasabi and tiles.
+// The host adds and removes them in the waiting room; the room moves each a moment after its turn
+// comes, from its seat's own view; nobody moves them from a browser; they wait while nobody is in the
+// room, and come through hibernation, a rematch and a new host. RoomHost on a fake clock, fake sockets and a storage kept as JSON, as in
 // room-host.test.ts.
 import { describe, expect, it, vi } from 'vitest'
 import { holdem } from '../../shared/games/holdem/rules.ts'
 import type { HoldemView } from '../../shared/games/holdem/types.ts'
 import { kart } from '../../shared/games/kart/rules.ts'
+import { palace } from '../../shared/games/palace/rules.ts'
+import { secretScroll } from '../../shared/games/secret-scroll/rules.ts'
+import { tiles } from '../../shared/games/tiles/rules.ts'
+import { wasabi } from '../../shared/games/wasabi/rules.ts'
 import { promotion } from '../../shared/games/promotion/rules.ts'
 import { traders } from '../../shared/games/traders/rules.ts'
 import { ticTacToe } from '../../shared/games/tictactoe/rules.ts'
@@ -81,6 +85,10 @@ class World {
       holdem: holdem as unknown as AnyGameModule,
       promotion: promotion as unknown as AnyGameModule,
       traders: traders as unknown as AnyGameModule,
+      palace: palace as unknown as AnyGameModule,
+      'secret-scroll': secretScroll as unknown as AnyGameModule,
+      wasabi: wasabi as unknown as AnyGameModule,
+      tiles: tiles as unknown as AnyGameModule,
       kart: kart as unknown as AnyGameModule,
       tictactoe: ticTacToe as unknown as AnyGameModule,
       ...modules,
@@ -413,6 +421,11 @@ describe('one person and two computers play a whole game', () => {
     ['promotion', undefined],
     ['promotion', { edition: 'full' }],
     ['traders', undefined],
+    // 2026-11-21
+    ['palace', undefined],
+    ['secret-scroll', { length: 'short' }],
+    ['wasabi', undefined],
+    ['tiles', { clock: 60 }],
   ]
   for (const [gameId, options] of games) {
     it(`${gameId}${options?.edition ? ' (full)' : ''}`, () => {
@@ -427,6 +440,26 @@ describe('one person and two computers play a whole game', () => {
       expect(ann.errors).toEqual([])
     })
   }
+})
+
+describe('the next round is the people’s to start', () => {
+  it('secret-scroll: after a round the computers wait for Ann or the clock', () => {
+    const { world, ann } = room('secret-scroll', { length: 'short' })
+    ann.send({ t: 'add_bot', level: 'normal' })
+    ann.send({ t: 'add_bot', level: 'easy' })
+    ann.send({ t: 'start' })
+    const phase = () => (ann.game.view as { phase: string }).phase
+    for (let i = 0; i < 2000 && phase() === 'turn'; i++) {
+      if (ann.game.legal.length > 0) ann.send({ t: 'action', action: ann.game.legal[0] })
+      else world.tick()
+    }
+    if (phase() === 'over') return
+    expect(phase()).toBe('roundEnd')
+    // Only the round's own clock is due, long after any computer's moment
+    expect(world.host.nextAlarm()! - world.clock).toBeGreaterThan(BOT_THINK_MS.max)
+    ann.send({ t: 'action', action: { type: 'next' } })
+    expect(phase()).toBe('turn')
+  })
 })
 
 /** Ann plays until it is a computer seat's turn */
