@@ -96,7 +96,9 @@ describe('the time trial', () => {
     for (let step = 0; step < COUNTDOWN_SECONDS / STEP_SECONDS - 1; step++)
       trial = stepTrial(trial, floored, course)
     expect(trial.phase).toBe('countdown')
-    expect(trial.run.kart).toMatchObject({ x: track.grid[0]!.x, z: track.grid[0]!.z, vx: 0, vz: 0 })
+    // A kart alone starts on the time trial's own place (TrackJson.solo, 2026-11-21)
+    const start = track.solo ?? track.grid[0]!
+    expect(trial.run.kart).toMatchObject({ x: start.x, z: start.z, vx: 0, vz: 0 })
     trial = stepTrial(trial, floored, course)
     expect(trial.phase).toBe('racing')
     expect(trial.steps).toBe(0)

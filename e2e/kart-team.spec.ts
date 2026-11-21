@@ -49,6 +49,9 @@ test('two people on opposite sides and a computer kart race a team race', async 
     await expect(teams.locator('li').nth(1)).toHaveAttribute('data-team', 'red')
     await expect(teams.locator('li').nth(2)).toHaveAttribute('data-team', 'blue')
   }
+  // 2026-11-21: the race waits for everyone to be ready (shared/protocol.ts 8.)
+  await bob.getByTestId('kart-lobby-ready').click()
+  await expect(ann.getByTestId('kart-lobby-waiting')).toHaveText('Everyone is ready')
   await ann.getByRole('button', { name: 'Start game' }).click()
 
   for (const page of [ann, bob]) {

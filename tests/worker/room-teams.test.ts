@@ -120,7 +120,9 @@ function teamRoom(teams: 'solo' | 'teams' = 'teams') {
   ).toBe(true)
   const ann = world.join('Ann')
   const bob = world.join('Bob')
+  bob.send({ t: 'ready', ready: true })
   const cat = world.join('Cat')
+  cat.send({ t: 'ready', ready: true })
   return { world, ann, bob, cat }
 }
 

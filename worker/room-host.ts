@@ -991,7 +991,26 @@ export class RoomHost {
     const room = this.requireRoom()
     if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
     if (room.status !== 'waiting') return this.refuse(conn, 'wrong_status')
+    if (this.waitsOnReady(room) && this.notReady(room).length > 0) {
+      return this.refuse(conn, 'not_ready')
+    }
     this.beginFromSeats(conn, room)
+  }
+
+  /** The room's game starts only once everyone seated is ready (`GameMeta.readyCheck`) */
+  private waitsOnReady(room: RoomRecord): boolean {
+    return this.deps.games(room.gameId)?.meta.readyCheck === true
+  }
+
+  /** Seated people, the host aside, not ready yet: offline counts as not ready (shared/protocol.ts 8.) */
+  private notReady(room: RoomRecord): MemberRecord[] {
+    return [...this.members.values()].filter(
+      (other) =>
+        other.seat !== null &&
+        other.bot === undefined &&
+        other.id !== room.hostId &&
+        (!other.ready || other.conn === null),
+    )
   }
 
   private rematch(conn: string, member: MemberRecord): void {
@@ -1642,9 +1661,12 @@ export class RoomHost {
   private markOffline(conn: string, connection: Connection): void {
     const member = connection.member === null ? undefined : this.members.get(connection.member)
     if (!member || member.conn !== conn) return
+    const room = this.room
     this.change(() => {
       member.conn = null
       member.offlineAt = this.deps.now()
+      // Gone from a room that waits on everyone's ready: they say it again when they are back
+      if (room && room.status === 'waiting' && this.waitsOnReady(room)) member.ready = false
       this.saveMembers()
     })
     // The host's browser ran the computer karts: nobody does now (shared/protocol.ts 14.)

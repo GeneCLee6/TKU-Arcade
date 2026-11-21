@@ -44,6 +44,7 @@ export const roomZhTW: Record<RoomMessageKey, string> = {
   'room.error.generic': '沒有成功，請再試一次。',
   'room.error.no_game': '現在沒有進行中的遊戲。',
   'room.error.not_enough_players': '入座人數不夠。',
+  'room.error.not_ready': '還有人沒按準備。',
   'room.error.not_joined': '你還沒加入，請稍等再試。',
   'room.error.not_seated': '請先入座。',
   'room.error.rate_limited': '太快了，請稍等再試。',

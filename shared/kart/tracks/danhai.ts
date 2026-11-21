@@ -96,6 +96,7 @@ export const DANHAI: TrackJson = {
   gates: made.gates,
   respawns: made.respawns,
   grid: made.grid,
+  solo: made.solo,
   walls: made.walls,
   boostPads: made.boostPads,
   itemBoxes: made.itemBoxes,

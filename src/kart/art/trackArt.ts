@@ -3,6 +3,7 @@
 // (shared/kart/scenery.ts). Riverside gets its river, bridge, town and hills; the harbour (N1) its
 // sea, breakwaters, boats and hillside town at sunset (harbourArt.ts). All of it original: a
 // low-poly look of our own (the PRD's Q4), no model or image files.
+import { themeNameOf } from './themeName.ts'
 import {
   BackSide,
   DoubleSide,
@@ -62,18 +63,8 @@ export interface TrackArt {
   dispose(): void
 }
 
-/** A track's sky and light: the harbour's sunset, or the sunny afternoon of every other track */
-export const themeOf = (track: Pick<Track, 'id' | 'theme'>): KartTheme =>
-  // e10-t07: a track from the editor names its own
-  track.theme
-    ? kartThemes[track.theme]
-    : track.id === 'harbour'
-      ? kartThemes.sunset
-      : track.id === 'tamkang'
-        ? kartThemes.campus
-        : track.id === 'oldstreet'
-          ? kartThemes.night
-          : kartThemes.day
+/** A track's sky and light: the harbour's sunset, or the sunny afternoon of every other track (themeName.ts) */
+export const themeOf = (track: Pick<Track, 'id' | 'theme'>): KartTheme => kartThemes[themeNameOf(track)]
 
 /** A track raced at night (2026-11-20, §4.47): headlights on, street lights pooled on the road */
 export const isNightTrack = (track: Pick<Track, 'id' | 'theme'>): boolean =>

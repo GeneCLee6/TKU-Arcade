@@ -285,6 +285,7 @@ export const WHARF: TrackJson = {
   gates: cleared.gates,
   respawns: cleared.respawns,
   grid: made.grid,
+  solo: made.solo,
   walls,
   boostPads: [...made.boostPads, ...lanePads],
   itemBoxes: made.itemBoxes,

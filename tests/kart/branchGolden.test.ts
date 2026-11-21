@@ -80,17 +80,21 @@ function raceDigest(track: Track): string {
   return hash.value
 }
 
-/** Taken on main at fb5f7e1: [track digest, race digest] */
+/**
+ * Taken on main at fb5f7e1: [track digest, race digest]. 2026-11-21: the track digests taken again
+ * with the grid in one row and the time trial's own start (shared/kart/startLine.ts); the races,
+ * driven from that start, are the very same
+ */
 const TRACKS: Record<string, readonly [string, string]> = {
-  riverside: ['7bd7c951', '847dafcb'],
-  harbour: ['f13192a1', 'bcba2291'],
-  tamkang: ['cc68535c', 'bd30b1b0'],
-  guanyin: ['222ba861', '18754f84'],
-  mangrove: ['6616d835', '5384366d'],
-  fort: ['d9a2851e', '960ef7c3'],
-  danhai: ['805b2f32', '9f25ce59'],
-  datun: ['8b1d30bb', 'e2c40dda'],
-  lanes: ['7a657b21', 'e46f40e5'],
+  riverside: ['09e66287', '847dafcb'],
+  harbour: ['3288e337', 'bcba2291'],
+  tamkang: ['f97d6557', 'bd30b1b0'],
+  guanyin: ['da874157', '18754f84'],
+  mangrove: ['0e545779', '5384366d'],
+  fort: ['52eb5dfa', '960ef7c3'],
+  danhai: ['13182b1e', '9f25ce59'],
+  datun: ['3ad039d7', 'e2c40dda'],
+  lanes: ['142a2b05', 'e46f40e5'],
   // 2026-11-20: the wharf (a branch now) and the old street (redrawn for its boost cover) changed
   // on purpose, their revisions raised; these are what they were
   // wharf: ['e842a0a2', '59e4d97c'],
@@ -112,11 +116,11 @@ const SPECS: Record<string, TrackSpec> = (() => {
   }
 })()
 
-/** Taken on main at fb5f7e1: each editor track's [id, track digest] */
+/** Taken on main at fb5f7e1: each editor track's [id, track digest] (the digests again 2026-11-21: the grid in one row) */
 const CUSTOM: Record<string, readonly [string, string]> = {
-  starter: ['custom-164wwb3lbtz', '34f4b76e'],
-  hill: ['custom-ih8shvnxar', '68c3a872'],
-  jump: ['custom-1jip6lh60ry', '74b3f282'],
+  starter: ['custom-164wwb3lbtz', 'e073cc2a'],
+  hill: ['custom-ih8shvnxar', '3f84d520'],
+  jump: ['custom-1jip6lh60ry', '1ff4a340'],
 }
 
 const customOf = (name: string) => SPECS[name]!

@@ -555,3 +555,19 @@ export const localScene = {
   // Unlit white: what an instance's own colour or a glow map multiplies
   glow: '#FFFFFF',
 } as const
+
+/**
+ * The race room's waiting room backdrop (2026-11-21, src/kart/lobby/LobbyBackdrop.tsx): drawn over
+ * the track's own sky (kartThemes), our own. Stars and the moon's halo at night, clouds by day, the
+ * lit windows of the skyline, and the track's outline glowing across the foot of it
+ */
+export const kartLobby = {
+  star: '#FFFFFF',
+  cloud: '#FFFFFF',
+  windowLit: '#FFC66B',
+  skylineDay: '#3B4A63',
+  skylineNight: '#120F2E',
+  hillsDay: '#5C7A6A',
+  hillsNight: '#231E47',
+  trackGlow: '#FFFFFF',
+} as const
