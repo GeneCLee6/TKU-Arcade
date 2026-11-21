@@ -33,6 +33,7 @@ import {
   uniqueName,
   type CoverableSeat,
   type ErrorCode,
+  type QuickBots,
   type RoomListing,
   type RoomMember,
   type RoomStatus,
@@ -78,6 +79,11 @@ export type RoomRecord = {
    * pass it on; a summary only says the room is locked, and a listing never has such a room
    */
   password?: string
+  /**
+   * Opened from the lobby's "Play the computer" (2026-11-21, CreateRoomRequest.bots): the game starts
+   * as soon as the first person joins, who becomes the host. Gone once that has happened
+   */
+  startOnJoin?: true
   /** Since when no socket has been open; null while one is (`settleCleanup`) */
   emptySince: number | null
   /** While `ended`: when something last happened; null in any other status (`settleCleanup`) */
@@ -297,9 +303,14 @@ export class RoomHost {
     isPublic = false,
     code: string | null = null,
     password: string | null = null,
+    bots: QuickBots | null = null,
   ): boolean {
     const module = this.deps.games(gameId)
     if (this.room || !module) return false
+    // Checked by POST /api/rooms already (parseQuickBots); a room never seats more than it has
+    // names and seats for, whatever it was asked
+    const names = module.bot ? (module.bots?.names ?? []) : []
+    const seated = bots === null ? [] : names.slice(0, Math.min(bots.count, module.meta.maxPlayers - 1))
     this.room = {
       id,
       gameId,
@@ -314,10 +325,19 @@ export class RoomHost {
       public: isPublic && password === null,
       code,
       ...(password !== null ? { password } : {}),
+      ...(seated.length > 0 ? { startOnJoin: true as const } : {}),
       emptySince: this.deps.now(),
       idleSince: null,
     }
     this.deps.storage.saveRoom(this.room)
+    // Seats 1 and on: the person who comes takes the lowest free one, the first
+    if (bots !== null && seated.length > 0) {
+      seated.forEach((name, index) => {
+        const bot = this.newBot(index + 1, bots.level, name, null)
+        this.members.set(bot.id, bot)
+      })
+      this.saveMembers()
+    }
     this.deps.metric?.('room_created', gameId)
     return true
   }
@@ -839,6 +859,7 @@ export class RoomHost {
       absent: false,
       ...(account ? { account: account.id } : {}),
     }
+    let startNow = false
     this.change(() => {
       const room = this.requireRoom()
       this.members.set(member.id, member)
@@ -846,10 +867,24 @@ export class RoomHost {
       this.saveMembers()
       if (room.hostId === null) {
         room.hostId = member.id
+        // Opened with computer players (2026-11-21): their host starts the game by joining
+        startNow = room.startOnJoin === true
+        delete room.startOnJoin
         this.deps.storage.saveRoom(room)
       }
     })
     this.welcome(conn, member)
+    // As if the host had pressed start, with the same checks (a paused game stays in the waiting
+    // room, where the refusal says why and the host can start it by hand later)
+    if (startNow && this.requireRoom().status === 'waiting') this.beginFromSeats(conn, this.requireRoom())
+  }
+
+  /**
+   * True while the room will start its game when its first person joins (a room opened with
+   * computer players, `RoomRecord.startOnJoin`): RoomDO then reads the paused games before a join
+   */
+  startsOnJoin(): boolean {
+    return this.room?.startOnJoin === true && this.room.hostId === null
   }
 
   private sit(conn: string, member: MemberRecord, seat: number | null): void {
@@ -917,7 +952,16 @@ export class RoomHost {
     if (seat === null || name === undefined || this.members.size >= MAX_MEMBERS) {
       return this.refuse(conn, 'seat_taken')
     }
-    const bot: MemberRecord = {
+    const bot = this.newBot(seat, level, name, look)
+    this.change(() => {
+      this.members.set(bot.id, bot)
+      this.saveMembers()
+    })
+  }
+
+  /** A computer member in `seat`, at `level`, named `name` (one of the game's `bots.names`) */
+  private newBot(seat: number, level: string, name: string, look: string | null): MemberRecord {
+    return {
       id: this.deps.newMemberId(),
       name,
       // Never sent to anyone: nobody can come back as a computer member
@@ -930,10 +974,6 @@ export class RoomHost {
       bot: { level, name },
       ...(look !== null ? { look } : {}),
     }
-    this.change(() => {
-      this.members.set(bot.id, bot)
-      this.saveMembers()
-    })
   }
 
   private ready(conn: string, member: MemberRecord, ready: boolean): void {

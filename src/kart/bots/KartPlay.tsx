@@ -32,9 +32,23 @@ function resumed(): Playing {
   return { kind: 'cup', run: next }
 }
 
+/**
+ * /kart?bots (2026-11-21, the lobby's "Play the computer"): the menu opens on the race against the
+ * computer's settings. Read once and taken off the address, so that closing the panel and reloading
+ * comes back to the plain menu
+ */
+function botsAsked(): boolean {
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has('bots')) return false
+  url.searchParams.delete('bots')
+  window.history.replaceState(null, '', url)
+  return true
+}
+
 export function KartPlay() {
   const t = useT()
   const [playing, setPlaying] = useState<Playing>(resumed)
+  const [openBots] = useState(botsAsked)
   // The school is in the address, so that a reload stays in it
   const openSchool = () => {
     const url = new URL(window.location.href)
@@ -52,6 +66,7 @@ export function KartPlay() {
     return (
       <SpikePage
         play
+        openBots={openBots}
         onBotRace={(setup) => setPlaying({ kind: 'bots', setup })}
         onCup={(run) => setPlaying({ kind: 'cup', run })}
         onSchool={openSchool}

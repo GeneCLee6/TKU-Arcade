@@ -104,11 +104,14 @@ function linkedTrack(): Linked {
  */
 export function SpikePage({
   play = false,
+  openBots = false,
   onBotRace,
   onCup,
   onSchool,
 }: {
   play?: boolean
+  /** 2026-11-21: open on the race against the computer's panel (/kart?bots, from the lobby) */
+  openBots?: boolean
   /** 2026-11-17: /kart's menu starts a race against the computer with these settings */
   onBotRace?: (setup: BotSetup) => void
   /** 2026-11-17: /kart's menu starts or continues a Grand Prix (src/kart/cup/) */
@@ -126,7 +129,7 @@ export function SpikePage({
   const [bindings, setBindings] = useState<Bindings>(loadBindings)
   const [rules, setRules] = useState<KartRules>(loadRules)
   const [tuning, setTuning] = useState<KartTuning>(() => loadTuning().tuning)
-  const [open, setOpen] = useState<Open>()
+  const [open, setOpen] = useState<Open>(() => (openBots && onBotRace ? 'bots' : undefined))
   const controlsOpen = open === 'controls'
   const [callout, setCallout] = useState<{ callout: Callout; id: number }>()
   const controlsOpener = useRef<HTMLButtonElement>(null)

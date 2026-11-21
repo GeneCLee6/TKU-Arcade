@@ -1386,6 +1386,29 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **房間首屏**：`KART_RADIUS`（`shared/kart/kartRadius.ts`）、`CELEBRATE_SECONDS`（`src/kart/race/celebrate.ts`）、`shotsAt`（`shared/kart/replayShots.ts`）搬成葉子模組，首屏不再帶物理與導播。
 - **預算腳本**：`npm run budget` 多三種 `info` 行（不設上限）：`/kart` 首屏、比賽引擎、每張賽道專屬場景的大小。
 
+### 4.55 路線圖外：大廳「跟電腦玩」一鍵開局（2026-11-21，`feat/lobby-quickplay-pwa`）
+
+擁有者 2026-11-21「繼續開發」。以前一定要湊人；現在桌遊有電腦玩家（§4.49）、卡丁車有對戰電腦與駕訓班，所以大廳首頁多一塊「跟電腦玩」：一個人、一下就開局。
+
+- **協定**：`POST /api/rooms` 多一個選用的 `bots: { count, level }`（`shared/protocol.ts` 的 `CreateRoomRequest`／`QuickBots`）。`shared/games/quickBots.ts` 的 `parseQuickBots(module, raw)` 檢查：遊戲要有 `bot`（房間在 DO 裡下的那種；卡丁車的電腦車是房主瀏覽器跑的，不收）與 `bots`；`level` 在 `bots.levels`；`count` 是正整數，加上那一個人在 `[minPlayers, maxPlayers]` 之間、不超過名字數。不合就 **400 `bad_bots`**（不默默丟掉）。帶 `bots` 的房間一律私人（`public` 被忽略）。**速率限制不變**：一鍵開局就是一個 POST，照樣算進每位址每分鐘 5 間（`tests/worker/abuse.test.ts`）。
+- **RoomDO**：`RoomHost.create(..., bots)` 建房時就把電腦放進座位 1..count（名字照 `bots.names` 的順序，`newBot` 與等待室的「加電腦玩家」共用），`RoomRecord.startOnJoin = true`。第一個加入的人照舊成為房主、坐 0 號，`join` 在 `welcome` 之後**以房主身分**走 `beginFromSeats`（同一套檢查：人數、遊戲暫停）；旗標用完即刪、跟著存檔，所以只會開一次，之後進來的人是旁觀。遊戲被擁有者暫停時留在等待室、房主收到 `game_disabled`，恢復後自己按開始。`RoomDO.webSocketMessage` 在 `startsOnJoin()` 時把 `join` 也當成會開局的訊息，先讀暫停清單（§e12-t11）。
+- **大廳**（`src/components/QuickPlay.tsx`，自己的 lazy chunk，首屏之後才載）：英雄區下面、遊戲卡片上面。列出 `LOBBY_GAMES` 裡 `meta.computer` 的桌遊（新遊戲加了 `computer: true` 就自動出現），每格「你和 N 位電腦玩家」＋「立刻開玩」；N＝`quickBotCount(meta)`＝`max(1, minPlayers − 1)`。難度是區塊上方的分段切換（簡單／普通，預設普通）。卡丁車兩格直接導到 `/kart?bots`（`KartPlay` 讀一次就從網址拿掉，`SpikePage` 以 `openBots` 開在對戰電腦設定）與 `/kart?school`。沒有暱稱時先跳暱稱框，再建房（和「建立房間」同一條路）。格子裡的遊戲名**不是標題**（`<p>`），因為測試與巡檢用 h3 找遊戲卡片。
+- **遊戲卡片**多一個「可以跟電腦玩」標籤：`meta.computer` 或有 `tryAlone`（卡丁車）的卡片。
+- **首屏**：主站 99.9 → 101.0 kB（字串、卡片標籤、service worker 註冊與更新提示的 hook；`QuickPlay`、`UpdatePrompt` 不在首屏）；`QuickPlay` 約 1.3 kB gzip 在首屏之外。
+- **測試**：`tests/games/quick-bots.test.ts`（每款 `computer` 遊戲的預設請求都合法、別的都不合法；每個難度與人數的邊界；格式）、`tests/worker/rooms.test.ts`（交給 DO 的參數、強制私人、各種不合法 400）、`tests/worker/room-table-bots.test.ts`「a room opened with computer players」（座位、加入就開局、只開一次、hibernation、暫停時留在等待室、房主重連不重開、卡丁車不收、一局玩到底）、`e2e/quick-play.spec.ts`（手機一鍵德州撲克到發牌、不在公開房列表、卡片標籤、卡丁車兩格）。
+
+### 4.56 路線圖外：PWA 的快取與新版本提示（2026-11-21，`feat/lobby-quickplay-pwa`）
+
+`e7-t09`（#48）已經有 manifest、圖示、只回離線頁的 service worker 與安裝提示。這批把 service worker 改成「App 殼＋靜態資產」快取、加上新版本提示，安裝提示可以關。
+
+- **service worker 由 build 寫出**：原始碼在 `scripts/pwa/sw.js`（不再放 `public/`），`scripts/pwa/serviceWorker.ts` 的 Vite 外掛在 client build 的 `generateBundle` 把 `VERSION`（所有輸出檔名的 SHA-256 前 12 碼，檔名本身帶內容雜湊）與 `SHELL`（入口 chunk、它 import 的 chunk 與 CSS、兩個語言 chunk）填進去，輸出 `/sw.js`。沒有用 `vite-plugin-pwa`：要的只有這兩個值，手寫零相依、首屏零成本；`vite.config.ts` 只多一行（和 `feat/kart-lazy-chunks` 的 chunk 設定不衝突，shell 是照 bundle 算的）。
+- **快取策略**：頁面（navigate）**永遠走網路**，只有完全沒網路時回離線頁，所以新部署一載入就是新版；`/assets/*`（雜湊檔名，一個名字永遠是同一個檔）cache-first，第一次用到就留下，安裝時先留 shell；只留 `ok`、同源、不是 HTML 的回應（舊部署的檔案被 SPA fallback 回成 index.html 時不會被當成 JS 存起來），有 `Range` 的請求不碰。`/api/*`、`/ws/*`、非 GET、別的網域（Google Fonts）**完全不攔**。快取名 `tku-arcade-<VERSION>`，新版接手時刪掉舊版（含 e7-t09 的 `tku-arcade-offline-v1`）。
+- **離線頁**：Cloudflare 把 `/offline.html` 307 轉到 `/offline`，被轉址的回應不能拿來回應導覽（e7-t09 起離線頁其實一直出不來：`ERR_FAILED`）。現在安裝時讀完再以 `/offline.html` 重新存成一個沒轉址的回應，**保留站上原本的安全標頭**（CSP）。離線頁的「再試一次」從 inline `onclick`（CSP 本來就擋）改成連到同一網址的連結。
+- **更新**：`installApp.ts` 用 `updateViaCache: 'none'` 註冊；頁面回到前景且距上次檢查超過 10 分鐘就 `registration.update()`。新版裝好會**等待**（不自動 `skipWaiting`），頁面看到 `waiting` 且已有 controller 時顯示「淡江遊樂場有新版本了 · 重新整理／稍後」（`UpdatePrompt.tsx`，lazy，只有有新版時才載），按重新整理 → `postMessage('skip-waiting')` → `controllerchange` → 重新載入。關掉所有分頁也會換新。因為頁面永遠從網路拿，就算沒按也不會卡在舊版：重新整理就是新版；協定版本不合（4400）時原本的「重新整理」提示照舊有效。
+- **安裝提示**（`InstallApp.tsx`）：多「不用了」，記在 `localStorage` 的 `tku-arcade.installHint`；Android 上沒有 `beforeinstallprompt` 的瀏覽器顯示「從瀏覽器選單安裝」。manifest 的 `name` 改成「TKU Arcade 淡江遊樂場」（主畫面用 `short_name`「TKU Arcade」）。
+- **CSP 不變**：`worker-src 'self'`、`manifest-src 'self'` 本來就有；service worker 自己的 fetch 也受同一份 CSP（`connect-src 'self'`），所以它只碰同源請求。
+- **測試**：`tests/pwa.test.ts` 在假的全域、Cache Storage 與網路上跑真的 `sw.js`（安裝留下 shell 與離線頁、離線頁不是轉址且帶 CSP、只在頁面說的時候接手、舊快取刪掉、API／WebSocket／POST／別的網域不碰、頁面永遠走網路、雜湊檔第一次之後從快取、錯誤與 HTML 不留、Range 不碰），外掛的 shell、版本與範本；`e2e/pwa.spec.ts`（manifest 與圖示可讀、註冊、快取內容、離線頁與 0 個 CSP 違規、再試一次回到大廳、API 不經 service worker；只有 build 出來的站有 service worker，dev server 上跳過）。更新流程在 `vite preview` 手動驗過（兩次 build 之間要重開 preview：它的資產 etag 是開機時算的，同一個 preview 裡 `sw.js` 換了也回 304）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

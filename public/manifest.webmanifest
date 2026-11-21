@@ -1,7 +1,8 @@
 {
-  "name": "TKU Arcade",
+  "name": "TKU Arcade 淡江遊樂場",
   "short_name": "TKU Arcade",
-  "description": "Party games for the TKU bridge club and friends.",
+  "description": "Party games for the TKU bridge club and friends. 淡江橋藝社朋友圈的遊戲大廳。",
+  "categories": ["games", "entertainment"],
   "id": "/",
   "start_url": "/?app=1",
   "scope": "/",

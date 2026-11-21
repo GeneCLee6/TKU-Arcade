@@ -3,6 +3,7 @@ import { cloudflare } from '@cloudflare/vite-plugin'
 import react from '@vitejs/plugin-react'
 import { createHash } from 'node:crypto'
 import { defineConfig, type Plugin } from 'vite'
+import { serviceWorker } from './scripts/pwa/serviceWorker.ts'
 import { headersFile } from './shared/security-headers.ts'
 
 // Stamps the built commit into index.html so a deployment can be traced back to its commit.
@@ -69,6 +70,8 @@ export default defineConfig({
     appVersion(),
     languageChunks(),
     securityHeaders(),
+    // The installed app's /sw.js, with this build's version and shell (scripts/pwa/, §4.53)
+    serviceWorker(),
     ...(process.env.VITEST ? [] : [cloudflare()])],
   // Port 5175: TKU-BridgeTable uses 5173, BridgeHall 5174
   server: { port: 5175, strictPort: true },

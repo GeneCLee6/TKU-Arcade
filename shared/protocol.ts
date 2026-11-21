@@ -461,12 +461,23 @@ export type ClientMessage =
  * room on the home page while it waits for people; without it the room is reachable by link only.
  */
 /** `password` (e1-t16): someone new must bring it to join; a room with one is never public */
+/**
+ * `bots` (2026-11-21, the lobby's "Play the computer"): a private room with this many computer
+ * players already seated, for a game the room plays them in (`GameModule.bot`), whose game starts
+ * as soon as its first person joins (and so becomes its host). `count` puts the table at least at
+ * the game's fewest players and at most at its most, `level` is one of the game's `bots.levels`;
+ * anything else is refused (400 `bad_bots`). Such a room is never public
+ */
 export type CreateRoomRequest = {
   gameId: string
   options?: OptionValues
   public?: boolean
   password?: string
+  bots?: QuickBots
 }
+
+/** CreateRoomRequest.bots */
+export type QuickBots = { count: number; level: string }
 
 /** 201 from POST /api/rooms */
 /** `code`: the room's short number, null when none could be given (the link still works) */

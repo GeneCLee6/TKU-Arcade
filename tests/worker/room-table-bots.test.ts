@@ -76,6 +76,8 @@ class World {
   sockets: OpenSocket[] = []
   host: RoomHost
   modules: Record<string, AnyGameModule>
+  /** Games the owner has paused (e12-t11) */
+  paused = new Set<string>()
   private next = 0
   private seed = 1
   constructor(modules: Record<string, AnyGameModule> = {}) {
@@ -116,6 +118,7 @@ class World {
       newMemberId: () => `member-${++this.next}`,
       newToken: () => `token-${this.next}`.padEnd(43, '_'),
       newSeed: () => (this.seed = (this.seed * 48271) % 2147483647),
+      gameEnabled: (id) => !this.paused.has(id),
     })
   }
   join(name: string, token: string | null = null): Client {
@@ -325,6 +328,88 @@ describe('the room moves them', () => {
     ann.send({ t: 'rematch' })
     expect(ann.view!.room.status).toBe('playing')
     expect(ann.bots).toHaveLength(2)
+    playOut(world, ann)
+    expect(ann.view!.room.status).toBe('ended')
+  })
+})
+
+// 2026-11-21: the lobby's "Play the computer" (CreateRoomRequest.bots)
+describe('a room opened with computer players', () => {
+  const quick = (gameId: string, count: number, level = 'normal') => {
+    const world = new World()
+    expect(world.host.create('abcdefghij', gameId, undefined, true, null, null, { count, level })).toBe(
+      true,
+    )
+    return world
+  }
+
+  it('seats them from seat 1, waits for its person, and starts the game when they join', () => {
+    const world = quick('holdem', 2, 'easy')
+    expect(world.host.startsOnJoin()).toBe(true)
+    // Nobody yet: never listed, nothing played, nothing to alarm about but the clean-up
+    expect(world.host.listing()).toBeNull()
+    expect(world.host.summary()).toMatchObject({ status: 'waiting', members: 2, seated: 2 })
+    const ann = world.join('Ann')
+    expect(world.host.startsOnJoin()).toBe(false)
+    expect(ann.view!.room.status).toBe('playing')
+    expect(ann.errors).toEqual([])
+    const me = ann.view!.members[ann.you]!
+    expect([me.host, me.seat]).toEqual([true, 0])
+    expect(ann.bots.map((bot) => [bot.seat, bot.bot])).toEqual([
+      [1, { level: 'easy', name: 'egret' }],
+      [2, { level: 'easy', name: 'banyan' }],
+    ])
+    // A game of three, with Ann's own view
+    expect(ann.game.view).toBeTruthy()
+  })
+
+  it('starts only once: whoever comes next watches, and a rematch is the host’s', () => {
+    const world = quick('promotion', 1)
+    const ann = world.join('Ann')
+    expect(ann.view!.room.status).toBe('playing')
+    const bob = world.join('Bob')
+    expect(bob.view!.members[bob.you]!.seat).toBeNull()
+    expect(bob.errors).toEqual([])
+    // Through hibernation: the flag is gone from storage too
+    world.hibernate()
+    expect(world.host.startsOnJoin()).toBe(false)
+  })
+
+  it('stays in the waiting room, saying why, when the owner has paused the game meanwhile', () => {
+    const world = quick('traders', 1)
+    world.paused.add('traders')
+    const ann = world.join('Ann')
+    expect(ann.view!.room.status).toBe('waiting')
+    expect(ann.errors).toEqual(['game_disabled'])
+    expect(ann.bots).toHaveLength(1)
+    // Unpaused, the host starts it the usual way
+    world.paused.clear()
+    ann.send({ t: 'start' })
+    expect(ann.view!.room.status).toBe('playing')
+  })
+
+  it('a host who comes back before anyone else is the same person: no second start', () => {
+    const world = quick('holdem', 1)
+    const ann = world.join('Ann')
+    world.disconnect(ann)
+    const again = world.join('Ann', ann.token)
+    expect(again.you).toBe(ann.you)
+    expect(again.view!.room.status).toBe('playing')
+    expect(again.errors).toEqual([])
+  })
+
+  it('never seats more than the game has seats for, and nothing for a game the room does not play', () => {
+    const world = quick('traders', 9)
+    expect(world.host.summary()).toMatchObject({ seated: 3 })
+    const kart = new World()
+    kart.host.create('abcdefghij', 'kart', undefined, false, null, null, { count: 2, level: 'normal' })
+    expect(kart.host.summary()).toMatchObject({ members: 0 })
+    expect(kart.host.startsOnJoin()).toBe(false)
+  })
+
+  it('a quick game plays to its end with the room moving the computer seats', () => {
+    const world = quick('holdem', 1)
+    const ann = world.join('Ann')
     playOut(world, ann)
     expect(ann.view!.room.status).toBe('ended')
   })
