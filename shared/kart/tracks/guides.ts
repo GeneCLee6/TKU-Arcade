@@ -5,6 +5,7 @@
 // 2026-11-20: a track with branches (shared/kart/branches.ts) has a second guide, for its route
 // down every branch (`routeRoad`), by the route's own road points: src/kart/bots/routes.ts drives
 // that route with it.
+import { NEEDLE_GUIDE } from './challenge.ts'
 import type { TrackGuide } from './guide.ts'
 import { LANES_GUIDE } from './lanes.ts'
 import { WHARF_GUIDE, WHARF_ROUTE_GUIDE } from './wharf.ts'
@@ -14,6 +15,8 @@ const GUIDES: Readonly<Record<string, TrackGuide>> = {
   wharf: WHARF_GUIDE,
   lanes: LANES_GUIDE,
   works: WORKS_GUIDE,
+  // 2026-11-21: the challenge mode's Needle Lane (challenge.ts): both lines through its slots
+  'ch-needle': NEEDLE_GUIDE,
 }
 
 const ROUTE_GUIDES: Readonly<Record<string, TrackGuide>> = {

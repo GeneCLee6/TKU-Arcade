@@ -45,6 +45,8 @@ test('the first two lessons, driven by the master’s hands, are passed and thei
   await page.getByTestId('kart-school-start-drive').click()
   const lesson = page.getByTestId('kart-school-lesson')
   await expect(lesson).toHaveAttribute('data-lesson', 'drive')
+  // The loading screen has the lesson's name as a heading too: past it first (§4.52)
+  await expect(page.getByTestId('kart-loading')).toHaveCount(0, { timeout: 120_000 })
   await expect(lesson.getByRole('heading', { name: 'Gas and steering' })).toBeVisible()
   // How to do it, with the player's own keys
   await lesson.locator('details summary').click()
