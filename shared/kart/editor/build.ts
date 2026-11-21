@@ -16,6 +16,7 @@ import {
   type RoadPoint,
   type TrackJson,
 } from '../track.ts'
+import { lineGrid, LINE_BACK, LINE_PLACES, LINE_SOLO_ACROSS } from '../startLine.ts'
 import { KART_RADIUS } from '../walls.ts'
 import { specHash } from './codec.ts'
 import { layout, wrapAngle, type Laid } from './layout.ts'
@@ -29,7 +30,7 @@ export const KERB_MARGIN = 6
 /** Two parts of the road this far apart along it must be this far apart on the ground */
 const CROSS_MARGIN = 4
 /** Places on the grid: a full room */
-export const GRID_PLACES = 8
+export const GRID_PLACES = LINE_PLACES
 /** Road points between gates, as the hand-made tracks */
 const GATE_EVERY = 7
 /** Boxes in a row across the road */
@@ -97,20 +98,27 @@ function spotAlong(road: Laid['road'], at: number[], total: number, distance: nu
   }
 }
 
-/** Two by two behind the line, staggered, as the hand-made tracks: the pole first */
+/** One row across the road behind the line, as the hand-made tracks (startLine.ts): the pole first */
 function gridOf(road: Laid['road'], at: number[], total: number): Spot[] {
-  return Array.from({ length: GRID_PLACES }, (_, slot) => {
-    const back = 10 + Math.floor(slot / 2) * 7 + (slot % 2) * 3.5
-    const across = slot % 2 === 0 ? -4 : 4
-    const spot = spotAlong(road, at, total, total - back)
-    // The road's right, facing along it
-    const right = { x: Math.cos(spot.heading), z: Math.sin(spot.heading) }
-    return {
-      x: Math.round((spot.x + right.x * across) * 100) / 100,
-      z: Math.round((spot.z + right.z * across) * 100) / 100,
-      heading: Math.round(spot.heading * 1e6) / 1e6,
-    }
-  })
+  const centre = spotAlong(road, at, total, total - LINE_BACK)
+  // The road's width there: the narrower of the two points either side
+  let index = 0
+  const d = total - LINE_BACK
+  while (index + 1 < at.length && at[index + 1]! <= d) index++
+  const width = Math.min(road[index]!.width, road[(index + 1) % road.length]!.width)
+  return lineGrid(centre, width)
+}
+
+/** The time trial's start (TrackJson.solo): where the pole stood before the row, to the centimetre */
+function soloOf(road: Laid['road'], at: number[], total: number): Spot {
+  const spot = spotAlong(road, at, total, total - LINE_BACK)
+  // The road's right, facing along it
+  const right = { x: Math.cos(spot.heading), z: Math.sin(spot.heading) }
+  return {
+    x: Math.round((spot.x + right.x * LINE_SOLO_ACROSS) * 100) / 100,
+    z: Math.round((spot.z + right.z * LINE_SOLO_ACROSS) * 100) / 100,
+    heading: Math.round(spot.heading * 1e6) / 1e6,
+  }
 }
 
 /** The road point nearest the middle of each piece */
@@ -344,6 +352,7 @@ export function buildSpec(spec: TrackSpec): Built {
     gates,
     respawns,
     grid,
+    ...(road.length > 3 ? { solo: soloOf(road, at, total) } : {}),
     walls: [],
     boostPads: road.length > 0 ? padsAlong(road, padSpots) : [],
     itemBoxes: boxes.slice(0, MAX_BOXES),

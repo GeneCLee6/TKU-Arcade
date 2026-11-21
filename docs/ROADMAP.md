@@ -169,6 +169,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 - **2026-11-20 路線圖外（`feat/kart-race-show`）**：比賽演出：開場鏡頭巡覽（可跳過，倒數 4 → 6.5 秒）、名次變動跳動＋箭頭、最後一圈橫幅、終點鏡頭轉到車前＋名次大字＋彩帶，之後才進結果。`ARCHITECTURE.md` §4.44。
 - **2026-11-21 路線圖外（`feat/kart-lazy-chunks`）**：卡丁車載入瘦身：引擎、賽道專屬場景、車系、配樂改成 lazy chunk，進比賽前有載入畫面（賽道名、技巧、進度條、失敗重試），多人房照舊等大家畫好才倒數；等待室與大獎賽背景預先下載。房間首屏 146.4 → 137.9 kB、`/kart` 首屏 456.0 → 226.8 kB。不算任何批次。`KART-PERF.md` §7、`ARCHITECTURE.md` §4.52。
 - **2026-11-21 路線圖外（`feat/lobby-quickplay-pwa`）**：大廳「跟電腦玩」：能跟電腦玩的桌遊一鍵開私人房、電腦玩家坐好、進房就開局（`POST /api/rooms` 的 `bots`），卡丁車直接進對戰電腦或駕訓班；遊戲卡片標「可以跟電腦玩」。PWA：service worker 由 build 寫出、快取 App 殼與雜湊靜態檔（不碰 API 與 WebSocket）、新版本提示、可關的安裝提示，修好被轉址擋住的離線頁。`ARCHITECTURE.md` §4.55、§4.56。
+- **2026-11-21 路線圖外（`feat/kart-room-lobby`）**：卡丁車等待室改成 8 格出賽陣容（車手正面 3D、共用一個 WebGL、依賽道的背景圖、準備完成大字）、房主要等所有真人按「準備」才能開始（`GameMeta.readyCheck`、`not_ready`、斷線取消準備）；起跑格改成全部並排在同一條線上（計時賽起點不變、紀錄不作廢）。`ARCHITECTURE.md` §4.57–4.58、`KART-NETCODE.md` §20。
 - **2026-11-20 路線圖外（`feat/readme-refresh`）**：英文 README 改寫成反映目前專案（正式站、重點數字、功能、架構、測試與 CI、安全、IP 原則）。
 - **2026-11-20 路線圖外（`feat/boardgame-bots`）**：桌遊電腦玩家：德州撲克、陞官圖（含完整版）、滬尾商行，房主在等待室加到空位（簡單／普通），房間在 RoomDO 裡替它下（0.6–1.5 秒思考、只看自己的 view），通用介面 `GameModule.bot`；沒人在時暫停；巡檢多「一人＋兩電腦」。`ARCHITECTURE.md` §4.49。
 - **2026-11-21 路線圖外（`feat/boardgame-bots-2`）**：再四款桌遊電腦玩家：朝堂暗鬥、奪祕笈、芥末餃子、社辦牌陣（只看自己的 view；普通對簡單三人勝率 58%／64%／63%／87%）；`GameModule.botLeaves` 讓電腦不按「下一輪」；巡檢多四款。`ARCHITECTURE.md` §4.49。

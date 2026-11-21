@@ -112,6 +112,7 @@ export const RIVERSIDE: TrackJson = {
   gates: made.gates,
   respawns: made.respawns,
   grid: made.grid,
+  solo: made.solo,
   walls: [],
   boostPads: made.boostPads,
   itemBoxes: [],

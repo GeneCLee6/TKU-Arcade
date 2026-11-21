@@ -36,6 +36,11 @@
 //    the others, leaving the seat or starting a game clears it. `start` (host only, at least
 //    `RoomInfo.minPlayers` seated, ready or not) begins the game: the seated members, in seat order,
 //    are renumbered 0, 1, ... n - 1, as games expect. When the game is over the room is `ended`.
+//    A game with `GameMeta.readyCheck` (2026-11-21: the kart) starts only once every seated person
+//    but the host is ready, and online: otherwise `start` is refused with `not_ready`. Its members
+//    stop being ready when their socket drops (they press again when they are back); changing kart
+//    or driver (`set_look`) or side (`set_team`) keeps it. `rematch` does not ask: the race just
+//    run was everyone's ready.
 // 9. What only the host can do. `reopen`, from `playing` or `ended`, drops the game and goes back to
 //    `waiting` with everyone in their seats. `rematch`, from `ended`, starts a new game with whoever
 //    is seated. `set_game`, from any status, drops any game and goes to `waiting` with the new game
@@ -179,7 +184,10 @@ export type RoomMember = {
   name: string
   /** Null for a spectator */
   seat: SeatId | null
-  /** Says they are set to play; always false without a seat. Does not hold back `start` */
+  /**
+   * Says they are set to play; always false without a seat. Holds back `start` only in a game with
+   * `GameMeta.readyCheck` (8. above)
+   */
   ready: boolean
   host: boolean
   /** False from the moment the socket drops; the member keeps its seat */
@@ -248,6 +256,8 @@ export type PatchMessage = { t: 'patch'; rev: number; ops: PatchOp[] }
  * - `bad_seat`: `sit` on a seat number the room does not have
  * - `seat_taken`: `sit` on someone else's seat
  * - `not_enough_players`: `start` or `rematch` with fewer than `RoomInfo.minPlayers` seated
+ * - `not_ready`: `start` of a game with `GameMeta.readyCheck` while someone seated (not the host,
+ *   not a computer) is not ready or is offline
  * - `bad_member`: `kick` of yourself or nobody; `transfer` to yourself, nobody or someone offline
  * - `bad_game`: `set_game` with a game this server does not have
  * - `game_failed`: the game module threw (a bug, not your mistake); nothing changed
@@ -269,6 +279,7 @@ export type ErrorCode =
   | 'bad_seat'
   | 'seat_taken'
   | 'not_enough_players'
+  | 'not_ready'
   | 'bad_member'
   | 'bad_game'
   | 'cannot_cover'

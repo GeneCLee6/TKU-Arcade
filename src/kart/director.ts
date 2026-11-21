@@ -24,6 +24,10 @@ export interface CameraShot {
 /** The grid shot: this far behind the last place on the grid, this high, metres */
 export const GRID_SHOT_BACK = 11
 export const GRID_SHOT_UP = 6.5
+/** The outermost place on the line is at most this far off where the camera looks (radians) */
+export const GRID_SHOT_HALF_ANGLE = (21 * Math.PI) / 180
+/** Standing further back than GRID_SHOT_BACK, the camera is this high for each metre back */
+export const GRID_SHOT_RISE = 0.45
 /** ... looking at a point this far ahead of the pole */
 export const GRID_SHOT_AHEAD = 6
 /** The glide down behind the kart: from this much countdown left to this much (seconds) */
@@ -34,7 +38,7 @@ export const CUT_AT = 1.6
 
 const forwardOf = (heading: number) => ({ x: Math.sin(heading), z: -Math.cos(heading) })
 
-/** Where the camera sees the whole grid from: behind its last row, up high, along the pole's heading */
+/** Where the camera sees the whole grid from: behind it, up high, along the pole's heading, far enough back to see it all */
 export function gridShot(spots: readonly Spot[], y = 0): Omit<CameraShot, 'blend'> | null {
   const pole = spots[0]
   if (!pole) return null
@@ -49,11 +53,18 @@ export function gridShot(spots: readonly Spot[], y = 0): Omit<CameraShot, 'blend
   const side = { x: -forward.z, z: forward.x }
   const across =
     (middle.x - pole.x) * side.x + (middle.z - pole.z) * side.z
-  const behind = back - GRID_SHOT_BACK
+  // 2026-11-21: the grid is one row across the road (startLine.ts), so the camera stands back as far
+  // as it takes for the outermost karts to be on the screen too, and rises with it
+  const spread = Math.max(
+    0,
+    ...spots.map((spot) => Math.abs((spot.x - pole.x) * side.x + (spot.z - pole.z) * side.z - across)),
+  )
+  const distance = Math.max(GRID_SHOT_BACK, spread / Math.tan(GRID_SHOT_HALF_ANGLE))
+  const behind = back - distance
   return {
     eye: {
       x: pole.x + forward.x * behind + side.x * across,
-      y: y + GRID_SHOT_UP,
+      y: y + Math.max(GRID_SHOT_UP, distance * GRID_SHOT_RISE),
       z: pole.z + forward.z * behind + side.z * across,
     },
     target: {
