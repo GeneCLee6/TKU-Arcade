@@ -71,6 +71,12 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
 - **車庫**：每台車、每位車手是一張切角卡，左邊一道斜的色條（車的霓虹色、車手的徽章色），車手下面是賽車號碼；數值條是斜的格子。選中是主題色框加底色，不只靠顏色（`aria-checked`、框變粗）。
 - **不變的**：道具欄在正上方中間（#100）、手機橫／直的版面規則（#89、#95）、所有 `data-testid` 與 ARIA；clip-path 一律在 `::before`（焦點框完整）；文字顏色只用 `text`／`muted`／`onAccent`，霓虹色只當裝飾（色條、框），不當文字底色以外的對比來源。
 
+**卡丁車等待室（2026-11-21，`feat/kart-room-lobby`，`ARCHITECTURE.md` §4.58）**
+
+- 同一套轉播風格：陣容、準備列、賽道卡都是 `broadcastSolid`；號位是 `ticker`；名字、狀態用 `displayType`；標籤用 `monoType`。
+- **準備完成**＝綠色（`success`）2 px 框＋內光暈＋大字；房主＝主題色框＋「房主」；沒準備／離線是 `muted` 字，不只靠顏色（狀態一定有字）。隊伍是格子上緣 4 px 的隊色＋隊名標籤。
+- 背景圖只是裝飾（`aria-hidden`），面板一律不透明，文字對比不靠背景。
+
 ## 4. 版面
 
 - 頂欄：玻璃、黏在最上面；標誌（`public/favicon.svg`，批次 E3）＋ `TKU Arcade`（Saira 斜體），右邊主題與語言切換。400 px 以下只留標誌（名字只是看不到，連結名稱還在），所以到 360 px 都是一行。

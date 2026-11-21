@@ -105,6 +105,7 @@ function kartRoom(laps = 1) {
   expect(world.host.create('abcdefghij', 'kart', { track: 'riverside', laps }, false)).toBe(true)
   const ann = world.join('Ann')
   const bob = world.join('Bob')
+  bob.send({ t: 'ready', ready: true })
   ann.send({ t: 'start' })
   return { world, ann, bob }
 }
@@ -209,6 +210,7 @@ describe('a race on a track made in the editor (e10-t08)', () => {
     )
     const ann = world.join('Ann')
     const bob = world.join('Bob')
+    bob.send({ t: 'ready', ready: true })
     // Checked when set: an illegal track, junk or an oversized code is not kept
     for (const custom of [crossing, '%%%', 'A'.repeat(5_000), 12]) {
       ann.send({ t: 'set_options', options: { track: 'custom', custom, laps: 1, mode: 'race' } })
@@ -219,6 +221,8 @@ describe('a race on a track made in the editor (e10-t08)', () => {
       options: { track: 'custom', custom: good, laps: 1, mode: 'race' },
     })
     expect(bob.view?.room.options).toMatchObject({ track: 'custom', custom: good })
+    // New options: nobody is ready for them yet (shared/protocol.ts 9.)
+    bob.send({ t: 'ready', ready: true })
     ann.send({ t: 'start' })
     // Everyone is sent the track as its code, and builds the same one from it
     expect(bob.race.track).toBe(`custom:${good}`)

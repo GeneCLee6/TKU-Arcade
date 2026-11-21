@@ -294,6 +294,7 @@ export const WORKS: TrackJson = {
   gates: cleared.gates,
   respawns: cleared.respawns,
   grid: made.grid,
+  solo: made.solo,
   walls,
   boostPads: [...made.boostPads, ...branchPads],
   itemBoxes: made.itemBoxes,

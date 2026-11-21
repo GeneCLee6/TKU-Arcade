@@ -2,6 +2,7 @@
 // that checkpoints, respawns, laps and the minimap have something to run on before the first real
 // track (e8-t05a). Original and plain on purpose: two 160 m straights joined by half circles of
 // 50 m radius, 14 m wide; the start on the left-hand straight, heading up it (towards -z).
+import { lineGrid, LINE_BACK } from '../startLine.ts'
 import { gatesAlong, headingOf, TRACK_FORMAT, type RoadPoint, type TrackJson } from '../track.ts'
 
 const STRAIGHT = 160
@@ -44,12 +45,13 @@ export const TEST_OVAL: TrackJson = {
   road,
   gates,
   respawns,
-  // Two by two behind the line, 6 m apart
-  grid: [0, 1, 2, 3, 4, 5].map((slot) => ({
-    x: road[0]!.x + (slot % 2 === 0 ? -3 : 3),
-    z: road[0]!.z + 8 + Math.floor(slot / 2) * 6,
-    heading: headingOf(pole),
-  })),
+  // One row across the road behind the line (startLine.ts)
+  grid: lineGrid(
+    { x: road[0]!.x, z: road[0]!.z + LINE_BACK, heading: headingOf(pole) },
+    road[0]!.width,
+  ),
+  // A kart alone starts where the pole stood before the row
+  solo: { x: road[0]!.x - 3, z: road[0]!.z + 8, heading: headingOf(pole) },
   walls: [],
   boostPads: [],
   itemBoxes: [],

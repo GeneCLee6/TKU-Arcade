@@ -46,6 +46,7 @@ export const roomEn = {
   'room.error.generic': "That didn't work. Try again.",
   'room.error.no_game': 'No game is being played right now.',
   'room.error.not_enough_players': 'Not enough players are seated.',
+  'room.error.not_ready': 'Not everyone seated is ready yet.',
   'room.error.not_joined': "You haven't joined yet. Wait a moment and try again.",
   'room.error.not_seated': 'Take a seat first.',
   'room.error.rate_limited': 'Too fast. Wait a moment and try again.',

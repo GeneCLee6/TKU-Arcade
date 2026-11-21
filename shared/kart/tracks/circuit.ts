@@ -1,9 +1,10 @@
 // 2026-11-18 (owner: "the maps should be more fun, not so many straights ... technical"): what the
 // hand-drawn tracks share, now that all of them are redrawn (docs/ARCHITECTURE.md §4.33). A circuit
 // is its control points (spline.ts), each with a width and, on a track with hills, a height; from
-// them come the road from the line on, the gates and respawns, a grid of eight, the jumps' ramps,
+// them come the road from the line on, the gates and respawns, a row of eight on the line, the jumps' ramps,
 // rows of item boxes and the boost pads. Pure.
 import type { Spot } from '../course.ts'
+import { lineGrid, LINE_BACK, LINE_SOLO_ACROSS } from '../startLine.ts'
 import type { Wall } from '../walls.ts'
 import {
   gatesAlong,
@@ -46,6 +47,8 @@ export interface Circuit {
   readonly gates: Gate[]
   readonly respawns: Spot[]
   readonly grid: Spot[]
+  /** The time trial's start: the old pole's place, LINE_BACK behind the line and 4 m left (TrackJson.solo) */
+  readonly solo: Spot
   readonly jumps: number[]
   readonly boostPads: BoostPad[]
   readonly itemBoxes: { x: number; z: number }[]
@@ -57,8 +60,6 @@ export interface Circuit {
   across(index: number, across: number): { x: number; z: number }
 }
 
-/** Places on the grid: a full room */
-export const GRID_PLACES = 8
 /** Road points between gates */
 const GATE_EVERY = 7
 
@@ -137,25 +138,31 @@ export function circuit(plan: CircuitPlan): Circuit {
     jumps.push(lip)
   }
 
-  // Two by two behind the line, 7 m apart, staggered, along the road: the pole first
-  const grid: Spot[] = []
-  for (let slot = 0; slot < GRID_PLACES; slot++) {
-    let back = 10 + Math.floor(slot / 2) * 7 + (slot % 2) * 3.5
+  // One row across the road, LINE_BACK behind the line (2026-11-21, startLine.ts): the pole first
+  let grid: Spot[] = []
+  let solo: Spot = { x: 0, z: 0, heading: 0 }
+  {
+    let back = LINE_BACK
     let index = 0
     for (;;) {
       const a = road[(index - 1 + count) % count]!
       const b = road[(index + count) % count]!
       const span = Math.hypot(b.x - a.x, b.z - a.z)
       if (span >= back) {
-        const t = back / span
         const dx = (b.x - a.x) / span
         const dz = (b.z - a.z) / span
-        const side = slot % 2 === 0 ? -4 : 4
-        grid.push({
+        const t = back / span
+        // Worked out as it was when it was the pole, to the centimetre
+        const side = LINE_SOLO_ACROSS
+        solo = {
           x: round(b.x - dx * span * t - dz * side),
           z: round(b.z - dz * span * t + dx * side),
           heading: Math.round(headingOf({ dx, dz }) * 1e6) / 1e6,
-        })
+        }
+        grid = lineGrid(
+          { x: b.x - dx * span * t, z: b.z - dz * span * t, heading: headingOf({ dx, dz }) },
+          Math.min(a.width, b.width),
+        )
         break
       }
       back -= span
@@ -198,6 +205,7 @@ export function circuit(plan: CircuitPlan): Circuit {
     gates,
     respawns,
     grid,
+    solo,
     jumps,
     boostPads: padsAlong(
       road,

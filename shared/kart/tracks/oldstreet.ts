@@ -29,6 +29,7 @@ import {
   type RoadPoint,
   type TrackJson,
 } from '../track.ts'
+import { lineGrid, LINE_BACK, LINE_SOLO_ACROSS } from '../startLine.ts'
 import type { Wall } from '../walls.ts'
 import { splineRoad, type ControlPoint } from './spline.ts'
 
@@ -111,7 +112,6 @@ const FINISH = road.findIndex((point) => point.x === 0 && point.z <= 110)
 const fromLine = [...road.slice(FINISH), ...road.slice(0, FINISH)]
 const { gates, respawns } = gatesAlong(fromLine, 7)
 const along = roadDirection(fromLine, 0)
-const side = { dx: -along.dz, dz: along.dx }
 
 /** A point `across` metres right of road point `index` (negative: left) */
 function across(road: readonly RoadPoint[], index: number, across: number) {
@@ -200,16 +200,21 @@ export const OLDSTREET: TrackJson = {
   road: fromLine,
   gates,
   respawns,
-  // Two by two behind the line, 7 m apart, staggered, facing up the promenade
-  grid: [0, 1, 2, 3, 4, 5, 6, 7].map((slot) => {
-    const back = 10 + Math.floor(slot / 2) * 7 + (slot % 2) * 3.5
-    const across = slot % 2 === 0 ? -4 : 4
-    return {
-      x: Math.round((fromLine[0]!.x - along.dx * back + side.dx * across) * 100) / 100,
-      z: Math.round((fromLine[0]!.z - along.dz * back + side.dz * across) * 100) / 100,
+  // One row across the promenade behind the line (2026-11-21, startLine.ts)
+  grid: lineGrid(
+    {
+      x: fromLine[0]!.x - along.dx * LINE_BACK,
+      z: fromLine[0]!.z - along.dz * LINE_BACK,
       heading: headingOf(along),
-    }
-  }),
+    },
+    fromLine[0]!.width,
+  ),
+  // The time trial's start, where the pole stood before the row (to the centimetre)
+  solo: {
+    x: Math.round((fromLine[0]!.x - along.dx * LINE_BACK + -along.dz * LINE_SOLO_ACROSS) * 100) / 100,
+    z: Math.round((fromLine[0]!.z - along.dz * LINE_BACK + along.dx * LINE_SOLO_ACROSS) * 100) / 100,
+    heading: headingOf(along),
+  },
   walls: islandWalls,
   // Off the middle of the straights: taking one is a choice of line
   boostPads: padsAlong(fromLine, [
