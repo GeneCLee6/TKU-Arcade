@@ -1,7 +1,8 @@
 // Computer players for the turn-based table games (2026-11-20, docs/ARCHITECTURE.md "電腦玩家"): the
 // levels a host may add one at and the names the room hands out in turn, shared by every game whose
-// module has a `bot` (holdem, promotion, traders). The names are ours, shown through the room's
-// strings (`room.bot.name.<id>`); the room plays these seats itself (worker/room-host.ts).
+// module has a `bot` (holdem, promotion, traders; 2026-11-21 palace, secret-scroll, wasabi and
+// tiles). The names are ours, shown through the room's strings (`room.bot.name.<id>`); the room
+// plays these seats itself (worker/room-host.ts).
 import type { Rng } from './types.ts'
 
 export const TABLE_BOT_LEVELS = ['easy', 'normal'] as const

@@ -1,5 +1,5 @@
 // 2026-11-20: the host's computer players in a table game's waiting room (hold'em, promotion,
-// traders: GameMeta.computer), its own lazy chunk. A level and a button: the room puts each one in the
+// traders; 2026-11-21 palace, secret-scroll, wasabi, tiles: GameMeta.computer), its own lazy chunk. A level and a button: the room puts each one in the
 // lowest free seat, names it and plays its turns itself (worker/room-host.ts); each shows in the seat
 // list with the host's way to remove it. The kart's computer karts have their own panel
 // (src/kart/bots/RoomBots.tsx), since the host's browser drives those.
