@@ -47,6 +47,10 @@ Set by the host in the waiting room.
 
 The host can skip a player who is away. The site then makes the mildest move for them: hides a plain dumpling (the wasabi only if nothing else is left), says I'm full in the bidding, or bids 1 if they have nothing to hide. If they are eating, it eats their own steamer first and then the first steamer in seat order; if they must take a dumpling, it takes the first one.
 
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats, at **Easy** or **Normal**. They act after a short pause and know only what a person in their seat would: their own dumplings and steamer, how many everyone owns and has stacked, what has been eaten, and who bid or said I'm full. Normal often hides its wasabi in its own steamer, never bids past the plain ones above its own wasabi, bids only what it can probably eat, and eats from the steamers most likely to be plain. Easy is reckless: it starts the bidding early, raises on thin odds and eats from anyone. After a round, a person starts the next one (or the clock does).
+
 ## Players
 
 3 to 6 players. A game takes about 20 minutes.

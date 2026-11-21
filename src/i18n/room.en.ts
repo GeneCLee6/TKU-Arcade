@@ -124,7 +124,7 @@ export const roomEn = {
   'room.waiting.standUp': 'Stand up',
   'room.waiting.start': 'Start game',
   'room.waiting.waitForHost': 'Waiting for the host to start',
-  // 2026-11-20: computer players the room moves itself (hold'em, promotion, traders)
+  // 2026-11-20: computer players the room moves itself (GameMeta.computer)
   'room.bot.title': 'Computer players',
   'room.bot.level': 'Level',
   'room.bot.level.easy': 'Easy',

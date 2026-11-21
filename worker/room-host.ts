@@ -3,12 +3,13 @@ import { CHAT_CHUNK, CHAT_HISTORY, ChatRateLimit, type ChatMessage } from '../sh
 import type { ReplayStep } from '../shared/games/match.ts'
 import { keepHidden, parseOptions } from '../shared/games/options.ts'
 import { createRng } from '../shared/games/rng.ts'
-import type {
-  AnyGameModule,
-  GameProjection,
-  OptionValues,
-  RealtimeMemory,
-  Viewer,
+import {
+  botLegal,
+  type AnyGameModule,
+  type GameProjection,
+  type OptionValues,
+  type RealtimeMemory,
+  type Viewer,
 } from '../shared/games/types.ts'
 import { diff, type JsonValue } from '../shared/patch.ts'
 import {
@@ -1403,7 +1404,8 @@ export class RoomHost {
       .sort((a, b) => a - b)
     for (const seat of seats) {
       try {
-        if (module.legalActions(game.match.state, seat).length > 0) return seat
+        // What the game leaves to the people (the next round's button) is not a computer's to press
+        if (botLegal(module, module.legalActions(game.match.state, seat)).length > 0) return seat
         // Out of turn, a policy may still have something to say (holdem's coming back from sitting
         // out): asked with what its browser would get, and a throwaway Rng
         const projection = projectFor(module, game, seat)
@@ -1437,9 +1439,10 @@ export class RoomHost {
       return
     }
     const rng = createRng(this.deps.newSeed())
+    const legal = botLegal(module, projection.legal)
     let action: JsonValue | null = null
     try {
-      action = module.bot(projection.view, projection.legal, member.bot.level, rng)
+      action = module.bot(projection.view, legal, member.bot.level, rng)
     } catch (error) {
       console.error(`game ${game.gameId}: bot threw`, error)
     }
@@ -1450,8 +1453,8 @@ export class RoomHost {
         console.error(`game ${game.gameId}: bot action refused: ${outcome.error.gameError}`)
       }
       outcome =
-        projection.legal.length > 0
-          ? playAction(module, game, rng.pick(projection.legal), seat, now)
+        legal.length > 0
+          ? playAction(module, game, rng.pick(legal), seat, now)
           : null
     }
     if (outcome?.kind === 'accepted') {
