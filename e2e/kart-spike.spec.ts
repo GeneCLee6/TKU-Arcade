@@ -903,6 +903,8 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
     'Pelican',
     'Otter',
     'Cormorant',
+    // 2026-11-21: the first season's flagship
+    'Black Kite',
   ])
   // e10-t05: the garage picks a driver too, and shows the kart's stats
   await page.getByTestId('kart-garage-open').click()
