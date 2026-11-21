@@ -19,6 +19,8 @@ The controls panel on the Kart page lists the keys, the gamepad buttons and the 
 
 **Driving school**: the Kart page's menu has ten short lessons, one technique each, from the first lap to the drift jump: the drift, the instant boost, perfect timing, the combo, N2O, the perfect start, the drift jump, the gates and a final test. Each shows your own keys, says what went wrong when a try fails, and can be tried again or skipped; a pass earns one to three stars. During a race, a short tip comes once for a technique you have not used yet (it can be turned off in the controls panel).
 
+**Challenges**: the Kart page's menu has two kinds. **Missions** come in four chapters (Basics, Technique, Master, Final boss), each one track and one condition: finish without a crash, reach a combo, make drift jumps, go through every slot in a wall, take every branch, finish in the top three without N2O, finish in sea fog, ride a bike, a knockout (the last over the line each lap is out), catch the computer ace, and more. A pass earns one to three stars; a chapter opens once you pass four missions of the one before. The **medal wall** is a three-lap time trial on every track: beat a target time for bronze, silver or gold, and gold reveals one more medal. You can race beside a ghost driving at the target's pace.
+
 ## Advanced techniques
 
 Some tracks (**Wharf Warehouses**, **Hillside Lanes**, **Viaduct Works**) have to be learnt by heart: the road everyone sees is the long way round, and the short way asks for one of these. On some the short way is a road of its own, a **branch** that leaves the road and joins it again further on: its checkpoints count the same, and a reset on it puts you back on it.

@@ -26,7 +26,7 @@ import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
 import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
 import { supportsWebGL2 } from '../webgl.ts'
-import type { SpikeHud, SpikeTrial } from '../spikeLoop.ts'
+import type { SpikeHud, SpikeStep, SpikeTrial } from '../spikeLoop.ts'
 import { RACE_ENGINE } from '../load/kartLoad.ts'
 import { KartLoading } from '../load/KartLoading.tsx'
 import { useKartLoad } from '../load/useKartLoad.ts'
@@ -206,6 +206,11 @@ export interface RaceViewProps {
   onWatch?: () => void
   /** 2026-11-20: the kart and driver each seat picked, to draw it on the grid before its frames come */
   lookOf?: (seat: number) => { kart: KartId; driver: DriverId } | null
+  /**
+   * 2026-11-21 (§4.59): after each physics step of this kart, the step as it ran: the challenge
+   * mode judges a mission's rules by it (no N2O, no crash). Only reads
+   */
+  onStep?: (step: SpikeStep) => void
 }
 
 /**
@@ -222,6 +227,7 @@ export default function RaceView({
   nameOf,
   onWatch,
   lookOf,
+  onStep,
 }: RaceViewProps) {
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
@@ -255,7 +261,9 @@ export default function RaceView({
   const tRef = useRef(t)
   const nameRef = useRef(nameOf)
   const lookRef = useRef(lookOf)
+  const stepRef = useRef(onStep)
   useLayoutEffect(() => {
+    stepRef.current = onStep
     latest.current = view
     actRef.current = act
     tRef.current = t
@@ -338,7 +346,10 @@ export default function RaceView({
         onTrial: setTrial,
         onClock: (total, lap) => clock.current?.set(total, lap),
         touch: touchSource,
-        ...(autopiloted ? {} : { onStep: (step) => coachStep(step, settings.tuning) }),
+        onStep: (step) => {
+          if (!autopiloted) coachStep(step, settings.tuning)
+          stepRef.current?.(step)
+        },
         net: autopiloted
           ? {
               ...net.net,

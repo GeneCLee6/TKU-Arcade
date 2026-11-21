@@ -409,6 +409,18 @@ export interface SpikeOptions {
    * lesson by it, and its coach gives a tip in a race (src/kart/school/). Only reads
    */
   readonly onStep?: (step: SpikeStep) => void
+  /**
+   * 2026-11-21 (§4.59, the challenge mode): a time trial of this many laps instead of the track's
+   * own. A run of other laps keeps no record and no ghost (they are the track's own laps' alone)
+   */
+  readonly laps?: number
+  /** 2026-11-21 (§4.59): false keeps no record and no ghost of this run (a mission with a handicap) */
+  readonly keepRecords?: boolean
+  /**
+   * 2026-11-21 (§4.59): this ghost races along instead of the picked one (a medal's target, its
+   * time already in it); null for none
+   */
+  readonly ghost?: Ghost | null
 }
 
 /** One physics step, for `onStep` */
@@ -477,6 +489,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   const net = options.net
   const plainCourse = track ? courseOf(track) : TEST_ARENA
   // In a race each kart starts on its own place on the grid
+  const ownLaps =
+    !net && options.laps !== undefined && plainCourse.checkpoints ? options.laps : undefined
   const course =
     net && plainCourse.checkpoints
       ? {
@@ -484,7 +498,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
           start: net.start,
           checkpoints: { ...plainCourse.checkpoints, laps: net.laps },
         }
-      : plainCourse
+      : ownLaps !== undefined && plainCourse.checkpoints
+        ? { ...plainCourse, checkpoints: { ...plainCourse.checkpoints, laps: ownLaps } }
+        : plainCourse
   const trialCourse: TrialCourse | null = track
     ? { ...course, checkpoints: course.checkpoints!, road: track.road }
     : null
@@ -496,7 +512,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   const pick: GhostPick = options.ghostPick ?? 'overall'
   // 2026-11-20 (§4.40): the records at once, from localStorage; the ghosts a moment later, from
   // IndexedDB (records.ts), unless this run has set a new record by then
-  const keyOfRecords = track && !net ? recordKey(track) : null
+  const keeps =
+    options.keepRecords !== false && (ownLaps === undefined || ownLaps === track?.laps)
+  const keyOfRecords = track && !net && keeps ? recordKey(track) : null
   let bestRun: RunRecord | null = keyOfRecords ? loadBestRun(keyOfRecords) : null
   let kartBestRun: number | null = keyOfRecords ? loadKartBestRun(keyOfRecords, kartId) : null
   let best: Ghost | null = null
@@ -509,7 +527,15 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       if (ghost && ghost.total === kartBestRun) kartBest ??= ghost
     })
   }
-  const chased = (): Ghost | null => (pick === 'off' ? null : pick === 'kart' ? kartBest : best)
+  const fixedGhost = options.ghost
+  const chased = (): Ghost | null =>
+    fixedGhost !== undefined
+      ? fixedGhost
+      : pick === 'off'
+        ? null
+        : pick === 'kart'
+          ? kartBest
+          : best
   let bestLap: number | null = keyOfRecords ? loadBestLap(keyOfRecords) : null
   let recorder: GhostRecorder | null = null
   let news: RecordNews | null = null
@@ -690,8 +716,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
         }
         if (was === 'countdown' && trial.phase === 'racing') {
           callout = louder(callout, calloutAtStart(trial.start))
-          if (!net) {
-            recorder = startRecording(recordKey(track))
+          if (keyOfRecords) {
+            recorder = startRecording(keyOfRecords)
             recordStep(recorder, 0, run.kart)
           }
         } else if (trial.phase !== 'countdown' && was === 'racing' && recorder) {

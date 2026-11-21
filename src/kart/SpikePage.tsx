@@ -108,6 +108,7 @@ export function SpikePage({
   onBotRace,
   onCup,
   onSchool,
+  onChallenge,
 }: {
   play?: boolean
   /** 2026-11-21: open on the race against the computer's panel (/kart?bots, from the lobby) */
@@ -118,6 +119,8 @@ export function SpikePage({
   onCup?: (run: CupRun) => void
   /** 2026-11-20 (§4.50): /kart's menu opens the driving school (src/kart/school/) */
   onSchool?: () => void
+  /** 2026-11-21 (§4.59): /kart's menu opens the challenge mode (src/kart/challenge/) */
+  onChallenge?: () => void
 } = {}) {
   const t: (key: KartMessageKey, params?: MessageParams) => string = useT()
   const stage = useRef<HTMLDivElement>(null)
@@ -447,6 +450,11 @@ export function SpikePage({
               data-testid="kart-school-open"
             >
               {t('kart.school.open')}
+            </Button>
+          )}
+          {onChallenge && (
+            <Button $size="sm" onClick={onChallenge} data-testid="kart-challenge-open">
+              {t('kart.challenge.open')}
             </Button>
           )}
           {onBotRace && (
