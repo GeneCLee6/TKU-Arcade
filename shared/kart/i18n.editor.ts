@@ -110,7 +110,7 @@ const en = {
   'kart.editor.problem.tight': 'Too tight a bend for this road: a radius of {radius} m at least.',
   'kart.editor.problem.short': 'Too short: at least {min} m round.',
   'kart.editor.problem.long': 'Too long: at most {max} m round.',
-  'kart.editor.problem.grid': 'No room for the starting grid of eight behind the line.',
+  'kart.editor.problem.grid': 'No room for eight karts side by side behind the line.',
   'kart.editor.problem.boxes': 'Too many rows of item boxes: {max} at most.',
   'kart.editor.problem.pieces': 'A track has {min} to {max} pieces.',
   'kart.editor.problem.level':
@@ -238,7 +238,7 @@ const zhTW: Record<KartEditorKey, string> = {
   'kart.editor.problem.tight': '以這個路寬來說彎太急了：半徑至少 {radius} m。',
   'kart.editor.problem.short': '太短了：一圈至少 {min} m。',
   'kart.editor.problem.long': '太長了：一圈最多 {max} m。',
-  'kart.editor.problem.grid': '起終點線後面放不下 8 台車的起跑格。',
+  'kart.editor.problem.grid': '起終點線後面放不下 8 台並排的車。',
   'kart.editor.problem.boxes': '道具箱太多排了：最多 {max} 排。',
   'kart.editor.problem.pieces': '一條賽道要有 {min} 到 {max} 段。',
   'kart.editor.problem.level': '繞一圈回來高度差了 {gap} m：上坡和下坡加起來要是零。',
