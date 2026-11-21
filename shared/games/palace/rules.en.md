@@ -48,6 +48,10 @@ The host can skip an absent player whenever the game waits on them: on their tur
 
 Every claim, challenge, block and lost backer is written in the log, newest first, so you can argue about it on your call.
 
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats, at **Easy** or **Normal**. They act after a short pause and know only what a person in their seat would: their own two backers, everyone's silver and face-up cards, and who has claimed what in the log. Normal mostly claims roles it really holds and bluffs now and then; it challenges a claim that is unlikely to be true (say, most copies of that role are already face up), blocks with a role it holds, and blocks anyway when an arrest would put it out. Easy bluffs more, challenges on a whim and often forgets to block. Computer players say nothing on your call: the arguing is up to you.
+
 ## Players
 
 2 to 6 players. A game takes about 15 minutes.

@@ -52,6 +52,10 @@ Set by the host in the waiting room.
 
 If the player on turn is away, the host can skip them: their turn ends as if they had drawn.
 
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats, at **Easy** or **Normal**. They take their whole turn at once after a short pause, and see only their own rack, the table and how many tiles everyone holds. Both levels find the groups and runs that lay down the most tiles from their own rack (30 points or more for a first play); Normal also adds what is left to the sets already on the table. They never take the table apart to rebuild it, and draw when they find nothing; each turn takes them only a moment. After a round, a person starts the next one (or the clock does).
+
 ## Players
 
 2 to 4 players. A round takes about 30 minutes.

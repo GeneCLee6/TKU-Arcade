@@ -10,7 +10,9 @@
 // goes back into the deck and the claimant draws a new card. Lose both backers and you are out.
 //
 // docs/PRD/e17-palace-bluff.md has the rules and every detail decided here.
+import { palaceBot } from './bot.ts'
 import { palaceInfo } from './info.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
@@ -483,6 +485,11 @@ export function phaseMs(phase: PalacePhase, seconds: PalaceWindow): number | nul
 export const palace: GameModule<PalaceState, PalaceAction, PalaceView, PalaceOptions> = {
   ...palaceInfo,
   meta: GAME_META.palace,
+  // Computer players, played by the room (bot.ts): they claim, challenge and block from their own view
+  bots: TABLE_BOTS,
+  bot(view, legal, level, rng) {
+    return palaceBot(view, legal, level, rng)
+  },
 
   init(seats, options, rng) {
     let deck = newDeck(rng)

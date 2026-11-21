@@ -5,7 +5,9 @@
 //
 // docs/PRD/e18-secret-scroll.md has the rules and every detail decided here.
 import { BEGGARS, DECK_COUNTS } from './deck.ts'
+import { secretScrollBot } from './bot.ts'
 import { secretScrollInfo } from './info.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 
 export { BEGGARS, DECK_COUNTS }
 import { GAME_META } from '../lobby.ts'
@@ -347,6 +349,14 @@ function nextRound(state: ScrollState, rng: Rng): ScrollState {
 export const secretScroll: GameModule<ScrollState, ScrollAction, ScrollView, ScrollOptions> = {
   ...secretScrollInfo,
   meta: GAME_META['secret-scroll'],
+  // Computer players, played by the room (bot.ts); the next round is the people's to start
+  bots: TABLE_BOTS,
+  bot(view, legal, level, rng) {
+    return secretScrollBot(view, legal, level, rng)
+  },
+  botLeaves(action) {
+    return action.type === 'next'
+  },
 
   init(seats, options, rng) {
     const players: ScrollPlayer[] = seats.map((seat) => ({

@@ -374,6 +374,20 @@ export interface GameModule<
    * back from sitting out after its clock ran out while nobody was watching).
    */
   bot?(view: V, legal: readonly A[], level: string, rng: Rng): A | null
+
+  /**
+   * Actions a computer seat leaves to the people and the clock (2026-11-21): ones any seat at the
+   * table may send to move everyone on, such as "next round" after a round's score. Were a computer
+   * to press it, the people would see the score for only a moment. The room drops these from what
+   * it asks `bot` about, and a seat with nothing else to do is not a computer's turn
+   */
+  botLeaves?(action: A): boolean
+}
+
+/** What a computer seat may be asked about: `legal` without what the module leaves to the people */
+export function botLegal<A>(module: { botLeaves?(action: A): boolean }, legal: readonly A[]): A[] {
+  const leaves = module.botLeaves
+  return leaves ? legal.filter((action) => !leaves(action)) : [...legal]
 }
 
 /**

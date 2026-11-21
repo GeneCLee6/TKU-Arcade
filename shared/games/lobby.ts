@@ -29,18 +29,19 @@ export const GAME_META = {
   lantern: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.lantern' },
   // 2 to 4: the owner's numbers (2026-11-14), and what 106 tiles hold (14 each, a pool to draw from).
   // No `proxyTurns`: a turn is a decision
-  tiles: { minPlayers: 2, maxPlayers: 4, minutes: 30, i18nKey: 'games.tiles' },
+  tiles: { minPlayers: 2, maxPlayers: 4, minutes: 30, i18nKey: 'games.tiles', computer: true },
   // No `proxyTurns`: every turn is a decision, and a random one could snap a line
   kite: { minPlayers: 2, maxPlayers: 5, minutes: 30, i18nKey: 'games.kite' },
-  // `computer`: the room plays computer seats (2026-11-20, GameModule.bot) in these three
+  // `computer`: the room plays computer seats (2026-11-20, GameModule.bot) in this and holdem and
+  // promotion; 2026-11-21 in tiles, secret-scroll, wasabi and palace too
   traders: { minPlayers: 2, maxPlayers: 4, minutes: 30, i18nKey: 'games.traders', computer: true },
   // 2 to 4 is the deck's sweet spot; 5 and 6 work, best with the Beggars (owner's brief 2026-11-14).
   // No `proxyTurns`: every card is a decision
-  'secret-scroll': { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.secret-scroll' },
+  'secret-scroll': { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.secret-scroll', computer: true },
   // 3 to 6 (owner's brief 2026-11-14). No `proxyTurns`: every bid is a decision
-  wasabi: { minPlayers: 3, maxPlayers: 6, minutes: 20, i18nKey: 'games.wasabi' },
+  wasabi: { minPlayers: 3, maxPlayers: 6, minutes: 20, i18nKey: 'games.wasabi', computer: true },
   // 2 to 6: the owner's numbers (2026-11-14). The bluffing is on the friends' own voice call
-  palace: { minPlayers: 2, maxPlayers: 6, minutes: 15, i18nKey: 'games.palace' },
+  palace: { minPlayers: 2, maxPlayers: 6, minutes: 15, i18nKey: 'games.palace', computer: true },
   // 2 to 9: the owner's numbers (2026-11-14), one full table
   holdem: { minPlayers: 2, maxPlayers: 9, minutes: 45, i18nKey: 'games.holdem', computer: true },
   // 2 to 10 (owner's request 2026-11-14). The talking is on the friends' own voice call; no

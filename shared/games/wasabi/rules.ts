@@ -6,7 +6,9 @@
 // or chosen by the bidder when it was their own. No dumplings left, out of the game.
 //
 // docs/PRD/e19-wasabi-dumplings.md has the rules and every detail decided here.
+import { wasabiBot } from './bot.ts'
 import { wasabiInfo } from './info.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
@@ -295,6 +297,14 @@ function act(state: WasabiState, action: WasabiAction, seat: SeatId, rng: Rng): 
 export const wasabi: GameModule<WasabiState, WasabiAction, WasabiView, WasabiOptions> = {
   ...wasabiInfo,
   meta: GAME_META.wasabi,
+  // Computer players, played by the room (bot.ts); the next round is the people's to start
+  bots: TABLE_BOTS,
+  bot(view, legal, level, rng) {
+    return wasabiBot(view, legal, level, rng)
+  },
+  botLeaves(action) {
+    return action.type === 'next'
+  },
 
   init(seats, options, rng) {
     const players: WasabiPlayer[] = seats.map((seat) => ({
