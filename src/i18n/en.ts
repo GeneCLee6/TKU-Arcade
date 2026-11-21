@@ -48,7 +48,7 @@ export const en = {
   'lobby.quick.versusOne': 'You and 1 computer player',
   'lobby.quick.versus': 'You and {count} computer players',
   'lobby.quick.play': 'Play now',
-  'lobby.quick.playNamed': 'Play {game} against the computer now',
+  'lobby.quick.playNamed': 'Play now: {game} against the computer',
   'lobby.quick.kartRace': 'Kart: race the computer',
   'lobby.quick.kartRaceHint': 'On this device, pick a track',
   'lobby.quick.kartSchool': 'Kart: driving school',

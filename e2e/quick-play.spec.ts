@@ -15,7 +15,7 @@ test('one tap from the lobby to a hand of hold’em against the computer, on a p
   // The level, Normal unless picked; Easy here
   await quick.getByRole('button', { name: 'Easy' }).click()
   await expect(quick.getByRole('button', { name: 'Easy' })).toHaveAttribute('aria-pressed', 'true')
-  await quick.getByRole('button', { name: "Play Texas Hold'em against the computer now" }).click()
+  await quick.getByRole('button', { name: "Play now: Texas Hold'em against the computer" }).click()
   await page.getByRole('textbox', { name: 'Nickname' }).fill('Ann')
   await page.getByRole('textbox', { name: 'Nickname' }).press('Enter')
   await page.waitForURL(/\/r\//)

@@ -43,7 +43,7 @@ export const zhTW: Messages = {
   'lobby.quick.versusOne': '你和 1 位電腦玩家',
   'lobby.quick.versus': '你和 {count} 位電腦玩家',
   'lobby.quick.play': '立刻開玩',
-  'lobby.quick.playNamed': '立刻跟電腦玩{game}',
+  'lobby.quick.playNamed': '立刻開玩：跟電腦玩{game}',
   'lobby.quick.kartRace': '卡丁車：對戰電腦',
   'lobby.quick.kartRaceHint': '在這台裝置上跑，自己選賽道',
   'lobby.quick.kartSchool': '卡丁車：駕訓班',
