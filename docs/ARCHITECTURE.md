@@ -1409,6 +1409,17 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **CSP 不變**：`worker-src 'self'`、`manifest-src 'self'` 本來就有；service worker 自己的 fetch 也受同一份 CSP（`connect-src 'self'`），所以它只碰同源請求。
 - **測試**：`tests/pwa.test.ts` 在假的全域、Cache Storage 與網路上跑真的 `sw.js`（安裝留下 shell 與離線頁、離線頁不是轉址且帶 CSP、只在頁面說的時候接手、舊快取刪掉、API／WebSocket／POST／別的網域不碰、頁面永遠走網路、雜湊檔第一次之後從快取、錯誤與 HTML 不留、Range 不碰），外掛的 shell、版本與範本；`e2e/pwa.spec.ts`（manifest 與圖示可讀、註冊、快取內容、離線頁與 0 個 CSP 違規、再試一次回到大廳、API 不經 service worker；只有 build 出來的站有 service worker，dev server 上跳過）。更新流程在 `vite preview` 手動驗過（兩次 build 之間要重開 preview：它的資產 etag 是開機時算的，同一個 preview 裡 `sw.js` 換了也回 304）。
 
+### 4.57 路線圖外：賽道特性決定最快車、賽季旗艦（2026-11-21，`feat/kart-meta-flagship`）
+
+擁有者要「每個時期一台公定最快的車」，以及「哪一台車跑哪一張圖最快，分上下坡、急彎、直線」。完整數字在 `KART-META.md`。
+
+- **坡道上的重量**（`shared/kart/terrain.ts` 的 `slopeWeight`、`TERRAIN_TUNING.slopeMass*`）：坡度超過 3% 的部分，極速再變動 5 ×（質量 − 1）× 超過的坡度（±6% 封頂）。`applyKart` 把 `kartMass` 放進 `KartTuning.mass`（和 `bodyRadius` 一樣，調參面板不顯示也不存）；標準重量不放，所以標準車與平面賽道一個 bit 都沒變（`flatGolden`、`branchGolden` 原封不動，`revision` 不動）。只算陡的部分，是因為閉合賽道爬升＝下降，正比於坡度的效果整圈抵銷。
+- **賽道特性與矩陣**（`scripts/kart/meta.ts`，純函式）：`trackTraits`（急彎數／km、直線比例、最長直線、爬升、上下坡比例與平均坡度）、`raceMatrix`（每格九場的中位數）、`ranking`、`podiums`、`winCounts`、`without`、`fairness`（旗艦以外沒有一台在每張或過半的圖第一）、`flagshipLead`。`npm run kart:meta`（`scripts/kart-meta.ts`）每張賽道開一個子行程平行跑。
+- **推薦是靜態的**（`shared/kart/meta.ts` 的 `TRACK_META`：前三名＋特性標籤）：車庫（`RosterPicker` 的 `track`，`/kart` 與等待室都傳）、`/kart` 的賽道選單、對電腦的設定面板顯示。比賽要跑幾分鐘，所以測試只擋資料形狀。
+- **賽季**（`shared/kart/karts.ts`）：`KART_TIERS` 多 `flagship`；`KartSpec.season`；`KART_SEASONS`（每季的旗艦與退役後的等級／數值／倍率）、`CURRENT_SEASON`、`inSeason`（`kartSpec` 都經過它：過季的旗艦換成退役版）、`seasonFlagship`、`isFlagship`。沒有時間機制，換季是一次發版。
+- **黑鳶 `kite`**：`KART_IDS` 第 21 個（loadout byte 5 bit，可到 32）；數值超出預算，代價是 `FLAGSHIP_TRAITS`；`speedCapFor` 讀它的參數，所以伺服器上限自動包含。造型 `src/kart/art/flagshipBodies.ts`，新的 lazy 家族 `flagship`（`bodyLoad.ts`），色票 `kartBodies.kite`，標誌在 `kartModel.ts` 的 `MARKS`。
+- **測試**：`tests/kart/slopeWeight.test.ts`（重量與坡道）、`tests/kart/meta.test.ts`（矩陣純邏輯、賽道特性、靜態推薦的形狀與公平、賽季與退役）、`tests/kart/flagship.test.ts`（頂尖腳本在漁港開旗艦比白鷺快、新手在山城開雨燕比旗艦快、速度上限）；`karts.test.ts` 的預算與極速 3% 規則改成只管非旗艦車。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

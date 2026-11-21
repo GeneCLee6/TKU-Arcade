@@ -52,8 +52,9 @@ describe('the garage (e10-t05)', () => {
     const cards = () => within(screen.getAllByRole('radiogroup')[0]!).getAllByRole('radio')
     const ids = () => cards().map((card) => card.getAttribute('data-kart'))
     const tabs = within(screen.getByRole('tablist')).getAllByRole('tab')
-    // All, the bikes, six series (2026-11-20: the item series), three tiers
-    expect(tabs).toHaveLength(11)
+    // All, the bikes, six series (2026-11-20: the item series), four tiers (2026-11-21: the season
+    // flagship's)
+    expect(tabs).toHaveLength(12)
     expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
 
     fireEvent.click(screen.getByRole('tab', { name: 'Bikes' }))
@@ -65,7 +66,7 @@ describe('the garage (e10-t05)', () => {
     expect(onKart).toHaveBeenCalledWith('hornet')
 
     fireEvent.click(screen.getByRole('tab', { name: 'Tailwind' }))
-    expect(ids()).toEqual(['marlin', 'ray', 'heron', 'hornet'])
+    expect(ids()).toEqual(['marlin', 'ray', 'heron', 'kite', 'hornet'])
     // 2026-11-20: the item series, with its perks as tags and a note
     fireEvent.click(screen.getByRole('tab', { name: 'Beachcomber' }))
     expect(ids()).toEqual(['pelican', 'otter', 'cormorant'])

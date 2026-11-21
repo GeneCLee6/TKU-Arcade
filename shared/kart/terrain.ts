@@ -72,6 +72,18 @@ export const TERRAIN_TUNING = {
    * the air: what the clean landing's boost is to a car that took off straight
    */
   driftJumpGauge: 45,
+  /**
+   * 2026-11-21 (docs/KART-META.md): a kart's weight on a steep slope. Past `slopeMassGrade` of grade,
+   * the top speed changes by a further `slopeMass` × (mass − 1) × the grade beyond it, held to
+   * `slopeMassMax`: a heavy kart is slower up a steep climb and faster down a steep descent, a light
+   * one the other way round. Only the steep part counts, because a loop climbs as far as it falls:
+   * an effect in proportion to the grade alone would cancel out over a lap on every track, while
+   * this one favours the light karts where the climbs are the steep side and the heavy ones where
+   * the descents are
+   */
+  slopeMass: 5,
+  slopeMassGrade: 0.03,
+  slopeMassMax: 0.06,
 } as const
 
 export type TerrainTuning = { readonly [K in keyof typeof TERRAIN_TUNING]: number }
@@ -287,6 +299,22 @@ function gradeOf(ground: Ground, vx: number, vz: number): number {
 }
 
 /**
+ * How much a kart's weight changes its top speed on a slope of `grade` (+ uphill), as a share
+ * (2026-11-21): 0 for the standard weight and on any slope gentler than `slopeMassGrade`; + slower
+ */
+export function slopeWeight(
+  tuning: Pick<KartTuning, 'mass'>,
+  grade: number,
+  numbers: TerrainTuning = TERRAIN_TUNING,
+): number {
+  const mass = tuning.mass
+  if (mass === undefined || mass === 1) return 0
+  const steep = Math.max(0, Math.abs(grade) - numbers.slopeMassGrade) * Math.sign(grade)
+  if (steep === 0) return 0
+  return clamp(numbers.slopeMass * (mass - 1) * steep, -numbers.slopeMassMax, numbers.slopeMassMax)
+}
+
+/**
  * One step in the air: the ground speed held, the height a parabola, the nose turned only a little.
  * No drift, no gauge, no throttle; boosts and windows run down as the clock goes
  */
@@ -361,7 +389,10 @@ export function stepOnTerrain(
   const ground = groundAt(terrain, state.x, state.z)
   const grade = gradeOf(ground, state.vx, state.vz)
   const limitScale =
-    1 - clamp(numbers.slopeLimit * grade, -numbers.slopeLimitMax, numbers.slopeLimitMax)
+    1 -
+    clamp(numbers.slopeLimit * grade, -numbers.slopeLimitMax, numbers.slopeLimitMax) -
+    // A heavy kart slower up a steep climb and faster down a steep descent (2026-11-21)
+    slopeWeight(tuning, grade, numbers)
   const next = stepKart(state, input, tuning, rules, limitScale)
   let { vx, vz } = next
   const speed = Math.hypot(vx, vz)
