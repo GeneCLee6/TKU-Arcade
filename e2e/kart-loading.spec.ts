@@ -76,7 +76,8 @@ test('a room counts down only once everyone has built the scene', async ({ brows
   await slowEngine(bob, 15_000)
   await joinRoom(ann, `/r/${id}?autopilot`, 'Ann')
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
-  await ann.getByTestId('kart-room-bots-add').click()
+  // 2026-11-22: one tap on the first open place adds a computer kart
+  await ann.getByTestId('kart-lobby-add-bot').click()
   await expect(ann.getByTestId('bot-member')).toHaveText(/\(CPU\)$/)
   // 2026-11-21: the race waits for everyone to be ready (shared/protocol.ts 8.)
   await bob.getByTestId('kart-lobby-ready').click()
