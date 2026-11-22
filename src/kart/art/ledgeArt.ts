@@ -1,4 +1,4 @@
-// 2026-11-23 (shared/kart/ledges.ts, docs/KART-WORLD.md §6.6): the art of a track's high platforms.
+// 2026-11-23 (shared/kart/ledges.ts, docs/KART-WORLD.md §6.5): the art of a track's high platforms.
 // The platform's road itself is a branch's and forkArt.ts draws it at its own height; here is what
 // it stands on and what shows the way onto it:
 //
