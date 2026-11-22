@@ -23,8 +23,11 @@ export interface OptionsFormProps {
   values: OptionValues
   /** The host's working controls; anyone else gets the same fields as text */
   editable: boolean
-  /** A control changed: the complete values to ask the server for */
-  onChange(values: OptionValues): void
+  /**
+   * A control changed: only that field, to ask the server for (shared/protocol.ts 16.), so that a
+   * second change before the first came back does not send the first's old value
+   */
+  onChange(changes: OptionValues): void
 }
 
 /** The rule options, generated from a game's schema. A game with none renders nothing */
@@ -61,7 +64,7 @@ export function OptionsForm({ schema, values, editable, onChange }: OptionsFormP
           key={key}
           field={field}
           value={complete[key]}
-          onPick={(value) => onChange({ ...complete, [key]: value })}
+          onPick={(value) => onChange({ [key]: value })}
         />
       ))}
     </Fields>

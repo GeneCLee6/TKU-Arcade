@@ -730,6 +730,7 @@ describe('reconnecting', () => {
     it.each([
       [CloseCode.kicked, 'kicked'],
       [CloseCode.dissolved, 'dissolved'],
+      [CloseCode.left, 'left'],
       [CloseCode.roomNotFound, 'notFound'],
       [CloseCode.versionMismatch, 'versionMismatch'],
       [CloseCode.roomFull, 'full'],

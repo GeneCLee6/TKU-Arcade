@@ -28,6 +28,8 @@ export interface ResultPanelProps {
   onRematch(): void
   onReopen(): void
   onDissolve(): void
+  /** The lobby link leaves the room on purpose (shared/protocol.ts 17.); absent in a replay */
+  onLeave?(): void
 }
 
 /** How a game ended, for any game (e2-t06): standings, then what comes next */
@@ -42,6 +44,7 @@ export function ResultPanel({
   onRematch,
   onReopen,
   onDissolve,
+  onLeave,
 }: ResultPanelProps) {
   const t = useT()
   const seated = seatedMembers(view)
@@ -110,7 +113,9 @@ export function ResultPanel({
         {you !== '' && (
           <BackLink to={`/r/${view.room.id}/replay`}>{t('room.result.replay')}</BackLink>
         )}
-        <BackLink to="/">{t('room.backToLobby')}</BackLink>
+        <BackLink to="/" onClick={onLeave}>
+          {t('room.backToLobby')}
+        </BackLink>
       </Next>
     </Panel>
   )
