@@ -137,8 +137,11 @@ test('two people and a computer kart race one lap in one room', async ({ browser
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
   // Only the host gets the computer karts' panel
   await expect(bob.getByTestId('kart-room-bots')).toHaveCount(0)
+  // 2026-11-22: the computer karts are in the waiting room's Room panel
+  await ann.getByTestId('kart-lobby-settings').click()
   await ann.getByTestId('kart-room-bots-level').selectOption('normal')
   await ann.getByTestId('kart-room-bots-add').click()
+  await ann.getByRole('button', { name: 'Close' }).click()
   for (const page of [ann, bob]) {
     await expect(page.getByTestId('bot-member')).toHaveText(/\(CPU\)$/)
   }

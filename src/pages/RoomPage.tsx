@@ -222,10 +222,12 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
     },
   }
   const Screen = gameScreen(view.room.gameId, view.game?.view)
+  // 2026-11-22: the race room's waiting room covers the screen, its chat behind a button of its own
+  const kartLobby = view.room.status === 'waiting' && view.room.gameId === 'kart'
   return (
     <>
       {/* Always in the page: screen readers only announce changes in a region they already know */}
-      <ConnectionStatus aria-live="polite">
+      <ConnectionStatus aria-live="polite" data-inert-keep="">
         {session.reconnecting && <ReconnectBanner>{t('room.reconnecting')}</ReconnectBanner>}
       </ConnectionStatus>
       <RoomHeading
@@ -265,10 +267,12 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
             onSetLook={room.setLook}
             onAddBot={room.addBot}
             onSetTeam={room.setTeam}
-            aside={!compact && <RoomChatPanel room={parts} />}
+            aside={!compact && !kartLobby && <RoomChatPanel room={parts} />}
+            chat={parts.chat}
+            onLeave={room.leave}
           />
           {/* On a phone the chat is a drawer, its bar stuck to the bottom of the whole page */}
-          {compact && <RoomChatPanel room={parts} />}
+          {compact && !kartLobby && <RoomChatPanel room={parts} />}
         </Suspense>
       ) : view.game && Screen ? (
         // While its code loads the room is already all there, chat included
@@ -395,10 +399,11 @@ const Main = styled.main`
 
 // Stuck to the top, since the room can be longer than a phone's screen. Empty, it takes up no room:
 // the negative margin cancels the gap of the grid it is in.
+// Over the race room's waiting room too (z-index 9, KartLobby.tsx); the race (20) covers it
 const ConnectionStatus = styled.div`
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 10;
 
   &:empty {
     margin-bottom: -${space.lg}px;

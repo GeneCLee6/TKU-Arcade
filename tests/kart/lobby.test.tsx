@@ -7,6 +7,7 @@ import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { ToastProvider } from '../../src/components/Toast.tsx'
 import { initLanguage, registerMessages } from '../../src/i18n/t.ts'
 import KartLobby from '../../src/kart/lobby/KartLobby.tsx'
+import { MemoryRouter } from '../../src/lib/router.tsx'
 import { seatState, waitingOn } from '../../src/kart/lobby/readiness.ts'
 import { stubDialog } from '../lib/stubDialog.ts'
 
@@ -53,9 +54,11 @@ function renderLobby(view: RoomView, you: string) {
     onSetTeam: vi.fn(),
   }
   render(
-    <ToastProvider>
-      <KartLobby view={view} you={you} side={null} {...handlers} />
-    </ToastProvider>,
+    <MemoryRouter>
+      <ToastProvider>
+        <KartLobby view={view} you={you} {...handlers} />
+      </ToastProvider>
+    </MemoryRouter>,
   )
   return handlers
 }
@@ -135,5 +138,39 @@ describe('the race room’s waiting room (2026-11-21)', () => {
     expect(card).toHaveTextContent('2 laps')
     expect(card).toHaveTextContent('side by side')
     expect(screen.getByTestId('kart-lobby-backdrop')).toHaveAttribute('data-theme', 'day')
+  })
+})
+
+describe('the waiting room over the whole screen (2026-11-22)', () => {
+  it('keeps the room’s settings, computer karts and own full-screen setting behind the Room button', () => {
+    const { onAddBot } = renderLobby(viewOf([ann(), bob()]), 'Ann')
+    expect(screen.queryByTestId('kart-room-bots')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('kart-lobby-settings'))
+    fireEvent.click(screen.getByTestId('kart-room-bots-add'))
+    expect(onAddBot).toHaveBeenCalled()
+    const auto = screen.getByTestId('kart-lobby-auto-fullscreen') as HTMLInputElement
+    expect(auto.checked).toBe(false)
+    fireEvent.click(auto)
+    expect(localStorage.getItem('tku-arcade.fullscreen.auto')).toBe('on')
+  })
+
+  it('gives the host a way with each other place, and nobody else', () => {
+    const { onKick } = renderLobby(viewOf([ann(), bob(), cpu]), 'Ann')
+    expect(within(placeOf('Ann')).queryByTestId('kart-lobby-manage')).not.toBeInTheDocument()
+    fireEvent.click(within(placeOf('Mochi (CPU)')).getByTestId('kart-lobby-manage'))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Mochi (CPU)' }))
+    expect(onKick).toHaveBeenCalledWith('cpu')
+  })
+
+  it('shows no host tools to a racer, and the count of racers', () => {
+    renderLobby(viewOf([ann(), bob(), cpu]), 'Bob')
+    expect(screen.queryAllByTestId('kart-lobby-manage')).toHaveLength(0)
+    expect(screen.getByTestId('kart-lobby-count')).toHaveTextContent('3/8 racers')
+  })
+
+  it('draws each racer flat until the 3D comes, with their kart’s quickest picks for the track', () => {
+    renderLobby(viewOf([ann(), bob()]), 'Ann')
+    expect(placeOf('Bob').querySelector('[data-flat] svg')).not.toBeNull()
+    expect(screen.getByTestId('kart-lobby-quickest')).toHaveTextContent('Quickest here')
   })
 })

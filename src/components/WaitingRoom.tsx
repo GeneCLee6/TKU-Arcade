@@ -4,6 +4,7 @@ import { getGameCard } from '../../shared/games/lobby.ts'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
+import type { RoomChat } from './GameLayout.tsx'
 import { monoType } from '../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
@@ -39,6 +40,10 @@ export interface WaitingRoomProps {
   onSetTeam?(team: 0 | 1 | null, member?: string): void
   /** Below the setup in the right-hand column of a wide screen: the room's chat */
   aside?: ReactNode
+  /** 2026-11-22: the race room's waiting room covers the screen and keeps its chat behind a button */
+  chat?: RoomChat
+  /** 2026-11-22: leaving the room on purpose, from the race room's waiting room (shared/protocol.ts 17.) */
+  onLeave?(): void
 }
 
 // e1-t16: its own chunk, with its strings
@@ -67,6 +72,8 @@ export function WaitingRoom({
   onAddBot,
   onSetTeam,
   aside,
+  chat,
+  onLeave,
 }: WaitingRoomProps) {
   const t = useT()
   const members = Object.values(view.members)
@@ -88,10 +95,8 @@ export function WaitingRoom({
     />
   )
 
-  // The right-hand column: the same in every room
-  const side = (
-    <>
-      {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
+  // Sharing the room: its number, link and QR code, whether it is listed, its password
+  const invite = (
       <Invite roomId={roomId} code={view.room.code ?? null}>
         <Visibility
           isPublic={view.room.public === true}
@@ -107,7 +112,10 @@ export function WaitingRoom({
           </Suspense>
         )}
       </Invite>
-
+  )
+  // The game and its options; the host's way to end the room
+  const setup = (
+    <>
       <GameSetup
         room={view.room}
         isHost={isHost}
@@ -120,6 +128,14 @@ export function WaitingRoom({
           <DissolveButton onDissolve={onDissolve} />
         </Actions>
       )}
+    </>
+  )
+  // The right-hand column: the same in every room
+  const side = (
+    <>
+      {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
+      {invite}
+      {setup}
       {aside}
     </>
   )
@@ -138,7 +154,10 @@ export function WaitingRoom({
           onSetLook={onSetLook}
           onAddBot={onAddBot}
           onSetTeam={onSetTeam}
-          side={side}
+          invite={invite}
+          setup={setup}
+          chat={chat}
+          onLeave={onLeave}
         />
       </Suspense>
     )
