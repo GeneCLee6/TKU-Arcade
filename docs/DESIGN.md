@@ -98,7 +98,7 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
 ## 5. i18n 規則
 
 1. **英文是來源語言**：先寫 `en.ts`，再翻 `zh-TW.ts`；key 以語意命名，不以英文句子當 key（句子會改）。
-2. **禁止裸字串**：JSX 裡的可見文字一律 `t()`；`scripts/check-i18n.mjs` 擋 zh-TW 缺 key 與多餘 key，另一支腳本 grep JSX 裡的 CJK 與長英文字串。
+2. **禁止裸字串**：JSX 裡的可見文字一律 `t()`；`scripts/check-i18n.mjs` 擋 zh-TW 缺 key 與多餘 key，也讀 `src/` 每個檔案的語法樹（Vite 的 oxc parser；TypeScript 7 沒有 JS API）找裸字串（2026-11-22，NEXT #6）：JSX 文字、JSX 子節點裡的字串（`{'Hello'}`、三元與 `||`／`??`／`&&` 的字串分支、template、`+` 拼接）、看得到的屬性不論怎麼寫（`aria-label`、`title`、`placeholder`、`alt`、`label`，以及元件的 `message`／`hint`／`heading`／`text` 等），傳給 `alert`／`confirm`／`prompt`／`toast`／`notify`／canvas `fillText`／`new Notification` 的字串，指定給 `document.title`／`textContent` 的字串；註解以外的 CJK。不看：`className`、`data-testid` 等其他屬性、`t()` 等函式呼叫的參數、沒有兩個連續英文字母的字串（符號、數字、單一字母）、網址與路徑。**豁免**：同一行 `// i18n-ignore`，或上一行 `// i18n-ignore-next-line`；JSX 子節點裡寫 `{/* // i18n-ignore */}`。豁免只給景物（卡丁車石碑上的校名）這類兩語都一樣的字。
 3. **數字、日期、複數**用 `Intl`，不要手拼。
 4. **英文的語氣**：短、直接、動詞開頭（"Create room"、"Join"、"Roll"）；不用「Please」開頭。
 5. **繁中的語氣**：台灣用語（「建立房間」「加入」「擲骰」），不用簡中詞彙（「創建」「視頻」）。
