@@ -66,6 +66,7 @@
 - `check-i18n` 讀語法樹找裸字串（JSX 子節點與條件式裡的字串、各種寫法的可見屬性、`toast`／`alert`／`fillText`、`document.title`），豁免 `// i18n-ignore`／`// i18n-ignore-next-line`；規則在 `DESIGN.md` §5（#137）。
 - 每款遊戲功能旗標、成本儀表板與 80% 警示、安全複查 `SECURITY.md`（#107）。
 - 濫用防護（跨 instance 速率、每房每位址連線數、暱稱過濾、管理金鑰鎖定）（#110）；建房每位址每分鐘 10 間（#133）。
+- **全螢幕**：房間標題列、卡丁車單機選單與等待室有全螢幕鈕（整頁 Fullscreen API；iPhone 退回專注模式並提示加到主畫面）；比賽可設定自動全螢幕、手機嘗試鎖橫；PWA `display_override` 先要 fullscreen（`ARCHITECTURE.md` §4.68）。
 
 ## 2. 待擁有者決定與要擁有者做的事
 
