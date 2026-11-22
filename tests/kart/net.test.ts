@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CLOCK_SETTLE_ANYWAY,
   clockOffset,
+  clockSettled,
   decodeFrame,
   encodeFrame,
   FLAG_AIRBORNE,
@@ -92,5 +94,40 @@ describe('the airborne flag (2026-11-17, a track with jumps)', () => {
     expect('airborne' in decodeFrame(plain)!).toBe(false)
     // and the drift's way still reads under it
     expect(decodeFrame(flying)!.driftDirection).toBe(-1)
+  })
+})
+
+// 2026-11-23 (#152): the opening presents its drivers only once the clock's answers agree
+describe('a settled clock', () => {
+  /** An answer with the server `ahead` of this browser, going out in `up` ms and back in `down` */
+  const answer = (sent: number, up: number, down: number, ahead = 5_000) => ({
+    sent,
+    received: sent + up + down,
+    server: sent + up + ahead,
+  })
+
+  it('not before three answers, then once the three quickest agree', () => {
+    expect(clockSettled([])).toBe(false)
+    expect(clockSettled([answer(0, 20, 20), answer(120, 20, 20)])).toBe(false)
+    expect(clockSettled([answer(0, 20, 20), answer(120, 22, 18), answer(240, 19, 21)])).toBe(true)
+  })
+
+  it('not while the only quick answers were read late by a busy page', () => {
+    // The first came back while the page was building the race: read 1.4 s late
+    const busy = [answer(0, 20, 1_420), answer(120, 20, 900), answer(240, 20, 20)]
+    expect(clockSettled(busy)).toBe(false)
+    expect(Math.abs(clockOffset(busy)! - 5_000)).toBeLessThan(1)
+    // ... and its offset would be 0.7 s out had it been the only one
+    expect(Math.abs(clockOffset(busy.slice(0, 1))! - 5_000)).toBeGreaterThan(690)
+    expect(clockSettled([...busy, answer(360, 21, 19), answer(480, 20, 20)])).toBe(true)
+  })
+
+  it('a slow but steady network settles; a jittery one after enough answers', () => {
+    expect(clockSettled([answer(0, 200, 200), answer(120, 205, 195), answer(240, 198, 202)])).toBe(true)
+    const jitter = Array.from({ length: CLOCK_SETTLE_ANYWAY }, (_, i) =>
+      answer(i * 120, 40 + (i % 2) * 120, 40 + ((i + 1) % 2) * 120),
+    )
+    expect(clockSettled(jitter.slice(0, CLOCK_SETTLE_ANYWAY - 1))).toBe(false)
+    expect(clockSettled(jitter)).toBe(true)
   })
 })
