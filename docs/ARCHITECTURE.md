@@ -1630,7 +1630,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **RoomDO**：跑到 `webSocketMessage` 的 `ping` 也記心跳。
 - **工具**：`scripts/net-soak.ts`（`npm run net:soak`）；`e2e/network.spec.ts`。
 
-### 4.72 路線圖外：可靠送達（訊息序號與確認）（2026-11-23，`feat/net-reliable-esports-ui`）
+### 4.72 路線圖外：可靠送達（訊息序號與確認）（2026-11-23，#153，`feat/net-reliable-esports-ui`）
 
 #149 留下的「送出了、socket 卻已死」那一下。細節、相容表與測試在 `docs/NETWORK.md` §5。
 
