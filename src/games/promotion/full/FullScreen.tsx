@@ -24,22 +24,11 @@ import { useBoardFit } from '../useBoardFit.ts'
 import { MAX_ZOOM, MIN_ZOOM, useBoardZoom } from '../useBoardZoom.ts'
 import { useImmersive } from '../useImmersive.ts'
 import { fullArtHref, fullKnob } from './fullArt.ts'
-import { FullBoard, type FullFlight, type FullPiece } from './FullBoard.tsx'
+import type { FullFlight, FullPiece } from './FullBoard.tsx'
 import { FullDice } from './FullDice.tsx'
 import { useFullData } from './fullData.ts'
 import type { SquareLayout } from './fullSquare.ts'
-import { shortCellName } from './fullText.ts'
-import {
-  beforeTransfers,
-  comboText,
-  degreeText,
-  householdText,
-  ladderGrade,
-  lastComboText,
-  seatInfo,
-  transferText,
-  turnSentence,
-} from './fullWords.ts'
+import { beforeTransfers, degreeText, householdText, transferText } from './fullMoney.ts'
 import { SETTLE_STEPS } from './settleSteps.ts'
 import { useTurnPlayback } from './useTurnPlayback.ts'
 
@@ -236,11 +225,11 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   // What names a cell waits for the board's data
   const seatDetail = (member: RoomMember) => {
     const player = playerOf(member.seat)
-    return player && data ? seatInfo(t, language, player) : null
+    return player && data ? data.words.seatInfo(t, language, player) : null
   }
   const resultDetail = (standing: Standing) => {
     const player = playerOf(standing.seat)
-    return player && data ? seatInfo(t, language, player) : null
+    return player && data ? data.words.seatInfo(t, language, player) : null
   }
   const topSeats = game.result?.standings.filter((standing) => standing.rank === 1) ?? []
   const resultHeadline = t('games.promotion.full.mostSilver', {
@@ -256,8 +245,8 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   const tumbling = beat?.kind === 'throw'
   const combo = (() => {
     if (!last || !shownThrow || tumbling || !data) return ''
-    if (beat?.kind === 'read') return comboText(t, shownThrow, last.birth, language, beat.index < last.throws.length - 1)
-    return lastComboText(t, last, language)
+    if (beat?.kind === 'read') return data.words.comboText(t, shownThrow, last.birth, language, beat.index < last.throws.length - 1)
+    return data.words.lastComboText(t, last, language)
   })()
   const throwCount =
     last && beat && (beat.kind === 'throw' || beat.kind === 'read') && last.throws.length > 1
@@ -268,9 +257,9 @@ export default function FullScreen({ room, game }: GameScreenProps) {
     ? deciding
       ? t(`games.promotion.full.watching.${pending.kind}`, {
           name: nameOf(pending.seat),
-          cell: shortCellName(pending.cell, language),
+          cell: data.words.shortCellName(pending.cell, language),
         })
-      : turnSentence(t, language, last, playerOf(last.seat), nameOf(last.seat))
+      : data.words.turnSentence(t, language, last, playerOf(last.seat), nameOf(last.seat))
     : ''
   // The card goes where it does not hide the cell it is about
   const pendingBox = deciding && layout ? layout.byId.get(pending.cell) : undefined
@@ -390,7 +379,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
   if (data && state.rulesVersion === 2) {
     for (const player of players) {
       if (player.origin === null) continue
-      const grade = ladderGrade(player, data.gradeOf, true)
+      const grade = data.words.ladderGrade(player, data.gradeOf, true)
       grades.set(grade, [...(grades.get(grade) ?? []), player.seat])
     }
   }
@@ -410,7 +399,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
             <FullRoutes
               players={players}
               nameOf={nameOf}
-              cellName={(id) => shortCellName(id, language)}
+              cellName={(id) => data.words.shortCellName(id, language)}
             />
           </Suspense>
         ) : undefined
@@ -440,8 +429,8 @@ export default function FullScreen({ room, game }: GameScreenProps) {
 
           <BoardArea ref={boxRef}>
             <Viewport ref={attach} $zoomed={zoom.zoom > MIN_ZOOM}>
-              {board && layout ? (
-              <FullBoard
+              {board && layout && data ? (
+              <data.view.FullBoard
                 board={board}
                 layout={layout}
                 pieces={pieces}
@@ -538,7 +527,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
           <Ledger>
             {players.map((player) => (
               <li key={player.seat}>
-                {nameOf(player.seat)}: {seatInfo(t, language, player)}
+                {nameOf(player.seat)}: {data.words.seatInfo(t, language, player)}
               </li>
             ))}
           </Ledger>

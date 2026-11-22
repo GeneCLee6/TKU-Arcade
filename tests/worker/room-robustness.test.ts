@@ -274,7 +274,7 @@ describe('seats of people who are gone (shared/protocol.ts 17.)', () => {
     const cy = world.join('Cy')
     cy.send({ t: 'sit', seat: null })
     ann.send({ t: 'start' })
-    expect((bob.view!.game?.view as { you: number | null }).you).toBe(1)
+    expect((bob.view!.game!.view as { you: number | null }).you).toBe(1)
     // Over by agreement, Bob goes and Cy takes his seat
     ann.send({ t: 'action', action: { type: 'endVote', on: true } })
     bob.send({ t: 'action', action: { type: 'endVote', on: true } })
@@ -293,7 +293,7 @@ describe('seats of people who are gone (shared/protocol.ts 17.)', () => {
     bob.send({ t: 'leave' })
     cy.send({ t: 'sit', seat: 1 })
     expect(cy.me?.seat).toBe(1)
-    expect((cy.view!.game?.view as { you: number | null }).you).toBeNull()
+    expect((cy.view!.game!.view as { you: number | null }).you).toBeNull()
   })
 
   it('never takes a computer member’s seat', () => {
