@@ -33,6 +33,8 @@ export type RoomParts = Omit<
   onSetLook?(look: string | null): void
   /** 2026-11-17: the host's browser acting for a computer seat (the kart); absent in tests */
   actFor?(seat: number, action: JsonValue): boolean
+  /** 2026-11-22: going back to the lobby on purpose (shared/protocol.ts 17.); absent in tests */
+  onLeave?(): void
 }
 
 export interface GameLayoutProps {
@@ -107,6 +109,7 @@ export function GameLayout({
       onRematch={room.onRematch}
       onReopen={room.onReopen}
       onDissolve={room.onDissolve}
+      onLeave={room.onLeave}
     />
   )
 

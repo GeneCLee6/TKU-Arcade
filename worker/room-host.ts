@@ -27,9 +27,12 @@ import {
   PROXY_HEADER_BYTES,
   RECONNECT_GRACE_MS,
   ROOM_CLEANUP_MS,
+  ROOM_IDLE_MAX_MS,
+  SEAT_RELEASE_MS,
   STALE_AFTER_MS,
   SWEEP_INTERVAL_MS,
   parseClientMessage,
+  sameName,
   uniqueName,
   type CoverableSeat,
   type ErrorCode,
@@ -56,6 +59,7 @@ import {
   type ActionOutcome,
   type StoredGame,
 } from './room-turn.ts'
+import { UNKNOWN_ADDRESS } from './address.ts'
 
 export type RoomRecord = {
   id: string
@@ -67,8 +71,8 @@ export type RoomRecord = {
   /** Null until the first member joins */
   hostId: string | null
   createdAt: number
-  /** Seat tokens that cannot join yet. Never part of a view */
-  bans: { token: string; until: number }[]
+  /** Who cannot join yet (shared/protocol.ts 18.). Never part of a view */
+  bans: KickBan[]
   /** Listed on the home page while waiting for people; otherwise reachable by link only */
   public: boolean
   /** Its short number (shared/room-code.ts); null when none was free, or the room is older */
@@ -88,6 +92,25 @@ export type RoomRecord = {
   emptySince: number | null
   /** While `ended`: when something last happened; null in any other status (`settleCleanup`) */
   idleSince: number | null
+  /**
+   * When a member last sent anything (heartbeats aside), to within ACTIVITY_SAVE_MS so that not every
+   * message is a write: ROOM_IDLE_MAX_MS later the room goes, sockets or not (shared/protocol.ts 19.).
+   * Absent in a room from before 2026-11-22, which starts counting when it wakes
+   */
+  activeAt?: number
+}
+
+/**
+ * A kick (shared/protocol.ts 18.): the kicked member's seat token always; their club account if
+ * they were signed in; their hashed address (worker/address.ts) and name, which only ban together,
+ * since a campus or a dorm shares one address
+ */
+export type KickBan = {
+  token: string
+  until: number
+  account?: string
+  address?: string
+  name?: string
 }
 
 export type MemberRecord = {
@@ -110,6 +133,11 @@ export type MemberRecord = {
   account?: string
   /** A game's cosmetic choice, shown to everyone (e10-t05, RoomMember.look) */
   look?: string
+  /**
+   * The hashed address (worker/address.ts) this member last joined from, for a kick's ban
+   * (shared/protocol.ts 18.); absent when unknown. Never part of a view
+   */
+  address?: string
   /** The side chosen for a game with teams (2026-11-18, RoomMember.team): 0 or 1 */
   team?: number
   /**
@@ -197,6 +225,9 @@ export const BOT_THINK_MS = { min: 600, max: 1500 } as const
 /** Wrong passwords one socket may send before it is closed (e1-t16) */
 export const PASSWORD_TRIES = 5
 
+/** `RoomRecord.activeAt` is written again only once it is this far behind */
+export const ACTIVITY_SAVE_MS = 10 * 60_000
+
 /**
  * One room, without Cloudflare: members, seats, the host, waiting → playing → ended → waiting, and
  * the engine (shared/protocol.ts is the contract; worker/room.ts is the glue, tests/worker runs
@@ -257,6 +288,7 @@ export class RoomHost {
       public: stored.room.public === true,
       emptySince: stored.room.emptySince ?? null,
       idleSince: stored.room.idleSince ?? null,
+      activeAt: stored.room.activeAt ?? this.deps.now(),
     }
     this.rev = stored.rev
     this.game = stored.game && { ...stored.game, timers: stored.game.timers ?? [] }
@@ -328,6 +360,7 @@ export class RoomHost {
       ...(seated.length > 0 ? { startOnJoin: true as const } : {}),
       emptySince: this.deps.now(),
       idleSince: null,
+      activeAt: this.deps.now(),
     }
     this.deps.storage.saveRoom(this.room)
     // Seats 1 and on: the person who comes takes the lowest free one, the first
@@ -446,7 +479,10 @@ export class RoomHost {
       return
     }
     // Coming back, or anything said or done, shows people are still at a finished room's table
-    if (message.t !== 'resync') this.noteActivity()
+    if (message.t !== 'resync') {
+      this.noteActivity()
+      this.noteActive()
+    }
     if (message.t === 'join') {
       if (connection.member !== null) this.refuse(conn, 'forbidden')
       else this.join(conn, connection, message.name, message.token, message.password ?? null)
@@ -501,7 +537,13 @@ export class RoomHost {
         this.setGame(conn, member, message.gameId, message.options)
         return
       case 'set_options':
-        this.setOptions(conn, member, message.options)
+        this.setOptions(conn, member, message.options, message.patch === true)
+        return
+      case 'set_public':
+        this.setPublic(conn, member, message.public)
+        return
+      case 'leave':
+        this.leave(conn, member)
         return
       case 'set_password':
         this.setPassword(conn, member, message.password)
@@ -549,6 +591,7 @@ export class RoomHost {
     if (!game || !module?.realtime) return this.badFrame(conn)
     const now = this.deps.now()
     connection.lastSeen = now
+    if (connection.member !== null) this.noteActive()
     const member = connection.member === null ? undefined : this.members.get(connection.member)
     // The host's frame for a computer seat (shared/protocol.ts 14.): judged as that seat's, and
     // passed on to the host too, whose race draws the computer karts from them like anyone's
@@ -712,6 +755,7 @@ export class RoomHost {
     this.fireTimers(now)
     this.playBot(now)
     this.markAbsent(now)
+    this.releaseSeats(now)
     this.replaceAbsentHost()
     this.removeAbsentSpectators()
     this.dropExpiredBans(now)
@@ -742,7 +786,10 @@ export class RoomHost {
     const room = this.room
     if (!room) return null
     const since = [room.emptySince, room.idleSince].filter((at) => at !== null)
-    return since.length > 0 ? Math.min(...since) + ROOM_CLEANUP_MS : null
+    const cleanup = since.length > 0 ? Math.min(...since) + ROOM_CLEANUP_MS : null
+    // A tab left open for days keeps no room (shared/protocol.ts 19.)
+    const idle = room.activeAt === undefined ? null : room.activeAt + ROOM_IDLE_MAX_MS
+    return cleanup === null ? idle : idle === null ? cleanup : Math.min(cleanup, idle)
   }
 
   /**
@@ -766,6 +813,16 @@ export class RoomHost {
     const room = this.room
     if (room?.status !== 'ended') return
     room.idleSince = this.deps.now()
+    this.deps.storage.saveRoom(room)
+  }
+
+  /** A member sent something: `activeAt` moves on, written only when it is ACTIVITY_SAVE_MS behind */
+  private noteActive(): void {
+    const room = this.room
+    if (!room) return
+    const now = this.deps.now()
+    if (room.activeAt !== undefined && now - room.activeAt < ACTIVITY_SAVE_MS) return
+    room.activeAt = now
     this.deps.storage.saveRoom(room)
   }
 
@@ -803,6 +860,11 @@ export class RoomHost {
       return
     }
     const known = token === null ? undefined : this.findByToken(token)
+    // Someone new: also by the account, or the address with the name (shared/protocol.ts 18.)
+    if (!known && this.isBannedNewcomer(connection, account?.name ?? name)) {
+      this.drop(conn, CloseCode.kicked, 'kicked')
+      return
+    }
     if (known) {
       const replaced = known.conn !== null
       if (known.conn !== null) {
@@ -814,6 +876,7 @@ export class RoomHost {
         known.conn = conn
         known.offlineAt = null
         known.absent = false
+        if (connection.address !== null) known.address = connection.address
         connection.member = known.id
         // Signed in since (or as someone else): the seat stays, the name becomes the account's
         if (account && known.account !== account.id) {
@@ -858,6 +921,7 @@ export class RoomHost {
       offlineAt: null,
       absent: false,
       ...(account ? { account: account.id } : {}),
+      ...(connection.address !== null ? { address: connection.address } : {}),
     }
     let startNow = false
     this.change(() => {
@@ -1032,8 +1096,13 @@ export class RoomHost {
       module &&
       beginGame(
         module,
-        // Each seat with the side its member chose, if any (shared/protocol.ts 15.)
-        seated.map((other, id) => (other.team === undefined ? { id } : { id, team: other.team })),
+        // Each seat with the side its member chose, if any (shared/protocol.ts 15.), and whether a
+        // computer sits there (Seat.bot)
+        seated.map((other, id) => ({
+          id,
+          ...(other.team !== undefined ? { team: other.team } : {}),
+          ...(other.bot ? { bot: true as const } : {}),
+        })),
         // Checked again: a room made before a game's options changed may hold values it no longer has
         parseOptions(module.options, room.options),
         this.deps.newSeed(),
@@ -1041,6 +1110,7 @@ export class RoomHost {
       )
     if (!game) return this.refuse(conn, 'game_failed')
     const oldSteps = this.game?.steps ?? 0
+    game.holders = Object.fromEntries(seated.map((other, index) => [String(index), other.id]))
     this.change(() => {
       seated.forEach((other, index) => {
         other.seat = index
@@ -1144,6 +1214,79 @@ export class RoomHost {
       for (const member of gone) member.absent = true
       this.saveMembers()
     })
+  }
+
+  /**
+   * While `waiting` or `ended`, members offline for SEAT_RELEASE_MS give up their seats
+   * (shared/protocol.ts 17.); being absent by now, `removeAbsentSpectators` then removes them
+   */
+  private releaseSeats(now: number): void {
+    const room = this.room
+    if (!room || room.status === 'playing') return
+    const gone = [...this.members.values()].filter(
+      (member) =>
+        !member.bot &&
+        member.seat !== null &&
+        member.conn === null &&
+        member.offlineAt !== null &&
+        now - member.offlineAt >= SEAT_RELEASE_MS,
+    )
+    if (gone.length === 0) return
+    this.change(() => {
+      for (const member of gone) {
+        member.seat = null
+        member.ready = false
+      }
+      this.saveMembers()
+    })
+  }
+
+  /**
+   * Going on purpose (shared/protocol.ts 17.): the host passes on at once; the member is removed,
+   * but for a seat in a game under way, which stays theirs, absent from now on
+   */
+  private leave(conn: string, member: MemberRecord): void {
+    const room = this.requireRoom()
+    const keepsSeat =
+      room.status === 'playing' &&
+      member.seat !== null &&
+      this.game?.seats.some((seat) => seat.id === member.seat) === true
+    const wasHost = member.id === room.hostId
+    // Gone first, so that nothing below is sent to it and its close tells nobody it went offline
+    this.conns.delete(conn)
+    this.deps.sockets.close(conn, CloseCode.left, 'left')
+    this.change(() => {
+      if (keepsSeat) {
+        member.conn = null
+        member.offlineAt = this.deps.now()
+        member.absent = true
+        member.ready = false
+      } else {
+        this.members.delete(member.id)
+        this.chatRate.forget(member.id)
+      }
+      this.saveMembers()
+      if (wasHost) {
+        room.hostId = this.nextHost(member.id)
+        this.deps.storage.saveRoom(room)
+      }
+    })
+    if (wasHost) this.abandonBots()
+    if (this.conns.size === 0) this.sweepAt = null
+  }
+
+  /** Who takes over from `leaving`: online first, seated first, earliest first; null for nobody */
+  private nextHost(leaving: string): string | null {
+    const people = [...this.members.values()].filter(
+      (other) => other.id !== leaving && !other.bot,
+    )
+    const online = people.filter((other) => other.conn !== null)
+    const next =
+      online.find((other) => other.seat !== null) ??
+      online[0] ??
+      people.find((other) => !other.absent) ??
+      people[0]
+    return next?.id ?? null
   }
 
   private replaceAbsentHost(): void {
@@ -1323,18 +1466,40 @@ export class RoomHost {
     })
   }
 
-  private setOptions(conn: string, member: MemberRecord, rawOptions: OptionValues): void {
+  /** `patch` (shared/protocol.ts 16.): `rawOptions` are only the fields that change */
+  private setOptions(
+    conn: string,
+    member: MemberRecord,
+    rawOptions: OptionValues,
+    patch: boolean,
+  ): void {
     const room = this.requireRoom()
     if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
     if (room.status !== 'waiting') return this.refuse(conn, 'wrong_status')
     const module = this.deps.games(room.gameId)
     if (!module) return this.refuse(conn, 'bad_game')
+    // A hidden option (types.ts) stays as the room was made: the form does not know it
+    const options = keepHidden(
+      module.options,
+      room.options,
+      patch ? { ...room.options, ...rawOptions } : rawOptions,
+    )
     this.change(() => {
-      // A hidden option (types.ts) stays as the room was made: the form does not know it
-      room.options = keepHidden(module.options, room.options, rawOptions)
+      room.options = options
       this.deps.storage.saveRoom(room)
       for (const other of this.members.values()) other.ready = false
       this.saveMembers()
+    })
+  }
+
+  /** shared/protocol.ts 19.: in any status; only listed while waiting, with no password */
+  private setPublic(conn: string, member: MemberRecord, value: boolean): void {
+    const room = this.requireRoom()
+    if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    if (room.public === value) return
+    this.change(() => {
+      room.public = value
+      this.deps.storage.saveRoom(room)
     })
   }
 
@@ -1390,7 +1555,14 @@ export class RoomHost {
       this.saveMembers()
       room.bans = [
         ...room.bans.filter((ban) => ban.until > now),
-        { token: target.token, until: now + KICK_BAN_MS },
+        {
+          token: target.token,
+          until: now + KICK_BAN_MS,
+          ...(target.account !== undefined ? { account: target.account } : {}),
+          ...(target.address !== undefined && target.address !== UNKNOWN_ADDRESS
+            ? { address: target.address, name: target.name }
+            : {}),
+        },
       ]
       this.deps.storage.saveRoom(room)
     })
@@ -1591,6 +1763,7 @@ export class RoomHost {
       maxSeats: room.maxSeats,
       ...(room.code ? { code: room.code } : {}),
       ...(room.password !== undefined ? { password: room.password } : {}),
+      ...(room.public ? { public: true as const } : {}),
     }
     const members: Record<string, RoomMember> = {}
     for (const member of this.members.values()) {
@@ -1612,8 +1785,11 @@ export class RoomHost {
     const projections = new Map<Viewer, GameProjection | null>()
     return (member) => {
       if (!game) return { room: shared, members, game: null, coverable }
-      // Someone who took a free seat after the game has no seat in it
-      const inGame = game.seats.some((seat) => seat.id === member.seat)
+      // Someone who took a free seat after the game has no seat in it, also one left by someone who
+      // was (`StoredGame.holders`: a kick, `leave`, a seat given up)
+      const inGame =
+        game.seats.some((seat) => seat.id === member.seat) &&
+        (game.holders === undefined || game.holders[String(member.seat)] === member.id)
       const viewer: Viewer = inGame ? (member.seat as number) : 'spectator'
       let projection = projections.get(viewer)
       if (projection === undefined) {
@@ -1680,6 +1856,25 @@ export class RoomHost {
   private isBanned(token: string): boolean {
     const now = this.deps.now()
     return this.requireRoom().bans.some((ban) => ban.token === token && ban.until > now)
+  }
+
+  /**
+   * Someone new, kicked under another token (shared/protocol.ts 18.): the same club account, or the
+   * same address and the same name. The address alone is not enough: a campus shares one
+   */
+  private isBannedNewcomer(connection: Connection, name: string): boolean {
+    const now = this.deps.now()
+    const account = connection.account?.id
+    const address = connection.address
+    return this.requireRoom().bans.some(
+      (ban) =>
+        ban.until > now &&
+        ((account !== undefined && ban.account === account) ||
+          (address !== null &&
+            ban.address === address &&
+            ban.name !== undefined &&
+            sameName(ban.name, name))),
+    )
   }
 
   private findByToken(token: string): MemberRecord | undefined {

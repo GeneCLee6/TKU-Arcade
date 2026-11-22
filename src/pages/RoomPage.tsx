@@ -155,6 +155,8 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         return <Problem message={t('room.kicked')} />
       case 'dissolved':
         return <Problem message={t('room.dissolved')} />
+      case 'left':
+        return <Problem message={t('room.left')} />
       case 'connectionLost':
         return (
           <Problem message={t('room.connectionLost')} action={<RetryButton onClick={retry} />} />
@@ -208,6 +210,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
     realtime: room.realtime,
     onSetLook: room.setLook,
     actFor: room.actFor,
+    onLeave: room.leave,
     chat: {
       messages: room.chat,
       locked: view.game?.chatLocked ?? false,
@@ -254,6 +257,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
             onDissolve={room.dissolve}
             onSetGame={room.setGame}
             onSetOptions={room.setOptions}
+            onSetPublic={room.setPublic}
             onSetPassword={room.setPassword}
             onSetLook={room.setLook}
             onAddBot={room.addBot}
@@ -278,7 +282,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         <GameLayout room={parts} />
       )}
       {/* A result carries its own, where it can be seen without passing the board */}
-      {!(view.room.status === 'ended' && view.game?.result) && <LobbyLink />}
+      {!(view.room.status === 'ended' && view.game?.result) && <LobbyLink onLeave={room.leave} />}
     </>
   )
 }
@@ -340,9 +344,14 @@ function RetryButton({ onClick }: { onClick: () => void }) {
   return <Button onClick={onClick}>{t('room.retry')}</Button>
 }
 
-function LobbyLink() {
+/** `onLeave`: from inside a room, which is left on purpose on the way (shared/protocol.ts 17.) */
+function LobbyLink({ onLeave }: { onLeave?: () => void }) {
   const t = useT()
-  return <BackLink to="/">{t('room.backToLobby')}</BackLink>
+  return (
+    <BackLink to="/" onClick={onLeave}>
+      {t('room.backToLobby')}
+    </BackLink>
+  )
 }
 
 const Main = styled.main`
