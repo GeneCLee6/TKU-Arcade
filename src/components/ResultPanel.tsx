@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import styled, { keyframes } from 'styled-components'
 import type { GameResult, Standing } from '../../shared/games/types.ts'
 import type { RoomView } from '../../shared/protocol.ts'
@@ -77,14 +77,16 @@ export function ResultPanel({
           const name = member
             ? memberName(member, view.room.gameId)
             : t('room.waiting.seat', { seat: standing.seat + 1 })
+          const delay = Math.min(order, 8) * 90
+          // A game's own words for a standing, or its score counting up as the row slides in
           const extra =
             detail?.(standing) ??
-            (standing.score !== null ? t('room.result.score', { score: standing.score }) : null)
+            (standing.score !== null ? <CountUp score={standing.score} delay={delay} /> : null)
           return (
             <StandingRow
               key={standing.seat}
               $top={!unranked && standing.rank === 1}
-              style={{ animationDelay: `${Math.min(order, 8) * 90}ms` }}
+              style={{ animationDelay: `${delay}ms` }}
             >
               {!unranked && (
                 <Place $top={standing.rank === 1}>
@@ -136,6 +138,51 @@ export function ResultPanel({
     </Panel>
   )
 }
+
+/** How long a score takes to count up */
+const COUNT_MS = 700
+
+/**
+ * A score that counts up from 0 as its row slides in (2026-11-23, NEXT §5 from #155), a broadcast's
+ * scoreboard. Only where the browser says motion is welcome (not with reduced motion, nor in jsdom);
+ * the page holds the final score before and after, so a screen reader and a test read that. React
+ * does not own the text: the count writes it straight into the element, frame by frame.
+ */
+function CountUp({ score, delay }: { score: number; delay: number }) {
+  const t = useT()
+  const ref = useRef<HTMLSpanElement>(null)
+  const text = t('room.result.score', { score })
+  useLayoutEffect(() => {
+    const node = ref.current
+    if (node === null) return undefined
+    node.textContent = text
+    const moving =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: no-preference)').matches
+    if (!moving || score === 0) return undefined
+    let frame = 0
+    let start: number | null = null
+    const step = (now: number) => {
+      start ??= now
+      const done = Math.min(1, Math.max(0, (now - start - delay) / COUNT_MS))
+      // Fast, then settling on the score
+      const shown = Math.round(score * (1 - (1 - done) ** 3))
+      node.textContent = done === 1 ? text : t('room.result.score', { score: shown })
+      if (done < 1) frame = requestAnimationFrame(step)
+    }
+    frame = requestAnimationFrame(step)
+    return () => {
+      cancelAnimationFrame(frame)
+      node.textContent = text
+    }
+  }, [text, score, delay, t])
+  return <Count ref={ref} />
+}
+
+// Digits of one width, so the line does not shake while it counts
+const Count = styled.span`
+  font-variant-numeric: tabular-nums;
+`
 
 // Glass, with the game's hue down from the top edge
 const Panel = styled.section`

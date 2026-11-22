@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { inertOthers } from '../../lib/inertOthers.ts'
+import { lateChunk } from '../../lib/lateChunk.ts'
+
+// What keeps the page behind out of reach is needed only once the board covers it: it loads after the
+// screen's first paint (2026-11-23), long before anyone goes full screen
+export const inertChunk = lateChunk(() => import('../../lib/inertOthers.ts').then((module) => module.inertOthers))
 
 /**
  * How the board fills the screen (e3-t10): not at all, through the browser's Fullscreen API, or where
@@ -26,6 +30,7 @@ const leaveFullscreen = () => {
  */
 export function useImmersive(target: RefObject<HTMLElement | null>): ImmersiveControls {
   const [mode, setMode] = useState<Immersion>('off')
+  inertChunk.use()
 
   const exit = useCallback(() => {
     leaveFullscreen()
@@ -70,11 +75,22 @@ export function useImmersive(target: RefObject<HTMLElement | null>): ImmersiveCo
     const element = target.current
     if (element === null) return undefined
     covered.current = element
-    const undo = inertOthers([element])
+    // Loaded by now; on the off chance it is not, as soon as it is
+    let undo: (() => void) | null = null
+    let left = false
+    const loaded = inertChunk.peek()
+    if (loaded) undo = loaded([element])
+    else
+      void inertChunk.load().then((inertOthers) => {
+        if (!left) undo = inertOthers([element])
+      }, () => {})
     if (!element.contains(document.activeElement)) {
       element.querySelector<HTMLElement>('[data-immersive-exit]')?.focus()
     }
-    return undo
+    return () => {
+      left = true
+      undo?.()
+    }
   }, [mode, target])
   useEffect(() => {
     const frame = covered.current

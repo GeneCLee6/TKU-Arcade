@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react'
 import type { LastRoll, PromotionPlayer } from '../../../shared/games/promotion/types.ts'
 import { playCue } from '../../lib/sound.ts'
 
-/** How long the top spins or the dice tumble */
-export const ROLL_MS = 1100
-/** How long the piece is in the air */
-export const MOVE_MS = 650
+import { MOVE_MS, ROLL_MS } from './playbackTimes.ts'
+
+export { MOVE_MS, ROLL_MS }
 
 export type PlaybackStage = 'idle' | 'rolling' | 'moving'
 

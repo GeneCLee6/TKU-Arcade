@@ -16,6 +16,21 @@ if (typeof document !== 'undefined') {
       import('../src/i18n/roomStrings.ts'),
       import('../src/i18n/t.ts'),
     ])
+  // The parts of a screen that load after its first paint (src/lib/lateChunk.ts): here up front too.
+  // Not through the screens themselves: a test that mocks a module they import must import it first
+  const lateParts = await import('../src/lib/lateParts.ts')
+  const { boardChunk } = await import('../src/games/promotion/boardChunk.ts')
+  const { inertChunk } = await import('../src/games/promotion/useImmersive.ts')
+  const { loadDetailStrings } = await import('../src/games/promotion/detailStrings.ts')
+  await Promise.all([
+    lateParts.resultPanelChunk.load(),
+    lateParts.chatPanelChunk.load(),
+    lateParts.drawerChunk.load(),
+    lateParts.bannerChunk.load(),
+    boardChunk.load(),
+    inertChunk.load(),
+    loadDetailStrings(),
+  ])
   await Promise.all([loadRoomStrings(), loadFullStrings(), ...GAME_CARDS.map((game) => loadScreenStrings(game.id))])
   await Promise.all([
     preloadLanguage('en'),
