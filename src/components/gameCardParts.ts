@@ -91,7 +91,7 @@ export const Cover = styled.div`
   }
 
   @media (max-width: 480px) {
-    height: 88px;
+    height: 72px;
     margin: -${space.lg}px -${space.lg}px 0;
   }
 `

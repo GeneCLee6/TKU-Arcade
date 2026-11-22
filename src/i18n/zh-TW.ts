@@ -37,6 +37,8 @@ export const zhTW: Messages = {
   'lobby.computerTag': '可以跟電腦玩',
   'lobby.quick.title': '跟電腦玩',
   'lobby.quick.hint': '沒人在線上？按一下就開一間私人房、坐滿電腦玩家、直接開局。朋友拿連結還是能進來看。',
+  'lobby.quick.show': '{count} 種玩法',
+  'lobby.quick.hide': '收起',
   'lobby.quick.level': '電腦難度',
   'lobby.quick.level.easy': '簡單',
   'lobby.quick.level.normal': '普通',

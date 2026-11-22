@@ -137,7 +137,7 @@ function SeatBox({
     >
       <Name>
         <Dot style={{ background: seatColor(player.seat) }} aria-hidden="true" />
-        {name}
+        <NameText>{name}</NameText>
       </Name>
       <Stack>{player.out ? status : player.stack}</Stack>
       <Holes>
@@ -251,10 +251,19 @@ const Name = styled.span`
   align-items: center;
   gap: 3px;
   max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   font-weight: 700;
+`
+
+// Two lines at most (2026-11-23): a phone's 70 px seat cut "Heron (CPU)" to "Heron (C", the
+// computer's tag lost; a long name still ends in an ellipsis on its second line
+const NameText = styled.span`
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 `
 
 const Dot = styled.span`

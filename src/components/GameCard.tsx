@@ -53,23 +53,49 @@ export function GameCard({ game, index = 0, disabled, paused = false, onNewRoom 
         )}
       </Facts>
       <Summary>{t(`${i18nKey}.summary`)}</Summary>
-      {hasRules(game.id) && (
-        <RulesLink to={`/games/${game.id}/rules`} aria-label={t('rules.pageTitle', { game: name })}>
-          {t('rules.howToPlay')}
-        </RulesLink>
-      )}
-      {game.meta.tryAlone && (
-        <RulesLink to={game.meta.tryAlone} data-try={game.id}>
-          {t(`${i18nKey}.tryAlone`)}
-        </RulesLink>
-      )}
       {paused && <Paused role="note">{t('lobby.paused')}</Paused>}
-      <Button disabled={disabled || paused} onClick={onNewRoom}>
-        {t('lobby.newRoom')}
-      </Button>
+      {/* 2026-11-23: on a phone the links and New room share one row, so that the first card's
+          New room is on the first screen; a wider screen keeps them one under another */}
+      <Actions>
+        {hasRules(game.id) && (
+          <RulesLink to={`/games/${game.id}/rules`} aria-label={t('rules.pageTitle', { game: name })}>
+            {t('rules.howToPlay')}
+          </RulesLink>
+        )}
+        {game.meta.tryAlone && (
+          <RulesLink to={game.meta.tryAlone} data-try={game.id}>
+            {t(`${i18nKey}.tryAlone`)}
+          </RulesLink>
+        )}
+        <Button disabled={disabled || paused} onClick={onNewRoom}>
+          {t('lobby.newRoom')}
+        </Button>
+      </Actions>
     </Body>
   )
 }
+
+// No box of its own on a wide screen: its children stay the card's, New room pushed to the bottom
+const Actions = styled.div`
+  display: contents;
+
+  & > button {
+    margin-top: auto;
+  }
+
+  @media (max-width: 480px) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: ${space.xs}px ${space.lg}px;
+    margin-top: auto;
+
+    & > button {
+      flex: 1 0 auto;
+      margin-top: 0;
+    }
+  }
+`
 
 const Paused = styled.p`
   margin: 0;

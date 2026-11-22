@@ -93,7 +93,9 @@ jobs:
   # The board games' sweep, light version (docs/QA-SWEEP-2026-11.md): every listed board game, at its
   # fewest players, from the waiting room through a whole game of random legal moves to the result
   # and a rematch, through the real Worker and RoomDO on Vite's dev server. Desktop only, axe on the
-  # desktop; the two phone sizes run locally (`npm run test:sweep`). About five minutes.
+  # desktop; the two phone sizes run locally (`npm run test:sweep`). About five minutes. Before it, the
+  # phone layout checks (e2e/mobile.spec.ts, 2026-11-23): the lobby's first screen, the waiting room,
+  # a game and its result at 375 px. About a minute and a half.
   sweep:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -108,6 +110,11 @@ jobs:
       # The local D1 the dev server uses, with the production tables (results, flags, metrics)
       - name: Local database
         run: npx wrangler d1 migrations apply DB --local --config wrangler.jsonc
+
+      - name: Phone layout (375 px)
+        env:
+          E2E_PORT: '5199'
+        run: npx playwright test mobile.spec.ts --workers=1
 
       - name: Every board game to its end
         env:

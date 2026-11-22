@@ -238,6 +238,12 @@ const Intro = styled.div`
     max-width: 560px;
     margin-top: ${space.md}px;
   }
+
+  @media (max-width: 480px) {
+    & > form {
+      margin-top: ${space.xs}px;
+    }
+  }
 `
 
 // A slanted magenta tag
@@ -272,8 +278,9 @@ const Tagline = styled.p`
   color: ${color.muted};
   font-size: ${fontSize.lg}px;
 
+  /* The title says enough on a phone, whose first screen is for the first game (2026-11-23) */
   @media (max-width: 480px) {
-    font-size: ${fontSize.md}px;
+    display: none;
   }
 `
 
@@ -331,6 +338,10 @@ const SectionTitle = styled.h2`
     background: linear-gradient(90deg, ${color.accent}, transparent);
     transform: none;
   }
+
+  @media (max-width: 480px) {
+    margin-bottom: ${space.sm}px;
+  }
 `
 
 const PublicChoice = styled.label`
@@ -341,6 +352,16 @@ const PublicChoice = styled.label`
   margin-bottom: ${space.md}px;
   font-weight: 700;
   cursor: pointer;
+
+  /* A phone says who can see the room once it is ticked: the first game's New room needs the
+     height (2026-11-23) */
+  @media (max-width: 480px) {
+    margin-bottom: ${space.sm}px;
+
+    &:not(:has(input:checked)) small {
+      display: none;
+    }
+  }
 `
 
 const PublicCheck = styled.input`

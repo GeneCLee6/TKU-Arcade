@@ -4,6 +4,8 @@
 // tile (2026-11-22: one up to a full table, a lively number first; shared/games/quickBots.ts), all at
 // one level or each at its own, whose game starts as soon as this person joins it; the kart goes
 // straight to its own page. Its own lazy chunk, after the first paint, like the public rooms.
+// 2026-11-23: on a phone it starts folded into one row with a Show button, so that the games and their
+// "New room" stay on the first screen (e2e/mobile.spec.ts); a wider screen always shows it all.
 import { useState } from 'react'
 import styled from 'styled-components'
 import { LOBBY_GAMES } from '../../shared/games/lobby.ts'
@@ -28,6 +30,8 @@ export interface QuickPlayProps {
 
 const COMPUTER_GAMES = LOBBY_GAMES.filter((game) => game.meta.computer === true)
 const KART_LISTED = LOBBY_GAMES.some((game) => game.id === 'kart')
+/** How many tiles the list has: the folded row says so */
+const TILES = COMPUTER_GAMES.length + (KART_LISTED ? 2 : 0)
 /** The level switch's own choice for "each computer player at its own level" */
 const EACH = 'each'
 
@@ -35,6 +39,8 @@ export default function QuickPlay({ disabled, paused, onPlay }: QuickPlayProps) 
   const t = useT()
   const navigate = useNavigate()
   const [level, setLevel] = useState<string>(QUICK_BOT_LEVEL)
+  // Folded on a phone until asked for (the CSS ignores it on a wider screen)
+  const [open, setOpen] = useState(false)
   // Per game, what the person changed: how many, and (picking each) the level of each in turn
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [each, setEach] = useState<Record<string, string[]>>({})
@@ -48,13 +54,24 @@ export default function QuickPlay({ disabled, paused, onPlay }: QuickPlayProps) 
       return { ...was, [gameId]: now }
     })
   return (
-    <Box aria-labelledby="quick-play-title" data-testid="quick-play">
+    <Box aria-labelledby="quick-play-title" data-testid="quick-play" $open={open}>
       <Top>
-        <div>
-          <Title id="quick-play-title">{t('lobby.quick.title')}</Title>
-          <Hint>{t('lobby.quick.hint')}</Hint>
-        </div>
-        <Level>
+        <Intro>
+          <Heading>
+            <Title id="quick-play-title">{t('lobby.quick.title')}</Title>
+            <Toggle
+              type="button"
+              aria-expanded={open}
+              aria-controls="quick-play-games"
+              onClick={() => setOpen((was) => !was)}
+              data-quick-toggle
+            >
+              {open ? t('lobby.quick.hide') : t('lobby.quick.show', { count: TILES })}
+            </Toggle>
+          </Heading>
+          <Hint data-fold>{t('lobby.quick.hint')}</Hint>
+        </Intro>
+        <Level data-fold>
           <span aria-hidden="true">{t('lobby.quick.level')}</span>
           <SegmentedSwitch
             label={t('lobby.quick.level')}
@@ -67,7 +84,7 @@ export default function QuickPlay({ disabled, paused, onPlay }: QuickPlayProps) 
           />
         </Level>
       </Top>
-      <List>
+      <List id="quick-play-games" data-fold>
         {COMPUTER_GAMES.map((game) => {
           const name = t(`${game.meta.i18nKey}.name`)
           const range = quickBotRange(game.meta, TABLE_BOT_NAMES.length)
@@ -176,8 +193,9 @@ export default function QuickPlay({ disabled, paused, onPlay }: QuickPlayProps) 
   )
 }
 
-// A strip of the brand's colour down the left: the lobby's one call to play now
-const Box = styled.section`
+// A strip of the brand's colour down the left: the lobby's one call to play now. Folded on a phone:
+// the title and its Show button in one row, the rest hidden until asked for
+const Box = styled.section<{ $open: boolean }>`
   display: grid;
   gap: ${space.md}px;
   min-width: 0;
@@ -188,6 +206,59 @@ const Box = styled.section`
   @media (max-width: 480px) {
     gap: ${space.sm}px;
     padding: ${space.sm}px ${space.sm}px ${space.sm}px ${space.md}px;
+
+    ${(p) => (p.$open ? '' : '& [data-fold] { display: none; }')}
+  }
+`
+
+// Takes the row, so that a phone's Show button sits at its end
+const Intro = styled.div`
+  flex: 1 1 auto;
+  min-width: 0;
+`
+
+// The title, and on a phone the Show button at the end of its row
+const Heading = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${space.sm}px;
+`
+
+// Only a phone folds the list away
+const Toggle = styled.button`
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: ${space.xs}px;
+  min-height: 44px;
+  padding: 0 ${space.md}px;
+  color: ${color.text};
+  background: ${color.surface};
+  border: 1px solid ${color.brand};
+  font: inherit;
+  font-size: ${fontSize.sm}px;
+  font-weight: 700;
+  cursor: pointer;
+
+  /* A chevron: down to open, up to fold */
+  &::after {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border: solid currentColor;
+    border-width: 0 2px 2px 0;
+    rotate: 45deg;
+    translate: 0 -2px;
+  }
+
+  &[aria-expanded='true']::after {
+    rotate: 225deg;
+    translate: 0 2px;
+  }
+
+  @media (max-width: 480px) {
+    display: inline-flex;
   }
 `
 
