@@ -37,15 +37,23 @@ export function createServerClock(realtime: RoomRealtime): ServerClock {
     if (samples.length > KEEP_SAMPLES) samples.shift()
     offset = clockOffset(samples)
   })
-  const timers = Array.from({ length: FIRST_PINGS }, (_, i) =>
-    setTimeout(ping, i * FIRST_PING_GAP_MS),
-  )
+  const timers: ReturnType<typeof setTimeout>[] = []
+  const burst = () => {
+    for (let i = 0; i < FIRST_PINGS; i++) timers.push(setTimeout(ping, i * FIRST_PING_GAP_MS))
+  }
+  burst()
   const pinger = setInterval(ping, PING_EVERY_MS)
+  // 2026-11-22: synced anew after a drop or the background, as a racer's (netRace.ts)
+  const stopResume = realtime.onResume?.(() => {
+    samples.length = 0
+    burst()
+  })
   return {
     now: () => (offset === null ? Date.now() : performance.now() + offset),
     synced: () => offset !== null,
     stop() {
       stopListening()
+      stopResume?.()
       for (const timer of timers) clearTimeout(timer)
       clearInterval(pinger)
     },

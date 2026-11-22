@@ -1625,6 +1625,17 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **測試**：`tests/kart/raceFlow.test.ts`（開場 8 人 ≤ 10 s、亮相 ≤ 6 s、照順序每位車手、鏡頭在車手正前方且最後接上全景、關掉亮相改繞場；倒數音效 3、2、1、GO 各一次且 GO 較亮；完賽倒數音效；伺服器 10 秒後第一個 frame 結束比賽、未完賽依進度排名、看不到的依圈數、壞的 progress 拒絕、玩家不能 close；團隊賽計分；暫停時比賽時鐘與房間時鐘一起停、恢復後不補時間、0 秒的一幀不跑物理；設定預設與逐欄回復、特效上限；頒獎台只放完賽的前三名、揭曉順序與時間、鏡頭、舉獎盃姿勢）；`tests/games/kart.test.ts`、`tests/worker/room-realtime.test.ts`、`tests/kart/roomBots.test.ts`（倒數改 `countdownMs(n)`、close 計時器）；e2e `kart-bots`（亮相卡、Esc 暫停時 tick 不動、設定、繼續後再動、頒獎台後才是結果）、`kart-race`（多人房 Esc 只開選單、完賽倒數、頒獎台、結果）、`kart-cup`（每場與總頒獎台）、`kart-watch-portrait`。
 
+
+### 4.71 路線圖外：房間連線的穩定度（2026-11-22，`feat/net-stability-bots`，#149）
+
+擁有者：「常常連線不穩。」原因、修法與前後數字在 `docs/NETWORK.md`。架構上的改變：
+
+- **協定**：`STALE_AFTER_MS` 45 → 90 s（背景分頁的 ping 一分鐘一次也不會被關）；頁面自己的「三次 ping 沒回就換」不再綁這個數字。4429 改成可重試的關閉碼（`canReconnectAfter`）。`/ws/<id>?v=2&resume=1`：斷線後的重連嘗試，Worker 在 `socket` 桶用完後再拿 `resume` 桶（240／分）。沒有升版。
+- **頁面**（`connectRoom`）：第一次連線失敗重試 20 s；4429 後至少等 20 s；重連期間 `send` 排隊（16 個、10 s），`welcome` 後送出，逾時的給 `onUnsent`；`send(message, false)` 不排隊（聊天、`set_look`、`leave`、替電腦車送的動作）；`onResumed`（重連 `welcome` 後、頁面隱藏 ≥ 1 s 再出現）→ `RoomRealtime.onResume` → 卡丁車重新對時；`reconnectNow()`；也聽 Page Lifecycle 的 `resume`。
+- **畫面**：`ConnectionBanner.tsx`（1 s 後出現、6 s 後「立刻重試」、回來時「已重新連線。」2.5 s）。
+- **RoomDO**：跑到 `webSocketMessage` 的 `ping` 也記心跳。
+- **工具**：`scripts/net-soak.ts`（`npm run net:soak`）；`e2e/network.spec.ts`。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

@@ -309,10 +309,21 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     remotes.add(relayed.seat, relayed.frame, raceNow() / 1000)
   })
   const timers: ReturnType<typeof setTimeout>[] = []
-  for (let i = 0; i < FIRST_PINGS; i++) {
-    timers.push(setTimeout(() => pingClock(), i * FIRST_PING_GAP_MS))
+  const burst = () => {
+    for (let i = 0; i < FIRST_PINGS; i++) {
+      timers.push(setTimeout(() => pingClock(), i * FIRST_PING_GAP_MS))
+    }
   }
+  burst()
   const pinger = setInterval(() => pingClock(), PING_EVERY_MS)
+  // 2026-11-22 (docs/NETWORK.md): back after a drop or from the background, the clock is synced
+  // anew. The old answers may be from before the device slept (when this browser's
+  // `performance.now()` can stand still) or from another network: the offset stays until the first
+  // new answer replaces them all
+  const stopResume = realtime.onResume?.(() => {
+    samples.length = 0
+    burst()
+  })
 
   const serverNow = () => (offset === null ? null : raceNow() + offset)
   /** The server's clock, or this browser's before the first answer: the items' times need one */
@@ -763,6 +774,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     order: orderOf,
     stop() {
       stopListening()
+      stopResume?.()
       for (const timer of timers) clearTimeout(timer)
       clearInterval(pinger)
       tagListener = null
