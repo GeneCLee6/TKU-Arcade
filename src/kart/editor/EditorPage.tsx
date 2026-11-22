@@ -9,11 +9,13 @@ import { closeLoop } from '../../../shared/kart/editor/close.ts'
 import { decodeSpec, encodeSpec } from '../../../shared/kart/editor/codec.ts'
 import {
   BYPASS_FEATURES,
+  BOOM_SPANS,
   LIMITS,
   PAD_PLACES,
   starterSpec,
   tenth,
   TRACK_THEMES,
+  type BoomSpan,
   type Bypass,
   type PadPlace,
   type Piece,
@@ -68,6 +70,18 @@ function pieceText(t: T, piece: Piece): string {
       length: piece.length,
       rise: Math.abs(piece.rise),
     })
+  }
+  if (piece.kind === 'boom') {
+    const key =
+      piece.span === 'left'
+        ? 'kart.editor.piece.boomLeft'
+        : piece.span === 'right'
+          ? 'kart.editor.piece.boomRight'
+          : 'kart.editor.piece.boom'
+    return t(key, { length: piece.length, period: piece.period })
+  }
+  if (piece.kind === 'slider') {
+    return t('kart.editor.piece.slider', { length: piece.length, period: piece.period })
   }
   if (piece.bank) {
     return t(piece.angle < 0 ? 'kart.editor.piece.bankedLeft' : 'kart.editor.piece.bankedRight', {
@@ -514,6 +528,53 @@ export default function EditorPage() {
                       testId="kart-editor-overpass-rise"
                     />
                   </>
+                ) : piece.kind === 'boom' || piece.kind === 'slider' ? (
+                  <>
+                    <NumberField
+                      label={t('kart.editor.length')}
+                      value={piece.length}
+                      min={LIMITS.minObstacle}
+                      max={LIMITS.maxLength}
+                      onValue={(length) => editPiece(at, { length })}
+                      testId="kart-editor-length"
+                    />
+                    {piece.kind === 'boom' && (
+                      <Inline>
+                        <span>{t('kart.editor.span')}</span>
+                        <select
+                          value={piece.span}
+                          onChange={(event) =>
+                            editPiece(at, { span: event.target.value as BoomSpan })
+                          }
+                          data-testid="kart-editor-span"
+                        >
+                          {BOOM_SPANS.map((span) => (
+                            <option key={span} value={span}>
+                              {t(`kart.editor.span.${span}`)}
+                            </option>
+                          ))}
+                        </select>
+                      </Inline>
+                    )}
+                    <NumberField
+                      label={t('kart.editor.period')}
+                      value={piece.period}
+                      min={LIMITS.minObstaclePeriod}
+                      max={LIMITS.maxObstaclePeriod}
+                      onValue={(period) =>
+                        editPiece(at, { period, phase: Math.min(piece.phase, tenth(period - 0.1)) })
+                      }
+                      testId="kart-editor-period"
+                    />
+                    <NumberField
+                      label={t('kart.editor.phase')}
+                      value={piece.phase}
+                      min={0}
+                      max={tenth(piece.period - 0.1)}
+                      onValue={(phase) => editPiece(at, { phase })}
+                      testId="kart-editor-phase"
+                    />
+                  </>
                 ) : piece.kind === 'jump' ? (
                   <>
                     <NumberField
@@ -593,7 +654,7 @@ export default function EditorPage() {
                   onValue={(next) => editPiece(at, { width: next })}
                   testId="kart-editor-width"
                 />
-                {piece.kind !== 'jump' && (
+                {piece.kind !== 'jump' && piece.kind !== 'boom' && piece.kind !== 'slider' && (
                   <>
                     <Inline>
                       <span>{t('kart.editor.pad')}</span>

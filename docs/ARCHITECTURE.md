@@ -1695,8 +1695,18 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **協定**（`shared/protocol.ts` 20.，沒有升版）：`join.session`（頁面載入的隨機 id）、其他訊息的 `seq`（`ClientMessage = ClientBody & { seq?: number }`，`parseClientMessage` 先解析本體再看信封）、`welcome.ack`、新的伺服器訊息 `{ t: 'ack', seq }`。
 - **RoomHost**：`handleMessage` 拆成判斷序號 + `dispatch`；`acks: Map<成員, SeqAck>`，`seq` ≤ 已處理就只回 `ack`；處理完寫 `deps.storage.saveAck`（選用，`RoomDO` 存 `ack:<成員>`，喚醒時 `list({ prefix })` 讀回、清掉已不在的成員），和那則訊息的改變同一個同步段落、一起提交。`welcome(conn, member, session)`：同 session 回已處理到哪，新 session 歸零。
 - **頁面**（`connectRoom`）：`queue` 換成 `outbox`（排隊的與送出未確認的），第一次 `welcome` 有 `ack` 才編號；重連 `welcome` 後重送 `ack` 之後的（原號、原順序）再送排隊的；`RESEND_TTL_MS` 30 s、`MAX_UNACKED` 64；伺服器會確認時不再呼叫 `onUnanswered`。socket 層記送出／確認到的最大 `seq`，還有沒確認的就繼續等回音。
+### 4.76 路線圖外：編輯器的欄杆與滑動貨櫃（2026-11-23，`feat/kart-editor-obstacles`）
 
-### 4.76 路線圖外：桌遊介面電競化（大廳、等待室、標題列、結果）（2026-11-23，#155，`feat/esports-board-ui`）
+#150：編輯器做不出 #143 的會動障礙物。
+
+- **片段**（`shared/kart/editor/spec.ts`）：`boom`（欄杆，`span` 整條／左半／右半）與 `slider`（滑動貨櫃），都是一段直線、障礙物在它中間的路點；參數是長度（40～400 m）、路寬、**週期**（3～20 s）、**相位**（起跑時在週期的第幾秒，0 到週期以內）。這兩種片段不放加速帶與道具箱（障礙物佔了中間）。片段庫多「欄杆（整條）」「欄杆（半邊）」「滑動貨櫃」三顆，片段面板有週期、相位與（欄杆）擋哪邊。
+- **代碼**（`codec.ts`）：新的 tuple `['g', 長, 寬, 擋哪邊, 週期, 相位]` 與 `['c', 長, 寬, 週期, 相位]`；沒有障礙物的舊代碼一個字都沒變（`specHash`、紀錄、幽靈車照舊）。解碼照樣不信任：週期超出範圍、相位 ≥ 週期、擋哪邊不是 0～2 都拒絕。
+- **變成賽道**（`build.ts` 的 `obstacleOfPiece`）：秒換成比賽時鐘的步。欄杆：整條從左路緣外 1 m 到右路緣外 1 m（半邊到中線）、放下 35% 週期（最多 4 s）、預警 20%（最多 1 s）。貨櫃：6.1 m 長、寬取路寬一半的 0.7（最多 12 m）、在離路緣 3 m 的兩端之間滑（`parseObstacles` 的規則），週期湊成偶數步、滑一趟 10%（最多 1.2 s）、預警 8%。軌跡與 #143 的手做賽道同一套（`obstacles.ts`），電腦車、伺服器裁定、畫面、道具（§4.74）都直接適用。
+- **伺服器驗證**（`build.ts`，房間經 `custom.ts` 跑同一套）：新的問題 `obstacle`：在起終點線前 60 m 內或起跑格後 40 m（＋`LINE_BACK`）內、在立體交叉的範圍（`inZone`，多 10 m）內、超過 16 個；復位點先自動往前移出障礙物範圍（`gatesClearOfObstacles`，和立體交叉的做法一樣，連同那道門），移不出來（12 個路點內）才算問題。
+- **地圖**（`MapView.tsx`）：欄杆是粉紅虛線、貨櫃是它滑過的整段半透明框（`kartEditor.obstacle`）。
+- **測試**：`tests/kart/editorObstacles.test.ts`（代碼來回、舊代碼不變、壞的週期／相位拒絕、三種片段都是合法賽道且復位點不在障礙物裡、整條與半邊、起點與起跑格拒絕、立體交叉拒絕）；e2e `kart-editor`（從片段庫加半邊欄杆與貨櫃、改週期、地圖上兩個、移到起點被擋）。
+
+### 4.77 路線圖外：桌遊介面電競化（大廳、等待室、標題列、結果）（2026-11-23，#155，`feat/esports-board-ui`）
 
 樣式規則在 `DESIGN.md` §3.7。程式上：
 
