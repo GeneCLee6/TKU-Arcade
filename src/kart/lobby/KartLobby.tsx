@@ -31,15 +31,11 @@ import { kartSpec, parseLook } from '../../../shared/kart/karts.ts'
 import { assignTeams, isTeamId, TEAM_NAMES } from '../../../shared/kart/team.ts'
 import { KICK_BAN_MS, type RoomMember, type RoomView } from '../../../shared/protocol.ts'
 import { Button } from '../../components/Button.tsx'
-import { ChatPanel } from '../../components/ChatPanel.tsx'
 import { ConfirmButton } from '../../components/ConfirmButton.tsx'
 import { Dialog } from '../../components/Dialog.tsx'
-import { Drawer } from '../../components/Drawer.tsx'
-import type { RoomChat } from '../../components/GameLayout.tsx'
 import { HowToPlay } from '../../components/HowToPlay.tsx'
 import { registerMessages } from '../../i18n/t.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
-import { unreadCount } from '../../lib/chatState.ts'
 import {
   autoFullscreen,
   enterFullscreen,
@@ -90,13 +86,23 @@ export interface KartLobbyProps {
   invite?: ReactNode
   /** The game's options and the host's way to end the room: behind the Room button */
   setup?: ReactNode
-  /** The room's chat, behind the Chat button; absent in tests */
-  chat?: RoomChat
+  /** The room's chat behind the Chat button, and its messages for the count of unread; absent in tests */
+  chat?: LobbyChat
   /** Leaving the room on purpose (shared/protocol.ts 17.) */
   onLeave?(): void
 }
 
 type Panel = 'garage' | 'invite' | 'room' | 'teams' | 'chat'
+
+/**
+ * Made by the room's page, whose chunk has the chat's code already: importing it here (two lazy
+ * chunks down) would split it out of the room's chunk and cost every game's first screen 3 kB
+ */
+export interface LobbyChat {
+  panel: ReactNode
+  messages: readonly ChatMessage[]
+  unreadCount(messages: readonly ChatMessage[], seen: number | null, you: string): number
+}
 
 /** The 3D pictures: three.js comes after the cards are up, and only where it can draw */
 function useLobbyStage(): { stage: LobbyStage | null; failed: boolean } {
@@ -143,11 +149,12 @@ function useCover(root: RefObject<HTMLElement | null>) {
 }
 
 /** New messages since the chat was last open */
-function useUnread(messages: readonly ChatMessage[], you: string, reading: boolean): number {
+function useUnread(chat: LobbyChat | undefined, you: string, reading: boolean): number {
+  const messages = chat?.messages ?? NO_MESSAGES
   const last = messages.at(-1)?.id ?? null
   const [seen, setSeen] = useState(last)
   if (reading && seen !== last) setSeen(last)
-  return reading ? 0 : unreadCount(messages, seen, you)
+  return reading || !chat ? 0 : chat.unreadCount(messages, seen, you)
 }
 
 /** With the setting on, Ready and Start are the tap a browser wants before full screen */
@@ -190,7 +197,7 @@ export default function KartLobby({
   const [level, setLevel] = useState<BotLevel>('normal')
   const root = useRef<HTMLDivElement>(null)
   useCover(root)
-  const unread = useUnread(chat?.messages ?? NO_MESSAGES, you, open === 'chat')
+  const unread = useUnread(chat, you, open === 'chat')
   const close = () => setOpen(null)
 
   const seated = Object.values(members)
@@ -402,9 +409,9 @@ export default function KartLobby({
         </Dialog>
       )}
       {chat && (
-        <Drawer open={open === 'chat'} onClose={close} title={t('chat.heading')}>
-          <ChatPanel {...chat} you={you} />
-        </Drawer>
+        <Dialog open={open === 'chat'} onClose={close} title={t('chat.heading')}>
+          {chat.panel}
+        </Dialog>
       )}
       <Dialog
         open={managed !== undefined}

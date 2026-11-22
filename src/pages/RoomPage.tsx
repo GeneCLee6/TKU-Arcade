@@ -2,6 +2,7 @@ import { createElement, lazy, Suspense, useEffect, useState, type ReactNode } fr
 import styled from 'styled-components'
 import { isRoomId } from '../../shared/room-id.ts'
 import { AccountControl } from '../components/AccountControl.tsx'
+import { ChatPanel } from '../components/ChatPanel.tsx'
 import { Button } from '../components/Button.tsx'
 import { GameLayout, RoomChatPanel, type RoomParts } from '../components/GameLayout.tsx'
 import { HowToPlay } from '../components/HowToPlay.tsx'
@@ -11,7 +12,7 @@ import { gameScreen } from '../games/screens.ts'
 import type { RulesEdition } from '../lib/rulesDoc.ts'
 import { loadGameDetails, useGameDetails } from '../i18n/gameDetails.ts'
 import { useT } from '../i18n/useT.ts'
-import { ChatDraft } from '../lib/chatState.ts'
+import { ChatDraft, unreadCount } from '../lib/chatState.ts'
 import { gameTitle } from '../lib/gameTitle.ts'
 import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
@@ -268,7 +269,15 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
             onAddBot={room.addBot}
             onSetTeam={room.setTeam}
             aside={!compact && !kartLobby && <RoomChatPanel room={parts} />}
-            chat={parts.chat}
+            chat={
+              kartLobby
+                ? {
+                    panel: <ChatPanel {...parts.chat} you={you} />,
+                    messages: parts.chat.messages,
+                    unreadCount,
+                  }
+                : undefined
+            }
             onLeave={room.leave}
           />
           {/* On a phone the chat is a drawer, its bar stuck to the bottom of the whole page */}

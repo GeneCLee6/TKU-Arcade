@@ -4,7 +4,7 @@ import { getGameCard } from '../../shared/games/lobby.ts'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
-import type { RoomChat } from './GameLayout.tsx'
+import type { LobbyChat } from '../kart/lobby/KartLobby.tsx'
 import { monoType } from '../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
@@ -41,7 +41,7 @@ export interface WaitingRoomProps {
   /** Below the setup in the right-hand column of a wide screen: the room's chat */
   aside?: ReactNode
   /** 2026-11-22: the race room's waiting room covers the screen and keeps its chat behind a button */
-  chat?: RoomChat
+  chat?: LobbyChat
   /** 2026-11-22: leaving the room on purpose, from the race room's waiting room (shared/protocol.ts 17.) */
   onLeave?(): void
 }
