@@ -863,7 +863,7 @@ export function buildTamkang(kit: ArtKit): { update(seconds: number): void } {
     // Scenery, not interface: the stone reads the same in either language, like the real place's
     signContext.fillText('淡江大學', 256, 82) // i18n-ignore
     signContext.font = 'bold 30px sans-serif'
-    signContext.fillText('TAMKANG UNIVERSITY', 256, 160)
+    signContext.fillText('TAMKANG UNIVERSITY', 256, 160) // i18n-ignore
   }
   const signTexture = ownTexture(new CanvasTexture(signCanvas))
   signTexture.colorSpace = SRGBColorSpace

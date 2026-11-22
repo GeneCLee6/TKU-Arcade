@@ -2,11 +2,19 @@
 // bare strings. Paths are relative to the current directory. Needs --experimental-strip-types: the
 // catalogs are imported from their .ts files, so this checks what t() really gets.
 //
-// A line containing `// i18n-ignore` is skipped by the bare-string checks. Inside JSX children, where
-// `//` would render, write `{/* // i18n-ignore */}`.
+// The bare-string check reads each src/ file's syntax tree (#6 of docs/NEXT.md §5, 2026-11-22): JSX
+// text, a string in a JSX child (`{'Hello'}`, `{ok ? 'Yes' : 'No'}`), a visible attribute however it
+// is written (`aria-label`, `title`, `placeholder`...), a string passed to alert(), toast() or a
+// canvas's fillText(), one assigned to document.title. Not looked at: className, test ids and other
+// attributes, a string without a word in it (symbols, numbers, a lone letter), an address.
+//
+// A line containing `// i18n-ignore` is skipped by the bare-string checks, and so is the line after
+// one containing `// i18n-ignore-next-line`. Inside JSX children, where `//` would render, write
+// `{/* // i18n-ignore */}`.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { parseSync } from 'vite'
 
 const SITE_EN = 'src/i18n/en.ts'
 const SITE_ZH = 'src/i18n/zh-TW.ts'
@@ -31,7 +39,8 @@ const SOURCE_ROOT = 'src'
 
 const USER_VISIBLE_ATTRIBUTES = new Set(['aria-label', 'title', 'placeholder', 'alt', 'label'])
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}　-〿＀-￯]/u
-const IGNORE = /\/\/\s*i18n-ignore/
+const IGNORE = /\/\/\s*i18n-ignore(?!-)/
+const IGNORE_NEXT = /\/\/\s*i18n-ignore-next-line/
 const PLACEHOLDER = /\{(\w+)\}/g // Same shape as format() in src/i18n/t.ts
 
 const problems = []
@@ -75,240 +84,167 @@ function checkParity(en, enLabel, zh, zhLabel) {
 
 // HTML entities are not words; a lone letter (an icon, a grade) reads the same in both languages
 const hasWords = (text) => /[A-Za-z]{2,}/.test(text.replace(/&#?\w+;/g, ' '))
+// Where a string is an address rather than words (an href in a ternary, a route)
+const URL_LIKE = /^(?:[a-z][a-z\d+.-]*:|\/|#|\.{1,2}\/)\S*$/i
+const isWords = (text) => hasWords(text) && !URL_LIKE.test(text.trim())
 
-const LITERAL_VALUE = /^\{\s*(['"])((?:(?!\1)[^\\]|\\.)*)\1\s*\}$/s
-
-// Walks one source file, returning its comment ranges and its bare strings. A real walk rather than
-// a regex: in JSX text an apostrophe does not open a string and `//` does not open a comment, while
-// in code `<` is usually not a tag. `<` is tried as an element only when `jsx` is set, and a try that
-// finds no matching closing tag (generics, comparisons) is undone, so it costs nothing.
-function scan(source, jsx) {
-  const comments = []
-  const bare = []
-  const notElements = new Set()
-
-  function skipComment(start) {
-    if (source.startsWith('//', start)) {
-      const newline = source.indexOf('\n', start)
-      comments.push([start, newline < 0 ? source.length : newline])
-    } else if (source.startsWith('/*', start)) {
-      const close = source.indexOf('*/', start + 2)
-      comments.push([start, close < 0 ? source.length : close + 2])
-    } else {
-      return -1
-    }
-    return comments.at(-1)[1]
-  }
-
-  function skipBlank(start) {
-    let i = start
-    for (;;) {
-      if (/\s/.test(source[i] ?? '')) i++
-      else {
-        const afterComment = skipComment(i)
-        if (afterComment < 0) return i
-        i = afterComment
+// The strings an expression can evaluate to and show as written: a literal, either side of a ternary,
+// the fallback of `||` and `??`, the right of `&&`, both sides of `+`, a template's own text. A call
+// (t('key'), a formatter) is never one: its arguments are not what shows
+function visibleStrings(node, found = []) {
+  switch (node?.type) {
+    case 'Literal':
+      if (typeof node.value === 'string') found.push({ at: node.start, text: node.value })
+      break
+    case 'TemplateLiteral':
+      found.push({ at: node.start, text: node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw).join(' ') })
+      break
+    case 'ConditionalExpression':
+      visibleStrings(node.consequent, found)
+      visibleStrings(node.alternate, found)
+      break
+    case 'LogicalExpression':
+      if (node.operator !== '&&') visibleStrings(node.left, found)
+      visibleStrings(node.right, found)
+      break
+    case 'BinaryExpression':
+      if (node.operator === '+') {
+        visibleStrings(node.left, found)
+        visibleStrings(node.right, found)
       }
-    }
+      break
+    case 'ParenthesizedExpression':
+    case 'TSAsExpression':
+    case 'TSSatisfiesExpression':
+    case 'TSNonNullExpression':
+      visibleStrings(node.expression, found)
+      break
+    case 'ArrayExpression':
+      for (const element of node.elements) visibleStrings(element, found)
+      break
+    case 'SequenceExpression':
+      visibleStrings(node.expressions.at(-1), found)
+      break
   }
-
-  // A newline ends it too, so a stray quote costs one line at most
-  function skipString(start) {
-    for (let i = start + 1; i < source.length; i++) {
-      if (source[i] === '\\') i++
-      else if (source[i] === source[start] || source[i] === '\n') return i + 1
-    }
-    return source.length
-  }
-
-  function regexCanStart(start) {
-    const before = source.slice(Math.max(0, start - 12), start).trimEnd()
-    return !/[\w$)\]}'"`]$/.test(before) || /\b(return|typeof|case|in|of|void)$/.test(before)
-  }
-
-  function skipRegex(start) {
-    let inClass = false
-    for (let i = start + 1; i < source.length && source[i] !== '\n'; i++) {
-      if (source[i] === '\\') i++
-      else if (source[i] === '[') inClass = true
-      else if (source[i] === ']') inClass = false
-      else if (source[i] === '/' && !inClass) return i + 1
-    }
-    return -1
-  }
-
-  // Its text is not looked at (styled-components CSS has `>`), but ${} is code again
-  function skipTemplate(start) {
-    for (let i = start + 1; i < source.length; i++) {
-      if (source[i] === '\\') i++
-      else if (source[i] === '`') return i + 1
-      else if (source.startsWith('${', i)) {
-        i = code(i + 2, true) - 1
-        if (i < 0) return -1
-      }
-    }
-    return -1
-  }
-
-  // Returns the index after the closing `}` when nested; -1 when the source ends first
-  function code(start, nested) {
-    let depth = 0
-    let i = start
-    while (i < source.length) {
-      const char = source[i]
-      const afterComment = skipComment(i)
-      if (afterComment >= 0) i = afterComment
-      else if (char === "'" || char === '"') i = skipString(i)
-      else if (char === '`') {
-        i = skipTemplate(i)
-        if (i < 0) return -1
-      } else if (char === '/' && regexCanStart(i)) {
-        const end = skipRegex(i)
-        i = end < 0 ? i + 1 : end
-      } else if (char === '{') {
-        depth++
-        i++
-      } else if (char === '}') {
-        if (nested && depth === 0) return i + 1
-        depth--
-        i++
-      } else if (char === '<' && jsx) {
-        const end = element(i)
-        i = end < 0 ? i + 1 : end
-      } else i++
-    }
-    return -1
-  }
-
-  function matchAt(pattern, at) {
-    pattern.lastIndex = at
-    return pattern.exec(source)?.[0] ?? ''
-  }
-
-  function skipTypeArguments(start) {
-    let depth = 0
-    for (let i = start; i < source.length; i++) {
-      if (source[i] === '<') depth++
-      else if (source[i] === '>' && source[i - 1] !== '=' && --depth === 0) return i + 1
-    }
-    return -1
-  }
-
-  function attribute(start) {
-    const name = matchAt(/[A-Za-z_$][\w$:.-]*/y, start)
-    if (!name) return -1
-    const afterName = skipBlank(start + name.length)
-    if (source[afterName] !== '=') return afterName
-    const at = skipBlank(afterName + 1)
-    let end
-    let value
-    if (source[at] === '"' || source[at] === "'") {
-      end = source.indexOf(source[at], at + 1) + 1
-      if (end === 0) return -1
-      value = source.slice(at + 1, end - 1)
-    } else if (source[at] === '{') {
-      end = code(at + 1, true)
-      if (end < 0) return -1
-      value = LITERAL_VALUE.exec(source.slice(at, end))?.[2]
-    } else if (source[at] === '<') {
-      return element(at)
-    } else {
-      return -1
-    }
-    if (USER_VISIBLE_ATTRIBUTES.has(name) && value !== undefined && hasWords(value)) {
-      bare.push({ at, what: `bare ${name} attribute`, text: value })
-    }
-    return end
-  }
-
-  function addText(from, to) {
-    let at = from
-    for (const line of source.slice(from, to).split('\n')) {
-      if (hasWords(line)) bare.push({ at, what: 'bare JSX text', text: line.trim() })
-      at += line.length + 1
-    }
-  }
-
-  function children(start, name) {
-    let i = start
-    for (;;) {
-      const stop = /[<>{}]/g
-      stop.lastIndex = i
-      const next = stop.exec(source)?.index
-      if (next === undefined) return -1
-      addText(i, next)
-      i = next
-      // A raw `>` or `}` is a syntax error in JSX text, so this was never an element
-      if (source[i] === '>' || source[i] === '}') return -1
-      if (source[i] === '{') {
-        i = code(i + 1, true)
-      } else if (source.startsWith('</', i)) {
-        const close = skipBlank(i + 2)
-        if (!source.startsWith(name, close)) return -1
-        const end = skipBlank(close + name.length)
-        return source[end] === '>' ? end + 1 : -1
-      } else {
-        i = element(i)
-      }
-      if (i < 0) return -1
-    }
-  }
-
-  function parseElement(start) {
-    const name = matchAt(/[A-Za-z_$][\w$:.-]*/y, start + 1)
-    let i = start + 1 + name.length
-    if (!name && source[i] !== '>') return -1
-    if (source[i] === '<') {
-      i = skipTypeArguments(i) // <Select<string> ...>
-      if (i < 0) return -1
-    }
-    for (;;) {
-      i = skipBlank(i)
-      if (source.startsWith('/>', i)) return i + 2
-      if (source[i] === '>') return children(i + 1, name)
-      i = source[i] === '{' ? code(i + 1, true) : attribute(i)
-      if (i < 0) return -1
-    }
-  }
-
-  function element(start) {
-    if (notElements.has(start)) return -1
-    const [commentCount, bareCount] = [comments.length, bare.length]
-    const end = parseElement(start)
-    if (end < 0) {
-      // Whatever the failed try read as comments and text was really code
-      notElements.add(start)
-      comments.length = commentCount
-      bare.length = bareCount
-    }
-    return end
-  }
-
-  code(0, false)
-  return { comments, bare }
+  return found
 }
+
+// A JSX attribute whose value is read out or shown: the DOM's, and the props of this site's components
+// that end up as text. Any other (className, data-testid, href, a variant) is not looked at
+const VISIBLE_ATTRIBUTES = new Set([
+  ...USER_VISIBLE_ATTRIBUTES,
+  'aria-description',
+  'aria-roledescription',
+  'aria-valuetext',
+  'aria-placeholder',
+  'caption',
+  'description',
+  'heading',
+  'hint',
+  'message',
+  'subtitle',
+  'summary',
+  'text',
+  'tooltip',
+])
+// Calls that put their arguments in front of the player: the browser's dialogs, a toast, a canvas that
+// draws words (the kart's scenery draws its signs with fillText)
+const TEXT_CALLS = new Set(['alert', 'confirm', 'prompt', 'toast', 'notify', 'fillText', 'strokeText'])
+// Assigned to one of these, a string shows: document.title, an element's text
+const TEXT_PROPERTIES = new Set(['title', 'textContent', 'innerText', 'placeholder', 'ariaLabel'])
+
+const attributeName = (name) =>
+  name.type === 'JSXNamespacedName' ? `${name.namespace.name}:${name.name.name}` : name.name
+const calleeName = (callee) =>
+  callee.type === 'Identifier'
+    ? callee.name
+    : callee.type === 'MemberExpression' && !callee.computed
+      ? callee.property.name
+      : undefined
+
+// Walks a file's syntax tree for the places where a string reaches the screen as written. The tree is
+// Vite's parser's (oxc): TypeScript 7, this repo's compiler, has no JavaScript API to parse with
+function bareStrings(program) {
+  const bare = []
+  const report = (strings, what) => {
+    for (const { at, text } of strings) if (isWords(text)) bare.push({ at, what, text: text.trim() })
+  }
+  const visit = (node, parent) => {
+    switch (node.type) {
+      case 'JSXText': {
+        let at = node.start
+        for (const line of node.value.split('\n')) {
+          if (hasWords(line)) bare.push({ at, what: 'bare JSX text', text: line.trim() })
+          at += line.length + 1
+        }
+        break
+      }
+      case 'JSXExpressionContainer':
+        if (parent?.type === 'JSXElement' || parent?.type === 'JSXFragment') {
+          report(visibleStrings(node.expression), 'bare string in JSX')
+        }
+        break
+      case 'JSXAttribute': {
+        const name = attributeName(node.name)
+        if (!VISIBLE_ATTRIBUTES.has(name) || node.value === null) break
+        const value = node.value.type === 'JSXExpressionContainer' ? node.value.expression : node.value
+        report(visibleStrings(value), `bare ${name} attribute`)
+        break
+      }
+      case 'CallExpression':
+      case 'NewExpression': {
+        const name = calleeName(node.callee)
+        if (TEXT_CALLS.has(name) || (node.type === 'NewExpression' && name === 'Notification')) {
+          for (const argument of node.arguments) report(visibleStrings(argument), `bare string passed to ${name}()`)
+        }
+        break
+      }
+      case 'AssignmentExpression': {
+        const { left } = node
+        if (left.type === 'MemberExpression' && !left.computed && TEXT_PROPERTIES.has(left.property.name)) {
+          report(visibleStrings(node.right), `bare string assigned to .${left.property.name}`)
+        }
+        break
+      }
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'type' || value === null || typeof value !== 'object') continue
+      for (const child of Array.isArray(value) ? value : [value]) {
+        if (child !== null && typeof child === 'object' && typeof child.type === 'string') visit(child, node)
+      }
+    }
+  }
+  visit(program, null)
+  return bare
+}
+
+const lineAt = (source, at) => source.slice(0, at).split('\n').length
 
 function checkSource(file) {
   const source = readFileSync(file, 'utf8')
   const lines = source.split('\n')
-  const { comments, bare } = scan(source, file.endsWith('.tsx'))
+  const { program, comments, errors } = parseSync(file, source, { lang: file.endsWith('.tsx') ? 'tsx' : 'ts' })
+  if (errors.length > 0) {
+    const at = errors[0].labels?.[0]?.start ?? 0
+    problems.push(`${file}:${lineAt(source, at)}: cannot parse: ${errors[0].message}`)
+    return
+  }
 
   const found = []
+  const ignored = (line) => IGNORE.test(lines[line - 1]) || IGNORE_NEXT.test(lines[line - 2] ?? '')
   const report = (line, what, text) => {
-    if (!IGNORE.test(lines[line - 1])) found.push({ line, what, text })
+    if (!ignored(line)) found.push({ line, what, text })
   }
 
   let withoutComments = source
-  for (const [start, end] of comments) {
+  for (const { start, end } of comments) {
     const blank = source.slice(start, end).replace(/[^\n]/g, ' ')
     withoutComments = withoutComments.slice(0, start) + blank + withoutComments.slice(end)
   }
   withoutComments.split('\n').forEach((line, index) => {
     if (CJK.test(line)) report(index + 1, 'CJK outside comments', line.trim())
   })
-  for (const { at, what, text } of bare) {
-    report(source.slice(0, at).split('\n').length, what, text)
-  }
+  for (const { at, what, text } of bareStrings(program)) report(lineAt(source, at), what, text)
 
   found.sort((a, b) => a.line - b.line)
   for (const { line, what, text } of found) problems.push(`${file}:${line}: ${what}: ${text}`)

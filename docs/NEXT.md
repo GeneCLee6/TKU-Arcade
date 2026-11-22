@@ -59,6 +59,7 @@
 
 - 每 PR 預覽 Worker、CI、`main` 自動部署（#1）；視覺回歸與 axe 進 CI（#48）。
 - 首屏預算：`npm run budget -- --chunks`，上限在 `scripts/check-budget.mjs`（#31、#80、#128）。
+- `check-i18n` 讀語法樹找裸字串（JSX 子節點與條件式裡的字串、各種寫法的可見屬性、`toast`／`alert`／`fillText`、`document.title`），豁免 `// i18n-ignore`／`// i18n-ignore-next-line`；規則在 `DESIGN.md` §5（#137）。
 - 每款遊戲功能旗標、成本儀表板與 80% 警示、安全複查 `SECURITY.md`（#107）。
 - 濫用防護（跨 instance 速率、每房每位址連線數、暱稱過濾、管理金鑰鎖定）（#110）；建房每位址每分鐘 10 間（#133）。
 
@@ -136,7 +137,6 @@
 
 **大廳與房間**
 
-- `check-i18n` 抓不到 `{'Hello'}`、`toast('Saved')`、條件式裡的字串（#6）。
 - 其他遊戲畫面的 `i18n.screen.ts` 仍兩語一起（每款 1–3 kB），可照陞官圖完整版的 `registerLanguageParts` 拆（#80）。
 - 陞官圖專注模式時把頁面其他部分設 `inert`（要先確認 DOM 結構與 iPhone 的行為）（#112）。
 - 光譜某個後段畫面一次 axe 對比不足未能重現；`sweep` 再報就照印出的元素修（#119）。
