@@ -157,7 +157,7 @@ test('two people and a computer kart race one lap in one room', async ({ browser
   for (const page of [ann, bob]) {
     await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 90_000 }).toBe(2)
   }
-  // 2026-11-22 (§4.72): Esc in a room opens the menu, and the race goes on
+  // 2026-11-22 (§4.73): Esc in a room opens the menu, and the race goes on
   await bob.keyboard.press('Escape')
   await expect(bob.getByTestId('kart-pause-live')).toBeVisible()
   await expect(bob.getByTestId('kart-pause-leave')).toBeVisible()

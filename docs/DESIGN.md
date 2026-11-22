@@ -77,7 +77,7 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
 - **準備完成**＝綠色（`success`）2 px 框＋內光暈＋大字；房主＝主題色框＋「房主」；沒準備／離線是 `muted` 字，不只靠顏色（狀態一定有字）。隊伍是格子上緣 4 px 的隊色＋隊名標籤。
 - 背景圖只是裝飾（`aria-hidden`），面板一律不透明，文字對比不靠背景。
 
-**卡丁車等待室滿版（2026-11-22，`feat/kart-lobby-fullscreen`，`ARCHITECTURE.md` §4.70）**
+**卡丁車等待室滿版（2026-11-22，`feat/kart-lobby-fullscreen`，`ARCHITECTURE.md` §4.71）**
 
 - 整個畫面是等待室：上方 `broadcast` 列（返回、標題、車手數 `ticker`、圖示工具鈕，寬度 > 1180 px 才露出文字）；左邊 8 張大卡（4×2，超寬 8×1），右邊側欄（賽道卡、車庫、準備／開始大按鈕）。房主的設定、邀請、聊天、分隊都收進對話框，主畫面只有車手。
 - 卡片：上面是 3D 車手（車的 `accent` 色地面光暈），下面名牌條（`displayType` 名字、`muted` 車款、`monoType` 標籤、狀態大字）；名牌條上緣 3 px 是隊色或主題色。準備完成＝綠框＋外光一閃＋字從大到正常砸進來；房主＝主題色框；狀態一定有字。

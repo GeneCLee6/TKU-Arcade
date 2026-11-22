@@ -1575,7 +1575,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **Esc**：真全螢幕時 Esc 是瀏覽器的（頁面攔不到），離開後頁面靠 `fullscreenchange`（含 `webkitfullscreenchange`）跟上；Chrome／Edge 桌機進入後用 Keyboard Lock 保留 Esc（`navigator.keyboard.lock(['Escape'])`），所以比賽的 Esc 先開暫停選單、長按 Esc 才離開全螢幕。專注模式沒有瀏覽器幫忙，Esc 由這裡處理，但有 `<dialog open>` 或畫面自己用掉這個 Esc（`event.preventDefault()`）時不動作——**要自己用 Esc 的畫面（暫停選單）請 `preventDefault()`**。
 - **自動全螢幕**（設定，預設關，`localStorage` `tku-arcade.fullscreen.auto`）：`autoFullscreen()`／`setAutoFullscreen()`／`useAutoFullscreen()`；瀏覽器只准從使用者動作進全螢幕，所以 `armAutoFullscreen()` 掛一次性的 `keydown`／`pointerdown`（捕獲階段，Esc 除外），比賽的第一個鍵或第一下觸控就進去；只用真全螢幕，不會無預警進專注模式。
 - **手機轉橫**：`lockLandscape()`／`unlockOrientation()`（`screen.orientation.lock('landscape')`，Chrome Android 只在全螢幕或已安裝的 app 有效，其他瀏覽器拒絕就維持現有的轉橫提示）。`src/kart/race/useRaceFullscreen.ts` 在比賽中：掛自動全螢幕、觸控裝置嘗試鎖橫（一進來先試一次給已安裝的 app，進全螢幕時再試）、離開比賽解鎖。
-- **按鈕**（`src/components/FullscreenButton.tsx`，自己的 lazy chunk，字串 `shared/games/i18n.fullscreen.ts` 由它登記、`screenMessages.ts` 列給 check-i18n）：每個房間標題列（桌遊等待室與遊戲中、卡丁車觀戰與結果）、卡丁車單機選單（`SpikePage.tsx`，`landscape`：進全螢幕順便鎖橫）、卡丁車等待室（§4.70）。比賽中由暫停選單（`feat/kart-race-flow`）提供。
+- **按鈕**（`src/components/FullscreenButton.tsx`，自己的 lazy chunk，字串 `shared/games/i18n.fullscreen.ts` 由它登記、`screenMessages.ts` 列給 check-i18n）：每個房間標題列（桌遊等待室與遊戲中、卡丁車觀戰與結果）、卡丁車單機選單（`SpikePage.tsx`，`landscape`：進全螢幕順便鎖橫）、卡丁車等待室（§4.71）。比賽中由暫停選單（`feat/kart-race-flow`）提供。
 - **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
 - **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
 
@@ -1605,7 +1605,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 **限制（照實寫）**：(1) 水面沒有倒影（沒有反射貼圖）；太陽的反光是燈光算的。(2) 高畫質的浪只在水面頂點上（約 12 m 一格），近看是平滑的大浪，不是碎浪。(3) 稜線是遠景，不能開上去；涼亭和廟沒有碰撞（離路 15 m 以上，開不到）。(4) 觀音山的輪廓是自己畫的峰，不是照真實的山形或照片。
 
 
-### 4.70 路線圖外：卡丁車等待室滿版（一頁、橫向、車手為主角）（2026-11-22，#151，`feat/kart-lobby-fullscreen`）
+### 4.71 路線圖外：卡丁車等待室滿版（一頁、橫向、車手為主角）（2026-11-22，#151，`feat/kart-lobby-fullscreen`）
 
 擁有者：「大廳準備階段的畫面要像跑跑一樣，全螢幕都是房主跟車手，現在的版面配置很醜也很空曠，要一頁就塞滿，橫向的寬的…總之要電競化專業化」。照規則 1 只學「準備畫面滿版、車手為主角」的類型排版；版面、美術、圖示是自己的（`IP-CHECKLIST.md`）。
 
@@ -1620,7 +1620,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **字串**：`shared/games/kart/i18n.lobby.ts` 多 9 個（`racers`、`room`、`roomTitle`、`manage`、`quickest`、`yourKart`、`sideways`、`watchingList`、`lineUp`）；`TrackCard` 的「各自為戰」不再寫（團隊賽才寫）。
 - **測試**：`tests/kart/lobby.test.tsx` 多 4 個（房間面板裡的電腦車與自動全螢幕設定、只有房主有管理鈕且能移除電腦車、車手數、3D 來之前的平面圖與最快車）；`e2e/kart-lobby.spec.ts`（新）：1280×720 與 844×390（觸控）房主＋Bob＋6 台電腦車：滾輪不動、等待室沒有捲動、8 格都完整在畫面內且高度 > 畫面 1/3、準備流程、axe 0 serious（含房間設定對話框）、聊天未讀數；等待室全螢幕進出；390×844 直拿是列表＋轉橫提示＋axe。`kart-race`／`kart-loading`／`kart-team`／`kart-editor` 改成從面板操作（房間設定、分隊、空位的加電腦車）。截圖：`KART_LOBBY_SHOTS=1` 時存到 `test-results/kart-lobby-*.png`。
 
-### 4.71 路線圖外：房間連線的穩定度（2026-11-22，`feat/net-stability-bots`，#149）
+### 4.72 路線圖外：房間連線的穩定度（2026-11-22，`feat/net-stability-bots`，#149）
 
 擁有者：「常常連線不穩。」原因、修法與前後數字在 `docs/NETWORK.md`。架構上的改變：
 
@@ -1630,7 +1630,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **RoomDO**：跑到 `webSocketMessage` 的 `ping` 也記心跳。
 - **工具**：`scripts/net-soak.ts`（`npm run net:soak`）；`e2e/network.spec.ts`。
 
-### 4.72 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，#152，`feat/kart-race-flow`）
+### 4.73 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，#152，`feat/kart-race-flow`）
 
 擁有者 2026-11-22：「按 esc 就可以暫停然後可以打開主選單……當第一台車完賽後倒數 10 秒，到了的車才能排名，然後最後要有前 3 名頒獎畫面動畫……地圖一開始要有每個車手的正面動畫，然後才是 321 倒數，倒數要有音效，GO 也要有音效，選單可以調節音量音效大小，動畫特效等等。」流程是類型慣例；畫面、聲音、文字全部自己做（`IP-CHECKLIST.md` 卡丁車 2026-11-22 補記）。
 

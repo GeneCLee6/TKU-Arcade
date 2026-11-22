@@ -1,5 +1,5 @@
 // 2026-11-22 (owner: "the menu can set the music and sound volumes, the animations and effects";
-// docs/ARCHITECTURE.md §4.72): the kart's race settings besides the volumes (audio/volumes.ts), the
+// docs/ARCHITECTURE.md §4.73): the kart's race settings besides the volumes (audio/volumes.ts), the
 // quality (quality.ts) and the tips (school/store.ts): how much effect is drawn, whether the camera
 // shakes, and how the race opens. Kept in this browser (lib/storage.ts never throws: blocked storage
 // keeps them for the page); read by the scene when it is built and by the race loop every frame.
