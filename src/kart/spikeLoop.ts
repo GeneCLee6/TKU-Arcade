@@ -341,7 +341,7 @@ export interface SpikeNet {
   /** Each frame: the other karts to draw */
   others(): readonly OtherKart[]
   /** After each frame is drawn: to put the name tags where the karts are */
-  drawn(scene: Pick<KartScene, 'project'>): void
+  drawn(scene: Pick<KartScene, 'tagPoints'>): void
   /** Drives the kart instead of the keys (testing a room alone, `?autopilot`) */
   readonly autopilot?: (trial: Trial) => KartInput
   /**

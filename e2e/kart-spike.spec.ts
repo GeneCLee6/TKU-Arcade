@@ -97,7 +97,8 @@ async function openSpike(page: Page) {
 async function screenshotColours(page: Page) {
   const png = (await page.locator('canvas').screenshot()).toString('base64')
   return page.evaluate(async (data) => {
-    const blob = await (await fetch(`data:image/png;base64,${data}`)).blob()
+    // Decoded here, not fetched: the site's CSP (connect-src 'self') blocks fetch() of a data: URL
+    const blob = new Blob([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], { type: 'image/png' })
     const bitmap = await createImageBitmap(blob)
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
     const context = canvas.getContext('2d')!

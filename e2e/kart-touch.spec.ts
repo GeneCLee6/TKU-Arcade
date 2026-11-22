@@ -114,6 +114,9 @@ function ovalLine(): Point[] {
 
 const wrap = (angle: number) => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI))
 
+/** As long as the loading screen may take on a busy machine; the page shows its progress meanwhile */
+const LOADING_MS = 45_000
+
 async function openTrial(
   page: Page,
   locale: 'en' | 'zh-TW',
@@ -128,12 +131,20 @@ async function openTrial(
     },
     { locale, settings },
   )
+  // Loading is not the test's own work: it gets its own allowance on top of the test's time
+  test.info().setTimeout(test.info().timeout + LOADING_MS)
   await page.goto(path)
+  // 2026-11-22 (#131): the race's chunks load behind a loading screen first (#128), and only then is
+  // there a canvas. That takes about 2 s on an idle machine and several times that on a busy one (the
+  // whole suite in one go, other work on the machine): what to wait for is the race drawing, as long
+  // as loading takes, not a canvas within the default 5 s
+  await expect
+    .poll(() => page.evaluate(() => (window as { __kartSpike?: Reading }).__kartSpike?.frames ?? 0), {
+      timeout: LOADING_MS,
+    })
+    .toBeGreaterThan(5)
   await expect(page.locator('canvas')).toBeVisible()
   await expect(page.getByTestId('kart-touch')).toBeVisible()
-  await expect
-    .poll(() => page.evaluate(() => (window as { __kartSpike?: Reading }).__kartSpike?.frames ?? 0))
-    .toBeGreaterThan(5)
 }
 
 const noScroll = (page: Page) =>
@@ -184,8 +195,13 @@ for (const [width, height] of [
       // Time trials have no items
       await expect(page.getByTestId('kart-touch-item')).toHaveCount(0)
       // Nothing for axe, with the buttons and with their settings open
+      // The buttons and their panel are what this is about: axe over the whole page under a running
+      // race (software WebGL drawing every frame) took most of the test's 30 s on a busy machine
       const problems = async () => {
-        const { violations } = await new AxeBuilder({ page }).analyze()
+        const { violations } = await new AxeBuilder({ page })
+          .include('[data-testid="kart-touch"]')
+          .include('[data-testid="kart-touch-panel"]')
+          .analyze()
         return violations.map(({ id, nodes }) => ({ id, nodes: nodes.map((node) => node.target) }))
       }
       expect(await problems()).toEqual([])
