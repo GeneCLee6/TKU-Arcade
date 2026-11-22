@@ -423,7 +423,7 @@ export function createBotBrain(
 
   /**
    * Watching the wall (skill.wallCare): from here, at this speed, on the arc the hands mean to
-   * drive (`steer`, a share of the grip's turn) and on a few others up to `turnMost` either way, how
+   * drive (`steer`, a share of the grip's turn) and on a few others up to `gripTurn` either way, how
    * soon the kart leaves the road. `own` for the hands' arc, `best` for the best of all (Infinity:
    * one keeps it on the road for `seconds`), and `steer` the stick for the arc that lasts, the
    * nearest to the hands' own among those that do
