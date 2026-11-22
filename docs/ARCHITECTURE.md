@@ -1399,6 +1399,15 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **首屏**：主站 99.9 → 101.0 kB（字串、卡片標籤、service worker 註冊與更新提示的 hook；`QuickPlay`、`UpdatePrompt` 不在首屏）；`QuickPlay` 約 1.3 kB gzip 在首屏之外。
 - **測試**：`tests/games/quick-bots.test.ts`（每款 `computer` 遊戲的預設請求都合法、別的都不合法；每個難度與人數的邊界；格式）、`tests/worker/rooms.test.ts`（交給 DO 的參數、強制私人、各種不合法 400）、`tests/worker/room-table-bots.test.ts`「a room opened with computer players」（座位、加入就開局、只開一次、hibernation、暫停時留在等待室、房主重連不重開、卡丁車不收、一局玩到底）、`e2e/quick-play.spec.ts`（手機一鍵德州撲克到發牌、不在公開房列表、卡片標籤、卡丁車兩格）。
 
+
+### 4.55b 「跟電腦玩」自選數量與各自難度（2026-11-22，`feat/table-bots-many`，#PRBOTS）
+
+擁有者 2026-11-22：「其他遊戲添加電腦你也要給多電腦模式，比如德州撲克目前只能加1個電腦。」§4.55 的一鍵開局只給 `max(1, minPlayers − 1)` 個電腦（德州撲克 1 個）。
+
+- **數量**：`shared/games/quickBots.ts` 的 `quickBotRange(meta, names)`＝最少 `max(1, minPlayers − 1)`、最多 `min(maxPlayers − 1, 名字數)`；`quickBotCount(gameId, meta)` 是每款的預設（德州撲克 5，陞官圖、滬尾商行、社辦牌陣、朝堂暗鬥、奪祕笈、芥末餃子 3），夾在範圍內。大廳每格多一個「− N ＋」。
+- **難度**：分段切換多一個「各自選」：每格出現每個電腦一顆小鈕（「1 普通」），點一下換下一個難度。請求變成 `bots: { count, level, levels }`，`levels` 一個電腦一個、照座位順序；`parseQuickBots` 檢查長度等於 `count`、每個都在 `bots.levels`，不合就 400 `bad_bots`。`RoomHost.create` 用 `quickBotLevel(bots, i)` 給第 i 個電腦難度。伺服器的人數上限本來就是座位數 − 1（不用放寬）；速率限制不變（一鍵仍是一個 POST）。
+- **等待室**：`TableBots.tsx` 多「空位全部坐滿（N）」，送 N 個 `add_bot`（房間照舊一個一個放進最低空位，超過的回 `seat_taken`）；七款都能加到滿座（`MAX_MEMBERS` 64 遠大於座位）。
+- **測試**：`tests/games/quick-bots.test.ts`（範圍、預設、`levels` 格式）、`tests/components/QuickPlay.test.tsx`（預設 5、1 到 8、各自選）、`tests/worker/room-table-bots.test.ts`「one person and a full table of computers」（七款各一人＋滿座電腦、難度交錯，房間下完一局；等待室加到滿、多的兩個被拒）、`e2e/quick-play.spec.ts`（手機一鍵德州撲克 5 個電腦開局、桌機 8 個電腦各自難度）。
 ### 4.56 路線圖外：PWA 的快取與新版本提示（2026-11-21，`feat/lobby-quickplay-pwa`）
 
 `e7-t09`（#48）已經有 manifest、圖示、只回離線頁的 service worker 與安裝提示。這批把 service worker 改成「App 殼＋靜態資產」快取、加上新版本提示，安裝提示可以關。
