@@ -2,6 +2,7 @@ import type { Account } from '../shared/account.ts'
 import { CHAT_CHUNK, CHAT_HISTORY, ChatRateLimit, type ChatMessage } from '../shared/chat.ts'
 import type { ReplayStep } from '../shared/games/match.ts'
 import { keepHidden, parseOptions } from '../shared/games/options.ts'
+import { quickBotLevel } from '../shared/games/quickBots.ts'
 import { createRng } from '../shared/games/rng.ts'
 import {
   botLegal,
@@ -366,7 +367,7 @@ export class RoomHost {
     // Seats 1 and on: the person who comes takes the lowest free one, the first
     if (bots !== null && seated.length > 0) {
       seated.forEach((name, index) => {
-        const bot = this.newBot(index + 1, bots.level, name, null)
+        const bot = this.newBot(index + 1, quickBotLevel(bots, index), name, null)
         this.members.set(bot.id, bot)
       })
       this.saveMembers()

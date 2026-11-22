@@ -130,6 +130,7 @@ export const roomZhTW: Record<RoomMessageKey, string> = {
   'room.bot.level.easy': '簡單',
   'room.bot.level.normal': '普通',
   'room.bot.add': '加電腦玩家',
+  'room.bot.fill': '空位全部坐滿（{count}）',
   'room.bot.full': '座位都滿了。',
   'room.bot.note': '人不夠？電腦玩家會坐進空位，自己出手。它只看得到坐在那個位子的人看得到的東西。',
   'room.bot.tag': '{name}（電腦）',
