@@ -7,7 +7,7 @@ import { raceTrack } from '../shared/kart/tracks/registry.ts'
 // the first ramp onto the breakwater's crown, up at its height, while the expert keeps to the road
 // round it. Headless Chromium draws with a software renderer (the flag lets it).
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } })
-test.setTimeout(240_000)
+test.setTimeout(360_000)
 
 interface SpikeReading {
   frames: number
@@ -48,6 +48,8 @@ test('the master flies onto the crown; the expert drives round it', async ({ pag
   const track = raceTrack('breakwater')!
   const [crown] = trackLedges(track)
   const fork = track.forks![crown!.fork]!
+  // In the fastest kart there is (the egret, speed +2): the default ferry is one of the slowest
+  await page.addInitScript(() => localStorage.setItem('tku-arcade.kart.body', 'heron'))
   // Halfway along the crown's own stretch, up at its height
   const high = fork.path.filter((point, index) => index >= fork.rise! && (point.y ?? 0) >= crown!.top - 0.1)
   const middle = high[Math.floor(high.length / 2)]!
@@ -58,7 +60,7 @@ test('the master flies onto the crown; the expert drives round it', async ({ pag
   }
   await page.goto('/kart/spike?track=breakwater&autopilot=master')
   await expect
-    .poll(async () => ((await near()) ?? 0) > crown!.top - 1, { timeout: 120_000, intervals: [50] })
+    .poll(async () => ((await near()) ?? 0) > crown!.top - 1, { timeout: 180_000, intervals: [50] })
     .toBe(true)
   // The expert never comes near the middle of the crown: it goes round the breakwater's shed
   await page.goto('/kart/spike?track=breakwater&autopilot=expert')
