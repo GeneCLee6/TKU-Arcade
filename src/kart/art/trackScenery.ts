@@ -48,9 +48,17 @@ const local = async (): Promise<TrackScenery> => {
 
 /** Each built-in track's quarter, by its id; any other id has none */
 const LOADERS: Readonly<Record<string, () => Promise<TrackScenery>>> = {
-  harbour: async () => ({ harbour: await import('./harbourArt.ts') }),
+  // 2026-11-22: and the cues for the step (skillCues.ts)
+  harbour: async () => {
+    const [harbour, kit] = await Promise.all([import('./harbourArt.ts'), skill()])
+    return { harbour, skill: kit }
+  },
   tamkang: async () => ({ tamkang: await import('./tamkangArt.ts') }),
-  oldstreet: async () => ({ oldStreet: await import('./oldStreetArt.ts') }),
+  // 2026-11-22: and the cues for the step and the lantern alley's doorway (skillCues.ts)
+  oldstreet: async () => {
+    const [oldStreet, kit] = await Promise.all([import('./oldStreetArt.ts'), skill()])
+    return { oldStreet, skill: kit }
+  },
   works: async () => {
     const [works, kit] = await Promise.all([import('./worksArt.ts'), skill()])
     return { works, skill: kit }

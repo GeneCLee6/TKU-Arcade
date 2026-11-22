@@ -20,6 +20,7 @@
 // lanes' esses swing 20 m either way where they swung 8; the shophouse row kinks round the well; the
 // old street home runs through one last alley. The boxes are placed again: the rows where the road
 // is wide, a pair on the line through the ferry alley and through the back lanes.
+import { branchPath, gatesClearOf, roadDepth, routeRoad, type BranchJson } from '../branches.ts'
 import {
   gatesAlong,
   padsAlong,
@@ -31,7 +32,10 @@ import {
 } from '../track.ts'
 import { lineGrid, LINE_BACK, LINE_SOLO_ACROSS } from '../startLine.ts'
 import type { Wall } from '../walls.ts'
+import { fence, guideFor, type TrackGuide } from './guide.ts'
+import { fitted, layBranch, left } from './lay.ts'
 import { splineRoad, type ControlPoint } from './spline.ts'
+import { SHED_HEIGHT } from './wharf.ts'
 
 /** Metres between road points */
 const SAMPLE = 6
@@ -109,7 +113,30 @@ const road = splineRoad(CONTROL, SAMPLE)
 const FINISH = road.findIndex((point) => point.x === 0 && point.z <= 110)
 
 // The road starts at the line, so that gate 0 is the finish
-const fromLine = [...road.slice(FINISH), ...road.slice(0, FINISH)]
+const flatLine = [...road.slice(FINISH), ...road.slice(0, FINISH)]
+
+/**
+ * 2026-11-22 (#103, revision 10): the old street home's step. A ramp up to a lip 1.6 m high across
+ * the old street, just before it bends right into the last alley: square, the car comes down in the
+ * bend and must lift before the crest; begun in a drift to the right, it lands already turning
+ * (terrain.ts's drift jump). Its road point: the one nearest (183, 307)
+ */
+const STEP_HEIGHT = 1.6
+const stepLip = flatLine.reduce(
+  (best, point, index) =>
+    Math.hypot(point.x - 183, point.z - 307) <
+    Math.hypot(flatLine[best]!.x - 183, flatLine[best]!.z - 307)
+      ? index
+      : best,
+  0,
+)
+const fromLine: RoadPoint[] = flatLine.map((point, index) =>
+  index === stepLip
+    ? { ...point, y: STEP_HEIGHT }
+    : index === stepLip - 1
+      ? { ...point, y: STEP_HEIGHT / 2 }
+      : point,
+)
 const { gates, respawns } = gatesAlong(fromLine, 7)
 const along = roadDirection(fromLine, 0)
 
@@ -187,6 +214,67 @@ const PAD_MARKET = 78
 const ALLEY_PAD = 27
 const apex = Math.round((span.first + span.last) / 2)
 
+// ── The lantern alley (2026-11-22, #103): a second shortcut, a road of its own (branches.ts) ──
+// Off the lantern lane's left kerb before its left turn into the back lanes, across the corner's
+// inside and back onto the back lanes: about 130 m where the road round is about 165 m. Halfway
+// along it a shophouse wall closes it but for a doorway off to its right: a car must be lined up
+// for it from the lane, before it can see it (the slot of docs/KART-FEEL.md §11)
+const ALLEY_WIDTH = 14
+/** The alley leaves the lane at this road point and joins the back lanes at that one */
+const alleyFrom = nearestIndex(217, -86)
+const alleyTo = nearestIndex(124, -3)
+const alleyLaid = layBranch(
+  fromLine,
+  alleyFrom,
+  alleyTo,
+  [left(40, 12, ALLEY_WIDTH), fitted(ALLEY_WIDTH, { mid: 'on' }), left(25, 60, ALLEY_WIDTH), fitted(ALLEY_WIDTH)],
+  ALLEY_WIDTH,
+)
+const branches: BranchJson[] = [{ from: alleyFrom, to: alleyTo, road: alleyLaid.road }]
+const alleyPath = branchPath(fromLine, branches[0]!)
+/**
+ * The doorway: two road points past where the alley is clear of the lane, its middle this far right,
+ * this wide
+ */
+export const ALLEY_DOOR = alleyPath.findIndex((point) => roadDepth(fromLine, true, point.x, point.z) < -point.width / 2) + 2
+export const ALLEY_DOOR_AT = 3
+export const ALLEY_DOOR_WIDTH = 9.5
+const alleyWalls: Wall[] = [
+  ...fence(
+    alleyPath,
+    [
+      [ALLEY_DOOR, -(ALLEY_WIDTH / 2 + 1)],
+      [ALLEY_DOOR, ALLEY_DOOR_AT - ALLEY_DOOR_WIDTH / 2],
+    ],
+    SHED_HEIGHT,
+  ),
+  ...fence(
+    alleyPath,
+    [
+      [ALLEY_DOOR, ALLEY_DOOR_AT + ALLEY_DOOR_WIDTH / 2],
+      [ALLEY_DOOR, ALLEY_WIDTH / 2 + 1],
+    ],
+    SHED_HEIGHT,
+  ),
+]
+const cleared = gatesClearOf(fromLine, gates, respawns, branches)
+
+// The route down the alley (routes.ts drives it): lined up from the lane with the doorway, through
+const route = routeRoad({ road: fromLine, jumps: [stepLip], forks: [{ from: alleyFrom, to: alleyTo, path: alleyPath, jumps: [] }] }, [0])
+const onLane = (index: number) => route.main[alleyFrom]! + index
+const routeLines = guideFor(route.road)
+/** Where the alley is clear of the lane, by its own road points */
+const alleyClear = alleyPath.findIndex((point) => roadDepth(fromLine, true, point.x, point.z) < -point.width / 2)
+// Down the middle of the lane to the alley's mouth (the kerbs either side), then down the alley's
+// middle and across to the doorway
+routeLines.tech
+  .hold(route.main[alleyFrom]! - 14, onLane(alleyClear), 0, 1.5)
+  .chord([onLane(alleyClear), 0], [onLane(ALLEY_DOOR), ALLEY_DOOR_AT], 1.5)
+  .hold(onLane(ALLEY_DOOR), onLane(ALLEY_DOOR) + 1, ALLEY_DOOR_AT, 1)
+routeLines.slot(onLane(ALLEY_DOOR), ALLEY_DOOR_AT)
+/** The old street's route guide: the alley's doorway on the technical line (shared/kart/tracks/guides.ts) */
+export const OLDSTREET_ROUTE_GUIDE: TrackGuide = routeLines.build()
+
 export const OLDSTREET: TrackJson = {
   format: TRACK_FORMAT,
   id: 'oldstreet',
@@ -195,11 +283,12 @@ export const OLDSTREET: TrackJson = {
   // 5: the straights broken up by alleys, the back lanes' esses made real (2026-11-18)
   // 6: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
   // 8: two boost pads in the fork's alley (2026-11-19); 9: one down the market street (2026-11-20)
-  revision: 10,
+  // 11: the lantern alley, a second shortcut, and the old street home's step (2026-11-22, #146)
+  revision: 11,
   laps: 3,
   road: fromLine,
-  gates,
-  respawns,
+  gates: cleared.gates,
+  respawns: cleared.respawns,
   // One row across the promenade behind the line (2026-11-21, startLine.ts)
   grid: lineGrid(
     {
@@ -215,7 +304,7 @@ export const OLDSTREET: TrackJson = {
     z: Math.round((fromLine[0]!.z - along.dz * LINE_BACK + along.dx * LINE_SOLO_ACROSS) * 100) / 100,
     heading: headingOf(along),
   },
-  walls: islandWalls,
+  walls: [...islandWalls, ...alleyWalls],
   // Off the middle of the straights: taking one is a choice of line
   boostPads: padsAlong(fromLine, [
     [12, 10],
@@ -228,7 +317,10 @@ export const OLDSTREET: TrackJson = {
     // 2026-11-20: one down the middle of the market street, where nothing else is worth a drift
     // (the expert's boost cover reaches 70%; docs/KART-FEEL.md §14)
     [PAD_MARKET, 0],
-  ]),
+  ]).concat(
+    // 2026-11-22: one down the lantern alley, past its doorway: what the shortcut pays
+    padsAlong(alleyPath, [[ALLEY_DOOR + 3, 0]], { length: 12, width: 6 }),
+  ),
   // The item race reads these (shared/kart/items.ts): rows across the wide parts, a row in the
   // fork's safe lane, two on the hairpin's inside kerb
   itemBoxes: [
@@ -249,4 +341,6 @@ export const OLDSTREET: TrackJson = {
     ...row(118, 62, [-4, 4]),
   ],
   decor: [],
+  jumps: [stepLip],
+  branches,
 }

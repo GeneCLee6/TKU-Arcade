@@ -1555,6 +1555,19 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **車身細節**（#99，`src/kart/art/bodyDetail.ts`）：`BODY_DETAIL`（低 off／中 medium／高 high）、`paintBodyDetail`（面板縫線、螺絲；高加刮痕與細顆粒）畫成 256／512 px 的高度圖，`bodyDetailTexture(level)` 一個等級一張、整頁共用；`createPaintMaterial(environment, weave, detail)` 當 `bumpMap`（`DETAIL_BUMP` 0.9），program cache key 分開；`wearDecal` 在號碼與標誌貼紙邊緣挖掉幾塊；`carbonTexture(fine)` 高畫質是 2/2 斜紋。`KartFinish.detail`，`Scene.ts` 照畫質給，車庫預覽與等待室舞台照 `loadQuality()`；幽靈車沒有。懸浮摩托車沒有輪子，所以沒有胎紋（只有懸浮墊）。顏色（灰階的高度）在 `kartTokens.ts` 的 `kartDetail`。截圖 `scripts/kart-shots.mjs --views close`。
 - **測試**：`tests/kart/kartAudio.test.ts`（摩托車的音高、檔位、音色與分級、`voiceBudget`）、`tests/kart/bodyDetail.test.ts`（分級、縫線與螺絲的數量、磨損可重現）、`tests/shared/kart-walls.test.ts`（`slideShare`、淺角度貼牆只慢一點且不算重撞、街機照舊磨速、20° 照舊是撞、8° 不到一半）、`tests/kart/terrain.test.ts`（落地前後 ±0.1 s 的新按都算、取代不疊加、太早太晚不算）、`tests/kart/school.test.ts`（第 11 課的過關與三種失敗）、`skillTracks.test.ts`（頂尖在沒有指南的賽道＝熟練＋落地時機）。
 
+### 4.68 路線圖外：燈籠老街的第二條捷徑（燈籠巷）、漁人碼頭與老街的跳台（2026-11-22，`feat/kart-track-routes`）
+
+`NEXT.md` §5 賽道內容的另外兩項（#103）。手感與數字在 `KART-FEEL.md` §21。賽道格式、伺服器裁定沒有新東西：岔路照 #113、跳台照 #94／#109。
+
+- **燈籠老街 `oldstreet@11`**（`shared/kart/tracks/oldstreet.ts`）：**燈籠巷**：從燈籠巷道（往西的寬直線）左轉進後巷之前的那個左彎，切過彎的內側、接回後巷（`layBranch`：半徑 12 m 左轉 40°、一條長斜線、左 25°、直線；14 m 寬），約 130 m 對主路約 165 m。巷子離開巷道兩個路點後一面店屋的牆把它封住，只在右邊留一個 9.5 m 的門（`ALLEY_DOOR*`，照高架廠區窄巷的做法）：要在斜線上就先對準，晚了會撞牆；門後一條加速帶。主路閘門用 `gatesClearOf` 讓開；路線導引 `OLDSTREET_ROUTE_GUIDE`（`guides.ts` 的 `ROUTE_GUIDES`）的技術線先沿巷道中間（room 1.5，切彎的 apex 不會把車推到左邊路緣）到巷口、再沿巷子斜線對準門、`slot` 一個，所以**專家每圈都走**，簡單、普通、困難不走（`skill.tricks`）。場景：老街的攤位與一般的路燈不放在岔路上（`oldStreetArt.ts` 認得 `forks`；`trackArt.ts` 的路燈在有岔路的賽道跳過落在別條路上的）。**老街回程的台階**：往西的老街回程、右轉進最後一條巷子之前一個 1.6 m 的跳台（`stepLip`，最接近 (212, 313) 的路點），直的跳會落在彎裡，要先收油或甩尾起跳。
+- **漁人碼頭 `harbour@15`**（`harbour.ts`）：第二段山坡直線、髮夾 2（左）前一個 1.6 m 的跳台（`HARBOUR_STEP`，`circuit` 的 `jumps`）。新導引 `HARBOUR_GUIDE`（兩條線預設在中間，只有跳台前技術線靠右、`cue` 往左甩尾起跳、落在髮夾入口），專家與頂尖腳本每圈甩尾起跳。
+- **電腦車的島牆判斷不看有高度的牆**（`brain.ts`）：沒有導引的賽道，`createBotBrain` 用 `walls` 猜「島牆分出的兩條車道」；燈籠巷的門牆（`top` 9 m）離主路 25–40 m，卻會被算進最近的主路路點，讓普通電腦車在左彎外側撞牆、復位（量到普通一場 4–6 次）。現在只看沒有 `top` 的牆（島牆、中島本來就沒有）；有 `top` 的牆只出現在有導引的賽道（碼頭倉庫、山城、廠區、針眼巷），那些賽道本來就不看 `walls`，所以舊賽道一步都沒變（`flatGolden`、`branchGolden`、`bots.test` 擋）。另外，**在島前被放回來的電腦車走外側車道**：復位點在老街中島的島頭前，會走捷徑內側的手（`shortcuts`）從靜止起步轉不過去、撞上島頭、又被放回同一個地方（八台困難電腦車的道具賽一台卡死在那裡）；現在被復位到島的範圍裡，這一次走外側（`safeLane`），過了島再照自己的選擇。
+- **畫面**：兩張圖除了跳台都是平的，所以**不畫**山路賽道的地面高度場（會蓋掉碼頭的岸邊與老街的石板），只畫跳台的斜面（`buildJumpRamps`）。技術點提示（`skillCues.ts`）也開給這兩張：`trackScenery.ts` 讓它們多載 `skill`，`trackArt.ts` 在沒有 `skillStyle` 的賽道只畫提示（不改牆的樣子）：跳台兩端的琥珀燈、跳台前的箭頭（漁人碼頭照導引往左斜）、燈籠巷的岔路箭頭與門的青色燈條。
+- **重跑**：`kart:medals -- --only harbour,oldstreet`（`kart-medals.ts` 的頂尖腳本現在在「有主路導引**或岔路導引**」的賽道都跑，老街的金牌因此照走燈籠巷的速度算）、`kart:meta -- --tracks harbour,oldstreet`。兩張的特性標籤（`shared/kart/meta.ts`）拿掉「平地」（有 1.6 m 的台階了），只剩「高速型」。
+- **測試**：`tests/kart/trackContent.test.ts`（新）：燈籠巷是一條岔路、比繞彎短 15% 以上、牆上只找得到一個門（`findSlots`，和畫面用同一個）、路線導引對準它；專家兩個種子每圈都走、其他三級都不走、不逆走；兩個台階：一個、1.6 m、跳台後 60 m 內路轉 ≥ 25°（接彎）；漁人碼頭導引的 cue 就在台階、專家每圈甩尾起跳零復位；四級電腦車兩張圖三圈不逆走、復位 ≤ 1。`technical.test.ts` 的紀錄 key 與跳台數；`flatGolden`、`expert.test.ts` 改用拿掉跳台、岔路、障礙物的同一張圖（`tests/kart/flatLayout.ts`：鎖的是平地物理）；`terrain.test.ts`、`meta.test.ts` 的「平地賽道」例子換成紅樹林、淡海；`flagship.test.ts` 比的對象改成每張圖目前的第一名（不再固定白鷺）。
+
+**限制（照實寫）**：(1) 老街沒有主路導引，所以頂尖腳本與專家在老街的台階是收油跳過，不會甩尾起跳；人可以。(2) 燈籠巷的牆是素色高牆（沒有個別的店屋場景）。(3) 台階讓困難電腦車每圈慢約 2 秒（坡頂收油）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
