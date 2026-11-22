@@ -1,5 +1,5 @@
 // 2026-11-22 (#94, #113: "the track format assumes a flat plan: no road over another"): level
-// crossings and banked bends, docs/ARCHITECTURE.md §4.64. A track's main road may now run over
+// crossings and banked bends, docs/ARCHITECTURE.md §4.65. A track's main road may now run over
 // itself, a figure of eight on a viaduct over an underpass, and lean across in its bends.
 //
 // A crossing is where two stretches of the main road's centre line cross on the plan. It is legal

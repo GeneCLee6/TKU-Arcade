@@ -7,8 +7,17 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type * as BoardData from '../../../../shared/games/promotion/boardFull.ts'
 import type * as Layouts from './fullSquare.ts'
+import type * as BoardView from './FullBoard.tsx'
+import type * as Words from './fullWords.ts'
 
-export type FullData = typeof BoardData & { layouts: typeof Layouts }
+// 2026-11-22: the component that draws the board, and the sentences that name its cells, come with
+// its data too: nothing draws a board
+// before there is one, and the full edition's first screen was in the budget's warning band
+export type FullData = typeof BoardData & {
+  layouts: typeof Layouts
+  view: typeof BoardView
+  words: typeof Words
+}
 
 let loaded: FullData | null = null
 let loading: Promise<FullData> | null = null
@@ -19,8 +28,10 @@ export function loadFullData(): Promise<FullData> {
   loading ??= Promise.all([
     import('../../../../shared/games/promotion/boardFull.ts'),
     import('./fullSquare.ts'),
-  ]).then(([board, layouts]) => {
-    const data: FullData = { ...board, layouts }
+    import('./FullBoard.tsx'),
+    import('./fullWords.ts'),
+  ]).then(([board, layouts, view, words]) => {
+    const data: FullData = { ...board, layouts, view, words }
     loaded = data
     for (const listener of listeners) listener()
     return data

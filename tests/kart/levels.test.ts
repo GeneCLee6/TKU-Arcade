@@ -1,4 +1,4 @@
-// 2026-11-22 (#94, #113; docs/ARCHITECTURE.md §4.64): a road over a road, banked bends, karts that
+// 2026-11-22 (#94, #113; docs/ARCHITECTURE.md §4.65): a road over a road, banked bends, karts that
 // pass over and under each other, the flights kept in replays and ghosts, the editor's new pieces,
 // and the technical showcase that has them all (the Zhuwei Flyover). The tracks without any of it
 // are exactly what they were: flatGolden.test.ts and branchGolden.test.ts.
