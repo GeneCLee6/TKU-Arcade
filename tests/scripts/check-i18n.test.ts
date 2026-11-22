@@ -274,6 +274,65 @@ describe('check-i18n bare strings', () => {
     expect(status).toBe(0)
   })
 
+  // #6 of docs/NEXT.md §5: what the old scanner let through, now read from the syntax tree
+  it.each([
+    ['a string child', `const A = () => <p>{'Hello'}</p>`, 'bare string in JSX: Hello'],
+    ['a ternary child', `const A = () => <p>{a ? 'Yes' : 'No'}</p>`, 'bare string in JSX: Yes'],
+    ['the other side of a ternary', `const A = () => <p>{a ? t('x') : 'Nothing yet'}</p>`, 'bare string in JSX: Nothing yet'],
+    ['a fallback', `const A = () => <p>{name ?? 'Nobody'}</p>`, 'bare string in JSX: Nobody'],
+    ['an && child', `const A = () => <p>{ok && 'Ready'}</p>`, 'bare string in JSX: Ready'],
+    ['a template child', 'const A = () => <p>{`${n} players`}</p>', 'bare string in JSX: players'],
+    ['a joined child', `const A = () => <p>{n + ' players'}</p>`, 'bare string in JSX: players'],
+    ['a ternary aria-label', `const A = () => <b aria-label={open ? 'Close' : 'Open'} />`, 'bare aria-label attribute: Close'],
+    ['a template title', 'const A = () => <b title={`Seat ${n}`} />', 'bare title attribute: Seat'],
+    ['a fallback placeholder', `const A = () => <input placeholder={hint || 'Your name'} />`, 'bare placeholder attribute: Your name'],
+    ['a component prop', `const A = () => <Empty message="Nothing here" />`, 'bare message attribute: Nothing here'],
+    ['toast()', `toast('Saved')`, 'bare string passed to toast(): Saved'],
+    ['alert()', `window.alert('Something broke')`, 'bare string passed to alert(): Something broke'],
+    ['confirm()', `if (confirm('Leave the room?')) leave()`, 'bare string passed to confirm(): Leave the room?'],
+    ['a canvas', `context.fillText('Finish', 0, 0)`, 'bare string passed to fillText(): Finish'],
+    ['a notification', `new Notification('Your turn')`, 'bare string passed to Notification(): Your turn'],
+    ['the page title', `document.title = 'TKU Arcade lobby'`, 'bare string assigned to .title: TKU Arcade lobby'],
+  ])('finds %s', (_name, body, message) => {
+    const { status, output } = run(page(body))
+    expect(output).toContain(message)
+    expect(status).toBe(1)
+  })
+
+  it.each([
+    ['translated ternaries', `const A = () => <p title={a ? t('x') : t('y')}>{a ? t('x') : t('y')}</p>`],
+    ['a translated toast', `toast(t('room.saved'))`],
+    ['a ternary className', `const A = () => <p className={on ? 'is on' : 'is off'} />`],
+    ['a test id', `const A = () => <p data-testid="room-code" />`],
+    ['a ternary href', `const A = () => <a href={full ? '/games/promotion/rules' : 'https://x.test'}>{t('a')}</a>`],
+    ['an address in a title', `const A = () => <i title={'https://tku.test/r/1234'} />`],
+    ['symbols and numbers', `const A = () => <p>{ok ? '✓' : '–'}{n ?? 0}{' · '}{'12:00'}</p>`],
+    ['a single letter', `const A = () => <p>{grade ?? 'A'}</p>`],
+    ['a string in a call', `const A = () => <p>{format(n, 'long words here')}</p>`],
+    ['a string as a key', `const A = () => <p>{t(on ? 'room.on' : 'room.off')}</p>`],
+    ['a comparison', `const A = () => <p>{mode === 'free play' ? t('a') : null}</p>`],
+    ['an unrelated call', `log('Something broke'); el.dataset.state = 'ready now'`],
+  ])('accepts %s', (_name, body) => {
+    const { status, output } = run(page(body))
+    expect(output).toContain('ok   check-i18n')
+    expect(status).toBe(0)
+  })
+
+  it('skips the line after // i18n-ignore-next-line, and only that one', () => {
+    const { status, output } = run(
+      page(`const A = () => (\n  // i18n-ignore-next-line\n  <p>{'Hello'}</p>\n)\nconst B = () => <p>{'There'}</p>`),
+    )
+    expect(output).not.toContain('Hello')
+    expect(output).toContain('src/pages/Page.tsx:5: bare string in JSX: There')
+    expect(status).toBe(1)
+  })
+
+  it('reports a file it cannot parse', () => {
+    const { status, output } = run(page(`const A = () => <p>{</p>`))
+    expect(output).toContain('src/pages/Page.tsx:1: cannot parse')
+    expect(status).toBe(1)
+  })
+
   it('does not look for JSX in .ts files', () => {
     expect(run({ 'src/x.ts': `const a = 1 // not JSX\nconst p = '<p>Hello there</p>'` }).status).toBe(0)
   })
