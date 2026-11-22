@@ -33,6 +33,7 @@ import ReplayShare from '../watch/ReplayShare.tsx'
 import { loadBody, loadDriver } from '../bodies.ts'
 import { formatTime } from '../../../shared/kart/timeTrial.ts'
 import { podiumSeats, type PodiumEntry } from '../ceremony/podium.ts'
+import { trackAchievement } from '../../achievements/track.ts'
 
 // 2026-11-20 (docs/KART-NETCODE.md §11.4): the race again, as in a room
 const ReplayView = lazy(() => import('../watch/ReplayView.tsx'))
@@ -160,6 +161,27 @@ function BotRound({
   const holding = useFinishHold(
     view.racers.find((racer) => racer.seat === game.playerSeat)?.finishMs != null,
   )
+
+  // e11-t06 (§4.81): where the race ended for the player, to the achievements, once
+  const over = view.phase === 'finished'
+  useEffect(() => {
+    if (!over) return
+    const { standings, summary } = kart.result(game.room.state())
+    const finished = view.racers.find((racer) => racer.seat === game.playerSeat)?.finishMs != null
+    // The player is always on the red side of a team race
+    const side = /\.result\.(red|blue)Won$/.exec(summary.key)?.[1]
+    trackAchievement({
+      type: 'kart.race',
+      mode: cup ? 'cup' : 'bots',
+      place: finished ? standings.findIndex((line) => line.seat === game.playerSeat) + 1 : null,
+      racers: standings.length,
+      level: setup.difficulty,
+      team: view.teams ? (side === undefined ? 'draw' : side === 'red' ? 'won' : 'lost') : null,
+      humans: 1,
+    })
+    // Once, as the race ends
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [over])
 
   if (view.phase === 'finished' && !holding) {
     const result = kart.result(game.room.state())
