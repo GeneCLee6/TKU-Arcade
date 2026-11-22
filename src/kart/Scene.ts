@@ -312,6 +312,7 @@ export function createKartScene(
       density: settings.density,
       shadows,
       anisotropy: Math.min(settings.anisotropy, renderer.capabilities.getMaxAnisotropy()),
+      water: software ? 0 : settings.water,
     })
     scene.add(art.group)
     scene.fog = new Fog(theme.fog, 160, settings.fogFar)
