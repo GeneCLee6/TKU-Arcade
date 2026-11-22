@@ -1,5 +1,5 @@
 /** CJK ideographs, kana and full-width forms: each nearly two letters wide */
-const WIDE = /[⺀-鿿豈-﫿＀-￯]/
+const WIDE = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/
 
 /**
  * 2026-11-23 (#151): how much a name's letters are shrunk to fit its place card in the race room

@@ -1676,6 +1676,18 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **測試**：`tests/kart/raceFlow.test.ts`（開場 8 人 ≤ 10 s、亮相 ≤ 6 s、照順序每位車手、鏡頭在車手正前方且最後接上全景、關掉亮相改繞場；倒數音效 3、2、1、GO 各一次且 GO 較亮；完賽倒數音效；伺服器 10 秒後第一個 frame 結束比賽、未完賽依進度排名、看不到的依圈數、壞的 progress 拒絕、玩家不能 close；團隊賽計分；暫停時比賽時鐘與房間時鐘一起停、恢復後不補時間、0 秒的一幀不跑物理；設定預設與逐欄回復、特效上限；頒獎台只放完賽的前三名、揭曉順序與時間、鏡頭、舉獎盃姿勢）；`tests/games/kart.test.ts`、`tests/worker/room-realtime.test.ts`、`tests/kart/roomBots.test.ts`（倒數改 `countdownMs(n)`、close 計時器）；e2e `kart-bots`（亮相卡、Esc 暫停時 tick 不動、設定、繼續後再動、頒獎台後才是結果）、`kart-race`（多人房 Esc 只開選單、完賽倒數、頒獎台、結果）、`kart-cup`（每場與總頒獎台）、`kart-watch-portrait`。
 
+### 4.74 路線圖外：卡丁車第三輪細修（亮相同步、道具撞障礙物、老街主路導引、等待室站姿與手機省電、文件撞號）（2026-11-23，`feat/kart-polish-3`）
+
+- **亮相多人同步**（#152 觀察：同一台機器兩個瀏覽器差一位車手）：亮相本來就只看伺服器的 `goAt` 與對時後的時鐘，差在**對時還沒收斂**。量到的原因：比賽畫面是在「載完」那一刻才開始對時（`createRaceNet`），而最後一個載完的人一送出 `loaded`，房間就定 `goAt` 開始亮相——他的頭幾個對時答覆是在建場景、編著色器的忙碌主執行緒上讀到的，來回時間被拉長、時差偏掉半個來回（實測一位 0.4 s）。修法三層：(1) `shared/kart/net.ts` 的 `clockSettled`：來回最短的 3 個答覆推出的時差彼此差 ≤ 40 ms 才算「收斂」（被拖延的答覆延遲不會一樣），8 個答覆之後不管怎樣都算（抖動大的網路）；(2) `netRace.ts` 沒收斂前每 120 ms ping 一次、收斂後 2 s 一次（原本是固定 5 個 250 ms 再 2 s）；(3) `RaceView.tsx` 等**對時收斂**（最多 4 s）才送 `loaded`，所以房間開始亮相時每個畫面都已經收斂；`spikeLoop.ts` 在還沒收斂時不帶車手、只給起跑格全景（`SpikeNet.clockSettled`）。`__kartRace` 多 `settled`、`settledAt`、`begunAt`、`goAt` 給測試讀。
+  - 量測（`e2e/kart-intro-sync.spec.ts`，兩個人＋兩台電腦車，同一台機器 1 worker；Ann 用 CDP `Network.emulateNetworkConditions` 加 60 ms，Bob 的 WebSocket 去 20 ms、回 120 ms 不對稱，且前兩個對時答覆被 1.4 s、0.5 s 的忙碌主執行緒擋住）：兩個畫面對伺服器時鐘的估計差最大 53 ms（舊程式 395 ms，且 Ann 的車手卡從第 1 位 38 ms 就跳到第 2 位）；四位車手每位開始的時刻兩個畫面差 7／55／57 ms。測試門檻：時鐘差 < 150 ms、車手卡 < 200 ms（卡片在畫面幀上換，軟體繪圖一幀可能就上百 ms）。
+- **道具撞障礙物**（#150）：`shared/kart/obstacles.ts` 新增 `tickAtMs`（伺服器時間→比賽時鐘的步）、`obstacleStop`（一顆從某步出發、等速前進的東西每 1/60 s 看一次當下關著的閘門與貨櫃四邊，回傳撞到的秒數）、`clearOfObstacles`（放在路上的東西移出貨櫃滑過的整段範圍、移出閘門那條線的半徑內，沿著路往近的那邊移）。`shots.ts` 的 `throwHail`／`layFog`／`dropPuddle`／`dropDecoy` 多一個 `ShotBlockers`（障礙物＋出手那一步）：冰雹在撞到的那一刻消失（`until` 提早，瀏覽器照數字畫，不用新協定）、海霧放在當下關著的障礙物前面、泥灘與假道具箱放在障礙物外面。房間（`rules.ts`）用 `courseOf(track).obstacles` 與 `goAt` 算；沒有障礙物的賽道一切照舊。高度不看（冰雹飛在路面高度）。測試 `tests/kart/shotObstacles.test.ts`。
+- **老街主路導引**（#150）：頂尖腳本（master）在老街台階是收油過頂（沒有主路的導引，只有燈籠巷的路線導引）。`TrackGuide` 多 `cuesOnly`：**只有提示**的導引——手照自己在路上找的線開（繞攤位島、看路緣），只拿甩尾起跳的提示（`brain.ts`：`cuesOnly` 時不用導引的線、也不關掉看路緣）。直接給完整導引會讓 master 走導引線、不看牆，三圈多撞 4～5 次、慢 1.4 s。老街的台階在右彎快結束、左彎要來的地方，所以是**往左**甩、空中車尾幾乎不甩（10°）、落在 12 個路點後的中間：master 三圈 88.0～88.4 s（原本 88.1～88.7 s）、每圈都甩尾起跳、不重置；`npm run kart:medals -- --only oldstreet`（金 88.7 → 88.4、白金 86.3 → 86.2、銀 92.3 → 92，任務 clean 31.8 → 31.1）、`kart:meta -- --tracks oldstreet`（前三海豚、旗魚、水獺）。
+- **等待室**（#151）：
+  - 車手**站在車旁**（`driverModel.ts` 的 `onFeet`：腿直、手垂在身側；`kartModel.ts` 的 `KartDetail.standing`：站在車身右側外 0.34 m、座位前 0.35 m、轉 0.22 rad 朝車）；比賽中照坐姿。站著時開車的動作（轉向、噴射後仰、暈眩）不動他，只動手勢（待機看左右、準備舉雙手）。卡片的鏡頭看每台車加車手的實心範圍（`solidBox`：不含發光與隱藏的東西）取景，寬度與身高都要放得下。
+  - **手機省電**：手機（`pointer: coarse` 或短邊 < 500）不再每幀輪流畫 3 格（每格約 5 fps，看起來是卡），改成每格**只在有變化時畫一次**（換車、準備的舉手、舉手結束、尺寸變），一幀最多畫一格；動感交給卡片的 CSS（`idleSway`：5.6 s 一輪的輕微上下、±0.7° 擺、1.02 縮放，各格錯開相位，`prefers-reduced-motion` 不動），由合成器做，不吃 WebGL。桌機照舊即時畫。
+  - **長名字**：`nameFit.ts` 依字寬（中日韓字算 1.8）縮字到 0.66；橫拿手機（`max-height: 520px`）的名字可以兩行（`-webkit-line-clamp: 2`）。`e2e/kart-lobby.spec.ts` 檢查 8 格名字都沒被截（含「(CPU)」）。
+- **文件撞號**（#152 回報）：原本兩個 §4.70，等待室滿版改為 §4.71、連線穩定度 §4.72、比賽流程 §4.73，所有文件與程式註解的引用跟著改。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
