@@ -179,18 +179,23 @@ export const KIND_TRAITS: { readonly [K in KartKind]: KindSpec } = {
 /**
  * What makes the first season's flagship what it is (2026-11-21, docs/KART-META.md §3), on top of
  * its stats (over the budget: top speed, acceleration and drift charge two points each). It is a
- * touch faster still on a straight (`topSpeed`, so its top speed is 3.5% over the standard, the
- * other vehicles' spread being 3%). And it is a handful: the steering follows the stick at once and
- * turns sharper (a hand that shakes, shakes the kart), a drift lets go of its slip slower (a drift
- * held too long swings on past the corner), and a wall takes far more of its speed and its gauge.
- * Measured, not guessed: the master driver is quickest in it on most tracks, by about 1.4%; a
- * novice is not (npm run kart:meta)
+ * touch faster still on a straight (`topSpeed`, so its top speed is 2.9% over the standard, heron's
+ * 2%). And it is a handful: the steering follows the stick at once (a hand that shakes, shakes the
+ * kart), a drift lets go of its slip slower (a drift held too long swings on past the corner), it
+ * scrubs a little more speed in a drift, and a wall takes far more of its speed and its gauge.
+ * 2026-11-22 (owner: its lead on the harbour, 6.1%, was too much): no sharper grip turn any more
+ * (`turnRate` 1.08 -> 1.005: exact hands clipped the harbour's hairpins without a scrape), its
+ * pull out of a corner a little weaker (`acceleration` 0.964), the steering a little less quick
+ * (2.2 -> 2.11), a little more drift scrub. Measured, not guessed: the master driver is quickest
+ * in it on 8 of the 12 tracks, by 0.8% on the mean; a novice is not (npm run kart:meta)
  */
 export const FLAGSHIP_TRAITS: KartTraits = {
-  topSpeed: 1.015,
-  steerResponse: 2.2,
-  turnRate: 1.08,
-  driftRecoverRate: 0.8,
+  topSpeed: 1.009,
+  acceleration: 0.964,
+  steerResponse: 2.11,
+  turnRate: 1.005,
+  driftScrub: 1.07,
+  driftRecoverRate: 0.86,
   wallImpactLoss: 1.6,
   wallScrapeDrag: 1.5,
   wallGaugeKeep: 0.4,
