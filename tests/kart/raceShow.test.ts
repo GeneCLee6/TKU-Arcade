@@ -32,7 +32,7 @@ const close = (a: { x: number; y: number; z: number }, b: { x: number; y: number
 
 describe('the fly round before the countdown', () => {
   it('fills the room countdown before the 3, 2, 1', () => {
-    // 2026-11-22 (§4.68): the opening grows with the field; INTRO_FROM is a full grid's
+    // 2026-11-22 (§4.70): the opening grows with the field; INTRO_FROM is a full grid's
     expect(introMs(8)).toBeGreaterThanOrEqual(2_000)
     expect(INTRO_FROM).toBeCloseTo(countdownMs(8) / 1000, 9)
     expect(INTRO_TO).toBe(3)

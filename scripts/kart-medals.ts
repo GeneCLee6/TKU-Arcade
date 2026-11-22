@@ -12,7 +12,7 @@
 import { writeFileSync } from 'node:fs'
 import { KART_TUNING } from '../shared/kart/physics.ts'
 import { CHALLENGE_TRACK_IDS } from '../shared/kart/tracks/challenge.ts'
-import { trackGuide } from '../shared/kart/tracks/guides.ts'
+import { routeGuide, trackGuide } from '../shared/kart/tracks/guides.ts'
 import { RACE_TRACK_IDS } from '../shared/kart/tracks/list.ts'
 import { createDriver } from '../src/kart/bots/drivers.ts'
 import { missionTrack, runMission } from '../src/kart/challenge/headless.ts'
@@ -40,7 +40,8 @@ for (const id of TRACKS) {
     })
   const average = race('average')
   const expert = race('expert')
-  const master = trackGuide(id) ? race('master') : expert
+  // The master knows a track by heart where it has a guide of its own, or one down its branches
+  const master = trackGuide(id) || routeGuide(id) ? race('master') : expert
   const times = calibrate({ average, expert, master }, track.laps)
   table[id] = times
   const list = (values: readonly number[]) => values.map((one) => one.toFixed(1)).join('/').padEnd(18)

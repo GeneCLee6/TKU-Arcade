@@ -1,4 +1,4 @@
-// 2026-11-22 (owner: "at the end, an animated podium for the top three"; docs/ARCHITECTURE.md §4.68):
+// 2026-11-22 (owner: "at the end, an animated podium for the top three"; docs/ARCHITECTURE.md §4.70):
 // what the podium after a race shows and when, without three.js so that it is tested in Node. The
 // stage (podiumStage.ts) draws it, PodiumCeremony.tsx puts the names over it.
 //

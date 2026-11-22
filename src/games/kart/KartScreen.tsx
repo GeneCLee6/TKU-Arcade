@@ -30,7 +30,7 @@ const ReplayShare = lazy(() => import('../../kart/watch/ReplayShare.tsx'))
 // 2026-11-22 (docs/KART-PERF.md §9): the standings of a race watched without the live view, which the
 // race view's chunk has too; not on the room's first screen
 const Standings = lazy(() => import('./Standings.tsx').then((module) => ({ default: module.Standings })))
-// 2026-11-22 (docs/ARCHITECTURE.md §4.68): the top three on the podium once the race is over, before
+// 2026-11-22 (docs/ARCHITECTURE.md §4.70): the top three on the podium once the race is over, before
 // the room's results; its own chunk
 const PodiumCeremony = lazy(() => import('../../kart/ceremony/PodiumCeremony.tsx'))
 

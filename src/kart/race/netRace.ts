@@ -110,7 +110,7 @@ export interface RaceNet {
    */
   order(racers: readonly KartRacer[]): number[]
   /**
-   * 2026-11-22 (§4.68): the room's clock now (ms since the epoch), for the countdown after the first
+   * 2026-11-22 (§4.70): the room's clock now (ms since the epoch), for the countdown after the first
    * finish; null before the first clock answer
    */
   serverNow(): number | null

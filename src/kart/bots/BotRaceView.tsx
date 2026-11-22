@@ -36,7 +36,7 @@ import { podiumSeats, type PodiumEntry } from '../ceremony/podium.ts'
 
 // 2026-11-20 (docs/KART-NETCODE.md §11.4): the race again, as in a room
 const ReplayView = lazy(() => import('../watch/ReplayView.tsx'))
-// 2026-11-22 (§4.68): the top three on the podium before the results
+// 2026-11-22 (§4.70): the top three on the podium before the results
 const PodiumCeremony = lazy(() => import('../ceremony/PodiumCeremony.tsx'))
 
 registerMessages(KART_MESSAGES)
@@ -113,7 +113,7 @@ function BotRound({
   const recording = useRaceRecorder(view, game.realtime)
   const [replay, setReplay] = useState<Replay | null>(null)
   const [watching, setWatching] = useState(false)
-  // 2026-11-22 (§4.68): the podium shown (or skipped) once the race is over
+  // 2026-11-22 (§4.70): the podium shown (or skipped) once the race is over
   const [podiumDone, setPodiumDone] = useState(false)
 
   useEffect(() => {
@@ -325,7 +325,7 @@ const Actions = styled.div`
 `
 
 /**
- * 2026-11-22 (§4.68): the podium's three from the room's standings: those who finished, each with
+ * 2026-11-22 (§4.70): the podium's three from the room's standings: those who finished, each with
  * the kart they drove (the player's own, the computer's from its entry) and their time
  */
 function podiumEntries(

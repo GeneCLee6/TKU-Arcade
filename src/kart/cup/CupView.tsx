@@ -38,7 +38,7 @@ import { podiumSeats } from '../ceremony/podium.ts'
 
 // 2026-11-20 (§4.47): the player's own driver on the podium, celebrating (three.js, fetched then)
 const KartPreview = lazy(() => import('../roster/KartPreview.tsx'))
-// 2026-11-22 (§4.68): the cup's top three on the podium, as after every race, before the card
+// 2026-11-22 (§4.70): the cup's top three on the podium, as after every race, before the card
 const PodiumCeremony = lazy(() => import('../ceremony/PodiumCeremony.tsx'))
 
 export interface CupViewProps {

@@ -1,4 +1,4 @@
-// 2026-11-22 (docs/ARCHITECTURE.md §4.68): the podium after a race, in 3D. A dark stage with three
+// 2026-11-22 (docs/ARCHITECTURE.md §4.70): the podium after a race, in 3D. A dark stage with three
 // steps (gold, silver, bronze), each winner's own kart and driver on theirs, facing the camera; a
 // warm spot comes up on each as it is revealed (podium.ts's timings), coloured lights sweep the
 // stage, and the winner holds a cup overhead. The same kart model as the race (art/kartModel.ts),

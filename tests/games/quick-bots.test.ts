@@ -3,19 +3,38 @@
 import { describe, expect, it } from 'vitest'
 import { getGame } from '../../shared/games/index.ts'
 import { GAME_CARDS, LOBBY_GAMES } from '../../shared/games/lobby.ts'
-import { parseQuickBots, QUICK_BOT_LEVEL, quickBotCount } from '../../shared/games/quickBots.ts'
+import {
+  parseQuickBots,
+  QUICK_BOT_LEVEL,
+  quickBotCount,
+  quickBotLevel,
+  quickBotRange,
+} from '../../shared/games/quickBots.ts'
+import { TABLE_BOT_NAMES } from '../../shared/games/tableBots.ts'
 
 describe('quick games against the computer', () => {
-  it('ask for enough computer players for the fewest the game takes, and at least one', () => {
-    expect(quickBotCount({ minPlayers: 1 })).toBe(1)
-    expect(quickBotCount({ minPlayers: 2 })).toBe(1)
-    expect(quickBotCount({ minPlayers: 4 })).toBe(3)
+  it('offer from enough for the fewest the game takes (at least one) to a full table', () => {
+    expect(quickBotRange({ minPlayers: 1, maxPlayers: 2 })).toEqual({ min: 1, max: 1 })
+    expect(quickBotRange({ minPlayers: 2, maxPlayers: 9 })).toEqual({ min: 1, max: 8 })
+    expect(quickBotRange({ minPlayers: 4, maxPlayers: 11 }, 9)).toEqual({ min: 3, max: 9 })
+    expect(quickBotCount('unknown', { minPlayers: 4, maxPlayers: 6 })).toBe(3)
+  })
+
+  it('first offer a lively table: hold’em five computers, never outside what the game takes', () => {
+    expect(quickBotCount('holdem', getGame('holdem')!.meta)).toBe(5)
+    for (const card of GAME_CARDS.filter((one) => one.meta.computer)) {
+      const count = quickBotCount(card.id, card.meta)
+      const range = quickBotRange(card.meta, TABLE_BOT_NAMES.length)
+      expect(count, card.id).toBeGreaterThanOrEqual(range.min)
+      expect(count, card.id).toBeLessThanOrEqual(range.max)
+      expect(count, card.id).toBeGreaterThan(1)
+    }
   })
 
   it('work for every listed game marked computer, at the default level, and for no other', () => {
     for (const card of GAME_CARDS) {
       const module = getGame(card.id)!
-      const ask = { count: quickBotCount(card.meta), level: QUICK_BOT_LEVEL }
+      const ask = { count: quickBotCount(card.id, card.meta), level: QUICK_BOT_LEVEL }
       expect(parseQuickBots(module, ask) !== null, card.id).toBe(card.meta.computer === true)
     }
     expect(LOBBY_GAMES.some((card) => card.meta.computer)).toBe(true)
@@ -42,5 +61,19 @@ describe('quick games against the computer', () => {
       count: 2,
       level: 'easy',
     })
+  })
+
+  it('take one level per computer player, in seat order, and nothing else', () => {
+    const holdem = getGame('holdem')!
+    const mixed = { count: 3, level: 'normal', levels: ['easy', 'normal', 'easy'] }
+    const bots = parseQuickBots(holdem, mixed)!
+    expect(bots).toEqual(mixed)
+    expect([0, 1, 2].map((index) => quickBotLevel(bots, index))).toEqual(['easy', 'normal', 'easy'])
+    expect(quickBotLevel({ count: 2, level: 'easy' }, 1)).toBe('easy')
+    for (const levels of [['easy'], ['easy', 'normal', 'hard'], 'easy', [1, 2, 3], null]) {
+      expect(parseQuickBots(holdem, { count: 3, level: 'normal', levels }), JSON.stringify(levels)).toBeNull()
+    }
+    // A full table of eight computer players
+    expect(parseQuickBots(holdem, { count: 8, level: 'easy' })).toEqual({ count: 8, level: 'easy' })
   })
 })

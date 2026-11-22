@@ -608,7 +608,7 @@ export const kartLobby = {
 } as const
 
 /**
- * 2026-11-22 (docs/ARCHITECTURE.md §4.68): the podium after a race (src/kart/ceremony/): the three
+ * 2026-11-22 (docs/ARCHITECTURE.md §4.70): the podium after a race (src/kart/ceremony/): the three
  * steps (winner, second, third), the stage, the lights that sweep it and the trophy. Also the name
  * plates' medal colours over it (2D, read from here as the 3D's are)
  */

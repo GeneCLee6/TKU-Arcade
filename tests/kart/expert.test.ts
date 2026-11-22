@@ -12,6 +12,7 @@ import { HARBOUR } from '../../shared/kart/tracks/harbour.ts'
 import { RIVERSIDE } from '../../shared/kart/tracks/riverside.ts'
 import { TAMKANG } from '../../shared/kart/tracks/tamkang.ts'
 import { createExpert, novice } from './drivers.ts'
+import { flatLayout } from './flatLayout.ts'
 
 // Pinned to the arcade feel (the "arcade (old)" preset, before 2026-11-17): these tests lock what it
 // always did. The classic feel, the default since, has its own (tests/kart/classic.test.ts)
@@ -67,9 +68,10 @@ const TIMES: Record<string, readonly [number, number, number]> = {
 /** How far a time may move before the test says so, in seconds */
 const TOLERANCE = 2.5
 
-// 2026-11-22: the harbour without its moving obstacles (obstacles.ts): these scripted drivers of old
-// keep to the middle of the road and know nothing of them; it is the physics that is locked here
-describe.each([RIVERSIDE, { ...HARBOUR, obstacles: undefined }, TAMKANG])('three laps of $id', (json) => {
+// 2026-11-22: the harbour without its newer parts (its moving obstacles and its step; flatLayout.ts):
+// these scripted drivers of old keep to the middle of the road and know nothing of them; it is the
+// physics that is locked here
+describe.each([RIVERSIDE, flatLayout(HARBOUR), TAMKANG])('three laps of $id', (json) => {
   const slow = race(json, novice)
   const average = race(json, createExpert(false))
   const expert = race(json, createExpert(true))

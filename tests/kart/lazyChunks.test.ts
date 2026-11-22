@@ -21,9 +21,9 @@ import { loadKart, peekKartLoad, type EngineSlot } from '../../src/kart/load/kar
 
 /** What each built-in track's quarter must hold */
 const PARTS: Record<string, readonly string[]> = {
-  harbour: ['harbour'],
+  harbour: ['harbour', 'skill'],
   tamkang: ['tamkang'],
-  oldstreet: ['oldStreet'],
+  oldstreet: ['oldStreet', 'skill'],
   works: ['works', 'skill'],
   wharf: ['wharf', 'skill'],
   lanes: ['lanes', 'skill'],
@@ -54,7 +54,8 @@ describe("a track's own scenery", () => {
     if (scenery.tamkang) expect(typeof scenery.tamkang.buildTamkang).toBe('function')
     if (scenery.oldStreet) expect(typeof scenery.oldStreet.buildOldStreet).toBe('function')
     if (scenery.skill) {
-      expect(scenery.skill.walls.skillStyleOf(id)).toBe(id)
+      // 2026-11-22: the harbour and the old street load it for their cues alone, no style of walls
+      expect(scenery.skill.walls.skillStyleOf(id)).toBe(['wharf', 'lanes', 'works'].includes(id) ? id : null)
       expect(typeof scenery.skill.cues.buildSkillCues).toBe('function')
     }
     if (scenery.local) expect(scenery.local.plan.isLocalTrack(id)).toBe(true)

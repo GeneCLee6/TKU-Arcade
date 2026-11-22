@@ -1399,6 +1399,15 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **首屏**：主站 99.9 → 101.0 kB（字串、卡片標籤、service worker 註冊與更新提示的 hook；`QuickPlay`、`UpdatePrompt` 不在首屏）；`QuickPlay` 約 1.3 kB gzip 在首屏之外。
 - **測試**：`tests/games/quick-bots.test.ts`（每款 `computer` 遊戲的預設請求都合法、別的都不合法；每個難度與人數的邊界；格式）、`tests/worker/rooms.test.ts`（交給 DO 的參數、強制私人、各種不合法 400）、`tests/worker/room-table-bots.test.ts`「a room opened with computer players」（座位、加入就開局、只開一次、hibernation、暫停時留在等待室、房主重連不重開、卡丁車不收、一局玩到底）、`e2e/quick-play.spec.ts`（手機一鍵德州撲克到發牌、不在公開房列表、卡片標籤、卡丁車兩格）。
 
+
+### 4.55b 「跟電腦玩」自選數量與各自難度（2026-11-22，`feat/table-bots-many`，#147）
+
+擁有者 2026-11-22：「其他遊戲添加電腦你也要給多電腦模式，比如德州撲克目前只能加1個電腦。」§4.55 的一鍵開局只給 `max(1, minPlayers − 1)` 個電腦（德州撲克 1 個）。
+
+- **數量**：`shared/games/quickBots.ts` 的 `quickBotRange(meta, names)`＝最少 `max(1, minPlayers − 1)`、最多 `min(maxPlayers − 1, 名字數)`；`quickBotCount(gameId, meta)` 是每款的預設（德州撲克 5，陞官圖、滬尾商行、社辦牌陣、朝堂暗鬥、奪祕笈、芥末餃子 3），夾在範圍內。大廳每格多一個「− N ＋」。
+- **難度**：分段切換多一個「各自選」：每格出現每個電腦一顆小鈕（「1 普通」），點一下換下一個難度。請求變成 `bots: { count, level, levels }`，`levels` 一個電腦一個、照座位順序；`parseQuickBots` 檢查長度等於 `count`、每個都在 `bots.levels`，不合就 400 `bad_bots`。`RoomHost.create` 用 `quickBotLevel(bots, i)` 給第 i 個電腦難度。伺服器的人數上限本來就是座位數 − 1（不用放寬）；速率限制不變（一鍵仍是一個 POST）。
+- **等待室**：`TableBots.tsx` 多「空位全部坐滿（N）」，送 N 個 `add_bot`（房間照舊一個一個放進最低空位，超過的回 `seat_taken`）；七款都能加到滿座（`MAX_MEMBERS` 64 遠大於座位）。
+- **測試**：`tests/games/quick-bots.test.ts`（範圍、預設、`levels` 格式）、`tests/components/QuickPlay.test.tsx`（預設 5、1 到 8、各自選）、`tests/worker/room-table-bots.test.ts`「one person and a full table of computers」（七款各一人＋滿座電腦、難度交錯，房間下完一局；等待室加到滿、多的兩個被拒）、`e2e/quick-play.spec.ts`（手機一鍵德州撲克 5 個電腦開局、桌機 8 個電腦各自難度）。
 ### 4.56 路線圖外：PWA 的快取與新版本提示（2026-11-21，`feat/lobby-quickplay-pwa`）
 
 `e7-t09`（#48）已經有 manifest、圖示、只回離線頁的 service worker 與安裝提示。這批把 service worker 改成「App 殼＋靜態資產」快取、加上新版本提示，安裝提示可以關。
@@ -1546,7 +1555,31 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **車身細節**（#99，`src/kart/art/bodyDetail.ts`）：`BODY_DETAIL`（低 off／中 medium／高 high）、`paintBodyDetail`（面板縫線、螺絲；高加刮痕與細顆粒）畫成 256／512 px 的高度圖，`bodyDetailTexture(level)` 一個等級一張、整頁共用；`createPaintMaterial(environment, weave, detail)` 當 `bumpMap`（`DETAIL_BUMP` 0.9），program cache key 分開；`wearDecal` 在號碼與標誌貼紙邊緣挖掉幾塊；`carbonTexture(fine)` 高畫質是 2/2 斜紋。`KartFinish.detail`，`Scene.ts` 照畫質給，車庫預覽與等待室舞台照 `loadQuality()`；幽靈車沒有。懸浮摩托車沒有輪子，所以沒有胎紋（只有懸浮墊）。顏色（灰階的高度）在 `kartTokens.ts` 的 `kartDetail`。截圖 `scripts/kart-shots.mjs --views close`。
 - **測試**：`tests/kart/kartAudio.test.ts`（摩托車的音高、檔位、音色與分級、`voiceBudget`）、`tests/kart/bodyDetail.test.ts`（分級、縫線與螺絲的數量、磨損可重現）、`tests/shared/kart-walls.test.ts`（`slideShare`、淺角度貼牆只慢一點且不算重撞、街機照舊磨速、20° 照舊是撞、8° 不到一半）、`tests/kart/terrain.test.ts`（落地前後 ±0.1 s 的新按都算、取代不疊加、太早太晚不算）、`tests/kart/school.test.ts`（第 11 課的過關與三種失敗）、`skillTracks.test.ts`（頂尖在沒有指南的賽道＝熟練＋落地時機）。
 
-### 4.68 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，`feat/kart-race-flow`）
+### 4.68 路線圖外：燈籠老街的第二條捷徑（燈籠巷）、漁人碼頭與老街的跳台（2026-11-22，`feat/kart-track-routes`）
+
+`NEXT.md` §5 賽道內容的另外兩項（#103）。手感與數字在 `KART-FEEL.md` §21。賽道格式、伺服器裁定沒有新東西：岔路照 #113、跳台照 #94／#109。
+
+- **燈籠老街 `oldstreet@11`**（`shared/kart/tracks/oldstreet.ts`）：**燈籠巷**：從燈籠巷道（往西的寬直線）左轉進後巷之前的那個左彎，切過彎的內側、接回後巷（`layBranch`：半徑 12 m 左轉 40°、一條長斜線、左 25°、直線；14 m 寬），約 130 m 對主路約 165 m。巷子離開巷道兩個路點後一面店屋的牆把它封住，只在右邊留一個 9.5 m 的門（`ALLEY_DOOR*`，照高架廠區窄巷的做法）：要在斜線上就先對準，晚了會撞牆；門後一條加速帶。主路閘門用 `gatesClearOf` 讓開；路線導引 `OLDSTREET_ROUTE_GUIDE`（`guides.ts` 的 `ROUTE_GUIDES`）的技術線先沿巷道中間（room 1.5，切彎的 apex 不會把車推到左邊路緣）到巷口、再沿巷子斜線對準門、`slot` 一個，所以**專家每圈都走**，簡單、普通、困難不走（`skill.tricks`）。場景：老街的攤位與一般的路燈不放在岔路上（`oldStreetArt.ts` 認得 `forks`；`trackArt.ts` 的路燈在有岔路的賽道跳過落在別條路上的）。**老街回程的台階**：往西的老街回程、右轉進最後一條巷子之前一個 1.6 m 的跳台（`stepLip`，最接近 (212, 313) 的路點），直的跳會落在彎裡，要先收油或甩尾起跳。
+- **漁人碼頭 `harbour@15`**（`harbour.ts`）：第二段山坡直線、髮夾 2（左）前一個 1.6 m 的跳台（`HARBOUR_STEP`，`circuit` 的 `jumps`）。新導引 `HARBOUR_GUIDE`（兩條線預設在中間，只有跳台前技術線靠右、`cue` 往左甩尾起跳、落在髮夾入口），專家與頂尖腳本每圈甩尾起跳。
+- **電腦車的島牆判斷不看有高度的牆**（`brain.ts`）：沒有導引的賽道，`createBotBrain` 用 `walls` 猜「島牆分出的兩條車道」；燈籠巷的門牆（`top` 9 m）離主路 25–40 m，卻會被算進最近的主路路點，讓普通電腦車在左彎外側撞牆、復位（量到普通一場 4–6 次）。現在只看沒有 `top` 的牆（島牆、中島本來就沒有）；有 `top` 的牆只出現在有導引的賽道（碼頭倉庫、山城、廠區、針眼巷），那些賽道本來就不看 `walls`，所以舊賽道一步都沒變（`flatGolden`、`branchGolden`、`bots.test` 擋）。另外，**在島前被放回來的電腦車走外側車道**：復位點在老街中島的島頭前，會走捷徑內側的手（`shortcuts`）從靜止起步轉不過去、撞上島頭、又被放回同一個地方（八台困難電腦車的道具賽一台卡死在那裡）；現在被復位到島的範圍裡，這一次走外側（`safeLane`），過了島再照自己的選擇。
+- **畫面**：兩張圖除了跳台都是平的，所以**不畫**山路賽道的地面高度場（會蓋掉碼頭的岸邊與老街的石板），只畫跳台的斜面（`buildJumpRamps`）。技術點提示（`skillCues.ts`）也開給這兩張：`trackScenery.ts` 讓它們多載 `skill`，`trackArt.ts` 在沒有 `skillStyle` 的賽道只畫提示（不改牆的樣子）：跳台兩端的琥珀燈、跳台前的箭頭（漁人碼頭照導引往左斜）、燈籠巷的岔路箭頭與門的青色燈條。
+- **重跑**：`kart:medals -- --only harbour,oldstreet`（`kart-medals.ts` 的頂尖腳本現在在「有主路導引**或岔路導引**」的賽道都跑，老街的金牌因此照走燈籠巷的速度算）、`kart:meta -- --tracks harbour,oldstreet`。兩張的特性標籤（`shared/kart/meta.ts`）拿掉「平地」（有 1.6 m 的台階了），只剩「高速型」。
+- **測試**：`tests/kart/trackContent.test.ts`（新）：燈籠巷是一條岔路、比繞彎短 15% 以上、牆上只找得到一個門（`findSlots`，和畫面用同一個）、路線導引對準它；專家兩個種子每圈都走、其他三級都不走、不逆走；兩個台階：一個、1.6 m、跳台後 60 m 內路轉 ≥ 25°（接彎）；漁人碼頭導引的 cue 就在台階、專家每圈甩尾起跳零復位；四級電腦車兩張圖三圈不逆走、復位 ≤ 1。`technical.test.ts` 的紀錄 key 與跳台數；`flatGolden`、`expert.test.ts` 改用拿掉跳台、岔路、障礙物的同一張圖（`tests/kart/flatLayout.ts`：鎖的是平地物理）；`terrain.test.ts`、`meta.test.ts` 的「平地賽道」例子換成紅樹林、淡海；`flagship.test.ts` 比的對象改成每張圖目前的第一名（不再固定白鷺）。
+
+**限制（照實寫）**：(1) 老街沒有主路導引，所以頂尖腳本與專家在老街的台階是收油跳過，不會甩尾起跳；人可以。(2) 燈籠巷的牆是素色高牆（沒有個別的店屋場景）。(3) 台階讓困難電腦車每圈慢約 2 秒（坡頂收油）。
+
+### 4.69 路線圖外：全螢幕遊玩（網頁與 PWA）（2026-11-22，#148，`feat/fullscreen-play`）
+
+- **共用 API**（`src/lib/fullscreen.ts`）：全站只有一個全螢幕，對象是整頁（`document.documentElement`），不是某個元素：等待室變比賽、比賽變結果都不用重新進入，`<dialog>`（top layer）與 toast 照常。`enterFullscreen()`（要在點擊或按鍵裡呼叫；`requestFullscreen({ navigationUI: 'hide' })`，舊 Safari 用 `webkit` 前綴）、`exitFullscreen()`（暫停選單的「離開全螢幕」就呼叫它）、`toggleFullscreen()`、`fullscreenMode()`（`'off' | 'fullscreen' | 'focus'`）、`subscribeFullscreen`、React 的 `useFullscreenMode()`。
+- **專注模式**：沒有 Fullscreen API 或被拒（iPhone Safari、沒權限的 iframe）時退回，和 #141 陞官圖同一個做法：`<html data-focus-mode>`，TopBar 藏起來（`TopBar.tsx`）；第一次會 toast 說明，iPhone 上提示「加到主畫面」才能沒有瀏覽器列。陞官圖自己的圖版全螢幕（`useImmersive.ts`）不動。
+- **Esc**：真全螢幕時 Esc 是瀏覽器的（頁面攔不到），離開後頁面靠 `fullscreenchange`（含 `webkitfullscreenchange`）跟上；Chrome／Edge 桌機進入後用 Keyboard Lock 保留 Esc（`navigator.keyboard.lock(['Escape'])`），所以比賽的 Esc 先開暫停選單、長按 Esc 才離開全螢幕。專注模式沒有瀏覽器幫忙，Esc 由這裡處理，但有 `<dialog open>` 或畫面自己用掉這個 Esc（`event.preventDefault()`）時不動作——**要自己用 Esc 的畫面（暫停選單）請 `preventDefault()`**。
+- **自動全螢幕**（設定，預設關，`localStorage` `tku-arcade.fullscreen.auto`）：`autoFullscreen()`／`setAutoFullscreen()`／`useAutoFullscreen()`；瀏覽器只准從使用者動作進全螢幕，所以 `armAutoFullscreen()` 掛一次性的 `keydown`／`pointerdown`（捕獲階段，Esc 除外），比賽的第一個鍵或第一下觸控就進去；只用真全螢幕，不會無預警進專注模式。
+- **手機轉橫**：`lockLandscape()`／`unlockOrientation()`（`screen.orientation.lock('landscape')`，Chrome Android 只在全螢幕或已安裝的 app 有效，其他瀏覽器拒絕就維持現有的轉橫提示）。`src/kart/race/useRaceFullscreen.ts` 在比賽中：掛自動全螢幕、觸控裝置嘗試鎖橫（一進來先試一次給已安裝的 app，進全螢幕時再試）、離開比賽解鎖。
+- **按鈕**（`src/components/FullscreenButton.tsx`，自己的 lazy chunk，字串 `shared/games/i18n.fullscreen.ts` 由它登記、`screenMessages.ts` 列給 check-i18n）：每個房間標題列（桌遊等待室與遊戲中、卡丁車觀戰與結果）、卡丁車單機選單（`SpikePage.tsx`，`landscape`：進全螢幕順便鎖橫）；卡丁車等待室的在下一個 PR（§4.70）。比賽中由暫停選單（`feat/kart-race-flow`）提供。
+- **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
+- **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
+
+### 4.70 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，`feat/kart-race-flow`）
 
 擁有者 2026-11-22：「按 esc 就可以暫停然後可以打開主選單……當第一台車完賽後倒數 10 秒，到了的車才能排名，然後最後要有前 3 名頒獎畫面動畫……地圖一開始要有每個車手的正面動畫，然後才是 321 倒數，倒數要有音效，GO 也要有音效，選單可以調節音量音效大小，動畫特效等等。」流程是類型慣例；畫面、聲音、文字全部自己做（`IP-CHECKLIST.md` 卡丁車 2026-11-22 補記）。
 

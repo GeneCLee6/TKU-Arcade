@@ -83,7 +83,8 @@ describe('the matrix', () => {
 
 describe('the tracks’ traits', () => {
   it('a flat track neither climbs nor falls; a hill track does, as far down as up', () => {
-    const flat = trackTraits(raceTrack('harbour')!)
+    // 2026-11-22: the harbour has a step now (#103); the mangrove channel is flat
+    const flat = trackTraits(raceTrack('mangrove')!)
     expect(flat.climb).toBe(0)
     expect(flat.upShare).toBe(0)
     const hill = trackTraits(raceTrack('datun')!)

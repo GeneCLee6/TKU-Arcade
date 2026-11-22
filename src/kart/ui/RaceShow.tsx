@@ -194,7 +194,7 @@ export const PlaceArrow = styled.span<{ $up: boolean }>`
   }
 `
 
-// ── 2026-11-22 (docs/ARCHITECTURE.md §4.68): each driver presented, and the close's countdown ──────
+// ── 2026-11-22 (docs/ARCHITECTURE.md §4.70): each driver presented, and the close's countdown ──────
 
 /**
  * During the opening, the driver in front of the camera: a lower third with their place on the grid,

@@ -1,5 +1,5 @@
 // 2026-11-22 (owner: "against the computer, Esc pauses and opens the main menu: back to the lobby or
-// other settings"; docs/ARCHITECTURE.md §4.68): the menu over a race. Esc, Start on a gamepad or the
+// other settings"; docs/ARCHITECTURE.md §4.70): the menu over a race. Esc, Start on a gamepad or the
 // button on the screen opens it. A race with no one else in it (the time trial, against the computer,
 // a Grand Prix, the school, a challenge) stops while it is open: the race clock (race/raceClock.ts)
 // stands still, the music drops and the effects fall silent (audio/bus.ts). A room's race does not
@@ -18,6 +18,7 @@ import { duckKartBus } from '../audio/bus.ts'
 import { ControlsPanel } from '../ControlsPanel.tsx'
 import { loadBindings, loadRules, saveBindings, saveRules } from '../devices.ts'
 import { pauseRace, resumeRace } from '../race/raceClock.ts'
+import { exitFullscreen, useFullscreenMode } from '../../lib/fullscreen.ts'
 import { broadcastSolid, ticker } from './broadcast.ts'
 import { SettingsPanel } from './SettingsPanel.tsx'
 import type { Bindings } from '../../../shared/kart/input.ts'
@@ -75,6 +76,8 @@ export function PauseLayer({
   const opener = useRef<HTMLButtonElement>(null)
   const [controls, setControls] = useState(() => ({ bindings: loadBindings(), rules: loadRules() }))
   const open = showing !== null
+  // 2026-11-22 (#148): full screen (or its focus mode) is left from here too
+  const fullscreen = useFullscreenMode()
   const changeRef = useRef(onOpenChange)
   useEffect(() => {
     changeRef.current = onOpenChange
@@ -210,6 +213,11 @@ export function PauseLayer({
                 ) : (
                   <Button type="button" $variant="secondary" onClick={leaveWith(lobby)} data-testid="kart-pause-lobby">
                     {t('kart.flow.pause.lobby')}
+                  </Button>
+                )}
+                {fullscreen !== 'off' && (
+                  <Button type="button" $variant="ghost" onClick={exitFullscreen} data-testid="kart-pause-exit-fullscreen">
+                    {t('kart.flow.pause.exitFullscreen')}
                   </Button>
                 )}
                 <Hint>{t('kart.flow.pause.hint')}</Hint>

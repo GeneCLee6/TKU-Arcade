@@ -45,6 +45,11 @@ const Bar = styled.header`
     padding-right: max(${space.xxl}px, env(safe-area-inset-right));
     padding-left: max(${space.xxl}px, env(safe-area-inset-left));
   }
+
+  /* Full screen's fallback (src/lib/fullscreen.ts): the page's own chrome goes */
+  :root[data-focus-mode] & {
+    display: none;
+  }
 `
 
 const Brand = styled(Link)`

@@ -442,6 +442,48 @@ describe('one person and two computers play a whole game', () => {
   }
 })
 
+// 2026-11-22 (the owner: hold'em with one computer is no game): a quick game against a full table of
+// computer players, each at its own level, played to its end by the room
+describe('one person and a full table of computers play a whole game', () => {
+  const games: [string, Record<string, unknown> | undefined][] = [
+    ['holdem', { stack: 100, blindUp: 15, timer: 30 }],
+    ['promotion', undefined],
+    ['traders', undefined],
+    ['palace', undefined],
+    ['secret-scroll', { length: 'short' }],
+    ['wasabi', undefined],
+    ['tiles', { clock: 60 }],
+  ]
+  for (const [gameId, options] of games) {
+    it(gameId, () => {
+      const world = new World()
+      const seats = world.modules[gameId]!.meta.maxPlayers
+      const count = seats - 1
+      const levels = Array.from({ length: count }, (_, index) => (index % 2 === 0 ? 'easy' : 'normal'))
+      expect(
+        world.host.create('abcdefghij', gameId, options, false, null, null, { count, level: 'normal', levels }),
+      ).toBe(true)
+      const ann = world.join('Ann')
+      expect(ann.view!.room.status).toBe('playing')
+      expect(ann.bots.map((bot) => [bot.seat, bot.bot!.level])).toEqual(
+        levels.map((level, index) => [index + 1, level]),
+      )
+      playOut(world, ann, 200_000)
+      expect(ann.view!.room.status).toBe('ended')
+      expect(ann.game.result!.standings).toHaveLength(seats)
+      expect(ann.errors).toEqual([])
+    })
+  }
+
+  it('the host fills every free seat in the waiting room, one add at a time, up to the last', () => {
+    const { ann } = room('holdem')
+    for (let one = 0; one < 10; one++) ann.send({ t: 'add_bot', level: 'easy' })
+    expect(ann.bots.map((bot) => bot.seat)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+    // The two past a full table are refused, nothing else
+    expect(ann.errors).toEqual(['seat_taken', 'seat_taken'])
+  })
+})
+
 describe('the next round is the people’s to start', () => {
   it('secret-scroll: after a round the computers wait for Ann or the clock', () => {
     const { world, ann } = room('secret-scroll', { length: 'short' })

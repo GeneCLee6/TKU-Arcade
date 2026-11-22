@@ -1,4 +1,4 @@
-// The race's flow (owner 2026-11-22; docs/ARCHITECTURE.md §4.68): the pause menu, the settings, each
+// The race's flow (owner 2026-11-22; docs/ARCHITECTURE.md §4.70): the pause menu, the settings, each
 // driver presented before the start, the countdown after the first finish and the podium. Merged
 // into KART_MESSAGES (i18n.ts), so the same check covers them. `en` is the source.
 const en = {
@@ -15,6 +15,7 @@ const en = {
   'kart.flow.pause.open': 'Pause (Esc)',
   'kart.flow.pause.openMenu': 'Menu (Esc)',
   'kart.flow.pause.hint': 'Esc or Start on a gamepad to go back',
+  'kart.flow.pause.exitFullscreen': 'Leave full screen',
   'kart.flow.settings.title': 'Settings',
   'kart.flow.settings.graphics': 'Picture',
   'kart.flow.settings.qualityNote': 'The quality and the effects apply from the next race.',
@@ -61,6 +62,7 @@ const zhTW: Record<KartFlowKey, string> = {
   'kart.flow.pause.open': '暫停（Esc）',
   'kart.flow.pause.openMenu': '選單（Esc）',
   'kart.flow.pause.hint': '按 Esc 或手把的 Start 回去',
+  'kart.flow.pause.exitFullscreen': '離開全螢幕',
   'kart.flow.settings.title': '設定',
   'kart.flow.settings.graphics': '畫面',
   'kart.flow.settings.qualityNote': '畫質與特效從下一場比賽起生效。',

@@ -219,7 +219,7 @@ export function createBotBrain(
    * line keeps to one lane all the way past it: by skill (`shortcuts`) the one on the inside of the
    * bend, the shorter and tighter; otherwise the other
    */
-  walls: readonly { ax: number; az: number; bx: number; bz: number }[] = [],
+  walls: readonly { ax: number; az: number; bx: number; bz: number; top?: number }[] = [],
   /**
    * The track's guide, if it has one (2026-11-19, shared/kart/tracks/guide.ts): its safe line and,
    * by skill (`tricks`), the line through its shortcuts and the drift jumps that line asks for
@@ -506,10 +506,22 @@ export function createBotBrain(
 
   // Islands: at each road point beside one, the lane the line keeps to, as an offset from the middle
   const lane = new Map<number, number>()
-  if (walls.length > 0 && !line) {
+  /**
+   * The outside lane round each island (2026-11-22): a kart put back just in front of one (a reset)
+   * takes it, whatever its hands would choose: from a standstill on the middle of the road there is
+   * no room to swing round to the inside lane, and a kart that tries meets the island's nose, is put
+   * back, and meets it again (seen in an item race on the old street)
+   */
+  const safeLane = new Map<number, number>()
+  /** Whether this pass by the island is on the outside lane, and the resets seen so far */
+  let onSafeLane = false
+  let resetsSeen = 0
+  // 2026-11-22: an island's walls only: a wall with a top (a doorway's, a fence's) is no island
+  const islandWalls = walls.filter((wall) => wall.top === undefined)
+  if (islandWalls.length > 0 && !line) {
     const count = road.length
     const band = new Map<number, { low: number; high: number }>()
-    for (const wall of walls) {
+    for (const wall of islandWalls) {
       const index = nearestRoadPoint(road, wall.ax, wall.az)
       const { dx, dz } = roadDirection(road, index)
       const point = road[index]!
@@ -531,19 +543,25 @@ export function createBotBrain(
     }
     const inner = bend >= 0 ? 1 : -1
     const side = skill.shortcuts ? inner : -inner
-    for (const index of indices) {
-      const { low, high } = band.get(index)!
-      const half = road[index]!.width / 2
-      // The middle of the lane on that side, but no further from the island than LANE_REACH
-      const edge = side > 0 ? high : low
-      const middle = (edge + side * half) / 2
-      const target =
-        side > 0 ? Math.min(middle, edge + LANE_REACH) : Math.max(middle, edge - LANE_REACH)
-      for (let near = index - LANE_LEAD; near <= index + LANE_LEAD; near++) {
-        const k = ((near % count) + count) % count
-        if (!band.has(k) || k === index) lane.set(k, lane.get(k) ?? target)
+    // 2026-11-22: and the outside lane, the safe one, for hands put back in front of the island
+    for (const [lanes, way] of [
+      [lane, side],
+      [safeLane, -inner],
+    ] as const) {
+      for (const index of indices) {
+        const { low, high } = band.get(index)!
+        const half = road[index]!.width / 2
+        // The middle of the lane on that side, but no further from the island than LANE_REACH
+        const edge = way > 0 ? high : low
+        const middle = (edge + way * half) / 2
+        const target =
+          way > 0 ? Math.min(middle, edge + LANE_REACH) : Math.max(middle, edge - LANE_REACH)
+        for (let near = index - LANE_LEAD; near <= index + LANE_LEAD; near++) {
+          const k = ((near % count) + count) % count
+          if (!band.has(k) || k === index) lanes.set(k, lanes.get(k) ?? target)
+        }
+        lanes.set(index, target)
       }
-      lane.set(index, target)
     }
   }
 
@@ -561,7 +579,7 @@ export function createBotBrain(
       const apex = inside.length === 0 ? 0 : inside[index]! * (skill.apex ?? 0) * room
       return middle + clamp(wander + apex, -room, room)
     }
-    const kept = lane.get(index)
+    const kept = (onSafeLane ? safeLane : lane).get(index)
     if (kept !== undefined) return kept
     const half = road[index]!.width / 2
     const sway = Math.sin(swayPhase + (along[index]! / SWAY_METRES) * Math.PI)
@@ -857,6 +875,10 @@ export function createBotBrain(
     }
 
     const nearest = nearestRoadPoint(road, kart.x, kart.z, kart.y)
+    // Put back beside or in front of an island: the outside lane until it is behind
+    if (trial.run.resets > resetsSeen && lane.has(nearest)) onSafeLane = true
+    resetsSeen = trial.run.resets
+    if (onSafeLane && !lane.has(nearest)) onSafeLane = false
     // In the air: hold the throttle for the landing boost, the nose kept in line with the flight (or,
     // by skill, let it go to press it afresh on landing: the timed landing)
     if ((kart.air ?? 0) > 0) {

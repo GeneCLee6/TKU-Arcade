@@ -33,9 +33,10 @@ const PLAN: Record<
     jumps: 1,
     hilly: true,
   },
-  harbour: { key: 'harbour@14', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
+  // 2026-11-22 (#146): the harbour's step before hairpin 2, the old street's home straight's step
+  harbour: { key: 'harbour@15', straight: 0.34, was: 0.54, longest: 290, jumps: 1, hilly: true },
   tamkang: { key: 'tamkang@13', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
-  oldstreet: { key: 'oldstreet@10', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
+  oldstreet: { key: 'oldstreet@11', straight: 0.4, was: 0.6, longest: 340, jumps: 1, hilly: true },
   guanyin: { key: 'guanyin@9', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
   // 2026-11-18, the four new ones (moreTracks.test.ts has what is their own): at most 30% straight
   mangrove: { key: 'mangrove@2', straight: 0.3, was: 0.3, longest: 280, jumps: 0, hilly: false },
