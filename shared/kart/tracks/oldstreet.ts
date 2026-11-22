@@ -262,6 +262,28 @@ const cleared = gatesClearOf(fromLine, gates, respawns, branches)
 // The route down the alley (routes.ts drives it): lined up from the lane with the doorway, through
 const route = routeRoad({ road: fromLine, jumps: [stepLip], forks: [{ from: alleyFrom, to: alleyTo, path: alleyPath, jumps: [] }] }, [0])
 const onLane = (index: number) => route.main[alleyFrom]! + index
+
+/**
+ * 2026-11-23 (#150): the old street home's step. The master lifted before the crest like everyone
+ * else. The lip sits where the right kink is all but done and the last alley's left is coming, so
+ * the drift that pays is to the left: begun late on the crest, the tail kept nearly in line in the
+ * air (a wider swing runs the landing into the right kerb), down about twelve road points on at the
+ * middle, already turning in (measured with scripts/kart/drivers.ts' master: as fast as lifting,
+ * three drift jumps a race). A guide of this cue alone: the rest of the road is driven as the hands
+ * find it (round the stall island, minding the kerbs), as before there was a guide
+ */
+const stepGuide = guideFor(fromLine)
+stepGuide.cue({
+  lip: stepLip,
+  way: -1,
+  land: [stepLip + 12, 0],
+  into: 0.2,
+  nose: (10 * Math.PI) / 180,
+  most: 62,
+})
+/** The old street's main road guide: the step's drift jump alone (shared/kart/tracks/guides.ts) */
+export const OLDSTREET_GUIDE: TrackGuide = { ...stepGuide.build(), cuesOnly: true }
+
 const routeLines = guideFor(route.road)
 /** Where the alley is clear of the lane, by its own road points */
 const alleyClear = alleyPath.findIndex((point) => roadDepth(fromLine, true, point.x, point.z) < -point.width / 2)
