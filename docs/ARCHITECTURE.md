@@ -1496,6 +1496,18 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **`check-budget.mjs`**：一個畫面「首屏之後才載」的東西，改算它自己（和它靜態 import 的、不含入口與房間頁）的全部動態 import。以前只看畫面 chunk 本身的動態 import，所以 `fullData.ts` 載的 `fullSquare.ts` 被當成一款「遊戲」多印一行；現在它和 `FullBoard`、`fullWords` 都列在完整版的「after the first paint」（32.4 kB，不限）。
 - **lint**：`tests/worker/room-robustness.test.ts` 的兩個 `no-unsafe-optional-chaining`（`game?.view as …` 再取 `.you`）改成 `game!.view`；`npm run lint` 0 警告。
 
+### 4.65 路線圖外：貼牆滑行、落地時機噴、駕訓第 11 課、摩托車引擎聲、聲音分級、車身細節（2026-11-22，`feat/kart-wall-slide-landing`）
+
+- **貼牆滑行**（`shared/kart/walls.ts`）：新 `WALL_SLIDE`（`slideAngle` 12°、`scrapeShare` 0.6）與純函式 `slideShare(headOn, slideAngle)`：碰牆時速度和牆的夾角在 `tuning.wallSlideAngle`（`KART_TUNING` 新的一項，12°，調參面板「貼牆滑行角度」，牆一組）以內，沿牆損失與 `hitSpeed` 乘 (sin 夾角 ÷ sin 上限)²，那一步的擦牆拖曳 ×0.6；`WallResult.sliding` 標出整步只有滑行。只有 `MODEL_CLASSIC` 會滑，街機（舊）照舊。撞牆反應全在 `collideWalls` 裡的這兩個值，和 `feat/kart-track-format-v2` 的高度碰撞（`wall.top`）不重疊。黑鳶 `FLAGSHIP_TRAITS.wallSlideAngle` ×0.5。
+- **落地時機噴**（`shared/kart/terrain.ts`）：`TERRAIN_TUNING.landingTapWindow` 0.1 s、`landingTimedBoost` 0.75 s；`KartState` 多 `airTap`、`landWindow`、`timedLandings`（只在有地形的賽道）。`stepAir` 記空中最後一次新按（`pressedAfresh`：沒按著→按下，或 `throttleTap`），`settleTerrain` 在落地時看它，或開 `landWindow` 讓落地後的新按補上；加速是 `max`（取代平常的 0.5 s 落地加速）。`stepOnTerrain` 保留 `timedLandings`。大字 `callouts.ts` 的 `landing`（「落地時機噴！」）。
+- **腳本駕駛**：`BotSkill.landTap`（`brain.ts`：空中放開油門，落地那一步的輸入自然就是新按）；只有 `scripts`／`drivers.ts` 的 `master` 有，電腦車沒有。`scripts/kart-feel.ts` 在有跳台的賽道多印一行「timed landings」（頂尖有／沒有這招的差）；`Measure.timedLandings`。
+- **駕訓班**：`LESSON_IDS` 多 `landing`（第 8 課，甩尾起跳之後），賽道 `riverside`（`SchoolTrackId` 多一個），一次一試；`judge.ts` 的 `landHeld`／`landEarly`／`landLate` 與即時提示 `landNow`；字串 `i18n.school.ts`；「十堂」改「十一堂」（大廳、駕訓介紹、規則頁）；`e2e/kart-school.spec.ts` 數 11 課。
+- **紀錄**：內建賽道 `revision` 各 +1、`CUSTOM_REVISION` 8、`GUANYIN_REVISION` 9、調參存檔 key `tku-arcade.kart.tuning.8`；`flatGolden` 經典雜湊、`branchGolden` 重取，街機（舊）不變；獎牌表重跑。量測與數字在 `KART-FEEL.md` §20。
+- **摩托車引擎聲**（#108，`src/kart/kartAudio.ts`）：`EngineVoice` 把引擎的音色與轉速曲線寫成資料，`ENGINE_VOICES.kart`（照舊：52 Hz 起、6 檔、兩支鋸齒加低八度方波）與 `.bike`（78 Hz 起、7 檔換得早、每檔爬得高，方波加鋸齒、第三聲部同音的三角波、Q 3.2 的濾波、音高 ¼ 的點火脈衝 tremolo、6 倍音高的渦輪高音）；`engineFrequency(speed, throttle, voice)`、`gearAt(speed, gears)`。`createKartAudio({ quality, kind })`，`spikeLoop.ts` 用 `kartKind(kartId)`。
+- **聲音依畫質分級**（#105，`src/kart/audio/tiers.ts`）：`AUDIO_TIERS`（同時一次性聲音 4／8／16、環境音持續層 1／2／全部、偶爾的聲音低畫質關、參數每 3／2／1 幀動一次、低畫質沒有引擎的第二支鋸齒）、`tierRecipe`、`voiceBudget`；`createAmbience(..., tier)`、`createCuePlayer(quality)`。成本與表在 `KART-PERF.md` §10。
+- **車身細節**（#99，`src/kart/art/bodyDetail.ts`）：`BODY_DETAIL`（低 off／中 medium／高 high）、`paintBodyDetail`（面板縫線、螺絲；高加刮痕與細顆粒）畫成 256／512 px 的高度圖，`bodyDetailTexture(level)` 一個等級一張、整頁共用；`createPaintMaterial(environment, weave, detail)` 當 `bumpMap`（`DETAIL_BUMP` 0.9），program cache key 分開；`wearDecal` 在號碼與標誌貼紙邊緣挖掉幾塊；`carbonTexture(fine)` 高畫質是 2/2 斜紋。`KartFinish.detail`，`Scene.ts` 照畫質給，車庫預覽與等待室舞台照 `loadQuality()`；幽靈車沒有。懸浮摩托車沒有輪子，所以沒有胎紋（只有懸浮墊）。顏色（灰階的高度）在 `kartTokens.ts` 的 `kartDetail`。截圖 `scripts/kart-shots.mjs --views close`。
+- **測試**：`tests/kart/kartAudio.test.ts`（摩托車的音高、檔位、音色與分級、`voiceBudget`）、`tests/kart/bodyDetail.test.ts`（分級、縫線與螺絲的數量、磨損可重現）、`tests/shared/kart-walls.test.ts`（`slideShare`、淺角度貼牆只慢一點且不算重撞、街機照舊磨速、20° 照舊是撞、8° 不到一半）、`tests/kart/terrain.test.ts`（落地前後 ±0.1 s 的新按都算、取代不疊加、太早太晚不算）、`tests/kart/school.test.ts`（第 11 課的過關與三種失敗）、`skillTracks.test.ts`（頂尖在沒有指南的賽道＝熟練＋落地時機）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

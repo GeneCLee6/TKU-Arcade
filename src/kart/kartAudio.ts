@@ -10,6 +10,8 @@
 // that the effects volume sets it apart from the music.
 import { isSoundOn } from '../lib/sound.ts'
 import { refreshKartBus, unlockKartAudio } from './audio/bus.ts'
+import { audioTier, voiceBudget, type AudioTier } from './audio/tiers.ts'
+import type { Quality } from './quality.ts'
 import { squealVoice } from './feelFx.ts'
 import type { ItemCue } from './hitFx.ts'
 import { voicesOf, type Voice } from './itemSounds.ts'
@@ -44,45 +46,131 @@ export interface KartAudio {
   dispose(): void
 }
 
-/** The engine's note at idle, Hz */
-const IDLE_HZ = 52
 /**
- * The speeds the engine changes up at, m/s: within a gear the note climbs, and at each change it
- * drops back part of the way, so that pulling away sounds like going up through the gears
+ * An engine's voice: its note through the gears, and what it is made of. 2026-11-22 (#108): the
+ * bikes have their own, a high, thin rasp that revs further and changes up sooner, pulsing as it
+ * fires, with the hover pad's turbine whining over it; the karts keep the deep twin saws they had
  */
-export const GEAR_SPEEDS: readonly number[] = [0, 14, 28, 42, 56, 72]
-/** Each gear starts this much higher than the last, and climbs this far, Hz */
-const GEAR_STEP_HZ = 16
-const GEAR_SPAN_HZ = 78
-/** Past the last gear the note still rises, Hz for each m/s */
-const OVER_HZ_PER_MPS = 2.2
+export interface EngineVoice {
+  /** The note at idle, Hz */
+  readonly idleHz: number
+  /**
+   * The speeds it changes up at, m/s: within a gear the note climbs, and at each change it drops
+   * back part of the way, so that pulling away sounds like going up through the gears
+   */
+  readonly gearSpeeds: readonly number[]
+  /** Each gear starts this much higher than the last, and climbs this far, Hz */
+  readonly gearStepHz: number
+  readonly gearSpanHz: number
+  /** Past the last gear the note still rises, Hz for each m/s */
+  readonly overHzPerMps: number
+  /** On the throttle the note is this much higher, Hz */
+  readonly throttleHz: number
+  /** The main oscillator, and the twin a hair apart (`twinRatio`) */
+  readonly wave: OscillatorType
+  readonly twinWave: OscillatorType
+  readonly twinRatio: number
+  /** The third voice, at this ratio of the note: an octave down for a kart's body, the note for a bike */
+  readonly lowWave: OscillatorType
+  readonly lowRatio: number
+  /** The filter: where it opens from, how far with the revs and with the speed, and its Q */
+  readonly filterHz: number
+  readonly filterRevHz: number
+  readonly filterSpeedHz: number
+  readonly filterQ: number
+  /** The firing pulse: a tremolo at this ratio of the note, this deep (0 for none) */
+  readonly pulseRatio: number
+  readonly pulseDepth: number
+  /** The turbine's whine: a sine at this ratio of the note, this loud (0 for none) */
+  readonly whineRatio: number
+  readonly whineGain: number
+}
+
+export const ENGINE_VOICES: Readonly<Record<'kart' | 'bike', EngineVoice>> = {
+  kart: {
+    idleHz: 52,
+    gearSpeeds: [0, 14, 28, 42, 56, 72],
+    gearStepHz: 16,
+    gearSpanHz: 78,
+    overHzPerMps: 2.2,
+    throttleHz: 6,
+    wave: 'sawtooth',
+    twinWave: 'sawtooth',
+    twinRatio: 1.007,
+    lowWave: 'square',
+    lowRatio: 0.5,
+    filterHz: 420,
+    filterRevHz: 1300,
+    filterSpeedHz: 14,
+    filterQ: 1.2,
+    pulseRatio: 0,
+    pulseDepth: 0,
+    whineRatio: 0,
+    whineGain: 0,
+  },
+  bike: {
+    idleHz: 78,
+    gearSpeeds: [0, 10, 21, 33, 46, 60, 74],
+    gearStepHz: 22,
+    gearSpanHz: 118,
+    overHzPerMps: 3.4,
+    throttleHz: 12,
+    wave: 'square',
+    twinWave: 'sawtooth',
+    twinRatio: 1.013,
+    lowWave: 'triangle',
+    lowRatio: 1,
+    filterHz: 780,
+    filterRevHz: 2100,
+    filterSpeedHz: 18,
+    filterQ: 3.2,
+    pulseRatio: 0.25,
+    pulseDepth: 0.35,
+    whineRatio: 6,
+    whineGain: 0.05,
+  },
+}
+
+/** The kart's gears (the bikes' are in ENGINE_VOICES.bike) */
+export const GEAR_SPEEDS: readonly number[] = ENGINE_VOICES.kart.gearSpeeds
 const MASTER = 0.35
 
 /** Which gear the engine is in at `speed`, from 0, and how far through it, 0 to 1 */
-export function gearAt(speed: number): { gear: number; rev: number } {
+export function gearAt(
+  speed: number,
+  gears: readonly number[] = GEAR_SPEEDS,
+): { gear: number; rev: number } {
   const pace = Math.abs(speed)
-  const last = GEAR_SPEEDS.length - 1
+  const last = gears.length - 1
   for (let gear = 0; gear < last; gear++) {
-    const low = GEAR_SPEEDS[gear]!
-    const high = GEAR_SPEEDS[gear + 1]!
+    const low = gears[gear]!
+    const high = gears[gear + 1]!
     if (pace < high) return { gear, rev: (pace - low) / (high - low) }
   }
   return { gear: last - 1, rev: 1 }
 }
 
 /** The engine's note: idle at a standstill, climbing through each gear, a little higher on the throttle */
-export function engineFrequency(speed: number, throttle: boolean): number {
+export function engineFrequency(
+  speed: number,
+  throttle: boolean,
+  voice: EngineVoice = ENGINE_VOICES.kart,
+): number {
   const pace = Math.abs(speed)
-  const { gear, rev } = gearAt(pace)
-  const over = Math.max(0, pace - GEAR_SPEEDS[GEAR_SPEEDS.length - 1]!)
+  const { gear, rev } = gearAt(pace, voice.gearSpeeds)
+  const over = Math.max(0, pace - voice.gearSpeeds[voice.gearSpeeds.length - 1]!)
   return (
-    IDLE_HZ +
-    gear * GEAR_STEP_HZ +
-    rev * GEAR_SPAN_HZ +
-    over * OVER_HZ_PER_MPS +
-    (throttle && pace > 0 ? 6 : 0)
+    voice.idleHz +
+    gear * voice.gearStepHz +
+    rev * voice.gearSpanHz +
+    over * voice.overHzPerMps +
+    (throttle && pace > 0 ? voice.throttleHz : 0)
   )
 }
+
+/** How long a cue's voices sound, seconds: what it holds of the voice budget */
+const cueLength = (voices: readonly Voice[]): number =>
+  Math.max(0, ...voices.map((voice) => (voice.delay ?? 0) + voice.seconds))
 
 /** One cue's voices, into `destination` now, at `volume` */
 function playVoices(
@@ -136,7 +224,8 @@ export interface CuePlayer {
   dispose(): void
 }
 
-export function createCuePlayer(): CuePlayer {
+export function createCuePlayer(quality?: Quality): CuePlayer {
+  const budget = voiceBudget(audioTier(quality).maxVoices)
   let audio: AudioContext | null = null
   let master: GainNode | null = null
   let noise: AudioBuffer | null = null
@@ -153,7 +242,9 @@ export function createCuePlayer(): CuePlayer {
     cue(cue, volume) {
       if (!audio || !master || !noise || !isSoundOn() || audio.state !== 'running') return
       refreshKartBus()
-      playVoices(audio, master, noise, voicesOf(cue), volume)
+      const voices = voicesOf(cue)
+      if (!budget.claim(audio.currentTime, cueLength(voices))) return
+      playVoices(audio, master, noise, voices, volume)
     },
     dispose() {
       master?.disconnect()
@@ -164,13 +255,27 @@ export function createCuePlayer(): CuePlayer {
   }
 }
 
-export function createKartAudio(): KartAudio {
+export interface KartAudioOptions {
+  /** The graphics quality: how much sound (audio/tiers.ts) */
+  readonly quality?: Quality
+  /** Whose engine: a kart's, or a bike's (2026-11-22, #108) */
+  readonly kind?: 'kart' | 'bike'
+}
+
+export function createKartAudio(options: KartAudioOptions = {}): KartAudio {
+  const tier: AudioTier = audioTier(options.quality)
+  const voice = ENGINE_VOICES[options.kind ?? 'kart']
+  const budget = voiceBudget(tier.maxVoices)
+  /** Frames since the parameters last moved (a lower tier moves them every few frames) */
+  let frames = 0
   let audio: AudioContext | null = null
   let nodes: {
     master: GainNode
     engine: OscillatorNode
-    engineTwin: OscillatorNode
+    engineTwin: OscillatorNode | null
     engineLow: OscillatorNode
+    pulse: OscillatorNode | null
+    whine: OscillatorNode | null
     engineFilter: BiquadFilterNode
     engineGain: GainNode
     windGain: GainNode
@@ -202,31 +307,57 @@ export function createKartAudio(): KartAudio {
       return source
     }
 
-    // The engine: two saws a hair apart and a square an octave down, through a filter that opens
-    // with the revs
+    // The engine (its voice, ENGINE_VOICES): a kart's two saws a hair apart and a square an octave
+    // down, a bike's rasp and its own note again, through a filter that opens with the revs; a bike
+    // pulses as it fires, and its turbine whines over it. On low the twin is left out
     const engineFilter = context.createBiquadFilter()
     engineFilter.type = 'lowpass'
     engineFilter.frequency.value = 600
-    engineFilter.Q.value = 1.2
+    engineFilter.Q.value = voice.filterQ
     const engineGain = context.createGain()
     engineGain.gain.value = 0.2
-    engineFilter.connect(engineGain).connect(master)
+    const pulseGain = context.createGain()
+    pulseGain.gain.value = 1
+    engineFilter.connect(pulseGain).connect(engineGain).connect(master)
     const engine = context.createOscillator()
-    engine.type = 'sawtooth'
-    const engineTwin = context.createOscillator()
-    engineTwin.type = 'sawtooth'
-    const twinGain = context.createGain()
-    twinGain.gain.value = 0.6
+    engine.type = voice.wave
+    engine.connect(engineFilter)
+    engine.start()
+    let engineTwin: OscillatorNode | null = null
+    if (tier.engineTwin) {
+      engineTwin = context.createOscillator()
+      engineTwin.type = voice.twinWave
+      const twinGain = context.createGain()
+      twinGain.gain.value = 0.6
+      engineTwin.connect(twinGain).connect(engineFilter)
+      engineTwin.start()
+      running.push(engineTwin)
+    }
     const engineLow = context.createOscillator()
-    engineLow.type = 'square'
+    engineLow.type = voice.lowWave
     const lowGain = context.createGain()
     lowGain.gain.value = 0.5
-    engine.connect(engineFilter)
-    engineTwin.connect(twinGain).connect(engineFilter)
     engineLow.connect(lowGain).connect(engineFilter)
-    engine.start()
-    engineTwin.start()
     engineLow.start()
+    let pulse: OscillatorNode | null = null
+    if (voice.pulseDepth > 0) {
+      pulse = context.createOscillator()
+      const depth = context.createGain()
+      depth.gain.value = voice.pulseDepth
+      pulse.connect(depth).connect(pulseGain.gain)
+      pulse.start()
+      running.push(pulse)
+    }
+    let whine: OscillatorNode | null = null
+    if (voice.whineGain > 0) {
+      whine = context.createOscillator()
+      whine.type = 'sine'
+      const whineLevel = context.createGain()
+      whineLevel.gain.value = voice.whineGain
+      whine.connect(whineLevel).connect(master)
+      whine.start()
+      running.push(whine)
+    }
 
     // The wind: a broad hiss that grows with the square of the speed
     const windFilter = context.createBiquadFilter()
@@ -270,7 +401,7 @@ export function createKartAudio(): KartAudio {
     squealTone.start()
     squealHigh.start()
     waver.start()
-    running.push(engine, engineTwin, engineLow, squealTone, squealHigh, waver)
+    running.push(engine, engineLow, squealTone, squealHigh, waver)
 
     // The boost: a jet's roar and a low rumble under it
     const jetFilter = context.createBiquadFilter()
@@ -292,6 +423,8 @@ export function createKartAudio(): KartAudio {
       engine,
       engineTwin,
       engineLow,
+      pulse,
+      whine,
       engineFilter,
       engineGain,
       windGain,
@@ -310,6 +443,7 @@ export function createKartAudio(): KartAudio {
     if (!audio || !nodes || !isSoundOn() || audio.state !== 'running') return
     const loud = Math.max(0.2, Math.min(1, power))
     const now = audio.currentTime
+    if (!budget.claim(now, 0.9)) return
     // The whoosh: noise through a band that sweeps up
     const whoosh = audio.createBufferSource()
     whoosh.buffer = nodes.noise
@@ -355,6 +489,7 @@ export function createKartAudio(): KartAudio {
     if (!audio || !nodes || !isSoundOn() || audio.state !== 'running') return
     const now = audio.currentTime
     const length = open ? 0.25 : 0.3
+    if (!budget.claim(now, length + 0.12)) return
     const [from, to] = open ? [190, 620] : [540, 170]
     const servo = audio.createOscillator()
     servo.type = 'sawtooth'
@@ -395,6 +530,9 @@ export function createKartAudio(): KartAudio {
     },
     update(sound) {
       if (!audio || !nodes) return
+      // On a lower quality the parameters move every few frames (audio/tiers.ts): they glide anyway
+      frames = (frames + 1) % tier.updateEvery
+      if (frames !== 0) return
       refreshKartBus()
       const now = audio.currentTime
       const glide = (param: AudioParam, value: number, seconds = 0.06) =>
@@ -402,15 +540,21 @@ export function createKartAudio(): KartAudio {
       glide(nodes.master.gain, isSoundOn() ? MASTER : 0, 0.05)
       const pace = Math.abs(sound.speed)
       // A boost winds the engine up a little higher
-      const frequency = engineFrequency(sound.speed, sound.throttle) * (sound.boosting ? 1.12 : 1)
-      const { rev } = gearAt(pace)
+      const frequency =
+        engineFrequency(sound.speed, sound.throttle, voice) * (sound.boosting ? 1.12 : 1)
+      const { rev } = gearAt(pace, voice.gearSpeeds)
       // Quick, so that a gear change is heard as a drop
       glide(nodes.engine.frequency, frequency, 0.035)
-      glide(nodes.engineTwin.frequency, frequency * 1.007, 0.035)
-      glide(nodes.engineLow.frequency, frequency / 2, 0.035)
+      if (nodes.engineTwin) glide(nodes.engineTwin.frequency, frequency * voice.twinRatio, 0.035)
+      glide(nodes.engineLow.frequency, frequency * voice.lowRatio, 0.035)
+      if (nodes.pulse) glide(nodes.pulse.frequency, frequency * voice.pulseRatio, 0.035)
+      if (nodes.whine) glide(nodes.whine.frequency, frequency * voice.whineRatio, 0.05)
       glide(
         nodes.engineFilter.frequency,
-        420 + rev * 1300 + Math.min(pace, 80) * 14 + (sound.throttle ? 320 : 0),
+        voice.filterHz +
+          rev * voice.filterRevHz +
+          Math.min(pace, 80) * voice.filterSpeedHz +
+          (sound.throttle ? 320 : 0),
       )
       glide(nodes.engineGain.gain, sound.throttle ? 0.24 : 0.14)
       glide(nodes.windGain.gain, 0.16 * Math.min(1.6, (pace / 68) ** 2), 0.2)
@@ -429,6 +573,7 @@ export function createKartAudio(): KartAudio {
     hit(strength) {
       if (!audio || !nodes || !isSoundOn()) return
       const now = audio.currentTime
+      if (!budget.claim(now, 0.4)) return
       const source = audio.createBufferSource()
       source.buffer = nodes.noise
       const filter = audio.createBiquadFilter()
@@ -448,7 +593,9 @@ export function createKartAudio(): KartAudio {
     },
     cue(cue, volume = 1) {
       if (!audio || !nodes || !isSoundOn()) return
-      playVoices(audio, nodes.master, nodes.noise, voicesOf(cue), volume)
+      const voices = voicesOf(cue)
+      if (!budget.claim(audio.currentTime, cueLength(voices))) return
+      playVoices(audio, nodes.master, nodes.noise, voices, volume)
     },
     dispose() {
       const master = nodes?.master

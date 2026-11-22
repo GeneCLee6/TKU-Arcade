@@ -22,6 +22,8 @@ import { kartParts, kartThemes } from '../../styles/kartTokens.ts'
 import { loadBodies } from '../art/bodyLoad.ts'
 import { buildKartEnvironment } from '../art/kartParts.ts'
 import { buildKartModel, type KartModel } from '../art/kartModel.ts'
+import { BODY_DETAIL } from '../art/bodyDetail.ts'
+import { loadQuality } from '../quality.ts'
 import { bodyReady } from '../art/vehicleBodies.ts'
 import type { DriverGesture } from '../driverGestures.ts'
 
@@ -158,7 +160,10 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
       )
       return
     }
-    place.model = buildKartModel(false, false, look.kart, look.driver, { environment })
+    place.model = buildKartModel(false, false, look.kart, look.driver, {
+      environment,
+      detail: BODY_DETAIL[loadQuality()],
+    })
     place.model.group.visible = false
     scene.add(place.model.group)
     place.built = key

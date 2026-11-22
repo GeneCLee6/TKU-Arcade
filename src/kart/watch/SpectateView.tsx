@@ -116,7 +116,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
     const hitFeed = createHitFeed(null, latest.current.used)
     // #86: and the items sound around the kart followed
     const ears = createWatchEars(latest.current.used)
-    const player = createCuePlayer()
+    const player = createCuePlayer(loadQuality())
     const stopUnlock = unlockOnGesture(player)
     let stop: (() => void) | undefined
     try {
