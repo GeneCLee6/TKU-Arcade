@@ -10,7 +10,8 @@
 
 | 情境 | 讀 |
 | --- | --- |
-| 現在做到哪、下一批是什麼 | `docs/NEXT.md` |
+| 現在做到哪、待擁有者決定的事、AI 可以接著做的事 | `docs/NEXT.md` |
+| 某個 PR 當時的細節（數字、取捨、試玩清單） | `docs/history/`（只用搜尋，不要整本讀） |
 | 批次順序 | `docs/ROADMAP.md` |
 | 產品範圍、某個功能的 AC 與 task | `docs/PRD/00-prd.md`、`docs/PRD/e*.md` |
 | **能不能用某個名稱／圖／題目／模型** | `docs/PRD/01-legal-ip-analysis.md` §4 |
