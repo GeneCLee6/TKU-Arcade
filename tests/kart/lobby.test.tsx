@@ -90,7 +90,7 @@ describe('the race room’s waiting room (2026-11-21)', () => {
     expect(screen.getAllByTestId('kart-lobby-open')).toHaveLength(5)
     const bobs = placeOf('Bob')
     expect(bobs).toHaveTextContent('Egret')
-    expect(bobs).toHaveTextContent('Club')
+    expect(bobs).toHaveTextContent('Clover')
     expect(bobs).toHaveAttribute('data-state', 'waiting')
     expect(within(placeOf('Ann')).getByTestId('kart-lobby-crown')).toBeInTheDocument()
     expect(within(placeOf('Mochi (CPU)')).getByTestId('kart-lobby-state')).toHaveTextContent('Ready')

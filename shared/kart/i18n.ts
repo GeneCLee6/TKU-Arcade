@@ -26,17 +26,17 @@ const en = {
   'kart.quality.low': 'Low',
   'kart.quality.medium': 'Medium',
   'kart.quality.high': 'High',
-  // The hover karts (2026-11-14): working names until KART-WORLD.md (e10-t01); their names are in
+  // The hover karts (2026-11-14): names settled in KART-WORLD.md (2026-11-22); their names are in
   // i18n.roster.ts (e10-t05)
   'kart.spike.body': 'Kart',
   'kart.course.arena': 'Test yard',
   'kart.course.oval': 'Test oval',
-  'kart.course.riverside': 'Riverside (graybox)',
-  'kart.course.harbour': 'Harbour Hairpins',
-  'kart.course.tamkang': 'Tamkang Campus',
+  'kart.course.riverside': 'Golden Riverbank',
+  'kart.course.harbour': "Fisherman's Wharf",
+  'kart.course.tamkang': 'Five Tigers Hill',
   'kart.course.oldstreet': 'Lantern Old Street',
   'kart.course.guanyin': 'Guanyin Hill Road',
-  // 2026-11-18: working names, like the rest (docs/KART-WORLD.md §6)
+  // 2026-11-18: names of our own, like the rest (docs/KART-WORLD.md §6)
   'kart.course.mangrove': 'Mangrove Channel',
   'kart.course.fort': 'Hobe Fort Hill',
   'kart.course.danhai': 'Danhai Night Circuit',
@@ -378,9 +378,9 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.body': '車款',
   'kart.course.arena': '測試場',
   'kart.course.oval': '測試橢圓',
-  'kart.course.riverside': '河畔（灰盒）',
-  'kart.course.harbour': '漁港髮夾彎',
-  'kart.course.tamkang': '淡江校園',
+  'kart.course.riverside': '金色水岸',
+  'kart.course.harbour': '漁人碼頭',
+  'kart.course.tamkang': '五虎崗',
   'kart.course.oldstreet': '燈籠老街',
   'kart.course.guanyin': '觀音山坡道',
   'kart.course.mangrove': '紅樹林水道',

@@ -1,7 +1,7 @@
 // The Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.24) and each kart's own records: the
 // menu's, the cup's screens' and the time trial's new strings. Merged into KART_MESSAGES (i18n.ts),
-// so the same check covers them. The cups' names are working titles of our own, like every name in
-// the kart's world until KART-WORLD.md settles them (e10-t01). `en` is the source.
+// so the same check covers them. The cups' names are our own, settled with every name in the
+// kart's world in KART-WORLD.md (2026-11-22). `en` is the source.
 const en = {
   'kart.race.recordIn': 'Record · {kart}',
   'kart.race.unknownKart': 'kart unknown',

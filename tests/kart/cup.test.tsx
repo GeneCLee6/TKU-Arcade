@@ -219,12 +219,12 @@ describe('the cup’s screens', () => {
   it('show the next race and the field, then the standings after a race', () => {
     const run = startCup(SETUP, 42)
     const { unmount } = render(<CupView run={run} onMenu={vi.fn()} />)
-    expect(screen.getByTestId('kart-cup-race')).toHaveTextContent('Race 1 of 2: Riverside')
+    expect(screen.getByTestId('kart-cup-race')).toHaveTextContent('Race 1 of 2: Golden Riverbank')
     expect(screen.getByText(en('kart.cup.field'))).toBeInTheDocument()
     unmount()
     const after = finishRace(beginRace(run), ranksOf([3, 0, 1, 2]))
     render(<CupView run={after} onMenu={vi.fn()} />)
-    expect(screen.getByTestId('kart-cup-race')).toHaveTextContent('Race 2 of 2: Harbour')
+    expect(screen.getByTestId('kart-cup-race')).toHaveTextContent("Race 2 of 2: Fisherman's Wharf")
     const rows = within(screen.getByTestId('kart-cup-standings')).getAllByRole('row')
     // A header, then four karts, the player first with 7 points
     expect(rows).toHaveLength(5)

@@ -1,6 +1,6 @@
 ## What is Kart?
 
-A 3D kart race in the browser for 1 to 8 karts: friends in one room, computer karts in the free seats, or both. Each browser drives its own kart; the room counts the laps, hands out the items and decides the result. The drift-and-boost feel is a tribute to the classic kart racers of the 2000s; the karts, drivers, tracks, items and names here are our own, and most are working titles.
+A 3D kart race in the browser for 1 to 8 karts: friends in one room, computer karts in the free seats, or both. Each browser drives its own kart; the room counts the laps, hands out the items and decides the result. The drift-and-boost feel is a tribute to the classic kart racers of the 2000s; the karts, drivers, tracks, items and names here are our own.
 
 ## A race
 
@@ -44,13 +44,13 @@ The fourteen items. "Ahead" means the kart just in front of you; in a team race,
 | --- | --- | --- |
 | Tailwind | A boost | Everyone |
 | Bubble | Stops the next harmful item or shot, then pops | The front |
-| Tow Line | Pulls you towards the kart ahead | Middle and back |
-| Headwind | Slows everyone ahead for a few seconds; a Bubble stops it | The back |
-| Switcheroo | Trades places with the kart ahead on the same lap; a Bubble stops it | Middle and back |
-| Hailstone | Thrown straight ahead; stops at a wall | Middle and back |
-| Thundercloud | Chases the kart ahead and strikes when it arrives | The back |
-| Mud Puddle | Dropped behind you; anyone who drives in spins (you too, after a moment) | The front |
-| Rebound | For 8 seconds, the next thrown or dropped item that would hit you goes back to whoever sent it (a Bubble on them stops it). It does nothing against Headwind, Switcheroo or Static. With a Bubble up as well, the Rebound goes first | The front |
+| Haul Line | Pulls you towards the kart ahead | Middle and back |
+| Monsoon | Slows everyone ahead for a few seconds; a Bubble stops it | The back |
+| Shuffle | Trades places with the kart ahead on the same lap; a Bubble stops it | Middle and back |
+| Splash | Thrown straight ahead; stops at a wall | Middle and back |
+| Thunder Shower | Chases the kart ahead and strikes when it arrives | The back |
+| Mudflat | Dropped behind you; anyone who drives in spins (you too, after a moment) | The front |
+| Rebound | For 8 seconds, the next thrown or dropped item that would hit you goes back to whoever sent it (a Bubble on them stops it). It does nothing against Monsoon, Shuffle or Static. With a Bubble up as well, the Rebound goes first | The front |
 | Sea Fog | A bank of fog appears on the road just ahead of the kart ahead and stays 7 seconds. Driving in clouds your view for about a second and a half and holds you back a little. Not a hit: no Bubble or Rebound stops it, and it never fogs whoever laid it | Middle and back |
 | Skip Stone | Skips you forward to the next gate along the road, with a small push; never over the finish line | The back |
 | Static | The kart in front of the whole field (of the other team, in a team race) cannot fire a boost for 3.5 seconds, and the one burning is cut. A Bubble stops it. Never given to the leader | Middle and back |
@@ -63,11 +63,11 @@ A kart that is hit spins and slows for about a second. Nothing that reaches a ka
 
 ## Team race
 
-Set **Sides** to **Team race** and the karts race as two teams, **Red** and **Blue**. Either mode can be a team race.
+Set **Sides** to **Team race** and the karts race as two teams, **Sunset** and **Estuary**. Either mode can be a team race.
 
-- **Sides**: in the waiting room everyone picks Red or Blue. Anyone who has not is put on the smaller team when the race starts. The host can move anyone, computer karts included, and **Balance the teams** takes every choice back so that the split is even. Two against two, three against three and four against four are the usual sizes.
+- **Sides**: in the waiting room everyone picks Sunset or Estuary. Anyone who has not is put on the smaller team when the race starts. The host can move anyone, computer karts included, and **Balance the teams** takes every choice back so that the split is even. Two against two, three against three and four against four are the usual sizes.
 - **Your gauge is your own**: as in any race, your drifts fill your own boost gauge, and a full gauge is a stored boost of your own (up to two). An ordinary boost burns **red**.
-- **Team gauge and blue boosts**: each team also shares one team gauge, shown in blue beside your own. Only drifting fills it, anyone's on the team; it takes about as much as everyone on the team filling their own gauge twice, so a bigger team fills it no faster. The moment it is full, every stored boost the team's karts **are holding** turns **blue**; a kart holding none gets nothing this time. A blue boost burns blue, for about half as long again as a red one, and goes faster. Blue ones are first in the row and fire first. One boost burns at a time. Blue is the colour of that boost, not of the Blue team: both teams' are blue.
+- **Team gauge and High Tide**: each team also shares one team gauge, shown in blue beside your own. Only drifting fills it, anyone's on the team; it takes about as much as everyone on the team filling their own gauge twice, so a bigger team fills it no faster. The moment it is full, every stored boost the team's karts **are holding** turns **blue**, a **High Tide**; a kart holding none gets nothing this time. A High Tide burns blue, for about half as long again as a red one, and goes faster. Blue ones are first in the row and fire first. One boost burns at a time. Blue is the colour of that boost, not of either team: both teams' are blue.
 - **Scoring**: places score **10, 8, 6, 5, 4, 3, 2, 1** points; a kart that does not finish scores 0. Each team counts its best karts, as many as the smaller team has, so three against two is still fair. The higher total wins. If the totals are level, the team of the kart that finished first wins.
 
 The results show which team won, the two totals, and every kart's side, time and points.

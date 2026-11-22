@@ -33,7 +33,7 @@ test.describe('the loading screen', () => {
     await page.goto('/kart?track=harbour')
     const loading = page.getByTestId('kart-loading')
     await expect(loading).toBeVisible()
-    await expect(loading).toContainText('Harbour Hairpins')
+    await expect(loading).toContainText("Fisherman's Wharf")
     await expect(loading).toContainText('Tip')
     await expect(loading.getByRole('progressbar')).toBeVisible()
     // Nothing drawn underneath meanwhile

@@ -1,15 +1,15 @@
 // e10-t05: the karts', drivers' and garage's strings. Merged into KART_MESSAGES (i18n.ts), so the
 // same check covers them; the waiting room's garage registers only these. Every kart and driver
-// name is a working name until KART-WORLD.md is settled (e10-t01). `en` is the source.
+// name is settled in KART-WORLD.md (owner, 2026-11-22); the ids never change. `en` is the source.
 const en = {
   // The first three moved here from i18n.ts unchanged, so the waiting room has every kart's name
-  'kart.body.tide': 'Tide Runner',
-  'kart.body.comet': 'Comet',
+  'kart.body.tide': 'Ferry',
+  'kart.body.comet': 'Agei',
   'kart.body.ray': 'Stingray',
-  'kart.body.crab': 'Fiddler',
+  'kart.body.crab': 'Fiddler Crab',
   'kart.body.heron': 'Egret',
   'kart.body.flyfish': 'Flying Fish',
-  // 2026-11-19: eight more karts and three bikes, working names of our own like the first six
+  // 2026-11-19: eight more karts and three bikes, names of our own like the first six
   'kart.body.dolphin': 'Dolphin',
   'kart.body.skipper': 'Mudskipper',
   'kart.body.shrimp': 'Mantis Shrimp',
@@ -21,7 +21,7 @@ const en = {
   'kart.body.swift': 'Swift',
   'kart.body.hornet': 'Hornet',
   'kart.body.petrel': 'Petrel',
-  // 2026-11-20: the item series, working names of our own
+  // 2026-11-20: the item series, names of our own
   'kart.body.pelican': 'Pelican',
   'kart.body.otter': 'Otter',
   'kart.body.cormorant': 'Cormorant',
@@ -76,9 +76,9 @@ const en = {
   'kart.tag.lean': 'Tips in fast',
   'kart.tag.light': 'Easily knocked',
   'kart.driver.spade': 'Spade',
-  'kart.driver.heart': 'Heart',
-  'kart.driver.diamond': 'Diamond',
-  'kart.driver.club': 'Club',
+  'kart.driver.heart': 'Hartie',
+  'kart.driver.diamond': 'Dee',
+  'kart.driver.club': 'Clover',
   'kart.driverBlurb.spade': 'Cool-headed, visor always down.',
   'kart.driverBlurb.heart': 'Cheers everyone on, even from last place.',
   'kart.driverBlurb.diamond': 'Plans every line, pace notes at the ready.',
@@ -129,8 +129,8 @@ const en = {
 export type KartRosterKey = keyof typeof en
 
 const zhTW: Record<KartRosterKey, string> = {
-  'kart.body.tide': '浪行者',
-  'kart.body.comet': '彗星',
+  'kart.body.tide': '渡輪',
+  'kart.body.comet': '阿給',
   'kart.body.ray': '魟魚',
   'kart.body.crab': '招潮蟹',
   'kart.body.heron': '白鷺',
@@ -196,10 +196,10 @@ const zhTW: Record<KartRosterKey, string> = {
   'kart.tag.narrow': '車身窄',
   'kart.tag.lean': '傾車入彎快',
   'kart.tag.light': '容易被撞開',
-  'kart.driver.spade': '黑桃',
-  'kart.driver.heart': '紅心',
-  'kart.driver.diamond': '方塊',
-  'kart.driver.club': '梅花',
+  'kart.driver.spade': '阿桃',
+  'kart.driver.heart': '心心',
+  'kart.driver.diamond': '小方',
+  'kart.driver.club': '梅子',
   'kart.driverBlurb.spade': '冷靜派，護目鏡永遠放下。',
   'kart.driverBlurb.heart': '跑最後一名也會幫大家加油。',
   'kart.driverBlurb.diamond': '每條跑線都先算好，路書隨時待命。',

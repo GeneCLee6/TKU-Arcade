@@ -1,6 +1,6 @@
 // Racing the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.20): the menu's, the race's and the
 // bots' strings. Merged into KART_MESSAGES (i18n.ts), so the same check covers them. The bots' names
-// are working titles of our own, like every name in the kart's world until KART-WORLD.md (e10-t01).
+// are names of our own, settled with every name in the kart's world in KART-WORLD.md (2026-11-22).
 // `en` is the source.
 const en = {
   'kart.bots.open': 'Race the computer',
@@ -39,8 +39,8 @@ const en = {
   'kart.bots.name.typhoon': 'Typhoon',
   'kart.bots.name.boba': 'Boba',
   'kart.bots.name.scooter': 'Scooter',
-  'kart.bots.name.sunset': 'Sunset',
-  'kart.bots.name.ferry': 'Ferry',
+  'kart.bots.name.sunset': 'Guava',
+  'kart.bots.name.ferry': 'Douhua',
   'kart.bots.name.kite': 'Kite',
 }
 
@@ -82,8 +82,8 @@ const zhTW: Record<KartBotsKey, string> = {
   'kart.bots.name.typhoon': '颱風',
   'kart.bots.name.boba': '珍奶',
   'kart.bots.name.scooter': '小綿羊',
-  'kart.bots.name.sunset': '夕陽',
-  'kart.bots.name.ferry': '渡輪',
+  'kart.bots.name.sunset': '芭樂',
+  'kart.bots.name.ferry': '豆花',
   'kart.bots.name.kite': '風箏',
 }
 

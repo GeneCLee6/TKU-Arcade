@@ -1,8 +1,8 @@
 // Computer karts' levels and names (docs/ARCHITECTURE.md §4.20, §4.21): shared by the race against
 // the computer on /kart and by the race room, where the host adds computer karts to free seats and
-// the room picks each one's name from this list. The names are working titles of our own
-// (`kart.bots.name.<id>` and `games.kart.bot.name.<id>`), like every name in the kart's world until
-// KART-WORLD.md settles them (e10-t01). Pure: no strings to show, only ids.
+// the room picks each one's name from this list. The names are our own
+// (`kart.bots.name.<id>` and `games.kart.bot.name.<id>`), settled with every name in the kart's
+// world in KART-WORLD.md (2026-11-22). Pure: no strings to show, only ids.
 
 // 2026-11-20: 'expert', the fourth (src/kart/bots/expert.ts)
 export const BOT_LEVELS = ['easy', 'normal', 'hard', 'expert'] as const

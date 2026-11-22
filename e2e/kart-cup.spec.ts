@@ -32,7 +32,7 @@ test('a one-race cup from the menu to the podium, kept across reloads', async ({
 
   const ready = page.getByTestId('kart-cup-ready')
   await expect(ready).toBeVisible({ timeout: 30_000 })
-  await expect(ready.getByTestId('kart-cup-race')).toHaveText('Race 1 of 1: Riverside (graybox)')
+  await expect(ready.getByTestId('kart-cup-race')).toHaveText('Race 1 of 1: Golden Riverbank')
   await expect(ready).toContainText('(CPU)')
   // A reload finds the cup where it was
   await page.reload()

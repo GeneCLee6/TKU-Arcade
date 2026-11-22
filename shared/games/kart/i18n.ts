@@ -11,11 +11,11 @@ const en = {
   // 2026-11-18: a team race (shared/kart/team.ts)
   'games.kart.option.teams': 'Sides',
   'games.kart.teams.solo': 'Everyone for themselves',
-  'games.kart.teams.teams': 'Team race (red v blue)',
-  // Working titles, as on the time trial's course menu
-  'games.kart.track.riverside': 'Riverside',
-  'games.kart.track.harbour': 'Harbour Hairpins',
-  'games.kart.track.tamkang': 'Tamkang Campus',
+  'games.kart.teams.teams': 'Team race (Sunset v Estuary)',
+  // The names settled in KART-WORLD.md, as on the time trial's course menu
+  'games.kart.track.riverside': 'Golden Riverbank',
+  'games.kart.track.harbour': "Fisherman's Wharf",
+  'games.kart.track.tamkang': 'Five Tigers Hill',
   'games.kart.track.oldstreet': 'Lantern Old Street',
   'games.kart.track.guanyin': 'Guanyin Hill Road',
   'games.kart.track.mangrove': 'Mangrove Channel',
@@ -40,7 +40,7 @@ const en = {
   'games.kart.custom.editor': 'Make one in the track editor',
   'games.kart.custom.tryAlone': 'Try it alone',
   'games.kart.custom.loading': 'Loading the track…',
-  // 2026-11-17: computer karts in a race room (ARCHITECTURE §4.21). Their names are working titles,
+  // 2026-11-17: computer karts in a race room (ARCHITECTURE §4.21). Their names are our own,
   // the same as the race against the computer's (shared/kart/i18n.bots.ts)
   'games.kart.bot.tag': '{name} (CPU)',
   'games.kart.bot.title': 'Computer karts',
@@ -60,8 +60,8 @@ const en = {
   'games.kart.bot.name.typhoon': 'Typhoon',
   'games.kart.bot.name.boba': 'Boba',
   'games.kart.bot.name.scooter': 'Scooter',
-  'games.kart.bot.name.sunset': 'Sunset',
-  'games.kart.bot.name.ferry': 'Ferry',
+  'games.kart.bot.name.sunset': 'Guava',
+  'games.kart.bot.name.ferry': 'Douhua',
   'games.kart.bot.name.kite': 'Kite',
 }
 
@@ -73,10 +73,10 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.mode.race': '競速賽（沒有道具）',
   'games.kart.option.teams': '賽制',
   'games.kart.teams.solo': '個人賽',
-  'games.kart.teams.teams': '團隊賽（紅隊對藍隊）',
-  'games.kart.track.riverside': '河畔',
-  'games.kart.track.harbour': '漁港髮夾彎',
-  'games.kart.track.tamkang': '淡江校園',
+  'games.kart.teams.teams': '團隊賽（夕照隊對河口隊）',
+  'games.kart.track.riverside': '金色水岸',
+  'games.kart.track.harbour': '漁人碼頭',
+  'games.kart.track.tamkang': '五虎崗',
   'games.kart.track.oldstreet': '燈籠老街',
   'games.kart.track.guanyin': '觀音山坡道',
   'games.kart.track.mangrove': '紅樹林水道',
@@ -118,8 +118,8 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.bot.name.typhoon': '颱風',
   'games.kart.bot.name.boba': '珍奶',
   'games.kart.bot.name.scooter': '小綿羊',
-  'games.kart.bot.name.sunset': '夕陽',
-  'games.kart.bot.name.ferry': '渡輪',
+  'games.kart.bot.name.sunset': '芭樂',
+  'games.kart.bot.name.ferry': '豆花',
   'games.kart.bot.name.kite': '風箏',
 }
 

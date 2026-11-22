@@ -76,7 +76,7 @@ const made = circuit({
 export const MANGROVE: TrackJson = {
   format: TRACK_FORMAT,
   id: 'mangrove',
-  // A working name (2026-11-18): the owner may rename it (docs/KART-WORLD.md §6)
+  // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Mangrove Channel', 'zh-TW': '紅樹林水道' },
   revision: 1,
   theme: 'day',

@@ -97,7 +97,7 @@ export const NEEDLE_GUIDE: TrackGuide = needleGuide.build()
 export const CHALLENGE_NEEDLE: TrackJson = {
   format: TRACK_FORMAT,
   id: 'ch-needle',
-  // A working name (docs/KART-WORLD.md §6)
+  // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Needle Lane', 'zh-TW': '針眼巷' },
   theme: 'night',
   laps: 3,

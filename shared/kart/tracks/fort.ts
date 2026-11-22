@@ -70,7 +70,7 @@ const made = circuit({
 export const FORT: TrackJson = {
   format: TRACK_FORMAT,
   id: 'fort',
-  // A working name (2026-11-18): the owner may rename it (docs/KART-WORLD.md §6)
+  // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Hobe Fort Hill', 'zh-TW': '滬尾砲台坡' },
   // 2026-11-19: the drift jump (terrain.ts) changed what a jump is
   revision: 2,

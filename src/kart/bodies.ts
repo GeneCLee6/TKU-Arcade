@@ -1,7 +1,7 @@
 // The kart and driver a player races with (owner 2026-11-14; e10-t05): the vehicles (seventeen
 // since 2026-11-19: fourteen karts and three bikes) and four drivers
 // of our own (shared/kart/karts.ts), kept in this browser (storage.ts never throws) and used on
-// /kart and in a room. Working names until KART-WORLD.md (e10-t01). Everything is open: unlocking
+// /kart and in a room. Names settled in KART-WORLD.md. Everything is open: unlocking
 // (e10-t06) waits for F2.
 import {
   DEFAULT_DRIVER,

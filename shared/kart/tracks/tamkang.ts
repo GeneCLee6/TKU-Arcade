@@ -1,5 +1,5 @@
-// 2026-11-14, owner: "try making a Tamkang University map". A working name (KART-WORLD.md, e10-t01,
-// will settle the world's names): an original circuit through a stylised 淡江大學 淡水校園 on its
+// 2026-11-14, owner: "try making a Tamkang University map". Named Five Tigers Hill (settled in
+// KART-WORLD.md, 2026-11-22): an original circuit through a stylised 淡江大學 淡水校園 on its
 // hillside above the river. The layout is ours, not a map of the real roads: a long run up the
 // lantern-lined avenue to the line, a fast left at the top round the tall memorial tower, a kink past
 // the library and the scroll plaza, esses along the campus's western edge (the old stairway down to
@@ -112,7 +112,7 @@ const made = circuit({
 export const TAMKANG: TrackJson = {
   format: TRACK_FORMAT,
   id: 'tamkang',
-  name: { en: 'Tamkang Campus', 'zh-TW': '淡江校園' },
+  name: { en: 'Five Tigers Hill', 'zh-TW': '五虎崗' },
   // 2026-11-14: drawn bigger and wider with sharper corners (owner: eight karts side by side); the
   // first layout's records are set aside
   // 2026-11-14 again (owner: much faster karts): straights 4 m wider, boost pads; old records

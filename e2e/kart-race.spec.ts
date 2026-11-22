@@ -44,11 +44,11 @@ test('two people race each other in one room, from the countdown to the results'
   // 2026-11-21: the garage opens over the waiting room; Ann sees the pick on Bob's place card
   await bob.getByTestId('kart-lobby-garage').click()
   await bob.getByTestId('kart-room-garage').getByRole('radio', { name: /Egret/ }).click()
-  await bob.getByTestId('kart-room-garage').getByRole('radio', { name: 'Club' }).click()
+  await bob.getByTestId('kart-room-garage').getByRole('radio', { name: 'Clover' }).click()
   await bob.getByRole('button', { name: 'Close' }).click()
   const bobsPlace = ann.locator('[data-testid="kart-lobby-place"]', { hasText: 'Bob' })
   await expect(bobsPlace).toContainText('Egret')
-  await expect(bobsPlace).toContainText('Club')
+  await expect(bobsPlace).toContainText('Clover')
   // Not ready yet: Ann's Start waits and says for whom
   await expect(ann.getByRole('button', { name: 'Start game' })).toBeDisabled()
   await expect(ann.getByTestId('kart-lobby-waiting')).toHaveText('Waiting for Bob to get ready')

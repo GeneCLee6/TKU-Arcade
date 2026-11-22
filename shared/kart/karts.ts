@@ -1,6 +1,6 @@
 // e10-t05a, e10-t05b: the six karts and four drivers (docs/PRD/e10-kart-content-progression.md,
-// AC-10.3). Every name here is a working name until the owner settles KART-WORLD.md (e10-t01); the
-// ids stay when the names change.
+// AC-10.3). Every name is settled in KART-WORLD.md (owner, 2026-11-22); the ids stay
+// whatever the names are.
 //
 // A kart's numbers are small changes to whatever tuning the physics runs with (physics.ts), made
 // from points: each kart spends a budget of zero across speed, acceleration, handling and drift
