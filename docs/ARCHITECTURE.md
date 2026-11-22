@@ -1579,7 +1579,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
 - **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
 
-### 4.70 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，`feat/kart-race-flow`）
+### 4.70 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，#152，`feat/kart-race-flow`）
 
 擁有者 2026-11-22：「按 esc 就可以暫停然後可以打開主選單……當第一台車完賽後倒數 10 秒，到了的車才能排名，然後最後要有前 3 名頒獎畫面動畫……地圖一開始要有每個車手的正面動畫，然後才是 321 倒數，倒數要有音效，GO 也要有音效，選單可以調節音量音效大小，動畫特效等等。」流程是類型慣例；畫面、聲音、文字全部自己做（`IP-CHECKLIST.md` 卡丁車 2026-11-22 補記）。
 
