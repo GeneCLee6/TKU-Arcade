@@ -1742,7 +1742,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **模擬手機巡檢**（`e2e/phones.spec.ts`，不進 CI）：iPhone（WebKit 375 × 812、390 × 844 中文）與 Android（Chromium 412 × 915）各走大廳、展開「跟電腦玩」、德州撲克對電腦一手、卡丁車等待室（直拿與橫拿）、`/kart?bots` 開場亮相，用 `e2e/sweep.ts` 的 `checkLayout`（橫向捲動、裸 key、被擋的按鈕、被截斷的字）與 `checkAxe`（serious 以上）。找到並修了：德州撲克手機座位名字被硬切（「Heron (CPU)」成「Heron (C」；`Table.tsx` 名字改最多兩行）、卡丁車等待室中文「加電腦車」的無障礙名稱不含看得到的字（axe `label-content-name-mismatch`）、收合列按鈕在 WebKit 沒靠右；`npm run test:sweep` 手機那兩種另外抓到德州撲克蓋牌座位整格半透明，連它亮出來的牌也淡掉（方塊 10 對比 1.9:1，axe serious），改成只淡座位的字。開發模式 React 掛兩次時 Safari 把「連線中就關掉的 socket」記成錯誤，只在 dev server 出現，列為提醒不擋。`E2E_PORT=5199 npx playwright test phones.spec.ts --workers=1`；`PHONE_SHOTS=1` 存截圖到 `test-results/phones/`。
 - **CI**：`sweep` job 在巡檢前多跑 `e2e/mobile.spec.ts`（`playwright.config.ts` 設了 `E2E_PORT` 就自己起 dev server），約一分半。
 
-### 4.80 路線圖外：卡丁車第二輪效能與預算（2026-11-23，`feat/kart-perf-2`）
+### 4.80 路線圖外：卡丁車第二輪效能與預算（2026-11-23，#160，`feat/kart-perf-2`）
 
 擁有者 2026-11-22：「整夜繼續開發」「電競化專業化」，朋友多半用手機玩。#124 之後加了障礙物、立體交叉、車身貼圖、真的海、等待室 8 個 3D 車手、頒獎台、高台，卡丁車 chunk 合計 567.8／600 kB。量法、前後表在 `KART-PERF.md` §11。
 
