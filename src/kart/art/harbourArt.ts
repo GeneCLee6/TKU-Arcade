@@ -33,8 +33,9 @@ import { createRng } from '../../../shared/games/rng.ts'
 import { roadClearance, scatter } from '../../../shared/kart/scenery.ts'
 import { roadDirection } from '../../../shared/kart/track.ts'
 import { HARBOUR_SCALE } from '../../../shared/kart/tracks/harbour.ts'
-import { harbourScene, kartScene, kartThemes } from '../../styles/kartTokens.ts'
+import { harbourScene, kartScene, kartThemes, waterScene } from '../../styles/kartTokens.ts'
 import { grain, painted } from './textures.ts'
+import { buildWater } from './seaWater.ts'
 import type { ArtKit } from './trackArt.ts'
 
 /** Metres, from the drawn units the layout and the scenery are placed in */
@@ -264,15 +265,26 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
   const seaBox = { minX: at(-1900), maxX: at(1500), minZ: HARBOUR_COAST - at(1700), maxZ: at(1250) }
   const seaWidth = seaBox.maxX - seaBox.minX
   const seaDepth = seaBox.maxZ - seaBox.minZ
-  const water = textures.water
-  water.repeat.set(seaWidth / 16, seaDepth / 16)
-  const sea = new Mesh(
-    keep(new PlaneGeometry(seaWidth, seaDepth)),
-    own(new MeshLambertMaterial({ map: water, color: harbourScene.sea })),
+  // 2026-11-22 (#115, seaWater.ts): real water on the medium and high pictures, the old plane on low;
+  // shallow by the quay and the beach, deep out at sea
+  const sea = buildWater(
+    kit,
+    {
+      x: (seaBox.minX + seaBox.maxX) / 2,
+      z: (seaBox.minZ + seaBox.maxZ) / 2,
+      width: seaWidth,
+      depth: seaDepth,
+      y: SEA_LEVEL,
+      depthAt: (x, z) => Math.max(HARBOUR_COAST - z, HARBOUR_SHORE - x) / 70,
+      ...waterScene.harbour,
+      sky: kartThemes.sunset.skyHorizon,
+      flatMap: textures.water,
+      flatColor: harbourScene.sea,
+      flatRepeat: 16,
+    },
+    level.water ?? 0,
   )
-  sea.rotation.x = -Math.PI / 2
-  sea.position.set((seaBox.minX + seaBox.maxX) / 2, SEA_LEVEL, (seaBox.minZ + seaBox.maxZ) / 2)
-  group.add(shadowed(sea, false))
+  group.add(shadowed(sea.mesh, false))
   const [sunX, , sunZ] = kartThemes.sunset.sunDirection
   const sunLength = Math.hypot(sunX, sunZ)
   const path = new Mesh(
@@ -933,7 +945,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
 
   return {
     update(seconds) {
-      water.offset.set(seconds * 0.01, seconds * 0.03)
+      sea.update(seconds)
       glitter.offset.set(0, seconds * 0.05)
       beams.rotation.y = seconds * 0.7
       bob(seconds)

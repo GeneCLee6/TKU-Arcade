@@ -22,10 +22,15 @@ export interface QualitySettings {
   readonly fogFar: number
   /** How the picture is developed after the scene is drawn (post.ts) */
   readonly post: PostLevel
+  /**
+   * 2026-11-22 (src/kart/art/seaWater.ts): the water by the sea and the river: 0 the flat picture,
+   * 1 lit with moving swells and the shallows, 2 its surface lifting too
+   */
+  readonly water: 0 | 1 | 2
 }
 
 export const QUALITY: Record<Quality, QualitySettings> = {
-  low: { pixelRatio: 1, antialias: false, shadowMap: 0, density: 0.35, anisotropy: 1, fogFar: 520, post: 'off' },
+  low: { pixelRatio: 1, antialias: false, shadowMap: 0, density: 0.35, anisotropy: 1, fogFar: 520, post: 'off', water: 0 },
   medium: {
     pixelRatio: 1.5,
     antialias: true,
@@ -34,6 +39,7 @@ export const QUALITY: Record<Quality, QualitySettings> = {
     anisotropy: 4,
     fogFar: 760,
     post: 'bloom',
+    water: 1,
   },
   high: {
     pixelRatio: 2,
@@ -43,6 +49,7 @@ export const QUALITY: Record<Quality, QualitySettings> = {
     anisotropy: 8,
     fogFar: 1000,
     post: 'full',
+    water: 2,
   },
 }
 
