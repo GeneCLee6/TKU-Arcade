@@ -66,7 +66,9 @@ function hasher() {
 
 /** The hard bot (as it was until 2026-11-22, goldenHard.ts), three laps (or 200 s), every step hashed */
 function trackHash(id: string, seed: number, tuning: KartTuning): { hash: string; steps: number } {
-  const track = raceTrack(id)!
+  // 2026-11-22: without the harbour's moving obstacles (obstacles.ts), which this hard bot of old
+  // does not know of: the physics on the layout is what is locked
+  const track = { ...raceTrack(id)!, obstacles: undefined }
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
   const brain = createBotBrain(GOLDEN_HARD, track.road, tuning, seed)

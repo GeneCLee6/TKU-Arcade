@@ -282,7 +282,8 @@ export default function ReplayView({
                   ),
                 }
               : null
-          return { karts, follow: followRef.current, overhead: overheadRef.current, props, hits }
+          // 2026-11-22: the reel's ticks are the race clock: the moving obstacles as they were
+          return { karts, follow: followRef.current, overhead: overheadRef.current, props, hits, tick }
         },
         drawn(scene, frame) {
           const others = frame.karts.filter((kart) => kart.id !== frame.follow)

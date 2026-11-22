@@ -5,9 +5,10 @@
 // trying a room with a second tab nobody drives; not a racing opponent. `?autopilot=drift` is the
 // same driver holding the drift key through the bends it takes at speed (2026-11-18: a team race's
 // gauges fill from drifting, and a kart that never drifts never holds a charge to turn blue).
-import { NO_INPUT, type KartInput } from '../../../shared/kart/physics.ts'
+import { NO_INPUT, type KartInput, type KartTuning } from '../../../shared/kart/physics.ts'
 import { nearestRoadPoint, type Trial } from '../../../shared/kart/timeTrial.ts'
-import type { RoadPoint } from '../../../shared/kart/track.ts'
+import type { RoadPoint, Track } from '../../../shared/kart/track.ts'
+import { withObstacles } from '../bots/obstacleSense.ts'
 
 const wrap = (angle: number) => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI))
 
@@ -50,4 +51,19 @@ export function driftingAutopilot(trial: Trial, road: readonly RoadPoint[]): Kar
     ...(drift ? { drift: true, throttle: true, brake: false } : {}),
     boost: input.boost || spare,
   }
+}
+
+/**
+ * 2026-11-22 (#103): the autopilot for `track`, minding its moving obstacles (bots/obstacleSense.ts:
+ * the other lane, or a wait in front of a boom) where it has any; `drifting` for `driftingAutopilot`.
+ * Each kart its own: the hands remember what they have set off past
+ */
+export function createAutopilot(
+  track: Track,
+  tuning: KartTuning,
+  drifting = false,
+): (trial: Trial) => KartInput {
+  const plain = drifting ? driftingAutopilot : autopilot
+  const hands = withObstacles((trial) => plain(trial, track.road), track, tuning)
+  return (trial) => hands(trial, { speedShare: 1 })
 }

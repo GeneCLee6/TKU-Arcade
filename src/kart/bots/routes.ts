@@ -20,6 +20,7 @@ import type { Track } from '../../../shared/kart/track.ts'
 import type { TrackGuide } from '../../../shared/kart/tracks/guide.ts'
 import { routeGuide, trackGuide } from '../../../shared/kart/tracks/guides.ts'
 import { createBotBrain, type BotBrain } from './brain.ts'
+import { withObstacles } from './obstacleSense.ts'
 import type { BotSkill } from './skill.ts'
 
 /** A branch is chosen this many main road points before it leaves */
@@ -48,7 +49,8 @@ export function createTrackBrain(
 ): BotBrain {
   const main = createBotBrain(skill, track.road, tuning, seed, track.jumps, track.walls, guide)
   const forks = track.forks ?? []
-  if (forks.length === 0) return main
+  // 2026-11-22: minding the moving obstacles, on a track that has any (obstacleSense.ts)
+  if (forks.length === 0) return withObstacles(main, track, tuning)
   const route = routeRoad(
     track,
     forks.map((_, index) => index),
@@ -66,7 +68,7 @@ export function createTrackBrain(
   /** The branches gone wrong, until they are behind */
   const failed = new Set<number>()
   let resets = 0
-  return (trial, sense) => {
+  return withObstacles((trial, sense) => {
     const { kart } = trial.run
     const index = nearestRoadPoint(track.road, kart.x, kart.z)
     const coming = approach(track, index)
@@ -84,5 +86,5 @@ export function createTrackBrain(
     const onMain = main(trial, sense)
     const onRoute = branchy(trial, sense)
     return take ? onRoute : onMain
-  }
+  }, track, tuning)
 }

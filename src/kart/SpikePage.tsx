@@ -44,7 +44,7 @@ import { customTrack } from '../../shared/kart/editor/custom.ts'
 import type { Track } from '../../shared/kart/track.ts'
 import { codeInAddress } from './editor/link.ts'
 import { createDriver, DRIVER_IDS, DRIVERS } from './bots/drivers.ts'
-import { autopilot } from './race/autopilot.ts'
+import { createAutopilot } from './race/autopilot.ts'
 import { CupSetupPanel } from './cup/CupSetupPanel.tsx'
 import type { CupRun } from './cup/cupRun.ts'
 import { GhostPicker } from './GhostPicker.tsx'
@@ -225,7 +225,7 @@ export function SpikePage({
           ? {
               autopilot: pilot
                 ? createDriver(DRIVERS[pilot], track, controls.current.tuning, 7)
-                : (trial: Parameters<typeof autopilot>[0]) => autopilot(trial, track.road),
+                : createAutopilot(track, controls.current.tuning),
             }
           : {}),
         quality,

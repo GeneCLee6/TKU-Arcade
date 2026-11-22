@@ -20,7 +20,7 @@ export interface TrackMeta {
 /** By track id: the built-in tracks `npm run kart:feel` drives */
 export const TRACK_META: Readonly<Record<string, TrackMeta>> = {
   riverside: { podium: ['shrimp', 'heron', 'squid'], character: ['fast', 'descent'] },
-  harbour: { podium: ['heron', 'hornet', 'whale'], character: ['fast', 'flat'] },
+  harbour: { podium: ['hornet', 'whale', 'heron'], character: ['fast', 'flat'] },
   tamkang: { podium: ['heron', 'shrimp', 'marlin'], character: ['fast'] },
   oldstreet: { podium: ['heron', 'dolphin', 'marlin'], character: ['fast', 'flat'] },
   guanyin: { podium: ['petrel', 'heron', 'swift'], character: ['fast', 'climb'] },

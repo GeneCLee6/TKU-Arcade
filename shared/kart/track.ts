@@ -7,6 +7,7 @@
 // physics.ts; heading 0 faces -z and grows clockwise.
 import { forkKerbs, parseBranches, rememberForks, trackLines, type BranchJson, type Fork } from './branches.ts'
 import type { Course, Spot } from './course.ts'
+import { obstaclesOf, parseObstacles, type ObstacleJson } from './obstacles.ts'
 import { terrainOf, type Terrain } from './terrain.ts'
 import type { Wall } from './walls.ts'
 
@@ -102,6 +103,11 @@ export interface TrackJson {
    * each with its own centre line. Left out when there are none
    */
   readonly branches?: readonly BranchJson[]
+  /**
+   * Moving obstacles (2026-11-22, obstacles.ts): booms that come down across the road and boxes
+   * that slide across it, each on a cycle of the race clock. Left out when there are none
+   */
+  readonly obstacles?: readonly ObstacleJson[]
 }
 
 export interface Track extends TrackJson {
@@ -293,6 +299,9 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
           jumps,
           walls,
         )
+  // Moving obstacles (2026-11-22): checked against the main road
+  const obstacles =
+    json.obstacles === undefined || road.length < 4 ? [] : parseObstacles(json.obstacles, road, problems)
   const boostPads = list(json.boostPads ?? [], 'boostPads', MAX_THINGS, problems, (item, at) =>
     numbers(item, ['x', 'z', 'heading', 'length', 'width'], at, problems)
       ? (item as unknown as BoostPad)
@@ -345,6 +354,7 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
           ),
         }
       : {}),
+    ...(obstacles.length > 0 ? { obstacles } : {}),
   }
   if (forks.length === 0) return { track: { ...base, allWalls: [...kerbs(road), ...walls] } }
   rememberForks(
@@ -500,6 +510,8 @@ export const courseOf = (track: Track): Course => {
     checkpoints: { gates: track.gates, respawns: track.respawns, laps: track.laps },
     boostPads: track.boostPads,
     ...(terrain ? { terrain } : {}),
+    // Moving obstacles (2026-11-22, obstacles.ts): placed on the road once
+    ...(track.obstacles && track.obstacles.length > 0 ? { obstacles: obstaclesOf(track) } : {}),
     // Branches (2026-11-20, branches.ts): each gate's stand-ins, and each branch's centre line
     ...(track.forks && track.forks.length > 0
       ? {
