@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useRef, type ReactNode } from 'react'
 import styled from 'styled-components'
 import type { KartMessageKey } from '../../shared/kart/i18n.ts'
 import { formatTime } from '../../shared/kart/timeTrial.ts'
@@ -90,12 +90,15 @@ export function RaceCenter({
   trial,
   onRestart,
   onGarage,
+  extra,
 }: {
   t: KartT
   trial: SpikeTrial
   onRestart: () => void
   /** 2026-11-17: opens the garage, to race again in another kart */
   onGarage?: () => void
+  /** 2026-11-23 (§4.80): under the laps, the leaderboard's upload card */
+  extra?: ReactNode
 }) {
   if (trial.phase === 'countdown') {
     return (
@@ -148,6 +151,7 @@ export function RaceCenter({
             </li>
           ))}
         </Laps>
+        {extra}
         <Button onClick={onRestart} autoFocus>
           {t('kart.race.again')}
         </Button>
@@ -276,6 +280,10 @@ const Results = styled.section`
   display: grid;
   gap: ${space.md}px;
   min-width: min(320px, calc(100% - ${space.lg * 2}px));
+  max-width: calc(100% - ${space.lg * 2}px);
+  /* With the leaderboard's card (2026-11-23) it can outgrow a phone held sideways: it scrolls */
+  max-height: calc(100% - ${space.lg * 2}px);
+  overflow-y: auto;
   padding: ${space.lg}px;
   translate: -50% -50%;
 `

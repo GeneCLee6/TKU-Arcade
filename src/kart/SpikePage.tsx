@@ -31,7 +31,9 @@ import { BoostVeil, CalloutText, Hud } from './Hud.tsx'
 import { supportsWebGL2 } from './webgl.ts'
 import { Minimap, type MinimapHandle } from './Minimap.tsx'
 import { RaceCenter, RaceClock, type RaceClockHandle } from './RaceOverlay.tsx'
-import type { SpikeHud, SpikeStats, SpikeTrial } from './spikeLoop.ts'
+import type { BoardRunDone, SpikeHud, SpikeStats, SpikeTrial } from './spikeLoop.ts'
+import type { BoardChase } from './board/chase.ts'
+import { formatTime } from '../../shared/kart/timeTrial.ts'
 import { SPIKE_COURSES, spikeTrack, type SpikeCourse } from './courses.ts'
 import { RACE_ENGINE } from './load/kartLoad.ts'
 import { KartLoading } from './load/KartLoading.tsx'
@@ -61,6 +63,8 @@ import { answerInvite, shouldInvite } from './school/store.ts'
 
 // 2026-11-22: full screen (src/lib/fullscreen.ts), its button a small chunk of its own
 const FullscreenButton = lazy(() => import('../components/FullscreenButton.tsx'))
+// 2026-11-23 (§4.80): the leaderboard's upload card, loaded once a board run has finished
+const BoardUpload = lazy(() => import('./board/BoardUpload.tsx'))
 
 registerMessages(KART_MESSAGES)
 
@@ -116,6 +120,9 @@ export function SpikePage({
   onCup,
   onSchool,
   onChallenge,
+  onBoard,
+  chase = null,
+  onStopChase,
 }: {
   play?: boolean
   /** 2026-11-21: open on the race against the computer's panel (/kart?bots, from the lobby) */
@@ -128,6 +135,14 @@ export function SpikePage({
   onSchool?: () => void
   /** 2026-11-21 (§4.60): /kart's menu opens the challenge mode (src/kart/challenge/) */
   onChallenge?: () => void
+  /**
+   * 2026-11-23 (§4.80): /kart's menu opens the leaderboard (src/kart/board/), on a track or the
+   * week's; a time trial's results then offer to upload the run
+   */
+  onBoard?: (track?: string) => void
+  /** 2026-11-23: a board row's ghost races along on its track, instead of this browser's own */
+  chase?: BoardChase | null
+  onStopChase?: () => void
 } = {}) {
   const t: (key: KartMessageKey, params?: MessageParams) => string = useT()
   const stage = useRef<HTMLDivElement>(null)
@@ -187,6 +202,12 @@ export function SpikePage({
   const clock = useRef<RaceClockHandle>(null)
   const race = useRef<{ restart: () => void } | null>(null)
   const [trial, setTrial] = useState<SpikeTrial>()
+  // 2026-11-23 (§4.80): the last run recorded for the leaderboard, offered at its results
+  const [boardRun, setBoardRun] = useState<BoardRunDone | null>(null)
+  const chasing = chase && chase.track === course ? chase : null
+  const chaseGhost = chasing?.ghost
+  // Whether /kart offers the board: a flag, so that a new handler each render does not restart the race
+  const hasBoard = !!onBoard
   const [quality, setQuality] = useState<Quality>(loadQuality)
   const [showNumbers, setShowNumbers] = useState(() =>
     new URLSearchParams(window.location.search).has('fps'),
@@ -238,19 +259,28 @@ export function SpikePage({
         driver,
         ghostPick,
         onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
-        onTrial: setTrial,
+        onTrial: (next) => {
+          // A run's upload card goes with its results: a new countdown leaves it behind
+          if (next.phase === 'countdown') setBoardRun(null)
+          setTrial(next)
+        },
         onClock: (total, lap) => clock.current?.set(total, lap),
         onReady: (handle) => {
           race.current = handle
         },
         touch: touchSource,
         ...(autopiloted ? {} : { onStep: (step) => coachStep(step, controls.current.tuning) }),
+        // The built-in race tracks have a board (not the test oval, not a shared custom track)
+        ...(hasBoard && course !== 'custom' && course !== 'oval' && course !== 'arena'
+          ? { onBoardRun: setBoardRun }
+          : {}),
+        ...(chaseGhost ? { ghost: chaseGhost } : {}),
       })
     } catch {
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, track, autopiloted, pilot, quality, body, driver, ghostPick, touchSource, coachStep, engine])
+  }, [course, track, autopiloted, pilot, quality, body, driver, ghostPick, touchSource, coachStep, engine, hasBoard, chaseGhost])
 
   const switchCourse = (next: PlayCourse) => {
     const url = new URL(window.location.href)
@@ -467,6 +497,15 @@ export function SpikePage({
               {t('kart.challenge.open')}
             </Button>
           )}
+          {onBoard && (
+            <Button
+              $size="sm"
+              onClick={() => onBoard(course === 'custom' ? undefined : course)}
+              data-testid="kart-board-open"
+            >
+              {t('kart.board.open')}
+            </Button>
+          )}
           {onBotRace && (
             <Button
               ref={botsOpener}
@@ -655,7 +694,15 @@ export function SpikePage({
       {track && (
         <MapCorner $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}>
           {trial && <RaceClock ref={clock} t={t} trial={trial} />}
-          {trial && (
+          {chasing && (
+            <ChaseBanner data-testid="kart-board-chasing">
+              <span>{t('kart.board.chasing', { nick: chasing.nick, time: formatTime(chasing.totalMs / 1000) })}</span>
+              <Button $size="sm" $variant="secondary" onClick={onStopChase} data-testid="kart-board-stop-chase">
+                {t('kart.board.stopChase')}
+              </Button>
+            </ChaseBanner>
+          )}
+          {trial && !chasing && (
             <GhostPicker
               t={t}
               pick={ghostPick}
@@ -677,6 +724,13 @@ export function SpikePage({
           trial={trial}
           onRestart={() => race.current?.restart()}
           onGarage={() => setOpen('garage')}
+          extra={
+            boardRun && boardRun.track === track.id ? (
+              <Suspense fallback={null}>
+                <BoardUpload run={boardRun} onBoard={onBoard} />
+              </Suspense>
+            ) : null
+          }
         />
       )}
       <Bottom $touch={touch.shown}>
@@ -939,6 +993,19 @@ const MapCorner = styled.div<{ $touch: 'left' | 'right' | null }>`
   pointer-events: none;
 
   ${({ $touch }) => $touch && touchCorner($touch)}
+`
+
+// 2026-11-23 (§4.80): whose ghost from the leaderboard races along, and a way to stop
+const ChaseBanner = styled.div`
+  ${broadcastSolid}
+  display: flex;
+  gap: ${space.xs}px;
+  align-items: center;
+  max-width: min(320px, 70vw);
+  padding: ${space.xs}px ${space.sm}px;
+  color: ${color.text};
+  font-size: ${fontSize.sm}px;
+  pointer-events: auto;
 `
 
 const CourseLabel = styled.label`
