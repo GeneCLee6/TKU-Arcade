@@ -1,5 +1,5 @@
 // 2026-11-23 (owner: "more high-platform shortcuts that take technique and enough speed to get up
-// onto; technique and the kart can both cut the time"): high platforms, docs/ARCHITECTURE.md §4.75.
+// onto; technique and the kart can both cut the time"): high platforms, docs/ARCHITECTURE.md §4.76.
 // A branch (branches.ts) may be a platform: a roof, a container stack, a breakwater's crown, raised
 // well above the road. It leaves the main road from a jump lip of the main road (terrain.ts), and a
 // few metres on its road steps straight up, a face as tall as a wall (`rise`: the first point of

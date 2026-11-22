@@ -98,6 +98,18 @@
 //    while it waits for people (and has no password); `set_public` is the host's, in any status.
 //    A room nobody sends anything to for ROOM_IDLE_MAX_MS is deleted as in 13., sockets or not (a
 //    tab left open for days).
+// 20. Delivered once (2026-11-23, docs/NETWORK.md §5). A page may send `session` in `join` (a random
+//    id of its own, new on every page load) and `seq` on any later message but `resync`: 1, 2, 3,
+//    ... in the order sent. The room keeps, per member, the session and the highest `seq` it has
+//    handled (in memory and in storage, written with the change it made, so a restart keeps both
+//    or neither). A message whose `seq` is at or below that is a repeat: it is not applied again,
+//    only acknowledged. Each handled one, applied or refused, is answered with `ack` (to the sender
+//    only, after its patch). `welcome` to a join that brought a `session` carries `ack`: the
+//    highest `seq` handled for that session, 0 for a new one (a new session starts over). So a page
+//    whose socket died with messages unanswered sends again, on the new socket, exactly those above
+//    `ack`, and none is applied twice. Without `session` and `seq` (a page from before) nothing
+//    changes; a server from before ignores both and sends no `ack`, and the page then does not
+//    send anything again.
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
@@ -154,6 +166,9 @@ export const MAX_CONNECTIONS_PER_ADDRESS = 24
 export const ROOM_CLEANUP_MS = 10 * 60_000
 /** A room nobody has sent anything to for this long is deleted, sockets open or not (19. above) */
 export const ROOM_IDLE_MAX_MS = 24 * 60 * 60_000
+
+/** A page's `session` (20. above): what `join` may carry */
+export const SESSION_PATTERN = /^[A-Za-z0-9_-]{8,32}$/
 
 /** Client messages larger than this (UTF-16 code units) are refused without parsing */
 export const MAX_CLIENT_MESSAGE_CHARS = 16_384
@@ -281,6 +296,11 @@ export type WelcomeMessage = {
   token: string
   rev: number
   state: RoomView
+  /**
+   * The highest `seq` the room has handled from this member's `session` (20. above), 0 for a new
+   * one; only when `join` brought a `session`
+   */
+  ack?: number
 }
 
 export type SnapshotMessage = { t: 'snapshot'; rev: number; state: RoomView }
@@ -353,6 +373,9 @@ export type ChatServerMessage = { t: 'chat'; messages: ChatMessage[]; reset?: tr
 
 export type { ChatMessage }
 
+/** Messages up to `seq` from this socket's session have been handled (20. above): to the sender only */
+export type AckMessage = { t: 'ack'; seq: number }
+
 /** Someone's reaction (e7-t11), to everyone in the room, the sender too. Gone once it has floated */
 export type ReactionMessage = { t: 'reaction'; member: string; reaction: number }
 
@@ -394,6 +417,7 @@ export type ServerMessage =
   | TimerMessage
   | ChatServerMessage
   | ReactionMessage
+  | AckMessage
 
 // ── Browser → server ─────────────────────────────────────────────────────────────────────────
 
@@ -401,7 +425,14 @@ export type ServerMessage =
  * The first message on every socket; `token` is null for someone new. `password`: a room that has
  * one (e1-t16) lets in someone new only with it; a member coming back with their token needs none
  */
-export type JoinMessage = { t: 'join'; name: string; token: string | null; password?: string }
+/** `session`: this page load's own id, for messages delivered once (20. above) */
+export type JoinMessage = {
+  t: 'join'
+  name: string
+  token: string | null
+  password?: string
+  session?: string
+}
 
 /** A room password's length, in characters (e1-t16) */
 export const MAX_PASSWORD_CHARS = 32
@@ -495,7 +526,10 @@ export type SetLookMessage = { t: 'set_look'; look: string | null }
  */
 export type SetTeamMessage = { t: 'set_team'; team: 0 | 1 | null; member?: string }
 
-export type ClientMessage =
+/** `seq` (20. above): this message's place in its page's session, for it to be applied only once */
+export type ClientMessage = ClientBody & { seq?: number }
+
+type ClientBody =
   | JoinMessage
   | ResyncMessage
   | ActionMessage
@@ -741,21 +775,36 @@ export function newSeatToken(): string {
     .replace(/=+$/, '')
 }
 
+const isSeq = (value: unknown): value is number =>
+  Number.isSafeInteger(value) && (value as number) >= 1
+
 /** A browser's message, or null when it is not one this version understands */
 export function parseClientMessage(raw: string): ClientMessage | null {
   const value = parseObject(raw, MAX_CLIENT_MESSAGE_CHARS)
-  switch (value?.t) {
+  if (!value) return null
+  const body = parseClientBody(value)
+  // `seq` on `join` and `resync` means nothing (20. above) and is dropped; a malformed one is refused
+  if (!body || value.seq === undefined || body.t === 'join' || body.t === 'resync') return body
+  return isSeq(value.seq) ? { ...body, seq: value.seq } : null
+}
+
+function parseClientBody(value: Record<string, unknown>): ClientBody | null {
+  switch (value.t) {
     case 'join': {
       // Also refused: a name that passes for the site or is abuse (e12-t06, shared/nickname.ts)
       const name = acceptableName(value.name)
       if (name === null) return null
       // A malformed token is someone new, not an error: the browser may hold an old one
       const password = normalizePassword(value.password)
+      // A malformed session is a page without one: it only loses being delivered once
+      const session =
+        typeof value.session === 'string' && SESSION_PATTERN.test(value.session) ? value.session : null
       return {
         t: 'join',
         name,
         token: isSeatToken(value.token) ? value.token : null,
         ...(password !== null ? { password } : {}),
+        ...(session !== null ? { session } : {}),
       }
     }
     case 'resync':
@@ -875,9 +924,12 @@ export function parseServerMessage(raw: string): ServerMessage | null {
         typeof value.you === 'string' &&
         typeof value.token === 'string' &&
         isRev(value.rev) &&
-        isRoomView(value.state)
+        isRoomView(value.state) &&
+        (value.ack === undefined || isRev(value.ack))
         ? (value as WelcomeMessage)
         : null
+    case 'ack':
+      return isSeq(value.seq) ? (value as AckMessage) : null
     case 'snapshot':
       return isRev(value.rev) && isRoomView(value.state) ? (value as SnapshotMessage) : null
     case 'patch':

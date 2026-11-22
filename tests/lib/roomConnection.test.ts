@@ -3,6 +3,7 @@ import type { PatchOp } from '../../shared/patch.ts'
 import {
   CloseCode,
   HEARTBEAT_INTERVAL_MS,
+  SESSION_PATTERN,
   roomSocketPath,
   type RoomView,
 } from '../../shared/protocol.ts'
@@ -10,7 +11,9 @@ import {
   connectRoom,
   FIRST_CONNECT_GIVE_UP_MS,
   MAX_QUEUED,
+  MAX_UNACKED,
   PROBE_TIMEOUT_MS,
+  RESEND_TTL_MS,
   QUEUE_TTL_MS,
   RATE_LIMITED_DELAY_MS,
   reconnectDelay,
@@ -1148,5 +1151,178 @@ describe('chat', () => {
     connection.leave()
     socket.receive(chat({ messages: [MESSAGE] }))
     expect(h.onChat).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-11-23 (shared/protocol.ts 20., docs/NETWORK.md §5): with a room that acknowledges, what is
+// sent is numbered and kept until acknowledged; a socket that dies with something unanswered sends
+// it again, with the same number, on the next socket, and the room applies it only once
+describe('delivered once', () => {
+  const ack = (seq: number) => JSON.stringify({ t: 'ack', seq })
+  const poke = { t: 'action', action: { type: 'poke' } } as const
+
+  /** Welcomed by a room that acknowledges, at `ack` 0; fake timers, no jitter */
+  function acking() {
+    vi.useFakeTimers()
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const h = handlers()
+    const connection = connectAndTrack(ROOM, h)
+    const socket = FakeWebSocket.last
+    socket.open()
+    socket.receive(welcome({}, { ack: 0 }))
+    const [session] = socket.sessions
+    socket.sent.length = 0
+    return { h, connection, socket, session }
+  }
+
+  /** The socket died; the next one is open and has sent its join */
+  function reconnect() {
+    vi.advanceTimersByTime(10)
+    const next = FakeWebSocket.last
+    next.open()
+    return next
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('joins with a session of its own, the same on every socket of this connection', () => {
+    const { socket, session } = acking()
+    expect(session).toMatch(SESSION_PATTERN)
+    socket.serverClose(1006)
+    const next = reconnect()
+    expect(next.sessions).toEqual([session])
+    // Another page load is another session
+    connectAndTrack(ROOM, handlers())
+    FakeWebSocket.last.open()
+    expect(FakeWebSocket.last.sessions[0]).not.toBe(session)
+  })
+
+  it('numbers what it sends, 1, 2, 3, in order; chat, set_look and leave go as before', () => {
+    const { connection, socket } = acking()
+    connection.send(poke)
+    connection.send({ t: 'ready', ready: true })
+    connection.send({ t: 'chat', text: 'hi' }, false)
+    expect(socket.messages).toEqual([
+      { ...poke, seq: 1 },
+      { t: 'ready', ready: true, seq: 2 },
+      { t: 'chat', text: 'hi' },
+    ])
+  })
+
+  it('sends again, with the same numbers, what the room had not acknowledged when the socket died', () => {
+    const { h, connection, socket } = acking()
+    connection.send(poke)
+    socket.receive(ack(1))
+    connection.send(poke)
+    connection.send(poke)
+    // The answers to 2 and 3 never came: the check finds the socket dead
+    vi.advanceTimersByTime(REPLY_TIMEOUT_MS + PROBE_TIMEOUT_MS)
+    expect(socket.closedByClient).toBe(true)
+    // Nobody is asked to tap again: it goes out by itself
+    expect(h.onUnanswered).not.toHaveBeenCalled()
+    const next = reconnect()
+    // The room had handled 2 after all, only its ack was lost
+    next.receive(welcome({}, { ack: 2 }))
+    expect(next.messages).toEqual([{ ...poke, seq: 3 }])
+    expect(h.onUnsent).not.toHaveBeenCalled()
+  })
+
+  it('sends what was tapped while reconnecting after those, numbered on', () => {
+    const { connection, socket } = acking()
+    connection.send(poke)
+    socket.serverClose(1006)
+    expect(connection.send({ t: 'ready', ready: true })).toBe(true)
+    const next = reconnect()
+    expect(next.messages).toEqual([])
+    next.receive(welcome({}, { ack: 0 }))
+    expect(next.messages).toEqual([
+      { ...poke, seq: 1 },
+      { t: 'ready', ready: true, seq: 2 },
+    ])
+    // And keeps them until acknowledged there too
+    next.receive(ack(2))
+    next.serverClose(1006)
+    const third = reconnect()
+    third.receive(welcome({}, { ack: 2 }))
+    expect(third.messages).toEqual([])
+  })
+
+  it('checks the socket when a later message goes unacknowledged, an earlier ack notwithstanding', () => {
+    const { connection, socket } = acking()
+    connection.send(poke)
+    connection.send(poke)
+    socket.receive(patch(1))
+    socket.receive(ack(1))
+    vi.advanceTimersByTime(REPLY_TIMEOUT_MS)
+    expect(socket.sent.at(-1)).toBe('ping')
+    socket.receive(ack(2))
+    vi.advanceTimersByTime(PROBE_TIMEOUT_MS + REPLY_TIMEOUT_MS)
+    expect(socket.closedByClient).toBe(false)
+    expect(socket.sent.filter((data) => data === 'ping')).toHaveLength(1)
+  })
+
+  it('lets go of what the room acknowledged, and sends nothing again after it', () => {
+    const { connection, socket } = acking()
+    connection.send(poke)
+    connection.send(poke)
+    socket.receive(ack(2))
+    socket.serverClose(1006)
+    const next = reconnect()
+    next.receive(welcome({}, { ack: 2 }))
+    expect(next.messages).toEqual([])
+  })
+
+  it('does not send again what is older than RESEND_TTL_MS (sent) or QUEUE_TTL_MS (waiting)', () => {
+    const { h, connection, socket } = acking()
+    connection.send(poke)
+    socket.serverClose(1006)
+    connection.send({ t: 'ready', ready: true })
+    // The first attempt fails, and the next ones take their time
+    vi.advanceTimersByTime(0)
+    FakeWebSocket.last.serverClose(1006)
+    vi.advanceTimersByTime(QUEUE_TTL_MS + 1)
+    let next = FakeWebSocket.last
+    next.open()
+    next.receive(welcome({}, { ack: 0 }))
+    // The one sent still goes; the one that only waited is let go
+    expect(next.messages).toEqual([{ ...poke, seq: 1 }])
+    expect(h.onUnsent).toHaveBeenCalledExactlyOnceWith(1)
+    next.serverClose(1006)
+    vi.advanceTimersByTime(0)
+    FakeWebSocket.last.serverClose(1006)
+    vi.advanceTimersByTime(RESEND_TTL_MS)
+    next = FakeWebSocket.last
+    next.open()
+    next.receive(welcome({}, { ack: 0 }))
+    expect(next.messages).toEqual([])
+    expect(h.onUnsent).toHaveBeenLastCalledWith(1)
+  })
+
+  it('with a room that does not acknowledge (from before), numbers nothing and sends nothing again', () => {
+    vi.useFakeTimers()
+    const { h, connection, socket } = welcomed()
+    connection.send(poke)
+    expect(socket.messages).toEqual([poke])
+    vi.advanceTimersByTime(REPLY_TIMEOUT_MS + PROBE_TIMEOUT_MS)
+    expect(h.onUnanswered).toHaveBeenCalledOnce()
+    vi.advanceTimersByTime(10)
+    expect(FakeWebSocket.instances).toHaveLength(2)
+    FakeWebSocket.last.open()
+    FakeWebSocket.last.receive(welcome({}))
+    expect(FakeWebSocket.last.messages).toEqual([])
+  })
+
+  it('keeps at most MAX_UNACKED sent and unacknowledged', () => {
+    const { connection, socket } = acking()
+    for (let i = 0; i < MAX_UNACKED + 5; i++) connection.send(poke)
+    socket.serverClose(1006)
+    const next = reconnect()
+    next.receive(welcome({}, { ack: 0 }))
+    const seqs = next.messages.map((message) => message.seq)
+    expect(seqs).toHaveLength(MAX_UNACKED)
+    expect(seqs[0]).toBe(6)
+    expect(seqs.at(-1)).toBe(MAX_UNACKED + 5)
   })
 })
