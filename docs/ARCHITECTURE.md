@@ -1688,6 +1688,14 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
   - **長名字**：`nameFit.ts` 依字寬（中日韓字算 1.8）縮字到 0.66；橫拿手機（`max-height: 520px`）的名字可以兩行（`-webkit-line-clamp: 2`）。`e2e/kart-lobby.spec.ts` 檢查 8 格名字都沒被截（含「(CPU)」）。
 - **文件撞號**（#152 回報）：原本兩個 §4.70，等待室滿版改為 §4.71、連線穩定度 §4.72、比賽流程 §4.73，所有文件與程式註解的引用跟著改。
 
+### 4.75 路線圖外：可靠送達（訊息序號與確認）（2026-11-23，#153，`feat/net-reliable-esports-ui`）
+
+#149 留下的「送出了、socket 卻已死」那一下。細節、相容表與測試在 `docs/NETWORK.md` §5。
+
+- **協定**（`shared/protocol.ts` 20.，沒有升版）：`join.session`（頁面載入的隨機 id）、其他訊息的 `seq`（`ClientMessage = ClientBody & { seq?: number }`，`parseClientMessage` 先解析本體再看信封）、`welcome.ack`、新的伺服器訊息 `{ t: 'ack', seq }`。
+- **RoomHost**：`handleMessage` 拆成判斷序號 + `dispatch`；`acks: Map<成員, SeqAck>`，`seq` ≤ 已處理就只回 `ack`；處理完寫 `deps.storage.saveAck`（選用，`RoomDO` 存 `ack:<成員>`，喚醒時 `list({ prefix })` 讀回、清掉已不在的成員），和那則訊息的改變同一個同步段落、一起提交。`welcome(conn, member, session)`：同 session 回已處理到哪，新 session 歸零。
+- **頁面**（`connectRoom`）：`queue` 換成 `outbox`（排隊的與送出未確認的），第一次 `welcome` 有 `ack` 才編號；重連 `welcome` 後重送 `ack` 之後的（原號、原順序）再送排隊的；`RESEND_TTL_MS` 30 s、`MAX_UNACKED` 64；伺服器會確認時不再呼叫 `onUnanswered`。socket 層記送出／確認到的最大 `seq`，還有沒確認的就繼續等回音。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

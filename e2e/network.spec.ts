@@ -12,11 +12,20 @@ type Relay = {
   /** New sockets are closed at once with this code; null lets them through */
   refuse: number | null
   opened: number
+  /**
+   * The next game action kills this socket without a word (2026-11-23, shared/protocol.ts 20.):
+   * `after` lets the action reach the room and loses everything after it (its patch and ack),
+   * `before` loses the action itself. Either way nothing more goes through in either direction,
+   * pings included, until the page gives the socket up
+   */
+  cut: 'before' | 'after' | null
+  /** Game actions that reached the room through the relay, as sent */
+  actions: string[]
 }
 
 async function relayedPerson(browser: Parameters<typeof newPerson>[0]): Promise<{ page: Page; relay: Relay }> {
   const page = await newPerson(browser, { reducedMotion: 'reduce' })
-  const relay: Relay = { current: null, refuse: null, opened: 0 }
+  const relay: Relay = { current: null, refuse: null, opened: 0, cut: null, actions: [] }
   await page.routeWebSocket(/\/ws\//, (client) => {
     relay.opened++
     if (relay.refuse !== null) {
@@ -25,8 +34,22 @@ async function relayedPerson(browser: Parameters<typeof newPerson>[0]): Promise<
     }
     relay.current = client
     const server = client.connectToServer()
-    client.onMessage((message) => server.send(message))
-    server.onMessage((message) => client.send(message))
+    let dead = false
+    client.onMessage((message) => {
+      if (dead) return
+      const isAction = typeof message === 'string' && message.includes('"t":"action"')
+      if (isAction && relay.cut !== null) {
+        const cut = relay.cut
+        relay.cut = null
+        dead = true
+        if (cut === 'before') return
+      }
+      if (isAction) relay.actions.push(message as string)
+      server.send(message)
+    })
+    server.onMessage((message) => {
+      if (!dead) client.send(message)
+    })
     client.onClose(() => void server.close())
     server.onClose((code, reason) => void client.close({ code, reason }))
   })
@@ -47,6 +70,7 @@ async function table(browser: Parameters<typeof newPerson>[0]) {
 }
 
 const RECONNECTING = 'Connection lost, reconnecting…'
+const LOST_TAP = /may not have arrived/i
 
 test('a dropped socket (a deploy) is back in well under a second, without a banner', async ({ browser }) => {
   test.setTimeout(90_000)
@@ -113,9 +137,48 @@ test('the network switched off and on: back by itself', async ({ browser }) => {
   await expect(guest.getByText(RECONNECTING)).toBeVisible({ timeout: 15_000 })
   await guest.context().setOffline(false)
   await expect(guest.getByText(RECONNECTING)).toHaveCount(0, { timeout: 20_000 })
-  await expect(guest.getByRole('button', { name: /^Take chip \d+$/ }).first()).toBeVisible()
-  // Whether the tap got out before the network went or not, the table agrees with itself
-  const left = await host.getByRole('button', { name: /^Take chip \d+$/ }).count()
-  expect([2, 3]).toContain(left)
+  // Whether the tap got out before the network went or not, it is taken exactly once (2026-11-23:
+  // before, it was 2 or 3 chips left and "may not have arrived")
+  await expect(host.getByRole('button', { name: /^Take chip \d+$/ })).toHaveCount(2)
+  await expect(guest.getByRole('button', { name: /you hold it$/ })).toBeVisible()
+  await expect(guest.getByText(LOST_TAP)).toHaveCount(0)
   for (const person of people) await person.context().close()
 })
+
+test('the network going away at the moment of a tap: the tap counts once', async ({ browser }) => {
+  test.setTimeout(90_000)
+  const { people, host, guest, take } = await table(browser)
+  // The click and the network going away race each other, as in a lift or a tunnel
+  await Promise.all([take.first().click(), guest.context().setOffline(true)])
+  await guest.waitForTimeout(1_500)
+  await guest.context().setOffline(false)
+  await expect(host.getByRole('button', { name: /^Take chip \d+$/ })).toHaveCount(2, { timeout: 30_000 })
+  await expect(guest.getByRole('button', { name: /you hold it$/ })).toBeVisible()
+  await expect(guest.getByText(LOST_TAP)).toHaveCount(0)
+  for (const person of people) await person.context().close()
+})
+
+for (const cut of ['after', 'before'] as const) {
+  const what =
+    cut === 'after'
+      ? 'reached the room but its answer never came back'
+      : 'never reached the room'
+  test(`a tap that ${what} is applied exactly once after the reconnect`, async ({ browser }) => {
+    test.setTimeout(90_000)
+    const { people, host, guest, relay, take } = await table(browser)
+    const before = relay.opened
+    relay.cut = cut
+    await take.first().click()
+    // The page finds the socket dead (no answer, then no answer to its ping) and comes back
+    await expect.poll(() => relay.opened, { timeout: 20_000 }).toBe(before + 1)
+    await expect(host.getByRole('button', { name: /^Take chip \d+$/ })).toHaveCount(2, { timeout: 10_000 })
+    await expect(guest.getByRole('button', { name: /you hold it$/ })).toBeVisible()
+    // Not "may not have arrived"
+    await expect(guest.getByText(LOST_TAP)).toHaveCount(0)
+    // Sent again with its number only when the room had not had it
+    const seqs = relay.actions.map((raw) => (JSON.parse(raw) as { seq?: number }).seq)
+    expect(seqs).toHaveLength(1)
+    expect(seqs[0]).toBeGreaterThan(0)
+    for (const person of people) await person.context().close()
+  })
+}

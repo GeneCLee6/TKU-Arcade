@@ -54,7 +54,8 @@ export type RoomHandlers = {
   onUnsent?: (count: number) => void
   /**
    * The socket was found dead while something sent on it had no answer yet: that tap most likely
-   * never arrived, and the person should make it again once back
+   * never arrived, and the person should make it again once back. Only with a server from before
+   * 2026-11-23: one that acknowledges (shared/protocol.ts 20.) gets it again by itself
    */
   onUnanswered?: () => void
   onError: (error: ErrorMessage) => void
@@ -73,7 +74,10 @@ export type RoomConnection = {
   /**
    * False when it could not go out: before `welcome`, or after the end. While reconnecting it waits
    * (up to QUEUE_TTL_MS, MAX_QUEUED of them) and goes out on the new socket once welcomed; with
-   * `wait` false it does not, for what has its own way of trying again (chat, the race loop)
+   * `wait` false it does not, for what has its own way of trying again (chat, the race loop).
+   * Since 2026-11-23 what waits is also numbered (`seq`, shared/protocol.ts 20.) and kept until the
+   * room acknowledges it: one sent on a socket that turned out dead goes out again, and the room
+   * applies it only once
    */
   send: (message: ClientMessage, wait?: boolean) => boolean
   /**
@@ -112,6 +116,14 @@ export const RATE_LIMITED_DELAY_MS = 20_000
 export const QUEUE_TTL_MS = 10_000
 /** At most this many taps wait; past it, send says no */
 export const MAX_QUEUED = 16
+/** Sent and not yet acknowledged, at most this many are kept to send again; older ones are let go */
+export const MAX_UNACKED = 64
+/**
+ * A tap sent and never acknowledged goes out again on the next socket up to this long after it was
+ * made: finding the socket dead alone takes up to REPLY_TIMEOUT_MS + PROBE_TIMEOUT_MS, and the
+ * game refuses what no longer fits (another turn, another hand)
+ */
+export const RESEND_TTL_MS = 30_000
 /**
  * Pings sent without hearing anything back: the socket is dead. Three, 45 s: no longer tied to the
  * server's STALE_AFTER_MS, which since 2026-11-22 allows for a background tab's slowed timers
@@ -138,6 +150,14 @@ export function reconnectDelay(failures: number): number {
 }
 
 const seatKey = (roomId: string) => `tku-arcade.seat.${roomId}`
+
+/** This page load's id for the room (shared/protocol.ts 20.): 16 random base64url characters */
+export function newSession(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(12))
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
 
 // Tokens localStorage would not keep, for as long as this page lives
 const unstoredTokens = new Map<string, string>()
@@ -191,8 +211,13 @@ type RoomSocket = Pick<RoomConnection, 'send' | 'sendQuiet' | 'leave'> & {
 }
 
 type RoomSocketHandlers = Omit<RoomHandlers, 'onEnd' | 'onReconnecting'> & {
-  /** Before the `onView` of the same `welcome` */
-  onWelcome: () => void
+  /**
+   * Before the `onView` of the same `welcome`; `ack`: how far the room got with this session
+   * (shared/protocol.ts 20.), undefined from a server that does not acknowledge
+   */
+  onWelcome: (ack: number | undefined) => void
+  /** Messages up to `seq` have been handled */
+  onAck: (seq: number) => void
   /**
    * This socket is over; `welcomed`: it had joined; `unanswered`: something sent on it was still
    * waiting for an answer. Not called after `leave`
@@ -208,6 +233,7 @@ type RoomSocketHandlers = Omit<RoomHandlers, 'onEnd' | 'onReconnecting'> & {
 function openRoomSocket(
   roomId: string,
   name: string,
+  session: string,
   handlers: RoomSocketHandlers,
   resume = false,
 ): RoomSocket {
@@ -229,6 +255,19 @@ function openRoomSocket(
   let replyTimer: ReturnType<typeof setTimeout> | undefined
   /** A ping is out to check the socket: no answer by then and it is dead */
   let probeTimer: ReturnType<typeof setTimeout> | undefined
+  /** The highest `seq` sent on this socket, and acknowledged (shared/protocol.ts 20.) */
+  let sentSeq = 0
+  let ackedSeq = 0
+
+  // Waits REPLY_TIMEOUT_MS for an answer, then checks the socket
+  const expectReply = () => {
+    awaiting = true
+    if (replyTimer !== undefined || probeTimer !== undefined) return
+    replyTimer = setTimeout(() => {
+      replyTimer = undefined
+      probe()
+    }, REPLY_TIMEOUT_MS)
+  }
 
   const dead = () => {
     closed(CLOSE_ABNORMAL)
@@ -281,6 +320,7 @@ function openRoomSocket(
       name,
       token: readSeatToken(roomId),
       ...(password !== null ? { password } : {}),
+      session,
     }
     sendRaw(JSON.stringify(join))
     // Without it the server closes the socket as stale
@@ -304,6 +344,8 @@ function openRoomSocket(
     clearTimeout(probeTimer)
     replyTimer = undefined
     probeTimer = undefined
+    // A numbered message still owes its ack: an answer to an earlier one does not settle it
+    if (sentSeq > ackedSeq) expectReply()
     if (!current) return
     if (event.data instanceof ArrayBuffer) {
       if (joined) handlers.onBinary?.(new Uint8Array(event.data))
@@ -316,7 +358,7 @@ function openRoomSocket(
         if (joined) return
         joined = { you: message.you, rev: message.rev, view: message.state }
         keepSeatToken(roomId, message.token)
-        handlers.onWelcome()
+        handlers.onWelcome(message.ack)
         handlers.onView(message.you, message.state)
         return
       case 'snapshot':
@@ -352,6 +394,15 @@ function openRoomSocket(
       case 'reaction':
         if (joined) handlers.onReaction?.(message.member, message.reaction)
         return
+      case 'ack':
+        ackedSeq = Math.max(ackedSeq, message.seq)
+        if (ackedSeq >= sentSeq) {
+          awaiting = false
+          clearTimeout(replyTimer)
+          replyTimer = undefined
+        }
+        if (joined) handlers.onAck(message.seq)
+        return
     }
   }
 
@@ -374,13 +425,8 @@ function openRoomSocket(
         return false
       }
       sendRaw(JSON.stringify(message))
-      awaiting = true
-      if (replyTimer === undefined && probeTimer === undefined) {
-        replyTimer = setTimeout(() => {
-          replyTimer = undefined
-          probe()
-        }, REPLY_TIMEOUT_MS)
-      }
+      if (message.seq !== undefined) sentSeq = Math.max(sentSeq, message.seq)
+      expectReply()
       return true
     },
     sendQuiet: (data) => {
@@ -421,8 +467,16 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
   let rateLimited = false
   /** While reconnecting: the wait for the next attempt or, with a socket, its deadline */
   let timer: ReturnType<typeof setTimeout> | undefined
-  /** Taps made while reconnecting, for the next socket */
-  let queue: { message: ClientMessage; at: number }[] = []
+  /** This page load's session (shared/protocol.ts 20.) */
+  const session = newSession()
+  let nextSeq = 1
+  /** The last `welcome` said how far the room got: it acknowledges, and taps are numbered */
+  let acking = false
+  /**
+   * Taps not known to have been handled, in the order made: waiting for the next socket (`sent`
+   * false), or, while the room acknowledges, sent and not yet acknowledged
+   */
+  let outbox: { message: ClientMessage; at: number; sent: boolean }[] = []
   let ended = false
   /** When the page was last hidden; null while it is shown */
   let hiddenAt: number | null = document.visibilityState === 'hidden' ? Date.now() : null
@@ -430,7 +484,13 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
   const retrying = () => lostAt !== null || joiningSince !== null
 
   const open = () => {
-    socket = openRoomSocket(roomId, name, { ...handlers, onWelcome, onClosed }, lostAt !== null)
+    socket = openRoomSocket(
+      roomId,
+      name,
+      session,
+      { ...handlers, onWelcome, onAck, onClosed },
+      lostAt !== null,
+    )
   }
 
   const attempt = () => {
@@ -475,41 +535,57 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
 
   const finish = (end: RoomEnd) => {
     ended = true
-    queue = []
+    outbox = []
     stopReconnecting()
     unwatch()
     handlers.onEnd(end)
   }
 
-  // What was tapped while reconnecting, on the socket just welcomed; what waited too long is not
-  // sent (the room may have moved on), and the person is told
-  const flush = () => {
+  // What was tapped while reconnecting, and what the room never acknowledged (`ack`: how far it got
+  // with this session, shared/protocol.ts 20.), on the socket just welcomed, in order and with the
+  // same numbers, so the room applies none twice. What waited too long is not sent (the room may
+  // have moved on), and the person is told. Without `ack` (a server from before), only what was
+  // never sent goes, as before
+  const flush = (ack: number | undefined) => {
     const now = Date.now()
-    const waiting = queue
-    queue = []
+    const waiting = outbox
+    outbox = []
     let dropped = 0
-    for (const { message, at } of waiting) {
-      if (now - at <= QUEUE_TTL_MS && socket?.send(message)) continue
+    for (const entry of waiting) {
+      const seq = entry.message.seq
+      if (seq !== undefined && ack !== undefined && seq <= ack) continue
+      if (entry.sent && (seq === undefined || ack === undefined)) continue
+      const ttl = entry.sent ? RESEND_TTL_MS : QUEUE_TTL_MS
+      if (now - entry.at <= ttl && socket?.send(entry.message)) {
+        if (acking && seq !== undefined) outbox.push({ ...entry, sent: true })
+        continue
+      }
       dropped++
     }
     if (dropped > 0) handlers.onUnsent?.(dropped)
   }
 
-  const onWelcome = () => {
+  const onWelcome = (ack: number | undefined) => {
     const wasLost = lostAt !== null
+    acking = ack !== undefined
     if (!retrying()) return
     stopReconnecting()
     if (!wasLost) return
     // The server only says so when some are running, and these are from before the drop
     handlers.onTimers([])
-    flush()
+    flush(ack)
     handlers.onResumed?.()
+  }
+
+  const onAck = (seq: number) => {
+    outbox = outbox.filter((entry) => !entry.sent || (entry.message.seq ?? 0) > seq)
   }
 
   const onClosed = (code: number, welcomed: boolean, unanswered: boolean) => {
     socket = null
     clearTimeout(timer)
-    if (welcomed && unanswered && finalEnd(code) === null) handlers.onUnanswered?.()
+    // A room that acknowledges gets it again after the reconnect (flush)
+    if (welcomed && unanswered && !acking && finalEnd(code) === null) handlers.onUnanswered?.()
     const final = finalEnd(code)
     if (final) return finish(final)
     if (!canReconnectAfter(code)) {
@@ -560,15 +636,26 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
 
   return {
     send: (message, wait = true) => {
-      if (socket?.send(message)) return true
-      if (!wait || ended || lostAt === null || queue.length >= MAX_QUEUED) return false
-      queue.push({ message, at: Date.now() })
+      if (!wait) return socket?.send(message) ?? false
+      if (ended) return false
+      const numbered = acking ? { ...message, seq: nextSeq++ } : message
+      if (socket?.send(numbered)) {
+        if (acking) {
+          outbox.push({ message: numbered, at: Date.now(), sent: true })
+          // A room that stopped answering is found by the probe long before this
+          if (outbox.length > MAX_UNACKED) outbox.splice(outbox.findIndex((entry) => entry.sent), 1)
+        }
+        return true
+      }
+      const waiting = outbox.reduce((count, entry) => count + (entry.sent ? 0 : 1), 0)
+      if (lostAt === null || waiting >= MAX_QUEUED) return false
+      outbox.push({ message: numbered, at: Date.now(), sent: false })
       return true
     },
     sendQuiet: (data) => socket?.sendQuiet(data) ?? false,
     leave: () => {
       ended = true
-      queue = []
+      outbox = []
       stopReconnecting()
       unwatch()
       socket?.leave()
