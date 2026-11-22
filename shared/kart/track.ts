@@ -7,6 +7,17 @@
 // physics.ts; heading 0 faces -z and grows clockwise.
 import { forkKerbs, parseBranches, rememberForks, trackLines, type BranchJson, type Fork } from './branches.ts'
 import type { Course, Spot } from './course.ts'
+import {
+  findCrossings,
+  inZone,
+  levelKerbs,
+  LIP_CLEAR,
+  MAX_BANK,
+  MAX_BANK_STEP,
+  rememberLevels,
+  ZONE_PAD,
+  type Crossing,
+} from './levels.ts'
 import { terrainOf, type Terrain } from './terrain.ts'
 import type { Wall } from './walls.ts'
 
@@ -28,6 +39,11 @@ export interface RoadPoint {
    * flat track, which then has no terrain at all
    */
   readonly y?: number
+  /**
+   * How far the road leans across here, degrees (2026-11-22, levels.ts): + its left kerb higher,
+   * as the outside of a right-hand bend is banked; − its right. Left out: level across
+   */
+  readonly bank?: number
 }
 
 /**
@@ -109,6 +125,11 @@ export interface Track extends TrackJson {
   readonly allWalls: readonly Wall[]
   /** The branches, checked, with their gates worked out (branches.ts); absent without any */
   readonly forks?: readonly Fork[]
+  /**
+   * Where the main road runs over itself (2026-11-22, levels.ts), worked out from its heights;
+   * absent on a track that never does (every track before then)
+   */
+  readonly crossings?: readonly Crossing[]
 }
 
 // ── Checking ───────────────────────────────────────────────────────────────────────────────────
@@ -181,6 +202,15 @@ const wall = (item: unknown, at: string, problems: Problems): Wall | null => {
     problems.push(`${at}: top must be a height`)
     return null
   }
+  // A foot (2026-11-22, levels.ts): only with a top above it
+  const base = (item as { base?: unknown }).base
+  if (
+    base !== undefined &&
+    (!isNumber(base) || Math.abs(base) > MAX_HEIGHT + 20 || top === undefined || base >= top)
+  ) {
+    problems.push(`${at}: base must be a height under its top`)
+    return null
+  }
   return item as Wall
 }
 
@@ -231,9 +261,17 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
       problems.push(`${at}: y a number from -${MAX_HEIGHT} to ${MAX_HEIGHT} m`)
       return null
     }
-    return y === undefined
-      ? { x: point.x, z: point.z, width: point.width }
-      : { x: point.x, z: point.z, width: point.width, y }
+    // Banking (2026-11-22): only where it is given, so that every older track reads as it did
+    const bank = (item as { bank?: unknown }).bank
+    if (bank !== undefined && (!isNumber(bank) || Math.abs(bank) > MAX_BANK)) {
+      problems.push(`${at}: bank a number from -${MAX_BANK} to ${MAX_BANK} degrees`)
+      return null
+    }
+    const plain =
+      y === undefined
+        ? { x: point.x, z: point.z, width: point.width }
+        : { x: point.x, z: point.z, width: point.width, y }
+    return bank === undefined || bank === 0 ? plain : { ...plain, bank }
   }
   const road = list(json.road, 'road', MAX_ROAD_POINTS, problems, roadPoint)
   if (road.length < 4) problems.push('road: at least 4 points')
@@ -242,6 +280,9 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     const b = road[(index + 1) % road.length]!
     if (Math.hypot(b.x - a.x, b.z - a.z) < 0.5)
       problems.push(`road[${index}]: closer than 0.5 m to the next point`)
+    if (Math.abs((b.bank ?? 0) - (a.bank ?? 0)) > MAX_BANK_STEP) {
+      problems.push(`road[${index}]: leans more than ${MAX_BANK_STEP} degrees from the next point`)
+    }
   }
 
   const jumps = list(json.jumps ?? [], 'jumps', MAX_JUMPS, problems, (item, at) => {
@@ -313,6 +354,47 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
     return item as unknown as Decor
   })
 
+  // Crossings (2026-11-22, levels.ts): where the road runs over itself, high enough apart, and
+  // nothing judged on the plan alone in the zone round each
+  const crossings = problems.length > 0 ? [] : findCrossings(road, problems)
+  if (crossings.length > 0) {
+    const clear = (what: string, x: number, z: number, pad = 0) => {
+      if (inZone(crossings, x, z, pad)) problems.push(`${what}: at a crossing`)
+    }
+    gates.forEach((gate, index) => {
+      for (let k = 0; k <= 8; k++) {
+        const t = k / 8
+        clear(`gates[${index}]`, gate.ax + (gate.bx - gate.ax) * t, gate.az + (gate.bz - gate.az) * t, 3)
+      }
+    })
+    respawns.forEach((spot, index) => clear(`respawns[${index}]`, spot.x, spot.z, 10))
+    grid.forEach((spot, index) => clear(`grid[${index}]`, spot.x, spot.z, 10))
+    if (solo) clear('solo', solo.x, solo.z, 10)
+    jumps.forEach((lip, index) => clear(`jumps[${index}]`, road[lip]!.x, road[lip]!.z, LIP_CLEAR))
+    boostPads.forEach((pad, index) =>
+      clear(`boostPads[${index}]`, pad.x, pad.z, Math.max(pad.length, pad.width) / 2 + 3),
+    )
+    itemBoxes.forEach((box, index) => clear(`itemBoxes[${index}]`, box.x, box.z, 3))
+    walls.forEach((one, index) => {
+      if (one.base !== undefined) return
+      for (const [x, z] of [
+        [one.ax, one.az],
+        [one.bx, one.bz],
+        [(one.ax + one.bx) / 2, (one.az + one.bz) / 2],
+      ] as const)
+        clear(`walls[${index}]`, x, z, 2)
+    })
+    forks.forEach((fork, index) => {
+      for (const point of fork.path) clear(`branches[${index}]`, point.x, point.z, ZONE_PAD)
+    })
+    // One problem for each thing, however many of its points are in the zone
+    const seen = new Set<string>()
+    for (let index = problems.length - 1; index >= 0; index--) {
+      if (seen.has(problems[index]!)) problems.splice(index, 1)
+      else seen.add(problems[index]!)
+    }
+  }
+
   if (problems.length > 0) return { problems }
   const base: TrackJson = {
     format: TRACK_FORMAT,
@@ -346,13 +428,24 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
         }
       : {}),
   }
-  if (forks.length === 0) return { track: { ...base, allWalls: [...kerbs(road), ...walls] } }
+  // At a crossing the kerbs stand only round their own road (levels.ts)
+  const roadKerbs = crossings.length > 0 ? levelKerbs(road, kerbs(road), crossings) : kerbs(road)
+  const levelled = crossings.length > 0 ? { crossings } : {}
+  if (crossings.length > 0) rememberLevels(road)
+  if (forks.length === 0) {
+    return { track: { ...base, allWalls: [...roadKerbs, ...walls], ...levelled } }
+  }
   rememberForks(
     road,
     forks.map((fork) => fork.path),
   )
   return {
-    track: { ...base, allWalls: [...forkKerbs(road, kerbs(road), forks), ...walls], forks },
+    track: {
+      ...base,
+      allWalls: [...forkKerbs(road, roadKerbs, forks), ...walls],
+      forks,
+      ...levelled,
+    },
   }
 }
 
@@ -426,6 +519,78 @@ export function gatesAlong(
     respawns.push({ x: point.x, z: point.z, heading: headingOf(direction) })
   }
   return { gates, respawns }
+}
+
+/**
+ * For whoever lays a road that runs over itself (2026-11-22, levels.ts: a track's author, the
+ * editor): the gates and respawn points with each that stands at a crossing moved along the road,
+ * forwards, to the first road point clear of it (gate 0, the finish line, is the author's to keep
+ * clear). The road's own crossings are found here; a road without any gets its gates back as they were
+ */
+export function gatesClearOfCrossings(
+  road: readonly RoadPoint[],
+  gates: readonly Gate[],
+  respawns: readonly Spot[],
+): { gates: Gate[]; respawns: Spot[] } {
+  const crossings = findCrossings(road, [])
+  if (crossings.length === 0) return { gates: [...gates], respawns: [...respawns] }
+  const count = road.length
+  const across = (index: number) => {
+    const point = road[index]!
+    const direction = roadDirection(road, index)
+    const half = point.width / 2
+    return {
+      gate: {
+        ax: point.x + direction.dz * half,
+        az: point.z - direction.dx * half,
+        bx: point.x - direction.dz * half,
+        bz: point.z + direction.dx * half,
+      },
+      respawn: { x: point.x, z: point.z, heading: headingOf(direction) },
+    }
+  }
+  const clear = (index: number) => {
+    const { gate, respawn } = across(index)
+    if (inZone(crossings, respawn.x, respawn.z, 10)) return false
+    for (let k = 0; k <= 8; k++) {
+      const t = k / 8
+      const x = gate.ax + (gate.bx - gate.ax) * t
+      const z = gate.az + (gate.bz - gate.az) * t
+      if (inZone(crossings, x, z, 3)) return false
+    }
+    return true
+  }
+  const nearest = (gate: Gate) => {
+    const mx = (gate.ax + gate.bx) / 2
+    const mz = (gate.az + gate.bz) / 2
+    let best = 0
+    road.forEach((point, index) => {
+      if (Math.hypot(point.x - mx, point.z - mz) < Math.hypot(road[best]!.x - mx, road[best]!.z - mz))
+        best = index
+    })
+    return best
+  }
+  const kept: { gate: Gate; respawn: Spot; at: number }[] = []
+  gates.forEach((gate, index) => {
+    const at = nearest(gate)
+    if (index === 0 || clear(at)) {
+      kept.push({ gate, respawn: respawns[index]!, at })
+      return
+    }
+    for (let shift = 1; shift < count; shift++) {
+      const moved = (at + shift) % count
+      if (moved === 0) return
+      if (!clear(moved)) continue
+      if (!kept.some((one) => one.at === moved)) kept.push({ ...across(moved), at: moved })
+      return
+    }
+  })
+  const [first, ...rest] = kept
+  rest.sort((a, b) => a.at - b.at)
+  const ordered = [first!, ...rest].filter(
+    (one, index, all) => index === 0 || one.at !== all[index - 1]!.at,
+  )
+  return { gates: ordered.map((one) => one.gate), respawns: ordered.map((one) => one.respawn) }
 }
 
 /**

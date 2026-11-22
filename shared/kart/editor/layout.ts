@@ -58,7 +58,21 @@ const round = (value: number) => Math.round(value * 100) / 100
 
 /** Whether any piece leaves the flat: then every road point has a height (track.ts) */
 export const hasHeights = (pieces: readonly Piece[]): boolean =>
-  pieces.some((piece) => piece.kind === 'slope' || piece.kind === 'jump')
+  pieces.some(
+    (piece) => piece.kind === 'slope' || piece.kind === 'jump' || piece.kind === 'overpass',
+  )
+
+/** A banked bend leans in and out over this many metres at each end, or a third of it if shorter */
+export const BANK_EASE = 40
+
+/** How far a piece leans `distance` metres along it, degrees (2026-11-22): + its left kerb higher */
+function bankOn(piece: Piece, distance: number, length: number): number {
+  if (piece.kind !== 'turn' || !piece.bank) return 0
+  const ease = Math.min(BANK_EASE, length / 3)
+  const share = Math.max(0, Math.min(1, distance / ease, (length - distance) / ease))
+  // Into the bend: a right-hand bend (angle above zero) raises its left, outside kerb
+  return Math.round(Math.sign(piece.angle) * piece.bank * share * 10) / 10
+}
 
 /** Eases 0 to 1 in and out: a slope's share of its rise at that share of its length */
 const ease = (t: number) => t * t * (3 - 2 * t)
@@ -87,6 +101,11 @@ function heightOn(piece: Piece, base: number, distance: number, length: number):
   if (piece.kind === 'jump') {
     const ramp = rampOf(length)
     return distance <= ramp ? base + piece.height * (distance / ramp) : base
+  }
+  if (piece.kind === 'overpass') {
+    const third = length / 3
+    const share = Math.min(1, distance / third, (length - distance) / third)
+    return base + piece.rise * ease(Math.max(0, share))
   }
   return base
 }
@@ -117,11 +136,11 @@ export function layout(pieces: readonly Piece[]): Laid {
       const width = Math.round((before + (piece.width - before) * mix) * 10) / 10
       if (sample === lip) jumps.push(road.length)
       const y = round(heightOn(piece, base, distance, length))
-      road.push(
-        lifted
-          ? { x: round(at.x), z: round(at.z), width, y }
-          : { x: round(at.x), z: round(at.z), width },
-      )
+      const bank = bankOn(piece, distance, length)
+      const point = lifted
+        ? { x: round(at.x), z: round(at.z), width, y }
+        : { x: round(at.x), z: round(at.z), width }
+      road.push(bank !== 0 ? { ...point, bank } : point)
       pieceOf.push(index)
     })
     lengths.push(length)

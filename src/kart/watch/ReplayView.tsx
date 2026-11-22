@@ -109,6 +109,8 @@ function kartsAt(reel: ReplayReel, tick: number): WatchedKart[] {
       x: one.x,
       z: one.z,
       heading: one.heading,
+      // 2026-11-22: a replay that knew when each kart was in the air draws it so (else guessed)
+      ...(reel.replay.airborne ? { airborne: one.airborne === true } : {}),
       vx: one.vx,
       vz: one.vz,
       skidding: one.skidding,

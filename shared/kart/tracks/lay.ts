@@ -23,6 +23,8 @@ export type Lay =
       /** A name for the place at its end, or (`mid`) half-way along it */
       readonly mark?: string
       readonly mid?: string
+      /** How far the road leans at the end of the step, degrees (levels.ts): eased along it */
+      readonly bank?: number
     }
   | {
       readonly kind: 'arc'
@@ -33,9 +35,10 @@ export type Lay =
       readonly height?: number
       readonly mark?: string
       readonly mid?: string
+      readonly bank?: number
     }
 
-type Extra = { height?: number; mark?: string; mid?: string }
+type Extra = { height?: number; mark?: string; mid?: string; bank?: number }
 
 export const line = (length: number, width: number, extra: Extra = {}): Lay => ({
   kind: 'line',
@@ -84,11 +87,15 @@ const RAD = Math.PI / 180
  */
 export function lay(
   steps: readonly Lay[],
-  start: { heading?: number; width: number; height?: number },
+  /**
+   * `eight` (2026-11-22): a figure of eight, whose turns add up to none (its road runs over itself,
+   * levels.ts), not to a whole circle
+   */
+  start: { heading?: number; width: number; height?: number; eight?: boolean },
 ): Laid {
   const turned = steps.reduce((sum, step) => sum + (step.kind === 'arc' ? step.degrees : 0), 0)
-  if (Math.abs(Math.abs(turned) - 360) > 1e-6) {
-    throw new Error(`lay: the steps turn ${turned} degrees, not a whole circle`)
+  if (Math.abs(Math.abs(turned) - (start.eight ? 0 : 360)) > 1e-6) {
+    throw new Error(`lay: the steps turn ${turned} degrees, not ${start.eight ? 'none' : 'a whole circle'}`)
   }
   const free = steps.flatMap((step, index) => (step.kind === 'line' && step.fit ? [index] : []))
   if (free.length !== 2) throw new Error('lay: exactly two straights are fitted')
@@ -101,10 +108,13 @@ export function lay(
     let heading = (start.heading ?? 0) * RAD
     let width = start.width
     let height = start.height ?? 0
+    let bank = 0
     const hilly = start.height !== undefined || steps.some((step) => step.height !== undefined)
+    const banked = steps.some((step) => step.bank !== undefined)
     steps.forEach((step, index) => {
       const toWidth = step.width
       const toHeight = step.height ?? height
+      const toBank = step.bank ?? bank
       const fit = free.indexOf(index)
       const length =
         step.kind === 'line'
@@ -141,7 +151,12 @@ export function lay(
           const point: CircuitPoint = hilly
             ? [px, pz, w, Math.round((height + (toHeight - height) * ease) * 100) / 100]
             : [px, pz, w]
-          control.push(point)
+          // A banked bend (2026-11-22): its lean, eased as the height is
+          control.push(
+            banked
+              ? [point[0], point[1], point[2], point[3], Math.round((bank + (toBank - bank) * ease) * 10) / 10]
+              : point,
+          )
         }
         if (step.mid) marks[step.mid] = at(0.5)
       }
@@ -150,6 +165,7 @@ export function lay(
       if (step.kind === 'arc') heading += step.degrees * RAD
       width = toWidth
       height = toHeight
+      bank = toBank
     })
     return { control, marks, x, z, height }
   }

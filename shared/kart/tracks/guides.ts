@@ -10,11 +10,13 @@ import type { TrackGuide } from './guide.ts'
 import { LANES_GUIDE } from './lanes.ts'
 import { WHARF_GUIDE, WHARF_ROUTE_GUIDE } from './wharf.ts'
 import { WORKS_GUIDE, WORKS_ROUTE_GUIDE } from './works.ts'
+import { ZHUWEI_GUIDE, ZHUWEI_ROUTE_GUIDE } from './zhuwei.ts'
 
 const GUIDES: Readonly<Record<string, TrackGuide>> = {
   wharf: WHARF_GUIDE,
   lanes: LANES_GUIDE,
   works: WORKS_GUIDE,
+  zhuwei: ZHUWEI_GUIDE,
   // 2026-11-21: the challenge mode's Needle Lane (challenge.ts): both lines through its slots
   'ch-needle': NEEDLE_GUIDE,
 }
@@ -22,6 +24,7 @@ const GUIDES: Readonly<Record<string, TrackGuide>> = {
 const ROUTE_GUIDES: Readonly<Record<string, TrackGuide>> = {
   wharf: WHARF_ROUTE_GUIDE,
   works: WORKS_ROUTE_GUIDE,
+  zhuwei: ZHUWEI_ROUTE_GUIDE,
 }
 
 export const trackGuide = (id: string): TrackGuide | undefined =>

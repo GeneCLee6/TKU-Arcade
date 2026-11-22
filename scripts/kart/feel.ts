@@ -25,6 +25,8 @@ export const FEEL_TRACKS = [
   'lanes',
   // 2026-11-20: the first with real branches (docs/KART-FEEL.md §14)
   'works',
+  // 2026-11-22: the technical showcase, over and under itself (docs/KART-FEEL.md §20)
+  'zhuwei',
 ] as const
 
 export const FEEL_DRIVERS = DRIVERS

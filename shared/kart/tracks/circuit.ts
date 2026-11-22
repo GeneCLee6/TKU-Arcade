@@ -16,8 +16,11 @@ import {
   type RoadPoint,
 } from '../track.ts'
 
-/** [x, z, width] or [x, z, width, height]: the middle of the road, in driving order */
-export type CircuitPoint = readonly [number, number, number, number?]
+/**
+ * [x, z, width] or [x, z, width, height]: the middle of the road, in driving order; a fifth, the
+ * road's lean in degrees (2026-11-22, levels.ts), on a track with banked bends
+ */
+export type CircuitPoint = readonly [number, number, number, number?, number?]
 
 export interface CircuitPlan {
   readonly control: readonly CircuitPoint[]
@@ -95,7 +98,9 @@ export function circuitRoad(control: readonly CircuitPoint[], sample: number): R
       }
       // Heights ease from one control point to the next: never over or under either
       const ease = t * t * (3 - 2 * t)
-      points.push({ x, z, width, y: round((b[3] ?? 0) + ((c[3] ?? 0) - (b[3] ?? 0)) * ease) })
+      const y = round((b[3] ?? 0) + ((c[3] ?? 0) - (b[3] ?? 0)) * ease)
+      const bank = Math.round(((b[4] ?? 0) + ((c[4] ?? 0) - (b[4] ?? 0)) * ease) * 10) / 10
+      points.push(bank !== 0 ? { x, z, width, y, bank } : { x, z, width, y })
     }
   }
   return points

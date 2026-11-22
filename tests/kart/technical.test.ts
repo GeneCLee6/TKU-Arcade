@@ -7,6 +7,7 @@
 // it is less straight than it was.
 import { describe, expect, it } from 'vitest'
 import { roadShape } from '../../scripts/kart/shape.ts'
+import { inZone, LEVEL_CLEARANCE, ZONE_PAD } from '../../shared/kart/levels.ts'
 import { KART_TUNING } from '../../shared/kart/physics.ts'
 import { roadClearance } from '../../shared/kart/scenery.ts'
 import { seconds, startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
@@ -49,6 +50,9 @@ const PLAN: Record<
   lanes: { key: 'lanes', straight: 0.4, was: 0.4, longest: 220, jumps: 3, hilly: true },
   // 2026-11-20, the first with branches (branches.test.ts and skillTracks.test.ts have its own)
   works: { key: 'works', straight: 0.4, was: 0.4, longest: 220, jumps: 1, hilly: true },
+  // 2026-11-22, the technical showcase (levels.test.ts has its own): a figure of eight whose two
+  // arms run straight over and under each other, so a little straighter than the rest
+  zhuwei: { key: 'zhuwei', straight: 0.44, was: 0.44, longest: 270, jumps: 1, hilly: true },
 }
 
 const load = (id: RaceTrackId): Track => raceTrack(id)!
@@ -82,7 +86,11 @@ describe.each(RACE_TRACK_IDS)('the redrawn %s', (id) => {
       for (let j = i + 1; j < road.length; j++) {
         if (alongRoad(road, i, j) < Math.max(90, (road[i]!.width + road[j]!.width) * 1.2)) continue
         const gap = Math.hypot(road[i]!.x - road[j]!.x, road[i]!.z - road[j]!.z)
-        if (gap <= (road[i]!.width + road[j]!.width) / 2 + 4) {
+        // 2026-11-22 (levels.ts): over or under itself at a crossing, high enough apart
+        const levelled =
+          inZone(track.crossings ?? [], road[i]!.x, road[i]!.z, ZONE_PAD) &&
+          Math.abs((road[i]!.y ?? 0) - (road[j]!.y ?? 0)) >= LEVEL_CLEARANCE
+        if (!levelled && gap <= (road[i]!.width + road[j]!.width) / 2 + 4) {
           throw new Error(`road ${i} and ${j} are ${gap.toFixed(1)} m apart`)
         }
       }
