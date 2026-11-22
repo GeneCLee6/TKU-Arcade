@@ -34,6 +34,7 @@ import { loadBodies } from '../art/bodyLoad.ts'
 import { buildKartEnvironment } from '../art/kartParts.ts'
 import { buildKartModel, solidBox, type KartModel } from '../art/kartModel.ts'
 import { BODY_DETAIL } from '../art/bodyDetail.ts'
+import { releaseSharedTextures } from '../art/sharedTextures.ts'
 import { loadQuality } from '../quality.ts'
 import { bodyReady } from '../art/vehicleBodies.ts'
 import type { DriverGesture } from '../driverGestures.ts'
@@ -358,6 +359,7 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
     },
     dispose() {
       disposed = true
+      releaseSharedTextures(renderer, scene)
       cancelAnimationFrame(handle)
       observer?.disconnect()
       sizes?.disconnect()

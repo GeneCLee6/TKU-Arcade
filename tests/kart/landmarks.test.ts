@@ -11,7 +11,14 @@ import {
   ridgeHeight,
   TEMPLE_REACH,
 } from '../../src/kart/art/guanyinArt.ts'
-import { buildWater, waterDepths, type WaterOptions } from '../../src/kart/art/seaWater.ts'
+import {
+  buildWater,
+  NEAR_MARGIN,
+  WAVE_VERTEX,
+  waterDepths,
+  waveTicks,
+  type WaterOptions,
+} from '../../src/kart/art/seaWater.ts'
 import { QUALITY } from '../../src/kart/quality.ts'
 
 // 2026-11-22 (#94, #115; docs/ARCHITECTURE.md §4.70): Guanyin Hill Road's landmarks and the real water
@@ -90,6 +97,38 @@ describe('the water', () => {
     const high = buildWater(kit, options, 2)
     expect((high.mesh.geometry as PlaneGeometry).parameters.widthSegments).toBeGreaterThan(20)
     medium.update(12)
+  })
+
+  // 2026-11-23 (docs/KART-PERF.md §11): a vertex about every WAVE_VERTEX metres along each side, by
+  // that side's own length: a long narrow river is not cut as finely across as along
+  it("on high is cut by each side's own length", () => {
+    const river = buildWater(kit, { ...options, width: 60, depth: 2000 }, 2)
+    const { widthSegments, heightSegments } = (river.mesh.geometry as PlaneGeometry).parameters
+    expect(heightSegments).toBe(Math.round(2000 / WAVE_VERTEX))
+    expect(widthSegments).toBe(8)
+    const sea = (buildWater(kit, options, 2).mesh.geometry as PlaneGeometry).parameters
+    expect(sea.widthSegments).toBe(Math.round(400 / WAVE_VERTEX))
+    expect(sea.heightSegments).toBe(Math.round(200 / WAVE_VERTEX))
+  })
+
+  // 2026-11-23: where the camera goes, a vertex every WAVE_VERTEX metres as before; beyond, coarser
+  it('on high is cut finely near the track and coarsely far from it', () => {
+    const ticks = waveTicks(-1500, 1500, -200, 300)
+    expect(ticks[0]).toBe(-1500)
+    expect(ticks.at(-1)).toBe(1500)
+    for (let i = 1; i < ticks.length; i++) expect(ticks[i]!).toBeGreaterThan(ticks[i - 1]!)
+    const inside = ticks.filter((t) => t >= -200 && t <= 300)
+    for (let i = 1; i < inside.length; i++) expect(inside[i]! - inside[i - 1]!).toBeCloseTo(500 / Math.round(500 / WAVE_VERTEX))
+    // 3 km cut in far fewer rows than one every 12 m
+    expect(ticks.length).toBeLessThan(3000 / WAVE_VERTEX / 2)
+    // A near box outside the span: still both ends, nothing doubled
+    expect(new Set(waveTicks(0, 100, 500, 600)).size).toBe(waveTicks(0, 100, 500, 600).length)
+    const sea = buildWater(kit, { ...options, width: 3000, depth: 3000, near: { minX: -100, maxX: 100, minZ: -50, maxZ: 50 } }, 2)
+    const { position, normal } = sea.mesh.geometry.attributes
+    expect(position!.count).toBe(normal!.count)
+    // Fewer than a tenth of the 250 x 250 an even cut would take, with the fine cut over the track
+    expect(position!.count).toBeLessThan((3000 / WAVE_VERTEX) ** 2 / 10)
+    expect(NEAR_MARGIN).toBeGreaterThan(0)
   })
 
   it('knows the shallows: 0 at the shore, the full depth out at sea', () => {

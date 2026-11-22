@@ -104,6 +104,17 @@ export function paintBodyDetail(
 
 const made = new Map<BodyDetailLevel, Texture>()
 
+/**
+ * 2026-11-23 (docs/KART-PERF.md §11, sharedTextures.ts): each renderer that draws a detail tile hangs a listener on it
+ * (three.js frees its copy when the texture is disposed), and the tiles live as long as the page: a
+ * renderer gone (a race, a podium, a garage) was held by them for good, every buffer and closure of
+ * it, about 0.35 MB a race. Called by each renderer's owner as it goes: every renderer drops its copy
+ * and its listener; the tiles stay, and a renderer still drawing uploads them again on its next frame
+ */
+export function releaseBodyDetail(): void {
+  for (const texture of made.values()) texture.dispose()
+}
+
 /** The detail tile for a level, made once for the page; null for none (low) or without a canvas */
 export function bodyDetailTexture(level: BodyDetailLevel): Texture | null {
   if (level === 'off' || typeof document === 'undefined') return null

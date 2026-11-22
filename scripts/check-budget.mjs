@@ -137,6 +137,34 @@ if (kartEntries.length > 0) {
   console.log('skip kart: no lazy chunk under src/kart/ yet')
 }
 
+// 2026-11-23 (docs/KART-PERF.md §11): what a race needs before its first frame, from /kart's menu:
+// the page and the race's engine, with the heaviest track's own quarter, the parts a track may need
+// (src/kart/art/trackParts.ts) and every family of vehicles (a grid of eight may span them all),
+// the main site's chunks left out as above. The kart line counts every chunk, the editor's, the
+// school's and the challenges' included, which a racer may never fetch: this one is what everyone
+// waits for, and keeps room under it
+const KART_RACE_LIMIT = 480 * KB
+const KART_PAGE = 'src/kart/bots/KartPlay.tsx'
+const KART_ENGINE = 'src/kart/spikeLoop.ts'
+const KART_PARTS = ['src/kart/art/trackParts.ts']
+if (manifest[KART_PAGE] && manifest[KART_ENGINE]?.isDynamicEntry) {
+  const engine = collectAll([KART_PAGE, KART_ENGINE])
+  const extra = (keys) => [...collectAll(keys)].filter((key) => !engine.has(key))
+  const sceneries = lazyEntriesUnder('src/kart/art/').filter((key) => /Art\.ts$/.test(key) && !KART_PARTS.includes(key))
+  const heaviest = sceneries
+    .map((key) => extra([key]))
+    .reduce((most, keys) => (gzipSize(keys) > gzipSize(most) ? keys : most), [])
+  const families = lazyEntriesUnder('src/kart/art/').filter((key) => /Bodies\.ts$/.test(key))
+  const keys = new Set([
+    ...engine,
+    ...heaviest,
+    ...extra(KART_PARTS.filter((key) => manifest[key])),
+    ...extra(families),
+  ])
+  for (const key of mainKeys) keys.delete(key)
+  budgets.push({ name: 'kart race from the menu (heaviest track)', keys, limit: KART_RACE_LIMIT, ownLanguage: false })
+}
+
 /**
  * What a game's screen loads after its first paint (promotion's full board, C8, and its layout, C9):
  * its dynamic imports, with their static imports, less what the first screen already has. Reported,
@@ -165,8 +193,6 @@ function withLanguage(keys, game) {
 // 2026-11-21 (docs/KART-PERF.md §7): what a kart page loads before it can show anything (its loading
 // screen and menu), and what its race then fetches: the engine, and each track's own scenery on top.
 // Reported, not limited: all of it is inside the kart's line
-const KART_PAGE = 'src/kart/bots/KartPlay.tsx'
-const KART_ENGINE = 'src/kart/spikeLoop.ts'
 const kartReport = []
 if (manifest[KART_PAGE]) {
   kartReport.push({ name: 'first screen of /kart', keys: withLanguage(collectAll([...entries, KART_PAGE])).keys })

@@ -25,16 +25,13 @@ import {
   terrainOf,
 } from '../../shared/kart/terrain.ts'
 import { buildTrackArt, isNightTrack, themeOf, type TrackArt } from './art/trackArt.ts'
-import {
-  addKartLights,
-  buildStreetLights,
-  createNightKit,
-  headlightLevel,
-  type KartLights,
-} from './art/nightLights.ts'
+import type { KartLights } from './art/nightLights.ts'
+import { headlightLevel } from './art/headlights.ts'
+import { loadedFeatures } from './art/trackFeatures.ts'
 import { QUALITY, type Quality } from './quality.ts'
 import { BODY_DETAIL } from './art/bodyDetail.ts'
-import { nextResolution, startResolution } from './resolution.ts'
+import { releaseSharedTextures } from './art/sharedTextures.ts'
+import { nextResolution, SHED_SECONDS, startResolution } from './resolution.ts'
 import { createKartEffects, type KartEffects } from './art/effects.ts'
 import { buildKartEnvironment } from './art/kartParts.ts'
 import { createPost, type PostFrame } from './post.ts'
@@ -219,6 +216,12 @@ export interface KartScene {
   stats(): RenderStats
   /** The last frame's draw calls and triangles alone, without allocating */
   drawn(): { readonly calls: number; readonly triangles: number }
+  /**
+   * 2026-11-23 (docs/KART-PERF.md §11): held (the race paused: nothing moves), `draw` draws one more
+   * frame and then none until the canvas changes size or the hold ends; the picture behind the pause
+   * menu stays as it was, and the GPU rests
+   */
+  hold(held: boolean): void
   /** Frees everything on the GPU and takes the canvas out of the page */
   dispose(): void
 }
@@ -247,6 +250,10 @@ export function createKartScene(
     antialias: settings.antialias && postLevel === 'off',
     powerPreference: 'high-performance',
   })
+  // 2026-11-23 (docs/KART-PERF.md §11): a shader first needed mid-race (an item's, a hit's) is not
+  // waited for to read its log: asking stalls the frame until the GPU has built it (tens of ms on a
+  // phone). `npm run dev` (and the browser tests run on it) still checks every shader
+  if (import.meta.env.PROD) renderer.debug.checkShaderErrors = false
   const topRatio = Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO, settings.pixelRatio)
   renderer.setPixelRatio(topRatio)
   // 2026-11-20 (resolution.ts): fewer pixels when the frames cannot keep up; not where the processor
@@ -339,13 +346,16 @@ export function createKartScene(
   const effects = createKartEffects(scene, kart, false, finish.glow)
   // 2026-11-20 (§4.47): at night the lamps light the road: the headlights (a real light on this
   // kart on high), the tail lamps' glow, the street lamps' pools
-  const nightKit = track && isNightTrack(track) ? createNightKit() : null
+  // (2026-11-23: their code is fetched with the track's parts, trackFeatures.ts)
+  const night = track && isNightTrack(track) ? (loadedFeatures(track)?.night ?? null) : null
+  const nightKit = night?.createNightKit() ?? null
   const lightLevel = headlightLevel(quality, software)
-  const ownLights: KartLights | null = nightKit ? addKartLights(kart, lightLevel, nightKit) : null
+  const ownLights: KartLights | null =
+    night && nightKit ? night.addKartLights(kart, lightLevel, nightKit) : null
   const otherLights = new Map<number, KartLights>()
   const streetLights =
-    track && nightKit
-      ? buildStreetLights(
+    track && night && nightKit
+      ? night.buildStreetLights(
           track,
           nightKit,
           track.id !== 'oldstreet',
@@ -410,6 +420,7 @@ export function createKartScene(
   /** Draws the frame: developed (post.ts) where the quality has it, else straight to the screen */
   const present = (boost: number, frameSeconds: number, shimmer: boolean) => {
     renderer.info.reset()
+    stale = false
     if (!post) {
       renderer.render(scene, camera)
       return
@@ -457,9 +468,13 @@ export function createKartScene(
   // The boost's wider view is motion: not for a viewer who asked for less (read live, it can change)
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
 
+  // Held (`hold`), and whether the canvas has changed since the last frame drawn
+  let held = false
+  let stale = true
   const resize = () => {
     const { clientWidth: width, clientHeight: height } = container
     if (width === 0 || height === 0) return
+    stale = true
     renderer.setSize(width, height)
     post?.resize()
     camera.aspect = width / height
@@ -475,9 +490,20 @@ export function createKartScene(
     const next = nextResolution(resolution, frameSeconds)
     const changed = next.ratio !== resolution.ratio
     resolution = next
+    // Still too slow with the fewest pixels: the edges' smoothing goes, once (post.ts)
+    if (post?.smoothed && next.starved >= SHED_SECONDS) {
+      post.shed()
+      resolution = { ...next, starved: 0 }
+    }
     if (!changed) return
     renderer.setPixelRatio(next.ratio)
     resize()
+  }
+  /** Held and drawn already: nothing to draw (and nothing counted) */
+  const resting = () => {
+    if (!held || stale) return false
+    renderer.info.reset()
+    return true
   }
   const observer = new ResizeObserver(resize)
   observer.observe(container)
@@ -490,6 +516,7 @@ export function createKartScene(
     rendererName,
     canvas: renderer.domElement,
     draw(pose, chased, frameSeconds, look = STILL) {
+      if (resting()) return
       const { x, z, heading } = pose
       const lift = liftOf(pose, Math.abs(look.speed), 'own')
       car.position.set(x, 0, z)
@@ -572,6 +599,7 @@ export function createKartScene(
       tune(frameSeconds)
     },
     watch(pose, chased, frameSeconds, overhead) {
+      if (resting()) return
       const { x, z } = pose
       car.visible = false
       if (terrain) {
@@ -608,6 +636,12 @@ export function createKartScene(
       }
       present(motion ? rig.boost : 0, frameSeconds, false)
       tune(frameSeconds)
+    },
+    hold(on) {
+      if (on === held) return
+      held = on
+      // The first frame held is drawn, and the first one after
+      stale = true
     },
     view(view) {
       looking = view
@@ -661,10 +695,10 @@ export function createKartScene(
           scene.add(model.group)
           otherEffects.set(other.id, createKartEffects(scene, model, true, finish.glow))
           // Only this kart carries a real light: the others' beams are pools
-          if (nightKit) {
+          if (night && nightKit) {
             otherLights.set(
               other.id,
-              addKartLights(model, lightLevel === 'spot' ? 'pool' : lightLevel, nightKit),
+              night.addKartLights(model, lightLevel === 'spot' ? 'pool' : lightLevel, nightKit),
             )
           }
         }
@@ -726,6 +760,7 @@ export function createKartScene(
     }),
     dispose() {
       observer.disconnect()
+      releaseSharedTextures(renderer, scene)
       for (const geometry of [groundGeometry, grid.geometry, wallGeometry]) {
         geometry.dispose()
       }
