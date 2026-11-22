@@ -238,6 +238,40 @@ const Tile = styled(Card)<{ $hue: string }>`
   height: 100%;
   padding: ${space.md}px;
   box-shadow: inset 0 3px 0 ${color.accent};
+  transition: translate 0.2s;
+
+  /* 2026-11-23: the game's hue rising from the bottom, and lifted with a neon edge on hover */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      0deg,
+      color-mix(in srgb, ${color.accent} 16%, transparent),
+      transparent 70%
+    );
+    pointer-events: none;
+  }
+
+  &:hover,
+  &:focus-within {
+    translate: 0 -${space.xs}px;
+  }
+
+  &:hover::before,
+  &:focus-within::before {
+    box-shadow: inset 0 0 0 1px ${color.accent};
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover,
+    &:focus-within {
+      translate: none;
+    }
+  }
 
   @media (max-width: 480px) {
     padding: ${space.sm}px;

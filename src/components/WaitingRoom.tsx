@@ -1,19 +1,20 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 import { getGameCard } from '../../shared/games/lobby.ts'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import type { LobbyChat } from '../kart/lobby/KartLobby.tsx'
-import { monoType } from '../styles/esports.ts'
+import { memberName } from '../lib/memberName.ts'
+import { clippedFill, cornerClip, displayType, monoType, slantClip } from '../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
-import { FreeSeatRow } from './FreeSeatRow.tsx'
+import { Avatar } from './Avatar.tsx'
 import { GameSetup } from './GameSetup.tsx'
 import { DissolveButton, SeatedGateButton } from './HostControls.tsx'
 import { MemberEntry } from './MemberEntry.tsx'
 import { QrCode } from './QrCode.tsx'
-import { Actions, Heading, List, Muted, Row, SeatNumber, Section } from './roomParts.ts'
+import { Actions, Heading, List, Muted, Row, Section } from './roomParts.ts'
 import { useToast } from './useToast.ts'
 
 export interface WaitingRoomProps {
@@ -170,19 +171,48 @@ export function WaitingRoom({
       <Column>
         <Section>
           <Heading>{t('room.waiting.seats')}</Heading>
-          <List>
+          {/* 2026-11-23: a card per seat, a player's name plate; free seats wait in the same grid */}
+          <SeatGrid>
             {seats.map((seat) => {
               const member = seated.find((other) => other.seat === seat)
-              return member ? (
-                <Row key={seat} $mark={seatColor(seat)}>
-                  <SeatNumber>{t('room.waiting.seat', { seat: seat + 1 })}</SeatNumber>
-                  {entry(member)}
-                </Row>
-              ) : (
-                <FreeSeatRow key={seat} seat={seat} onSit={onSit} />
+              if (!member) {
+                return (
+                  <SeatCard key={seat} $tint={seatColor(seat)} $state="free">
+                    <SeatTag>{t('room.waiting.seat', { seat: seat + 1 })}</SeatTag>
+                    <FreeMark aria-hidden="true" />
+                    <Muted>{t('room.waiting.empty')}</Muted>
+                    <Button
+                      $variant="secondary"
+                      $size="sm"
+                      aria-label={t('room.waiting.sitIn', { seat: seat + 1 })}
+                      onClick={() => onSit(seat)}
+                    >
+                      {t('room.waiting.sit')}
+                    </Button>
+                  </SeatCard>
+                )
+              }
+              const state: SeatState =
+                member.ready || member.bot ? 'ready' : member.host ? 'host' : 'seated'
+              return (
+                <SeatCard
+                  key={seat}
+                  $tint={seatColor(seat)}
+                  $state={state}
+                  $away={!member.online && !member.bot}
+                  data-you={member.id === you ? '' : undefined}
+                >
+                  <SeatTag>{t('room.waiting.seat', { seat: seat + 1 })}</SeatTag>
+                  <Avatar
+                    name={memberName(member, view.room.gameId)}
+                    tint={seatColor(seat)}
+                    size={56}
+                  />
+                  <Plate>{entry(member)}</Plate>
+                </SeatCard>
               )
             })}
-          </List>
+          </SeatGrid>
         </Section>
 
         {spectators.length > 0 && (
@@ -325,6 +355,171 @@ const Layout = styled.div`
   @media (min-width: 900px) {
     grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
   }
+
+  /*
+   * A wide screen fills one page (2026-11-23): the seats and the start bar on the left; the
+   * invitation beside the game's setup and the chat, two columns on the right
+   */
+  @media (min-width: 1280px) {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.65fr);
+
+    & > :last-child {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+
+      & > :first-child {
+        grid-row: span 4;
+      }
+    }
+  }
+`
+
+// Two to a row on a phone, as many as fit on a wide screen
+const SeatGrid = styled.ul`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(136px, 100%), 1fr));
+  gap: ${space.sm}px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @media (max-width: 599px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+`
+
+type SeatState = 'free' | 'seated' | 'host' | 'ready'
+
+const seatEdge = (state: SeatState) =>
+  state === 'ready'
+    ? `inset 0 0 0 2px ${color.success}, inset 0 0 ${space.xl}px color-mix(in srgb, ${color.success} 22%, transparent)`
+    : state === 'host'
+      ? `inset 0 0 0 2px ${color.accent}`
+      : state === 'free'
+        ? `inset 0 0 0 1px ${color.border}`
+        : `inset 0 0 0 1px ${color.line}`
+
+const settle = keyframes`
+  from {
+    opacity: 0;
+    translate: 0 ${space.sm}px;
+  }
+`
+
+/**
+ * A seat as a player card (2026-11-23): the seat's number on a slanted tag, a big hexagon avatar in
+ * the seat's colour, the name plate with its badges. Ready (and a computer player) is a green frame
+ * and glow, the host the hue's frame; each also says so in words (MemberEntry's badges)
+ */
+const SeatCard = styled.li<{ $tint: string; $state: SeatState; $away?: boolean }>`
+  ${(p) => clippedFill(cornerClip(14), p.$state === 'free' ? 'transparent' : color.sunken)}
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: ${space.sm}px;
+  min-height: 176px;
+  padding: ${space.xxl}px ${space.md}px ${space.md}px;
+  text-align: center;
+  animation: ${settle} 0.3s ease-out both;
+
+  &::before {
+    box-shadow: ${(p) => seatEdge(p.$state)};
+    ${(p) =>
+      p.$state === 'free'
+        ? `background: repeating-linear-gradient(-76deg, ${color.raised} 0 6px, transparent 6px 14px);`
+        : ''}
+  }
+
+  /* The seat's colour along the top */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 3px;
+    background: ${(p) => p.$tint};
+    opacity: ${(p) => (p.$state === 'free' ? 0.4 : 1)};
+  }
+
+  & > [aria-hidden='true'] {
+    opacity: ${(p) => (p.$away ? 0.45 : 1)};
+  }
+
+  /* A phone: a row each, the avatar beside the name plate, so that six seats fit a screen or two */
+  @media (max-width: 599px) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: 0;
+    padding: ${space.sm}px ${space.md}px ${space.md}px;
+    text-align: start;
+
+    & > span:first-child {
+      position: static;
+      flex-basis: 100%;
+      justify-self: start;
+      margin-right: auto;
+    }
+
+    & > [aria-hidden='true'] {
+      width: 40px !important;
+      height: 40px !important;
+    }
+
+    & > div,
+    & > p {
+      flex: 1;
+      justify-items: start;
+    }
+
+    & > div > span {
+      justify-content: start;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`
+
+const SeatTag = styled.span`
+  ${clippedFill(slantClip(8), color.raised)}
+  position: absolute;
+  top: ${space.sm}px;
+  left: ${space.sm}px;
+  padding: 0 ${space.md}px;
+  ${monoType}
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
+`
+
+// An empty seat's place for an avatar: a hexagon's outline
+const FreeMark = styled.span`
+  width: 56px;
+  height: 56px;
+  background: ${color.border};
+  clip-path: polygon(
+    25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%,
+    5% 50%, 28% 94%, 72% 94%, 95% 50%, 72% 6%, 28% 6%, 5% 50%, 0 50%
+  );
+`
+
+// The name plate: name, badges, the host's controls, centred under the avatar
+const Plate = styled.div`
+  display: grid;
+  justify-items: center;
+  gap: ${space.xs}px;
+  width: 100%;
+  min-width: 0;
+
+  & > span:first-child {
+    ${displayType}
+    font-size: ${fontSize.lg}px;
+  }
+
+  & > span {
+    justify-content: center;
+    margin-left: 0;
+  }
 `
 
 const Column = styled.div`
@@ -340,8 +535,14 @@ const StartBar = styled.div`
   justify-content: space-between;
   gap: ${space.md}px;
   padding: ${space.lg}px;
-  background: ${color.sunken};
-  box-shadow: inset 0 0 0 1px ${color.line};
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, ${color.accent} 12%, ${color.sunken}),
+    ${color.sunken}
+  );
+  box-shadow:
+    inset 0 2px 0 ${color.accent},
+    inset 0 0 0 1px ${color.line};
 `
 
 // The room's id, big and mono, as people read it out to each other
