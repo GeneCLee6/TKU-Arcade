@@ -5,6 +5,7 @@
 // TextEncoder, btoa and atob.
 import { CODE_PATTERN, MAX_CODE_CHARS } from './codeShape.ts'
 import {
+  BOOM_SPANS,
   BYPASS_FEATURES,
   LIMITS,
   PAD_PLACES,
@@ -31,6 +32,9 @@ type PieceTuple =
   // 2026-11-22: a banked bend ('b', a turn and its lean) and a straight over or under ('o')
   | readonly ['b', number, number, number, number, number, number]
   | readonly ['o', number, number, number, number, number]
+  // 2026-11-23: a boom ('g': length, width, span, period, phase) and a sliding container ('c')
+  | readonly ['g', number, number, number, number, number]
+  | readonly ['c', number, number, number, number]
 
 const padIndex = (pad: PadPlace) => PAD_PLACES.indexOf(pad)
 
@@ -58,6 +62,17 @@ function pieceTuple(piece: Piece): PieceTuple {
       return ['u', tenth(piece.length), tenth(piece.rise), tenth(piece.width), pad, boxes]
     case 'jump':
       return ['j', tenth(piece.length), tenth(piece.height), tenth(piece.width)]
+    case 'boom':
+      return [
+        'g',
+        tenth(piece.length),
+        tenth(piece.width),
+        BOOM_SPANS.indexOf(piece.span),
+        tenth(piece.period),
+        tenth(piece.phase),
+      ]
+    case 'slider':
+      return ['c', tenth(piece.length), tenth(piece.width), tenth(piece.period), tenth(piece.phase)]
   }
 }
 
@@ -185,6 +200,19 @@ function readPiece(value: unknown): Piece | null {
     if (length === null || rise === null || Math.abs(rise) < LIMITS.minOverpassRise) return null
     if (width === null || !more) return null
     return { kind: 'overpass', length, rise, width, ...more }
+  }
+  // 2026-11-23: the moving obstacles; the phase within the period
+  if ((value[0] === 'g' && value.length === 6) || (value[0] === 'c' && value.length === 5)) {
+    const boom = value[0] === 'g'
+    const length = numberIn(value[1], LIMITS.minObstacle, LIMITS.maxLength)
+    const width = numberIn(value[2], LIMITS.minWidth, LIMITS.maxWidth)
+    const span = boom && Number.isInteger(value[3]) ? BOOM_SPANS[value[3] as number] : undefined
+    const period = numberIn(value[boom ? 4 : 3], LIMITS.minObstaclePeriod, LIMITS.maxObstaclePeriod)
+    const phase = numberIn(value[boom ? 5 : 4], 0, LIMITS.maxObstaclePeriod)
+    if (length === null || width === null || period === null || phase === null) return null
+    if (phase >= period || (boom && span === undefined)) return null
+    const base = { length, width, period, phase, pad: 'none' as const, boxes: false }
+    return boom ? { kind: 'boom', ...base, span: span! } : { kind: 'slider', ...base }
   }
   if (value[0] === 'j' && value.length === 4) {
     const length = numberIn(value[1], LIMITS.minJump, LIMITS.maxJump)

@@ -24,7 +24,17 @@ import { lineGrid, LINE_BACK, LINE_PLACES, LINE_SOLO_ACROSS } from '../startLine
 import { KART_RADIUS } from '../walls.ts'
 import { specHash } from './codec.ts'
 import { layout, pieceLength, wrapAngle, type Laid } from './layout.ts'
-import { BYPASS_EASE, LIMITS, type Bypass, type Piece, type TrackSpec } from './spec.ts'
+import {
+  BYPASS_EASE,
+  hasObstacle,
+  LIMITS,
+  type BoomPiece,
+  type Bypass,
+  type Piece,
+  type SliderPiece,
+  type TrackSpec,
+} from './spec.ts'
+import { inObstacle, placeObstacle, type Obstacle, type ObstacleJson } from '../obstacles.ts'
 
 /** The loop is closed when the last piece ends this near the start, facing this near its way */
 export const CLOSE_GAP = 2.5
@@ -62,6 +72,9 @@ export type ProblemCode =
   // long enough to lean in and out
   | 'crossing'
   | 'bank'
+  // 2026-11-23 (obstacles.ts): a moving obstacle kept off a crossing, the start and the grid, and
+  // off every respawn point; at most LIMITS.maxObstacles of them
+  | 'obstacle'
 
 export interface Problem {
   readonly code: ProblemCode
@@ -273,6 +286,98 @@ function bypassFeature(
   return { road: laidBy.road, walls: [] }
 }
 
+/** Steps of the race clock in `seconds` */
+const steps = (seconds: number) => Math.round(seconds * 60)
+/** An obstacle stays this far along the road from the start line ahead of it, and the grid behind */
+export const OBSTACLE_START_CLEAR = 60
+export const OBSTACLE_GRID_CLEAR = 40
+/** ... and this far from a respawn point (a kart put back there is in the clear) */
+const OBSTACLE_RESPAWN_CLEAR = 4
+
+/**
+ * The obstacle a piece carries (2026-11-23), at road point `at` where the road is `width` wide: its
+ * timings in the race clock's steps from the piece's seconds. A boom is down 35% of its cycle (four
+ * seconds at the most) and warned a fifth of it before (a second at the most); a container slides
+ * across in a tenth of its cycle (1.2 s at the most), warned before each slide, sized to leave a
+ * kart's way round it at either end
+ */
+export function obstacleOfPiece(
+  piece: BoomPiece | SliderPiece,
+  at: number,
+  width: number,
+): ObstacleJson {
+  const half = width / 2
+  if (piece.kind === 'boom') {
+    const period = steps(piece.period)
+    const reach = half + 1
+    return {
+      kind: 'boom',
+      at,
+      from: piece.span === 'right' ? 0 : -reach,
+      to: piece.span === 'left' ? 0 : reach,
+      period,
+      shift: steps(piece.phase) % period,
+      closed: Math.max(30, Math.min(240, Math.round(period * 0.35))),
+      warn: Math.max(30, Math.min(60, Math.round(period * 0.2))),
+    }
+  }
+  // An even number of steps: the slide there and the slide back take half each
+  const period = Math.round(steps(piece.period) / 2) * 2
+  const size = Math.round(Math.min(12, half * 0.7) * 10) / 10
+  const reach = Math.floor((half - 3 - size / 2) * 10) / 10
+  return {
+    kind: 'slider',
+    at,
+    length: 6.1,
+    size,
+    a: -reach,
+    b: reach,
+    period,
+    shift: steps(piece.phase) % period,
+    move: Math.max(30, Math.min(72, Math.round(period * 0.1))),
+    warn: Math.max(30, Math.min(48, Math.round(period * 0.08))),
+  }
+}
+
+type GateLine = { readonly ax: number; readonly az: number; readonly bx: number; readonly bz: number }
+
+/**
+ * The gates and respawn points with each whose respawn stands in an obstacle's way moved forwards
+ * along the road to the first point clear of it (2026-11-23), as `gatesClearOfCrossings` does
+ */
+function gatesClearOfObstacles(
+  road: readonly RoadPoint[],
+  gates: readonly GateLine[],
+  respawns: readonly Spot[],
+  obstacles: readonly Obstacle[],
+): { gates: GateLine[]; respawns: Spot[] } {
+  if (obstacles.length === 0) return { gates: [...gates], respawns: [...respawns] }
+  const blocked = (x: number, z: number) =>
+    obstacles.some((obstacle) => inObstacle(obstacle, x, z, OBSTACLE_RESPAWN_CLEAR))
+  const outGates = [...gates]
+  const outRespawns = [...respawns]
+  respawns.forEach((respawn, k) => {
+    // The finish line (gate 0) stays: the start is kept clear of obstacles anyway
+    if (k === 0 || !blocked(respawn.x, respawn.z)) return
+    let index = road.findIndex((point) => point.x === respawn.x && point.z === respawn.z)
+    if (index < 0) return
+    for (let tries = 0; tries < 12 && blocked(road[index]!.x, road[index]!.z); tries++) {
+      index = (index + 1) % road.length
+    }
+    const point = road[index]!
+    const direction = roadDirection(road, index)
+    const half = point.width / 2
+    outGates[k] = {
+      ax: point.x + direction.dz * half,
+      az: point.z - direction.dx * half,
+      bx: point.x - direction.dz * half,
+      bz: point.z + direction.dx * half,
+    }
+    outRespawns[k] = { x: point.x, z: point.z, heading: headingOf(direction) }
+  })
+  return { gates: outGates, respawns: outRespawns }
+}
+
 /** The track the spec makes, under its own id (`custom-<hash>`), and everything wrong with it */
 export function buildSpec(spec: TrackSpec): Built {
   const pieces: readonly Piece[] = spec.pieces
@@ -413,16 +518,44 @@ export function buildSpec(spec: TrackSpec): Built {
   const forked =
     branches.length > 0 ? gatesClearOf(road, along.gates, along.respawns, branches) : along
   // ... and off any crossing (2026-11-22): a road that never crosses itself keeps them as they were
-  const { gates, respawns } =
+  const crossed =
     levels.length > 0 ? gatesClearOfCrossings(road, forked.gates, forked.respawns) : forked
+
+  // The moving obstacles (2026-11-23): each piece's at its middle, kept off a crossing, the start
+  // and the grid; the respawn points moved off them
+  const obstacles: ObstacleJson[] = []
+  const obstaclePieces: number[] = []
+  pieces.forEach((piece, index) => {
+    const mid = mids[index]!
+    if (!hasObstacle(piece) || mid < 0) return
+    obstacles.push(obstacleOfPiece(piece, mid, road[mid]!.width))
+    obstaclePieces.push(index)
+  })
+  if (obstacles.length > LIMITS.maxObstacles) {
+    problems.push({ code: 'obstacle', pieces: obstaclePieces.slice(LIMITS.maxObstacles) })
+  }
+  const placed = obstacles.map((json) => placeObstacle(road, json))
+  placed.forEach((obstacle, k) => {
+    const d = at[obstacle.json.at] ?? 0
+    const nearStart = d < OBSTACLE_START_CLEAR || total - d < LINE_BACK + OBSTACLE_GRID_CLEAR
+    const onCrossing = levels.length > 0 && inZone(levels, obstacle.x, obstacle.z, ZONE_PAD + 10)
+    if (nearStart || onCrossing) problems.push({ code: 'obstacle', pieces: [obstaclePieces[k]!] })
+  })
+  const { gates, respawns } = gatesClearOfObstacles(road, crossed.gates, crossed.respawns, placed)
+  respawns.forEach((respawn) => {
+    const k = placed.findIndex((obstacle) =>
+      inObstacle(obstacle, respawn.x, respawn.z, OBSTACLE_RESPAWN_CLEAR),
+    )
+    if (k >= 0) problems.push({ code: 'obstacle', pieces: [obstaclePieces[k]!] })
+  })
   const padSpots: [number, number][] = []
   const boxes: { x: number; z: number }[] = []
   pieces.forEach((piece, index) => {
     const mid = mids[index]!
     if (mid < 0) return
     const width = road[mid]!.width
-    // A jump has neither: a car flies over them
-    if (piece.kind === 'jump') return
+    // A jump has neither: a car flies over them; nor has an obstacle's piece (2026-11-23)
+    if (piece.kind === 'jump' || hasObstacle(piece)) return
     if (piece.pad !== 'none') {
       const across = piece.pad === 'left' ? -width / 4 : piece.pad === 'right' ? width / 4 : 0
       padSpots.push([mid, across])
@@ -463,6 +596,7 @@ export function buildSpec(spec: TrackSpec): Built {
     decor: [],
     ...(laid.jumps.length > 0 ? { jumps: laid.jumps } : {}),
     ...(branches.length > 0 ? { branches } : {}),
+    ...(obstacles.length > 0 ? { obstacles: obstacles.slice(0, LIMITS.maxObstacles) } : {}),
   }
   // A crossing's zone (2026-11-22): whatever parseTrack finds there names the crossing's pieces
   if (levels.length > 0 && problems.length === 0) {
