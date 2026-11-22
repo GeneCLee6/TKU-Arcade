@@ -206,6 +206,25 @@ describe('WebSocket upgrades across instances', () => {
     expect(closed).toEqual([{ code: CloseCode.tooManyConnections, reason: 'too many connections' }])
     expect(fetch).toHaveBeenCalledTimes(1)
   })
+
+  // 2026-11-22: a deploy drops every socket at once; a room behind one address comes back together
+  it('coming back after a drop (resume) have an allowance of their own once that is spent', async () => {
+    const { env, fetch } = setup(1)
+    const plain = new URL(upgrade().url)
+    const resume = new URL(`${plain.href}&resume=1`)
+    const comeBack = () =>
+      new Request(resume, {
+        headers: { Upgrade: 'websocket', 'cf-connecting-ip': '198.51.100.7' },
+      })
+    await handleRoomSocket(upgrade(), env, plain)
+    expect(await (await handleRoomSocket(comeBack(), env, resume)).text()).toBe('upgraded')
+    expect(fetch).toHaveBeenCalledTimes(2)
+    // That one is spent too: refused like any other
+    await handleRoomSocket(comeBack(), env, resume).catch(() => null)
+    expect(closed).toEqual([{ code: CloseCode.tooManyConnections, reason: 'too many connections' }])
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(SHARED_LIMITS.resume).toBeGreaterThan(SHARED_LIMITS.socket)
+  })
 })
 
 describe('sockets per address in a room', () => {

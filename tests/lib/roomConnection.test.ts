@@ -8,7 +8,11 @@ import {
 } from '../../shared/protocol.ts'
 import {
   connectRoom,
+  FIRST_CONNECT_GIVE_UP_MS,
+  MAX_QUEUED,
   PROBE_TIMEOUT_MS,
+  QUEUE_TTL_MS,
+  RATE_LIMITED_DELAY_MS,
   reconnectDelay,
   REPLY_TIMEOUT_MS,
   RECONNECT_ATTEMPT_TIMEOUT_MS,
@@ -30,6 +34,8 @@ function handlers() {
     onChat: vi.fn(),
     onEnd: vi.fn(),
     onUnanswered: vi.fn(),
+    onResumed: vi.fn(),
+    onUnsent: vi.fn(),
   } satisfies RoomHandlers
 }
 
@@ -603,11 +609,16 @@ describe('reconnecting', () => {
       expect(sockets()).toBe(1)
     })
 
-    it('ignores them on a first connection that failed', () => {
-      connectRoom(ROOM, 'Al', handlers())
+    // 2026-11-22: a first connection that failed is tried again too (FIRST_CONNECT_GIVE_UP_MS)
+    it('tries a first connection that failed again, at once', () => {
+      vi.useFakeTimers()
+      const h = handlers()
+      connectAndTrack(ROOM, h)
       FakeWebSocket.last.serverClose(1006)
       window.dispatchEvent(new Event('online'))
-      expect(sockets()).toBe(1)
+      expect(sockets()).toBe(2)
+      expect(h.onReconnecting).not.toHaveBeenCalled()
+      expect(h.onEnd).not.toHaveBeenCalled()
     })
   })
 
@@ -721,8 +732,13 @@ describe('reconnecting', () => {
       vi.useFakeTimers()
       const { h, socket, connection } = welcomed()
       socket.gone = true
-      expect(connection.send(action)).toBe(false)
+      // The tap waits for the new socket (2026-11-22)
+      expect(connection.send(action)).toBe(true)
       expect(h.onReconnecting).toHaveBeenCalledOnce()
+      vi.advanceTimersByTime(0)
+      FakeWebSocket.last.open()
+      FakeWebSocket.last.receive(welcome({}))
+      expect(FakeWebSocket.last.sent.at(-1)).toBe(JSON.stringify(action))
     })
   })
 
@@ -734,7 +750,6 @@ describe('reconnecting', () => {
       [CloseCode.roomNotFound, 'notFound'],
       [CloseCode.versionMismatch, 'versionMismatch'],
       [CloseCode.roomFull, 'full'],
-      [CloseCode.tooManyConnections, 'tooManyConnections'],
       [CloseCode.replaced, 'replaced'],
       [CloseCode.badMessage, 'disconnected'],
     ])('%i ends as %s, with nothing left running', (code, end) => {
@@ -747,6 +762,36 @@ describe('reconnecting', () => {
       window.dispatchEvent(new Event('online'))
       vi.advanceTimersByTime(RECONNECT_GIVE_UP_MS)
       expect(sockets()).toBe(2)
+    })
+
+    // 2026-11-22: before, a 4429 ended it, and a room coming back after a deploy could all end so
+    it('4429 is a pause, not an end: the next attempt waits RATE_LIMITED_DELAY_MS, waking or not', () => {
+      const { h, attempt } = attempting()
+      attempt.serverClose(CloseCode.tooManyConnections)
+      expect(h.onEnd).not.toHaveBeenCalled()
+      window.dispatchEvent(new Event('online'))
+      vi.advanceTimersByTime(RATE_LIMITED_DELAY_MS - 1)
+      expect(sockets()).toBe(2)
+      vi.advanceTimersByTime(1)
+      expect(sockets()).toBe(3)
+      FakeWebSocket.last.open()
+      FakeWebSocket.last.receive(welcome({}))
+      expect(h.onView).toHaveBeenCalledOnce()
+    })
+
+    it('ends as tooManyConnections when 4429 is still the answer after 5 minutes', () => {
+      const { h } = dropped(CloseCode.tooManyConnections)
+      for (let waited = 0; waited <= RECONNECT_GIVE_UP_MS; waited += RATE_LIMITED_DELAY_MS) {
+        vi.advanceTimersByTime(RATE_LIMITED_DELAY_MS)
+        FakeWebSocket.last.serverClose(CloseCode.tooManyConnections)
+      }
+      expect(h.onEnd).toHaveBeenCalledExactlyOnceWith('tooManyConnections')
+    })
+
+    it('asks the site for its allowance for coming back (resume), only after a drop', () => {
+      const { attempt } = attempting()
+      expect(FakeWebSocket.instances[0].url).not.toContain('resume')
+      expect(attempt.url).toBe(`ws://${window.location.host}${roomSocketPath(ROOM)}&resume=1`)
     })
 
     it('treats a 44xx this page does not know as an end too', () => {
@@ -802,18 +847,62 @@ describe('reconnecting', () => {
   })
 
   describe('sending', () => {
-    it('says it could not while waiting, and while an attempt has not been welcomed', () => {
-      const { connection, attempt } = (() => {
-        const room = dropped()
-        expect(room.connection.send({ t: 'start' })).toBe(false)
-        vi.advanceTimersByTime(1_000)
-        FakeWebSocket.last.open()
-        return { ...room, attempt: FakeWebSocket.last }
-      })()
-      attempt.sent.length = 0
+    // 2026-11-22: taps made while reconnecting wait for the new socket, rather than being lost
+    it('keeps what is sent while waiting, and sends it, in order, once welcomed', () => {
+      const { connection, h } = dropped()
+      expect(connection.send({ t: 'ready', ready: true })).toBe(true)
+      vi.advanceTimersByTime(0)
+      const attempt = FakeWebSocket.last
+      attempt.open()
+      expect(connection.send({ t: 'start' })).toBe(true)
+      expect(attempt.sent.filter((data) => !data.includes('"join"'))).toEqual([])
+      attempt.receive(welcome({}))
+      expect(attempt.sent.slice(-2)).toEqual([
+        JSON.stringify({ t: 'ready', ready: true }),
+        JSON.stringify({ t: 'start' }),
+      ])
+      expect(h.onUnsent).not.toHaveBeenCalled()
+    })
 
+    it('gives up what waited longer than QUEUE_TTL_MS, and says how many', () => {
+      const { connection, h } = dropped()
+      // The first attempt fails; the next one is a second later
+      vi.advanceTimersByTime(0)
+      FakeWebSocket.last.serverClose(1006)
+      connection.send({ t: 'start' })
+      vi.advanceTimersByTime(QUEUE_TTL_MS + 1)
+      FakeWebSocket.last.open()
+      connection.send({ t: 'ready', ready: true })
+      FakeWebSocket.last.receive(welcome({}))
+      expect(h.onUnsent).toHaveBeenCalledExactlyOnceWith(1)
+      expect(FakeWebSocket.last.sent.at(-1)).toBe(JSON.stringify({ t: 'ready', ready: true }))
+      expect(FakeWebSocket.last.sent.join()).not.toContain('start')
+    })
+
+    it('keeps at most MAX_QUEUED, and nothing after the end', () => {
+      const { connection } = dropped()
+      for (let i = 0; i < MAX_QUEUED; i++) expect(connection.send({ t: 'start' })).toBe(true)
       expect(connection.send({ t: 'start' })).toBe(false)
-      expect(attempt.sent).toEqual([])
+      connection.leave()
+      expect(connection.send({ t: 'start' })).toBe(false)
+    })
+
+    it('says it could not before the first welcome', () => {
+      const h = handlers()
+      const connection = connectAndTrack(ROOM, h)
+      FakeWebSocket.last.open()
+      expect(connection.send({ t: 'start' })).toBe(false)
+    })
+
+    it('tells the page to redo its clocks once back, and after the page was hidden', () => {
+      const { attempt, h } = attempting()
+      expect(h.onResumed).not.toHaveBeenCalled()
+      attempt.receive(welcome({}))
+      expect(h.onResumed).toHaveBeenCalledOnce()
+      setVisibility('hidden')
+      vi.advanceTimersByTime(5_000)
+      setVisibility('visible')
+      expect(h.onResumed).toHaveBeenCalledTimes(2)
     })
 
     it('goes out on the new socket once welcomed', () => {
@@ -938,14 +1027,51 @@ describe('leaving and closing', () => {
     [CloseCode.roomFull, 'full'],
     [CloseCode.kicked, 'kicked'],
     [CloseCode.dissolved, 'dissolved'],
-    [CloseCode.stale, 'connectionLost'],
     [CloseCode.badMessage, 'connectionLost'],
-    [1006, 'connectionLost'],
   ])('reads close %i before welcome as %s', (code, end) => {
     const h = handlers()
     connectRoom(ROOM, 'Al', h)
     FakeWebSocket.last.serverClose(code)
     expect(h.onEnd).toHaveBeenCalledExactlyOnceWith(end)
+  })
+
+  // 2026-11-22: before, one failed upgrade ended the page in "Couldn't connect"
+  it.each([[CloseCode.stale], [1006]])(
+    'tries a first connection closed %i again, and reads it as connectionLost after 20 s',
+    (code) => {
+      vi.useFakeTimers()
+      vi.spyOn(Math, 'random').mockReturnValue(0)
+      const h = handlers()
+      connectAndTrack(ROOM, h)
+      FakeWebSocket.last.serverClose(code)
+      expect(h.onEnd).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(0)
+      expect(FakeWebSocket.instances).toHaveLength(2)
+      // The first one that works is a join like any other, no `resume`
+      expect(FakeWebSocket.last.url).not.toContain('resume')
+      // Every attempt fails: the first one at or past 20 s is the last
+      for (let waited = 0; waited < FIRST_CONNECT_GIVE_UP_MS * 2; waited += 500) {
+        if (!FakeWebSocket.last.gone) FakeWebSocket.last.serverClose(code)
+        vi.advanceTimersByTime(500)
+      }
+      expect(h.onEnd).toHaveBeenCalledExactlyOnceWith('connectionLost')
+      expect(FakeWebSocket.instances.length).toBeLessThan(10)
+      expect(h.onReconnecting).not.toHaveBeenCalled()
+      vi.restoreAllMocks()
+    },
+  )
+
+  it('is welcomed on a second try of a first connection as if on the first', () => {
+    vi.useFakeTimers()
+    const h = handlers()
+    connectAndTrack(ROOM, h)
+    FakeWebSocket.last.serverClose(1006)
+    vi.advanceTimersByTime(0)
+    FakeWebSocket.last.open()
+    FakeWebSocket.last.receive(welcome({}))
+    expect(h.onView).toHaveBeenCalledOnce()
+    expect(h.onTimers).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(1)
   })
 
   it.each([
@@ -982,9 +1108,9 @@ describe('leaving and closing', () => {
     expect(localStorage.getItem(SEAT_KEY)).toBe(TOKEN_A)
   })
 
-  it('opens no new socket by itself after a close', () => {
+  it('opens no new socket by itself after a close that ends it', () => {
     connectRoom(ROOM, 'Al', handlers())
-    FakeWebSocket.last.serverClose(1006)
+    FakeWebSocket.last.serverClose(CloseCode.roomNotFound)
     expect(FakeWebSocket.instances).toHaveLength(1)
   })
 })

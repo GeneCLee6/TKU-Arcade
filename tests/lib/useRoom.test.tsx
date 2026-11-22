@@ -328,7 +328,16 @@ describe('reconnecting', () => {
     expect(screen.queryByText(en['room.reconnecting.notSent'])).toBeNull()
 
     act(() => socket.serverClose(1006))
+    // 2026-11-22: it waits for the new socket, and is given up (and said so) only after a while
     fireEvent.click(screen.getByRole('button', { name: 'start' }))
+    expect(screen.queryByText(en['room.reconnecting.notSent'])).toBeNull()
+    act(() => vi.advanceTimersByTime(0))
+    act(() => FakeWebSocket.last.serverClose(1006))
+    act(() => vi.advanceTimersByTime(15_000))
+    act(() => {
+      FakeWebSocket.last.open()
+      FakeWebSocket.last.receive(welcome({}))
+    })
 
     expect(screen.getByText(en['room.reconnecting.notSent'])).toBeInTheDocument()
     expect(socket.sent).toEqual([JSON.stringify({ t: 'start' })])

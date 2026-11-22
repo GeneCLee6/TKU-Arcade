@@ -2,6 +2,7 @@ import { createElement, lazy, Suspense, useEffect, useState, type ReactNode } fr
 import styled from 'styled-components'
 import { isRoomId } from '../../shared/room-id.ts'
 import { AccountControl } from '../components/AccountControl.tsx'
+import { ConnectionBanner } from '../components/ConnectionBanner.tsx'
 import { Button } from '../components/Button.tsx'
 import { GameLayout, RoomChatPanel, type RoomParts } from '../components/GameLayout.tsx'
 import { HowToPlay } from '../components/HowToPlay.tsx'
@@ -223,7 +224,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
     <>
       {/* Always in the page: screen readers only announce changes in a region they already know */}
       <ConnectionStatus aria-live="polite">
-        {session.reconnecting && <ReconnectBanner>{t('room.reconnecting')}</ReconnectBanner>}
+        <ConnectionBanner reconnecting={session.reconnecting} onTryNow={room.reconnectNow} />
       </ConnectionStatus>
       <RoomHeading
         title={gameTitle(t, view.room.gameId)}
@@ -397,14 +398,6 @@ const ConnectionStatus = styled.div`
   &:empty {
     margin-bottom: -${space.lg}px;
   }
-`
-
-const ReconnectBanner = styled.p`
-  padding: ${space.sm}px ${space.md}px;
-  background: ${color.surface};
-  color: ${color.text};
-  border: 1px solid ${color.border};
-  border-left: ${space.xs}px solid ${color.warning};
 `
 
 const HeadingRow = styled.div`

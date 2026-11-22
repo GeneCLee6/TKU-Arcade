@@ -44,6 +44,13 @@ export const SHARED_LIMITS = {
   create: 10,
   /** WebSocket upgrades (/ws/<id>): every one wakes a room, also one that is not there */
   socket: 120,
+  /**
+   * 2026-11-22: upgrades that come back after a drop (`?resume=1`, src/lib/roomConnection.ts), once
+   * `socket` is spent: a deploy drops every socket at once, and a club behind one campus address
+   * coming back together must not be refused (4429) as a flood. A further allowance, not a way
+   * round the limit: a script that says `resume` gets 120 + 240 a minute, no more
+   */
+  resume: 240,
   /** Wrong owner keys, after which the address is locked out for a minute (worker/owner.ts) */
   ownerFail: 5,
 } as const

@@ -118,8 +118,15 @@ export const PROTOCOL_VERSION = 2
 export const HEARTBEAT_PING = 'ping'
 export const HEARTBEAT_PONG = 'pong'
 export const HEARTBEAT_INTERVAL_MS = 15_000
-/** Three missed heartbeats */
-export const STALE_AFTER_MS = 45_000
+/**
+ * Six missed heartbeats (three before 2026-11-22). A tab in the background has its timers slowed by
+ * the browser, Chrome's to once a minute after five minutes hidden: at 45 s the room closed such a
+ * socket every minute or two (`npm run net:soak -- --ping 60`: 72 closes per client-hour), and the
+ * person dropped offline, lost the host and came back, over and over. A dead network is still found
+ * by the page itself in 45 s (three unanswered pings, src/lib/roomConnection.ts), and a socket that
+ * closes properly is gone at once
+ */
+export const STALE_AFTER_MS = 90_000
 /** A socket must send `join` this soon after opening; the next sweep closes it */
 export const JOIN_TIMEOUT_MS = 10_000
 /** How long until a disconnected member is `absent`, and loses the host if they had it (AC-2.3) */
@@ -155,7 +162,8 @@ export const MAX_NAME_CHARS = 16
 
 /**
  * WebSocket close codes the server uses. The browser reconnects after any close but the 44xx ones,
- * except `stale` (a socket the server stopped hearing from, e.g. a phone that slept)
+ * except `stale` (a socket the server stopped hearing from, e.g. a phone that slept) and, since
+ * 2026-11-22, `tooManyConnections` (after a pause: a whole room coming back after a deploy)
  */
 export const CloseCode = {
   /** The browser speaks another protocol version: reload the page */
