@@ -12,6 +12,7 @@ import { KART_FLOW_MESSAGES, type KartFlowKey } from './i18n.flow.ts'
 // Types only: these screens register their own strings (scripts/check-i18n.mjs KART_PARTS)
 import type { KartSchoolKey } from './i18n.school.ts'
 import type { KartChallengeKey } from './i18n.challenge.ts'
+import type { KartBoardKey } from './i18n.board.ts'
 
 const en = {
   'kart.spike.title': 'Kart physics test',
@@ -359,10 +360,15 @@ const en = {
 type KartBaseKey = keyof typeof en | KartRosterKey | KartBotsKey | KartCupKey | KartTouchKey | KartLoadKey | KartMenuKey | KartFlowKey
 
 /**
- * Every kart string's key. The driving school's, the challenges' and the editor's are registered by
+ * Every kart string's key. The driving school's, the challenges', the leaderboard's and the editor's are registered by
  * their own lazy chunks (2026-11-22, docs/KART-PERF.md): only those screens may use them
  */
-export type KartMessageKey = KartBaseKey | KartEditorKey | KartSchoolKey | KartChallengeKey
+export type KartMessageKey =
+  | KartBaseKey
+  | KartEditorKey
+  | KartSchoolKey
+  | KartChallengeKey
+  | KartBoardKey
 
 const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.title': '卡丁車物理測試',

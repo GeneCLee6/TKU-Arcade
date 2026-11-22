@@ -592,6 +592,8 @@ export type MetricName =
   | 'game_finished'
   | `kart_fps_${KartFpsBand}`
   | `kart_load_${KartLoadBand}`
+  /** 2026-11-23 (worker/kartBoard.ts): an upload to the kart's leaderboard; `game` says how it went */
+  | 'board_upload'
 
 export type KartFpsBand = 'under30' | '30to45' | '45to55' | '55up'
 export type KartLoadBand = 'under1s' | '1to3s' | '3to6s' | '6sup'

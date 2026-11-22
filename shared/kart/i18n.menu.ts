@@ -31,6 +31,12 @@ const en = {
   'kart.challenge.open': 'Challenges',
   'kart.challenge.loading': 'Loading the challenge…',
 
+  // The leaderboard (i18n.board.ts): the menu's way in, and the time trial chasing a board's ghost
+  'kart.board.open': 'Leaderboard',
+  'kart.board.opening': 'Loading the leaderboard…',
+  'kart.board.chasing': 'Racing the ghost of {nick} ({time})',
+  'kart.board.stopChase': 'Stop',
+
   // The track editor (i18n.editor.ts): what /kart shows of a shared track
   'kart.editor.open': 'Track editor',
   'kart.editor.editCopy': 'Edit a copy of this track',
@@ -66,6 +72,11 @@ const zhTW: Record<KartMenuKey, string> = {
   // The challenges (i18n.challenge.ts): the menu's way in
   'kart.challenge.open': '挑戰',
   'kart.challenge.loading': '挑戰載入中…',
+
+  'kart.board.open': '排行榜',
+  'kart.board.opening': '排行榜載入中…',
+  'kart.board.chasing': '正在和 {nick} 的幽靈車比（{time}）',
+  'kart.board.stopChase': '停止',
 
   // The track editor (i18n.editor.ts): what /kart shows of a shared track
   'kart.editor.open': '賽道編輯器',
