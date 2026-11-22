@@ -1676,7 +1676,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **測試**：`tests/kart/raceFlow.test.ts`（開場 8 人 ≤ 10 s、亮相 ≤ 6 s、照順序每位車手、鏡頭在車手正前方且最後接上全景、關掉亮相改繞場；倒數音效 3、2、1、GO 各一次且 GO 較亮；完賽倒數音效；伺服器 10 秒後第一個 frame 結束比賽、未完賽依進度排名、看不到的依圈數、壞的 progress 拒絕、玩家不能 close；團隊賽計分；暫停時比賽時鐘與房間時鐘一起停、恢復後不補時間、0 秒的一幀不跑物理；設定預設與逐欄回復、特效上限；頒獎台只放完賽的前三名、揭曉順序與時間、鏡頭、舉獎盃姿勢）；`tests/games/kart.test.ts`、`tests/worker/room-realtime.test.ts`、`tests/kart/roomBots.test.ts`（倒數改 `countdownMs(n)`、close 計時器）；e2e `kart-bots`（亮相卡、Esc 暫停時 tick 不動、設定、繼續後再動、頒獎台後才是結果）、`kart-race`（多人房 Esc 只開選單、完賽倒數、頒獎台、結果）、`kart-cup`（每場與總頒獎台）、`kart-watch-portrait`。
 
-### 4.74 路線圖外：桌遊介面電競化（大廳、等待室、標題列、結果）（2026-11-23，`feat/esports-board-ui`）
+### 4.74 路線圖外：桌遊介面電競化（大廳、等待室、標題列、結果）（2026-11-23，#155，`feat/esports-board-ui`）
 
 樣式規則在 `DESIGN.md` §3.7。程式上：
 
