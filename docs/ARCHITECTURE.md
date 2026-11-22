@@ -1579,6 +1579,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
 - **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
 
+
 ### 4.70 路線圖外：卡丁車等待室滿版（一頁、橫向、車手為主角）（2026-11-22，#151，`feat/kart-lobby-fullscreen`）
 
 擁有者：「大廳準備階段的畫面要像跑跑一樣，全螢幕都是房主跟車手，現在的版面配置很醜也很空曠，要一頁就塞滿，橫向的寬的…總之要電競化專業化」。照規則 1 只學「準備畫面滿版、車手為主角」的類型排版；版面、美術、圖示是自己的（`IP-CHECKLIST.md`）。
@@ -1593,6 +1594,16 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **全螢幕**（§4.69）：上方列的全螢幕鈕（`landscape`：手機進全螢幕順便鎖橫）；「自動全螢幕」打開時，按「準備」或「開始遊戲」就是瀏覽器要的那一下，直接進全螢幕。
 - **字串**：`shared/games/kart/i18n.lobby.ts` 多 9 個（`racers`、`room`、`roomTitle`、`manage`、`quickest`、`yourKart`、`sideways`、`watchingList`、`lineUp`）；`TrackCard` 的「各自為戰」不再寫（團隊賽才寫）。
 - **測試**：`tests/kart/lobby.test.tsx` 多 4 個（房間面板裡的電腦車與自動全螢幕設定、只有房主有管理鈕且能移除電腦車、車手數、3D 來之前的平面圖與最快車）；`e2e/kart-lobby.spec.ts`（新）：1280×720 與 844×390（觸控）房主＋Bob＋6 台電腦車：滾輪不動、等待室沒有捲動、8 格都完整在畫面內且高度 > 畫面 1/3、準備流程、axe 0 serious（含房間設定對話框）、聊天未讀數；等待室全螢幕進出；390×844 直拿是列表＋轉橫提示＋axe。`kart-race`／`kart-loading`／`kart-team`／`kart-editor` 改成從面板操作（房間設定、分隊、空位的加電腦車）。截圖：`KART_LOBBY_SHOTS=1` 時存到 `test-results/kart-lobby-*.png`。
+
+### 4.71 路線圖外：房間連線的穩定度（2026-11-22，`feat/net-stability-bots`，#149）
+
+擁有者：「常常連線不穩。」原因、修法與前後數字在 `docs/NETWORK.md`。架構上的改變：
+
+- **協定**：`STALE_AFTER_MS` 45 → 90 s（背景分頁的 ping 一分鐘一次也不會被關）；頁面自己的「三次 ping 沒回就換」不再綁這個數字。4429 改成可重試的關閉碼（`canReconnectAfter`）。`/ws/<id>?v=2&resume=1`：斷線後的重連嘗試，Worker 在 `socket` 桶用完後再拿 `resume` 桶（240／分）。沒有升版。
+- **頁面**（`connectRoom`）：第一次連線失敗重試 20 s；4429 後至少等 20 s；重連期間 `send` 排隊（16 個、10 s），`welcome` 後送出，逾時的給 `onUnsent`；`send(message, false)` 不排隊（聊天、`set_look`、`leave`、替電腦車送的動作）；`onResumed`（重連 `welcome` 後、頁面隱藏 ≥ 1 s 再出現）→ `RoomRealtime.onResume` → 卡丁車重新對時；`reconnectNow()`；也聽 Page Lifecycle 的 `resume`。
+- **畫面**：`ConnectionBanner.tsx`（1 s 後出現、6 s 後「立刻重試」、回來時「已重新連線。」2.5 s）。
+- **RoomDO**：跑到 `webSocketMessage` 的 `ping` 也記心跳。
+- **工具**：`scripts/net-soak.ts`（`npm run net:soak`）；`e2e/network.spec.ts`。
 
 ## 5. i18n
 
