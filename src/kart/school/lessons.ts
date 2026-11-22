@@ -14,6 +14,7 @@ export const LESSON_IDS = [
   'n2o',
   'start',
   'jump',
+  'landing',
   'gap',
   'final',
 ] as const
@@ -81,6 +82,13 @@ export const LESSONS: Readonly<Record<LessonId, Lesson>> = {
     stars: { by: 'attempts', three: 1, two: 3 },
   },
   jump: { id: 'jump', track: 'wharf', target: 1, tries: true, stars: { by: 'attempts', three: 1, two: 3 } },
+  landing: {
+    id: 'landing',
+    track: 'riverside',
+    target: 1,
+    tries: true,
+    stars: { by: 'attempts', three: 1, two: 3 },
+  },
   gap: { id: 'gap', track: 'lanes', target: 3, tries: true, stars: { by: 'attempts', three: 1, two: 3 } },
   final: {
     id: 'final',

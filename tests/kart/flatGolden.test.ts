@@ -160,9 +160,11 @@ const GOLDEN_ARENA = '72389793'
 // And once more that day (owner: "the N2O fills too slowly: an expert should boost all the way round,
 // a novice not"): the gauge goes by the quality of the drift (a bonus at the exit for an instant
 // boost, by its timing and the combo), it fills in a boost too, and a perfectly timed instant boost
-// is longer and stronger. The hard bot's hands are the same; it is the physics that changed
+// is longer and stronger. The hard bot's hands are the same; it is the physics that changed.
+// Taken again 2026-11-22: the wall slide (walls.ts; docs/KART-FEEL.md §22), a contact at a shallow
+// angle a slide along the wall rather than a hit. The arcade (old) preset has none: its hashes stand
 const CLASSIC_GOLDEN: Record<string, { hash: string; steps: number }> = {
-  harbour: { hash: '81d17129', steps: 7074 },
-  oldstreet: { hash: 'a07e98ae', steps: 6749 },
+  harbour: { hash: 'f18d06b9', steps: 7049 },
+  oldstreet: { hash: '1430ff7b', steps: 6406 },
 }
-const CLASSIC_GOLDEN_ARENA = '481a0bad'
+const CLASSIC_GOLDEN_ARENA = '74e889d4'

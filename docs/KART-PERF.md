@@ -177,3 +177,36 @@ npm run build && node scripts/kart-fps.mjs --base http://localhost:<port> \
 
 - 改了畫面（新賽道、新車、新特效）就跑一次 §1 的指令，前後各一份 JSON，貼到 PR。看 draw calls 與 JS ms；fps 只在同一台、沒有別的工作時才比。
 - **實機**：擁有者手上的手機開 `/kart/spike`，統計面板的 fps、drawing buffer；或接 USB 用 Chrome 的 `chrome://inspect` 看 `__kartSpike.render` 與 `jsMs`。
+
+## 10. 聲音依畫質分級、車身細節（2026-11-22，#145，`feat/kart-wall-slide-landing`）
+
+### 10.1 聲音（#105，`src/kart/audio/tiers.ts`）
+
+WebAudio 的成本在音訊執行緒，手機上和畫面搶 CPU。`AUDIO_TIERS` 照畫質給：
+
+| | 低 | 中 | 高 |
+| --- | --- | --- | --- |
+| 同時的一次性聲音（撞牆、噴射的爆音、變身、道具） | 4 | 8 | 16 |
+| 環境音的持續層（最大聲的幾層） | 1 | 2 | 全部（最多 4） |
+| 偶爾的聲音（海鷗、鈴、路過的車、沖床） | 不響 | 有 | 有 |
+| 引擎、環境音的參數多久動一次 | 每 3 幀 | 每 2 幀 | 每幀 |
+| 引擎的第二支鋸齒波 | 沒有 | 有 | 有 |
+
+超過上限的一次性聲音直接不放（`voiceBudget`，照音訊時鐘算還在響的）；參數本來就是 `setTargetAtTime` 滑過去，每 3 幀動一次聽不出來。低畫質一台車少一個振盪器，河濱的環境音從 2 層變 1 層、鳥叫不排程。觀戰與重播的 `createCuePlayer(quality)` 也照分級。
+
+摩托車的引擎（#108，`kartAudio.ts` 的 `ENGINE_VOICES.bike`）多一個點火脈衝的 LFO 與一個渦輪高音的振盪器（卡丁車沒有），低畫質一樣拿掉第二支鋸齒波。
+
+### 10.2 車身細節（#99，`src/kart/art/bodyDetail.ts`）
+
+低畫質什麼都不載（沒有貼圖、shader 沒有 bump）；中：256 px 的高度圖（面板縫線、螺絲）當 bump map、塗裝貼紙磨損；高：512 px 加刮痕與細顆粒、64 px 的 2/2 斜紋碳纖。一個畫質一張貼圖、整頁共用（所有車都用同一張），GPU 記憶體最多約 0.25 MB。
+
+**量到的成本**（`scripts/kart-fps.mjs`，1280×720@1、河濱、7 台電腦車、正式建置用同一個靜態伺服器輪流量，各兩次；這台機器同時有別的工作，fps 的絕對值會飄）：
+
+| | 中畫質 fps | 高畫質 fps | textures |
+| --- | --- | --- | --- |
+| 沒有細節（同一份程式把 `BODY_DETAIL` 都改成 off） | 66 / 63 | 58 / 56 | 65–69 |
+| 有細節 | 75 / 78 | 73 / 59 | 68–70 |
+
+差別在雜訊之內（有細節的那組反而比較快，是機器負載的起伏）；draw calls、三角形不變（同一個合併後的材質，只多一張貼圖）。chunk：比賽引擎 263.4 → 265.9 kB、`/kart` 首屏 226.1 → 227.0 kB（車庫預覽也用細節，`bodyDetail.ts` 進了選單的 chunk）、卡丁車總量 512.3 → 516.0／600 kB；房間首屏 134.6 kB 不變。
+
+截圖：`node scripts/kart-shots.mjs --quality low|medium|high --views close`（新增的近拍視角）。

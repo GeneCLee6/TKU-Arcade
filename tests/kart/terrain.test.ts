@@ -226,6 +226,39 @@ describe('jumps', () => {
     }
   })
 
+  // 2026-11-22 (docs/KART-FEEL.md §22): the timed landing. The plain landing's flight, flown again
+  // with the throttle let go in the air and pressed afresh at `press` steps from the touch-down
+  function timed(press: number) {
+    const plain = flight(50)
+    let run = plain.runs[plain.off]!
+    const touch = plain.down - plain.off
+    for (let step = 1; step <= touch + 12; step++) {
+      const input = step - touch >= press ? THROTTLE : NO_INPUT
+      run = stepRun(run, input, c)
+      if (step === touch) expect(run.terrainEvent).toBe('landing')
+    }
+    return run.kart
+  }
+
+  it('a fresh press just before or just after the touch-down is a timed landing: a longer boost', () => {
+    for (const press of [-6, -1, 0, 1, 5]) {
+      const kart = timed(press)
+      expect(kart.timedLandings, `press at ${press}`).toBe(1)
+      // In place of the plain landing's boost, not on top of it: what is left of 0.75 s
+      expect(kart.miniSeconds).toBeGreaterThan(TERRAIN_TUNING.landingBoost)
+      expect(kart.miniSeconds).toBeLessThanOrEqual(TERRAIN_TUNING.landingTimedBoost + 1e-9)
+    }
+  })
+
+  it('too early or too late is no timed landing', () => {
+    expect(timed(-12).timedLandings ?? 0).toBe(0)
+    expect(timed(9).timedLandings ?? 0).toBe(0)
+    // Held all through the air: the plain landing's boost, as before
+    const held = flight(50)
+    expect(held.runs[held.down]!.kart.timedLandings ?? 0).toBe(0)
+    expect(held.runs[held.down]!.kart.miniSeconds).toBeCloseTo(TERRAIN_TUNING.landingBoost, 6)
+  })
+
   it('a reset in the air puts the car back on the ground', () => {
     const { runs, off } = flight(45)
     const reset = stepRun(runs[off + 5]!, { ...NO_INPUT, reset: true }, c)

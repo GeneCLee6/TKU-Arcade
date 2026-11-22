@@ -11,7 +11,7 @@ import { createTrackBrain } from '../../src/kart/bots/routes.ts'
 import { BOT_SKILLS, DIFFICULTIES, type Difficulty } from '../../src/kart/bots/skill.ts'
 import { findSlots, wallRuns } from '../../src/kart/art/skillWalls.ts'
 
-// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.67): the lantern alley, the old street's second
+// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.68): the lantern alley, the old street's second
 // shortcut, and the steps into a corner on the harbour and the old street
 
 const oldstreet = raceTrack('oldstreet')!
@@ -50,9 +50,9 @@ function race(track: Track, difficulty: Difficulty | 'master', seed: number) {
   }
 }
 
-describe('the lantern alley (oldstreet@10)', () => {
+describe('the lantern alley (oldstreet@11)', () => {
   it('is a branch of its own off the lantern lane, its doorway one slot in a wall across it', () => {
-    expect(oldstreet.revision).toBe(10)
+    expect(oldstreet.revision).toBe(11)
     expect(oldstreet.forks).toHaveLength(1)
     const fork = oldstreet.forks![0]!
     // Shorter than the road round the corner it cuts

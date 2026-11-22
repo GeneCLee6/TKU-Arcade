@@ -164,6 +164,8 @@ export const DRIVERS: Readonly<Record<DriverId, Driver>> = {
       // People's hands: the computer karts' care at the wall is theirs (2026-11-22, #100)
       wallCare: 0,
       tricks: true,
+      // 2026-11-22: and the timed landing (docs/KART-FEEL.md §22)
+      landTap: true,
     },
     hands: { ...STEADY_HANDS, shake: 0.02 },
   },

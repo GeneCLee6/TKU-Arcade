@@ -199,6 +199,8 @@ export const FLAGSHIP_TRAITS: KartTraits = {
   wallImpactLoss: 1.6,
   wallScrapeDrag: 1.5,
   wallGaugeKeep: 0.4,
+  // 2026-11-22: and it slides along a wall only half as steep (walls.ts): a wall hurts it more
+  wallSlideAngle: 0.5,
 }
 
 /**

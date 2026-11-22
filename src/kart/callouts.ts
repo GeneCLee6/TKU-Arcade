@@ -29,6 +29,8 @@ export type CalloutKind =
   | 'late'
   // 2026-11-19: a drift carried over a jump and landed (shared/kart/terrain.ts)
   | 'driftJump'
+  // 2026-11-22: the throttle pressed afresh just as the kart touched down off a jump (terrain.ts)
+  | 'landing'
 
 export interface Callout {
   readonly kind: CalloutKind
@@ -40,6 +42,8 @@ export interface Callout {
 export function calloutBetween(before: KartState, after: KartState): Callout | undefined {
   // A drift landed off a jump
   if ((after.driftJumps ?? 0) > (before.driftJumps ?? 0)) return { kind: 'driftJump', count: 0 }
+  // A landing timed with the throttle
+  if ((after.timedLandings ?? 0) > (before.timedLandings ?? 0)) return { kind: 'landing', count: 0 }
   // The double says so itself; any other release boost is a chain from the second in a row
   if (after.doubles > before.doubles) return { kind: 'double', count: 0 }
   // The classic feel grades the press: a perfect one says so (and the combo it has reached), a
@@ -102,6 +106,7 @@ const RANK: Record<CalloutKind, number> = {
   perfect: 5,
   late: 3,
   driftJump: 6,
+  landing: 5,
 }
 
 /** Of two callouts in the same frame, the one to show */

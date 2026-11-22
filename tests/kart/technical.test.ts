@@ -26,34 +26,35 @@ const PLAN: Record<
   { key: string; straight: number; was: number; longest: number; jumps: number; hilly: boolean }
 > = {
   riverside: {
-    key: 'riverside@13',
+    key: 'riverside@14',
     straight: 0.35,
     was: 0.36,
     longest: 285,
     jumps: 1,
     hilly: true,
   },
-  // 2026-11-22 (#103): the harbour's step before hairpin 2, the old street's home straight's step
-  harbour: { key: 'harbour@14', straight: 0.34, was: 0.54, longest: 290, jumps: 1, hilly: true },
-  tamkang: { key: 'tamkang@12', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
-  oldstreet: { key: 'oldstreet@10', straight: 0.4, was: 0.6, longest: 340, jumps: 1, hilly: true },
-  guanyin: { key: 'guanyin@8', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
+  // 2026-11-22 (#146): the harbour's step before hairpin 2, the old street's home straight's step
+  harbour: { key: 'harbour@15', straight: 0.34, was: 0.54, longest: 290, jumps: 1, hilly: true },
+  tamkang: { key: 'tamkang@13', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
+  oldstreet: { key: 'oldstreet@11', straight: 0.4, was: 0.6, longest: 340, jumps: 1, hilly: true },
+  guanyin: { key: 'guanyin@9', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
   // 2026-11-18, the four new ones (moreTracks.test.ts has what is their own): at most 30% straight
-  mangrove: { key: 'mangrove', straight: 0.3, was: 0.3, longest: 280, jumps: 0, hilly: false },
-  fort: { key: 'fort@2', straight: 0.3, was: 0.3, longest: 200, jumps: 1, hilly: true },
-  danhai: { key: 'danhai', straight: 0.3, was: 0.3, longest: 220, jumps: 0, hilly: false },
-  datun: { key: 'datun@2', straight: 0.3, was: 0.3, longest: 200, jumps: 2, hilly: true },
+  mangrove: { key: 'mangrove@2', straight: 0.3, was: 0.3, longest: 280, jumps: 0, hilly: false },
+  fort: { key: 'fort@3', straight: 0.3, was: 0.3, longest: 200, jumps: 1, hilly: true },
+  danhai: { key: 'danhai@2', straight: 0.3, was: 0.3, longest: 220, jumps: 0, hilly: false },
+  datun: { key: 'datun@3', straight: 0.3, was: 0.3, longest: 200, jumps: 2, hilly: true },
   // 2026-11-19, the two to learn by heart (skillTracks.test.ts has what is their own): a shortcut
   // is a straight line, so they are straighter than the technical four
   // 2026-11-20: the wharf's shed lane is a branch (branches.ts), its records afresh; then (revision
   // 3) the road round the shed reaches further out and the lane is half as long as it
-  wharf: { key: 'wharf@3', straight: 0.36, was: 0.36, longest: 230, jumps: 2, hilly: true },
-  lanes: { key: 'lanes', straight: 0.4, was: 0.4, longest: 220, jumps: 3, hilly: true },
+  // 2026-11-22: every one raised again for the wall slide and the timed landing (KART-FEEL §22)
+  wharf: { key: 'wharf@4', straight: 0.36, was: 0.36, longest: 230, jumps: 2, hilly: true },
+  lanes: { key: 'lanes@2', straight: 0.4, was: 0.4, longest: 220, jumps: 3, hilly: true },
   // 2026-11-20, the first with branches (branches.test.ts and skillTracks.test.ts have its own)
-  works: { key: 'works', straight: 0.4, was: 0.4, longest: 220, jumps: 1, hilly: true },
+  works: { key: 'works@2', straight: 0.4, was: 0.4, longest: 220, jumps: 1, hilly: true },
   // 2026-11-22, the technical showcase (levels.test.ts has its own): a figure of eight whose two
   // arms run straight over and under each other, so a little straighter than the rest
-  zhuwei: { key: 'zhuwei', straight: 0.44, was: 0.44, longest: 270, jumps: 1, hilly: true },
+  zhuwei: { key: 'zhuwei@2', straight: 0.44, was: 0.44, longest: 270, jumps: 1, hilly: true },
 }
 
 const load = (id: RaceTrackId): Track => raceTrack(id)!

@@ -68,7 +68,7 @@ const releaseWindowOpen = (page: Page) =>
 const quickGauge = (page: Page) =>
   page.addInitScript(() => {
     localStorage.setItem(
-      'tku-arcade.kart.tuning.7',
+      'tku-arcade.kart.tuning.8',
       JSON.stringify({
         kind: 'tku-arcade.kart.tuning',
         version: 2,

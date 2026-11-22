@@ -271,6 +271,28 @@ describe('each lesson’s goal (judgeStep)', () => {
     expect(landed.done).toBe(true)
   })
 
+  it('landing: a timed landing passes; held, too early or too late ends the try, and says which', () => {
+    const flying = (over: Partial<KartState> = {}) => kart({ air: 0.6, airTap: 9, ...over })
+    const down = (over: Partial<KartState> = {}) => kart({ air: 0, landWindow: 0.1, ...over })
+    const timed = run('landing', [step(flying({ airTap: 0.05 }), kart({ air: 0, timedLandings: 1 }))])
+    expect(timed.done).toBe(true)
+    const after = run('landing', [
+      step(flying(), down(), press({ throttle: false })),
+      step(down(), kart({ timedLandings: 1 }), press()),
+    ])
+    expect(after.done).toBe(true)
+    const closes = (input: KartInput, flight: Partial<KartState> = {}) =>
+      run('landing', [
+        step(flying(flight), down(), input),
+        step(down(), kart({ landWindow: 0 }), input),
+      ])
+    const held = closes(press())
+    expect(held.tryOver).toBe(true)
+    expect(held.note).toBe('landHeld')
+    expect(closes(press({ throttle: false })).note).toBe('landLate')
+    expect(closes(press(), { airTap: 0.3 }).note).toBe('landEarly')
+  })
+
   it('gap: through the gates in turn; round a wall ends the try', () => {
     // A road straight up -z (heading 0), two gates 5 m right of the middle
     const gates = [
@@ -343,8 +365,11 @@ describe('each lesson’s goal (judgeStep)', () => {
 })
 
 describe('the lessons and their tracks', () => {
-  it('ten lessons in order, each on a track that checks out', () => {
-    expect(LESSON_IDS).toHaveLength(10)
+  it('eleven lessons in order, each on a track that checks out', () => {
+    // The timed landing came after the drift jump (2026-11-22)
+    expect(LESSON_IDS).toHaveLength(11)
+    expect(nextLesson('jump')).toBe('landing')
+    expect(nextLesson('landing')).toBe('gap')
     expect(nextLesson('drive')).toBe('drift')
     expect(nextLesson('final')).toBeNull()
     for (const json of [SCHOOL_YARD, SCHOOL_TEST]) expect(parseTrack(json)).toHaveProperty('track')
