@@ -1,14 +1,17 @@
-// The full edition's sentences: what a throw makes, what a turn did, where silver went and why. The
-// ones that name cells need the board's data (fullData.ts): the screen asks for them once it is there.
+// The full edition's sentences: what a throw makes, what a turn did. They name cells, so they need the
+// board's data, and come with it (fullData.ts, 2026-11-22); where silver went is in fullMoney.ts.
 import { DISMISSED } from '../../../../shared/games/promotion/fullFaces.ts'
 import type {
   FullLastTurn,
   FullPlayer,
   FullThrow,
-  Transfer,
 } from '../../../../shared/games/promotion/types.ts'
 import type { Language, Translate } from '../../../i18n/t.ts'
 import { anyCell, shortCellName } from './fullText.ts'
+import { degreeText, householdText } from './fullMoney.ts'
+
+export { beforeTransfers, degreeText, householdText, transferText } from './fullMoney.ts'
+export { shortCellName }
 
 const face = (t: Translate, step: string) => t(`games.promotion.full.face.${step}`)
 
@@ -75,23 +78,6 @@ export function comboText(
   }
 }
 
-/** The household a seat was born into */
-export const householdText = (t: Translate, player: FullPlayer, short = false): string =>
-  t(
-    player.banner
-      ? short
-        ? 'games.promotion.full.bannerShort'
-        : 'games.promotion.full.banner'
-      : short
-        ? 'games.promotion.full.civilianShort'
-        : 'games.promotion.full.civilian',
-  )
-
-export const degreeText = (t: Translate, player: FullPlayer): string => {
-  const degree = t(`games.promotion.full.degree.${player.degree}`)
-  return player.wu ? `${degree}, ${t('games.promotion.full.wu')}` : degree
-}
-
 /** What the turn did, once it is all shown: born, moved (through where), or stayed */
 export function turnSentence(
   t: Translate,
@@ -146,33 +132,6 @@ export function lastComboText(t: Translate, last: FullLastTurn, language: Langua
     return t(thrown.combo === 'cancel' ? 'games.promotion.full.combo.cancelStay' : 'games.promotion.full.combo.noMove')
   }
   return comboText(t, thrown, last.birth, language)
-}
-
-export function transferText(t: Translate, transfer: Transfer, nameOf: (seat: number) => string): string {
-  const party = (seat: number | null) => (seat === null ? t('games.promotion.full.bank') : nameOf(seat))
-  return t('games.promotion.full.transfer', {
-    from: party(transfer.from),
-    to: party(transfer.to),
-    amount: transfer.amount,
-    why: t(`games.promotion.full.why.${transfer.why}`),
-  })
-}
-
-/** Each seat's silver and the pot before a turn's transfers: what to show until they play */
-export function beforeTransfers(
-  players: readonly FullPlayer[],
-  bank: number,
-  transfers: readonly Transfer[],
-): { money: Map<number, number>; bank: number } {
-  const money = new Map(players.map((player) => [player.seat, player.money]))
-  let pot = bank
-  for (const { from, to, amount } of transfers) {
-    if (from === null) pot += amount
-    else money.set(from, (money.get(from) ?? 0) + amount)
-    if (to === null) pot -= amount
-    else money.set(to, (money.get(to) ?? 0) - amount)
-  }
-  return { money, bank: pot }
 }
 
 /** Each seat's grade for the ladder (品級考), as the end compares it: honorary titles add (C8) */

@@ -85,7 +85,7 @@ export const ItemSlot = memo(function ItemSlot({
 }: ItemSlotProps) {
   const full = item !== null
   return (
-    <Dock $centred={centred}>
+    <Dock $centred={centred} data-item-dock="">
       {/* Keyed by the item: each one arriving plays the drop again */}
       <Slot key={item ?? 'empty'} data-testid="kart-item" data-item={item ?? ''} $full={full}>
         <Frame $full={full}>{item && <ItemIcon item={item} />}</Frame>

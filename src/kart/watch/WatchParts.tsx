@@ -47,7 +47,7 @@ export function WatchedPanel({ t, name, place, total, detail }: WatchedPanelProp
 export function WatchedItem({ t, item }: { t: Translate; item: ItemId | null | undefined }) {
   if (item === undefined) return null
   return (
-    <div role="group" aria-label={t('games.kart.watch.item')}>
+    <div role="group" aria-label={t('games.kart.watch.item')} data-watched-item="">
       <ItemSlot t={t} item={item} />
     </div>
   )
@@ -143,6 +143,42 @@ export const MapCorner = styled.div`
   top: ${space.sm}px;
   right: ${space.sm}px;
   pointer-events: none;
+`
+
+/**
+ * The top of a watch page: whose kart (TopLeft), what it holds (WatchedItem) and the map (MapCorner),
+ * in that order. Nothing of its own on a wide screen, where each places itself as before. A phone held
+ * upright (2026-11-22, as the race since #140, docs/ARCHITECTURE.md §4.64): one column down the left,
+ * the item slot in the middle of the screen under the panel and the map on the left under it, so
+ * none of them can cover another however many lines the panel has (a replay's notes, a team race)
+ */
+export const WatchTop = styled.div`
+  display: contents;
+
+  @media (max-width: 560px) and (orientation: portrait) {
+    position: absolute;
+    top: ${space.sm}px;
+    left: ${space.sm}px;
+    right: ${space.sm}px;
+    display: grid;
+    justify-items: start;
+    gap: ${space.sm}px;
+    pointer-events: none;
+
+    & > * {
+      position: static;
+      max-width: 100%;
+    }
+
+    & > [data-watched-item] {
+      justify-self: center;
+    }
+
+    & [data-item-dock] {
+      position: static;
+      translate: none;
+    }
+  }
 `
 
 export const Note = styled.p`
