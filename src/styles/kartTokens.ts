@@ -105,6 +105,8 @@ export const kartEditor = {
   pad: '#22D3EE',
   box: '#FFA62B',
   arrow: '#F9FAFB',
+  /** 2026-11-23: a barrier's line and a container's stretch (shared/kart/obstacles.ts) */
+  obstacle: '#F472B6',
 } as const
 
 /**

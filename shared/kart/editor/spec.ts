@@ -78,7 +78,36 @@ export interface Overpass extends PieceBase {
   readonly rise: number
 }
 
-export type Piece = Straight | Turn | Slope | Jump | Overpass
+/**
+ * 2026-11-23 (#150): a straight with a moving obstacle at its middle (shared/kart/obstacles.ts).
+ * A boom comes down across the whole road or one half of it, once each `period` seconds, `phase`
+ * seconds into its cycle at GO; a container slides from one side of the road to the other and back
+ * once each `period`. No boost pad or item boxes on either: the obstacle has the middle
+ */
+export const BOOM_SPANS = ['full', 'left', 'right'] as const
+export type BoomSpan = (typeof BOOM_SPANS)[number]
+
+export interface BoomPiece extends PieceBase {
+  readonly kind: 'boom'
+  readonly length: number
+  readonly span: BoomSpan
+  /** Seconds */
+  readonly period: number
+  readonly phase: number
+}
+
+export interface SliderPiece extends PieceBase {
+  readonly kind: 'slider'
+  readonly length: number
+  readonly period: number
+  readonly phase: number
+}
+
+export type Piece = Straight | Turn | Slope | Jump | Overpass | BoomPiece | SliderPiece
+
+/** Whether a piece carries a moving obstacle (2026-11-23) */
+export const hasObstacle = (piece: Piece): piece is BoomPiece | SliderPiece =>
+  piece.kind === 'boom' || piece.kind === 'slider'
 
 /** The jump ramp's length, from the road to its lip, metres */
 export const RAMP_LENGTH = 14
@@ -162,6 +191,12 @@ export const LIMITS = {
   /** Metres up or down, either way */
   minOverpassRise: 3.5,
   maxOverpassRise: 9,
+  // Moving obstacles (2026-11-23, obstacles.ts)
+  minObstacle: 40,
+  /** A cycle, seconds; the phase is within it */
+  minObstaclePeriod: 3,
+  maxObstaclePeriod: 20,
+  maxObstacles: 16,
 } as const
 
 /** Rounds to the tenth that every number in a spec is kept to */
@@ -197,6 +232,26 @@ export const overpass = (
   width = 36,
   more: Partial<PieceBase> = {},
 ): Overpass => ({ kind: 'overpass', length, rise, width, pad: 'none', boxes: false, ...more })
+
+/** A straight with a boom across it (2026-11-23) */
+export const boomPiece = (
+  length = 80,
+  width = 36,
+  span: BoomSpan = 'full',
+  period = 8,
+  phase = 0,
+): BoomPiece => ({ kind: 'boom', length, width, span, period, phase, pad: 'none', boxes: false })
+
+/** A straight with a container sliding across it (2026-11-23) */
+export const sliderPiece = (length = 80, width = 36, period = 6, phase = 0): SliderPiece => ({
+  kind: 'slider',
+  length,
+  width,
+  period,
+  phase,
+  pad: 'none',
+  boxes: false,
+})
 
 export const jump = (length = 80, height = 2.5, width = 36): Jump => ({
   kind: 'jump',

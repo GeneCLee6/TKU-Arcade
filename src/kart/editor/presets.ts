@@ -1,9 +1,11 @@
 // e10-t07: the editor's piece library. Each button adds one piece or a few (an S-bend is two), all of
 // them ordinary pieces that can be changed afterwards; the road keeps the width it had.
 import {
+  boomPiece,
   jump,
   overpass,
   slope,
+  sliderPiece,
   straight,
   turn,
   type Piece,
@@ -88,4 +90,12 @@ export const PRESETS: readonly Preset[] = [
     label: 'kart.editor.preset.bankedRight',
     make: (w) => [turn(90, 70, w, { bank: 10 })],
   },
+  // 2026-11-23 (#150, shared/kart/obstacles.ts): the moving obstacles, each on a straight of its own
+  { id: 'boom', label: 'kart.editor.preset.boom', make: (w) => [boomPiece(80, w, 'full', 8, 0)] },
+  {
+    id: 'boomHalf',
+    label: 'kart.editor.preset.boomHalf',
+    make: (w) => [boomPiece(80, w, 'left', 6, 0)],
+  },
+  { id: 'slider', label: 'kart.editor.preset.slider', make: (w) => [sliderPiece(80, w, 6, 0)] },
 ]

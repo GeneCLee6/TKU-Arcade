@@ -101,3 +101,31 @@ test('a race room on a track from the editor: pasted by the host, raced by two',
     ann.getByRole('region', { name: 'Results' }).getByText(/Finished in \d:\d\d\.\d{3}/),
   ).toHaveCount(2)
 })
+
+// 2026-11-23 (#150): the moving obstacles in the editor: a barrier and a sliding container added
+// from the library, their cycle set, drawn on the map, and refused at the start
+test('barriers and sliding containers from the library, on the map, kept off the start', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.addInitScript(() => localStorage.setItem('tku-arcade.language', 'en'))
+  await page.goto('/kart/editor')
+  await expect(page.getByTestId('kart-editor-ok')).toBeVisible()
+  const pieces = page.getByTestId('kart-editor-pieces').locator('li')
+  // The back straight (piece 5) selected: a barrier goes in after it, then a container
+  await pieces.nth(4).getByRole('button').click()
+  await page.getByTestId('kart-editor-add-boomHalf').click()
+  await expect(page.getByTestId('kart-editor-span')).toHaveValue('left')
+  await page.getByTestId('kart-editor-period').fill('5')
+  await page.getByTestId('kart-editor-period').press('Tab')
+  await expect(pieces.nth(5)).toContainText('Barrier on the left, 80 m, every 5 s')
+  await page.getByTestId('kart-editor-add-slider').click()
+  await expect(pieces.nth(6)).toContainText('Sliding container')
+  // The loop is open now; the editor closes it again
+  await page.getByTestId('kart-editor-close').click()
+  await expect(page.getByTestId('kart-editor-ok')).toBeVisible()
+  await expect(page.getByTestId('kart-editor-obstacle')).toHaveCount(2)
+  // One before the first piece, at the start line: refused, and the piece named
+  await pieces.nth(5).getByRole('button').click()
+  for (let step = 0; step < 5; step++) await page.getByRole('button', { name: 'Move up', exact: true }).click()
+  await expect(pieces.first()).toContainText('Barrier')
+  await expect(page.getByTestId('kart-editor-problems')).toContainText('start')
+})
