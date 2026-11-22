@@ -138,6 +138,7 @@ const en = {
   'kart.callout.perfectCombo': 'Perfect! Combo ×{count}',
   'kart.callout.late': 'Late',
   'kart.callout.driftJump': 'Drift jump!',
+  'kart.callout.landing': 'Timed landing!',
   'kart.hud.combo': 'Combo ×{count}',
   'kart.hud.gain': '+{value}',
   'kart.hud.gainSaid': 'Gauge up {value}',
@@ -274,6 +275,7 @@ const en = {
   'kart.param.wallGaugeKeep': 'Gauge kept after a crash',
   'kart.param.model': 'Physics (0 arcade, 1 classic)',
   'kart.param.wallBounce': 'Wall bounce',
+  'kart.param.wallSlideAngle': 'Wall slide angle',
   'kart.param.wallImpactLoss': 'Speed lost in a crash',
   'kart.param.wallScrapeDrag': 'Slowing along a wall',
 
@@ -479,6 +481,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.callout.perfectCombo': '完美！連段 ×{count}',
   'kart.callout.late': '太晚',
   'kart.callout.driftJump': '甩尾起跳！',
+  'kart.callout.landing': '落地時機噴！',
   'kart.hud.combo': '連段 ×{count}',
   'kart.hud.gain': '+{value}',
   'kart.hud.gainSaid': '加速條增加 {value}',
@@ -614,6 +617,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'kart.param.wallGaugeKeep': '撞牆後保留的集氣',
   'kart.param.model': '物理（0 街機、1 經典）',
   'kart.param.wallBounce': '撞牆反彈',
+  'kart.param.wallSlideAngle': '貼牆滑行角度',
   'kart.param.wallImpactLoss': '撞牆掉速',
   'kart.param.wallScrapeDrag': '擦牆減速',
 

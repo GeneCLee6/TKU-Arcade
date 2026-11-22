@@ -31,6 +31,11 @@ export interface BotSkill {
    * line asks for. Without it the safe line, lifting before a jump into a corner
    */
   readonly tricks?: boolean
+  /**
+   * The timed landing (2026-11-22, shared/kart/terrain.ts): off the throttle in the air and on it
+   * again the moment the kart is down, for the timed landing's longer boost. Script drivers only
+   */
+  readonly landTap?: boolean
   /** Steps between seeing the road and the hands answering (1/60 s each) */
   readonly reactionSteps: number
   /**

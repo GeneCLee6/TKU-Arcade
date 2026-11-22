@@ -42,6 +42,8 @@ const VIEWS = {
   side: { orbit: 1.5, back: 3.4, up: 1.0 },
   front: { orbit: 2.55, back: 3.2, up: 1.5 },
   top: { orbit: 0.2, back: 2.2, up: 5.5 },
+  // 2026-11-22: close in on the body, for its fine detail (art/bodyDetail.ts)
+  close: { orbit: 1.1, back: 1.6, up: 0.9 },
 }
 
 mkdirSync(out, { recursive: true })

@@ -47,7 +47,7 @@ export const zhTW: Messages = {
   'lobby.quick.kartRace': '卡丁車：對戰電腦',
   'lobby.quick.kartRaceHint': '在這台裝置上跑，自己選賽道',
   'lobby.quick.kartSchool': '卡丁車：駕訓班',
-  'lobby.quick.kartSchoolHint': '十堂短課，一堂一招',
+  'lobby.quick.kartSchoolHint': '十一堂短課，一堂一招',
   'lobby.quick.school': '開始上課',
   'lobby.join.submit': '加入',
   'lobby.minutes': '約 {minutes} 分鐘',

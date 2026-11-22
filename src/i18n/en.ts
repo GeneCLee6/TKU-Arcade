@@ -52,7 +52,7 @@ export const en = {
   'lobby.quick.kartRace': 'Kart: race the computer',
   'lobby.quick.kartRaceHint': 'On this device, pick a track',
   'lobby.quick.kartSchool': 'Kart: driving school',
-  'lobby.quick.kartSchoolHint': 'Ten short lessons, one move each',
+  'lobby.quick.kartSchoolHint': 'Eleven short lessons, one move each',
   'lobby.quick.school': 'Start a lesson',
   'lobby.minutes': 'About {minutes} min',
   'lobby.newRoom': 'New room',

@@ -232,7 +232,8 @@ export const ZHUWEI: TrackJson = {
   id: 'zhuwei',
   // A working name (2026-11-22): the owner settles it (docs/KART-WORLD.md §6)
   name: { en: 'Zhuwei Flyover', 'zh-TW': '竹圍高架' },
-  revision: 1,
+  // 2: the wall slide and the timed landing (2026-11-22, docs/KART-FEEL.md §22)
+  revision: 2,
   theme: 'sunset',
   laps: 3,
   road,

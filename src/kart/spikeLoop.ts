@@ -22,7 +22,7 @@ import {
 } from './records.ts'
 import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
-import { DEFAULT_KART, kartMass, kartRadius, type DriverId, type KartId } from '../../shared/kart/karts.ts'
+import { DEFAULT_KART, kartKind, kartMass, kartRadius, type DriverId, type KartId } from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { courseOf, recordKey, type Track } from '../../shared/kart/track.ts'
 import { spikeTrack, type SpikeCourse } from './courses.ts'
@@ -98,6 +98,7 @@ import { claimMusic } from './audio/musicPlayer.ts'
 import { sectionFor } from './audio/sequencer.ts'
 import { songFor } from './audio/songs.ts'
 import { createAmbience } from './audio/ambiencePlayer.ts'
+import { audioTier } from './audio/tiers.ts'
 import { isNightTrack } from './art/trackArt.ts'
 import { gestureAt, type DriverGesture } from './driverGestures.ts'
 
@@ -549,7 +550,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     options.body,
     options.driver,
   )
-  const audio = createKartAudio()
+  // 2026-11-22: a bike's own engine, and as much sound as the quality has (audio/tiers.ts)
+  const audio = createKartAudio({ quality: options.quality, kind: kartKind(kartId) })
   // 2026-11-20 (§4.46): the track's song, by the race's part, and the world around the track
   const music = claimMusic(true)
   const song = songFor(track)
@@ -560,6 +562,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
           track,
           { x: (finishLine.ax + finishLine.bx) / 2, z: (finishLine.az + finishLine.bz) / 2 },
           isNightTrack(track),
+          audioTier(options.quality),
         )
       : null
   let crossingsHeard = 0

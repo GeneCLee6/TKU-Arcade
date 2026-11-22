@@ -96,6 +96,9 @@ export type Note =
   | 'jumpNoDrift'
   | 'jumpShallow'
   | 'jumpLetGo'
+  | 'landHeld'
+  | 'landEarly'
+  | 'landLate'
   | 'gapAround'
   | 'gapWall'
   | 'timeUp'
@@ -242,6 +245,8 @@ export interface Judge {
   readonly gate: number
   /** The kart's place along the next gate's way at the last step */
   readonly along: number | null
+  /** The timed landing: the throttle was pressed afresh in this flight, too soon to time it */
+  readonly landEarly?: boolean
 }
 
 export const startJudge = (): Judge => ({
@@ -286,6 +291,8 @@ export interface JudgeContext {
 export const REFILL_POINTS = 8
 /** Standing still this long in the race is being stuck, steps */
 const STUCK_STEPS = 120
+/** A press of the throttle in the air is seen in `airTap` below this many seconds (terrain.ts caps it at 9) */
+const AIR_PRESS_SEEN = 8
 /** How long after GO a start is settled: the late grace, and the time a late press is told in */
 const startSettled = (tuning: KartTuning) =>
   Math.ceil((tuning.startLate + START_LATE_TELL) / STEP_SECONDS) + 1
@@ -354,7 +361,8 @@ export function judgeStep(
   // The instant boost
   const seen = watchDash(next.dash, sample, tuning)
   next = { ...next, dash: seen.watch }
-  const dashLessons = lesson.id !== 'drive' && lesson.id !== 'jump' && lesson.id !== 'gap'
+  const dashLessons =
+    lesson.id !== 'drive' && lesson.id !== 'jump' && lesson.id !== 'gap' && lesson.id !== 'landing'
   for (const event of dashLessons ? seen.events : []) {
     if (event.kind === 'unearned') next = noted(next, event.why, steps)
     if (event.kind === 'missed' && lesson.id !== 'drift') next = noted(next, event.why, steps)
@@ -419,6 +427,20 @@ export function judgeStep(
     }
     if ((after.driftJumps ?? 0) > (before.driftJumps ?? 0)) {
       next = counted(next, next.count + 1, lesson, steps)
+    }
+  }
+
+  // The timed landing (2026-11-22): a fresh press of the throttle just as the kart touches down
+  if (lesson.id === 'landing') {
+    const landed = (before.air ?? 0) > 0 && (after.air ?? 0) === 0
+    if ((after.timedLandings ?? 0) > (before.timedLandings ?? 0)) {
+      next = counted({ ...next, landEarly: false }, next.count + 1, lesson, steps)
+    } else if (landed && (after.landWindow ?? 0) > 0) {
+      // Down, and still time to press: was it pressed in the air already?
+      next = { ...next, landEarly: (before.airTap ?? Infinity) < AIR_PRESS_SEEN }
+    } else if ((before.landWindow ?? 0) > 0 && (after.landWindow ?? 0) === 0) {
+      const why = next.landEarly ? 'landEarly' : input.throttle ? 'landHeld' : 'landLate'
+      return { ...noted({ ...next, landEarly: false }, why, steps), tryOver: true }
     }
   }
 
@@ -497,6 +519,7 @@ export type LiveHint =
   | 'keepDrifting'
   | 'wait'
   | 'holdNow'
+  | 'landNow'
 
 export function liveHint(
   lesson: Lesson,
@@ -509,6 +532,8 @@ export function liveHint(
     return countdown > 1 ? 'wait' : 'holdNow'
   }
   if (lesson.id === 'drive' || lesson.id === 'gap') return null
+  // The timed landing: in the air, get ready to press
+  if (lesson.id === 'landing') return (kart.air ?? 0) > 0 ? 'landNow' : null
   if (lesson.id === 'n2o' && kart.boostSeconds > 0) return 'keepDrifting'
   if (lesson.id === 'n2o' && kart.storedBoosts > 0) return 'fire'
   if (kart.drifting && !kart.burstReady) return lesson.id === 'jump' ? null : 'deeper'

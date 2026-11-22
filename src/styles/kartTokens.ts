@@ -336,6 +336,20 @@ export const kartParts = {
 } as const
 
 /**
+ * The bodies' fine detail (2026-11-22, art/bodyDetail.ts): a height map, so these are greys, not
+ * colours: the panel at mid height, the seams between panels sunk, a screw's rim sunk round a raised
+ * head, and the scratches of wear a little raised. And the wear on a livery decal, the paint gone
+ */
+export const kartDetail = {
+  panel: '#808080',
+  seam: '#303030',
+  screwRim: '#4A4A4A',
+  screwHead: '#B8B8B8',
+  scratch: '#9A9A9A',
+  wear: '#000000',
+} as const
+
+/**
  * A night track's light (2026-11-20, nightLights.ts): the headlights' beam and its pool on the road,
  * the tail lamps' glow behind, the street lamps (a sodium-warm head on a dark post) and their pools,
  * and the old street's lantern light pooled on the paving

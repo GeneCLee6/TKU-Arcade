@@ -232,7 +232,7 @@ export default function ReplayView({
     }))
     const hitEffects = fxEvents.flatMap((event) => effectsOf(event))
     // #86: and the items sound around the kart followed, while it plays through them
-    const player = createCuePlayer()
+    const player = createCuePlayer(loadQuality())
     const stopUnlock = unlockOnGesture(player)
     let lastMs: number | null = null
     /** The playhead as the last frame left it: moved since, it was dragged or jumped */

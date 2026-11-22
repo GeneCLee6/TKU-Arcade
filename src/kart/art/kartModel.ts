@@ -59,6 +59,7 @@ import {
   type BoostKind,
   type BoostReading,
 } from '../boostFx.ts'
+import { bodyDetailTexture, wearDecal, type BodyDetailLevel } from './bodyDetail.ts'
 import { buildDriver } from './driverModel.ts'
 import { blendPose, gesturePose, REST, type DriverGesture, type GesturePose } from '../driverGestures.ts'
 import { buildKartBody } from './vehicleBodies.ts'
@@ -163,6 +164,11 @@ export interface KartFinish {
    * developed afterwards (post.ts), which turns the excess into a glow
    */
   readonly glow?: number
+  /**
+   * The body's fine detail by the quality (2026-11-22, bodyDetail.ts): seams, screws and worn
+   * decals on medium, the scratches, the grain and the fine twill too on high; none when left out
+   */
+  readonly detail?: BodyDetailLevel
 }
 
 /** 2026-11-20 (docs/KART-PERF.md): what a model keeps besides its full self */
@@ -350,6 +356,7 @@ export function buildKartModel(
   const colours = kartBodies[body]
   const environment = finish.environment ?? null
   const bright = finish.glow ?? 1
+  const detailLevel: BodyDetailLevel = ghost ? 'off' : (finish.detail ?? 'off')
   const geometries: BufferGeometry[] = []
   const materials: Material[] = []
   const textures: Texture[] = []
@@ -406,7 +413,7 @@ export function buildKartModel(
   // 2026-11-20 (docs/KART-PERF.md): every paint of a moving part drawn as one (kartParts.ts's flatten)
   let paintAll: Material | undefined
   if (!carbon) {
-    const weave = carbonTexture()
+    const weave = carbonTexture(detailLevel === 'high')
     textures.push(weave)
     const woven = own(
       new MeshStandardMaterial({
@@ -426,7 +433,7 @@ export function buildKartModel(
       env: environment ? 0.9 : 0,
       woven: true,
     })
-    paintAll = own(createPaintMaterial(environment, weave))
+    paintAll = own(createPaintMaterial(environment, weave, bodyDetailTexture(detailLevel)))
   }
   const glowColour = new Color(colours.glow)
   const core = lit(colours.glow)
@@ -462,10 +469,14 @@ export function buildKartModel(
     if (made) return made
     const map =
       kind === 'number'
-        ? decalTexture(128, 64, (context, width, height) =>
-            paintNumber(context, width, height, DRIVER_NUMBERS[driverId], kartDrivers[driverId].crest),
-          )
-        : decalTexture(64, 64, (context, size) => paintMark(context, size, body, colours.accent))
+        ? decalTexture(128, 64, (context, width, height) => {
+            paintNumber(context, width, height, DRIVER_NUMBERS[driverId], kartDrivers[driverId].crest)
+            if (detailLevel !== 'off') wearDecal(context, width, height, Number.parseInt(DRIVER_NUMBERS[driverId], 10) || 7)
+          })
+        : decalTexture(64, 64, (context, size) => {
+            paintMark(context, size, body, colours.accent)
+            if (detailLevel !== 'off') wearDecal(context, size, size, body.length * 31)
+          })
     textures.push(map)
     const material = own(
       new MeshStandardMaterial({

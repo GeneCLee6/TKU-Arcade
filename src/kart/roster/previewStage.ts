@@ -18,6 +18,8 @@ import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
 import { kartParts, kartThemes } from '../../styles/kartTokens.ts'
 import { loadBodies } from '../art/bodyLoad.ts'
 import { buildKartModel, type KartModel } from '../art/kartModel.ts'
+import { BODY_DETAIL } from '../art/bodyDetail.ts'
+import { loadQuality } from '../quality.ts'
 import { bodyReady } from '../art/vehicleBodies.ts'
 import { buildKartEnvironment } from '../art/kartParts.ts'
 import type { DriverGesture } from '../driverGestures.ts'
@@ -184,7 +186,11 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
       scene.remove(model.group)
       model.dispose()
     }
-    model = buildKartModel(false, false, kart, driver, { environment })
+    model = buildKartModel(false, false, kart, driver, {
+      environment,
+      // 2026-11-22: the garage shows the body up close: its fine detail, as the race's quality has it
+      detail: BODY_DETAIL[loadQuality()],
+    })
     scene.add(model.group)
   }
 

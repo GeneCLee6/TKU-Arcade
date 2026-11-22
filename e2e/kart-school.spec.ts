@@ -23,7 +23,7 @@ test('/kart suggests the driving school the first time, and its menu opens it', 
   await invite.getByTestId('kart-school-invite-go').click()
   const school = page.getByTestId('kart-school')
   await expect(school).toBeVisible()
-  await expect(school.getByRole('listitem')).toHaveCount(10)
+  await expect(school.getByRole('listitem')).toHaveCount(11)
   await expect(page).toHaveURL(/school/)
   // Back on /kart the suggestion, once answered, is gone; the menu still has the school
   await page.getByTestId('kart-school-exit').click()

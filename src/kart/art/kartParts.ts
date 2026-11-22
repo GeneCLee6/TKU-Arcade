@@ -35,6 +35,7 @@ import {
   type Texture,
   type WebGLRenderer,
 } from 'three'
+import { DETAIL_BUMP } from './bodyDetail.ts'
 import { kartParts } from '../../styles/kartTokens.ts'
 
 // ── The environment the paint reflects ──────────────────────────────────────────────────────────
@@ -91,8 +92,12 @@ export function buildKartEnvironment(
   return target.texture
 }
 
-/** A carbon weave: a small tile of two threads over and under each other, repeated */
-export function carbonTexture(): CanvasTexture {
+/**
+ * A carbon weave: a small tile of two threads over and under each other, repeated. `fine` (the high
+ * quality, 2026-11-22, bodyDetail.ts): a 2/2 twill on a tile twice the size, each tow with its sheen
+ */
+export function carbonTexture(fine = false): CanvasTexture {
+  if (fine) return twillTexture()
   const size = 32
   const canvas = document.createElement('canvas')
   canvas.width = size
@@ -121,6 +126,44 @@ export function carbonTexture(): CanvasTexture {
   const texture = new CanvasTexture(canvas)
   texture.wrapS = RepeatWrapping
   texture.wrapT = RepeatWrapping
+  texture.colorSpace = SRGBColorSpace
+  return texture
+}
+
+/** The fine weave: tows two over two under, stepping one along each row, each lit along its length */
+function twillTexture(): CanvasTexture {
+  const size = 64
+  const tows = 8
+  const step = size / tows
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const context = canvas.getContext('2d')
+  if (context) {
+    context.fillStyle = kartParts.carbon
+    context.fillRect(0, 0, size, size)
+    for (let row = 0; row < tows; row++) {
+      for (let column = 0; column < tows; column++) {
+        // Two over, two under, the pattern one tow along on each row: the twill's diagonal
+        const upright = (column + row) % 4 < 2
+        const x = column * step
+        const y = row * step
+        const gradient = upright
+          ? context.createLinearGradient(x, 0, x + step, 0)
+          : context.createLinearGradient(0, y, 0, y + step)
+        gradient.addColorStop(0, kartParts.carbon)
+        gradient.addColorStop(0.45, kartParts.carbonThread)
+        gradient.addColorStop(0.55, kartParts.carbonThread)
+        gradient.addColorStop(1, kartParts.carbon)
+        context.fillStyle = gradient
+        context.fillRect(x, y, step, step)
+      }
+    }
+  }
+  const texture = new CanvasTexture(canvas)
+  texture.wrapS = RepeatWrapping
+  texture.wrapT = RepeatWrapping
+  texture.repeat.set(0.5, 0.5)
   texture.colorSpace = SRGBColorSpace
   return texture
 }
@@ -422,7 +465,12 @@ const paintOf = (material: Material): PaintLook | undefined =>
  * metalness, glow, reflection and weave: the same shading as a MeshStandardMaterial of each
  * (three.js's own shader, with those numbers read per vertex rather than per material)
  */
-export function createPaintMaterial(environment: Texture | null, weave: Texture | null): MeshStandardMaterial {
+export function createPaintMaterial(
+  environment: Texture | null,
+  weave: Texture | null,
+  /** The body's fine detail (bodyDetail.ts), read as a bump map: seams, screws, wear; none on low */
+  detail: Texture | null = null,
+): MeshStandardMaterial {
   const material = new MeshStandardMaterial({
     color: 0xffffff,
     vertexColors: true,
@@ -430,6 +478,7 @@ export function createPaintMaterial(environment: Texture | null, weave: Texture 
     envMap: environment,
     roughness: 1,
     metalness: 1,
+    ...(detail ? { bumpMap: detail, bumpScale: DETAIL_BUMP } : {}),
   })
   const varyings = 'varying vec2 vPaintRM;\nvarying vec3 vPaintEmissive;\nvarying vec2 vPaintEnv;'
   material.onBeforeCompile = (shader) => {
@@ -456,7 +505,7 @@ export function createPaintMaterial(environment: Texture | null, weave: Texture 
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vPaintRM.x;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vPaintRM.y;')
   }
-  material.customProgramCacheKey = () => 'kart-paint'
+  material.customProgramCacheKey = () => (detail ? 'kart-paint-detail' : 'kart-paint')
   return material
 }
 

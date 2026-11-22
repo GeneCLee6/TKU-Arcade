@@ -115,6 +115,7 @@ export const TUNING_SPECS: { readonly [K in TuningKey]: TuningSpec } = {
   wallImpactLoss: { group: 'walls', min: 0, max: 1, step: 0.05, unit: 'share' },
   wallScrapeDrag: { group: 'walls', min: 0, max: 30, step: 0.5, unit: 'metresPerSecondSquared' },
   wallBreakSpeed: { group: 'walls', min: 0, max: 20, step: 0.5, unit: 'metresPerSecond' },
+  wallSlideAngle: { group: 'walls', min: 0, max: 30, step: 1, unit: 'degrees' },
 
   // The classic feel's own numbers (2026-11-17, classic.ts; docs/KART-FEEL.md)
   dragShare: { group: 'speed', min: 0, max: 1, step: 0.05, unit: 'share' },

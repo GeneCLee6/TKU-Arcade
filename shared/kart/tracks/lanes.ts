@@ -206,7 +206,7 @@ export const LANES: TrackJson = {
   id: 'lanes',
   // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Hillside Lanes', 'zh-TW': '山城坡巷' },
-  revision: 1,
+  revision: 2,
   theme: 'sunset',
   laps: 3,
   road,

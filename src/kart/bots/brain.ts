@@ -857,7 +857,8 @@ export function createBotBrain(
     }
 
     const nearest = nearestRoadPoint(road, kart.x, kart.z, kart.y)
-    // In the air: hold the throttle for the landing boost, the nose kept in line with the flight
+    // In the air: hold the throttle for the landing boost, the nose kept in line with the flight (or,
+    // by skill, let it go to press it afresh on landing: the timed landing)
     if ((kart.air ?? 0) > 0) {
       move = NONE
       wasDrifting = false
@@ -872,7 +873,12 @@ export function createBotBrain(
           steer: carrying.way * clampSteer((carrying.nose - out) * AIR_NOSE_GAIN),
         }
       }
-      return { ...NO_INPUT, throttle: true, steer: clampSteer(wrap(flight - kart.heading) * 4) }
+      // The timed landing (by skill): off the throttle now, so that the press on touching down is fresh
+      return {
+        ...NO_INPUT,
+        throttle: !(skill.landTap ?? false),
+        steer: clampSteer(wrap(flight - kart.heading) * 4),
+      }
     }
     const jump = jumps.length > 0 ? nextJump(nearest) : { lip: -1, ahead: Infinity }
     let cue = fallback > 0 ? undefined : cues.get(jump.lip)

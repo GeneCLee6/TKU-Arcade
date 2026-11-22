@@ -6,6 +6,7 @@
 import { kartBus, type KartBus } from './bus.ts'
 import { ambienceFor, crowdLevel, nextIn, type AmbienceLayer, type AmbienceRecipe } from './ambience.ts'
 import type { TrackThemeName } from '../../../shared/kart/track.ts'
+import { AUDIO_TIERS, tierRecipe, type AudioTier } from './tiers.ts'
 
 export interface Ambience {
   /** Every frame: where the kart is */
@@ -29,8 +30,11 @@ export function createAmbience(
   track: { readonly id: string; readonly theme?: TrackThemeName },
   line: { readonly x: number; readonly z: number },
   night: boolean,
+  /** How much of it (2026-11-22, tiers.ts): on low one bed and nothing now and then */
+  tier: AudioTier = AUDIO_TIERS.high,
 ): Ambience {
-  const recipe: AmbienceRecipe = ambienceFor(track)
+  const recipe: AmbienceRecipe = tierRecipe(ambienceFor(track), tier)
+  let frames = 0
   let built: Built | null = null
   let disposed = false
 
@@ -130,7 +134,7 @@ export function createAmbience(
     lfo(0.4, 0.15, crowdBody.gain)
     lfo(3.1, 0.08, crowdBody.gain)
     const next = new Map<AmbienceLayer, number>()
-    for (const layer of Object.keys(recipe.layers) as AmbienceLayer[]) {
+    for (const layer of (tier.occasional ? Object.keys(recipe.layers) : []) as AmbienceLayer[]) {
       next.set(layer, context.currentTime + nextIn(layer, Math.random))
     }
     return { bus, out, crowd, sources, next }
@@ -238,6 +242,8 @@ export function createAmbience(
       const bus = kartBus()
       if (!bus) return
       built ??= build(bus)
+      frames = (frames + 1) % tier.updateEvery
+      if (frames !== 0) return
       const { context } = bus
       const now = context.currentTime
       const level = crowdLevel(Math.hypot(x - line.x, z - line.z)) * recipe.crowd * 0.5

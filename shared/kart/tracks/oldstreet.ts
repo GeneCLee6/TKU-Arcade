@@ -195,7 +195,7 @@ export const OLDSTREET: TrackJson = {
   // 5: the straights broken up by alleys, the back lanes' esses made real (2026-11-18)
   // 6: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
   // 8: two boost pads in the fork's alley (2026-11-19); 9: one down the market street (2026-11-20)
-  revision: 9,
+  revision: 10,
   laps: 3,
   road: fromLine,
   gates,

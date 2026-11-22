@@ -221,7 +221,7 @@ export function bypassRoad(
 }
 
 /** Raised whenever the physics changes enough that old times on custom tracks mean nothing */
-export const CUSTOM_REVISION = 7
+export const CUSTOM_REVISION = 8
 
 /** A bypass's slot (2026-11-22): this wide, in the middle of the wall across it */
 const BYPASS_SLOT = 9

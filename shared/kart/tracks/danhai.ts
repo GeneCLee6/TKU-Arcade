@@ -89,7 +89,7 @@ export const DANHAI: TrackJson = {
   id: 'danhai',
   // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Danhai Night Circuit', 'zh-TW': '淡海夜城' },
-  revision: 1,
+  revision: 2,
   theme: 'night',
   laps: 3,
   road: made.road,
