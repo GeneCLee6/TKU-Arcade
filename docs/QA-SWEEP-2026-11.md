@@ -55,6 +55,7 @@
 - **dev 才有的警告**：每位玩家進房時 `WebSocket is closed before the connection is established`。原因是 `src/main.tsx` 的 `<StrictMode>` 在開發模式把 effect 跑兩次，第一條 socket 還沒連上就被關掉；正式版不會。
 - **本機 D1 沒有資料表時**：dev server 記錄 `no such table: game_flags／daily_metrics`（功能旗標讀不到就當全開、指標寫不進去就略過，不影響遊戲）。CI 的巡檢 job 先 `wrangler d1 migrations apply DB --local`。
 - **光譜一次 axe 對比不足**：第一輪桌機巡檢在某個後段畫面（訪客視角）報過一次 `color-contrast`（serious），之後 6 次不同隨機局都沒再出現，沒能定位是哪個元件、哪種狀態。腳本現在會印出元素 HTML 與實際對比值，下次出現就能直接定位。列在 NEXT §2 供擁有者知悉，不擋。
+  - **2026-11-22 已處理（NEXT #119）**：`npm run test:sweep` 光譜三種畫面 × 8 個 seed（11、22、33、44、55 與預設 3 次）共 24 次都沒有再報。改在 `e2e/spectrum.spec.ts` 的深色 axe 測試重現：16 次有 3 次在**結算**畫面報 `color-contrast`，元素是回合步驟列的「3 Guess」（字 #eef1ff、底 #4da3ff，2.33）與「4 Reveal」（字 #05060d、底 #2c2d34，1.47）。這兩組是「字已換成新狀態、底還是舊狀態（猜題中）」的組合，畫面上從來不會同時畫出（同一個 `Step` 的字色與底色在同一條 CSS 規則），是 axe 讀到一半時步驟列重畫——和 #125 巡檢修的是同一種競態。處理：`e2e/spectrum.spec.ts` 的 axe 也照巡檢「隔 400 ms 再看一次、兩次都在同一元素才算」，並把元素 HTML 與對比值印出來；之後 10 次深色全過。配色本身不用改。
 
 ## CI
 

@@ -234,13 +234,32 @@ async function expectNoSeriousProblems(page: Page, step: string) {
   // The dock sticks to the bottom of the window and covers whatever scrolls under it, which axe then
   // measures against the dock: let it sit in the page's flow while axe looks (2026-11-14)
   const unstick = await page.addStyleTag({ content: '[data-dock] { position: static !important; }' })
-  const { violations } = await new AxeBuilder({ page }).analyze()
+  const blockingNow = async () =>
+    (await new AxeBuilder({ page }).analyze()).violations.filter((violation) => BLOCKING.has(violation.impact ?? ''))
+  let blocking = await blockingNow()
+  // #119 of docs/NEXT.md §5, as the sweep does (e2e/sweep.ts, #125): the round's steps can re-render
+  // while axe reads them, and it then pairs the new text colour with the old fill ("4 Reveal" dark on
+  // dark, seen at the result 3 times in 16 dark runs; a pair never drawn). A real one stays: look
+  // again once the page is still and keep what both passes saw on the same element
+  if (blocking.length > 0) {
+    await page.waitForTimeout(400)
+    const again = new Set(
+      (await blockingNow()).flatMap(({ id, nodes }) => nodes.map((node) => `${id} ${node.target.join(' ')}`)),
+    )
+    blocking = blocking
+      .map((violation) => ({
+        ...violation,
+        nodes: violation.nodes.filter((node) => again.has(`${violation.id} ${node.target.join(' ')}`)),
+      }))
+      .filter((violation) => violation.nodes.length > 0)
+  }
   await unstick.evaluate((tag) => (tag as Element).remove())
   await page.setViewportSize(size)
-  const blocking = violations
-    .filter((violation) => BLOCKING.has(violation.impact ?? ''))
-    .map(({ id, nodes }) => ({ id, nodes: nodes.map((node) => node.target.join(' ')) }))
-  expect(blocking, step).toEqual([])
+  const found = blocking.map(({ id, nodes }) => ({
+    id,
+    nodes: nodes.map((node) => `${node.target.join(' ')} ${node.html.slice(0, 80)} ${node.failureSummary ?? ''}`),
+  }))
+  expect(found, step).toEqual([])
 }
 
 for (const scheme of ['light', 'dark'] as const) {

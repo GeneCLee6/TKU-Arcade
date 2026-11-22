@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { inertOthers } from '../../lib/inertOthers.ts'
 
 /**
  * How the board fills the screen (e3-t10): not at all, through the browser's Fullscreen API, or where
@@ -57,6 +58,33 @@ export function useImmersive(target: RefObject<HTMLElement | null>): ImmersiveCo
       window.removeEventListener('keydown', onKey)
     }
   }, [mode, exit])
+
+  // The page behind is out of reach while the board covers it (#112 of docs/NEXT.md §5): no Tab stop,
+  // tap or screen reader there, as behind a modal; the frame (the square's drawer and the decision
+  // card are inside it) and what is marked data-inert-keep (toasts, the update prompt, reactions'
+  // live region) stay. The focus goes in with it, to the frame's way out, and comes back to the
+  // button that went in
+  const covered = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (mode === 'off') return undefined
+    const element = target.current
+    if (element === null) return undefined
+    covered.current = element
+    const undo = inertOthers([element])
+    if (!element.contains(document.activeElement)) {
+      element.querySelector<HTMLElement>('[data-immersive-exit]')?.focus()
+    }
+    return undo
+  }, [mode, target])
+  useEffect(() => {
+    const frame = covered.current
+    if (mode !== 'off' || frame === null) return
+    covered.current = null
+    const active = document.activeElement
+    if (active === null || active === document.body || frame.contains(active)) {
+      frame.querySelector<HTMLElement>('[data-immersive-enter]')?.focus()
+    }
+  }, [mode])
 
   return { mode, enter, exit }
 }

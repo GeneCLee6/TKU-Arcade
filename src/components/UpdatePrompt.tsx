@@ -14,7 +14,7 @@ export default function UpdatePrompt() {
   const [later, setLater] = useState(false)
   if (later) return null
   return (
-    <Bar role="status" data-testid="update-prompt">
+    <Bar role="status" data-testid="update-prompt" data-inert-keep="">
       <span>{t('update.ready')}</span>
       <Actions>
         <Button $size="sm" onClick={applyUpdate}>

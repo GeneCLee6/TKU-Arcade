@@ -61,7 +61,7 @@ export default function Reactions({ reactions, onReact, nameOf }: ReactionsProps
           </Pick>
         ))}
       </Bar>
-      <Sky aria-live="polite">
+      <Sky aria-live="polite" data-inert-keep="">
         {reactions.map((one) => (
           <Float key={one.id} $still={still} $lane={one.id % 5}>
             <Glyph aria-hidden="true">{GLYPHS[one.reaction]}</Glyph>
