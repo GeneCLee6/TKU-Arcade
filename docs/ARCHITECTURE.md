@@ -1488,6 +1488,14 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **鍵帽與多支手把**（#19）：`devices.ts` 的 `watchKeyLayout`／`useKeyLayout`（`navigator.keyboard.getLayoutMap()`，Chromium、安全頁才有；`layoutchange` 時重讀）與純函式 `keycap(code, layout)`：字母、數字照鍵帽印的字（AZERTY 的 `KeyQ` 是 A）；方向鍵、Space、Shift 這些照位置命名的鍵、數字鍵盤不變；沒有 API 就維持美式位置的名稱。`keyLabel(code, t, layout?)` 預設用讀到的 layout，所以改鍵設定（仍存 `KeyboardEvent.code`，`e8-t12`）不用改；改鍵面板、比賽的道具鍵提示、單機與駕訓的提示都 `useKeyLayout()`，layout 到了重畫。手把：純函式 `pickPad(pads, current)`：最近有輸入的那支開（有按鍵或搖桿超過 0.5 就換到它；正在開的那支有輸入就不換；拔掉就換有輸入的、否則第一支標準配置的），`readGamepad()` 每幀照它挑，所以一台電腦任何一支手把都能開，第二支放在桌上不會搶。用陣列位置而不是 `Gamepad.index` 記（一支手把連著時位置不變）。
 - **測試**：`tests/kart/polish2.test.ts`（噴射鍵三種樣子與團隊格子、`keepsForBlue`、各級 `teamSave`／`wallCare` 與腳本駕駛沒有 `wallCare`、`keycap`／`keyLabel` 的 AZERTY 與 fallback、`pickPad`）；`flagship.test.ts` 多擋漁港與老街領先 ≤ 3.5%；`bots.test.ts` 的 rubber band 只數超過速度上限時的收油（看牆的收油不算）。
 
+### 4.64 路線圖外：觀戰與重播直拿版面、陞官圖完整版首屏離開警告區、lint 警告（2026-11-22，#142，`feat/kart-watch-portrait-promotion-lazy`）
+
+- **觀戰與重播直拿**（#140 回報沒做的那半）：`WatchParts.tsx` 新 `WatchTop`，包住 `TopLeft`（看誰、名次、團隊分數、重播的提示）、`WatchedItem`、`MapCorner` 三塊。寬螢幕它是 `display: contents`，三塊照舊各自定位（畫面不變）；`(max-width: 560px) and (orientation: portrait)` 時它變成貼左上的一欄 grid：面板、道具欄（`justify-self: center`，水平置中）、小地圖（靠左），三塊改 `position: static`，所以面板再多幾行（重播的道具提示、團隊賽）也不會蓋到道具欄或地圖。`ItemSlot` 的 `Dock` 多 `data-item-dock`，`WatchTop` 用它把道具欄的絕對定位與 `translate` 拿掉。`SpectateView`、`ReplayView` 共用。
+- **e2e**：`e2e/kart-watch-portrait.spec.ts`：960×600 跑一圈道具賽對電腦（`?autopilot`），存成重播檔，用 390×844、360×740 繁中打開：道具欄水平置中（±6 px）、小地圖在左半、在道具欄下方、三塊互不重疊也不蓋「關閉」鍵；附截圖。觀戰（`SpectateView`）用同一個 `WatchTop`，沒有另寫直拿 e2e（`kart-race.spec.ts` 照舊驗觀戰）。
+- **陞官圖完整版首屏 146.2 → 139.7 kB**（zh-TW，上限 150、警告區 140 以上）：畫圖版的元件 `FullBoard.tsx` 與點名格子的句子 `fullWords.ts`（擲骰結果、這一手做了什麼、座位的官職）本來就要等圖版資料（C8 起資料在首屏之後載），所以改成和資料一起載：`fullData.ts` 的 `loadFullData` 多 import 這兩個，`FullData` 多 `view`、`words`；畫面寫 `data.view.FullBoard`、`data.words.turnSentence(...)`。不需要資料的（每人銀兩、轉帳、出身、功名：`beforeTransfers`、`transferText`、`householdText`、`degreeText`）搬到新的 `fullMoney.ts` 留在首屏，`fullWords.ts` 照舊轉出（測試不用改）。資料到之前圖版位置本來就是「正在畫圖版」，所以畫面不變。簡化版 144.3 kB 沒動（仍在警告區）。
+- **`check-budget.mjs`**：一個畫面「首屏之後才載」的東西，改算它自己（和它靜態 import 的、不含入口與房間頁）的全部動態 import。以前只看畫面 chunk 本身的動態 import，所以 `fullData.ts` 載的 `fullSquare.ts` 被當成一款「遊戲」多印一行；現在它和 `FullBoard`、`fullWords` 都列在完整版的「after the first paint」（32.4 kB，不限）。
+- **lint**：`tests/worker/room-robustness.test.ts` 的兩個 `no-unsafe-optional-chaining`（`game?.view as …` 再取 `.you`）改成 `game!.view`；`npm run lint` 0 警告。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

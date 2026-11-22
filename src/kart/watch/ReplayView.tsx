@@ -56,6 +56,7 @@ import ReplayShare from './ReplayShare.tsx'
 import {
   Fallback,
   MapCorner,
+  WatchTop,
   NameTag,
   Note,
   Row,
@@ -245,8 +246,7 @@ export default function ReplayView({
           lastTick = tick
           const karts = kartsAt(reel, tick)
           const nowMs = (tick * 1000) / TICKS_PER_SECOND
-          const playedThrough =
-            !sought && lastMs !== null && nowMs > lastMs && nowMs - lastMs < 500
+          const playedThrough = !sought && lastMs !== null && nowMs > lastMs && nowMs - lastMs < 500
           const where = (seat: number) => karts.find((kart) => kart.id === seat)
           const hits = hitFrameOf(
             hitEffects,
@@ -391,45 +391,49 @@ export default function ReplayView({
           </NameTag>
         ))}
       </TagLayer>
-      <TopLeft>
-        <Title>{t('games.kart.replay.title')}</Title>
-        <WatchedPanel
+      <WatchTop>
+        <TopLeft>
+          <Title>{t('games.kart.replay.title')}</Title>
+          <WatchedPanel
+            t={t}
+            name={name}
+            place={follow === null ? 0 : order.indexOf(follow) + 1}
+            total={replay.racers.length}
+            detail={detail}
+          />
+          {teamGauge && teamTotals && (
+            <>
+              <TeamScore t={t} totals={teamTotals} mine={null} />
+              <TeamGauges t={t} gauge={teamGauge} />
+            </>
+          )}
+          {notice && (
+            <Note role="status" data-testid="kart-replay-notice">
+              {notice}
+            </Note>
+          )}
+          {reel.start > 0 && <Note>{t('games.kart.replay.partial')}</Note>}
+          {recent.map((event) => (
+            <Note key={`${event.tick}-${event.by}-${event.item}`}>
+              {t('games.kart.replay.used', {
+                name: nameOf(event.by),
+                item: t(`games.kart.item.${event.item}`),
+              })}
+            </Note>
+          ))}
+        </TopLeft>
+        <WatchedItem
           t={t}
-          name={name}
-          place={follow === null ? 0 : order.indexOf(follow) + 1}
-          total={replay.racers.length}
-          detail={detail}
+          item={
+            replay.mode === 'items' && follow !== null
+              ? heldAt(replay.held, follow, tick)
+              : undefined
+          }
         />
-        {teamGauge && teamTotals && (
-          <>
-            <TeamScore t={t} totals={teamTotals} mine={null} />
-            <TeamGauges t={t} gauge={teamGauge} />
-          </>
-        )}
-        {notice && (
-          <Note role="status" data-testid="kart-replay-notice">
-            {notice}
-          </Note>
-        )}
-        {reel.start > 0 && <Note>{t('games.kart.replay.partial')}</Note>}
-        {recent.map((event) => (
-          <Note key={`${event.tick}-${event.by}-${event.item}`}>
-            {t('games.kart.replay.used', {
-              name: nameOf(event.by),
-              item: t(`games.kart.item.${event.item}`),
-            })}
-          </Note>
-        ))}
-      </TopLeft>
-      <WatchedItem
-        t={t}
-        item={
-          replay.mode === 'items' && follow !== null ? heldAt(replay.held, follow, tick) : undefined
-        }
-      />
-      <MapCorner>
-        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} />
-      </MapCorner>
+        <MapCorner>
+          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} />
+        </MapCorner>
+      </WatchTop>
       <WatchControls
         t={t}
         overhead={overhead}

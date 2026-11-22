@@ -108,7 +108,13 @@ const detailsOf = (game) =>
 // A lazy chunk a game's screen loads after its first paint (the full board's layout, C9) is that
 // screen's, not a game of its own
 const gameChunks = lazyEntriesUnder('src/games/')
-const loadedByGame = new Set(gameChunks.flatMap((key) => manifest[key].dynamicImports ?? []))
+// What a chunk loads later: its own dynamic imports and those of every chunk it imports statically
+// (the full board's data, fullData.ts, brings the board's layout and the component that draws it),
+// less the site's and the room page's own chunks, which load every game
+const shell = collectAll([...entries, ...room])
+const laterOf = (key) =>
+  [...collectAll([key])].filter((one) => !shell.has(one)).flatMap((one) => manifest[one].dynamicImports ?? [])
+const loadedByGame = new Set(gameChunks.flatMap(laterOf))
 const games = gameChunks.filter((key) => !loadedByGame.has(key))
 
 const budgets = [
@@ -137,8 +143,7 @@ if (kartEntries.length > 0) {
  * not limited: the first screen is what the budget is for
  */
 function afterPaint(game, firstKeys) {
-  const later = manifest[game]?.dynamicImports ?? []
-  const keys = collectAll(later)
+  const keys = collectAll(manifest[game] ? laterOf(game) : [])
   for (const key of firstKeys) keys.delete(key)
   return keys
 }
