@@ -1721,6 +1721,15 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **測試**：`tests/kart/ledges.test.ts`（拋物線與門檻、快一點上得去慢一點撞牆落回主路不重置、預測、格式拒絕、四張賽道的門檻與省的距離、伺服器圈時、電腦車的選擇與噴射）；`technical.test.ts` 的四張圖、`challenge.test.ts` 的章節數。
 - **限制（照實寫）**：(1) 只有「從主路跳台斜飛到旁邊平台」一種形狀；平台不能在主路正上方（岔路必須離開主路）。(2) 平台沒有「掉下去落回主路」的開放邊：側邊是牆，失誤是撞牆或掉進縫。(3) 電腦車對準靠一個簡單的追點；斜角 40° 的網寮屋頂偶爾會偏。(4) 平台的建築是方塊，沒有各圖專屬造型。
 
+### 4.78 路線圖外：桌遊介面電競化（大廳、等待室、標題列、結果）（2026-11-23，#155，`feat/esports-board-ui`）
+
+樣式規則在 `DESIGN.md` §3.7。程式上：
+
+- `GameArt.tsx`（lazy chunk）多 `GameCover`（卡片封面，`seedOf(id)` 決定斜槓位置）與 `HeroArena`（大廳主視覺）兩個具名匯出，`GameCard`、`HomePage` 用 `lazy(() => import(...).then(({ X }) => ({ default: X })))` 拿；`ART` 多了 `kart`。`gameCardParts.ts` 多 `Cover`（固定高、切角、`color: accent`，SVG 全用 `currentColor`）。
+- `WaitingRoom.tsx`：座位清單改成 `SeatGrid`／`SeatCard`（仍是 `ul`／`li`，座位號、`入座` 的無障礙名稱不變），`MemberEntry` 原樣放在名牌裡；空位不再用 `FreeSeatRow`（遊戲中的成員面板照舊用）。`Avatar` 多一個選用的 `size`。
+- `RoomPage.tsx` 的 `RoomHeading` 多 `status`（`room.status.*`）；`ResultPanel.tsx` 多 `room.result.final`、`room.result.winner`。
+- **首屏**：大廳 101.5 → 101.6 kB（封面框與 hover 的樣式；色塊主視覺搬出首屏抵掉一部分）；房間的 chunk 多約 1.3 kB（陞官圖首屏 145.5 → 146.8 kB；合併 #153 之後 147.2 kB，上限 150）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

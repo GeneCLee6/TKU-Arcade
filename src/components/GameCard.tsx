@@ -7,13 +7,17 @@ import { hasRules } from '../lib/rulesList.ts'
 import { monoType } from '../styles/esports.ts'
 import { color, fontSize, gameHue, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
-import { Body, Heading, Monogram, Name, Summary } from './gameCardParts.ts'
+import { Body, Cover, Heading, Monogram, Name, Summary } from './gameCardParts.ts'
 
-// e7-t12: after the first paint; the first letter until then
-const GameArt = lazy(() => import('./GameArt.tsx'))
+// e7-t12, 2026-11-23: the cover is drawn after the first paint; the first letter until then
+const GameCover = lazy(() =>
+  import('./GameArt.tsx').then(({ GameCover }) => ({ default: GameCover })),
+)
 
 interface GameCardProps {
   game: GameCardInfo
+  /** Its place in the lobby's list, shown on its cover */
+  index?: number
   /** A room is being created: a second click would make a second room */
   disabled: boolean
   /** Paused by the owner (e12-t11): said on the card, and no New room */
@@ -21,7 +25,7 @@ interface GameCardProps {
   onNewRoom: () => void
 }
 
-export function GameCard({ game, disabled, paused = false, onNewRoom }: GameCardProps) {
+export function GameCard({ game, index = 0, disabled, paused = false, onNewRoom }: GameCardProps) {
   const t = useT()
   const { minPlayers, maxPlayers, minutes, i18nKey } = game.meta
   const name = t(`${i18nKey}.name`)
@@ -32,12 +36,12 @@ export function GameCard({ game, disabled, paused = false, onNewRoom }: GameCard
 
   return (
     <Body $hue={gameHue(game.id)}>
+      <Cover aria-hidden>
+        <Suspense fallback={<Monogram>{[...name][0]}</Monogram>}>
+          <GameCover gameId={game.id} index={index} />
+        </Suspense>
+      </Cover>
       <Heading>
-        <Monogram aria-hidden>
-          <Suspense fallback={[...name][0]}>
-            <GameArt gameId={game.id} fallback={[...name][0]} />
-          </Suspense>
-        </Monogram>
         <Name>{name}</Name>
       </Heading>
       <Facts>

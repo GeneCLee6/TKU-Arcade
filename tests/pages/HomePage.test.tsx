@@ -241,10 +241,11 @@ describe('lobby cards', () => {
   })
 
   // e7-t12: the first letter until the card's picture has loaded, then the picture; neither is read
-  it('hides the monogram and the picture from screen readers', async () => {
+  it('hides the cover and its picture from screen readers', async () => {
     renderLobby()
     const heading = screen.getByRole('heading', { level: 3, name: 'Promotion' })
-    const monogram = heading.parentElement!.querySelector('[aria-hidden]')!
+    // 2026-11-23: the cover (GameCover) sits above the heading, in the same card
+    const monogram = heading.parentElement!.parentElement!.querySelector('[aria-hidden]')!
     await waitFor(() => expect(monogram.querySelector('svg')).not.toBeNull())
     expect(monogram.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })

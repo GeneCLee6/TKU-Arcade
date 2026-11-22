@@ -7,12 +7,15 @@ export interface AvatarProps {
   name: string
   /** A colour that means something here, such as the seat's piece; by the name without it */
   tint?: string
+  /** Its width and height in px (2026-11-23: the waiting room's seat cards); 30 without it */
+  size?: number
 }
 
 /** A person's mark beside their name, which it repeats: hidden from screen readers */
-export function Avatar({ name, tint }: AvatarProps) {
+export function Avatar({ name, tint, size }: AvatarProps) {
+  const sized = size === undefined ? {} : { width: size, height: size, fontSize: size * 0.45 }
   return (
-    <Circle aria-hidden="true" style={{ background: tint ?? avatarColor(name) }}>
+    <Circle aria-hidden="true" style={{ background: tint ?? avatarColor(name), ...sized }}>
       {initialOf(name)}
     </Circle>
   )

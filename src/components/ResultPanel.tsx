@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 import type { GameResult, Standing } from '../../shared/games/types.ts'
 import type { RoomView } from '../../shared/protocol.ts'
 import type { TextKey } from '../i18n/t.ts'
@@ -7,7 +7,7 @@ import { useT } from '../i18n/useT.ts'
 import { memberName } from '../lib/memberName.ts'
 import { Link } from '../lib/router.tsx'
 import { useReducedMotion } from '../lib/useMediaQuery.ts'
-import { cornerClip, displayType, glass } from '../styles/esports.ts'
+import { clippedFill, cornerClip, displayType, glass, slantClip } from '../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
 import { Avatar } from './Avatar.tsx'
 import { HostEndedActions } from './HostControls.tsx'
@@ -65,12 +65,13 @@ export function ResultPanel({
 
   return (
     <Panel ref={panel} aria-label={t('room.result.heading')}>
+      <Kicker>{t('room.result.final')}</Kicker>
       <Title>{t('room.result.heading')}</Title>
       {headline && <Headline>{headline}</Headline>}
       <Muted>{t(result.summary.key as TextKey, result.summary.params)}</Muted>
 
       <List as="ol">
-        {result.standings.map((standing) => {
+        {result.standings.map((standing, order) => {
           const member = seated.find((candidate) => candidate.seat === standing.seat)
           // Whoever left since the game ended still has their place in it
           const name = member
@@ -80,13 +81,28 @@ export function ResultPanel({
             detail?.(standing) ??
             (standing.score !== null ? t('room.result.score', { score: standing.score }) : null)
           return (
-            <StandingRow key={standing.seat} $top={!unranked && standing.rank === 1}>
-              {!unranked && <Place>{t('room.result.place', { rank: standing.rank })}</Place>}
-              <Avatar name={name} tint={seatColor(standing.seat)} />
+            <StandingRow
+              key={standing.seat}
+              $top={!unranked && standing.rank === 1}
+              style={{ animationDelay: `${Math.min(order, 8) * 90}ms` }}
+            >
+              {!unranked && (
+                <Place $top={standing.rank === 1}>
+                  {t('room.result.place', { rank: standing.rank })}
+                </Place>
+              )}
+              <Avatar
+                name={name}
+                tint={seatColor(standing.seat)}
+                size={!unranked && standing.rank === 1 ? 44 : 30}
+              />
               <Who>
                 <Name>
                   {name}
                   {member?.id === you && <YouMark> · {t('room.waiting.badge.you')}</YouMark>}
+                  {!unranked && standing.rank === 1 && (
+                    <WinnerTag>{t('room.result.winner')}</WinnerTag>
+                  )}
                 </Name>
                 {extra && <Small>{extra}</Small>}
                 <Small>{t(standing.note.key as TextKey, standing.note.params)}</Small>
@@ -150,10 +166,40 @@ const Panel = styled.section`
   }
 `
 
+// A slanted magenta tag over the title, as a broadcast's lower third
+const Kicker = styled.p`
+  ${clippedFill(slantClip(10), color.magenta)}
+  justify-self: start;
+  padding: ${space.xs}px ${space.lg}px;
+  color: ${color.onAccent};
+  ${displayType}
+  font-size: ${fontSize.sm}px;
+  text-transform: uppercase;
+`
+
 const Title = styled.h2`
   margin: 0;
   ${displayType}
-  font-size: ${fontSize.xxl}px;
+  font-size: clamp(${fontSize.xxl}px, 5vw, 48px);
+  text-shadow: 0 0 ${space.xl}px color-mix(in srgb, ${color.accent} 45%, transparent);
+`
+
+// The standings come in one after another, slid in from the side; still with reduced motion
+const slideIn = keyframes`
+  from {
+    opacity: 0;
+    translate: -${space.xl}px 0;
+  }
+`
+
+const sheen = keyframes`
+  0%, 55% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(220%);
+  }
 `
 
 const Headline = styled.p`
@@ -164,22 +210,71 @@ const Headline = styled.p`
 
 // The top place is told by the outline and the number, not only by how it looks
 const StandingRow = styled.li<{ $top: boolean }>`
+  position: relative;
   display: flex;
   align-items: center;
   gap: ${space.sm}px;
-  min-height: 44px;
+  min-height: ${(p) => (p.$top ? 64 : 44)}px;
   padding: ${space.xs}px ${space.md}px;
+  overflow: hidden;
   background: ${(p) =>
-    p.$top ? `color-mix(in srgb, ${color.accent} 14%, ${color.surface})` : color.sunken};
+    p.$top
+      ? `linear-gradient(90deg, color-mix(in srgb, ${color.accent} 26%, ${color.surface}), ${color.surface})`
+      : color.sunken};
   outline: ${(p) => (p.$top ? `2px solid ${color.accent}` : 'none')};
   outline-offset: -2px;
+  box-shadow: ${(p) =>
+    p.$top ? `0 0 ${space.xl}px color-mix(in srgb, ${color.accent} 35%, transparent)` : 'none'};
+  animation: ${slideIn} 0.35s ease-out both;
+
+  /* A light that sweeps over the winner now and then */
+  &::after {
+    content: '';
+    display: ${(p) => (p.$top ? 'block' : 'none')};
+    position: absolute;
+    inset: 0;
+    width: 30%;
+    background: linear-gradient(
+      100deg,
+      transparent,
+      color-mix(in srgb, ${color.text} 12%, transparent),
+      transparent
+    );
+    pointer-events: none;
+    animation: ${sheen} 4.5s ease-in-out 1s infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+
+    &::after {
+      display: none;
+    }
+  }
 `
 
-const Place = styled.span`
+// The place on a slanted tag: the hue's for the winner, a quiet one for the rest
+const Place = styled.span<{ $top: boolean }>`
+  ${(p) => clippedFill(slantClip(8), p.$top ? color.accent : color.raised)}
   flex: none;
   min-width: 3.5em;
+  padding: ${space.xs}px ${space.md}px;
+  color: ${(p) => (p.$top ? color.onAccent : color.text)};
+  text-align: center;
   ${displayType}
-  font-size: ${fontSize.lg}px;
+  font-size: ${(p) => (p.$top ? fontSize.xl : fontSize.lg)}px;
+`
+
+const WinnerTag = styled.span`
+  display: inline-block;
+  margin-left: ${space.sm}px;
+  padding: 0 ${space.sm}px;
+  color: ${color.accent};
+  border: 1px solid currentColor;
+  ${displayType}
+  font-size: ${fontSize.sm}px;
+  text-transform: uppercase;
+  vertical-align: middle;
 `
 
 /** The host's next move and the way back, under the standings */
