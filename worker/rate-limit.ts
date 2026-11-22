@@ -37,8 +37,11 @@ export class FixedWindowLimit {
 
 /** What each shared bucket allows one address a minute (e12-t06, docs/SECURITY.md §6) */
 export const SHARED_LIMITS = {
-  /** New rooms (POST /api/rooms); the PRD's 5 */
-  create: 5,
+  /**
+   * New rooms (POST /api/rooms). The PRD said 5; the owner raised it to 10 on 2026-11-22 because a
+   * campus Wi-Fi puts many tables behind one address
+   */
+  create: 10,
   /** WebSocket upgrades (/ws/<id>): every one wakes a room, also one that is not there */
   socket: 120,
   /** Wrong owner keys, after which the address is locked out for a minute (worker/owner.ts) */

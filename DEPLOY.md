@@ -342,7 +342,7 @@ npx wrangler d1 execute tku-arcade --remote --command   "INSERT INTO game_flags 
 
 | 桶 | 限制 |
 | --- | --- |
-| `create` | 每位址每分鐘 5 間新房 |
+| `create` | 每位址每分鐘 10 間新房（擁有者 2026-11-22 從 5 間調高） |
 | `socket` | 每位址每分鐘 120 次 WebSocket 升級 |
 | `ownerFail` | 每位址每分鐘 5 次錯的擁有者金鑰（之後鎖一分鐘） |
 

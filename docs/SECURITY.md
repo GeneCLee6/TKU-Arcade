@@ -10,7 +10,7 @@
 | CSP | 原本沒有 | 加上（§3），`_headers` 由 build 產生 |
 | 其他安全標頭 | 原本沒有 | `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Cross-Origin-Opener-Policy`、`X-Frame-Options`（§4） |
 | 依賴 | `npm audit`：0 個弱點 | 沒有安全更新要做，沒升級（§5） |
-| 建房速率 | 原本沒有限制 | 每個 Worker instance 每個位址每分鐘 30 間（§6）；`e12-t06` 加上跨 instance 的每位址每分鐘 5 間 |
+| 建房速率 | 原本沒有限制 | 每個 Worker instance 每個位址每分鐘 30 間（§6）；`e12-t06` 加上跨 instance 的每位址每分鐘 10 間（原 5 間，擁有者 2026-11-22 調高） |
 | 連線上限 | 每房 72 條／64 人 | `e12-t06`：每房每位址 24 條、每位址每分鐘 120 次升級（§6） |
 | 暱稱 | 濾控制字元、方向覆寫、長度 | `e12-t06`：再濾零寬與隱形字元、擋冒充與基本髒話，伺服器端也檢查（§9） |
 | 擁有者端點 | `/api/stats` 要 `STATS_KEY` | 新的 `/api/admin/flags`、`/api/admin/usage` 共用同一個檢查（`worker/owner.ts`）；`e12-t06` 加上錯 5 次鎖一分鐘、比對不洩漏長度（§7） |
@@ -95,7 +95,7 @@ frame-ancestors 'none'
 
 | 端點 | 限制 | 在哪 |
 | --- | --- | --- |
-| `POST /api/rooms`（開房） | **每位址每分鐘 5 間**，所有 instance、所有機房共用（`LimiterDO`，`e12-t06`）；前面還有每 instance 每位址 30 間、instance 合計 600 間的記憶體限制（`e12-t13`）。超過 429（`retry-after: 60`），大廳 toast「你所在的網路剛開了太多房間」 | `worker/rooms.ts`、`worker/rate-limit.ts` |
+| `POST /api/rooms`（開房） | **每位址每分鐘 10 間**（擁有者 2026-11-22 從 5 間調高），所有 instance、所有機房共用（`LimiterDO`，`e12-t06`）；前面還有每 instance 每位址 30 間、instance 合計 600 間的記憶體限制（`e12-t13`）。超過 429（`retry-after: 60`），大廳 toast「你所在的網路剛開了太多房間」 | `worker/rooms.ts`、`worker/rate-limit.ts` |
 | `/ws/<id>`（WebSocket 升級） | **每位址每分鐘 120 次**（`LimiterDO`）；超過時接受再以 **4429** `tooManyConnections` 關閉，不叫醒房間 | `worker/rooms.ts` |
 | WebSocket（房內） | 每房 `MAX_CONNECTIONS`（72）條、`MAX_MEMBERS`（64）人；**每房每位址 `MAX_CONNECTIONS_PER_ADDRESS`（24）條**（含旁觀，`e12-t06`），超過 4429 | `RoomHost.admit` |
 | 擁有者金鑰 | 每位址每分鐘錯 5 次後鎖一分鐘（§7） | `worker/owner.ts` |
@@ -112,7 +112,7 @@ frame-ancestors 'none'
 - **LimiterDO**（`worker/limiter.ts`，DO migration `v2`）：依位址雜湊的第一個字分 16 個物件，每個物件在記憶體裡對每個桶（`create`／`socket`／`ownerFail`，數字在 `worker/rate-limit.ts` 的 `SHARED_LIMITS`）做每分鐘的固定視窗，**不寫儲存**；物件被回收就忘掉，只會讓人早點能再試。所有 instance 與機房都問同一個物件，所以計數精確。物件不存在（沒有 binding）或出錯時放行（限制器壞掉不該把網站一起拖垮），只剩每 instance 的記憶體限制。代價：每次建房、每次 WebSocket 升級、每次錯的金鑰多一次 DO 請求（免費額度每日 10 萬次）。
 - **為什麼不用 Cloudflare 的 Rate Limiting binding**：先做過（`ratelimits`，#110 的第一版）：部署成功、binding 有列出，但預覽站的日誌顯示同一個 key 連打 25 次都回 `success: true`，在這個帳號上沒有作用。它本來也只在單一機房內共用、最終一致。
 - **本機**：127.0.0.1、::1 不經 LimiterDO（Cloudflare 不會報這種位址），所以 `npm run dev` 與整套瀏覽器測試不會被擋。
-- **共用位址**：同一個校園 Wi-Fi 或手機網路的人共用位址。5 間／分鐘、120 次升級／分鐘、每房 24 條是照「一桌朋友在同一個 Wi-Fi」抓的；「再來一局」與換遊戲都不算建房。
+- **共用位址**：同一個校園 Wi-Fi 或手機網路的人共用位址。10 間／分鐘、120 次升級／分鐘、每房 24 條是照「幾桌朋友在同一個 Wi-Fi」抓的（建房原本 5 間，2026-11-22 擁有者為校園 Wi-Fi 調成 10）；「再來一局」與換遊戲都不算建房。
 - **聊天以外的文字**：遊戲內的文字輸入都由規則在伺服器限長度、也只在該輪能送（撞詞與搭橋的提示 12 字、撞詞猜答 20 字、光譜的答案 30 字：`shared/games/*/clue.ts`、`answer.ts`），所以不另外限速率；每則訊息還有 `MAX_CLIENT_MESSAGE_CHARS`。沒有題目投稿、卡丁車名牌；卡丁車編輯器的分享碼只在瀏覽器解析。
 - GET 端點沒有限制：它們只讀、回應很小，Cloudflare 的 DDoS 防護在前面；成本儀表板會先看到異常（每日 Workers 請求 80% 警示）。
 

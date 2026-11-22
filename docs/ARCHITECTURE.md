@@ -1164,6 +1164,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - 跳台：跳台兩端路緣外各一根黑柱琥珀燈；跳台前 10、7、4 個路點各一個琥珀箭頭，放在導引的技術線上、往導引說的甩尾方向越來越斜（`cue.way`；沒有導引但跳台就是分支起點的——廠區的裝卸平台——用分支往哪邊離開）。
 - 矮欄：頂上每 5 m 一盞琥珀燈。
 - 燈慢慢呼吸（亮度 55–100%，青與琥珀錯開半拍）；其他都不動。路面箭頭是 `polygonOffset` 的透明平面，`depthWrite` 關。導引的路點數和賽道不同（編輯器的副本）就不用導引，只標跳台與縫。
+- **可以關**（擁有者 2026-11-22）：`/kart` 操作設定的「賽道技術提示」開關（預設開，`src/kart/trackCues.ts`，localStorage `tku-arcade.kart.trackCues`，讀寫都走不會丟例外的 `lib/storage.ts`）。關掉時 `SkillCues.setVisible(false)` 把全部標記（路面箭頭、燈、燈條、燈柱）藏起來，比賽中切換也立刻生效（`trackArt.ts` 訂閱，`dispose` 時退訂）；牆、縫、跳台本身不變。測試 `tests/kart/trackCues.test.tsx`。
 
 **效能**（Playwright、`--use-angle=d3d11` 真 GPU、1280 × 720、中畫質、自動駕駛 10 秒）：每幀 draw call 碼頭倉庫 203 → 215、山城坡巷 213 → 228、高架廠區 249 → 242；幀數在量測雜訊內（70 → 79、70 → 73、67.5 → 64）。卡丁車 chunk 391 → 403.0 kB gzip（上限 600）。貨櫃、燈、箭頭、盆栽、燈籠用 instancing，其他用 `Batch` 合併；低畫質照 `level.density` 少放倉庫、房子、貨櫃堆。
 
@@ -1390,7 +1391,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 擁有者 2026-11-21「繼續開發」。以前一定要湊人；現在桌遊有電腦玩家（§4.49）、卡丁車有對戰電腦與駕訓班，所以大廳首頁多一塊「跟電腦玩」：一個人、一下就開局。
 
-- **協定**：`POST /api/rooms` 多一個選用的 `bots: { count, level }`（`shared/protocol.ts` 的 `CreateRoomRequest`／`QuickBots`）。`shared/games/quickBots.ts` 的 `parseQuickBots(module, raw)` 檢查：遊戲要有 `bot`（房間在 DO 裡下的那種；卡丁車的電腦車是房主瀏覽器跑的，不收）與 `bots`；`level` 在 `bots.levels`；`count` 是正整數，加上那一個人在 `[minPlayers, maxPlayers]` 之間、不超過名字數。不合就 **400 `bad_bots`**（不默默丟掉）。帶 `bots` 的房間一律私人（`public` 被忽略）。**速率限制不變**：一鍵開局就是一個 POST，照樣算進每位址每分鐘 5 間（`tests/worker/abuse.test.ts`）。
+- **協定**：`POST /api/rooms` 多一個選用的 `bots: { count, level }`（`shared/protocol.ts` 的 `CreateRoomRequest`／`QuickBots`）。`shared/games/quickBots.ts` 的 `parseQuickBots(module, raw)` 檢查：遊戲要有 `bot`（房間在 DO 裡下的那種；卡丁車的電腦車是房主瀏覽器跑的，不收）與 `bots`；`level` 在 `bots.levels`；`count` 是正整數，加上那一個人在 `[minPlayers, maxPlayers]` 之間、不超過名字數。不合就 **400 `bad_bots`**（不默默丟掉）。帶 `bots` 的房間一律私人（`public` 被忽略）。**速率限制不變**：一鍵開局就是一個 POST，照樣算進每位址每分鐘的建房上限（2026-11-22 起 10 間；`tests/worker/abuse.test.ts`）。
 - **RoomDO**：`RoomHost.create(..., bots)` 建房時就把電腦放進座位 1..count（名字照 `bots.names` 的順序，`newBot` 與等待室的「加電腦玩家」共用），`RoomRecord.startOnJoin = true`。第一個加入的人照舊成為房主、坐 0 號，`join` 在 `welcome` 之後**以房主身分**走 `beginFromSeats`（同一套檢查：人數、遊戲暫停）；旗標用完即刪、跟著存檔，所以只會開一次，之後進來的人是旁觀。遊戲被擁有者暫停時留在等待室、房主收到 `game_disabled`，恢復後自己按開始。`RoomDO.webSocketMessage` 在 `startsOnJoin()` 時把 `join` 也當成會開局的訊息，先讀暫停清單（§e12-t11）。
 - **大廳**（`src/components/QuickPlay.tsx`，自己的 lazy chunk，首屏之後才載）：英雄區下面、遊戲卡片上面。列出 `LOBBY_GAMES` 裡 `meta.computer` 的桌遊（新遊戲加了 `computer: true` 就自動出現），每格「你和 N 位電腦玩家」＋「立刻開玩」；N＝`quickBotCount(meta)`＝`max(1, minPlayers − 1)`。難度是區塊上方的分段切換（簡單／普通，預設普通）。卡丁車兩格直接導到 `/kart?bots`（`KartPlay` 讀一次就從網址拿掉，`SpikePage` 以 `openBots` 開在對戰電腦設定）與 `/kart?school`。沒有暱稱時先跳暱稱框，再建房（和「建立房間」同一條路）。格子裡的遊戲名**不是標題**（`<p>`），因為測試與巡檢用 h3 找遊戲卡片。
 - **遊戲卡片**多一個「可以跟電腦玩」標籤：`meta.computer` 或有 `tryAlone`（卡丁車）的卡片。
