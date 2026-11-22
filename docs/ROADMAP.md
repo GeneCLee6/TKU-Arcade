@@ -192,6 +192,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #132 | 2026-11-22 | `docs/next-restructure` | NEXT 重整成短交接手冊、歷史搬到 `docs/history/`、本表 |
 | #133 | 2026-11-22 | `feat/platform-decisions-docs` | 擁有者平台決定：建房每分鐘 10 間、PRD 連線上限對齊實作、賽道技術提示開關 |
 | #134 | 2026-11-22 | `feat/kart-fixes-budget` | 房間卡丁車首屏 139.7 → 133.6 kB；駕訓班、挑戰、編輯器字串各自 lazy |
+| #135 | 2026-11-22 | `feat/kart-fixes-e2e` | 坡道上名牌貼著車；CSP 下讀截圖、觸控 e2e 等比賽載完；整套卡丁車 e2e 75/75 |
 
 ## Phase O · M4 社群
 
