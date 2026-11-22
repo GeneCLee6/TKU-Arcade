@@ -20,7 +20,13 @@ import type { Env } from './app.ts'
 import { ADDRESS_HEADER } from './address.ts'
 import { ACCOUNT_HEADER, decodeAccountHeader } from './auth.ts'
 import { LOBBY_NAME, lobbyReportDue, type LobbyReport } from './lobby-board.ts'
-import { RoomHost, type MemberRecord, type OpenSocket, type RoomRecord } from './room-host.ts'
+import {
+  RoomHost,
+  type MemberRecord,
+  type OpenSocket,
+  type RoomRecord,
+  type SeqAck,
+} from './room-host.ts'
 import type { StoredGame } from './room-turn.ts'
 
 const ROOM_KEY = 'room'
@@ -34,6 +40,8 @@ const stepKey = (index: number) => STEP_PREFIX + String(index).padStart(12, '0')
 /** Chat messages, one key each: a message is up to 2 kB and the room keeps 200 */
 const CHAT_PREFIX = 'chat:'
 const chatKey = (id: number) => CHAT_PREFIX + String(id).padStart(12, '0')
+/** What each member's page has had handled (shared/protocol.ts 20.), one key per member */
+const ACK_PREFIX = 'ack:'
 /** The most keys one `storage.delete` takes */
 const DELETE_BATCH = 128
 /** How long the paused games (e12-t11) read from D1 are trusted before a game may start on them */
@@ -113,6 +121,8 @@ export class RoomDO extends DurableObject<Env> {
         },
         saveChat: (message) => void storage.put(chatKey(message.id), message),
         dropChat: (id) => void storage.delete(chatKey(id)),
+        saveAck: (member, ack) =>
+          void (ack ? storage.put(ACK_PREFIX + member, ack) : storage.delete(ACK_PREFIX + member)),
         clearAll: () => void storage.deleteAll(),
       },
       games: getGame,
@@ -127,9 +137,10 @@ export class RoomDO extends DurableObject<Env> {
     })
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG))
     void ctx.blockConcurrencyWhile(async () => {
-      const [stored, chat, alarm] = await Promise.all([
+      const [stored, chat, acks, alarm] = await Promise.all([
         storage.get<unknown>([ROOM_KEY, MEMBERS_KEY, REV_KEY, GAME_KEY, LOBBY_KEY]),
         storage.list<ChatMessage>({ prefix: CHAT_PREFIX }),
+        storage.list<SeqAck>({ prefix: ACK_PREFIX }),
         storage.getAlarm(),
       ])
       this.alarmAt = alarm
@@ -141,6 +152,9 @@ export class RoomDO extends DurableObject<Env> {
           rev: (stored.get(REV_KEY) as number | undefined) ?? 0,
           game: (stored.get(GAME_KEY) as StoredGame | null | undefined) ?? null,
           chat: [...chat.values()],
+          acks: Object.fromEntries(
+            [...acks].map(([key, ack]) => [key.slice(ACK_PREFIX.length), ack]),
+          ),
         },
         ctx.getWebSockets().map((ws) => ws.deserializeAttachment() as OpenSocket),
         alarm,

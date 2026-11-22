@@ -90,6 +90,16 @@ for (const { name, options } of [
     await expectOnePage(ann)
     await expectOnePage(bob)
     await expect(ann.getByTestId('kart-lobby-place')).toHaveCount(8)
+    // 2026-11-23 (#151): every name whole, a computer's tag too (shrunk, or on two lines)
+    for (const page of [ann, bob]) {
+      const cut = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('[data-testid="kart-lobby-place"] [data-name]')]
+          // (The display face reaches a few pixels over its line: a third line would be a dozen)
+          .filter((name) => name.scrollWidth > name.clientWidth + 1 || name.scrollHeight > name.clientHeight + 6)
+          .map((name) => name.textContent),
+      )
+      expect(cut).toEqual([])
+    }
     // The ready flow: Start waits on Bob, Bob presses Ready, Ann starts
     await expect(ann.getByRole('button', { name: 'Start game' })).toBeDisabled()
     await expect(ann.getByTestId('kart-lobby-waiting')).toHaveText('Waiting for Bob to get ready')

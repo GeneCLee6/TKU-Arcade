@@ -1575,7 +1575,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **Esc**：真全螢幕時 Esc 是瀏覽器的（頁面攔不到），離開後頁面靠 `fullscreenchange`（含 `webkitfullscreenchange`）跟上；Chrome／Edge 桌機進入後用 Keyboard Lock 保留 Esc（`navigator.keyboard.lock(['Escape'])`），所以比賽的 Esc 先開暫停選單、長按 Esc 才離開全螢幕。專注模式沒有瀏覽器幫忙，Esc 由這裡處理，但有 `<dialog open>` 或畫面自己用掉這個 Esc（`event.preventDefault()`）時不動作——**要自己用 Esc 的畫面（暫停選單）請 `preventDefault()`**。
 - **自動全螢幕**（設定，預設關，`localStorage` `tku-arcade.fullscreen.auto`）：`autoFullscreen()`／`setAutoFullscreen()`／`useAutoFullscreen()`；瀏覽器只准從使用者動作進全螢幕，所以 `armAutoFullscreen()` 掛一次性的 `keydown`／`pointerdown`（捕獲階段，Esc 除外），比賽的第一個鍵或第一下觸控就進去；只用真全螢幕，不會無預警進專注模式。
 - **手機轉橫**：`lockLandscape()`／`unlockOrientation()`（`screen.orientation.lock('landscape')`，Chrome Android 只在全螢幕或已安裝的 app 有效，其他瀏覽器拒絕就維持現有的轉橫提示）。`src/kart/race/useRaceFullscreen.ts` 在比賽中：掛自動全螢幕、觸控裝置嘗試鎖橫（一進來先試一次給已安裝的 app，進全螢幕時再試）、離開比賽解鎖。
-- **按鈕**（`src/components/FullscreenButton.tsx`，自己的 lazy chunk，字串 `shared/games/i18n.fullscreen.ts` 由它登記、`screenMessages.ts` 列給 check-i18n）：每個房間標題列（桌遊等待室與遊戲中、卡丁車觀戰與結果）、卡丁車單機選單（`SpikePage.tsx`，`landscape`：進全螢幕順便鎖橫）、卡丁車等待室（§4.70）。比賽中由暫停選單（`feat/kart-race-flow`）提供。
+- **按鈕**（`src/components/FullscreenButton.tsx`，自己的 lazy chunk，字串 `shared/games/i18n.fullscreen.ts` 由它登記、`screenMessages.ts` 列給 check-i18n）：每個房間標題列（桌遊等待室與遊戲中、卡丁車觀戰與結果）、卡丁車單機選單（`SpikePage.tsx`，`landscape`：進全螢幕順便鎖橫）、卡丁車等待室（§4.71）。比賽中由暫停選單（`feat/kart-race-flow`）提供。
 - **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
 - **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
 
@@ -1605,7 +1605,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 **限制（照實寫）**：(1) 水面沒有倒影（沒有反射貼圖）；太陽的反光是燈光算的。(2) 高畫質的浪只在水面頂點上（約 12 m 一格），近看是平滑的大浪，不是碎浪。(3) 稜線是遠景，不能開上去；涼亭和廟沒有碰撞（離路 15 m 以上，開不到）。(4) 觀音山的輪廓是自己畫的峰，不是照真實的山形或照片。
 
 
-### 4.70 路線圖外：卡丁車等待室滿版（一頁、橫向、車手為主角）（2026-11-22，#151，`feat/kart-lobby-fullscreen`）
+### 4.71 路線圖外：卡丁車等待室滿版（一頁、橫向、車手為主角）（2026-11-22，#151，`feat/kart-lobby-fullscreen`）
 
 擁有者：「大廳準備階段的畫面要像跑跑一樣，全螢幕都是房主跟車手，現在的版面配置很醜也很空曠，要一頁就塞滿，橫向的寬的…總之要電競化專業化」。照規則 1 只學「準備畫面滿版、車手為主角」的類型排版；版面、美術、圖示是自己的（`IP-CHECKLIST.md`）。
 
@@ -1620,7 +1620,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **字串**：`shared/games/kart/i18n.lobby.ts` 多 9 個（`racers`、`room`、`roomTitle`、`manage`、`quickest`、`yourKart`、`sideways`、`watchingList`、`lineUp`）；`TrackCard` 的「各自為戰」不再寫（團隊賽才寫）。
 - **測試**：`tests/kart/lobby.test.tsx` 多 4 個（房間面板裡的電腦車與自動全螢幕設定、只有房主有管理鈕且能移除電腦車、車手數、3D 來之前的平面圖與最快車）；`e2e/kart-lobby.spec.ts`（新）：1280×720 與 844×390（觸控）房主＋Bob＋6 台電腦車：滾輪不動、等待室沒有捲動、8 格都完整在畫面內且高度 > 畫面 1/3、準備流程、axe 0 serious（含房間設定對話框）、聊天未讀數；等待室全螢幕進出；390×844 直拿是列表＋轉橫提示＋axe。`kart-race`／`kart-loading`／`kart-team`／`kart-editor` 改成從面板操作（房間設定、分隊、空位的加電腦車）。截圖：`KART_LOBBY_SHOTS=1` 時存到 `test-results/kart-lobby-*.png`。
 
-### 4.71 路線圖外：房間連線的穩定度（2026-11-22，`feat/net-stability-bots`，#149）
+### 4.72 路線圖外：房間連線的穩定度（2026-11-22，`feat/net-stability-bots`，#149）
 
 擁有者：「常常連線不穩。」原因、修法與前後數字在 `docs/NETWORK.md`。架構上的改變：
 
@@ -1630,7 +1630,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **RoomDO**：跑到 `webSocketMessage` 的 `ping` 也記心跳。
 - **工具**：`scripts/net-soak.ts`（`npm run net:soak`）；`e2e/network.spec.ts`。
 
-### 4.72 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，#152，`feat/kart-race-flow`）
+### 4.73 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，#152，`feat/kart-race-flow`）
 
 擁有者 2026-11-22：「按 esc 就可以暫停然後可以打開主選單……當第一台車完賽後倒數 10 秒，到了的車才能排名，然後最後要有前 3 名頒獎畫面動畫……地圖一開始要有每個車手的正面動畫，然後才是 321 倒數，倒數要有音效，GO 也要有音效，選單可以調節音量音效大小，動畫特效等等。」流程是類型慣例；畫面、聲音、文字全部自己做（`IP-CHECKLIST.md` 卡丁車 2026-11-22 補記）。
 
@@ -1676,7 +1676,27 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **測試**：`tests/kart/raceFlow.test.ts`（開場 8 人 ≤ 10 s、亮相 ≤ 6 s、照順序每位車手、鏡頭在車手正前方且最後接上全景、關掉亮相改繞場；倒數音效 3、2、1、GO 各一次且 GO 較亮；完賽倒數音效；伺服器 10 秒後第一個 frame 結束比賽、未完賽依進度排名、看不到的依圈數、壞的 progress 拒絕、玩家不能 close；團隊賽計分；暫停時比賽時鐘與房間時鐘一起停、恢復後不補時間、0 秒的一幀不跑物理；設定預設與逐欄回復、特效上限；頒獎台只放完賽的前三名、揭曉順序與時間、鏡頭、舉獎盃姿勢）；`tests/games/kart.test.ts`、`tests/worker/room-realtime.test.ts`、`tests/kart/roomBots.test.ts`（倒數改 `countdownMs(n)`、close 計時器）；e2e `kart-bots`（亮相卡、Esc 暫停時 tick 不動、設定、繼續後再動、頒獎台後才是結果）、`kart-race`（多人房 Esc 只開選單、完賽倒數、頒獎台、結果）、`kart-cup`（每場與總頒獎台）、`kart-watch-portrait`。
 
-### 4.74 路線圖外：桌遊介面電競化（大廳、等待室、標題列、結果）（2026-11-23，#155，`feat/esports-board-ui`）
+### 4.74 路線圖外：卡丁車第三輪細修（亮相同步、道具撞障礙物、老街主路導引、等待室站姿與手機省電、文件撞號）（2026-11-23，`feat/kart-polish-3`）
+
+- **亮相多人同步**（#152 觀察：同一台機器兩個瀏覽器差一位車手）：亮相本來就只看伺服器的 `goAt` 與對時後的時鐘，差在**對時還沒收斂**。量到的原因：比賽畫面是在「載完」那一刻才開始對時（`createRaceNet`），而最後一個載完的人一送出 `loaded`，房間就定 `goAt` 開始亮相——他的頭幾個對時答覆是在建場景、編著色器的忙碌主執行緒上讀到的，來回時間被拉長、時差偏掉半個來回（實測一位 0.4 s）。修法三層：(1) `shared/kart/net.ts` 的 `clockSettled`：來回最短的 3 個答覆推出的時差彼此差 ≤ 40 ms 才算「收斂」（被拖延的答覆延遲不會一樣），8 個答覆之後不管怎樣都算（抖動大的網路）；(2) `netRace.ts` 沒收斂前每 120 ms ping 一次、收斂後 2 s 一次（原本是固定 5 個 250 ms 再 2 s）；(3) `RaceView.tsx` 等**對時收斂**（最多 4 s）才送 `loaded`，所以房間開始亮相時每個畫面都已經收斂；`spikeLoop.ts` 在還沒收斂時不帶車手、只給起跑格全景（`SpikeNet.clockSettled`）。`__kartRace` 多 `settled`、`settledAt`、`begunAt`、`goAt` 給測試讀。
+  - 量測（`e2e/kart-intro-sync.spec.ts`，兩個人＋兩台電腦車，同一台機器 1 worker；Ann 用 CDP `Network.emulateNetworkConditions` 加 60 ms，Bob 的 WebSocket 去 20 ms、回 120 ms 不對稱，且前兩個對時答覆被 1.4 s、0.5 s 的忙碌主執行緒擋住）：兩個畫面對伺服器時鐘的估計差最大 53 ms（舊程式 395 ms，且 Ann 的車手卡從第 1 位 38 ms 就跳到第 2 位）；四位車手每位開始的時刻兩個畫面差 7／55／57 ms。測試門檻：時鐘差 < 150 ms、車手卡 < 200 ms（卡片在畫面幀上換，軟體繪圖一幀可能就上百 ms）。
+- **道具撞障礙物**（#150）：`shared/kart/obstacles.ts` 新增 `tickAtMs`（伺服器時間→比賽時鐘的步）、`obstacleStop`（一顆從某步出發、等速前進的東西每 1/60 s 看一次當下關著的閘門與貨櫃四邊，回傳撞到的秒數）、`clearOfObstacles`（放在路上的東西移出貨櫃滑過的整段範圍、移出閘門那條線的半徑內，沿著路往近的那邊移）。`shots.ts` 的 `throwHail`／`layFog`／`dropPuddle`／`dropDecoy` 多一個 `ShotBlockers`（障礙物＋出手那一步）：冰雹在撞到的那一刻消失（`until` 提早，瀏覽器照數字畫，不用新協定）、海霧放在當下關著的障礙物前面、泥灘與假道具箱放在障礙物外面。房間（`rules.ts`）用 `courseOf(track).obstacles` 與 `goAt` 算；沒有障礙物的賽道一切照舊。高度不看（冰雹飛在路面高度）。測試 `tests/kart/shotObstacles.test.ts`。
+- **老街主路導引**（#150）：頂尖腳本（master）在老街台階是收油過頂（沒有主路的導引，只有燈籠巷的路線導引）。`TrackGuide` 多 `cuesOnly`：**只有提示**的導引——手照自己在路上找的線開（繞攤位島、看路緣），只拿甩尾起跳的提示（`brain.ts`：`cuesOnly` 時不用導引的線、也不關掉看路緣）。直接給完整導引會讓 master 走導引線、不看牆，三圈多撞 4～5 次、慢 1.4 s。老街的台階在右彎快結束、左彎要來的地方，所以是**往左**甩、空中車尾幾乎不甩（10°）、落在 12 個路點後的中間：master 三圈 88.0～88.4 s（原本 88.1～88.7 s）、每圈都甩尾起跳、不重置；`npm run kart:medals -- --only oldstreet`（金 88.7 → 88.4、白金 86.3 → 86.2、銀 92.3 → 92，任務 clean 31.8 → 31.1）、`kart:meta -- --tracks oldstreet`（前三海豚、旗魚、水獺）。
+- **等待室**（#151）：
+  - 車手**站在車旁**（`driverModel.ts` 的 `onFeet`：腿直、手垂在身側；`kartModel.ts` 的 `KartDetail.standing`：站在車身右側外 0.34 m、座位前 0.35 m、轉 0.22 rad 朝車）；比賽中照坐姿。站著時開車的動作（轉向、噴射後仰、暈眩）不動他，只動手勢（待機看左右、準備舉雙手）。卡片的鏡頭看每台車加車手的實心範圍（`solidBox`：不含發光與隱藏的東西）取景，寬度與身高都要放得下。
+  - **手機省電**：手機（`pointer: coarse` 或短邊 < 500）不再每幀輪流畫 3 格（每格約 5 fps，看起來是卡），改成每格**只在有變化時畫一次**（換車、準備的舉手、舉手結束、尺寸變），一幀最多畫一格；動感交給卡片的 CSS（`idleSway`：5.6 s 一輪的輕微上下、±0.7° 擺、1.02 縮放，各格錯開相位，`prefers-reduced-motion` 不動），由合成器做，不吃 WebGL。桌機照舊即時畫。
+  - **長名字**：`nameFit.ts` 依字寬（中日韓字算 1.8）縮字到 0.66；橫拿手機（`max-height: 520px`）的名字可以兩行（`-webkit-line-clamp: 2`）。`e2e/kart-lobby.spec.ts` 檢查 8 格名字都沒被截（含「(CPU)」）。
+- **文件撞號**（#152 回報）：原本兩個 §4.70，等待室滿版改為 §4.71、連線穩定度 §4.72、比賽流程 §4.73，所有文件與程式註解的引用跟著改。
+
+### 4.75 路線圖外：可靠送達（訊息序號與確認）（2026-11-23，#153，`feat/net-reliable-esports-ui`）
+
+#149 留下的「送出了、socket 卻已死」那一下。細節、相容表與測試在 `docs/NETWORK.md` §5。
+
+- **協定**（`shared/protocol.ts` 20.，沒有升版）：`join.session`（頁面載入的隨機 id）、其他訊息的 `seq`（`ClientMessage = ClientBody & { seq?: number }`，`parseClientMessage` 先解析本體再看信封）、`welcome.ack`、新的伺服器訊息 `{ t: 'ack', seq }`。
+- **RoomHost**：`handleMessage` 拆成判斷序號 + `dispatch`；`acks: Map<成員, SeqAck>`，`seq` ≤ 已處理就只回 `ack`；處理完寫 `deps.storage.saveAck`（選用，`RoomDO` 存 `ack:<成員>`，喚醒時 `list({ prefix })` 讀回、清掉已不在的成員），和那則訊息的改變同一個同步段落、一起提交。`welcome(conn, member, session)`：同 session 回已處理到哪，新 session 歸零。
+- **頁面**（`connectRoom`）：`queue` 換成 `outbox`（排隊的與送出未確認的），第一次 `welcome` 有 `ack` 才編號；重連 `welcome` 後重送 `ack` 之後的（原號、原順序）再送排隊的；`RESEND_TTL_MS` 30 s、`MAX_UNACKED` 64；伺服器會確認時不再呼叫 `onUnanswered`。socket 層記送出／確認到的最大 `seq`，還有沒確認的就繼續等回音。
+
+### 4.76 路線圖外：桌遊介面電競化（大廳、等待室、標題列、結果）（2026-11-23，#155，`feat/esports-board-ui`）
 
 樣式規則在 `DESIGN.md` §3.7。程式上：
 

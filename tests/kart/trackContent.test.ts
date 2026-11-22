@@ -67,7 +67,9 @@ describe('the lantern alley (oldstreet@11)', () => {
     expect(slots[0]!.width).toBeCloseTo(ALLEY_DOOR_WIDTH, 1)
     // The route's guide aims the technical line through it
     expect(routeGuide('oldstreet')!.slots).toHaveLength(1)
-    expect(trackGuide('oldstreet')).toBeUndefined()
+    // The main road's guide (2026-11-23, #150) is the step's drift jump alone: no slot, no line
+    expect(trackGuide('oldstreet')!.cuesOnly).toBe(true)
+    expect(trackGuide('oldstreet')!.slots).toEqual([])
   })
 
   it('the expert takes it every lap; the easy, normal and hard computer karts never do', () => {

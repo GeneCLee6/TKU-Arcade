@@ -1,5 +1,5 @@
 // 2026-11-22 (owner: "the menu can set the music and sound volumes, the animations and effects";
-// docs/ARCHITECTURE.md §4.72): the kart's settings in one place, in the pause menu and on /kart's
+// docs/ARCHITECTURE.md §4.73): the kart's settings in one place, in the pause menu and on /kart's
 // menu. The volumes (audio/volumes.ts) are heard at once; the quality, the effects level and the
 // shake are read when a race's scene is built, so they apply from the next race; the opening and the
 // tips are read as the race goes. All kept in this browser, never throwing where storage is blocked.

@@ -4,6 +4,7 @@
 // countdown to the room's GO, the other karts to draw and to bump into, and their name tags.
 import {
   clockOffset,
+  clockSettled,
   encodeFrame,
   readRelayed,
   SEND_EVERY_STEPS,
@@ -70,9 +71,11 @@ import { createRemotes, type RemotePose } from './remotes.ts'
 import { gestureAt } from '../driverGestures.ts'
 import { raceEpochNow, raceNow } from './raceClock.ts'
 
-/** Clock pings: a quick few at first, then one every PING_EVERY_MS */
-const FIRST_PINGS = 5
-const FIRST_PING_GAP_MS = 250
+/**
+ * Clock pings: quick ones until the clock is settled (2026-11-23, shared/kart/net.ts's
+ * `clockSettled`), then one every PING_EVERY_MS
+ */
+const FIRST_PING_GAP_MS = 120
 const PING_EVERY_MS = 2_000
 /** Clock answers kept: the best of the recent ones wins */
 const KEEP_SAMPLES = 10
@@ -110,10 +113,16 @@ export interface RaceNet {
    */
   order(racers: readonly KartRacer[]): number[]
   /**
-   * 2026-11-22 (§4.72): the room's clock now (ms since the epoch), for the countdown after the first
+   * 2026-11-22 (§4.73): the room's clock now (ms since the epoch), for the countdown after the first
    * finish; null before the first clock answer
    */
   serverNow(): number | null
+  /**
+   * 2026-11-23 (#152): `listener` once the room's clock is settled here (at once if it is already):
+   * the race screen tells the room it is on the grid only then, so that the opening, which the room
+   * starts when everyone is, finds every screen's clock settled
+   */
+  whenSettled(listener: () => void): void
   stop(): void
 }
 
@@ -176,6 +185,13 @@ const ITEM_WAIT_MS = 700
 export interface RaceDebug {
   seat: number
   offset: number | null
+  /** 2026-11-23: the clock's answers agree (the opening presents its drivers from then on) */
+  settled: boolean
+  /** ... since when (Date.now()), and the samples it took */
+  settledAt?: number
+  /** When this race's side began here (Date.now()), and the room's GO as last read */
+  begunAt?: number
+  goAt?: number | null
   rtt: number | null
   sent: number
   received: number
@@ -218,6 +234,9 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   const heights = new Map<number, number>()
   const samples: ClockSample[] = []
   let offset: number | null = null
+  /** Whether the clock's answers agree yet (shared/kart/net.ts's `clockSettled`) */
+  let settled = false
+  const settledListeners: (() => void)[] = []
   let lastRtt: number | null = null
   let lastAnswerAt = raceNow()
   let badSince: number | null = null
@@ -231,6 +250,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   const debug: RaceDebug = {
     seat,
     offset: null,
+    settled: false,
+    begunAt: Date.now(),
     rtt: null,
     sent: 0,
     received: 0,
@@ -301,6 +322,13 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       if (samples.length > KEEP_SAMPLES) samples.shift()
       offset = clockOffset(samples)
       debug.offset = offset
+      // Settled once (2026-11-23): later answers only refine it, the opening never goes back
+      if (!settled && clockSettled(samples)) {
+        settled = true
+        debug.settled = true
+        debug.settledAt = Date.now()
+        for (const listener of settledListeners.splice(0)) listener()
+      }
       return
     }
     const relayed = readRelayed(data)
@@ -308,20 +336,26 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     debug.received++
     remotes.add(relayed.seat, relayed.frame, raceNow() / 1000)
   })
-  const timers: ReturnType<typeof setTimeout>[] = []
-  const burst = () => {
-    for (let i = 0; i < FIRST_PINGS; i++) {
-      timers.push(setTimeout(() => pingClock(), i * FIRST_PING_GAP_MS))
-    }
+  // Quick pings until the clock is settled, then the slow beat; each ping sets the next
+  let pinger: ReturnType<typeof setTimeout> | null = null
+  const nextPing = (delay: number) => {
+    if (pinger !== null) clearTimeout(pinger)
+    pinger = setTimeout(() => {
+      pinger = null
+      pingClock()
+      nextPing(settled ? PING_EVERY_MS : FIRST_PING_GAP_MS)
+    }, delay)
   }
+  const burst = () => nextPing(0)
   burst()
-  const pinger = setInterval(() => pingClock(), PING_EVERY_MS)
   // 2026-11-22 (docs/NETWORK.md): back after a drop or from the background, the clock is synced
   // anew. The old answers may be from before the device slept (when this browser's
   // `performance.now()` can stand still) or from another network: the offset stays until the first
   // new answer replaces them all
   const stopResume = realtime.onResume?.(() => {
     samples.length = 0
+    settled = false
+    debug.settled = false
     burst()
   })
 
@@ -587,6 +621,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       const now = serverNow()
       left = goAt === null || now === null ? null : (goAt - now) / 1000
       debug.countdown = left
+      debug.goAt = goAt
       if (left !== null && left > 0) debug.counted = true
       return left
     },
@@ -617,6 +652,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           }
         }),
     gridSpots: () => options.view().racers.map((_, slot) => gridSpot(track, slot)),
+    clockSettled: () => settled,
     place: () => orderOf(options.view().racers).indexOf(seat) + 1,
     others() {
       const view = options.view()
@@ -761,6 +797,10 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       tagListener = listener
     },
     serverNow,
+    whenSettled(listener) {
+      if (settled) listener()
+      else settledListeners.push(listener)
+    },
     status() {
       const now = raceNow()
       const silent = now - lastAnswerAt > SILENT_MS
@@ -775,8 +815,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     stop() {
       stopListening()
       stopResume?.()
-      for (const timer of timers) clearTimeout(timer)
-      clearInterval(pinger)
+      if (pinger !== null) clearTimeout(pinger)
+      pinger = null
       tagListener = null
     },
   }
