@@ -116,7 +116,19 @@ const standing = (sections: Parameters<typeof hull>[0]) => hull(sections).rotate
  * `astride` (2026-11-19): on a bike. The legs go down either side to the pegs, knees forward,
  * instead of out ahead into a kart's nose; the model lays the torso forward (kartModel.ts)
  */
-export function buildDriver(kit: BodyKit, driver: DriverId, astride = false): DriverModel {
+/**
+ * `onFeet` (2026-11-23, #151): on their feet beside the kart, for the race room's place cards
+ * (src/kart/lobby/lobbyStage.ts): the legs straight down to the ground, the arms hanging at the sides.
+ * The group's origin is still the hips' seat, 0.8 m above the soles
+ */
+export const STANDING_HIP = 0.8
+
+export function buildDriver(
+  kit: BodyKit,
+  driver: DriverId,
+  astride = false,
+  onFeet = false,
+): DriverModel {
   const colours = kartDrivers[driver]
   const suit = kit.colour(colours.suit, 0.8, 0.05)
   const panel = kit.colour(colours.panel, 0.55, 0.1, 0.12)
@@ -130,6 +142,16 @@ export function buildDriver(kit: BodyKit, driver: DriverId, astride = false): Dr
   const group = new Group()
   // Seated: the thighs forward and up to the knees, the shins down into the nose, boots
   for (const side of [-1, 1]) {
+    if (onFeet) {
+      // Standing: the thighs down to the knees, the shins to the ankles, the boots forward
+      const knee: Point = [side * 0.105, -0.32, -0.025]
+      const ankle: Point = [side * 0.105, -0.72, 0]
+      limb(kit, group, suit, [side * 0.09, 0.1, 0], knee, 0.085, 0.065)
+      limb(kit, group, suit, knee, ankle, 0.06, 0.045)
+      limb(kit, group, panel, [side * 0.105, -0.27, -0.03], [side * 0.105, -0.37, -0.03], 0.066, 0.068)
+      limb(kit, group, trim, [side * 0.105, -0.76, 0.02], [side * 0.105, -0.76, -0.15], 0.05, 0.045)
+      continue
+    }
     if (astride) {
       // Astride: the thighs forward and down round the tank, the shins back to the pegs, boots
       const knee: Point = [side * 0.215, -0.02, -0.34]
@@ -200,6 +222,17 @@ export function buildDriver(kit: BodyKit, driver: DriverId, astride = false): Dr
     const arm = new Group()
     arm.position.set(side * 0.2, 0.44, 0)
     // The shoulder's pad, the upper arm to the elbow, the forearm to the grip, a glove
+    if (onFeet) {
+      // Hanging at the side, a little out from the hips, the elbow just bent
+      const elbow: Point = [side * 0.05, -0.29, 0.02]
+      const hand: Point = [side * 0.07, -0.54, -0.05]
+      limb(kit, arm, panel, [0, 0.01, 0], [side * 0.03, -0.11, 0], 0.07, 0.058)
+      limb(kit, arm, suit, [side * 0.03, -0.11, 0], elbow, 0.055, 0.047)
+      limb(kit, arm, suit, elbow, hand, 0.047, 0.038)
+      limb(kit, arm, trim, [side * 0.068, -0.51, -0.045], [side * 0.072, -0.6, -0.06], 0.042, 0.046)
+      torso.add(arm)
+      return arm
+    }
     const elbow: Point = [side * 0.045, -0.22, -0.2]
     const hand: Point = [side * -0.085, -0.14, -0.45]
     limb(kit, arm, panel, [0, 0.01, 0], [side * 0.02, -0.1, -0.09], 0.07, 0.058)
