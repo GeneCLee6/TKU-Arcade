@@ -15,6 +15,7 @@ interface GameSetupProps {
   room: RoomInfo
   isHost: boolean
   onSetGame(gameId: string): void
+  /** Only the fields that change */
   onSetOptions(options: OptionValues): void
 }
 

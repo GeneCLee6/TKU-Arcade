@@ -495,6 +495,15 @@ function agreedToEnd(state: HoldemState): boolean {
   return votes.length > 0 && live.every((player) => player.away || state.endVotes.includes(player.seat))
 }
 
+/**
+ * Every person at the table has lost their chips, and only computer players are left (2026-11-22,
+ * #121): nobody is there to watch them play it out, so the game ends with the standings as they are
+ */
+function peopleOut(state: HoldemState): boolean {
+  const people = state.players.filter((player) => !player.bot)
+  return people.length > 0 && people.length < state.players.length && people.every((player) => player.out)
+}
+
 const gameOver = (state: HoldemState): HoldemState =>
   logged({ ...state, phase: { kind: 'over' }, step: state.step + 1 }, { k: 'end' })
 
@@ -596,6 +605,7 @@ export const holdem: GameModule<HoldemState, HoldemAction, HoldemView, HoldemOpt
       actedAt: 0,
       out: false,
       away: false,
+      ...(seat.bot ? { bot: true as const } : {}),
     }))
     const button = seats[rng.int(seats.length)].id
     const empty: HoldemState = {
@@ -642,7 +652,9 @@ export const holdem: GameModule<HoldemState, HoldemAction, HoldemView, HoldemOpt
           return sitOutNow(state, action.seat)
         case 'next': {
           if (phase.kind !== 'handEnd' || action.hand !== state.hand) return gameError(ERROR.notNow)
-          if (state.players.filter((player) => !player.out).length <= 1 || agreedToEnd(state)) return gameOver(state)
+          if (state.players.filter((player) => !player.out).length <= 1 || agreedToEnd(state) || peopleOut(state)) {
+            return gameOver(state)
+          }
           return startHand(state, nextLive(state, state.button), rng)
         }
       }

@@ -48,7 +48,7 @@
 //    any seat. `set_options`, only while `waiting`, replaces the rule options. Both clear `ready`,
 //    since nobody has said they are set for these rules. `transfer` hands the host to an online
 //    member. `kick` removes a member (also an offline one) and closes their socket with
-//    CloseCode.kicked; their seat token cannot join again for KICK_BAN_MS. During a game the seat
+//    CloseCode.kicked; they cannot join again for KICK_BAN_MS (18.). During a game the seat
 //    stays empty: the game may wait for it, and `reopen` is the way out until B4's skip. `dissolve`
 //    closes every socket with CloseCode.dissolved and deletes the room for good.
 //    A host offline for RECONNECT_GRACE_MS loses the host to the earliest member to join who is
@@ -77,6 +77,27 @@
 //    null, leaves it to the game: one's own, or anyone's from the host (`member`), in any status
 //    but `playing`. It is `RoomMember.team`, and each seat's goes to the game when it starts
 //    (`Seat.team`); a game without teams ignores it. Nothing else about the room reads it.
+// 16. Rule options as a patch (2026-11-22): `set_options` with `patch: true` carries only the fields
+//    that changed, merged into the room's options, so two quick changes in a row both stay (the
+//    second no longer carries the first's old value). Without `patch` (a page from before) it is
+//    the whole set, as before: a missing field gets its default.
+// 17. Seats of people who are gone (2026-11-22). While the room is `waiting` or `ended`, a member
+//    offline for SEAT_RELEASE_MS gives up their seat (a sweep finds it, so up to SWEEP_INTERVAL_MS
+//    later); being absent by then, they are removed as a spectator would be (10.), unless they are
+//    the host. During a game the seat stays theirs, and 10. and 11. apply as before. `leave` is
+//    going on purpose (the lobby link): at once, the host passes on (to the earliest member online,
+//    seated ones first; with nobody online, to the earliest other person; with none, to whoever
+//    joins next), and the socket is closed with CloseCode.left. While `waiting` or `ended` the member
+//    is removed; during a game a seated member is `absent` at once (their seat can be covered) and
+//    may come back with their token, a spectator is removed.
+// 18. Kicks (2026-11-22): besides the token, for KICK_BAN_MS the room refuses someone new whose
+//    session is the kicked member's club account, or who comes from the kicked member's hashed
+//    address (worker/address.ts) with the same name (as uniqueName compares them). The address
+//    alone never bans: a campus or a dorm shares one.
+// 19. Public or not (2026-11-22): `RoomInfo.public` says the room is listed on the home page
+//    while it waits for people (and has no password); `set_public` is the host's, in any status.
+//    A room nobody sends anything to for ROOM_IDLE_MAX_MS is deleted as in 13., sockets or not (a
+//    tab left open for days).
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
@@ -103,8 +124,13 @@ export const STALE_AFTER_MS = 45_000
 export const JOIN_TIMEOUT_MS = 10_000
 /** How long until a disconnected member is `absent`, and loses the host if they had it (AC-2.3) */
 export const RECONNECT_GRACE_MS = 45_000
-/** How long a kicked member's seat token cannot join again (E1) */
-export const KICK_BAN_MS = 5 * 60_000
+/**
+ * How long a kicked member cannot join again (E1): their seat token, their account, or their
+ * address with their name (18. above). Five minutes before 2026-11-22
+ */
+export const KICK_BAN_MS = 10 * 60_000
+/** While `waiting` or `ended`, how long someone offline keeps their seat (17. above) */
+export const SEAT_RELEASE_MS = 90_000
 /** How often the room looks for sockets past those limits, so a close can come this much later */
 export const SWEEP_INTERVAL_MS = 15_000
 /** Members a room keeps, seated or not, online or not; someone new past this gets roomFull */
@@ -119,6 +145,8 @@ export const MAX_CONNECTIONS = MAX_MEMBERS + 8
 export const MAX_CONNECTIONS_PER_ADDRESS = 24
 /** How long a room stays with nobody in it, or finished with nothing happening, before it is deleted */
 export const ROOM_CLEANUP_MS = 10 * 60_000
+/** A room nobody has sent anything to for this long is deleted, sockets open or not (19. above) */
+export const ROOM_IDLE_MAX_MS = 24 * 60 * 60_000
 
 /** Client messages larger than this (UTF-16 code units) are refused without parsing */
 export const MAX_CLIENT_MESSAGE_CHARS = 16_384
@@ -144,6 +172,8 @@ export const CloseCode = {
   kicked: 4411,
   /** The host dissolved the room; it no longer exists */
   dissolved: 4412,
+  /** This member left on purpose (`leave`, 17. above): nothing to reconnect to */
+  left: 4413,
   /** A message that does not parse */
   badMessage: 4422,
   /**
@@ -176,6 +206,11 @@ export type RoomInfo = {
    * got in with it or was already there, so they may see it to pass it on
    */
   password?: string
+  /**
+   * Listed on the home page while it waits for people and has no password (19. above); absent for
+   * a room reachable by link only
+   */
+  public?: true
 }
 
 /** One person in the room. The seat token is never part of the view: only its owner gets it */
@@ -402,7 +437,7 @@ export type RematchMessage = { t: 'rematch' }
 /** The host adds a computer member at `level` to the lowest free seat (14. above); `look` as set_look */
 export type AddBotMessage = { t: 'add_bot'; level: string; look?: string }
 
-/** The host removes a member from the room; their token cannot join again for KICK_BAN_MS */
+/** The host removes a member from the room; they cannot join again for KICK_BAN_MS (18. above) */
 export type KickMessage = { t: 'kick'; member: string }
 
 /** The host hands the host to another online member */
@@ -414,8 +449,17 @@ export type DissolveMessage = { t: 'dissolve' }
 /** The host changes the game; back to `waiting`. Options the game does not accept get defaults */
 export type SetGameMessage = { t: 'set_game'; gameId: string; options?: OptionValues }
 
-/** The host replaces the rule options while `waiting`. A missing or invalid one gets its default */
-export type SetOptionsMessage = { t: 'set_options'; options: OptionValues }
+/**
+ * The host changes the rule options while `waiting`. With `patch` (16. above) only the fields in
+ * `options` change; without it they are the whole set, and a missing or invalid one gets its default
+ */
+export type SetOptionsMessage = { t: 'set_options'; options: OptionValues; patch?: true }
+
+/** Leave the room on purpose (17. above): the seat and the host go at once */
+export type LeaveMessage = { t: 'leave' }
+
+/** The host lists the room on the home page, or takes it off (19. above) */
+export type SetPublicMessage = { t: 'set_public'; public: boolean }
 
 /** How many reactions there are (e7-t11); the browser draws them, the room only passes on a number */
 export const REACTION_COUNT = 6
@@ -464,6 +508,8 @@ export type ClientMessage =
   | SetTeamMessage
   | ReactMessage
   | AddBotMessage
+  | LeaveMessage
+  | SetPublicMessage
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -651,6 +697,11 @@ function nameKey(name: string): string {
  * `name`, or if someone in `taken` looks the same, the first free of `name (2)`, `name (3)`, ...,
  * in the person's own spelling and within MAX_NAME_CHARS, the base giving way to the suffix.
  */
+/** Whether two names look the same (as uniqueName tells them apart) */
+export function sameName(a: string, b: string): boolean {
+  return nameKey(a) === nameKey(b)
+}
+
 export function uniqueName(name: string, taken: Iterable<string>): string {
   const keys = new Set<string>()
   for (const other of taken) keys.add(nameKey(other))
@@ -747,9 +798,15 @@ export function parseClientMessage(raw: string): ClientMessage | null {
         ? { t: 'set_game', gameId: value.gameId, options: value.options as OptionValues }
         : null
     case 'set_options':
-      return isPlainObject(value.options)
-        ? { t: 'set_options', options: value.options as OptionValues }
+      if (!isPlainObject(value.options)) return null
+      if (value.patch === undefined) return { t: 'set_options', options: value.options as OptionValues }
+      return value.patch === true
+        ? { t: 'set_options', options: value.options as OptionValues, patch: true }
         : null
+    case 'leave':
+      return { t: 'leave' }
+    case 'set_public':
+      return typeof value.public === 'boolean' ? { t: 'set_public', public: value.public } : null
     case 'react':
       return Number.isInteger(value.reaction) &&
         (value.reaction as number) >= 0 &&

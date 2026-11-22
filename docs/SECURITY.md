@@ -108,10 +108,11 @@ frame-ancestors 'none'
 
 說明：
 
-- **位址**：`CF-Connecting-IP`，IPv4 整個、IPv6 取 /64（一個家或一支手機拿到整段 /64，可以在裡面換位址），加前綴後 SHA-256，只留前 16 個十六進位字（`worker/address.ts`）。完整位址不存、不寫日誌；雜湊只當 rate limiter 的 key（Cloudflare 那邊只留一分鐘的計數）和房間記憶體裡的連線計數（socket 的 attachment，連線關掉就沒了）。
+- **位址**：`CF-Connecting-IP`，IPv4 整個、IPv6 取 /64（一個家或一支手機拿到整段 /64，可以在裡面換位址），加前綴後 SHA-256，只留前 16 個十六進位字（`worker/address.ts`）。完整位址不存、不寫日誌；雜湊只當 rate limiter 的 key（Cloudflare 那邊只留一分鐘的計數）、房間記憶體裡的連線計數（socket 的 attachment，連線關掉就沒了），以及 2026-11-22 起的**踢人黑名單**：房間儲存裡每個成員記著最後一次加入的位址雜湊（`MemberRecord.address`，房間刪掉就一起沒了；沒人用的房間最晚 24 小時就刪），被踢的那筆黑名單（`RoomRecord.bans`）記著位址雜湊＋名字 10 分鐘（`KICK_BAN_MS`）。都不進任何 view、不寫日誌。
 - **LimiterDO**（`worker/limiter.ts`，DO migration `v2`）：依位址雜湊的第一個字分 16 個物件，每個物件在記憶體裡對每個桶（`create`／`socket`／`ownerFail`，數字在 `worker/rate-limit.ts` 的 `SHARED_LIMITS`）做每分鐘的固定視窗，**不寫儲存**；物件被回收就忘掉，只會讓人早點能再試。所有 instance 與機房都問同一個物件，所以計數精確。物件不存在（沒有 binding）或出錯時放行（限制器壞掉不該把網站一起拖垮），只剩每 instance 的記憶體限制。代價：每次建房、每次 WebSocket 升級、每次錯的金鑰多一次 DO 請求（免費額度每日 10 萬次）。
 - **為什麼不用 Cloudflare 的 Rate Limiting binding**：先做過（`ratelimits`，#110 的第一版）：部署成功、binding 有列出，但預覽站的日誌顯示同一個 key 連打 25 次都回 `success: true`，在這個帳號上沒有作用。它本來也只在單一機房內共用、最終一致。
 - **本機**：127.0.0.1、::1 不經 LimiterDO（Cloudflare 不會報這種位址），所以 `npm run dev` 與整套瀏覽器測試不會被擋。
+- **踢人黑名單**（2026-11-22，`shared/protocol.ts` 18.）：被踢的人 10 分鐘內，同一個 seat token、同一個社團帳號、或「同一個位址雜湊**而且**同一個名字」都進不來（4411）。不只看位址是刻意的：同一個校園 Wi-Fi 或宿舍共用一個位址，只看位址會把整桌朋友都擋掉。代價：換名字或換網路就能回來；朋友圈可以接受，再不行就設房間密碼或解散另開。
 - **共用位址**：同一個校園 Wi-Fi 或手機網路的人共用位址。10 間／分鐘、120 次升級／分鐘、每房 24 條是照「幾桌朋友在同一個 Wi-Fi」抓的（建房原本 5 間，2026-11-22 擁有者為校園 Wi-Fi 調成 10）；「再來一局」與換遊戲都不算建房。
 - **聊天以外的文字**：遊戲內的文字輸入都由規則在伺服器限長度、也只在該輪能送（撞詞與搭橋的提示 12 字、撞詞猜答 20 字、光譜的答案 30 字：`shared/games/*/clue.ts`、`answer.ts`），所以不另外限速率；每則訊息還有 `MAX_CLIENT_MESSAGE_CHARS`。沒有題目投稿、卡丁車名牌；卡丁車編輯器的分享碼只在瀏覽器解析。
 - GET 端點沒有限制：它們只讀、回應很小，Cloudflare 的 DDoS 防護在前面；成本儀表板會先看到異常（每日 Workers 請求 80% 警示）。

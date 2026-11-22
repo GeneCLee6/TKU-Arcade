@@ -36,7 +36,12 @@ export type RoomHandle = {
   /** The host deals with a seat in `view.coverable` */
   cover(seat: number, how: CoverMessage['how']): void
   setGame(gameId: string, options?: OptionValues): void
+  /** Only the fields that change (shared/protocol.ts 16.) */
   setOptions(options: OptionValues): void
+  /** 2026-11-22: the host lists the room in the lobby or takes it off (shared/protocol.ts 19.) */
+  setPublic(value: boolean): void
+  /** 2026-11-22: going back to the lobby on purpose; the seat and the host go at once (17.) */
+  leave(): void
   /** e1-t16: the host's; null takes the password away */
   setPassword(password: string | null): void
   /** e10-t05: a cosmetic choice for the others to see (RoomMember.look); null takes it away */
@@ -198,10 +203,17 @@ export function useRoom(roomId: string, name: string): RoomHandle {
       send(options ? { t: 'set_game', gameId, options } : { t: 'set_game', gameId }),
     [send],
   )
+  // Only what changed: two quick changes in a row both stay (shared/protocol.ts 16.)
   const setOptions = useCallback(
-    (options: OptionValues) => send({ t: 'set_options', options }),
+    (options: OptionValues) => send({ t: 'set_options', options, patch: true }),
     [send],
   )
+  const setPublic = useCallback(
+    (value: boolean) => send({ t: 'set_public', public: value }),
+    [send],
+  )
+  // Quiet: the page is on its way to the lobby, and a dropped socket goes the old way (17.)
+  const leave = useCallback(() => void connection.current?.send({ t: 'leave' }), [])
   const react = useCallback((reaction: number) => send({ t: 'react', reaction }), [send])
   const setPassword = useCallback(
     (password: string | null) => send({ t: 'set_password', password }),
@@ -255,6 +267,8 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     cover,
     setGame,
     setOptions,
+    setPublic,
+    leave,
     setPassword,
     setLook,
     addBot,

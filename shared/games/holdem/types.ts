@@ -45,6 +45,8 @@ export type HoldemPlayer = {
   out: boolean
   /** Sitting out: checks or folds at once when it is their turn, until they come back */
   away: boolean
+  /** A computer player (Seat.bot, 2026-11-22); absent for a person and in games from before */
+  bot?: true
 }
 
 /** One pot as it was won */

@@ -504,8 +504,17 @@ describe('host controls in the waiting room, over the wire', () => {
     fireEvent.blur(limit)
     expect(lastSent()).toEqual({
       t: 'set_options',
-      options: { edition: 'simple', dice: 'four-sided', turnLimit: 77, decisionSeconds: 30, buying: true, endAtDahe: false },
+      options: { turnLimit: 77 },
+      patch: true,
     })
+  })
+
+  it('leaves the room on purpose by the lobby link (17.), and lists it from the waiting room', async () => {
+    await joined()
+    fireEvent.click(screen.getByRole('button', { name: 'List in the lobby' }))
+    expect(lastSent()).toEqual({ t: 'set_public', public: true })
+    fireEvent.click(screen.getByRole('link', { name: 'Back to the lobby' }))
+    expect(lastSent()).toEqual({ t: 'leave' })
   })
 
   it('sends dissolve only after the confirmation', async () => {
@@ -688,6 +697,7 @@ describe('closes', () => {
   describe.each([
     ['kicked', CloseCode.kicked, 'The host removed you'],
     ['dissolved', CloseCode.dissolved, 'closed this room'],
+    ['left', CloseCode.left, 'You left this room'],
   ])('%s', (_, code, text) => {
     it('after welcome: says so, with the lobby link and no retry', async () => {
       await joined()
