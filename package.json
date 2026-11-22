@@ -26,6 +26,7 @@
     "kart:bots": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/kart-bots.ts",
     "kart:medals": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/kart-medals.ts",
     "kart:meta": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/kart-meta.ts",
+    "net:soak": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/net-soak.ts",
     "kart:loadtest": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/kart-loadtest.ts",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy"

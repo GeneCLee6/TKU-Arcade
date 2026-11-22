@@ -236,9 +236,12 @@ export class RoomDO extends DurableObject<Env> {
 
   override async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer): Promise<void> {
     const { conn } = ws.deserializeAttachment() as OpenSocket
-    // Normally answered by the auto-response without waking the object
-    if (data === HEARTBEAT_PING) ws.send(HEARTBEAT_PONG)
-    else if (typeof data === 'string') {
+    // Normally answered by the auto-response without waking the object (and read back at the
+    // sweep); one that reaches here counts as a heartbeat all the same
+    if (data === HEARTBEAT_PING) {
+      ws.send(HEARTBEAT_PONG)
+      this.host.heartbeat(conn, Date.now())
+    } else if (typeof data === 'string') {
       if (startsAGame(data, this.host.startsOnJoin())) await this.readFlags()
       this.host.message(conn, data)
     }

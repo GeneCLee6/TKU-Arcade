@@ -201,7 +201,7 @@ export async function handleRoomSocket(request: Request, env: Env, url: URL): Pr
   // would keep retrying
   const address = clientAddress(request)
   const key = await addressKey(address)
-  if ((address === null || !isLoopback(address)) && !(await takeShared(env.LIMITER, 'socket', key))) {
+  if ((address === null || !isLoopback(address)) && !(await takeSocket(env, key, url))) {
     return refuseSocket(CloseCode.tooManyConnections, 'too many connections')
   }
   // Who the session says this is (e1-t13): the room takes a signed-in person's name from here, not
@@ -214,6 +214,15 @@ export async function handleRoomSocket(request: Request, env: Env, url: URL): Pr
   const account = await sessionAccount(request, env)
   if (account) headers.set(ACCOUNT_HEADER, encodeAccountHeader(account))
   return roomStub(env, match[1]).fetch(new Request(request, { headers }))
+}
+
+/**
+ * One take of the address's socket allowance; a page coming back after a drop (`?resume=1`) has a
+ * further one of its own once that is spent (worker/rate-limit.ts SHARED_LIMITS.resume)
+ */
+async function takeSocket(env: Env, key: string, url: URL): Promise<boolean> {
+  if (await takeShared(env.LIMITER, 'socket', key)) return true
+  return url.searchParams.get('resume') === '1' && (await takeShared(env.LIMITER, 'resume', key))
 }
 
 /** An upgrade that is accepted only to be closed at once with `code`, which the page understands */
