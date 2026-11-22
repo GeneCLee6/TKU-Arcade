@@ -68,6 +68,7 @@ import {
 import type { SpikeNet } from '../spikeLoop.ts'
 import { createRemotes, type RemotePose } from './remotes.ts'
 import { gestureAt } from '../driverGestures.ts'
+import { raceEpochNow, raceNow } from './raceClock.ts'
 
 /** Clock pings: a quick few at first, then one every PING_EVERY_MS */
 const FIRST_PINGS = 5
@@ -108,6 +109,11 @@ export interface RaceNet {
    * they are (this kart by its own count, the others by their newest frames), then those out
    */
   order(racers: readonly KartRacer[]): number[]
+  /**
+   * 2026-11-22 (§4.68): the room's clock now (ms since the epoch), for the countdown after the first
+   * finish; null before the first clock answer
+   */
+  serverNow(): number | null
   stop(): void
 }
 
@@ -213,7 +219,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   const samples: ClockSample[] = []
   let offset: number | null = null
   let lastRtt: number | null = null
-  let lastAnswerAt = performance.now()
+  let lastAnswerAt = raceNow()
   let badSince: number | null = null
   let steps = 0
   let seq = 0
@@ -277,7 +283,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   const pingClock = () => {
     const ping = new Uint8Array(CLOCK_PING_BYTES)
     ping[0] = CLOCK_FRAME
-    new DataView(ping.buffer).setFloat64(1, performance.now(), true)
+    new DataView(ping.buffer).setFloat64(1, raceNow(), true)
     realtime.send(ping)
   }
   const stopListening = realtime.listen((data) => {
@@ -285,7 +291,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
       const sample: ClockSample = {
         sent: view.getFloat64(1, true),
-        received: performance.now(),
+        received: raceNow(),
         server: view.getFloat64(CLOCK_PING_BYTES, true),
       }
       lastAnswerAt = sample.received
@@ -300,7 +306,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     const relayed = readRelayed(data)
     if (!relayed || relayed.seat === seat) return
     debug.received++
-    remotes.add(relayed.seat, relayed.frame, performance.now() / 1000)
+    remotes.add(relayed.seat, relayed.frame, raceNow() / 1000)
   })
   const timers: ReturnType<typeof setTimeout>[] = []
   for (let i = 0; i < FIRST_PINGS; i++) {
@@ -308,9 +314,9 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
   }
   const pinger = setInterval(() => pingClock(), PING_EVERY_MS)
 
-  const serverNow = () => (offset === null ? null : performance.now() + offset)
+  const serverNow = () => (offset === null ? null : raceNow() + offset)
   /** The server's clock, or this browser's before the first answer: the items' times need one */
-  const roughNow = () => serverNow() ?? Date.now()
+  const roughNow = () => serverNow() ?? raceEpochNow()
 
   /** The items used since the last step, applied to this kart */
   const applyEvents = (run: Run): Run => {
@@ -390,7 +396,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     const run = view.teams ? teamStep(start, view) : start
     if (view.mode !== 'items') return run
     let next = applyEvents(run)
-    const now = performance.now()
+    const now = raceNow()
     const me = view.racers.find((racer) => racer.seat === seat)
     const holding = me?.item ?? null
     // The item key, once per press
@@ -603,7 +609,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     place: () => orderOf(options.view().racers).indexOf(seat) + 1,
     others() {
       const view = options.view()
-      poses = onGrid(remotes.poses(performance.now() / 1000), view)
+      poses = onGrid(remotes.poses(raceNow() / 1000), view)
       debug.others = poses.filter((pose) => !pose.stale).length
       const at = roughNow()
       // A team race: whose team boost burns now, by the room's word (their flames are blue)
@@ -671,7 +677,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
       const view = options.view()
       if (view.mode !== 'items') return { boxes: [], shields: [], shots: [] }
       const at = roughNow()
-      const now = performance.now()
+      const now = raceNow()
       const whereUp = (until: (racer: KartRacer) => number) =>
         view.racers
           .filter((racer) => until(racer) > at)
@@ -743,8 +749,9 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     onTags(listener) {
       tagListener = listener
     },
+    serverNow,
     status() {
-      const now = performance.now()
+      const now = raceNow()
       const silent = now - lastAnswerAt > SILENT_MS
       const slow = lastRtt !== null && lastRtt > SLOW_RTT_MS
       const quiet = poses.some((pose) => pose.stale)

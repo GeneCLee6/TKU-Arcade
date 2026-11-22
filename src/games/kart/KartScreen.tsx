@@ -2,7 +2,9 @@ import { lazy, Suspense, useState } from 'react'
 import styled from 'styled-components'
 import type { KartView } from '../../../shared/games/kart/types.ts'
 import type { Replay } from '../../../shared/kart/replay.ts'
-import { parseLook } from '../../../shared/kart/karts.ts'
+import { DEFAULT_DRIVER, DEFAULT_KART, parseLook } from '../../../shared/kart/karts.ts'
+import { raceTime } from './raceTime.ts'
+import { podiumSeats, type PodiumEntry } from '../../kart/ceremony/podium.ts'
 import { useFinishHold } from '../../kart/race/useFinishHold.ts'
 import { useMenuMusic } from '../../kart/audio/useMenuMusic.ts'
 import { Button } from '../../components/Button.tsx'
@@ -28,6 +30,9 @@ const ReplayShare = lazy(() => import('../../kart/watch/ReplayShare.tsx'))
 // 2026-11-22 (docs/KART-PERF.md §9): the standings of a race watched without the live view, which the
 // race view's chunk has too; not on the room's first screen
 const Standings = lazy(() => import('./Standings.tsx').then((module) => ({ default: module.Standings })))
+// 2026-11-22 (docs/ARCHITECTURE.md §4.68): the top three on the podium once the race is over, before
+// the room's results; its own chunk
+const PodiumCeremony = lazy(() => import('../../kart/ceremony/PodiumCeremony.tsx'))
 
 /**
  * The race room's screen (e9-t07, e9-t08, e9-t10). A racer gets the race full screen, from the grid
@@ -50,6 +55,8 @@ export default function KartScreen({ room, game }: GameScreenProps) {
   const [garage, setGarage] = useState(false)
   // The race as recorded, made once the race is over (for the file)
   const [finished, setFinished] = useState<Replay | null>(null)
+  // 2026-11-22: the race (by its start) whose podium has been shown or skipped
+  const [podiumShown, setPodiumShown] = useState<number | null>(null)
   const nameOf = (seat: number) => {
     const member = Object.values(room.view.members).find((one) => one.seat === seat)
     return member
@@ -87,7 +94,17 @@ export default function KartScreen({ room, game }: GameScreenProps) {
           nameOf={nameOf}
           lookOf={lookOf}
           onWatch={() => setWatchChoice(true)}
+          pause={{ canPause: false, onLeave: room.onLeave }}
         />
+      </Suspense>
+    )
+  }
+  const podium = game.over ? podiumOf(view, nameOf, lookOf) : []
+  if (game.over && podium.length > 0 && view.goAt !== null && podiumShown !== view.goAt) {
+    const race = view.goAt
+    return (
+      <Suspense fallback={loading}>
+        <PodiumCeremony entries={podium} onDone={() => setPodiumShown(race)} />
       </Suspense>
     )
   }
@@ -167,6 +184,32 @@ export default function KartScreen({ room, game }: GameScreenProps) {
         </Suspense>
       )}
     </>
+  )
+}
+
+/** The podium's three: the first three home, each in the kart they picked, with their time */
+function podiumOf(
+  view: KartView,
+  nameOf: (seat: number) => string,
+  lookOf: (seat: number) => ReturnType<typeof parseLook>,
+): PodiumEntry[] {
+  const home = view.racers
+    .filter((racer) => racer.finishMs !== null)
+    .sort((a, b) => (a.finishMs as number) - (b.finishMs as number) || a.seat - b.seat)
+  return podiumSeats(home.map((racer, index) => ({ seat: racer.seat, rank: index + 1 }))).map(
+    ({ seat, place }) => {
+      const look = lookOf(seat)
+      const finishMs = home.find((racer) => racer.seat === seat)?.finishMs ?? 0
+      return {
+        seat,
+        place,
+        name: nameOf(seat),
+        kart: look?.kart ?? DEFAULT_KART,
+        driver: look?.driver ?? DEFAULT_DRIVER,
+        line: raceTime(finishMs),
+        you: seat === view.you,
+      }
+    },
   )
 }
 

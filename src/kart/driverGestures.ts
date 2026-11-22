@@ -4,7 +4,9 @@
 // hit they already sway (kartModel.ts, #99). Which gesture when, and the pose it makes, pure so that
 // a test can read them; kartModel.ts eases between them and puts them on the driver.
 
-export type DriverGesture = 'idle' | 'wave' | 'pump' | 'cheer' | 'podium'
+// 2026-11-22 (§4.68): and on the podium after a race, the winner lifts the trophy high (the podium's
+// stage puts the cup in the hands)
+export type DriverGesture = 'idle' | 'wave' | 'pump' | 'cheer' | 'podium' | 'trophy'
 
 /** A fist in the air this long after a place gained, s */
 export const PUMP_SECONDS = 1.3
@@ -110,6 +112,21 @@ export function gesturePose(gesture: DriverGesture, t: number, seed = 0): Gestur
         headUp: 0.25,
         torsoBack: 0.12,
         bounce: Math.abs(Math.sin(t * 3)) * 0.03,
+      }
+    }
+    case 'trophy': {
+      // Both hands together straight overhead, lifted in time with the crowd, looking up at it
+      const rise = Math.min(1, t / 0.4)
+      const lift = Math.max(0, Math.sin(t * 4 + phase)) * 0.12
+      return {
+        leftUp: (2.9 + lift) * rise,
+        rightUp: (2.9 + lift) * rise,
+        leftOut: 0.12 * rise,
+        rightOut: 0.12 * rise,
+        headTurn: Math.sin(t * 0.7 + phase) * 0.15 * rise,
+        headUp: 0.35 * rise,
+        torsoBack: 0.1 * rise,
+        bounce: lift * 0.25 * rise,
       }
     }
   }

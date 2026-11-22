@@ -53,6 +53,8 @@ import { TouchControls } from './touch/TouchControls.tsx'
 import { useTouchControls } from './touch/useTouchControls.ts'
 import { touchBottom, touchCorner, touchSpace } from './touch/touchLayout.ts'
 import { broadcastSolid } from './ui/broadcast.ts'
+import { PauseLayer } from './ui/PauseLayer.tsx'
+import { SettingsDialog } from './ui/SettingsPanel.tsx'
 import { CoachTip } from './school/CoachTip.tsx'
 import { useCoach } from './school/useCoach.ts'
 import { answerInvite, shouldInvite } from './school/store.ts'
@@ -79,7 +81,7 @@ interface GaragePick {
   driver?: DriverId
 }
 
-type Open = 'controls' | 'tuning' | 'garage' | 'bots' | 'cup' | undefined
+type Open = 'controls' | 'tuning' | 'garage' | 'bots' | 'cup' | 'settings' | undefined
 
 /** What /kart drives on: a course, or the track made in the editor that its link brought (e10-t07) */
 type PlayCourse = SpikeCourse | 'custom'
@@ -493,6 +495,17 @@ export function SpikePage({
               {t('kart.tuning.open')}
             </Button>
           )}
+          {play && (
+            <Button
+              $variant="secondary"
+              $size="sm"
+              aria-expanded={open === 'settings'}
+              onClick={() => (open === 'settings' ? setOpen(undefined) : openPanel('settings'))}
+              data-testid="kart-settings-open"
+            >
+              {t('kart.flow.settings.title')}
+            </Button>
+          )}
           <Button
             ref={garageOpener}
             $variant="secondary"
@@ -679,6 +692,23 @@ export function SpikePage({
           )}
         </Hint>
       </Bottom>
+      {open === 'settings' && (
+        <SettingsDialog
+          t={t}
+          onClose={() => setOpen(undefined)}
+          onControls={() => setOpen('controls')}
+          onQuality={setQuality}
+        />
+      )}
+      {play && (
+        <PauseLayer
+          t={t}
+          canPause
+          button={false}
+          enabled={open === undefined && !menuOpen}
+          onRestart={() => race.current?.restart()}
+        />
+      )}
       {open === 'tuning' && (
         <TuningPanel t={t} tuning={tuning} onTuning={changeTuning} onClose={closeTuning} />
       )}

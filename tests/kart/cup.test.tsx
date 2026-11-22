@@ -36,6 +36,12 @@ import { trophyShape } from '../../src/kart/cup/trophyShape.ts'
 // The menu song is fetched after the screen is up; a test file can end first, and the late import
 // then fails the run (EnvironmentTeardownError, seen in CI 2026-11-22). No song is tested here.
 vi.mock('../../src/kart/audio/useMenuMusic.ts', () => ({ useMenuMusic: () => {} }))
+// 2026-11-22 (§4.68): the 3D podium comes first; here only its skip button
+vi.mock('../../src/kart/ceremony/PodiumCeremony.tsx', () => ({
+  default: ({ onDone }: { onDone: () => void }) => (
+    <button type="button" data-testid="kart-podium-skip" onClick={onDone} />
+  ),
+}))
 
 // The Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.24)
 
@@ -252,7 +258,7 @@ describe('the cup’s screens', () => {
     expect(loadCupRun()).toBeNull()
   })
 
-  it('end on the podium: the first three on steps, a trophy, the player’s result', () => {
+  it('end on the podium: the first three on steps, a trophy, the player’s result', async () => {
     const run = runCup(SETUP, [
       [0, 3, 1, 2],
       [3, 0, 2, 1],
@@ -260,6 +266,7 @@ describe('the cup’s screens', () => {
     saveCupRun(run)
     const onMenu = vi.fn()
     render(<CupView run={run} onMenu={onMenu} />)
+    fireEvent.click(await screen.findByTestId('kart-podium-skip'))
     const podium = screen.getByTestId('kart-cup-podium')
     expect(podium.querySelectorAll('[data-place]')).toHaveLength(3)
     expect(screen.getByTestId('kart-cup-trophy')).toHaveAccessibleName('The Ebb Tide Cup trophy')

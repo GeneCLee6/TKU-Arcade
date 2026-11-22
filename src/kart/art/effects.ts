@@ -43,6 +43,7 @@ import { kartHover, kartScene } from '../../styles/kartTokens.ts'
 import { BOOST_FX } from '../boostFx.ts'
 import { createParticleBatch } from './particles.ts'
 import type { KartLook, KartModel } from './kartModel.ts'
+import { loadSettings, PARTICLE_SHARE } from '../settings.ts'
 
 /** Dust puffs alive at once, at most */
 const FULL_PUFFS = 110
@@ -259,6 +260,8 @@ export function createKartEffects(
   const SKIDS = lite ? 1200 : FULL_SKIDS
   const RIBBON = lite ? 16 : FULL_RIBBON
   const texture = softTexture()
+  // 2026-11-22 (§4.68, src/kart/settings.ts): the effects level lays fewer of them
+  const share = PARTICLE_SHARE[loadSettings().effects]
   let clock = 0
 
   // 2026-11-20 (docs/KART-PERF.md): the smoke, the sparks and the fire are particles in two
@@ -663,6 +666,7 @@ export function createKartEffects(
       // stream under boost
       const smoking = skid > 0
       puffDue +=
+        share *
         (smoking ? PUFF_RATE + PUFF_RATE_MORE * skid : look.boosting && !flying ? 4 : 0) * seconds
       const cos = Math.cos(pose.heading)
       const sin = Math.sin(pose.heading)
@@ -697,7 +701,7 @@ export function createKartEffects(
       // drift has earned its release boost; pale blue from both corners while its window is open
       const charge = look.charge ?? 0
       const ready = charge === 2
-      sparkDue += (ready && !flying ? 140 : sliding ? (charge === 1 ? 110 : 70) : 0) * seconds
+      sparkDue += share * (ready && !flying ? 140 : sliding ? (charge === 1 ? 110 : 70) : 0) * seconds
       const throwSpark = (
         corner: { x: number; z: number },
         outward: number,
@@ -758,7 +762,7 @@ export function createKartEffects(
         }
         flashAge = 0
         flashMaterial.color.set(style.core)
-        jetDue += 24 * burstPower
+        jetDue += 24 * burstPower * share
         for (let index = 0; index < Math.round(BURST_SPARKS * (0.5 + burstPower)); index++) {
           const corner = corners[index % corners.length]!
           const fan = (Math.random() - 0.5) * 9
@@ -769,7 +773,7 @@ export function createKartEffects(
       burstAge = Math.min(BURST_SECONDS, burstAge + seconds)
       // A full boost throws sparks out of the back all the while
       if (burning && style.ribbons && !flying) {
-        boostSparkDue += BOOST_SPARK_RATE * (lite ? 0.4 : 1) * seconds
+        boostSparkDue += BOOST_SPARK_RATE * (lite ? 0.4 : 1) * share * seconds
         while (boostSparkDue >= 1) {
           boostSparkDue -= 1
           const corner = corners[nextSpark % corners.length]!
@@ -821,6 +825,7 @@ export function createKartEffects(
           JET_RATE *
           (style.ribbons ? 0.3 : 0.5 + 0.5 * style.length) *
           kart.thrusters.length *
+          share *
           seconds
       else jetDue = Math.min(jetDue, 1)
       let mouth = 0

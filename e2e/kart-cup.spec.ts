@@ -45,6 +45,9 @@ test('a one-race cup from the menu to the podium, kept across reloads', async ({
   await expect(results.getByTestId('kart-bots-again')).toHaveCount(0)
   await results.getByTestId('kart-cup-next').click()
 
+  // 2026-11-22 (§4.68): the cup's top three on the 3D podium first, skipped by its button
+  await expect(page.getByTestId('kart-podium')).toBeVisible()
+  await page.getByTestId('kart-podium-skip').click()
   const podium = page.getByTestId('kart-cup-podium')
   await expect(podium).toBeVisible()
   await expect(podium.getByTestId('kart-cup-trophy')).toBeVisible()
@@ -54,6 +57,8 @@ test('a one-race cup from the menu to the podium, kept across reloads', async ({
   expect(outcome).toMatch(/^You took place [12] of 2, with [35] points$/)
   // The podium stays for a reload, until it is left
   await page.reload()
+  await expect(page.getByTestId('kart-podium')).toBeVisible({ timeout: 30_000 })
+  await page.getByTestId('kart-podium-skip').click()
   await expect(podium).toBeVisible({ timeout: 30_000 })
   await podium.getByTestId('kart-cup-done').click()
 

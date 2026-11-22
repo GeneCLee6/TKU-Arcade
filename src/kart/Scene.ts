@@ -73,6 +73,7 @@ import {
   type Chased,
 } from './camera.ts'
 import type { CameraShot } from './director.ts'
+import { cappedPost, loadSettings } from './settings.ts'
 
 const GROUND_SIZE = 400
 const GRID_CELL = 5
@@ -237,7 +238,10 @@ export function createKartScene(
   const settings = QUALITY[quality]
   const farAt = FAR_KART[quality]
   const software = softwareRenderer()
-  const postLevel = software ? 'off' : settings.post
+  // 2026-11-22 (§4.68): the effects level may develop the picture less than the quality would
+  const raceSettings = loadSettings()
+  const postLevel = software ? 'off' : cappedPost(settings.post, raceSettings.effects)
+  const shakeScale = raceSettings.shake ? 1 : 0
   const renderer = new WebGLRenderer({
     // Developed afterwards (post.ts), the scene is smoothed in its own buffer, not on the canvas
     antialias: settings.antialias && postLevel === 'off',
@@ -532,12 +536,12 @@ export function createKartScene(
       const cos = Math.cos(rig.heading + (looking?.orbit ?? 0))
       camera.position.set(x - sin * back, (looking?.up ?? CAMERA_UP) + cameraY, z + cos * back)
       if (motion) {
-        const jolt = cameraShake(rig)
+        const jolt = cameraShake(rig) * shakeScale
         camera.position.add(
           projected.set(
-            cos * shake.x + (Math.random() - 0.5) * 2 * jolt,
-            shake.y + (Math.random() - 0.5) * 2 * jolt,
-            sin * shake.x + (Math.random() - 0.5) * 2 * jolt,
+            (cos * shake.x + (Math.random() - 0.5) * 2 * jolt) * shakeScale,
+            (shake.y + (Math.random() - 0.5) * 2 * jolt) * shakeScale,
+            (sin * shake.x + (Math.random() - 0.5) * 2 * jolt) * shakeScale,
           ),
         )
       }

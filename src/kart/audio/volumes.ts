@@ -1,16 +1,19 @@
-// 2026-11-20 (docs/ARCHITECTURE.md §4.46): the kart's two volumes, music and sound effects, each 0 to
-// 1, kept in this browser (lib/storage.ts never throws: blocked storage keeps them for the page). The
-// site's own sound switch (lib/sound.ts) still silences both; these only set how loud each is.
+// 2026-11-20 (docs/ARCHITECTURE.md §4.46): the kart's volumes, music and sound effects (2026-11-22,
+// §4.68: and the ambience), each 0 to 1, kept in this browser (lib/storage.ts never throws: blocked
+// storage keeps them for the page). The site's own sound switch (lib/sound.ts) still silences them
+// all; these only set how loud each is.
 import { readStored, writeStored } from '../../lib/storage.ts'
 
 export interface KartVolumes {
   /** The soundtrack, 0 to 1 */
   readonly music: number
-  /** The engine, the tyres, the items, the world around the track, 0 to 1 */
+  /** The engine, the tyres, the items, 0 to 1 */
   readonly effects: number
+  /** 2026-11-22: the world around the track (ambience.ts), its own volume, 0 to 1 */
+  readonly ambience: number
 }
 
-export const DEFAULT_VOLUMES: KartVolumes = { music: 0.7, effects: 1 }
+export const DEFAULT_VOLUMES: KartVolumes = { music: 0.7, effects: 1, ambience: 0.8 }
 
 const KEY = 'tku-arcade.kart.volumes'
 const listeners = new Set<() => void>()
@@ -28,6 +31,7 @@ export function parseVolumes(stored: string | null): KartVolumes {
     return {
       music: clamp(json.music, DEFAULT_VOLUMES.music),
       effects: clamp(json.effects, DEFAULT_VOLUMES.effects),
+      ambience: clamp(json.ambience, DEFAULT_VOLUMES.ambience),
     }
   } catch {
     return DEFAULT_VOLUMES
@@ -41,7 +45,11 @@ export function loadVolumes(): KartVolumes {
 
 /** Keeps them, and returns whether the browser did (false: they last until the page closes) */
 export function saveVolumes(next: KartVolumes): boolean {
-  cached = { music: clamp(next.music, 0), effects: clamp(next.effects, 0) }
+  cached = {
+    music: clamp(next.music, 0),
+    effects: clamp(next.effects, 0),
+    ambience: clamp(next.ambience, DEFAULT_VOLUMES.ambience),
+  }
   writeStored(KEY, JSON.stringify(cached))
   for (const listener of listeners) listener()
   return readStored(KEY) === JSON.stringify(cached)

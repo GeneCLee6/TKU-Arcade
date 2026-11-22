@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { kart } from '../../shared/games/kart/rules.ts'
 import { KART_TUNING } from '../../shared/kart/physics.ts'
 import { seconds, startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
 import { courseOf, type Track } from '../../shared/kart/track.ts'
@@ -161,15 +162,21 @@ function botsOnly(id: string, mode: KartMode, difficulty: Difficulty, count: num
 
 describe('a race of bots in a room run in this browser', () => {
   it.each(RACE_TRACK_IDS)(
-    'every bot finishes an item race on %s',
+    'the bots race an item race on %s to its end: home, or placed by how far round when it closes',
     (id) => {
       const { room, race } = botsOnly(id, 'items', 'normal', 4)
       const state = room.state()
       expect(state.phase).toBe('finished')
+      // 2026-11-22: ten seconds after the first finish the rest are out, with how far they came
+      expect(state.racers.some((racer) => racer.finishMs !== null)).toBe(true)
       for (const racer of state.racers) {
-        expect(racer.out).toBe(false)
-        expect(racer.finishMs).not.toBeNull()
-        expect(racer.lapMs).toHaveLength(3)
+        if (racer.finishMs !== null) {
+          expect(racer.out).toBe(false)
+          expect(racer.lapMs).toHaveLength(3)
+        } else {
+          expect(racer.out).toBe(true)
+          expect(racer.progress).toBeGreaterThan(2)
+        }
       }
       // They took boxes and used what they got, and the room judged it
       const bots = race.bots()
@@ -185,8 +192,15 @@ describe('a race of bots in a room run in this browser', () => {
     const state = room.state()
     expect(state.phase).toBe('finished')
     expect(hits).toBeGreaterThan(0)
-    const times = state.racers.map((racer) => racer.finishMs ?? Infinity)
-    expect(times.every(Number.isFinite)).toBe(true)
+    // Those home first, by their times, then those out by how far round they had come
+    const { standings } = kart.result(state)
+    const racerOf = (seat: number) => state.racers.find((racer) => racer.seat === seat)!
+    const home = standings.filter((line) => racerOf(line.seat).finishMs !== null)
+    expect(home.length).toBeGreaterThan(0)
+    const times = home.map((line) => racerOf(line.seat).finishMs!)
+    expect(times).toEqual([...times].sort((a, b) => a - b))
+    const far = standings.slice(home.length).map((line) => racerOf(line.seat).progress ?? 0)
+    expect(far).toEqual([...far].sort((a, b) => b - a))
   }, 60_000)
 
   it('a plain race has no boxes and no items', () => {

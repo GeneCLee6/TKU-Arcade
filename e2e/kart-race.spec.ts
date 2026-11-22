@@ -137,7 +137,8 @@ test('two people and a computer kart race one lap in one room', async ({ browser
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
   // Only the host gets the computer karts' panel
   await expect(bob.getByTestId('kart-room-bots')).toHaveCount(0)
-  await ann.getByTestId('kart-room-bots-level').selectOption('normal')
+  // 2026-11-22: the easy one, behind: the room's ten seconds after the first finish count down
+  await ann.getByTestId('kart-room-bots-level').selectOption('easy')
   await ann.getByTestId('kart-room-bots-add').click()
   for (const page of [ann, bob]) {
     await expect(page.getByTestId('bot-member')).toHaveText(/\(CPU\)$/)
@@ -153,11 +154,35 @@ test('two people and a computer kart race one lap in one room', async ({ browser
   for (const page of [ann, bob]) {
     await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 90_000 }).toBe(2)
   }
+  // 2026-11-22 (§4.68): Esc in a room opens the menu, and the race goes on
+  await bob.keyboard.press('Escape')
+  await expect(bob.getByTestId('kart-pause-live')).toBeVisible()
+  await expect(bob.getByTestId('kart-pause-leave')).toBeVisible()
+  await expect(bob.getByTestId('kart-pause-restart')).toHaveCount(0)
+  await bob.getByTestId('kart-pause-resume').click()
+  // After the first finish, ten seconds for the rest: the big countdown for one still out, or the
+  // seconds left under a finished racer's place
+  await expect
+    .poll(
+      async () => {
+        for (const page of [ann, bob]) {
+          if ((await page.getByTestId('kart-close-countdown').count()) > 0) return true
+          if ((await page.getByText(/The others have \d+ s/).count()) > 0) return true
+        }
+        return false
+      },
+      { timeout: 180_000, intervals: [200] },
+    )
+    .toBe(true)
+  // The top three on the podium, then the results
   for (const page of [ann, bob]) {
-    await expect(page.getByText('Race over')).toBeVisible({ timeout: 180_000 })
+    await expect(page.getByTestId('kart-podium')).toBeVisible({ timeout: 60_000 })
   }
-  // The computer kart is in the results by name, with a time: the room judged its lap
+  for (const page of [ann, bob]) {
+    await expect(page.getByText('Race over')).toBeVisible({ timeout: 60_000 })
+  }
+  // The computer kart is in the results by name: the room judged its lap, or that it did not finish
   const results = bob.getByRole('region', { name: 'Results' })
   await expect(results).toContainText(botName)
-  await expect(results.getByText(/Finished in \d:\d\d\.\d{3}/)).toHaveCount(3)
+  await expect(results.getByText(/Finished in \d:\d\d\.\d{3}/).first()).toBeVisible()
 })
