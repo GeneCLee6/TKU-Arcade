@@ -3,6 +3,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import type { GameProjection } from '../../shared/games/types.ts'
 import type { RoomParts } from '../components/GameLayout.tsx'
+import { loadDetailStrings } from './promotion/detailStrings.ts'
 import { loadFullStrings } from './promotion/full/fullStrings.ts'
 import { loadScreenStrings } from './screenStrings.ts'
 
@@ -17,7 +18,7 @@ type GameScreen = LazyExoticComponent<ComponentType<GameScreenProps>>
 type ScreenModule = Promise<{ default: ComponentType<GameScreenProps> }>
 
 // A screen and its words in the page's language, fetched side by side (screenStrings.ts): the screen
-// shows with them, never before. Promotion's simple board and the kart register their own
+// shows with them, never before. The kart registers its own
 const withStrings = (gameId: string, load: () => ScreenModule): GameScreen =>
   lazy(() => {
     const strings = loadScreenStrings(gameId)
@@ -25,7 +26,11 @@ const withStrings = (gameId: string, load: () => ScreenModule): GameScreen =>
   })
 
 const SCREENS: Partial<Record<string, GameScreen>> = {
-  promotion: lazy(() => import('./promotion/PromotionScreen.tsx')),
+  // The simple board's words, one language at a time too (2026-11-23)
+  promotion: lazy(() => {
+    const strings = loadDetailStrings()
+    return import('./promotion/PromotionScreen.tsx').then((module) => strings.then(() => module))
+  }),
   'silent-table': withStrings('silent-table', () => import('./silent-table/SilentTableScreen.tsx')),
   spectrum: withStrings('spectrum', () => import('./spectrum/SpectrumScreen.tsx')),
   bluff: withStrings('bluff', () => import('./bluff/BluffScreen.tsx')),

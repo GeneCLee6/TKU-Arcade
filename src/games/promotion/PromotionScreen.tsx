@@ -20,13 +20,12 @@ import {
   space,
 } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
-import { loadBoardFont } from './boardFont.ts'
 import { BOARD_LAYOUTS, CELL_WIDTH, fitBoard } from './boardLayout.ts'
-import { CellDetail } from './CellDetail.tsx'
 import { cellText, shortCellText } from './cellText.ts'
-import { PromotionBoard, type BoardPiece, type PieceFlight } from './PromotionBoard.tsx'
+import type { BoardPiece, PieceFlight } from './PromotionBoard.tsx'
 import { artHref, knobStyle, rankArtOf } from './rankArt.ts'
 import { RollDisplay } from './RollDisplay.tsx'
+import { boardChunk } from './boardChunk.ts'
 import { useBoardFit } from './useBoardFit.ts'
 import { MIN_ZOOM, MAX_ZOOM, useBoardZoom } from './useBoardZoom.ts'
 import { useImmersive } from './useImmersive.ts'
@@ -55,7 +54,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
   const language = useLanguage()
   const state = game.view as unknown as PromotionView
   const reducedMotion = useReducedMotion()
-  useEffect(loadBoardFont, [])
+  const drawn = boardChunk.use()
   const zoom = useBoardZoom()
   const { viewport, attach, show, zoom: zoomLevel } = zoom
 
@@ -296,19 +295,23 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
 
           <BoardArea ref={boxRef}>
             <Viewport ref={attach} $zoomed={zoom.zoom > MIN_ZOOM}>
-              <PromotionBoard
-                layout={layout}
-                pieces={pieces}
-                activeSeat={activeSeat}
-                selected={markedCell ?? null}
-                onSelect={toggleCell}
-                flight={flight}
-                reducedMotion={reducedMotion}
-                width={boardWidth}
-                dense={dense}
-              />
+              {drawn ? (
+                <drawn.PromotionBoard
+                  layout={layout}
+                  pieces={pieces}
+                  activeSeat={activeSeat}
+                  selected={markedCell ?? null}
+                  onSelect={toggleCell}
+                  flight={flight}
+                  reducedMotion={reducedMotion}
+                  width={boardWidth}
+                  dense={dense}
+                />
+              ) : (
+                <BoardSpace style={{ width: boardWidth, aspectRatio: `${layout.width} / ${layout.height}` }} />
+              )}
             </Viewport>
-            <CellDetail id={selected} onClose={() => setSelected(null)} />
+            {drawn && <drawn.CellDetail id={selected} onClose={() => setSelected(null)} />}
           </BoardArea>
 
           {/* On a phone held upright the names are small: the board is biggest on its side */}
@@ -481,6 +484,13 @@ const BoardArea = styled.div`
 
 // One finger scrolls a zoomed board, two are ours (useBoardZoom). Auto margins centre the board
 // without cutting off the top or left of a zoomed one
+// The board's place for the moment before its drawing arrives (boardChunk)
+const BoardSpace = styled.div`
+  margin: auto;
+  flex: none;
+  max-height: 100%;
+`
+
 const Viewport = styled.div<{ $zoomed: boolean }>`
   position: absolute;
   inset: 0;

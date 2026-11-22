@@ -1,7 +1,10 @@
-// The lobby cards' pictures (e7-t12): a small original drawing for each game, in the card's hexagon,
-// drawn here as SVG (no asset file: DESIGN.md §6). Its own chunk, after the first paint; until it
-// comes, and for a game without a drawing, the card shows the name's first letter.
+// The lobby cards' pictures (e7-t12): a small original drawing for each game, drawn here as SVG (no
+// asset file: DESIGN.md §6). Its own chunk, after the first paint; until it comes, and for a game
+// without a drawing, the card shows the name's first letter. Since 2026-11-23 the same chunk draws
+// each card's broadcast cover (GameCover) and the lobby hero's arena (HeroArena) from them.
 import type { ReactElement, ReactNode } from 'react'
+import styled, { keyframes } from 'styled-components'
+import { color, font, gameHue } from '../styles/tokens.ts'
 
 const stroke = {
   fill: 'none',
@@ -178,6 +181,16 @@ const ART: Record<string, ReactElement> = {
       <circle fill="currentColor" cx="24" cy="20" r="3" />
     </>
   ),
+  // A low wedge of a kart, two wheels and speed lines behind it (2026-11-23)
+  kart: (
+    <>
+      <path {...stroke} d="M9 21l3-6h9l7 4v2z" />
+      <path {...stroke} d="M15 15l2-4h3" />
+      <circle {...stroke} cx="12" cy="23" r="2.6" />
+      <circle {...stroke} cx="24" cy="23" r="2.6" />
+      <path {...stroke} d="M2 14h6M3 18h4M1 22h4" />
+    </>
+  ),
   // A dumpling over a steamer's rim
   wasabi: (
     <>
@@ -195,6 +208,183 @@ export default function GameArt({ gameId, fallback }: { gameId: string; fallback
   return (
     <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" focusable="false">
       {art}
+    </svg>
+  )
+}
+
+/** A small number from a game's id, the same every time: where its cover's bars fall */
+function seedOf(id: string): number {
+  let hash = 2166136261
+  for (const char of id) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619)
+  return hash >>> 0
+}
+
+const HEX = 'M-20 0 L-10 -17.3 L10 -17.3 L20 0 L10 17.3 L-10 17.3 Z'
+
+/**
+ * A lobby card's cover (2026-11-23): made from the game's id, in its hue (`currentColor`, which the
+ * card sets to its accent). A floor of grid lines, slanted bars placed by the id, the game's drawing
+ * large in a hexagon with a glow, and its number in the list. Only for the eye
+ */
+export function GameCover({ gameId, index }: { gameId: string; index: number }) {
+  const seed = seedOf(gameId)
+  const bars = [0, 1, 2, 3].map((i) => {
+    const bits = (seed >>> (i * 7)) & 127
+    return { x: 8 + ((bits * 37) % 150), w: 10 + (bits % 4) * 9, o: 0.12 + (bits % 3) * 0.08 }
+  })
+  const art = ART[gameId]
+  return (
+    <svg
+      viewBox="0 0 320 120"
+      preserveAspectRatio="xMidYMid slice"
+      width="100%"
+      height="100%"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect width="320" height="120" fill="currentColor" opacity="0.1" />
+      {/* The floor: lines running off to a point above the drawing */}
+      <g stroke="currentColor" strokeWidth="1" opacity="0.22">
+        {[-160, -80, 0, 80, 160, 240, 320, 400, 480].map((x) => (
+          <line key={x} x1={x} y1="120" x2="240" y2="10" />
+        ))}
+        {[70, 88, 104, 118].map((y) => (
+          <line key={y} x1="0" y1={y} x2="320" y2={y} />
+        ))}
+      </g>
+      {bars.map((bar, i) => (
+        <path
+          key={i}
+          d={`M${bar.x + 30} 0h${bar.w}l-30 120h-${bar.w}z`}
+          fill="currentColor"
+          opacity={bar.o}
+        />
+      ))}
+      <path d="M150 120l26-120h4l-26 120z" style={{ fill: color.magenta }} opacity="0.55" />
+      <g transform="translate(244 58) scale(2.3)">
+        <path d={HEX} fill="currentColor" opacity="0.16" />
+        <path d={HEX} fill="none" stroke="currentColor" strokeWidth="1" opacity="0.7" />
+      </g>
+      {art && <g transform="translate(212 26) scale(2)">{art}</g>}
+      <text
+        x="14"
+        y="104"
+        fill="currentColor"
+        opacity="0.55"
+        fontSize="40"
+        fontWeight="900"
+        fontStyle="italic"
+        style={{ fontFamily: font.display }}
+      >
+        {String(index + 1).padStart(2, '0')}
+      </text>
+    </svg>
+  )
+}
+
+const HERO_GAMES = ['promotion', 'silent-table', 'spectrum', 'holdem', 'lantern', 'tiles'] as const
+
+// Honeycomb places, around the middle one
+const HERO_SPOTS = [
+  [170, 70],
+  [254, 118],
+  [86, 118],
+  [254, 214],
+  [86, 214],
+  [170, 262],
+] as const
+
+const drift = keyframes`
+  50% {
+    transform: translateY(-6px);
+  }
+`
+
+const Floating = styled.g`
+  animation: ${drift} 6s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`
+
+const sweep = keyframes`
+  0%, 70% {
+    transform: translateX(-200px);
+  }
+
+  100% {
+    transform: translateX(560px);
+  }
+`
+
+const Sweep = styled.rect`
+  animation: ${sweep} 7s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    display: none;
+  }
+`
+
+/**
+ * The lobby hero's picture on a wide screen (2026-11-23): an arena of the games' emblems, each in its
+ * hue, round a hexagon with the site's glyph, over a grid floor in a cut-corner frame. Only for the eye
+ */
+export function HeroArena({ glyph }: { glyph: string }) {
+  return (
+    <svg viewBox="0 0 340 340" width="100%" height="100%" aria-hidden="true" focusable="false">
+      <defs>
+        <clipPath id="hero-frame">
+          <path d="M24 0H340V300L300 340H0V24Z" />
+        </clipPath>
+      </defs>
+      <g clipPath="url(#hero-frame)">
+        <rect width="340" height="340" style={{ fill: color.brand }} opacity="0.06" />
+        <g style={{ stroke: color.brand }} strokeWidth="1" opacity="0.25">
+          {[-170, -85, 0, 85, 170, 255, 340, 425, 510].map((x) => (
+            <line key={x} x1={x} y1="340" x2="170" y2="150" />
+          ))}
+          {[250, 280, 304, 324].map((y) => (
+            <line key={y} x1="0" y1={y} x2="340" y2={y} />
+          ))}
+        </g>
+        <Sweep x="0" y="0" width="60" height="340" transform="skewX(-14)" style={{ fill: color.brand }} opacity="0.08" />
+      </g>
+      <path
+        d="M24 0H340V300L300 340H0V24Z"
+        fill="none"
+        style={{ stroke: color.brand }}
+        strokeWidth="1.5"
+        opacity="0.6"
+      />
+      <path d="M0 24L24 0h60l-6 6H26L6 26v50l-6 6z" style={{ fill: color.magenta }} />
+      <path d="M340 300l-40 40h-70l6-6h62l36-36v-60l6-6z" style={{ fill: color.brand }} />
+      {HERO_SPOTS.map(([x, y], i) => {
+        const id = HERO_GAMES[i]
+        return (
+          <Floating key={id} style={{ animationDelay: `${-i}s` }}>
+            <g transform={`translate(${x} ${y}) scale(2)`}>
+              <path d={HEX} style={{ fill: gameHue(id) }} />
+            </g>
+            <g transform={`translate(${x - 22} ${y - 22}) scale(1.375)`} style={{ color: color.onAccent }}>
+              {ART[id]}
+            </g>
+          </Floating>
+        )
+      })}
+      <g transform="translate(170 166) scale(2.6)">
+        <path d={HEX} style={{ fill: color.surface, stroke: color.magenta }} strokeWidth="1.2" />
+      </g>
+      <text
+        x="170"
+        y="186"
+        textAnchor="middle"
+        fontSize="54"
+        fontWeight="900"
+        style={{ fill: color.text, fontFamily: font.displayZh }}
+      >
+        {glyph}
+      </text>
     </svg>
   )
 }

@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/KART-PERF.md §11, docs/ARCHITECTURE.md §4.78): the art of what only some tracks
+// 2026-11-23 (docs/KART-PERF.md §11, docs/ARCHITECTURE.md §4.80): the art of what only some tracks
 // have, each its own lazy chunk, like a track's own quarter (trackScenery.ts): the branches' roads
 // (forkArt.ts), the high platforms on them (ledgeArt.ts), a road over a road (crossingArt.ts), the
 // moving obstacles (obstacleArt.ts) and the light at night (nightLights.ts), together in one lazy

@@ -45,7 +45,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.lobby.seat': '{seat} 號位',
   'games.kart.lobby.empty': '空位',
   'games.kart.lobby.addBot': '加電腦車',
-  'games.kart.lobby.addBotIn': '在 {seat} 號位加一台電腦車',
+  'games.kart.lobby.addBotIn': '加電腦車到 {seat} 號位',
   'games.kart.lobby.ready': '準備完成',
   'games.kart.lobby.notReady': '還沒準備',
   'games.kart.lobby.host': '房主',

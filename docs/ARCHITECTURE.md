@@ -1721,7 +1721,28 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **測試**：`tests/kart/ledges.test.ts`（拋物線與門檻、快一點上得去慢一點撞牆落回主路不重置、預測、格式拒絕、四張賽道的門檻與省的距離、伺服器圈時、電腦車的選擇與噴射）；`technical.test.ts` 的四張圖、`challenge.test.ts` 的章節數。
 - **限制（照實寫）**：(1) 只有「從主路跳台斜飛到旁邊平台」一種形狀；平台不能在主路正上方（岔路必須離開主路）。(2) 平台沒有「掉下去落回主路」的開放邊：側邊是牆，失誤是撞牆或掉進縫。(3) 電腦車對準靠一個簡單的追點；斜角 40° 的網寮屋頂偶爾會偏。(4) 平台的建築是方塊，沒有各圖專屬造型。
 
-### 4.78 路線圖外：卡丁車第二輪效能與預算（2026-11-23，`feat/kart-perf-2`）
+### 4.78 路線圖外：桌遊介面電競化（大廳、等待室、標題列、結果）（2026-11-23，#155，`feat/esports-board-ui`）
+
+樣式規則在 `DESIGN.md` §3.7。程式上：
+
+- `GameArt.tsx`（lazy chunk）多 `GameCover`（卡片封面，`seedOf(id)` 決定斜槓位置）與 `HeroArena`（大廳主視覺）兩個具名匯出，`GameCard`、`HomePage` 用 `lazy(() => import(...).then(({ X }) => ({ default: X })))` 拿；`ART` 多了 `kart`。`gameCardParts.ts` 多 `Cover`（固定高、切角、`color: accent`，SVG 全用 `currentColor`）。
+- `WaitingRoom.tsx`：座位清單改成 `SeatGrid`／`SeatCard`（仍是 `ul`／`li`，座位號、`入座` 的無障礙名稱不變），`MemberEntry` 原樣放在名牌裡；空位不再用 `FreeSeatRow`（遊戲中的成員面板照舊用）。`Avatar` 多一個選用的 `size`。
+- `RoomPage.tsx` 的 `RoomHeading` 多 `status`（`room.status.*`）；`ResultPanel.tsx` 多 `room.result.final`、`room.result.winner`。
+- **首屏**：大廳 101.5 → 101.6 kB（封面框與 hover 的樣式；色塊主視覺搬出首屏抵掉一部分）；房間的 chunk 多約 1.3 kB（陞官圖首屏 145.5 → 146.8 kB；合併 #153 之後 147.2 kB，上限 150）。
+
+### 4.79 路線圖外：手機大廳的第一個畫面、首屏瘦身、模擬手機巡檢（2026-11-23，`feat/site-polish-mobile`）
+
+- **大廳**：`QuickPlay.tsx` 多 `open` 狀態與只在 480 px 以下出現的 `Toggle`（`aria-expanded`、`aria-controls="quick-play-games"`、`data-quick-toggle`）；收合時 `[data-fold]`（說明、難度、清單）在手機上 `display: none`，寬螢幕不看這個狀態。`GameCard` 的連結與「建立房間」包進 `Actions`：寬螢幕 `display: contents`（版面和原本一樣），手機一列。`HomePage` 的標語、公開房說明（`:has(input:checked)`）、間距在 480 px 以下收緊。樣式見 `DESIGN.md` §4。
+- **首屏之後才載的部分**（`src/lib/lateChunk.ts`）：一個動態 import，畫面第一次 render 後開始載，載到了就同步 render（不像 `React.lazy` 每次掛載都要等一輪）；`tests/setup.ts` 一開始全部載好，所以測試照舊同步。用在：
+  - `src/lib/lateParts.ts`：結果（`ResultPanel`，`GameLayout` 用 `createElement`）、聊天（`ChatPanel`）、手機抽屜與分頁（`Drawer`、`Tabs`）、斷線提示（`ConnectionBanner`；它本來就延遲 1 s 才出現，載入失敗會在下一次斷線重試）。元件在 `src/components/LateParts.tsx`。
+  - 陞官圖簡化版：畫圖版的 `PromotionBoard` 與格子說明 `CellDetail`（`src/games/promotion/boardChunk.ts`；來之前留一塊同尺寸的空位，畫面不跳）；畫面字串改成分語言（`i18n.detail.en.ts`／`zh-TW.ts`，`detailStrings.ts`，`check-budget` 的 `SCREEN_LANGUAGE_PARTS` 有列）；圖版專用的幾何（棋子位置、飛行弧線、官名斷行）搬到 `boardGeometry.ts`；圖版字型（`loadBoardFont`）改由圖版要；`MOVE_MS`／`ROLL_MS` 搬到 `playbackTimes.ts`（圖版不再拉進播放與音效）。
+  - 全螢幕的 `inertOthers`（`useImmersive.ts` 的 `inertChunk`，按全螢幕時通常早已載好；萬一還沒就載到再套）。
+- **首屏**（zh-TW，上限 150、警告區 140 以上）：陞官圖簡化版 147.2 → 139.4 kB、完整版 142.6 → 139.6 kB；其他 15 款各少約 2–3 kB（例如光譜 137.0 → 134.1、卡丁車房間 138.3 → 135.4、德州撲克 134.9 → 132.1）；主站 101.6 → 101.9 kB（收合鈕的樣式與字串）。
+- **結果的分數數上去**：`ResultPanel` 的 `CountUp`，只有瀏覽器說可以動（`prefers-reduced-motion: no-preference`）時才數，React 不管那段文字（`useLayoutEffect` 直接寫 `textContent`），前後都是最後的分數。
+- **模擬手機巡檢**（`e2e/phones.spec.ts`，不進 CI）：iPhone（WebKit 375 × 812、390 × 844 中文）與 Android（Chromium 412 × 915）各走大廳、展開「跟電腦玩」、德州撲克對電腦一手、卡丁車等待室（直拿與橫拿）、`/kart?bots` 開場亮相，用 `e2e/sweep.ts` 的 `checkLayout`（橫向捲動、裸 key、被擋的按鈕、被截斷的字）與 `checkAxe`（serious 以上）。找到並修了：德州撲克手機座位名字被硬切（「Heron (CPU)」成「Heron (C」；`Table.tsx` 名字改最多兩行）、卡丁車等待室中文「加電腦車」的無障礙名稱不含看得到的字（axe `label-content-name-mismatch`）、收合列按鈕在 WebKit 沒靠右；`npm run test:sweep` 手機那兩種另外抓到德州撲克蓋牌座位整格半透明，連它亮出來的牌也淡掉（方塊 10 對比 1.9:1，axe serious），改成只淡座位的字。開發模式 React 掛兩次時 Safari 把「連線中就關掉的 socket」記成錯誤，只在 dev server 出現，列為提醒不擋。`E2E_PORT=5199 npx playwright test phones.spec.ts --workers=1`；`PHONE_SHOTS=1` 存截圖到 `test-results/phones/`。
+- **CI**：`sweep` job 在巡檢前多跑 `e2e/mobile.spec.ts`（`playwright.config.ts` 設了 `E2E_PORT` 就自己起 dev server），約一分半。
+
+### 4.80 路線圖外：卡丁車第二輪效能與預算（2026-11-23，`feat/kart-perf-2`）
 
 擁有者 2026-11-22：「整夜繼續開發」「電競化專業化」，朋友多半用手機玩。#124 之後加了障礙物、立體交叉、車身貼圖、真的海、等待室 8 個 3D 車手、頒獎台、高台，卡丁車 chunk 合計 567.8／600 kB。量法、前後表在 `KART-PERF.md` §11。
 
@@ -1752,7 +1773,8 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 | 一款遊戲的選項與房間要的字串（選項標籤、錯誤、結算） | `shared/games/<id>/info.ts`、`i18n.ts`（仍是兩語一檔，很小） | 進那款遊戲的房間時（`src/i18n/gameDetails.ts` 用 `import.meta.glob` 每款各一個 chunk；`RoomPage` 一拿到房間摘要就開始載，第一次顯示房間前等它；房主換遊戲時選單一變就開始載） |
 | 陞官圖完整版的畫面字串（最大的一張表） | `shared/games/promotion/i18n.full.en.ts`、`i18n.full.zh-TW.ts` | 和完整版畫面一起（`screens.ts` 的 lazy、`full/fullStrings.ts`），只載目前語言；字型要的中文字在畫面之後才載（`fullFont.ts`） |
 | 其他 15 款桌遊畫面的字串（2026-11-22） | `shared/games/<id>/i18n.screen.en.ts`、`i18n.screen.zh-TW.ts`（`i18n.screen.ts` 只是兩語合起來給 check-i18n、`npm run play` 與測試） | 和畫面一起（`screens.ts` 的 `withStrings`、`src/games/screenStrings.ts` 用 `import.meta.glob` 每款每語一個 chunk），只載目前語言；`tests/games/screenStrings.test.ts` 擋網站再 import 兩語那份 |
-| 陞官圖簡化版畫面、卡丁車 | `i18n.screen.ts` 等，`registerMessages` | 照舊隨畫面 chunk，兩語（簡化版很小、字型要全部中文字；卡丁車另有 `KART_PARTS`） |
+| 陞官圖簡化版畫面的字（2026-11-23） | `shared/games/promotion/i18n.detail.en.ts`、`i18n.detail.zh-TW.ts`（`i18n.detail.ts` 只是兩語合起來） | 和畫面一起（`screens.ts`、`src/games/promotion/detailStrings.ts`），只載目前語言 |
+| 陞官圖圖版的字、卡丁車 | `i18n.screen.ts` 等，`registerMessages` | 照舊隨畫面（圖版）chunk，兩語（字型要全部中文字；卡丁車另有 `KART_PARTS`） |
 
 - **不閃英文**：`index.html` 有一段 inline script，用和 `t.ts` 一樣的規則（localStorage，否則 `navigator.languages`）決定語言，對那份字串 chunk 發 `modulepreload`，所以它和入口一起下載、不是入口跑完才開始；檔名由 `vite.config.ts` 的 `languageChunks` 在 build 時填進去（找不到就 build 失敗）。`src/main.tsx` 等那份到了才 render。載入失敗就改用英文，再失敗也照樣 render（看到的是 key）。
 - **切換語言**：`setLanguage` 先記住選擇（localStorage），等那個語言的網站字串與已註冊的語言分片（`registerLanguageParts`：房間、陞官圖完整版、15 款桌遊畫面）都到了才換；載過一次之後是立即的。連點兩下以最後一次為準。

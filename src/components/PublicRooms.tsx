@@ -141,6 +141,33 @@ const Row = styled.li<{ $hue: string }>`
   justify-content: space-between;
   gap: ${space.md}px;
   padding: ${space.sm}px ${space.lg}px ${space.sm}px ${space.xl}px;
+  transition: translate 0.2s;
+
+  /* 2026-11-23: a bar in the game's hue down the slanted left edge; slides over on hover */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: -1;
+    width: ${space.xl}px;
+    background: ${color.accent};
+    clip-path: ${slantClip(12)};
+    pointer-events: none;
+  }
+
+  &:hover,
+  &:focus-within {
+    translate: ${space.xs}px 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover,
+    &:focus-within {
+      translate: none;
+    }
+  }
 
   & > button {
     flex: none;

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { createElement, useState, type ReactNode } from 'react'
 import styled from 'styled-components'
 import type { ChatMessage } from '../../shared/chat.ts'
 import type { Standing } from '../../shared/games/types.ts'
@@ -7,16 +7,15 @@ import type { RoomMember } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import type { RoomRealtime } from '../lib/useRoom.ts'
 import { unreadCount } from '../lib/chatState.ts'
+import { resultPanelChunk } from '../lib/lateParts.ts'
 import { useCompact } from '../lib/useMediaQuery.ts'
 import { color, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
-import { ChatPanel, type ChatPanelProps } from './ChatPanel.tsx'
+import type { ChatPanelProps } from './ChatPanel.tsx'
 import { Countdown } from './Countdown.tsx'
-import { Drawer } from './Drawer.tsx'
-import { ResultPanel } from './ResultPanel.tsx'
+import { LateChatPanel as ChatPanel, LateDrawer as Drawer, LateTabs as Tabs } from './LateParts.tsx'
 import { CoverSection, RoomInPlay, type RoomInPlayProps } from './RoomInPlay.tsx'
 import { seatedMembers } from './roomParts.ts'
-import { Tabs } from './Tabs.tsx'
 
 export type RoomChat = Pick<ChatPanelProps, 'messages' | 'locked' | 'onSend' | 'draftStore'>
 
@@ -86,6 +85,7 @@ export function GameLayout({
   ownCountdown,
 }: GameLayoutProps) {
   const compact = useCompact()
+  const ResultPanel = resultPanelChunk.use()
   const hasGame = children !== undefined
   const status = room.view.room.status
   const result = status === 'ended' ? (room.view.game?.result ?? null) : null
@@ -97,21 +97,24 @@ export function GameLayout({
     hidePlaying: hasGame,
     resultElsewhere: result !== null,
   }
-  const resultPanel = result && !resultHeld && (
-    <ResultPanel
-      view={room.view}
-      you={room.you}
-      result={result}
-      headline={resultHeadline}
-      detail={resultDetail}
-      unranked={resultUnranked}
-      extra={resultExtra}
-      onRematch={room.onRematch}
-      onReopen={room.onReopen}
-      onDissolve={room.onDissolve}
-      onLeave={room.onLeave}
-    />
-  )
+  // 2026-11-23: its code loads after the game's first paint (src/lib/lateParts.ts)
+  const resultPanel =
+    result &&
+    !resultHeld &&
+    ResultPanel &&
+    createElement(ResultPanel, {
+      view: room.view,
+      you: room.you,
+      result,
+      headline: resultHeadline,
+      detail: resultDetail,
+      unranked: resultUnranked,
+      extra: resultExtra,
+      onRematch: room.onRematch,
+      onReopen: room.onReopen,
+      onDissolve: room.onDissolve,
+      onLeave: room.onLeave,
+    })
 
   if (!compact) {
     return (

@@ -1,5 +1,6 @@
 import {
   memo,
+  useEffect,
   useId,
   useLayoutEffect,
   useRef,
@@ -16,33 +17,22 @@ import {
   type Face,
 } from '../../../shared/games/promotion/board.ts'
 import { knobOf } from '../../../shared/games/promotion/departments.ts'
-import { promotionDetailMessages } from '../../../shared/games/promotion/i18n.detail.ts'
 import { promotionScreenMessages } from '../../../shared/games/promotion/i18n.screen.ts'
 import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { registerMessages, type Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { promotionBoard as paint } from '../../styles/promotionTokens.ts'
 import { color, font, seatColor } from '../../styles/tokens.ts'
-import {
-  arcControl,
-  arcPoints,
-  cellNameLines,
-  centre,
-  piecePoints,
-  PLAQUE_HEIGHT,
-  type BlockBox,
-  type BoardLayout,
-  type CellBox,
-  type Point,
-} from './boardLayout.ts'
+import { arcControl, arcPoints, cellNameLines, centre, piecePoints, type Point } from './boardGeometry.ts'
+import { PLAQUE_HEIGHT, type BlockBox, type BoardLayout, type CellBox } from './boardLayout.ts'
+import { loadBoardFont } from './boardFont.ts'
 import { cellForKey } from './boardKeys.ts'
 import { artHref, knobStyle, rankArtOf, rankArtSize } from './rankArt.ts'
-import { MOVE_MS } from './useRollPlayback.ts'
+import { MOVE_MS } from './playbackTimes.ts'
 
 // The board's own strings (plaques, seals) and the rest of the screen's, cell and rank names among
 // them: they load with the game's screen, not with the site (D4)
 registerMessages(promotionScreenMessages)
-registerMessages(promotionDetailMessages)
 
 export interface BoardPiece {
   seat: number
@@ -98,6 +88,8 @@ export function PromotionBoard({
   dense = false,
 }: PromotionBoardProps) {
   const t = useT()
+  // The brush face is asked for with the drawing that uses it (2026-11-23: not the screen's first load)
+  useEffect(loadBoardFont, [])
   const points = piecePoints(pieces, layout)
   const flown = flight && !reducedMotion ? flightPath(flight, pieces, layout) : null
   const hintId = useId()

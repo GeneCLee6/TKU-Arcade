@@ -137,10 +137,10 @@ function SeatBox({
     >
       <Name>
         <Dot style={{ background: seatColor(player.seat) }} aria-hidden="true" />
-        {name}
+        <NameText>{name}</NameText>
       </Name>
       <Stack>{player.out ? status : player.stack}</Stack>
-      <Holes>
+      <Holes data-holes="">
         {player.shown.length > 0
           ? player.shown.map((card) => <CardFace key={card} card={card} size="tiny" win={winning.has(card)} />)
           : player.inHand && !you && (
@@ -236,7 +236,11 @@ const Box = styled.div<{ $turn: boolean; $you: boolean; $faded: boolean }>`
   color: ${color.text};
   border: 2px solid ${(p) => (p.$turn ? color.accent : p.$you ? color.brand : color.line)};
   box-shadow: ${(p) => (p.$turn ? `0 0 12px ${color.accent}` : 'none')};
-  opacity: ${(p) => (p.$faded ? 0.6 : 1)};
+  /* Folded or out: the seat's words fade, never cards it shows (2026-11-23: a shown 10 of diamonds in a
+     faded seat was 1.9:1 against the dimmed card, axe serious in the phone sweep) */
+  & > :not([data-holes]) {
+    opacity: ${(p) => (p.$faded ? 0.6 : 1)};
+  }
   font-size: 12px;
   line-height: 1.2;
 
@@ -251,10 +255,19 @@ const Name = styled.span`
   align-items: center;
   gap: 3px;
   max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   font-weight: 700;
+`
+
+// Two lines at most (2026-11-23): a phone's 70 px seat cut "Heron (CPU)" to "Heron (C", the
+// computer's tag lost; a long name still ends in an ellipsis on its second line
+const NameText = styled.span`
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 `
 
 const Dot = styled.span`

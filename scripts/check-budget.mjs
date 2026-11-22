@@ -79,6 +79,7 @@ if (!manifest[languageFile(SITE_LANGUAGE, 'en')]) console.log('skip languages: n
 // that no line leaves out what its screen waits for
 const SCREEN_LANGUAGE_PARTS = {
   'src/games/promotion/full/FullScreen.tsx': ['shared/games/promotion/i18n.full'],
+  'src/games/promotion/PromotionScreen.tsx': ['shared/games/promotion/i18n.detail'],
 }
 // And every game screen whose own words come one language at a time (src/games/screenStrings.ts,
 // 2026-11-22): src/games/<id>/<Name>Screen.tsx waits for shared/games/<id>/i18n.screen.<language>.ts
