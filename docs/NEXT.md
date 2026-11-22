@@ -469,7 +469,7 @@
 
 | 問題 | 在哪一批之前 | 建議 |
 | --- | --- | --- |
-| 卡丁車困難級電腦車要不要學新技巧（完美時機、甩尾起跳、穿縫、背圖捷徑）：目前只有第四級「專家」會（`KART-FEEL.md` §13） | 不擋 | 先開過專家再決定；要教就把 `expert.ts` 的部分欄位併進 `BOT_SKILLS.hard` |
+| ~~卡丁車困難級電腦車要不要學新技巧~~：**已決定（擁有者 2026-11-22）**，困難學完美時機與連段、不學背圖路線（`KART-FEEL.md` §13.4） | 不擋 | 先開過專家再決定；要教就把 `expert.ts` 的部分欄位併進 `BOT_SKILLS.hard` |
 | 巡檢（`QA-SWEEP-2026-11.md`）沒有需要拍板的規則、名稱或題庫；只記一件：光譜一次後段畫面 axe 對比不足未能重現 | 不擋 | 不用做什麼；CI `sweep` 或本機 `npm run test:sweep` 再出現就直接修 |
 | ~~Q1 產品名稱~~ | — | 已拍板：TKU Arcade |
 | ~~E7 瀏覽器語言自動切換~~ | — | 已拍板：初次依瀏覽器語言，之後以使用者為準 |
@@ -487,7 +487,7 @@
 | 慘度排排站：正式名稱（暫名）、看 `docs/content/misery-cards.zh-TW.csv`（刪改卡片、調慘度）、簽 `IP-CHECKLIST.md` 那一節；起始 3 張、目標 10 張、預設 60 秒是否合適 | 盡快（已上大廳） | 改完跑 `node scripts/misery-bank.mjs`；同一慘度最多 6 張由測試擋 |
 | 搭橋、撞詞：試玩、正式名稱（暫名）、逐詞審兩份詞庫（`word-bridge-words`、`clue-clash-words`）、簽 `IP-CHECKLIST.md` 兩節 | 盡快（已上大廳） | 改完 CSV 跑 `node scripts/word-bridge-bank.mjs`／`clue-clash-bank.mjs`；合作太難就調提示次數 |
 | ~~Q4 卡丁車視覺風格~~ | — | 已拍板（2026-11-09）：低多邊形卡通 |
-| 卡丁車世界觀與名稱（`e10-t01`）：看 `KART-WORLD.md` 草稿，拍板角色、車、道具、賽道的名稱 | N3 收尾、改名的小 PR 之前 | 草稿 §8 列了要回答的問題；id 不改，只改字串 |
+| ~~卡丁車世界觀與名稱（`e10-t01`）~~：**已拍板（擁有者 2026-11-22「全照建議」）**，最終名稱表在 `KART-WORLD.md` §0 | N3 收尾、改名的小 PR 之前 | 草稿 §8 列了要回答的問題；id 不改，只改字串 |
 | Q5 AI 題目生成的模型與金鑰 | `e5-t06`（F3 之後；H2 沒做這個 task） | 沿用牌桌的 Anthropic SDK |
 | Q6 真假朗讀站內語音 | I1 | 不做，用 LongTalk |
 | 成本儀表板的資料（P1）：建一把只有 Account Analytics 讀取權限的 Cloudflare API token，設正式站 secret `CF_ANALYTICS_TOKEN` 與 `CF_ACCOUNT_ID`；`/stats` 要 `STATS_KEY`（I4 起，若還沒設） | 盡快（AC-12.4 等這個才勾） | 步驟在 `DEPLOY.md` §13.1；設好後看 `/stats` 最下面每列都有數字 |

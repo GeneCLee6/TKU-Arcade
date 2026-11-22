@@ -20,7 +20,7 @@ import { courseOf, type Track } from '../../shared/kart/track.ts'
 import { trackGuide } from '../../shared/kart/tracks/guides.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
-import { BOT_SKILLS } from '../../src/kart/bots/skill.ts'
+import { GOLDEN_HARD } from './goldenHard.ts'
 
 /** FNV-1a over a string, and over the bytes of numbers */
 function hasher() {
@@ -58,7 +58,7 @@ function raceDigest(track: Track): string {
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
   const brain = createBotBrain(
-    BOT_SKILLS.hard,
+    GOLDEN_HARD,
     track.road,
     KART_TUNING,
     5,

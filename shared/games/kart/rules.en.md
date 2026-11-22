@@ -31,7 +31,7 @@ Some tracks (**Wharf Warehouses**, **Hillside Lanes**, **Viaduct Works**) have t
 - **Through the slot**: the tall walls (sheds, rows of containers, yard walls) have gaps one kart wide, lined up so that the straight way through is hidden until you are on it. Line up early, do not drift, and go through straight; missing by a metre is a head-on crash. Each slot has a boost pad just behind it.
 - **The blind turn-in**: a branch whose mouth opens only for a moment, behind a wall or over a crest. Be on its side of the road and already turning before you can see it; late, you meet the corner of the wall.
 
-**Expert** computer karts take these shortcuts, and fire perfect instant boosts and keep the combo going; the Easy, Normal and Hard ones keep to the long way round. On the Kart page, `?autopilot=master` shows a driver who takes every shortcut; `?autopilot=expert` drives the same track well without knowing it.
+**Expert** computer karts take these shortcuts; the Easy, Normal and Hard ones keep to the long way round. Hard and Expert ones fire perfect instant boosts and keep the combo going. On the Kart page, `?autopilot=master` shows a driver who takes every shortcut; `?autopilot=expert` drives the same track well without knowing it.
 
 ## Modes
 
