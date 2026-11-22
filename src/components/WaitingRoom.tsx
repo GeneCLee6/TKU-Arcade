@@ -29,6 +29,8 @@ export interface WaitingRoomProps {
   onSetOptions(options: OptionValues): void
   /** e1-t16: the host sets or takes away the room's password */
   onSetPassword?(password: string | null): void
+  /** 2026-11-22: the host lists the room in the lobby or takes it off (shared/protocol.ts 19.) */
+  onSetPublic?(value: boolean): void
   /** e10-t05: a member's cosmetic choice for the others to see (the kart room's kart and driver) */
   onSetLook?(look: string | null): void
   /** 2026-11-17: the host adds a computer member (the kart room's computer karts) */
@@ -60,6 +62,7 @@ export function WaitingRoom({
   onSetGame,
   onSetOptions,
   onSetPassword,
+  onSetPublic,
   onSetLook,
   onAddBot,
   onSetTeam,
@@ -90,6 +93,11 @@ export function WaitingRoom({
     <>
       {/* Right after a new room, sharing it is the next thing to do: not three phone screens down */}
       <Invite roomId={roomId} code={view.room.code ?? null}>
+        <Visibility
+          isPublic={view.room.public === true}
+          locked={view.room.password !== undefined}
+          onSet={isHost ? onSetPublic : undefined}
+        />
         {(isHost || view.room.password !== undefined) && (
           <Suspense>
             <RoomPasswordSetting
@@ -253,6 +261,41 @@ function Invite({
     </Section>
   )
 }
+
+/** Public or not, for everyone to see; the host's to change (shared/protocol.ts 19.) */
+function Visibility({
+  isPublic,
+  locked,
+  onSet,
+}: {
+  isPublic: boolean
+  locked: boolean
+  onSet?: (value: boolean) => void
+}) {
+  const t = useT()
+  const text = !isPublic
+    ? t('room.visibility.private')
+    : locked
+      ? t('room.visibility.publicLocked')
+      : t('room.visibility.public')
+  return (
+    <VisibilityRow data-testid="room-visibility">
+      <CodeHint>{text}</CodeHint>
+      {onSet && (
+        <Button $variant="ghost" $size="sm" onClick={() => onSet(!isPublic)}>
+          {t(isPublic ? 'room.visibility.makePrivate' : 'room.visibility.makePublic')}
+        </Button>
+      )}
+    </VisibilityRow>
+  )
+}
+
+const VisibilityRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${space.sm}px;
+`
 
 const Layout = styled.div`
   display: grid;

@@ -28,6 +28,7 @@ export type RoomEnd =
   | 'replaced'
   | 'kicked'
   | 'dissolved'
+  | 'left'
 
 /** One countdown, in this browser's own time: `performance.now()` reads against `deadline` */
 export type RoomTimer = {
@@ -129,6 +130,8 @@ function finalEnd(code: number): RoomEnd | null {
       return 'kicked'
     case CloseCode.dissolved:
       return 'dissolved'
+    case CloseCode.left:
+      return 'left'
     case CloseCode.versionMismatch:
       return 'versionMismatch'
     case CloseCode.roomNotFound:

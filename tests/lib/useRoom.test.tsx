@@ -150,8 +150,10 @@ describe('senders', () => {
     [
       'setOptions',
       (room) => room.setOptions({ turnLimit: 20 }),
-      { t: 'set_options', options: { turnLimit: 20 } },
+      { t: 'set_options', options: { turnLimit: 20 }, patch: true },
     ],
+    ['setPublic', (room) => room.setPublic(true), { t: 'set_public', public: true }],
+    ['leave', (room) => room.leave(), { t: 'leave' }],
   ])('%s sends its frame', (_, call, frame) => {
     const { result, socket } = joined()
     act(() => call(result.current))

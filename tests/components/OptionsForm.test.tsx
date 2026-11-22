@@ -67,7 +67,7 @@ describe('the host', () => {
   it('turns a boolean on, sending every value', () => {
     const { onChange } = setup()
     fireEvent.click(screen.getByRole('checkbox', { name: 'games.x.fast' }))
-    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...VALUES, fast: true })
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ fast: true })
   })
 
   it('picks a choice, sending every value', () => {
@@ -75,7 +75,7 @@ describe('the host', () => {
     const select = screen.getByRole('combobox', { name: 'games.x.dice' })
     expect(screen.getByRole('option', { name: 'games.x.dice.big' })).toBeInTheDocument()
     fireEvent.change(select, { target: { value: 'big' } })
-    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...VALUES, dice: 'big' })
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ dice: 'big' })
   })
 
   it('keeps a numeric choice a number', () => {
@@ -83,20 +83,15 @@ describe('the host', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'games.x.seats' }), {
       target: { value: '4' },
     })
-    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...VALUES, seats: 4 })
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ seats: 4 })
   })
 
-  it('fills in what the room does not have, so the values sent are complete', () => {
+  it('sends only the field that changed, so a second change cannot undo the first (16.)', () => {
     const { onChange } = setup({ fast: true })
     fireEvent.change(screen.getByRole('combobox', { name: 'games.x.dice' }), {
       target: { value: 'big' },
     })
-    expect(onChange).toHaveBeenCalledExactlyOnceWith({
-      fast: true,
-      rounds: 50,
-      dice: 'big',
-      seats: 2,
-    })
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ dice: 'big' })
   })
 
   it('says the range of a number', () => {
@@ -116,7 +111,7 @@ describe('the host', () => {
       expect(onChange).not.toHaveBeenCalled()
 
       fireEvent.blur(rounds())
-      expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...VALUES, rounds: 120 })
+      expect(onChange).toHaveBeenCalledExactlyOnceWith({ rounds: 120 })
     })
 
     it('sends it on Enter too, once', () => {
@@ -124,7 +119,7 @@ describe('the host', () => {
       typeRounds('120')
       fireEvent.keyDown(rounds(), { key: 'Enter' })
       fireEvent.blur(rounds())
-      expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...VALUES, rounds: 120 })
+      expect(onChange).toHaveBeenCalledExactlyOnceWith({ rounds: 120 })
     })
 
     it.each([
@@ -135,7 +130,7 @@ describe('the host', () => {
       const { onChange } = setup()
       typeRounds(text)
       fireEvent.blur(rounds())
-      expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...VALUES, rounds: sent })
+      expect(onChange).toHaveBeenCalledExactlyOnceWith({ rounds: sent })
     })
 
     it.each([

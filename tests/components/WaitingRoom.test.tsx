@@ -183,7 +183,7 @@ describe('the host, on someone else’s row', () => {
     const { onKick } = renderRoom(viewOf([al(), bo()]))
     fireEvent.click(button('Kick Bo')!)
     expect(onKick).not.toHaveBeenCalled()
-    expect(dialog('Kick Bo?')).toHaveTextContent(/Bo will be removed.*5 minutes/)
+    expect(dialog('Kick Bo?')).toHaveTextContent(/Bo will be removed.*10 minutes/)
 
     fireEvent.click(inDialog('Kick Bo?', 'Kick'))
 
@@ -283,6 +283,37 @@ describe('dissolving', () => {
   })
 })
 
+describe('public or private (shared/protocol.ts 19.)', () => {
+  const visibility = () => screen.getByTestId('room-visibility')
+
+  it('says so to everyone, and only the host can change it', () => {
+    renderRoom(viewOf([al(), bo()]), 'Bo')
+    expect(visibility()).toHaveTextContent('Private: only by the link or the room number.')
+    expect(within(visibility()).queryByRole('button')).toBeNull()
+  })
+
+  it('lets the host list the room, or make it private again', () => {
+    const view = viewOf([al()])
+    const onSetPublic = vi.fn()
+    const { rerender } = render(
+      <ToastProvider>
+        <WaitingRoom roomId={ROOM} view={view} you="Al" onSit={vi.fn()} onReady={vi.fn()} onStart={vi.fn()} onKick={vi.fn()} onTransfer={vi.fn()} onDissolve={vi.fn()} onSetGame={vi.fn()} onSetOptions={vi.fn()} onSetPublic={onSetPublic} />
+      </ToastProvider>,
+    )
+    fireEvent.click(within(visibility()).getByRole('button', { name: 'List in the lobby' }))
+    expect(onSetPublic).toHaveBeenCalledExactlyOnceWith(true)
+    const listed = { ...view, room: { ...view.room, public: true as const, password: 'kite' } }
+    rerender(
+      <ToastProvider>
+        <WaitingRoom roomId={ROOM} view={listed} you="Al" onSit={vi.fn()} onReady={vi.fn()} onStart={vi.fn()} onKick={vi.fn()} onTransfer={vi.fn()} onDissolve={vi.fn()} onSetGame={vi.fn()} onSetOptions={vi.fn()} onSetPublic={onSetPublic} />
+      </ToastProvider>,
+    )
+    expect(visibility()).toHaveTextContent('Public, but not listed while it has a password.')
+    fireEvent.click(within(visibility()).getByRole('button', { name: 'Make private' }))
+    expect(onSetPublic).toHaveBeenLastCalledWith(false)
+  })
+})
+
 describe('the game', () => {
   const inGame = (gameId: string, view = viewOf([al(), bo()])): RoomView => ({
     ...view,
@@ -349,7 +380,7 @@ describe('the rule options', () => {
     return { ...view, room: { ...view.room, options: { dice: 'six-sided', turnLimit: 40 } } }
   }
 
-  it('are the host’s to change, sending every value', () => {
+  it('are the host’s to change, sending only what changed (16.)', () => {
     const { onSetOptions } = renderRoom(withOptions())
     const limit = screen.getByRole('spinbutton')
     expect(limit).toHaveValue(40)
@@ -357,7 +388,7 @@ describe('the rule options', () => {
     fireEvent.change(limit, { target: { value: '60' } })
     fireEvent.blur(limit)
 
-    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ edition: 'simple', dice: 'six-sided', turnLimit: 60, decisionSeconds: 30, buying: true, endAtDahe: false })
+    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ turnLimit: 60 })
   })
 
   it('are for everyone else to read', () => {
@@ -445,7 +476,7 @@ describe('the promotion edition (C7)', () => {
     expect(edition).toHaveAccessibleDescription(/79 offices/)
     expect(screen.getByRole('spinbutton')).toBeInTheDocument()
     fireEvent.change(edition, { target: { value: 'full' } })
-    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ edition: 'full', dice: 'six-sided', turnLimit: 40, decisionSeconds: 30, buying: true, endAtDahe: false })
+    expect(onSetOptions).toHaveBeenCalledExactlyOnceWith({ edition: 'full' })
   })
 
   it('hides the simple edition’s options in a full room', () => {

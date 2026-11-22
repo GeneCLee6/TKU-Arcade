@@ -41,9 +41,11 @@ export type SeatId = number
 
 /**
  * `team` (2026-11-18): the side its member chose in the waiting room (`RoomMember.team`), for a game
- * with teams (the kart's team race); absent when none was chosen, and any other game ignores it
+ * with teams (the kart's team race); absent when none was chosen, and any other game ignores it.
+ * `bot` (2026-11-22): a computer member sits there (`RoomMember.bot`); a game may end once only
+ * computers are left in it (holdem), any other ignores it
  */
-export type Seat = { id: SeatId; team?: number }
+export type Seat = { id: SeatId; team?: number; bot?: true }
 
 /** Who a view is for. A spectator is anyone without a seat */
 export type Viewer = SeatId | 'spectator'

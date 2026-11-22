@@ -48,6 +48,12 @@ export type StoredGame = {
   /** How many steps have been stored */
   steps: number
   timers: RunningTimer[]
+  /**
+   * The member who held each seat when the game began (2026-11-22), by seat id: someone who sits in
+   * a seat a member left after the game sees it as a spectator, not as that seat. Absent in a game
+   * from before, where the seat alone decides as it did
+   */
+  holders?: Record<string, string>
 }
 
 export type ActionOutcome =
