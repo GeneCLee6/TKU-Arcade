@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { trackLedges } from '../shared/kart/ledges.ts'
 import { raceTrack } from '../shared/kart/tracks/registry.ts'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.76): high platforms. The Breakwater Roofs open from /kart's
+// 2026-11-23 (docs/ARCHITECTURE.md §4.77): high platforms. The Breakwater Roofs open from /kart's
 // course picker; the master driver (`?autopilot=master`, the one who knows the shortcuts) flies off
 // the first ramp onto the breakwater's crown, up at its height, while the expert keeps to the road
 // round it. Headless Chromium draws with a software renderer (the flag lets it).

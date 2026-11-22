@@ -1,4 +1,4 @@
-// 2026-11-23 (shared/kart/ledges.ts, docs/ARCHITECTURE.md §4.76): high platforms. The least speed
+// 2026-11-23 (shared/kart/ledges.ts, docs/ARCHITECTURE.md §4.77): high platforms. The least speed
 // off the lip is a closed form of the flight terrain.ts flies, and it is the speed that decides:
 // a little faster and the kart flies over the face and lands on the platform; a little slower and it
 // meets the face and comes down on the main road, never stuck there for good. The track format

@@ -528,6 +528,26 @@ export function obstacleStop(
 }
 
 /**
+ * Whether (x, z) is within `pad` metres of where `obstacle` ever stands (2026-11-23): a boom's line,
+ * the whole stretch a container slides over
+ */
+export function inObstacle(obstacle: Obstacle, x: number, z: number, pad: number): boolean {
+  const { json } = obstacle
+  const rx = x - obstacle.x
+  const rz = z - obstacle.z
+  const along = rx * obstacle.dx + rz * obstacle.dz
+  const right = rx * -obstacle.dz + rz * obstacle.dx
+  if (json.kind === 'slider') {
+    return (
+      Math.abs(along) < json.length / 2 + pad &&
+      right > Math.min(json.a, json.b) - json.size / 2 - pad &&
+      right < Math.max(json.a, json.b) + json.size / 2 + pad
+    )
+  }
+  return Math.abs(along) < pad && right > json.from - pad && right < json.to + pad
+}
+
+/**
  * A spot for something lying on the road (a puddle, a fake box) `radius` metres wide, out of every
  * obstacle: out of the whole stretch a container slides over, and off a boom's line (it comes down
  * on whatever is there). Moved along the road, the shorter way out; unchanged when already clear

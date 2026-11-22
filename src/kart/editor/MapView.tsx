@@ -5,6 +5,7 @@
 import { memo, useMemo } from 'react'
 import styled from 'styled-components'
 import type { Built } from '../../../shared/kart/editor/build.ts'
+import { besideObstacle, obstaclesOf, sliderCorners } from '../../../shared/kart/obstacles.ts'
 import { roadDirection } from '../../../shared/kart/track.ts'
 import { kartEditor } from '../../styles/kartTokens.ts'
 
@@ -153,6 +154,40 @@ export const MapView = memo(function MapView({
           fill={kartEditor.box}
         />
       ))}
+      {/* 2026-11-23: the moving obstacles: a barrier's line, the stretch a container slides over */}
+      {obstaclesOf(track).map((obstacle, index) => {
+        const { json } = obstacle
+        if (json.kind === 'boom') {
+          const a = besideObstacle(obstacle, json.from)
+          const b = besideObstacle(obstacle, json.to)
+          return (
+            <line
+              key={`obstacle-${index}`}
+              x1={a.x}
+              y1={a.z}
+              x2={b.x}
+              y2={b.z}
+              stroke={kartEditor.obstacle}
+              strokeWidth={2.5 * scale}
+              strokeDasharray={`${4 * scale} ${2 * scale}`}
+              data-testid="kart-editor-obstacle"
+            />
+          )
+        }
+        const ends = [json.a, json.b].map((across) => sliderCorners(obstacle, json, across))
+        const corners = [ends[0]![0]!, ends[1]![1]!, ends[1]![2]!, ends[0]![3]!]
+        return (
+          <path
+            key={`obstacle-${index}`}
+            d={`M${corners.map((corner) => `${corner.x} ${corner.z}`).join('L')}Z`}
+            fill={kartEditor.obstacle}
+            fillOpacity={0.45}
+            stroke={kartEditor.obstacle}
+            strokeWidth={scale}
+            data-testid="kart-editor-obstacle"
+          />
+        )
+      })}
       {track.grid.map((spot, index) => (
         <rect
           key={`grid-${index}`}
