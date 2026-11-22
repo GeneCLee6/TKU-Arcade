@@ -343,7 +343,8 @@ export function buildTrackArt(
   // worksArt.ts) and their technical places shown (skillCues.ts)
   const skillArt = quarter.skill ?? null
   const skillStyle = skillArt ? skillArt.walls.skillStyleOf(track.id) : null
-  const skillRuns = skillArt && skillStyle ? skillArt.walls.wallRuns(track.walls, groundAt) : []
+  // 2026-11-22: the harbour's and the old street's step and alley are shown too (cues only)
+  const skillRuns = skillArt ? skillArt.walls.wallRuns(track.walls, groundAt) : []
   const skillSlots = skillArt ? skillArt.walls.findSlots(skillRuns) : []
   const wharfLayout =
     skillStyle === 'wharf' && quarter.wharf ? quarter.wharf.wharfPlan(track, level.density) : null
@@ -675,11 +676,11 @@ export function buildTrackArt(
     lastLamp = along[index]!
     for (const side of [1, -1]) {
       const offset = point.width / 2 + 2.2
-      lamps.push({
-        x: point.x + side * a.dz * offset,
-        z: point.z - side * a.dx * offset,
-        turn: Math.atan2(a.dx, a.dz) + (side > 0 ? 0 : Math.PI),
-      })
+      const x = point.x + side * a.dz * offset
+      const z = point.z - side * a.dx * offset
+      // 2026-11-22: not on a branch leaving the road there (the old street's lantern alley)
+      if (track.forks && roadClearance(track.road, x, z) < 0.5) continue
+      lamps.push({ x, z, turn: Math.atan2(a.dx, a.dz) + (side > 0 ? 0 : Math.PI) })
     }
   })
   const poles = new InstancedMesh(
@@ -773,7 +774,9 @@ export function buildTrackArt(
   // ── A hill track (2026-11-17): the ground's height field and the jumps' ramps ──
   if (hillAt) {
     const kit = { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place }
-    group.add(buildHillGround(kit, hillAt))
+    // 2026-11-22: the harbour and the old street have a step and are flat but for it: their own
+    // ground (the quay and the hillside, the street) stays, only the ramp is drawn
+    if (!harbour && !oldStreet) group.add(buildHillGround(kit, hillAt))
     for (const ramp of buildJumpRamps(kit)) group.add(ramp)
   }
 
@@ -943,15 +946,14 @@ export function buildTrackArt(
       roadHeight: (index) => roadHeights?.[index] ?? 0,
     })
   }
-  const skillCues =
-    skillArt && skillStyle
-    ? (skillArt.walls.buildSkillWalls(skillKit, skillStyle, skillRuns, skillSlots),
-      skillArt.cues.buildSkillCues(skillKit, {
+  if (skillArt && skillStyle) skillArt.walls.buildSkillWalls(skillKit, skillStyle, skillRuns, skillSlots)
+  const skillCues = skillArt
+    ? skillArt.cues.buildSkillCues(skillKit, {
         guide: trackGuide(track.id) ?? null,
         runs: skillRuns,
         slots: skillSlots,
         roadHeight: (index) => roadHeights?.[index] ?? 0,
-      }))
+      })
     : null
   // 2026-11-22: the controls panel's switch hides the marks, also in a race already running
   skillCues?.setVisible(loadTrackCuesOn())

@@ -7,11 +7,15 @@
 // that route with it.
 import { NEEDLE_GUIDE } from './challenge.ts'
 import type { TrackGuide } from './guide.ts'
+import { HARBOUR_GUIDE } from './harbour.ts'
 import { LANES_GUIDE } from './lanes.ts'
+import { OLDSTREET_ROUTE_GUIDE } from './oldstreet.ts'
 import { WHARF_GUIDE, WHARF_ROUTE_GUIDE } from './wharf.ts'
 import { WORKS_GUIDE, WORKS_ROUTE_GUIDE } from './works.ts'
 
 const GUIDES: Readonly<Record<string, TrackGuide>> = {
+  // 2026-11-22: the drift jump into hairpin 2 (harbour.ts)
+  harbour: HARBOUR_GUIDE,
   wharf: WHARF_GUIDE,
   lanes: LANES_GUIDE,
   works: WORKS_GUIDE,
@@ -20,6 +24,8 @@ const GUIDES: Readonly<Record<string, TrackGuide>> = {
 }
 
 const ROUTE_GUIDES: Readonly<Record<string, TrackGuide>> = {
+  // 2026-11-22: the lantern alley's doorway (oldstreet.ts)
+  oldstreet: OLDSTREET_ROUTE_GUIDE,
   wharf: WHARF_ROUTE_GUIDE,
   works: WORKS_ROUTE_GUIDE,
 }

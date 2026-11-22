@@ -10,8 +10,10 @@ import {
   type KartTuning,
 } from '../../shared/kart/physics.ts'
 import { startTrial, stepTrial, type Trial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
-import { courseOf } from '../../shared/kart/track.ts'
-import { raceTrack } from '../../shared/kart/tracks/registry.ts'
+import { courseOf, parseTrack, type Track } from '../../shared/kart/track.ts'
+import { RACE_TRACKS } from '../../shared/kart/tracks/registry.ts'
+import type { RaceTrackId } from '../../shared/kart/tracks/list.ts'
+import { flatLayout } from './flatLayout.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
 import { GOLDEN_HARD } from './goldenHard.ts'
 
@@ -66,9 +68,12 @@ function hasher() {
 
 /** The hard bot (as it was until 2026-11-22, goldenHard.ts), three laps (or 200 s), every step hashed */
 function trackHash(id: string, seed: number, tuning: KartTuning): { hash: string; steps: number } {
-  // 2026-11-22: without the harbour's moving obstacles (obstacles.ts), which this hard bot of old
-  // does not know of: the physics on the layout is what is locked
-  const track = { ...raceTrack(id)!, obstacles: undefined }
+  // 2026-11-22: the layout without its newer parts (the harbour's moving obstacles and step, the old
+  // street's alley and step; flatLayout.ts), which this hard bot of old does not know of: the flat
+  // physics on the layout is what is locked
+  const parsed = parseTrack(flatLayout(RACE_TRACKS[id as RaceTrackId]))
+  if ('problems' in parsed) throw new Error(parsed.problems.join('; '))
+  const track: Track = parsed.track
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
   const brain = createBotBrain(GOLDEN_HARD, track.road, tuning, seed)

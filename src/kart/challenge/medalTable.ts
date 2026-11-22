@@ -4,9 +4,9 @@ import type { MedalTimes } from './medals.ts'
 
 export const MEDAL_TABLE: Readonly<Record<string, MedalTimes>> = {
   riverside: { laps: 3, bronze: 132.9, silver: 95.8, gold: 92.1, platinum: 87.7 },
-  harbour: { laps: 3, bronze: 150.1, silver: 118.8, gold: 114.2, platinum: 110.1 },
+  harbour: { laps: 3, bronze: 147.8, silver: 121.7, gold: 116.6, platinum: 113.1 },
   tamkang: { laps: 3, bronze: 156.4, silver: 126.6, gold: 121.7, platinum: 115.7 },
-  oldstreet: { laps: 3, bronze: 112.4, silver: 93.8, gold: 90.1, platinum: 87.8 },
+  oldstreet: { laps: 3, bronze: 117.3, silver: 92.4, gold: 88.8, platinum: 86.4 },
   guanyin: { laps: 3, bronze: 92.4, silver: 75.8, gold: 72.8, platinum: 70.6 },
   mangrove: { laps: 3, bronze: 129.2, silver: 95.1, gold: 91.4, platinum: 86.4 },
   fort: { laps: 3, bronze: 87.2, silver: 78.5, gold: 75.4, platinum: 71 },
@@ -25,8 +25,9 @@ export const MEDAL_TABLE: Readonly<Record<string, MedalTimes>> = {
  * passes), seconds from GO; none where neither does
  */
 export const MISSION_PACE: Readonly<Record<string, number>> = {
-  combo5: 56.9,
-  perfects: 19.3,
+  clean: 31.8,
+  combo5: 59.1,
+  perfects: 20.2,
   launch: 41,
   bike: 25,
   combo10: 70.2,
@@ -35,7 +36,7 @@ export const MISSION_PACE: Readonly<Record<string, number>> = {
   cover: 50.4,
   needle: 32.2,
   branches: 82.2,
-  fog: 78.6,
+  fog: 78.3,
   hopyard: 36.9,
   bikeneedle: 33.5,
   lockrun: 45.4,

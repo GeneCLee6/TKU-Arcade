@@ -113,7 +113,7 @@ describe('the track format', () => {
   it('Lock Gate Lane and the harbour have theirs; no other race track has any', () => {
     expect(lock.obstacles).toHaveLength(4)
     expect(harbour.obstacles).toHaveLength(4)
-    expect(harbour.revision).toBe(13)
+    expect(harbour.revision).toBe(14)
     for (const id of RACE_TRACK_IDS) {
       if (id === 'harbour') continue
       expect(raceTrack(id)!.obstacles).toBeUndefined()

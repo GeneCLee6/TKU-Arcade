@@ -37,7 +37,7 @@
 - 車系：河口系 Estuary、湧浪系 Surge、順風系 Tailwind、迴流系 Eddy、礁岩系 Reef、拾貝系 Beachcomber；等級：入門、進階、高階、賽季旗艦。
 - 賽季旗艦：第一季 黑鳶 Black Kite（`kite`）。
 - 道具：順風 Tailwind、泡泡罩 Bubble、回浪板 Rebound、海霧 Sea Fog、打水漂 Skip Stone、靜電 Static、加油旗 Rally Flag、假箱子 Fake Box。
-- 賽道：燈籠老街 Lantern Old Street（兩個選項裡的「不改」）、觀音山坡道 Guanyin Hill Road、紅樹林水道 Mangrove Channel、滬尾砲台坡 Hobe Fort Hill、淡海夜城 Danhai Night Circuit、大屯稜線 Datun Ridgeline、碼頭倉庫 Wharf Warehouses、山城坡巷 Hillside Lanes、高架廠區 Viaduct Works；挑戰賽道 針眼巷 Needle Lane、跳台場 Hop Yard。
+- 賽道：燈籠老街 Lantern Old Street（兩個選項裡的「不改」）、觀音山坡道 Guanyin Hill Road、紅樹林水道 Mangrove Channel、滬尾砲台坡 Hobe Fort Hill、淡海夜城 Danhai Night Circuit、大屯稜線 Datun Ridgeline、碼頭倉庫 Wharf Warehouses、山城坡巷 Hillside Lanes、高架廠區 Viaduct Works；挑戰賽道 針眼巷 Needle Lane、跳台場 Hop Yard（2026-11-22 加的閘門巷 Lock Gate Lane、老街的燈籠巷 Lantern Alley 是暫名）。
 - 盃：退潮盃 Ebb Tide Cup、山崗盃 Hilltop Cup、河口盃 Rivermouth Cup、漲潮盃 Flood Tide Cup、巷弄盃 Backstreet Cup。（藍色噴射「漲潮」和「漲潮盃」共用兩個字：一個是噴射、一個是盃，意思都是潮水推著走，照留。英文 High Tide 與 Flood Tide Cup 不同。）
 - 模式：駕訓班 Driving school、挑戰 Challenges（章名入門、技術、高手、魔王；24 關名照 §6.4）、團隊賽 Team race、大獎賽 Grand Prix、計時賽 Time trial。
 - 其他電腦車名：胡椒 Pepper、麻糬 Mochi、颱風 Typhoon、珍奶 Boba、小綿羊 Scooter、風箏 Kite。
@@ -295,7 +295,7 @@
 | `riverside` | 入門、流暢：四連 S、雙 apex、越轉越緊的彎，沒有一個彎要煞車 | 河與拱橋、堤防上的跳台 | 2.4 km | 堤防 7 m、跳台 1 |
 | `harbour` | 髮夾技術：山坡上四個連續髮夾，一圈換向 22 次 | 海堤與起重機、貨櫃場、山坡上的梯田屋、沙灘 | 2.8 km | 平面 |
 | `tamkang` | 高低差：宮燈道頂右轉上山、山頂髮夾、坡頂跳台往下飛 | 宮燈道、驚聲大樓、書卷廣場、牧羊草坪與商管大樓之間的窄門、海博館 | 3.1 km | 山 9 m、跳台 1 |
-| `oldstreet` | 窄巷＋道具：44 m 的市場街搶箱子、28–29 m 的巷子躲道具、廟口捷徑 | 河岸欄杆、燈籠、廟、渡船頭 | 2.4 km | 平面 |
+| `oldstreet` | 窄巷＋道具：44 m 的市場街搶箱子、28–29 m 的巷子躲道具、廟口捷徑；2026-11-22 加燈籠巷（穿縫的第二條捷徑，暫名）與回程的台階 | 河岸欄杆、燈籠、廟、渡船頭 | 2.4 km | 平面（一個台階） |
 | `guanyin` | 跳台與下坡：兩個跳台、Ω 形三連甩、兩個背靠背的 chicane | 山頂、長下坡 | 1.9 km | 山 14 m、跳台 2 |
 | `mangrove` | **節奏、換邊連甩**：七個甩尾連成一條蛇、越來越緊，中間沒有直線；越轉越緊的右彎立刻接反向左彎；一對髮夾；S 彎中間的窄門。中等難度 | 潮池與紅樹林、白鷺、起跑直線旁的棧道 | 2.5 km | 平面 |
 | `fort` | **坡上甩尾、越轉越緊**：上坡是一個從 64 m 收到 36 m 的右彎、立刻接反向；山頂跳台落地就左轉；山腳越轉越緊的髮夾接兩個髮夾。短而密 | 跳台正前方的紅磚砲台、山頂矮牆、夕陽 | 1.8 km | 山 16 m、跳台 1 |
