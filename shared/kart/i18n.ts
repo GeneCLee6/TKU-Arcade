@@ -8,6 +8,7 @@ import { KART_ROSTER_MESSAGES, type KartRosterKey } from './i18n.roster.ts'
 import { KART_TOUCH_MESSAGES, type KartTouchKey } from './i18n.touch.ts'
 import { KART_LOAD_MESSAGES, type KartLoadKey } from './i18n.load.ts'
 import { KART_MENU_MESSAGES, type KartMenuKey } from './i18n.menu.ts'
+import { KART_FLOW_MESSAGES, type KartFlowKey } from './i18n.flow.ts'
 // Types only: these screens register their own strings (scripts/check-i18n.mjs KART_PARTS)
 import type { KartSchoolKey } from './i18n.school.ts'
 import type { KartChallengeKey } from './i18n.challenge.ts'
@@ -355,7 +356,7 @@ const en = {
 } as const
 
 /** What KART_MESSAGES holds: everything a race and the menu say */
-type KartBaseKey = keyof typeof en | KartRosterKey | KartBotsKey | KartCupKey | KartTouchKey | KartLoadKey | KartMenuKey
+type KartBaseKey = keyof typeof en | KartRosterKey | KartBotsKey | KartCupKey | KartTouchKey | KartLoadKey | KartMenuKey | KartFlowKey
 
 /**
  * Every kart string's key. The driving school's, the challenges' and the editor's are registered by
@@ -704,6 +705,7 @@ export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartBaseKey, string>> 
     ...KART_TOUCH_MESSAGES.en,
     ...KART_LOAD_MESSAGES.en,
     ...KART_MENU_MESSAGES.en,
+    ...KART_FLOW_MESSAGES.en,
   },
   'zh-TW': {
     ...zhTW,
@@ -713,5 +715,6 @@ export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartBaseKey, string>> 
     ...KART_TOUCH_MESSAGES['zh-TW'],
     ...KART_LOAD_MESSAGES['zh-TW'],
     ...KART_MENU_MESSAGES['zh-TW'],
+    ...KART_FLOW_MESSAGES['zh-TW'],
   },
 }

@@ -48,9 +48,13 @@ import {
   countdownShot,
   finishShot,
   inIntro,
-  introShot,
+  openingShot,
   type CameraShot,
 } from './director.ts'
+import { openingStage } from '../../shared/kart/opening.ts'
+import { isRacePaused } from './race/raceClock.ts'
+import { playBeep, startBeep } from './audio/countBeeps.ts'
+import { loadSettings } from './settings.ts'
 import {
   actionKeys,
   activeControls,
@@ -230,6 +234,11 @@ export interface SpikeTrial {
   readonly newKartBestRun: boolean
   /** 2026-11-20 (§4.43): a race's fly round the grid before the countdown, not skipped */
   readonly intro: boolean
+  /**
+   * 2026-11-22 (§4.72): during the opening, the driver in front of the camera (their place in the
+   * race's list, the pole first); null otherwise, or when not presented here
+   */
+  readonly presenting: number | null
   /** ... and the finish's show, for CELEBRATE_SECONDS after crossing the line */
   readonly celebrating: boolean
 }
@@ -247,6 +256,7 @@ const sameTrial = (a: SpikeTrial | undefined, b: SpikeTrial): boolean =>
   a.kartBestRun === b.kartBestRun &&
   a.newKartBestRun === b.newKartBestRun &&
   a.intro === b.intro &&
+  a.presenting === b.presenting &&
   a.celebrating === b.celebrating
 
 /** What tests and a curious owner can read from the console. It stays after the loop stops. */
@@ -626,6 +636,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   // §4.43: the fly round skipped (any key or touch), and when this kart crossed the line
   let skipped = false
   let finishedAt: number | null = null
+  // 2026-11-22 (§4.72): the countdown left at the last frame, for the 3, 2, 1 and GO beeps
+  let beepFrom: number | null = null
+  let wasPaused = false
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
 
   let firstFrameAt: number | null = null
@@ -639,8 +652,12 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     } else if (now - firstFrameAt >= TELEMETRY_AFTER_MS && !reported) {
       report(((debug.frames + 1) * 1000) / (now - firstFrameAt), loadMs, options.quality ?? 'high')
     }
-    const frameMs = lastFrame === undefined ? 0 : now - lastFrame
+    // 2026-11-22 (§4.72): paused (a race with no one else in it, raceClock.ts), no time passes: no
+    // step, no countdown, nothing moves; the picture is still drawn (the menu blurs it)
+    const paused = isRacePaused()
+    const frameMs = lastFrame === undefined || paused || wasPaused ? 0 : now - lastFrame
     lastFrame = now
+    wasPaused = paused
 
     const { bindings, rules, tuning, enabled } = options.controls()
     const pad = readGamepad()
@@ -887,6 +904,22 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     const reduced = reducedMotion?.matches ?? false
     const left = net && trial?.phase === 'countdown' ? net.countdown() : null
     const introNow = !!net?.gridSpots && trial?.phase === 'countdown' && inIntro(left) && !skipped
+    // 2026-11-22 (§4.72): how the opening is shown here, each driver in turn by default
+    const settings = loadSettings()
+    const opening = { drivers: settings.driverIntro, flyby: settings.flyby }
+    const spotsNow = introNow && net?.gridSpots ? net.gridSpots() : null
+    const stage = spotsNow ? openingStage(left, spotsNow.length) : null
+    const presenting = opening.drivers && stage?.kind === 'present' ? stage.index : null
+    // The start's beeps: 3, 2, 1 and GO, by the room's countdown in a race, this run's in a trial
+    if (trial?.phase === 'countdown' || beepFrom !== null) {
+      const counted = trial?.phase === 'countdown' ? (net ? left : trial.countdown) : 0
+      if (counted !== null) {
+        beepFrom ??= Math.max(counted, 3) + 1e-6
+        const beep = startBeep(beepFrom, counted)
+        if (beep) playBeep(beep)
+        beepFrom = trial?.phase === 'countdown' ? counted : null
+      }
+    }
     let shot: CameraShot | null = null
     if (trial?.phase === 'finished' && finishedAt !== null) {
       shot = finishShot(
@@ -897,9 +930,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     } else if (net?.gridSpots && trial?.phase === 'countdown') {
       const spots = net.gridSpots()
       shot =
-        introNow && !reduced && left !== null
-          ? introShot(spots, left, current.y ?? 0)
-          : countdownShot(spots, left, reduced, current.y ?? 0)
+        (introNow ? openingShot(spots, left, opening, reduced, current.y ?? 0) : null) ??
+        countdownShot(spots, left, reduced, current.y ?? 0)
     }
     if (shot || directed) scene.shot(shot)
     directed = shot !== null
@@ -1017,6 +1049,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
           news ? seconds(news.kartRunSteps) : kartBestRun === null ? null : seconds(kartBestRun),
         newKartBestRun: news?.kartBestRun ?? false,
         intro: introNow,
+        presenting,
         celebrating:
           trial.phase === 'finished' &&
           finishedAt !== null &&
@@ -1087,15 +1120,19 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     isBoundKey(bindings, code) || code.startsWith('Arrow')
 
   // §4.43: any key or touch skips the fly round on this screen (GO stays the room's)
-  const skip = () => {
+  const skip = (event?: Event) => {
     // A tap is a gesture too: the sound may start (a phone has no keys)
     audio.unlock()
+    // 2026-11-22: not while paused, and not by the pause menu's own key or buttons
+    if (isRacePaused() || (event?.target instanceof Element && event.target.closest('[data-kart-menu]'))) return
     if (trial?.phase === 'countdown') skipped = true
   }
   const onKeyDown = (event: KeyboardEvent) => {
     // Sound may start only after a gesture: the first key is one
     audio.unlock()
-    skip()
+    if (event.key !== 'Escape') skip(event)
+    // 2026-11-22: paused, the keys drive nothing
+    if (isRacePaused()) return
     const { bindings, enabled } = options.controls()
     // Ctrl itself boosts (ALWAYS_KEYS), and an arrow pressed while Ctrl is held still steers
     const ctrlChord =
@@ -1163,6 +1200,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       news = null
       finishedAt = null
       skipped = false
+      beepFrom = null
       previous = run.kart
       lastTrial = undefined
       scene.snapCamera(run.kart.heading)

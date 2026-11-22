@@ -49,12 +49,14 @@ test('one person races a computer kart in an item race, from the menu to the res
   await setup.getByTestId('kart-bots-start').click()
 
   await expect(page.getByTestId('kart-race')).toBeVisible({ timeout: 30_000 })
-  // 2026-11-20 (§4.43): the fly round the grid first, with the track and the laps, skipped by a key
-  const intro = page.getByTestId('kart-intro')
-  await expect(intro).toBeVisible({ timeout: 30_000 })
-  await expect(intro).toContainText('Laps: 1')
+  // 2026-11-22 (§4.72): each driver presented first (the computer, then you), with their place on the
+  // grid and their kart; skipped by a key
+  const card = page.getByTestId('kart-driver-card')
+  await expect(card).toBeVisible({ timeout: 30_000 })
+  await expect(card).toContainText(/Grid [12]/)
   await page.keyboard.press('KeyM')
-  await expect(intro).toBeHidden()
+  await expect(card).toBeHidden()
+  await expect(page.getByTestId('kart-intro')).toBeHidden()
   await expect
     .poll(async () => (await race(page))?.counted ?? false, { timeout: 30_000 })
     .toBe(true)
@@ -72,22 +74,49 @@ test('one person races a computer kart in an item race, from the menu to the res
   await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 30_000 }).toBe(1)
   await expect(page.getByTestId('kart-item')).toBeVisible()
   // The item slot is at the top of the screen, in the middle (owner 2026-11-18), clear of the place
-  // and of the button that leaves the race
+  // and of the pause button (2026-11-22, in place of the one that left the race)
   const slot = (await page.getByTestId('kart-item').boundingBox())!
   expect(Math.abs(slot.x + slot.width / 2 - 480)).toBeLessThan(8)
   expect(slot.y + slot.height).toBeLessThan(150)
   expect(slot.width).toBeGreaterThan(120)
   const place = (await page.getByTestId('kart-place').boundingBox())!
-  const quit = (await page.getByRole('button', { name: 'Quit the race' }).boundingBox())!
+  const quit = (await page.getByRole('button', { name: 'Pause (Esc)' }).boundingBox())!
   expect(place.x + place.width).toBeLessThanOrEqual(quit.x)
   expect(quit.x + quit.width).toBeLessThan(slot.x)
   await expect
     .poll(async () => (await race(page))?.pickups ?? 0, { timeout: 90_000 })
     .toBeGreaterThan(0)
-  // One lap: the finish's show (the place, the confetti), then the results with both karts
+  // 2026-11-22 (§4.72): Esc pauses: the menu, and the race stands still (no physics step, the room's
+  // clock with it), then goes on where it was
+  const ticks = () =>
+    page.evaluate(() => (window as unknown as { __kartSpike?: { tick: number } }).__kartSpike?.tick ?? 0)
+  await page.keyboard.press('Escape')
+  const menu = page.getByTestId('kart-pause')
+  await expect(menu).toBeVisible()
+  await expect(menu).toHaveAttribute('data-paused', 'true')
+  await expect(menu.getByTestId('kart-pause-restart')).toBeVisible()
+  await expect(menu.getByTestId('kart-pause-menu')).toBeVisible()
+  await expect(menu.getByTestId('kart-pause-lobby')).toBeVisible()
+  const held = await ticks()
+  await page.waitForTimeout(1_500)
+  expect(await ticks()).toBe(held)
+  // The settings, and back
+  await menu.getByTestId('kart-pause-settings').click()
+  await expect(menu.getByTestId('kart-settings')).toBeVisible()
+  await expect(menu.getByTestId('kart-volume-ambience')).toBeVisible()
+  await menu.getByTestId('kart-settings-done').click()
+  await menu.getByTestId('kart-pause-resume').click()
+  await expect(menu).toBeHidden()
+  await expect.poll(ticks, { timeout: 10_000 }).toBeGreaterThan(held)
+  // One lap: the finish's show (the place, the confetti), the podium, then the results with both karts
   await expect(page.getByTestId('kart-celebration')).toBeVisible({ timeout: 180_000 })
+  const podium = page.getByTestId('kart-podium')
+  await expect(podium).toBeVisible({ timeout: 180_000 })
+  await expect(podium.getByTestId('kart-podium-1')).toBeVisible()
   const results = page.getByTestId('kart-bots-results')
-  await expect(results).toBeVisible({ timeout: 180_000 })
+  // It ends by itself (about seven seconds)
+  await expect(results).toBeVisible({ timeout: 30_000 })
+  await expect(podium).toBeHidden()
   await expect(results.getByTestId('kart-standings').locator('li')).toHaveCount(2)
   await expect(results).toContainText('(CPU)')
   await expect(results.getByTestId('kart-bots-again')).toBeVisible()

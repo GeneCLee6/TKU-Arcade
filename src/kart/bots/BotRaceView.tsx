@@ -23,15 +23,21 @@ import RaceView from '../race/RaceView.tsx'
 import { useFinishHold } from '../race/useFinishHold.ts'
 import { botSeats, createBotRace } from './botRace.ts'
 import { createLocalRoom } from './localRoom.ts'
+import { raceEpochNow } from '../race/raceClock.ts'
 import { drawBots, type BotEntry } from './roster.ts'
 import { botTrackId, type BotSetup } from './setup.ts'
 import { useMenuMusic } from '../audio/useMenuMusic.ts'
 import { useRaceRecorder } from '../../games/kart/useRaceRecorder.ts'
 import type { Replay } from '../../../shared/kart/replay.ts'
 import ReplayShare from '../watch/ReplayShare.tsx'
+import { loadBody, loadDriver } from '../bodies.ts'
+import { formatTime } from '../../../shared/kart/timeTrial.ts'
+import { podiumSeats, type PodiumEntry } from '../ceremony/podium.ts'
 
 // 2026-11-20 (docs/KART-NETCODE.md §11.4): the race again, as in a room
 const ReplayView = lazy(() => import('../watch/ReplayView.tsx'))
+// 2026-11-22 (§4.72): the top three on the podium before the results
+const PodiumCeremony = lazy(() => import('../ceremony/PodiumCeremony.tsx'))
 
 registerMessages(KART_MESSAGES)
 
@@ -98,7 +104,7 @@ function BotRound({
         seat === playerSeat ? 0 : undefined,
       ),
       seed,
-      now: () => Date.now(),
+      now: () => raceEpochNow(),
     })
     return { seed, entries, playerSeat, room, realtime: room.realtimeFor(playerSeat) }
   })
@@ -107,6 +113,8 @@ function BotRound({
   const recording = useRaceRecorder(view, game.realtime)
   const [replay, setReplay] = useState<Replay | null>(null)
   const [watching, setWatching] = useState(false)
+  // 2026-11-22 (§4.72): the podium shown (or skipped) once the race is over
+  const [podiumDone, setPodiumDone] = useState(false)
 
   useEffect(() => {
     const track = raceTrack(botTrackId(setup))
@@ -122,10 +130,10 @@ function BotRound({
       bots: botSeats(game.entries, 0, setup.difficulty),
       players: [game.playerSeat],
       seed: game.seed,
-      now: Date.now(),
+      now: raceEpochNow(),
     })
     show()
-    const timer = window.setInterval(() => race.advance(Date.now()), RUN_EVERY_MS)
+    const timer = window.setInterval(() => race.advance(raceEpochNow()), RUN_EVERY_MS)
     return () => {
       window.clearInterval(timer)
       stopWatching()
@@ -160,6 +168,14 @@ function BotRound({
     const me = view.racers.find((racer) => racer.seat === game.playerSeat)
     const place = order.indexOf(game.playerSeat) + 1
     if (!replay && recording.recorder.hasFrames()) setReplay(recording.recorder.replay())
+    const podium = podiumEntries(view.racers, standings, game, nameOf)
+    if (!podiumDone && podium.length > 0) {
+      return (
+        <Suspense fallback={null}>
+          <PodiumCeremony entries={podium} onDone={() => setPodiumDone(true)} />
+        </Suspense>
+      )
+    }
     if (watching && replay) {
       return (
         <Suspense fallback={<p role="status">{t('kart.bots.loading')}</p>}>
@@ -238,12 +254,8 @@ function BotRound({
         act={act}
         nameOf={nameOf}
         lookOf={(seat) => game.entries[seat] ?? null}
+        pause={{ canPause: true, onRestart: onAgain, onKartMenu: onMenu }}
       />
-      <QuitCorner>
-        <Button type="button" $variant="secondary" $size="sm" onClick={onMenu}>
-          {t('kart.bots.quit')}
-        </Button>
-      </QuitCorner>
       {me?.finishMs != null && (
         <BottomCenter>
           <Button
@@ -259,15 +271,7 @@ function BotRound({
   )
 }
 
-// Over the race screen (RaceView's page sits at z-index 20). Beside the place, top left: the top
-// centre is the item slot's (2026-11-18)
-const QuitCorner = styled.div`
-  position: fixed;
-  top: ${space.sm}px;
-  left: ${space.sm + 100}px;
-  z-index: 21;
-`
-
+// Over the race screen (RaceView's page sits at z-index 20)
 const BottomCenter = styled.div`
   position: fixed;
   bottom: 120px;
@@ -319,3 +323,31 @@ const Actions = styled.div`
   flex-wrap: wrap;
   gap: ${space.sm}px;
 `
+
+/**
+ * 2026-11-22 (§4.72): the podium's three from the room's standings: those who finished, each with
+ * the kart they drove (the player's own, the computer's from its entry) and their time
+ */
+function podiumEntries(
+  racers: readonly { seat: number; finishMs: number | null }[],
+  standings: readonly { seat: number; rank: number }[],
+  game: { readonly playerSeat: number; readonly entries: readonly BotEntry[] },
+  nameOf: (seat: number) => string,
+): PodiumEntry[] {
+  const finishOf = (seat: number) => racers.find((racer) => racer.seat === seat)?.finishMs ?? null
+  return podiumSeats(
+    standings.map((line) => ({ ...line, out: finishOf(line.seat) === null })),
+  ).map(({ seat, place }) => {
+    const entry = game.entries[seat]
+    const you = seat === game.playerSeat
+    return {
+      seat,
+      place,
+      name: nameOf(seat),
+      kart: you || !entry ? loadBody() : entry.kart,
+      driver: you || !entry ? loadDriver() : entry.driver,
+      line: formatTime((finishOf(seat) ?? 0) / 1000),
+      you,
+    }
+  })
+}

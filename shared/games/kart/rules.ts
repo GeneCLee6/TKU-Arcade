@@ -2,13 +2,14 @@
 // Worker only: it judges laps on the tracks themselves.
 //
 // loading → countdown → racing → finished. Everyone's browser loads the track and says so; when all
-// have (or LOAD_WAIT_MS runs out) the countdown starts, and the room's clock sets GO COUNTDOWN_MS
+// have (or LOAD_WAIT_MS runs out) the countdown starts, and the room's clock sets GO countdownMs
 // later (`realtime.clock`): every browser counts down to that same moment on its own clock, synced
 // to the server's (net.ts's clock pings). Then each browser races its own kart and sends frames;
 // `realtime.frame` judges them (shared/kart/race.ts) and turns every lap the server sees into a
-// `lap` action, the last of them a finish. CLOSE_AFTER_FINISH_MS after the first finish, or once
-// everyone is done, the race is over; a kart not heard from for RETIRE_AFTER_MS drops out, and
-// RACE_CAP_MS per lap closes a race nobody can end.
+// `lap` action, the last of them a finish. CLOSE_AFTER_FINISH_MS (10 s) after the first finish, or
+// once everyone is done, the race is over (those still out placed by how far round they came); a
+// kart not heard from for RETIRE_AFTER_MS drops out, and RACE_CAP_MS per lap closes a race nobody
+// can end.
 import {
   decodeItemFrame,
   drawItem,
@@ -64,6 +65,7 @@ import {
 } from '../../kart/team.ts'
 import { TEAM_BOOST } from '../../kart/teamBoost.ts'
 import { courseOf, type Track } from '../../kart/track.ts'
+import { CLOSE_AFTER_FINISH_MS, closeAt, countdownMs } from '../../kart/opening.ts'
 import { formatTime } from '../../kart/timeTrial.ts'
 import { CUSTOM_PREFIX, isCustomId, isTrackCode } from '../../kart/editor/custom.ts'
 import { raceTrack } from '../../kart/tracks/registry.ts'
@@ -90,15 +92,17 @@ import type {
 
 /** How long the room waits for everyone's track to load before it starts anyway */
 export const LOAD_WAIT_MS = 25_000
+// 2026-11-22 (docs/KART-NETCODE.md §23): from everyone on the grid to GO grows with the field (each
+// driver presented in turn, then 3, 2, 1; anyone may skip it on their own screen, GO does not
+// move), and the others have ten seconds after the first finish (it was thirty). The numbers are
+// shared/kart/opening.ts's, which the race screen reads too
+export { CLOSE_AFTER_FINISH_MS, countdownMs }
 /**
- * 2026-11-20 (the race's show, docs/ARCHITECTURE.md §4.43): the camera's fly round the grid before
- * the countdown, which anyone may skip on their own screen; GO is the room's and does not move
+ * The room's own `close` timer runs this much after the moment the race closes: the first frame
+ * that comes in after that moment closes it, with how far round each kart still out had come; the
+ * timer only closes a race nobody sends frames to any more (placed by laps alone then)
  */
-export const INTRO_MS = 2_500
-/** From everyone on the grid to GO: the fly round, a moment to settle, then 3, 2, 1 */
-export const COUNTDOWN_MS = INTRO_MS + 4_000
-/** After the first kart finishes, the others have this long */
-export const CLOSE_AFTER_FINISH_MS = 30_000
+export const CLOSE_GRACE_MS = 1_500
 /** A kart not heard from this long during the race drops out */
 export const RETIRE_AFTER_MS = 20_000
 /** A race closes after this long per lap, whatever happens */
@@ -122,6 +126,13 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 const isTime = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value)
+
+/** A `close`'s list of how far round each kart had come */
+const isProgressList = (value: unknown): value is { seat: SeatId; at: number }[] =>
+  Array.isArray(value) &&
+  value.every(
+    (one) => isObject(one) && Number.isInteger(one.seat) && isTime(one.at) && (one.at as number) >= 0,
+  )
 
 const isSeatList = (value: unknown): value is SeatId[] =>
   Array.isArray(value) && value.every((seat) => Number.isInteger(seat))
@@ -228,9 +239,12 @@ function standings(state: KartState): Standing[] {
   const finished = state.racers
     .filter((racer) => racer.finishMs !== null)
     .sort((a, b) => (a.finishMs as number) - (b.finishMs as number) || a.seat - b.seat)
+  // 2026-11-22: those who did not finish by how far round they had come when the race closed (laps
+  // alone for one the room had not seen then, or one that dropped out before)
+  const far = (racer: KartRacer) => racer.progress ?? racer.lapMs.length
   const rest = state.racers
     .filter((racer) => racer.finishMs === null)
-    .sort((a, b) => b.lapMs.length - a.lapMs.length || a.seat - b.seat)
+    .sort((a, b) => far(b) - far(a) || a.seat - b.seat)
   const lines: Standing[] = finished.map((racer, index) => ({
     seat: racer.seat,
     // Two karts can only tie to the millisecond in theory, and then they share the place
@@ -244,9 +258,9 @@ function standings(state: KartState): Standing[] {
       params: { time: formatTime((racer.finishMs as number) / 1000) },
     },
   }))
-  // Those who did not finish share a place by laps done
+  // Those who did not finish come after, sharing a place only when just as far round
   rest.forEach((racer, index) => {
-    const first = rest.findIndex((other) => other.lapMs.length === racer.lapMs.length)
+    const first = rest.findIndex((other) => far(other) === far(racer))
     lines.push({
       seat: racer.seat,
       rank: finished.length + (first === index ? index : first) + 1,
@@ -586,13 +600,23 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
           racers: state.racers.map((one) => (one === racer ? { ...one, teamBoosts: held } : one)),
         }
       }
-      case 'close':
+      case 'close': {
         if (state.phase === 'finished') return gameError(PHASE)
+        const progress = a.progress
+        if (progress !== undefined && !isProgressList(progress)) return gameError(BAD)
+        const at = (seat: SeatId) => progress?.find((one) => one.seat === seat)?.at
         return {
           ...state,
           phase: 'finished',
-          racers: state.racers.map((one) => (done(one) ? one : { ...one, out: true })),
+          racers: state.racers.map((one) => {
+            if (done(one)) return one
+            const far = at(one.seat)
+            return far === undefined
+              ? { ...one, out: true }
+              : { ...one, out: true, progress: Math.round(Math.min(state.laps, far) * 1000) / 1000 }
+          }),
         }
+      }
       default:
         return gameError(BAD)
     }
@@ -620,13 +644,13 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         return [{ id: 'load', ms: LOAD_WAIT_MS, action: { t: 'start' } }]
       case 'countdown':
         // Started with the countdown, at the very moment `realtime.clock` sets goAt by
-        return [{ id: 'go', ms: COUNTDOWN_MS, action: { t: 'go' } }]
+        return [{ id: 'go', ms: countdownMs(state.racers.length), action: { t: 'go' } }]
       case 'racing': {
         const timers: TimerSpec<KartAction>[] = [
           { id: 'cap', ms: RACE_CAP_MS * state.laps, action: { t: 'close' } },
         ]
         if (state.racers.some((racer) => racer.finishMs !== null)) {
-          timers.push({ id: 'close', ms: CLOSE_AFTER_FINISH_MS, action: { t: 'close' } })
+          timers.push({ id: 'close', ms: CLOSE_AFTER_FINISH_MS + CLOSE_GRACE_MS, action: { t: 'close' } })
         }
         return timers
       }
@@ -651,7 +675,7 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
 
     clock(state, now) {
       return state.phase === 'countdown' && state.goAt === null
-        ? [{ t: 'schedule', goAt: now + COUNTDOWN_MS }]
+        ? [{ t: 'schedule', goAt: now + countdownMs(state.racers.length) }]
         : []
     },
 
@@ -673,6 +697,13 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         return { relay: null, actions: [] }
       }
       // On the grid, and once a kart is done, its frames only go round to be drawn
+      // 2026-11-22: the race closes with the first frame in after CLOSE_AFTER_FINISH_MS from the first
+      // finish, whoever's it is (a finished kart's too)
+      const closing = state.phase === 'racing' ? closeAt(state) : null
+      const due = closing !== null && now >= closing
+      if (due && done(racer)) {
+        return { relay: data, actions: [closeWith(state, memoryOf(memory).tracked, track)] }
+      }
       if (state.phase === 'loading' || done(racer)) return { relay: data, actions: [] }
       const { tracked } = memoryOf(memory)
       const slot = state.racers.indexOf(racer)
@@ -719,6 +750,13 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
             actions.push({ t: 'retire', seat: other.seat })
           }
         }
+      }
+      if (due && closing !== null && state.goAt !== null) {
+        // Time is up: a lap that ended in time still counts (its crossing is judged to the moment,
+        // the frame that brought it may come a little later), nothing else does
+        const goAt = state.goAt
+        const kept = actions.filter((one) => one.t === 'lap' && goAt + one.ms <= closing)
+        return { relay: data, actions: [...kept, closeWith(state, memoryOf(memory).tracked, track)] }
       }
       return { relay: data, actions }
     },
@@ -810,6 +848,18 @@ function field(state: KartState, tracked: Map<SeatId, Tracked>, track: Track): R
       return { seat: racer.seat, at, tracked: one }
     })
     .sort((a, b) => b.at - a.at || a.seat - b.seat)
+}
+
+/**
+ * 2026-11-22 (docs/KART-NETCODE.md §23): the race closes, with how far round each kart still out had
+ * come by the room's last look at it (none for a kart it has not seen since GO)
+ */
+function closeWith(state: KartState, tracked: Map<SeatId, Tracked>, track: Track): KartAction {
+  const progress = field(state, tracked, track)
+    .filter((one) => one.tracked?.last)
+    // In laps: whole gates passed and a share of the next, over the gates a lap has
+    .map((one) => ({ seat: one.seat, at: Math.round((one.at / Math.max(1, track.gates.length)) * 1000) / 1000 }))
+  return { t: 'close', progress }
 }
 
 /**

@@ -769,7 +769,10 @@ describe('a team race of computer karts in a room run here', () => {
     const state = room.state()
     expect(state.phase).toBe('finished')
     expect(state.racers.map((racer) => racer.team)).toEqual([0, 1, 0, 1, 0, 1])
-    expect(state.racers.every((racer) => racer.finishMs !== null)).toBe(true)
+    // 2026-11-22: ten seconds after the first finish the rest do not finish (and score nothing)
+    const home = state.racers.filter((racer) => racer.finishMs !== null).length
+    expect(home).toBeGreaterThan(0)
+    expect(state.racers.every((racer) => racer.finishMs !== null || racer.out)).toBe(true)
     // Both sides drifted their gauge full at least once, and the karts burnt what they got
     expect(state.teams!.fills[0]).toBeGreaterThan(0)
     expect(state.teams!.fills[1]).toBeGreaterThan(0)
@@ -783,6 +786,6 @@ describe('a team race of computer karts in a room run here', () => {
     const result = kart.result(state)
     expect(result.summary.key).toMatch(/^games\.kart\.result\.(red|blue)Won$/)
     const total = result.standings.reduce((sum, line) => sum + (line.score ?? 0), 0)
-    expect(total).toBe(10 + 8 + 6 + 5 + 4 + 3)
+    expect(total).toBe([10, 8, 6, 5, 4, 3].slice(0, home).reduce((sum, points) => sum + points, 0))
   }, 60_000)
 })

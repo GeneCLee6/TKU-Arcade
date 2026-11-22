@@ -72,6 +72,7 @@ import {
   type Progress,
 } from './store.ts'
 import { schoolTrack } from '../../../shared/kart/tracks/school.ts'
+import { PauseLayer } from '../ui/PauseLayer.tsx'
 
 registerMessages(KART_MESSAGES)
 // This screen's own strings, in its own chunk: the menu and a race never load them (2026-11-22)
@@ -420,6 +421,7 @@ function LessonScreen({
       data-done={shown.done || undefined}
     >
       <Stage ref={stage} role="img" aria-label={t('kart.spike.canvas')} />
+      <PauseLayer t={t} canPause button={false} enabled={!shown.done} onRestart={restart} onKartMenu={onExit} />
       {!engine && (
         <KartLoading
           t={t}

@@ -143,7 +143,7 @@ for (const [name, tuning] of CHOSEN) {
   }
 }
 
-// 2026-11-23 (docs/KART-FEEL.md §24): what the high platforms are worth, track by track: the
+// 2026-11-23 (docs/KART-FEEL.md §25): what the high platforms are worth, track by track: the
 // master flying onto them against the same master kept to the main road there (`platforms: false`),
 // and the expert, who never goes for them. Each platform's least speed off its lip beside
 if (!ONLY_KARTS) {

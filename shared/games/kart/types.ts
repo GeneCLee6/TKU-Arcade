@@ -35,6 +35,12 @@ export type KartRacer = {
   finishMs: number | null
   /** Dropped out: gone too long, or still out on the track when the race closed */
   out: boolean
+  /**
+   * 2026-11-22 (docs/KART-NETCODE.md §23): still out on the track when the race closed, how far
+   * round it had come (laps, with the share of the lap it was on); absent when the room had not
+   * seen it then. Those who did not finish are placed by it
+   */
+  progress?: number
   /** The item it holds, if any (item race only) */
   item: ItemId | null
   /** Its shield is up until then, by the server's clock (ms since the epoch); 0 for none */
@@ -138,8 +144,11 @@ export type KartAction =
   | { t: 'lap'; seat: SeatId; ms: number }
   /** System: `seat` has not been heard from for too long */
   | { t: 'retire'; seat: SeatId }
-  /** System: time is up for those still out on the track */
-  | { t: 'close' }
+  /**
+   * System: time is up for those still out on the track. 2026-11-22: with how far round each of them
+   * had come by the room's last look (laps and the share of the next), to place them by
+   */
+  | { t: 'close'; progress?: { seat: SeatId; at: number }[] }
   /** System: `seat` took box `box` at server time `at` and got `item` (e9-t05) */
   | { t: 'got'; seat: SeatId; box: number; item: ItemId; at: number }
   /** System: `seat` used `item`, judged to reach `targets`, of whom `blocked` had shields (e9-t06a) */

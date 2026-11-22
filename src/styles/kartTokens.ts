@@ -493,6 +493,44 @@ export const skillCue = {
 } as const
 
 /**
+ * 2026-11-22 (#94): Guanyin Hill Road's own scenery (src/kart/art/guanyinArt.ts): the ridge, the
+ * trail pavilion, the temple, the river and the ferry pier
+ */
+export const guanyinScene = {
+  ridgeFoot: '#3F6B45',
+  ridgeTop: '#7E9C8A',
+  stone: '#B9B2A4',
+  pillar: '#B0362B',
+  wood: '#7A4E2D',
+  roof: '#3E5A4C',
+  gold: '#D9A441',
+  wall: '#E6DCC8',
+  door: '#7E1F1A',
+  ridge: '#C9A043',
+  bronze: '#6E5636',
+  lantern: '#FF6A3D',
+  riverDeep: '#1E4F63',
+  riverShallow: '#4E9C8E',
+  riverFlat: '#7FB3C2',
+  foam: '#EEF4F0',
+  concrete: '#A9A9A2',
+  pile: '#5A5650',
+  post: '#2E2F33',
+  hull: '#2B5F8E',
+  cabin: '#F1EFE8',
+  window: '#9FE3FF',
+  band: '#C23B2E',
+  funnel: '#D24A35',
+} as const
+
+/** 2026-11-22 (#115, seaWater.ts): each body of water's deep, shallow and foam colours */
+export const waterScene = {
+  harbour: { deep: '#1C4766', shallow: '#3F8F95', foam: '#F2E6DC' },
+  wharf: { deep: '#1E5A86', shallow: '#47ABAE', foam: '#EEF5F4' },
+  river: { deep: '#2A5F6E', shallow: '#5E9F8E', foam: '#E9F0EA' },
+} as const
+
+/**
  * 2026-11-23 (src/kart/art/ledgeArt.ts): the high platforms' buildings, by track: the walls under
  * each roof, its parapet, and the face a flier clears (striped in skillCue's hazard colours)
  */
@@ -621,4 +659,19 @@ export const kartLobby = {
   hillsDay: '#5C7A6A',
   hillsNight: '#231E47',
   trackGlow: '#FFFFFF',
+} as const
+
+/**
+ * 2026-11-22 (docs/ARCHITECTURE.md §4.72): the podium after a race (src/kart/ceremony/): the three
+ * steps (winner, second, third), the stage, the lights that sweep it and the trophy. Also the name
+ * plates' medal colours over it (2D, read from here as the 3D's are)
+ */
+export const kartPodium = {
+  steps: ['#E8B931', '#C9D1DC', '#C77B3A'],
+  stepSide: '#1B2238',
+  floor: '#10152A',
+  sky: '#070A16',
+  lights: ['#FF3B6B', '#2EC4F1', '#FFD23F'],
+  spot: '#FFF4D6',
+  trophy: '#F2C94C',
 } as const

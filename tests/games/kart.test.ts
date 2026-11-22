@@ -6,7 +6,8 @@ import { createRng } from '../../shared/games/rng.ts'
 import { SCREEN_MESSAGES } from '../../shared/games/screenMessages.ts'
 import {
   CLOSE_AFTER_FINISH_MS,
-  COUNTDOWN_MS,
+  CLOSE_GRACE_MS,
+  countdownMs,
   kart,
   LOAD_WAIT_MS,
   RETIRE_AFTER_MS,
@@ -85,10 +86,10 @@ describe('the race (e9-t07, e9-t08)', () => {
     expect(refused(state, { t: 'loaded' }, 0)).toBe(true)
     state = act(state, { t: 'loaded' }, 1)
     expect(state.phase).toBe('countdown')
-    expect(kart.timers?.(state)).toEqual([{ id: 'go', ms: COUNTDOWN_MS, action: { t: 'go' } }])
+    expect(kart.timers?.(state)).toEqual([{ id: 'go', ms: countdownMs(2), action: { t: 'go' } }])
     // The clock sets GO, once
     expect(kart.realtime?.clock?.(state, 5000)).toEqual([
-      { t: 'schedule', goAt: 5000 + COUNTDOWN_MS },
+      { t: 'schedule', goAt: 5000 + countdownMs(2) },
     ])
     state = act(state, { t: 'schedule', goAt: 9000 })
     expect(kart.realtime?.clock?.(state, 5000)).toEqual([])
@@ -126,7 +127,7 @@ describe('the race (e9-t07, e9-t08)', () => {
     state = act(state, { t: 'lap', seat: 0, ms: 80_000 })
     expect(state.racers[0]).toMatchObject({ lapMs: [41_000, 39_000], finishMs: 80_000 })
     expect(kart.timers?.(state).map((timer) => timer.id)).toEqual(['cap', 'close'])
-    expect(kart.timers?.(state)[1]).toMatchObject({ ms: CLOSE_AFTER_FINISH_MS })
+    expect(kart.timers?.(state)[1]).toMatchObject({ ms: CLOSE_AFTER_FINISH_MS + CLOSE_GRACE_MS })
     // A finished kart counts no more laps
     expect(refused(state, { t: 'lap', seat: 0, ms: 90_000 })).toBe(true)
     state = act(state, { t: 'lap', seat: 1, ms: 81_500 })

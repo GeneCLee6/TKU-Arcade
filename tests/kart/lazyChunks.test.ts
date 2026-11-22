@@ -27,6 +27,7 @@ const PARTS: Record<string, readonly string[]> = {
   works: ['works', 'skill'],
   wharf: ['wharf', 'skill'],
   lanes: ['lanes', 'skill'],
+  guanyin: ['guanyin'],
   mangrove: ['local'],
   fort: ['local'],
   danhai: ['local'],
@@ -40,7 +41,7 @@ describe("a track's own scenery", () => {
   })
 
   it('is at hand at once for a track with none of its own', () => {
-    for (const id of ['riverside', 'guanyin', 'oval', 'custom-abc', 'school']) {
+    for (const id of ['riverside', 'oval', 'custom-abc', 'school']) {
       expect(hasOwnScenery({ id })).toBe(false)
       expect(loadedScenery({ id })).toEqual({})
     }

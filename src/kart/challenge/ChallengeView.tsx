@@ -50,6 +50,8 @@ import { KartLoading } from '../load/KartLoading.tsx'
 import { useKartLoad } from '../load/useKartLoad.ts'
 import { loadQuality } from '../quality.ts'
 import RaceView from '../race/RaceView.tsx'
+import { PauseLayer } from '../ui/PauseLayer.tsx'
+import { raceEpochNow } from '../race/raceClock.ts'
 import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
 import type { SpikeHud, SpikeStep, SpikeTrial } from '../spikeLoop.ts'
 import { TouchControls } from '../touch/TouchControls.tsx'
@@ -575,6 +577,7 @@ function MissionRun({ mission, onResult, onAgain, onNext, onList }: RunProps) {
       data-done={shown.done || undefined}
     >
       <Stage ref={stage} role="img" aria-label={t('kart.spike.canvas')} />
+      <PauseLayer t={t} canPause button={false} enabled={!shown.done && !shown.failed} onRestart={onAgain} onKartMenu={onList} />
       {mission.fog && <FogCover aria-hidden="true" data-testid="kart-challenge-fog" />}
       {!engine && (
         <KartLoading
@@ -754,7 +757,7 @@ function MissionRace({ mission, onResult, onAgain, onNext, onList }: RunProps) {
       seats: entries.length + 1,
       options: { track: mission.track, laps: mission.laps, mode: 'race', teams: 'solo' },
       seed,
-      now: () => Date.now(),
+      now: () => raceEpochNow(),
     })
     return { seed, entries, playerSeat, room, realtime: room.realtimeFor(playerSeat) }
   })
@@ -789,10 +792,10 @@ function MissionRace({ mission, onResult, onAgain, onNext, onList }: RunProps) {
       bots: botSeats(game.entries, 0, mission.bots?.difficulty ?? 'normal'),
       players: [game.playerSeat],
       seed: game.seed,
-      now: Date.now(),
+      now: raceEpochNow(),
     })
     show()
-    const timer = window.setInterval(() => race.advance(Date.now()), RUN_EVERY_MS)
+    const timer = window.setInterval(() => race.advance(raceEpochNow()), RUN_EVERY_MS)
     return () => {
       window.clearInterval(timer)
       stopWatching()
@@ -863,6 +866,7 @@ function MissionRace({ mission, onResult, onAgain, onNext, onList }: RunProps) {
         nameOf={nameOf}
         lookOf={(seat) => game.entries[seat] ?? null}
         onStep={onStep}
+        pause={{ canPause: true, onRestart: onAgain, onKartMenu: onList }}
       />
       <RaceGoal data-testid="kart-challenge-race" data-mission={mission.id}>
         <GoalPanel t={t} mission={mission} name={name} stars={stars}>
@@ -875,11 +879,6 @@ function MissionRace({ mission, onResult, onAgain, onNext, onList }: RunProps) {
           )}
         </GoalPanel>
       </RaceGoal>
-      <QuitCorner>
-        <Button type="button" $variant="secondary" $size="sm" onClick={onList}>
-          {t('kart.challenge.quit')}
-        </Button>
-      </QuitCorner>
       {(passed || failedWhy) && (
         <ResultLayer>
           <ResultCard
@@ -1058,6 +1057,7 @@ function MedalScreen({
       data-track={trackId}
     >
       <Stage ref={stage} role="img" aria-label={t('kart.spike.canvas')} />
+      <PauseLayer t={t} canPause button={false} enabled={!result} onRestart={onAgain} onKartMenu={onList} />
       {(!engine || ghost === undefined) && (
         <KartLoading
           t={t}
@@ -1472,13 +1472,6 @@ const Actions = styled.div`
     flex-wrap: nowrap;
     max-width: none;
   }
-`
-
-const QuitCorner = styled.div`
-  position: fixed;
-  top: ${space.sm}px;
-  left: ${space.sm + 100}px;
-  z-index: 21;
 `
 
 const ClockCorner = styled.div<{ $touch: boolean }>`
