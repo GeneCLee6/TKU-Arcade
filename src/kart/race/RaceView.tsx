@@ -202,6 +202,8 @@ function noteFor(
 }
 /** How often the places and the connection's state are read again */
 const POLL_MS = 250
+/** 2026-11-23: on the grid once the clock is settled here, or after this long whatever, ms */
+const SETTLE_WAIT_MS = 4_000
 
 export interface RaceViewProps {
   view: KartView
@@ -218,7 +220,7 @@ export interface RaceViewProps {
    */
   onStep?: (step: SpikeStep) => void
   /**
-   * 2026-11-22 (§4.72): the menu over the race (Esc, Start, the button): what it offers, and whether
+   * 2026-11-22 (§4.73): the menu over the race (Esc, Start, the button): what it offers, and whether
    * the race stops while it is open (a race with no one else in it) or goes on (a room's)
    */
   pause?: RacePause
@@ -309,7 +311,7 @@ export default function RaceView({
     tuning: applyKart(loadTuning().tuning, loadout.body),
     enabled: true,
   }))
-  // 2026-11-22 (§4.72): what the loop reads every frame: the keys changed in the menu's controls, and
+  // 2026-11-22 (§4.73): what the loop reads every frame: the keys changed in the menu's controls, and
   // none while a room's menu is open (the race goes on, the kart takes no keys)
   const liveControls = useRef(settings)
   // 2026-11-20 (§4.50): a tip for a technique not yet used (not for a kart driving itself)
@@ -384,12 +386,31 @@ export default function RaceView({
     } catch {
       queueMicrotask(() => setFailure(true))
     }
-    // Drawn and on the grid: the room can count this kart in
-    const me = latest.current.racers.find((racer) => racer.seat === seat)
-    if (stop && latest.current.phase === 'loading' && me && !me.loaded) {
-      actRef.current({ t: 'loaded' } satisfies KartAction)
+    // Drawn and on the grid: the room can count this kart in. 2026-11-23 (#152): once the room's
+    // clock is settled here too (or after SETTLE_WAIT_MS at most), so that the opening the room then
+    // starts shows every screen the same driver at the same moment
+    let settleWait: ReturnType<typeof setTimeout> | null = null
+    const tellLoaded = () => {
+      if (settleWait !== null) clearTimeout(settleWait)
+      settleWait = null
+      const me = latest.current.racers.find((racer) => racer.seat === seat)
+      if (latest.current.phase === 'loading' && me && !me.loaded) {
+        actRef.current({ t: 'loaded' } satisfies KartAction)
+      }
+    }
+    let told = false
+    if (stop) {
+      const once = () => {
+        if (told) return
+        told = true
+        tellLoaded()
+      }
+      settleWait = setTimeout(once, SETTLE_WAIT_MS)
+      net.whenSettled(once)
     }
     return () => {
+      told = true
+      if (settleWait !== null) clearTimeout(settleWait)
       stop?.()
       net.stop()
       raceNet.current = null
@@ -495,7 +516,7 @@ export default function RaceView({
     const timer = window.setTimeout(() => setPlaceShift(undefined), PLACE_SHIFT_MS)
     return () => window.clearTimeout(timer)
   }, [placeShift])
-  // 2026-11-22 (§4.72): after the first finish, the seconds left to everyone still out, with a tock
+  // 2026-11-22 (§4.73): after the first finish, the seconds left to everyone still out, with a tock
   // for each (shared/kart/opening.ts; the room closes the race at that moment)
   const closing = closeAt(view)
   const [closeTicks, setCloseLeft] = useState<number | null>(null)
@@ -576,7 +597,7 @@ export default function RaceView({
   // The track's name on the fly round's card; a custom track has none of its own here
   const courseKey = `kart.course.${view.track}`
   const courseTitle = courseKey in KART_MESSAGES.en ? t(courseKey as KartMessageKey) : null
-  // 2026-11-22 (§4.72): the driver in front of the camera during the opening
+  // 2026-11-22 (§4.73): the driver in front of the camera during the opening
   const presented = trial?.presenting != null ? view.racers[trial.presenting] : undefined
   const presentedLook = presented
     ? presented.seat === seat

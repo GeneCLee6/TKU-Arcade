@@ -1,4 +1,4 @@
-// 2026-11-22 (owner: "the countdown needs sounds, GO too"; docs/ARCHITECTURE.md §4.72): the start's
+// 2026-11-22 (owner: "the countdown needs sounds, GO too"; docs/ARCHITECTURE.md §4.73): the start's
 // 3, 2, 1 and GO, and the ticks of the ten seconds left after the first finish. Made here, as every
 // sound of the kart is (no sound files): a short two-oscillator blip for each count, a brighter
 // rising chord for GO, a low wooden tock for each second of the close and a higher one for its last

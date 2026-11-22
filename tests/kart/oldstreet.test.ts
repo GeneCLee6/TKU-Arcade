@@ -251,3 +251,34 @@ describe('the old street scenery', () => {
     expect(oldStreetTreeFits(-100, 0)).toBe(false)
   })
 })
+
+// 2026-11-23 (#150): the old street home's step on the main road's guide. The master drove it like
+// everyone else, lifting before the crest; now it drifts over the lip
+describe('the old street home’s step', () => {
+  it('has a guide of its drift jump alone: the road’s own line everywhere else', async () => {
+    const { trackGuide } = await import('../../shared/kart/tracks/guides.ts')
+    const guide = trackGuide('oldstreet')!
+    expect(guide.cuesOnly).toBe(true)
+    expect(guide.cues.map((cue) => cue.lip)).toEqual(OLDSTREET.jumps)
+    expect(guide.slots).toEqual([])
+  })
+
+  it('the master drift-jumps it every lap, as fast as lifting and no reset', async () => {
+    const { DRIVERS } = await import('../../scripts/kart/drivers.ts')
+    const { KART_TUNING } = await import('../../shared/kart/physics.ts')
+    const { createDriver } = await import('../../src/kart/bots/drivers.ts')
+    const track = raceTrack('oldstreet')!
+    const plain = courseOf(track)
+    const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
+    const drive = createDriver(DRIVERS.master, track, KART_TUNING, 7)
+    let trial: Trial = startTrial(course)
+    for (let step = 0; trial.phase !== 'finished' && step < 200 * 60; step++) {
+      trial = stepTrial(trial, drive(trial), course, KART_TUNING)
+    }
+    expect(trial.phase).toBe('finished')
+    expect(trial.run.kart.driftJumps).toBe(track.laps)
+    expect(trial.run.resets).toBe(0)
+    // As fast as it was before the guide (88.1 to 88.7 s over three seeds), give or take
+    expect(seconds(trial.steps)).toBeLessThan(89.5)
+  }, 60_000)
+})

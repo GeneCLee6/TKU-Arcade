@@ -23,6 +23,7 @@
 //
 // Pure and shared: the browser and the Worker read the same shots.
 import { KART_RADIUS } from './kartRadius.ts'
+import { clearOfObstacles, obstacleStop, obstacleWalls, type Obstacle } from './obstacles.ts'
 import type { Wall } from './walls.ts'
 
 /** A seat in the room (shared/games/types.ts's SeatId) */
@@ -173,15 +174,32 @@ export type Thrower = {
   readonly vz: number
 }
 
+/**
+ * The moving obstacles on the road (obstacles.ts, 2026-11-23, #150) and the race clock's step at the
+ * moment the item leaves: a hailstone stops at a boom that is down or a container in its way, a fog
+ * bank short of them, and a puddle or a fake box lies clear of them
+ */
+export type ShotBlockers = { readonly obstacles: readonly Obstacle[]; readonly tick: number }
+
 /** A hailstone thrown from `kart` at `at`: straight ahead, gone at the first wall or its range */
-export function throwHail(n: number, kart: Thrower, at: number, walls: readonly Wall[]): KartShot {
+export function throwHail(
+  n: number,
+  kart: Thrower,
+  at: number,
+  walls: readonly Wall[],
+  blockers?: ShotBlockers,
+): KartShot {
   const dx = Math.sin(kart.heading)
   const dz = -Math.cos(kart.heading)
   const forward = Math.max(0, kart.vx * dx + kart.vz * dz)
   const speed = SHOT_TUNING.hailSpeed + forward
   const x = kart.x + dx * SHOT_TUNING.hailLead
   const z = kart.z + dz * SHOT_TUNING.hailLead
-  const range = rayToWall(walls, x, z, dx, dz, SHOT_TUNING.hailRange)
+  let range = rayToWall(walls, x, z, dx, dz, SHOT_TUNING.hailRange)
+  if (blockers) {
+    const stop = obstacleStop(blockers.obstacles, x, z, dx * speed, dz * speed, blockers.tick, range / speed)
+    if (stop !== null) range = stop * speed
+  }
   return {
     n,
     item: 'hail',
@@ -196,15 +214,26 @@ export function throwHail(n: number, kart: Thrower, at: number, walls: readonly 
   }
 }
 
-/** A puddle dropped behind `kart` at `at` */
-export function dropPuddle(n: number, kart: Thrower, at: number): KartShot {
+/** A puddle dropped behind `kart` at `at` (clear of any obstacle, 2026-11-23) */
+export function dropPuddle(
+  n: number,
+  kart: Thrower,
+  at: number,
+  blockers?: ShotBlockers,
+  radius: number = SHOT_TUNING.puddleRadius,
+): KartShot {
+  const behind = {
+    x: kart.x - Math.sin(kart.heading) * SHOT_TUNING.puddleBehind,
+    z: kart.z + Math.cos(kart.heading) * SHOT_TUNING.puddleBehind,
+  }
+  const spot = blockers ? clearOfObstacles(blockers.obstacles, behind.x, behind.z, radius) : behind
   return {
     n,
     item: 'puddle',
     by: kart.seat,
     at,
-    x: kart.x - Math.sin(kart.heading) * SHOT_TUNING.puddleBehind,
-    z: kart.z + Math.cos(kart.heading) * SHOT_TUNING.puddleBehind,
+    x: spot.x,
+    z: spot.z,
     vx: 0,
     vz: 0,
     until: at + SHOT_TUNING.puddleMs,
@@ -213,8 +242,12 @@ export function dropPuddle(n: number, kart: Thrower, at: number): KartShot {
 }
 
 /** A fake item box dropped behind `kart` at `at` (2026-11-20): where a puddle would be */
-export function dropDecoy(n: number, kart: Thrower, at: number): KartShot {
-  return { ...dropPuddle(n, kart, at), item: 'decoy', until: at + SHOT_TUNING.decoyMs }
+export function dropDecoy(n: number, kart: Thrower, at: number, blockers?: ShotBlockers): KartShot {
+  return {
+    ...dropPuddle(n, kart, at, blockers, SHOT_TUNING.decoyRadius),
+    item: 'decoy',
+    until: at + SHOT_TUNING.decoyMs,
+  }
 }
 
 /**
@@ -228,7 +261,12 @@ export function layFog(
   target: { readonly x: number; readonly z: number; readonly heading: number; readonly speed: number },
   at: number,
   walls: readonly Wall[],
+  blockers?: ShotBlockers,
 ): KartShot {
+  // The obstacles in the way as it is laid count as walls (2026-11-23)
+  if (blockers && blockers.obstacles.length > 0) {
+    walls = [...walls, ...obstacleWalls(blockers.obstacles, blockers.tick)]
+  }
   const dx = Math.sin(target.heading)
   const dz = -Math.cos(target.heading)
   const wanted = Math.max(SHOT_TUNING.fogLeadMin, target.speed * SHOT_TUNING.fogLeadSeconds)
