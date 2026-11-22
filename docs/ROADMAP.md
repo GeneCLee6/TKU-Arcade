@@ -206,6 +206,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #146 | 2026-11-22 | `feat/kart-track-routes` | 燈籠老街的燈籠巷（第二條捷徑，穿縫）、漁人碼頭與老街各一個接彎的台階；`oldstreet@11`、`harbour@15` |
 | #147 | 2026-11-22 | `feat/table-bots-many` | 「跟電腦玩」自選電腦數量（1 到滿座，德州撲克預設 5）與各自難度；等待室「空位全部坐滿」 |
 | #148 | 2026-11-22 | `feat/fullscreen-play` | 全螢幕遊玩：共用 `src/lib/fullscreen.ts`（整頁 Fullscreen API、iPhone 退回專注模式並提示加到主畫面、Keyboard Lock 保留 Esc）、房間標題與卡丁車選單的按鈕、比賽自動全螢幕設定與手機鎖橫、PWA `display_override` |
+| #151 | 2026-11-22 | `feat/kart-lobby-fullscreen` | 卡丁車等待室滿版一頁：8 位大尺寸 3D 車手（4×2／超寬 8×1）與名牌條、側欄賽道卡與準備／開始大按鈕、邀請／聊天／設定／分隊收進對話框、房主管理鈕、直拿列表、無 WebGL 平面圖；聊天面板由房間頁做好傳下去，首屏 135.1 kB |
 
 ## Phase O · M4 社群
 

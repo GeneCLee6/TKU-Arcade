@@ -1579,7 +1579,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
 - **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
 
-### 4.70 路線圖外：卡丁車等待室滿版（一頁、橫向、車手為主角）（2026-11-22，`feat/kart-lobby-fullscreen`）
+### 4.70 路線圖外：卡丁車等待室滿版（一頁、橫向、車手為主角）（2026-11-22，#151，`feat/kart-lobby-fullscreen`）
 
 擁有者：「大廳準備階段的畫面要像跑跑一樣，全螢幕都是房主跟車手，現在的版面配置很醜也很空曠，要一頁就塞滿，橫向的寬的…總之要電競化專業化」。照規則 1 只學「準備畫面滿版、車手為主角」的類型排版；版面、美術、圖示是自己的（`IP-CHECKLIST.md`）。
 
