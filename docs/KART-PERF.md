@@ -152,6 +152,27 @@ npm run build && node scripts/kart-fps.mjs --base http://localhost:<port> \
 - **合計多了約 25 kB**：拆成多個 chunk 每個都從頭壓縮，共用的字典沒了（平均每多一個 chunk 約 0.6 kB），加上載入器、載入畫面、預先下載約 3 kB。玩家實際下載的只會少：進一場比賽少 11–20 kB，`/kart` 的第一個畫面少一半。three.js 本身用 `vite.config.ts` 的 `codeSplitting.groups` 固定成一個 chunk（`three`）：賽道場景與車系只 import 它的核心類別，打包器原本會把它切成兩塊、多約 1 kB。
 - 試過沒用的：把 skillKit／skillWalls／skillCues 與在地賽道的 plan／art 用 `codeSplitting.groups` 各併成一塊——group 預設連相依一起拉，結果把 three.js 整個拉進去（170 kB），不能用。
 
+## 9. 房間首屏回到 135 以下；駕訓班、挑戰、編輯器的字串各自 lazy（2026-11-22，`feat/kart-fixes-budget`）
+
+擁有者 2026-11-22「全照建議」：房間的卡丁車首屏 139.7／140 kB 又貼著警告線。**量過才知道**：#131 說是挑戰的字串併進 `KART_MESSAGES` 造成的，但 `KART_MESSAGES`（`shared/kart/i18n.ts`）從來不在房間首屏（它跟 `RaceView` 一起在首屏之後）；#131 前後首屏 139.0 → 139.7 kB 的 0.7 kB 是打包器重切共用 chunk（`Standings`、`net.ts` 分出來）。首屏裡真正能拿掉的是**錄影器**與**觀戰名次表**：
+
+- 錄影器 `useRaceRecorder` 原本靜態帶進 `replay.ts`（錄影器＋播放的工具函式）、`net.ts`（frame 格式）、`team.ts`：改成首屏只留一個小殼，真正的錄影（`src/kart/watch/raceTape.ts`）是 lazy chunk，掛上就開始下載；到之前收到的 frame 與 view 依序排隊，到了照順序交給它（上限 20 000 筆，下載失敗就這場沒有重播，比賽照常）。比賽本身（three.js）比它大得多也晚得多，所以實際上不會漏錄。
+- 觀戰名次表 `Standings`（＋`broadcast.ts`）只在「比賽中、自己沒車、沒開即時觀看」才出現，改成 lazy。
+
+字串的部分照擁有者的建議也做了，省的是 `/kart` 首屏與進比賽要等的字串，不是房間首屏：駕訓班（`i18n.school.ts`）、挑戰（`i18n.challenge.ts`）、賽道編輯器（`i18n.editor.ts`）不再併進 `KART_MESSAGES`，各由自己的 lazy 畫面（`SchoolView`、`ChallengeView`、`EditorPage`）`registerMessages`；選單入口、駕訓班邀請、比賽中的技巧提示、分享賽道連結這幾句搬到 `i18n.menu.ts`（仍併進 `KART_MESSAGES`）。`check-i18n` 的 `KART_PARTS` 逐一比對這三個檔，key 不得和 `KART_MESSAGES` 重複，`shared/kart/i18n.*.ts` 沒併進也沒列進去就擋。
+
+`npm run build && npm run budget -- --chunks`（gzip，zh-TW）：
+
+| | 前（`bdd81cb`） | 後 |
+| --- | --- | --- |
+| 房間的卡丁車首屏 `KartScreen`（上限 150，警告線 140） | **139.7 kB**（ok，差 0.3 到警告） | **133.6 kB** |
+| 　其中錄影器 `useRaceRecorder`＋`replay`＋`net`＋`team` | 4.9 kB | 0.8 kB |
+| 　其中 `Standings`＋`broadcast` | 1.9 kB | 0 |
+| 單機 `/kart` 首屏（選單） | 234.6 kB | 224.0 kB |
+| 　其中卡丁車字串 `shared/kart/i18n.ts` chunk | 25.3 kB | 14.7 kB |
+| 房間首屏之後才載的（比賽、觀戰、重播） | 155.1 kB | 151.1 kB |
+| 卡丁車全部 chunk 合計（上限 600） | 506.2 kB | 508.9 kB |
+
 ## 8. 之後再量
 
 - 改了畫面（新賽道、新車、新特效）就跑一次 §1 的指令，前後各一份 JSON，貼到 PR。看 draw calls 與 JS ms；fps 只在同一台、沒有別的工作時才比。

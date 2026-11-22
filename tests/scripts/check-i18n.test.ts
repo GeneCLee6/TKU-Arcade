@@ -68,6 +68,33 @@ describe('check-i18n catalogs', () => {
     expect(stray.status).toBe(1)
   })
 
+  it('compares the kart screens that register their own strings, and finds an unchecked one', () => {
+    const KART = 'shared/kart/i18n.ts'
+    const kart = `import { KART_TOUCH_MESSAGES } from './i18n.touch.ts'
+export const KART_MESSAGES = { en: { 'kart.a': 'A word' }, 'zh-TW': { 'kart.a': '甲' } }`
+    const part = (name: string, en: string, zh: string) => ({
+      [`shared/kart/i18n.${name}.ts`]: `export const KART_${name.toUpperCase()}_MESSAGES = { en: { ${en} }, 'zh-TW': { ${zh} } }`,
+    })
+    const ok = run({
+      [KART]: kart,
+      ...part('touch', ``, ``),
+      ...part('school', `'kart.school.b': 'B'`, `'kart.school.b': '乙'`),
+    })
+    expect(ok.output).toContain('ok   check-i18n')
+    expect(ok.status).toBe(0)
+
+    const missing = run({ [KART]: kart, ...part('touch', ``, ``), ...part('school', `'kart.school.b': 'B'`, ``) })
+    expect(missing.output).toContain(`shared/kart/i18n.school.ts (zh-TW): missing key 'kart.school.b'`)
+    expect(missing.status).toBe(1)
+
+    const twice = run({ [KART]: kart, ...part('touch', ``, ``), ...part('school', `'kart.a': 'A'`, `'kart.a': '甲'`) })
+    expect(twice.output).toContain(`'kart.a' is in ${KART}`)
+
+    const unchecked = run({ [KART]: kart, ...part('touch', ``, ``), ...part('lonely', `'kart.c': 'C'`, `'kart.c': '丙'`) })
+    expect(unchecked.output).toContain('shared/kart/i18n.lonely.ts: neither merged')
+    expect(unchecked.status).toBe(1)
+  })
+
   it('fails on a site key missing from zh-TW', () => {
     const { status, output } = run({
       [SITE_EN]: `export const en = { a: 'A word', b: 'B word' }`,

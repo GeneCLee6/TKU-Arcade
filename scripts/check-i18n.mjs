@@ -20,6 +20,13 @@ const LOBBY_KEY = /^games\.[a-z-]+\.(name|summary|tryAlone)$/
 const GAMES = 'shared/games/index.ts'
 const GAME_SCREENS = 'shared/games/screenMessages.ts'
 const KART = 'shared/kart/i18n.ts' // Registered by the kart's lazy chunk, so not in the site's catalogs
+// The kart's screens that register their own strings, not merged into KART_MESSAGES (2026-11-22):
+// [file, export]. Every shared/kart/i18n.*.ts must be merged into i18n.ts or listed here
+const KART_PARTS = [
+  ['shared/kart/i18n.school.ts', 'KART_SCHOOL_MESSAGES'],
+  ['shared/kart/i18n.challenge.ts', 'KART_CHALLENGE_MESSAGES'],
+  ['shared/kart/i18n.editor.ts', 'KART_EDITOR_MESSAGES'],
+]
 const SOURCE_ROOT = 'src'
 
 const USER_VISIBLE_ATTRIBUTES = new Set(['aria-label', 'title', 'placeholder', 'alt', 'label'])
@@ -349,6 +356,34 @@ checkParity(kartEn, `${KART} (en)`, kartMessages['zh-TW'] ?? {}, `${KART} (zh-TW
 for (const key of Object.keys(kartEn)) {
   if (!key.startsWith('kart.')) problems.push(`${KART}: '${key}': keys here start with kart.`)
 }
+const kartKeys = new Set(Object.keys(kartEn))
+let kartPartKeys = 0
+for (const [file, exportName] of KART_PARTS) {
+  if (!existsSync(file)) continue
+  const part = await load(file, exportName)
+  const partEn = part.en ?? {}
+  checkParity(partEn, `${file} (en)`, part['zh-TW'] ?? {}, `${file} (zh-TW)`)
+  for (const key of Object.keys(partEn)) {
+    if (!key.startsWith('kart.')) problems.push(`${file}: '${key}': keys here start with kart.`)
+    if (kartKeys.has(key)) problems.push(`${file}: '${key}' is in ${KART} or another part too`)
+    kartKeys.add(key)
+    kartPartKeys++
+  }
+}
+// A string file of the kart's that nothing checks would let a missing translation through
+if (existsSync(KART)) {
+  const kartSource = readFileSync(KART, 'utf8')
+  const listed = new Set(KART_PARTS.map(([file]) => file))
+  for (const name of readdirSync('shared/kart').filter((one) => /^i18n\..+\.ts$/.test(one))) {
+    const file = `shared/kart/${name}`
+    const merged = kartSource
+      .split(/\r?\n/)
+      .some((line) => line.startsWith('import {') && line.endsWith(`from './${name}'`))
+    if (!merged && !listed.has(file)) {
+      problems.push(`${file}: neither merged into ${KART} nor listed in check-i18n.mjs KART_PARTS`)
+    }
+  }
+}
 for (const [catalog, file] of [[siteEn, SITE_EN], [siteZh, SITE_ZH], [roomEn, ROOM_EN]]) {
   for (const key of Object.keys(catalog)) {
     if (key.startsWith('games.')) problems.push(`${file}: '${key}': games.* belongs to game modules`)
@@ -367,6 +402,7 @@ if (problems.length > 0) {
     Object.keys(roomEn).length +
     Object.keys(gamesEn).length +
     Object.keys(screensEn).length +
-    Object.keys(kartEn).length
+    Object.keys(kartEn).length +
+    kartPartKeys
   console.log(`ok   check-i18n: ${keys} keys, ${sourceFiles.length} source files`)
 }

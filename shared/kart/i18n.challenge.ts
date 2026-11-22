@@ -1,13 +1,12 @@
 // The challenge mode (2026-11-21; docs/ARCHITECTURE.md §4.60): its chapters, its missions (working
 // titles of our own, docs/KART-WORLD.md §6), what each asks, why a run failed, and the medals of the
-// time trial. Merged into KART_MESSAGES (i18n.ts), so the same check covers them. `en` is the source.
+// time trial. Registered by ChallengeView's lazy chunk, not merged into KART_MESSAGES (2026-11-22; the
+// menu's way in is in i18n.menu.ts). `npm run check-i18n` checks them. `en` is the source.
 const en = {
-  'kart.challenge.open': 'Challenges',
   'kart.challenge.title': 'Challenges',
   'kart.challenge.intro':
     'Missions that ask for one thing done well, and a medal for every track. Each chapter opens once you pass four missions of the one before.',
   'kart.challenge.back': 'Back to the kart',
-  'kart.challenge.loading': 'Loading the challenge…',
   'kart.challenge.tab.missions': 'Missions',
   'kart.challenge.tab.medals': 'Medal wall',
   'kart.challenge.total': '{stars} of {most} stars',
@@ -127,11 +126,9 @@ const en = {
 export type KartChallengeKey = keyof typeof en
 
 const zhTW: Record<KartChallengeKey, string> = {
-  'kart.challenge.open': '挑戰',
   'kart.challenge.title': '挑戰',
   'kart.challenge.intro': '每一關只要求把一件事做好，每張賽道還有獎牌可拿。過了前一章的四關，下一章才會打開。',
   'kart.challenge.back': '回到卡丁車',
-  'kart.challenge.loading': '挑戰載入中…',
   'kart.challenge.tab.missions': '任務',
   'kart.challenge.tab.medals': '獎牌牆',
   'kart.challenge.total': '{stars} / {most} 顆星',

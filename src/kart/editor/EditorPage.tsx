@@ -20,6 +20,7 @@ import {
   type TrackTheme,
 } from '../../../shared/kart/editor/spec.ts'
 import { KART_MESSAGES, type KartMessageKey } from '../../../shared/kart/i18n.ts'
+import { KART_EDITOR_MESSAGES } from '../../../shared/kart/i18n.editor.ts'
 import { Button } from '../../components/Button.tsx'
 import { registerMessages, type MessageParams } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
@@ -31,6 +32,8 @@ import { PRESETS } from './presets.ts'
 import { deleteTrack, loadSaves, saveTrack, type SavedTrack } from './saves.ts'
 
 registerMessages(KART_MESSAGES)
+// This screen's own strings, in its own chunk: the menu and a race never load them (2026-11-22)
+registerMessages(KART_EDITOR_MESSAGES)
 
 const View3D = lazy(() => import('./View3D.tsx'))
 

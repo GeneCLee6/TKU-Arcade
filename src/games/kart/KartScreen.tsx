@@ -12,7 +12,6 @@ import { memberName } from '../../lib/memberName.ts'
 import { space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import './messages.ts'
-import { Standings } from './Standings.tsx'
 import { useRaceRecorder } from './useRaceRecorder.ts'
 import { useRoomBots } from './useRoomBots.ts'
 
@@ -26,6 +25,9 @@ const ReplayView = lazy(() => import('../../kart/watch/ReplayView.tsx'))
 const RoomGarage = lazy(() => import('../../kart/roster/RoomGarage.tsx'))
 // 2026-11-20 (docs/KART-NETCODE.md §11.4): the replay as a file or a link, a small chunk of its own
 const ReplayShare = lazy(() => import('../../kart/watch/ReplayShare.tsx'))
+// 2026-11-22 (docs/KART-PERF.md §9): the standings of a race watched without the live view, which the
+// race view's chunk has too; not on the room's first screen
+const Standings = lazy(() => import('./Standings.tsx').then((module) => ({ default: module.Standings })))
 
 /**
  * The race room's screen (e9-t07, e9-t08, e9-t10). A racer gets the race full screen, from the grid
@@ -148,7 +150,9 @@ export default function KartScreen({ room, game }: GameScreenProps) {
                 </Button>
               </div>
             )}
-            <Standings view={view} order={view.racers.map((racer) => racer.seat)} nameOf={nameOf} />
+            <Suspense fallback={null}>
+              <Standings view={view} order={view.racers.map((racer) => racer.seat)} nameOf={nameOf} />
+            </Suspense>
           </Watching>
         )}
       </GameLayout>

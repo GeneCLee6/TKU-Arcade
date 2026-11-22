@@ -1463,6 +1463,14 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **驗證**：`tests/kart/challenge.test.ts`（任務資料：24 關、每章 6 關、每關有名字、對電腦只在比賽賽道；兩張挑戰賽道過 `parseTrack`、不在 `RACE_TRACK_IDS`；判定的每種條件、規則與時限；淘汰順序、名次、追逐；獎牌校準公式、每張賽道銅 > 銀 > 金 > 白金、時限與星等；目標幽靈車縮放；進度存取、壞資料、章節解鎖）、`tests/kart/challenge.medals.test.ts`（河畔、紅樹林、碼頭倉庫：頂尖拿金、專家至少銀、一般至少銅、新手沒有；頂尖過得了七個技術任務且至少兩星；新手過不了甩尾起跳、穿縫、岔路、十連段）、`e2e/kart-challenge.spec.ts`（選單入口、章節鎖、獎牌牆與隱藏白金；`?autopilot` 完成「完美五發」、星等存進 localStorage）。截圖：`scripts/kart-challenge-shots.mjs`（真 GPU）。
 
+### 4.61 路線圖外：房間卡丁車首屏瘦身、單機畫面的字串各自 lazy（2026-11-22，`feat/kart-fixes-budget`）
+
+擁有者 2026-11-22「全照建議」。數字在 `KART-PERF.md` §9。**更正 §4.60 的「首屏」一段**：挑戰的字串併進 `KART_MESSAGES` 不影響房間首屏（`KART_MESSAGES` 跟 `RaceView` 在首屏之後），#131 的 +0.7 kB 是打包器重切共用 chunk。
+
+- **字串**：`KART_MESSAGES`（`shared/kart/i18n.ts`）只放選單與比賽要的；駕訓班 `KART_SCHOOL_MESSAGES`、挑戰 `KART_CHALLENGE_MESSAGES`、編輯器 `KART_EDITOR_MESSAGES` 由 `SchoolView`／`ChallengeView`／`EditorPage` 自己 `registerMessages`（和 `promotion/i18n.sheets.ts` 同一招）。三個畫面以外用到的幾句（`kart.school.open`／`loading`／`invite*`／`coach*`／`tip*`、`kart.challenge.open`／`loading`、`kart.editor.open`／`editCopy`／`badLink`／`untitled`）在 `i18n.menu.ts`。型別 `KartMessageKey` 仍包含全部（只有型別，不進 chunk）；`KART_MESSAGES` 的型別是其中的 `KartBaseKey`。**新增單機畫面的字串**：自己一個 `shared/kart/i18n.<名>.ts`，由畫面登記，列進 `scripts/check-i18n.mjs` 的 `KART_PARTS`（沒列又沒併進 `i18n.ts` 會被擋）；別的畫面也要說的那幾句放 `i18n.menu.ts`。
+- **錄影器**（`src/games/kart/useRaceRecorder.ts`）：首屏只有一個殼 `deferredRecorder`，`import('../../kart/watch/raceTape.ts')`（frame 解碼＋`createReplayRecorder`）在掛上時開始；之前的 `heard`／`sent`／`view` 呼叫排隊，到了依序重放。`recorder.hasFrames()` 在 chunk 到之前是 false（結果面板的「看重播」不出現），`recorder.ready` 給測試等。
+- **觀戰名次表**：`KartScreen` 的 `Standings` 改 `lazy`（`RaceView`、`BotRaceView` 仍靜態 import，它們本來就在首屏之後）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
