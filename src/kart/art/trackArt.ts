@@ -40,6 +40,7 @@ import { buildFestival } from './festival.ts'
 import { buildForks } from './forkArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
+import { buildObstacleArt } from './obstacleArt.ts'
 import { loadedScenery, type TrackScenery } from './trackScenery.ts'
 import { loadTrackCuesOn, onTrackCuesChange } from '../trackCues.ts'
 import {
@@ -63,6 +64,11 @@ export interface TrackArt {
   readonly group: Group
   /** Every frame: the water flows */
   update(seconds: number): void
+  /**
+   * Every frame (2026-11-22, obstacleArt.ts): the race clock, steps since GO (a fraction between
+   * two), that puts the moving obstacles where the physics has them
+   */
+  clock(tick: number): void
   dispose(): void
 }
 
@@ -984,6 +990,10 @@ export function buildTrackArt(
       )
     : null
 
+  // ── Moving obstacles (2026-11-22, obstacleArt.ts): booms and sliding containers, by the race clock ──
+  const obstacleArt = buildObstacleArt(track, { group, shadows: level.shadows, keep, own, ownTexture })
+  obstacleArt?.clock(0)
+
   for (const instances of group.children) {
     if (instances instanceof InstancedMesh) {
       instances.instanceMatrix.setUsage(DynamicDrawUsage)
@@ -1004,6 +1014,9 @@ export function buildTrackArt(
       worksScenery?.update(seconds)
       wharfScenery?.update(seconds)
       skillCues?.update(seconds)
+    },
+    clock(tick) {
+      obstacleArt?.clock(tick)
     },
     dispose() {
       stopCues?.()

@@ -30,7 +30,7 @@ import type { SpikeHud, SpikeStep, SpikeTrial } from '../spikeLoop.ts'
 import { RACE_ENGINE } from '../load/kartLoad.ts'
 import { KartLoading } from '../load/KartLoading.tsx'
 import { useKartLoad } from '../load/useKartLoad.ts'
-import { autopilot, driftingAutopilot } from './autopilot.ts'
+import { createAutopilot } from './autopilot.ts'
 import { ITEM_SLOT_UPRIGHT_TOP, ItemNote, ItemSlot, MAP_UNDER_ITEM_SLOT } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
 import { FogVeil, StunHud } from './HitHud.tsx'
@@ -355,7 +355,7 @@ export default function RaceView({
         net: autopiloted
           ? {
               ...net.net,
-              autopilot: (trial) => (drifts ? driftingAutopilot : autopilot)(trial, track.road),
+              autopilot: createAutopilot(track, settings.tuning, drifts),
             }
           : net.net,
       })

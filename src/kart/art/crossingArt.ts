@@ -1,4 +1,4 @@
-// 2026-11-22: the art of a road over a road (shared/kart/levels.ts, docs/ARCHITECTURE.md §4.65):
+// 2026-11-22: the art of a road over a road (shared/kart/levels.ts, docs/ARCHITECTURE.md §4.66):
 // where the viaduct crosses the underpass, its deck (a concrete slab under the road, with a dark
 // underside: the underpass's roof) and the underpass's two walls standing on its kerbs up to the
 // deck. The ground beside the underpass lies at its level (hillArt.ts), so the viaduct is on its

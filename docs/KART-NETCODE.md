@@ -401,9 +401,20 @@ JSON patch 少約 **73–76%**（本機 1.52 → 0.36、預覽站 1.46 → 0.40 
 - **換車、換車手、換隊伍保留準備**（`set_look`、`set_team` 不碰 `ready`）：換車只影響自己。換賽道、圈數等選項（`set_options`）照舊清掉所有人的準備。
 - **壓測**：`npm run kart:loadtest` 的機器人坐好後除了房主都送 `ready`，等到大家都準備好才 `start`。
 
-## 21. 立體交叉、車撞車看高度、重播的「在空中」（2026-11-22，`feat/kart-track-format-v2`）
+## 21. 會動的障礙物：比賽時鐘的純函式、伺服器把關著的閘門當牆（2026-11-22，`feat/kart-track-content`）
 
-賽道可以跨過自己（8 字的高架與地下道，`ARCHITECTURE.md` §4.65）。**協定沒有變**：frame 格式、`PROTOCOL_VERSION`、op 都一樣；frame 沒有高度，也不需要。
+賽道可以有升降欄杆與滑動貨櫃（`ARCHITECTURE.md` §4.65）。**協定沒有變**：frame 格式、`PROTOCOL_VERSION`、op、patch 都一樣。
+
+- **不用同步**：障礙物在第幾步是什麼狀態，只由 GO 起算的步數決定（`shared/kart/obstacles.ts` 的 `boomState`／`sliderState`）。每個瀏覽器用自己的 `trial.steps` 跑物理（就是它送出的 frame 的 `tick`），伺服器用 frame 的 `tick` 裁定，觀戰用房間的 GO 換算、重播用錄下的 tick——四個地方算出同一個狀態，不需要額外訊息。
+- **伺服器裁定**（`judgeFrame`，一般的移動才看）：從上一個 frame 到這一個 frame 的線段穿過一支「兩個 tick 都關著、而且中間一直關著」的欄杆 → 拒收（`refused`，原因 `obstacle`）；剛好在這段時間裡放下或抬起的不拒收（給客戶端好處，不冤枉人）。位置在那個 tick 的貨櫃裡超過 0.6 m → 拒收；在空中（`FLAG_AIRBORNE`）的不看貨櫃。拒收的效果和速度、跳躍的拒收一樣：伺服器停在上一個位置、不數門，持續 `RESYNC_AFTER_MS` 後重新同步——穿牆不會多數到門、也不會被當成跑完一圈。
+- **為什麼不會誤殺**：客戶端的物理就是用同一個函式、同一個 tick 把關著的欄杆當牆；正常開的車根本到不了欄杆另一邊。碰撞推擠（`bumpKart`）可能把車推進貨櫃一點點，所以貨櫃留 0.6 m 的寬容。測試（`tests/kart/obstacles.test.ts`）讓普通與專家電腦車在閘門巷、漁港跑完，把每一個 frame（每 3 步一個，和瀏覽器一樣）餵給伺服器的 `judgeFrame`：**零拒收**。
+- **電腦車**（多人房的、房主代跑的）用同一套物理與 `obstacleSense.ts` 的手，送出的 frame 一樣被裁定。壓測機器人（`scripts/kart/loadtest-bot.ts`）改用 `createAutopilot(track, tuning)`：會等閘門、換車道。
+- **限制**：觀戰畫面的障礙物照房間時鐘，別人的車是內插過的（約 0.1 秒），所以網路很差時，看別人過平交道可能差一點點；比賽結果不受影響（裁定只看 frame 的 tick）。
+- **壓測**：PR 預覽站 `npm run kart:loadtest -- --bots 6 --track harbour --laps 3`，數字見 PR。
+
+## 22. 立體交叉、車撞車看高度、重播的「在空中」（2026-11-22，`feat/kart-track-format-v2`）
+
+賽道可以跨過自己（8 字的高架與地下道，`ARCHITECTURE.md` §4.66）。**協定沒有變**：frame 格式、`PROTOCOL_VERSION`、op 都一樣；frame 沒有高度，也不需要。
 
 - **伺服器裁定不改**：`judgeFrame`／`passGates` 只看 x、z。`parseTrack` 保證交叉「區」裡沒有閘門、復位點、起跑格、跳台唇、加速帶、道具箱、分支（`levels.ts`），區外兩條路不重疊，所以平面上越過的閘門一定是那一層自己的；速度、跳點、復位、追門的檢查都照舊。編輯器的賽道在伺服器（`custom.ts` → `buildSpec` → `parseTrack`）走同一套檢查，太低（< 6 m）、太斜（< 30°）、區內有東西的交叉都被拒。
 - **別人的車在哪一層**：瀏覽器每台別人的車記住上一次畫的高度（`createHeightKeeper`），下一個 frame 在交叉區裡取「不高於它 2 m 的最高路面」，所以從高架上來的車留在高架、地下道的留在地下道（frame 一秒 20 個，一步最多移動幾公尺，不會跳層）。`FLAG_AIRBORNE` 照舊決定畫在飛行弧線上還是路面上。

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { raceTrack } from '../shared/kart/tracks/registry.ts'
 
-// 2026-11-22 (docs/ARCHITECTURE.md §4.65): the technical showcase, a road over a road. It opens from
+// 2026-11-22 (docs/ARCHITECTURE.md §4.66): the technical showcase, a road over a road. It opens from
 // /kart's course picker with the viaduct drawn over the underpass on its minimap; the autopilot
 // drives it through the underpass and then over the viaduct, the same place on the plan, each at
 // its own height; and the editor offers the viaduct, the underpass and the banked bends.

@@ -1124,7 +1124,7 @@ test('the garage recommends the track’s quickest karts, and the season flagshi
   })
   await page.goto('/kart?track=harbour')
   await expect(page.locator('canvas')).toBeVisible()
-  await expect(page.getByTestId('kart-course-meta')).toContainText('Egret · Hornet · Humpback')
+  await expect(page.getByTestId('kart-course-meta')).toContainText('Hornet · Humpback · Egret')
   await page.getByTestId('kart-garage-open').click()
   const garage = page.getByTestId('kart-garage')
   const meta = garage.getByTestId('kart-meta')

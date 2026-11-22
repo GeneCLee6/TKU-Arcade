@@ -478,6 +478,24 @@ export const skillCue = {
   post: '#2B2D33',
 } as const
 
+/**
+ * 2026-11-22 (#103): the moving obstacles (src/kart/art/obstacleArt.ts): the level crossing's posts,
+ * striped arms and lamps, the container trolleys' rails, frames and beacons, the stop line
+ */
+export const obstacleScene = {
+  post: '#3A3D44',
+  housing: '#1E2024',
+  armRed: '#D7263D',
+  armWhite: '#F4F1EA',
+  lampRed: '#FF3B30',
+  lampGreen: '#34E07A',
+  lampAmber: '#FFB02E',
+  rail: '#5C6068',
+  trolley: '#F2C230',
+  containers: ['#1F6FB2', '#C0392B', '#2E8B57', '#E67E22'],
+  stopLine: '#F4F1EA',
+} as const
+
 /** 2026-11-20: the Wharf Warehouses' own scenery (src/kart/art/wharfArt.ts) */
 export const wharfScene = {
   containers: ['#C0392B', '#1F6FB2', '#2E8B57', '#E67E22', '#7D3C98', '#D4AC0D', '#2F7F9E', '#8C3B2E'],
