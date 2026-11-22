@@ -194,6 +194,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #134 | 2026-11-22 | `feat/kart-fixes-budget` | 房間卡丁車首屏 139.7 → 133.6 kB；駕訓班、挑戰、編輯器字串各自 lazy |
 | #135 | 2026-11-22 | `feat/kart-fixes-e2e` | 坡道上名牌貼著車；CSP 下讀截圖、觸控 e2e 等比賽載完；整套卡丁車 e2e 75/75 |
 | #136 | 2026-11-22 | `feat/kart-names-bots` | 卡丁車名稱定案（只改字串）、困難電腦車學完美時機與連段、黑鳶平衡 |
+| #137 | 2026-11-22 | `feat/i18n-hygiene` | `check-i18n` 讀語法樹找裸字串（JSX 子節點、條件式、各種寫法的屬性、toast／alert／fillText） |
 
 ## Phase O · M4 社群
 
