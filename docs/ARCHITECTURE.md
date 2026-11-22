@@ -1703,7 +1703,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - `GameArt.tsx`（lazy chunk）多 `GameCover`（卡片封面，`seedOf(id)` 決定斜槓位置）與 `HeroArena`（大廳主視覺）兩個具名匯出，`GameCard`、`HomePage` 用 `lazy(() => import(...).then(({ X }) => ({ default: X })))` 拿；`ART` 多了 `kart`。`gameCardParts.ts` 多 `Cover`（固定高、切角、`color: accent`，SVG 全用 `currentColor`）。
 - `WaitingRoom.tsx`：座位清單改成 `SeatGrid`／`SeatCard`（仍是 `ul`／`li`，座位號、`入座` 的無障礙名稱不變），`MemberEntry` 原樣放在名牌裡；空位不再用 `FreeSeatRow`（遊戲中的成員面板照舊用）。`Avatar` 多一個選用的 `size`。
 - `RoomPage.tsx` 的 `RoomHeading` 多 `status`（`room.status.*`）；`ResultPanel.tsx` 多 `room.result.final`、`room.result.winner`。
-- **首屏**：大廳 101.5 → 101.6 kB（封面框與 hover 的樣式；色塊主視覺搬出首屏抵掉一部分）；房間的 chunk 多約 1.3 kB（陞官圖首屏 145.5 → 146.8 kB，上限 150）。
+- **首屏**：大廳 101.5 → 101.6 kB（封面框與 hover 的樣式；色塊主視覺搬出首屏抵掉一部分）；房間的 chunk 多約 1.3 kB（陞官圖首屏 145.5 → 146.8 kB；合併 #153 之後 147.2 kB，上限 150）。
 
 ## 5. i18n
 
