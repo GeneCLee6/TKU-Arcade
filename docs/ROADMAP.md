@@ -201,7 +201,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #141 | 2026-11-22 | `feat/promotion-focus-inert` | 陞官圖全螢幕／專注模式時頁面其他部分 inert、焦點留在圖版；光譜偶發對比不足查明是 axe 讀到一半重畫 |
 | #142 | 2026-11-22 | `feat/kart-watch-portrait-promotion-lazy` | 觀戰與重播直拿道具欄置中、小地圖靠左；陞官圖完整版首屏 146.2 → 139.7 kB；lint 0 警告 |
 | #143 | 2026-11-22 | `feat/kart-track-content` | 會動的障礙物（升降閘門、滑動貨櫃，比賽時鐘的純函式、伺服器當牆裁定、電腦車會等或換車道）；漁人碼頭 `harbour@13`；挑戰賽道閘門巷與兩關 |
-| #PR2 | 2026-11-22 | `feat/kart-track-routes` | 燈籠老街的燈籠巷（第二條捷徑，穿縫）、漁人碼頭與老街各一個接彎的台階；`oldstreet@10`、`harbour@14` |
+| #146 | 2026-11-22 | `feat/kart-track-routes` | 燈籠老街的燈籠巷（第二條捷徑，穿縫）、漁人碼頭與老街各一個接彎的台階；`oldstreet@10`、`harbour@14` |
 
 ## Phase O · M4 社群
 
