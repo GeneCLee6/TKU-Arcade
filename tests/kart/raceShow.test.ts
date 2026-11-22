@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { COUNTDOWN_MS, INTRO_MS } from '../../shared/games/kart/rules.ts'
+import { countdownMs, introMs } from '../../shared/kart/opening.ts'
 import { NO_INPUT } from '../../shared/kart/physics.ts'
 import { gridSpot } from '../../shared/kart/race.ts'
 import { startTrial, stepTrial, type Trial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
@@ -32,9 +32,9 @@ const close = (a: { x: number; y: number; z: number }, b: { x: number; y: number
 
 describe('the fly round before the countdown', () => {
   it('fills the room countdown before the 3, 2, 1', () => {
-    expect(INTRO_MS).toBeGreaterThanOrEqual(2_000)
-    expect(INTRO_MS).toBeLessThanOrEqual(3_000)
-    expect(INTRO_FROM).toBeCloseTo(COUNTDOWN_MS / 1000, 9)
+    // 2026-11-22 (§4.72): the opening grows with the field; INTRO_FROM is a full grid's
+    expect(introMs(8)).toBeGreaterThanOrEqual(2_000)
+    expect(INTRO_FROM).toBeCloseTo(countdownMs(8) / 1000, 9)
     expect(INTRO_TO).toBe(3)
     expect(inIntro(5)).toBe(true)
     expect(inIntro(2.9)).toBe(false)

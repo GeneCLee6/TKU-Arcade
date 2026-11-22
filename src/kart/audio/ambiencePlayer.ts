@@ -1,8 +1,8 @@
 // 2026-11-20 (§4.46): the world around the track, made from noise and a few oscillators (ambience.ts
 // says which layers a track has). Beds that loop (waves, wind, insects, a murmur, a hum), sounds now
 // and then on top (a gull, a bell, a car passing, a press), and a crowd at the start and finish whose
-// loudness follows the kart's distance from the line. Into the effects bus (bus.ts): the effects
-// volume and the site's sound switch cover it.
+// loudness follows the kart's distance from the line. Into the ambience bus (bus.ts; 2026-11-22, its
+// own volume, it was the effects'): that volume and the site's sound switch cover it.
 import { kartBus, type KartBus } from './bus.ts'
 import { ambienceFor, crowdLevel, nextIn, type AmbienceLayer, type AmbienceRecipe } from './ambience.ts'
 import type { TrackThemeName } from '../../../shared/kart/track.ts'
@@ -43,7 +43,7 @@ export function createAmbience(
     const out = context.createGain()
     out.gain.value = 0.0001
     out.gain.setTargetAtTime(LEVEL, context.currentTime, 1.2)
-    out.connect(bus.effects)
+    out.connect(bus.ambience)
     const sources: AudioScheduledSourceNode[] = []
     const loop = (): AudioBufferSourceNode => {
       const source = context.createBufferSource()

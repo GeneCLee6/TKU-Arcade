@@ -3,7 +3,7 @@
 // `loaded` for their seats, frames wrapped in PROXY_FRAME), against the Worker's own room
 // (worker/room-host.ts) on a counter for a clock. The room judges their laps like anyone's.
 import { describe, expect, it } from 'vitest'
-import { COUNTDOWN_MS, kart } from '../../shared/games/kart/rules.ts'
+import { countdownMs, kart } from '../../shared/games/kart/rules.ts'
 import type { KartAction, KartView } from '../../shared/games/kart/types.ts'
 import type { AnyGameModule, GameProjection } from '../../shared/games/types.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
@@ -170,7 +170,7 @@ describe('computer karts in a race room (2026-11-17)', () => {
       now: w.clock,
     })
     w.send({ t: 'action', action: { t: 'loaded' } })
-    w.clock += COUNTDOWN_MS + 1_000
+    w.clock += countdownMs(8) + 1_000
     w.host.sweep()
     race.advance(w.clock)
     expect(w.race().phase).toBe('racing')

@@ -40,10 +40,15 @@ import { teamColor } from '../team/teamColor.ts'
 import { TeamPanel, TeamScore, TeamVeil } from './TeamHud.tsx'
 import {
   Celebration,
+  CloseCountdown,
+  DriverCard,
   FinalLapBanner,
   IntroCard,
   PlaceArrow,
 } from '../ui/RaceShow.tsx'
+import { PauseLayer, type PauseLayerProps } from '../ui/PauseLayer.tsx'
+import { closeAt } from '../../../shared/kart/opening.ts'
+import { closeBeep, playBeep } from '../audio/countBeeps.ts'
 import { placeBump } from '../ui/placeBump.ts'
 import { TouchControls } from '../touch/TouchControls.tsx'
 import { useTouchControls } from '../touch/useTouchControls.ts'
@@ -212,7 +217,17 @@ export interface RaceViewProps {
    * mode judges a mission's rules by it (no N2O, no crash). Only reads
    */
   onStep?: (step: SpikeStep) => void
+  /**
+   * 2026-11-22 (§4.72): the menu over the race (Esc, Start, the button): what it offers, and whether
+   * the race stops while it is open (a race with no one else in it) or goes on (a room's)
+   */
+  pause?: RacePause
 }
+
+export type RacePause = Pick<
+  PauseLayerProps,
+  'canPause' | 'onRestart' | 'onKartMenu' | 'onLobby' | 'onLeave'
+>
 
 /**
  * A race in a room (e9-t03, e9-t07, e9-t08, e9-t09), full screen, for someone with a kart in it.
@@ -229,6 +244,7 @@ export default function RaceView({
   onWatch,
   lookOf,
   onStep,
+  pause,
 }: RaceViewProps) {
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
@@ -293,6 +309,9 @@ export default function RaceView({
     tuning: applyKart(loadTuning().tuning, loadout.body),
     enabled: true,
   }))
+  // 2026-11-22 (§4.72): what the loop reads every frame: the keys changed in the menu's controls, and
+  // none while a room's menu is open (the race goes on, the kart takes no keys)
+  const liveControls = useRef(settings)
   // 2026-11-20 (§4.50): a tip for a technique not yet used (not for a kart driving itself)
   const coach = useCoach()
   const coachStep = coach.onStep
@@ -338,7 +357,7 @@ export default function RaceView({
     let stop: (() => void) | undefined
     try {
       stop = engine.startSpikeLoop(stage.current, {
-        controls: () => settings,
+        controls: () => liveControls.current,
         onStats: () => {},
         onHud: setHud,
         onCallout: (next) => setCallout((last) => ({ callout: next, id: (last?.id ?? 0) + 1 })),
@@ -476,6 +495,29 @@ export default function RaceView({
     const timer = window.setTimeout(() => setPlaceShift(undefined), PLACE_SHIFT_MS)
     return () => window.clearTimeout(timer)
   }, [placeShift])
+  // 2026-11-22 (§4.72): after the first finish, the seconds left to everyone still out, with a tock
+  // for each (shared/kart/opening.ts; the room closes the race at that moment)
+  const closing = closeAt(view)
+  const [closeTicks, setCloseLeft] = useState<number | null>(null)
+  const closeLeft = closing !== null && view.phase === 'racing' ? closeTicks : null
+  useEffect(() => {
+    if (closing === null || view.phase !== 'racing') return
+    let before: number | null = null
+    const tick = () => {
+      const now = raceNet.current?.serverNow() ?? null
+      if (now === null) return
+      const left = (closing - now) / 1000
+      const beep = closeBeep(before, left)
+      if (beep) playBeep(beep)
+      before = left
+      const shown = Math.max(0, Math.ceil(left))
+      setCloseLeft((was) => (was === shown ? was : shown))
+    }
+    tick()
+    const timer = window.setInterval(tick, 100)
+    return () => window.clearInterval(timer)
+  }, [closing, view.phase])
+
   const onFinalLap = racing && trial.laps > 1 && trial.lap === trial.laps
   useEffect(() => {
     if (!onFinalLap) return
@@ -534,6 +576,14 @@ export default function RaceView({
   // The track's name on the fly round's card; a custom track has none of its own here
   const courseKey = `kart.course.${view.track}`
   const courseTitle = courseKey in KART_MESSAGES.en ? t(courseKey as KartMessageKey) : null
+  // 2026-11-22 (§4.72): the driver in front of the camera during the opening
+  const presented = trial?.presenting != null ? view.racers[trial.presenting] : undefined
+  const presentedLook = presented
+    ? presented.seat === seat
+      ? { kart: loadout.body, driver: loadout.driver }
+      : (lookOf?.(presented.seat) ?? null)
+    : null
+  const presentedSide = presented ? teamOf(presented.seat) : null
 
   return (
     <Page
@@ -645,7 +695,29 @@ export default function RaceView({
       {view.phase === 'countdown' && !counting && (
         <Center role="status">{t('games.kart.race.ready')}</Center>
       )}
-      {trial?.intro && (
+      {presented && trial?.presenting != null && (
+        <DriverCard
+          key={`driver-${presented.seat}`}
+          grid={t('kart.flow.intro.grid', { place: trial.presenting + 1 })}
+          name={nameOf(presented.seat)}
+          ride={
+            presentedLook
+              ? t('kart.flow.intro.rides', {
+                  kart: t(`kart.body.${presentedLook.kart}` as KartMessageKey),
+                  driver: t(`kart.driver.${presentedLook.driver}` as KartMessageKey),
+                })
+              : null
+          }
+          stripe={presentedSide === null ? color.accent : teamColor(presentedSide)}
+          you={
+            presented.seat === seat && nameOf(seat) !== t('kart.flow.intro.you')
+              ? t('kart.flow.intro.you')
+              : null
+          }
+          skip={t(touch.shown ? 'kart.race.introSkipTouch' : 'kart.race.introSkip')}
+        />
+      )}
+      {trial?.intro && !presented && (
         <IntroCard
           title={courseTitle}
           laps={t('kart.race.introLaps', { count: view.laps })}
@@ -657,7 +729,14 @@ export default function RaceView({
         (counting || (trial.phase === 'racing' && trial.wrongWay)) && (
           <RaceCenter t={t} trial={trial} onRestart={() => {}} />
         )}
-      {finalLap && !finished && <FinalLapBanner text={t('kart.race.finalLap')} />}
+      {finalLap && !finished && closeLeft === null && <FinalLapBanner text={t('kart.race.finalLap')} />}
+      {closeLeft !== null && !finished && (
+        <CloseCountdown
+          label={t('kart.flow.close.label')}
+          seconds={closeLeft}
+          timeUp={t('kart.flow.close.timeUp')}
+        />
+      )}
       {finished && trial?.celebrating && (
         <Celebration
           big={t('games.kart.race.placeBig', { place: place || 1 })}
@@ -668,7 +747,11 @@ export default function RaceView({
         <Finish role="status" data-testid="kart-finish">
           <FinishTitle>{t('games.kart.race.finishedPlace', { place: place || 1 })}</FinishTitle>
           <Standings view={view} order={order} nameOf={nameOf} />
-          <Muted>{t('games.kart.race.waitingOthers')}</Muted>
+          <Muted>
+            {closeLeft !== null && closeLeft > 0
+              ? t('kart.flow.close.others', { seconds: closeLeft })
+              : t('games.kart.race.waitingOthers')}
+          </Muted>
           {onWatch && (
             <Button
               $variant="secondary"
@@ -693,6 +776,18 @@ export default function RaceView({
         )}
         <Hud t={t} hud={hud} maxStored={settings.tuning.maxStoredBoosts} dense={touch.shown} />
       </Bottom>
+      {pause && (
+        <PauseLayer
+          t={t}
+          {...pause}
+          onOpenChange={(open) => {
+            if (!pause.canPause) liveControls.current = { ...liveControls.current, enabled: !open }
+          }}
+          onControls={({ bindings, rules }) => {
+            liveControls.current = { ...liveControls.current, bindings, rules }
+          }}
+        />
+      )}
     </Page>
   )
 }

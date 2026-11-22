@@ -209,6 +209,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #148 | 2026-11-22 | `feat/fullscreen-play` | 全螢幕遊玩：共用 `src/lib/fullscreen.ts`（整頁 Fullscreen API、iPhone 退回專注模式並提示加到主畫面、Keyboard Lock 保留 Esc）、房間標題與卡丁車選單的按鈕、比賽自動全螢幕設定與手機鎖橫、PWA `display_override` |
 | #149 | 2026-11-22 | `feat/net-stability-bots` | 連線穩定度：心跳寬限 45 → 90 s（背景分頁不再每一兩分鐘被踢，預覽站每人每小時 58 → 0 次）、第一次連線失敗自動重試、4429 改成暫停並給重連另 240 次額度、重連期間的操作排隊、提示晚 1 s 出現並可立刻重試、卡丁車重連後重新對時；`npm run net:soak`、`docs/NETWORK.md` |
 | #151 | 2026-11-22 | `feat/kart-lobby-fullscreen` | 卡丁車等待室滿版一頁：8 位大尺寸 3D 車手（4×2／超寬 8×1）與名牌條、側欄賽道卡與準備／開始大按鈕、邀請／聊天／設定／分隊收進對話框、房主管理鈕、直拿列表、無 WebGL 平面圖；聊天面板由房間頁做好傳下去，首屏 135.1 kB |
+| #152 | 2026-11-22 | `feat/kart-race-flow` | 比賽流程電競化：Esc 暫停選單（單機暫停、多人房照跑）、設定面板、車手正面亮相、3-2-1-GO 音效、完賽 10 秒倒數與未完賽依進度排名、每場前三名 3D 頒獎台 |
 | #153 | 2026-11-23 | `feat/net-reliable-esports-ui` | 可靠送達：協定加 `session`／`seq`／`ack`（沒升版、新舊頁面與伺服器互通），RoomDO 每成員記已處理到的序號（記憶體＋storage，和改變一起提交），重連後自動重送沒確認的、重複的不套用；不再提示「可能沒送到」；`NETWORK.md` §5 |
 
 ## Phase O · M4 社群

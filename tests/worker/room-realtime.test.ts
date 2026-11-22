@@ -2,7 +2,7 @@
 // module's judgement turned into actions, the clock's start time, and clock pings. RoomHost on a fake
 // clock and fake sockets, as in room-host.test.ts.
 import { describe, expect, it } from 'vitest'
-import { COUNTDOWN_MS, kart } from '../../shared/games/kart/rules.ts'
+import { countdownMs, kart } from '../../shared/games/kart/rules.ts'
 import type { KartView } from '../../shared/games/kart/types.ts'
 import type { AnyGameModule, GameProjection } from '../../shared/games/types.ts'
 import { readRelayed, type KartFrame } from '../../shared/kart/net.ts'
@@ -117,10 +117,10 @@ describe('a real-time game in a room (e2-t11)', () => {
     ann.send({ t: 'action', action: { t: 'loaded' } })
     bob.send({ t: 'action', action: { t: 'loaded' } })
     expect(ann.race.phase).toBe('countdown')
-    expect(ann.race.goAt).toBe(world.clock + COUNTDOWN_MS)
+    expect(ann.race.goAt).toBe(world.clock + countdownMs(ann.race.racers.length))
     expect(bob.race.goAt).toBe(ann.race.goAt)
     // GO fires on the timer, when the alarm comes
-    world.clock += COUNTDOWN_MS
+    world.clock += countdownMs(ann.race.racers.length)
     world.host.sweep()
     expect(ann.race.phase).toBe('racing')
   })
