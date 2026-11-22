@@ -42,10 +42,12 @@ npm run net:soak -- --url https://tku-arcade-pr-<號>.genelee-pro.workers.dev --
 | 情境 | 修之前 | 修之後 |
 | --- | --- | --- |
 | 本機 dev（Miniflare），3 人 5 分鐘，ping 60 s | **18 次 4408**（每人每小時 72 次），每次 22–37 ms 回來 | **0 次** |
-| 預覽站（真 Cloudflare，#147 的預覽＝修之前），3 人 15 分鐘，ping 15 s | 0 次 | AFTER_PREVIEW_15 |
-| 預覽站，2 人 15 分鐘，ping 60 s | **29 次 4408**（每人每小時 58 次），重連 p50 322 ms、p90 711 ms、最慢 1.17 s | AFTER_PREVIEW_60 |
+| 預覽站（真 Cloudflare，#147 的預覽＝修之前），3 人 15 分鐘，ping 15 s | 0 次 | 0 次（#149 的預覽） |
+| 預覽站，2 人 15 分鐘，ping 60 s | **29 次 4408**（每人每小時 58 次），重連 p50 322 ms、p90 711 ms、最慢 1.17 s | **0 次** |
 
 正常前景（ping 15 s）在真 Cloudflare 上 15 分鐘一次都沒斷，DO hibernation（點一下之間有兩分鐘閒置）也沒有讓房間誤判誰還在：所以「常常不穩」最主要的來源是**背景分頁被當成斷線**（#1），其次是部署與換網路那一下（#2、#3、#5）。
+
+卡丁車：`npm run kart:loadtest -- --bots 6` 對 #149 的預覽站跑一場（老街 3 圈道具賽）：6 台都完賽、圈數與伺服器一致、房間丟 0 個 frame、轉送 p50／p95 48／68 ms、對時來回 p50 48 ms，和改之前（`KART-NETCODE.md` §8）同一水準。
 
 ### 瀏覽器裡的重現（`e2e/network.spec.ts`、`e2e/connection.spec.ts`）
 
