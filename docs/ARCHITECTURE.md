@@ -1400,7 +1400,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **測試**：`tests/games/quick-bots.test.ts`（每款 `computer` 遊戲的預設請求都合法、別的都不合法；每個難度與人數的邊界；格式）、`tests/worker/rooms.test.ts`（交給 DO 的參數、強制私人、各種不合法 400）、`tests/worker/room-table-bots.test.ts`「a room opened with computer players」（座位、加入就開局、只開一次、hibernation、暫停時留在等待室、房主重連不重開、卡丁車不收、一局玩到底）、`e2e/quick-play.spec.ts`（手機一鍵德州撲克到發牌、不在公開房列表、卡片標籤、卡丁車兩格）。
 
 
-### 4.55b 「跟電腦玩」自選數量與各自難度（2026-11-22，`feat/table-bots-many`，#PRBOTS）
+### 4.55b 「跟電腦玩」自選數量與各自難度（2026-11-22，`feat/table-bots-many`，#147）
 
 擁有者 2026-11-22：「其他遊戲添加電腦你也要給多電腦模式，比如德州撲克目前只能加1個電腦。」§4.55 的一鍵開局只給 `max(1, minPlayers − 1)` 個電腦（德州撲克 1 個）。
 
