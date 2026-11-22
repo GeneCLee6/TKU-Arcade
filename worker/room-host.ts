@@ -35,6 +35,7 @@ import {
   parseClientMessage,
   sameName,
   uniqueName,
+  type ClientMessage,
   type CoverableSeat,
   type ErrorCode,
   type QuickBots,
@@ -155,6 +156,12 @@ export type MemberRecord = {
 /** `address`: the hashed address the Worker saw (worker/address.ts, e12-t06); absent in old sockets */
 export type OpenSocket = { conn: string; openedAt: number; account?: Account; address?: string }
 
+/**
+ * What the room has handled from a member's page (shared/protocol.ts 20.): that page load's
+ * `session` ('' for one that sent none) and the highest `seq` handled from it
+ */
+export type SeqAck = { session: string; seq: number }
+
 /** All the room keeps between two wake-ups, apart from the steps, which only a replay reads */
 export type StoredRoom = {
   room: RoomRecord | null
@@ -163,6 +170,8 @@ export type StoredRoom = {
   game: StoredGame | null
   /** Any order */
   chat: ChatMessage[]
+  /** By member id; absent in a room from before 2026-11-23 */
+  acks?: Record<string, SeqAck>
 }
 
 export type RoomHostDeps = {
@@ -189,6 +198,11 @@ export type RoomHostDeps = {
     saveChat(message: ChatMessage): void
     /** A chat message that fell out of the last CHAT_HISTORY */
     dropChat(id: number): void
+    /**
+     * A member's SeqAck (shared/protocol.ts 20.), one key each, written with the change the message
+     * made; null forgets it. Absent: kept in memory only (a test that does not hibernate)
+     */
+    saveAck?(member: string, ack: SeqAck | null): void
     /** Forgets the whole room */
     clearAll(): void
   }
@@ -270,6 +284,8 @@ export class RoomHost {
    * next (the game, how many steps in, the seat)
    */
   private botTurn: { key: string; at: number } | null = null
+  /** By member id: what has been handled from their page (shared/protocol.ts 20.), as stored */
+  private readonly acks = new Map<string, SeqAck>()
 
   constructor(deps: RoomHostDeps) {
     this.deps = deps
@@ -321,6 +337,12 @@ export class RoomHost {
           ? { ...member, offlineAt: null, absent: false }
           : { ...member, conn: null, offlineAt: member.offlineAt ?? this.deps.now() },
       )
+    }
+    this.acks.clear()
+    for (const [member, ack] of Object.entries(stored.acks ?? {})) {
+      // A member removed since only leaves its key behind: forgotten now
+      if (this.members.has(member)) this.acks.set(member, ack)
+      else this.deps.storage.saveAck?.(member, null)
     }
     this.settleCleanup()
     this.settleBots()
@@ -486,7 +508,16 @@ export class RoomHost {
     }
     if (message.t === 'join') {
       if (connection.member !== null) this.refuse(conn, 'forbidden')
-      else this.join(conn, connection, message.name, message.token, message.password ?? null)
+      else {
+        this.join(
+          conn,
+          connection,
+          message.name,
+          message.token,
+          message.password ?? null,
+          message.session ?? null,
+        )
+      }
       return
     }
     const member = connection.member === null ? undefined : this.members.get(connection.member)
@@ -494,7 +525,31 @@ export class RoomHost {
       this.refuse(conn, 'not_joined')
       return
     }
+    const seq = message.seq
+    if (seq === undefined) {
+      this.dispatch(conn, member, message)
+      return
+    }
+    // shared/protocol.ts 20.: a message sent again after its socket died, already handled
+    const handled = this.acks.get(member.id)
+    if (handled && seq <= handled.seq) {
+      this.deps.sockets.send(conn, { t: 'ack', seq: handled.seq })
+      return
+    }
+    this.dispatch(conn, member, message)
+    // Gone with it (the room dissolved, the member kicked): nothing to remember, nobody to tell
+    if (!this.room || !this.members.has(member.id)) return
+    const ack = { session: handled?.session ?? '', seq }
+    this.acks.set(member.id, ack)
+    // In the same turn as the change's own writes, so storage keeps both or neither
+    this.deps.storage.saveAck?.(member.id, ack)
+    this.deps.sockets.send(conn, { t: 'ack', seq })
+  }
+
+  private dispatch(conn: string, member: MemberRecord, message: ClientMessage): void {
     switch (message.t) {
+      case 'join':
+        return
       case 'resync':
         // It also clears a countdown whose ending was the message that went missing
         this.deps.sockets.send(conn, { t: 'timer', timers: this.timers() })
@@ -853,6 +908,7 @@ export class RoomHost {
     name: string,
     token: string | null,
     password: string | null = null,
+    session: string | null = null,
   ): void {
     // Who the session says this is (e1-t13): the name `join` sent is only a guest's
     const account = connection.account
@@ -886,7 +942,7 @@ export class RoomHost {
         }
         this.saveMembers()
       })
-      this.welcome(conn, known)
+      this.welcome(conn, known, session)
       // A reload that beat the old socket's close: the old page ran the computer karts, not this one
       if (replaced && known.id === this.room?.hostId) this.abandonBots()
       return
@@ -938,7 +994,7 @@ export class RoomHost {
         this.deps.storage.saveRoom(room)
       }
     })
-    this.welcome(conn, member)
+    this.welcome(conn, member, session)
     // As if the host had pressed start, with the same checks (a paused game stays in the waiting
     // room, where the refusal says why and the host can start it by hand later)
     if (startNow && this.requireRoom().status === 'waiting') this.beginFromSeats(conn, this.requireRoom())
@@ -1586,6 +1642,7 @@ export class RoomHost {
     this.sweepAt = null
     this.chat = []
     this.chatId = 0
+    this.acks.clear()
     this.deps.storage.clearAll()
   }
 
@@ -1801,7 +1858,22 @@ export class RoomHost {
     }
   }
 
-  private welcome(conn: string, member: MemberRecord): void {
+  /**
+   * `session` (shared/protocol.ts 20.): the page's; the same as before, `ack` says how far the room
+   * got with it, and a new one starts over at 0
+   */
+  private welcome(conn: string, member: MemberRecord, session: string | null = null): void {
+    let ack: number | undefined
+    if (session !== null) {
+      const handled = this.acks.get(member.id)
+      if (handled?.session === session) ack = handled.seq
+      else {
+        ack = 0
+        const fresh = { session, seq: 0 }
+        this.acks.set(member.id, fresh)
+        this.deps.storage.saveAck?.(member.id, fresh)
+      }
+    }
     this.deps.sockets.send(conn, {
       t: 'welcome',
       v: PROTOCOL_VERSION,
@@ -1809,6 +1881,7 @@ export class RoomHost {
       token: member.token,
       rev: this.rev,
       state: this.viewBuilder()(member),
+      ...(ack !== undefined ? { ack } : {}),
     })
     const timers = this.timers()
     if (timers.length > 0) this.deps.sockets.send(conn, { t: 'timer', timers })

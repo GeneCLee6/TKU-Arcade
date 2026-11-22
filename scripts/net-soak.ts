@@ -66,6 +66,9 @@ const closes: CloseRecord[] = []
 let welcomes = 0
 let taps = 0
 let answered = 0
+/** Taps the room acknowledged (shared/protocol.ts 20.), and the slowest acknowledgement */
+let acked = 0
+let slowestAckMs = 0
 const stamp = () => `${((Date.now() - started) / 1000).toFixed(0).padStart(5)} s`
 
 async function createRoom(): Promise<string> {
@@ -86,6 +89,10 @@ class Client {
   attempts = 0
   pending: CloseRecord | null = null
   ready = false
+  /** As a page does (shared/protocol.ts 20.): one session for the run, taps numbered in it */
+  readonly session = `soak${Math.random().toString(36).slice(2, 14)}`
+  seq = 0
+  sentAt = new Map<number, number>()
   readonly index: number
   readonly roomId: string
   private pinger: ReturnType<typeof setInterval> | undefined
@@ -102,7 +109,9 @@ class Client {
     this.attempts++
     socket.addEventListener('open', () => {
       this.openedAt = Date.now()
-      socket.send(JSON.stringify({ t: 'join', name: `soak-${this.index + 1}`, token: this.token }))
+      socket.send(
+        JSON.stringify({ t: 'join', name: `soak-${this.index + 1}`, token: this.token, session: this.session }),
+      )
       this.pinger = setInterval(() => socket.send(HEARTBEAT_PING), pingMs)
     })
     socket.addEventListener('message', (event) => {
@@ -121,6 +130,14 @@ class Client {
         this.attempts = 0
         this.scheduleTap()
       } else if (message.t === 'patch' || message.t === 'snapshot') answered++
+      else if (message.t === 'ack') {
+        const at = this.sentAt.get(message.seq)
+        if (at !== undefined) {
+          acked++
+          slowestAckMs = Math.max(slowestAckMs, Date.now() - at)
+          this.sentAt.delete(message.seq)
+        }
+      }
     })
     socket.addEventListener('close', (event) => {
       clearInterval(this.pinger)
@@ -153,7 +170,9 @@ class Client {
     this.tapper = setTimeout(() => {
       if (this.socket?.readyState === WebSocket.OPEN) {
         this.ready = !this.ready
-        this.socket.send(JSON.stringify({ t: 'ready', ready: this.ready }))
+        const seq = ++this.seq
+        this.sentAt.set(seq, Date.now())
+        this.socket.send(JSON.stringify({ t: 'ready', ready: this.ready, seq }))
         taps++
       }
       this.scheduleTap()
@@ -199,6 +218,8 @@ const summary = {
   welcomes,
   taps,
   answered,
+  acked,
+  slowestAckMs,
 }
 console.log(JSON.stringify(summary, null, 2))
 if (values.json) writeFileSync(values.json, JSON.stringify({ summary, closes }, null, 2))

@@ -38,26 +38,25 @@ async function table(browser: Parameters<typeof newPerson>[0]) {
   return { people: [host, guest, third], host, guest, relay, take }
 }
 
-test('a tap into a dead connection is noticed in seconds, reconnects, and the tap can be made again', async ({
+test('a tap into a dead connection is noticed in seconds, reconnects, and the tap goes out again by itself', async ({
   browser,
 }) => {
   test.setTimeout(120_000)
   const { people, host, guest, relay, take } = await table(browser)
 
-  // The socket goes dead without closing: the tap is lost
+  // The socket goes dead without closing: the tap never arrives
   relay.dead = true
   await take.first().click()
   const started = Date.now()
   await expect(guest.getByText('Connection lost, reconnecting…')).toBeVisible({ timeout: 15_000 })
   // Noticed in seconds (3 s for an answer, 4 s for the check), where it used to take 45
   expect(Date.now() - started).toBeLessThan(12_000)
-  await expect(guest.getByText(/your last move may not have arrived/)).toBeVisible()
+  // 2026-11-23 (shared/protocol.ts 20.): no "make it again", the page sends it again itself
+  await expect(guest.getByText(/your last move may not have arrived/)).toHaveCount(0)
 
-  // The relay lets the new socket through: back in the room, and the tap again works
+  // The relay lets the new socket through: back in the room, and the tap is taken, once
   relay.dead = false
   await expect(guest.getByText('Connection lost, reconnecting…')).toHaveCount(0, { timeout: 15_000 })
-  await expect(take).toHaveCount(3)
-  await take.first().click()
   await expect(guest.getByRole('button', { name: /you hold it$/ })).toBeVisible()
   await expect(host.getByRole('button', { name: /^Take chip \d+$/ })).toHaveCount(2)
   for (const person of people) await person.context().close()

@@ -65,9 +65,34 @@ export class FakeWebSocket {
     this.onclose?.({ code })
   }
 
-  /** The `join` messages this socket sent */
+  /**
+   * The messages this socket sent; a `join`'s `session` (shared/protocol.ts 20.) left out, being
+   * random: `sessions` has it
+   */
   get joins(): { t: string; name: string; token: string | null }[] {
-    return this.sent.filter((data) => data !== 'ping').map((data) => JSON.parse(data))
+    return this.sent
+      .filter((data) => data !== 'ping')
+      .map((data) => {
+        const { session: _session, ...message } = JSON.parse(data) as Record<string, unknown>
+        return message as { t: string; name: string; token: string | null }
+      })
+  }
+
+  /** The `session` of each `join` this socket sent */
+  get sessions(): unknown[] {
+    return this.sent
+      .filter((data) => data !== 'ping')
+      .map((data) => JSON.parse(data) as Record<string, unknown>)
+      .filter((message) => message.t === 'join')
+      .map((message) => message.session)
+  }
+
+  /** What this socket sent but pings and joins, parsed */
+  get messages(): Record<string, unknown>[] {
+    return this.sent
+      .filter((data) => data !== 'ping')
+      .map((data) => JSON.parse(data) as Record<string, unknown>)
+      .filter((message) => message.t !== 'join')
   }
 }
 
@@ -77,7 +102,11 @@ export const TOKEN_B = 'b'.repeat(43)
 /** The `welcome` for member `me`; `others` are further members in the room */
 export function welcome(
   me: Partial<RoomMember>,
-  { token = TOKEN_A, others = 0 }: { token?: string; others?: number } = {},
+  {
+    token = TOKEN_A,
+    others = 0,
+    ack,
+  }: { token?: string; others?: number; ack?: number } = {},
 ): string {
   const member: RoomMember = {
     id: 'm1',
@@ -112,6 +141,8 @@ export function welcome(
       game: null,
       coverable: [],
     },
+    // A server that acknowledges (shared/protocol.ts 20.)
+    ...(ack !== undefined ? { ack } : {}),
   }
   return JSON.stringify(message)
 }
