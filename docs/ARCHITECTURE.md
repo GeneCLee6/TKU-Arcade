@@ -1399,6 +1399,15 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **首屏**：主站 99.9 → 101.0 kB（字串、卡片標籤、service worker 註冊與更新提示的 hook；`QuickPlay`、`UpdatePrompt` 不在首屏）；`QuickPlay` 約 1.3 kB gzip 在首屏之外。
 - **測試**：`tests/games/quick-bots.test.ts`（每款 `computer` 遊戲的預設請求都合法、別的都不合法；每個難度與人數的邊界；格式）、`tests/worker/rooms.test.ts`（交給 DO 的參數、強制私人、各種不合法 400）、`tests/worker/room-table-bots.test.ts`「a room opened with computer players」（座位、加入就開局、只開一次、hibernation、暫停時留在等待室、房主重連不重開、卡丁車不收、一局玩到底）、`e2e/quick-play.spec.ts`（手機一鍵德州撲克到發牌、不在公開房列表、卡片標籤、卡丁車兩格）。
 
+
+### 4.55b 「跟電腦玩」自選數量與各自難度（2026-11-22，`feat/table-bots-many`，#147）
+
+擁有者 2026-11-22：「其他遊戲添加電腦你也要給多電腦模式，比如德州撲克目前只能加1個電腦。」§4.55 的一鍵開局只給 `max(1, minPlayers − 1)` 個電腦（德州撲克 1 個）。
+
+- **數量**：`shared/games/quickBots.ts` 的 `quickBotRange(meta, names)`＝最少 `max(1, minPlayers − 1)`、最多 `min(maxPlayers − 1, 名字數)`；`quickBotCount(gameId, meta)` 是每款的預設（德州撲克 5，陞官圖、滬尾商行、社辦牌陣、朝堂暗鬥、奪祕笈、芥末餃子 3），夾在範圍內。大廳每格多一個「− N ＋」。
+- **難度**：分段切換多一個「各自選」：每格出現每個電腦一顆小鈕（「1 普通」），點一下換下一個難度。請求變成 `bots: { count, level, levels }`，`levels` 一個電腦一個、照座位順序；`parseQuickBots` 檢查長度等於 `count`、每個都在 `bots.levels`，不合就 400 `bad_bots`。`RoomHost.create` 用 `quickBotLevel(bots, i)` 給第 i 個電腦難度。伺服器的人數上限本來就是座位數 − 1（不用放寬）；速率限制不變（一鍵仍是一個 POST）。
+- **等待室**：`TableBots.tsx` 多「空位全部坐滿（N）」，送 N 個 `add_bot`（房間照舊一個一個放進最低空位，超過的回 `seat_taken`）；七款都能加到滿座（`MAX_MEMBERS` 64 遠大於座位）。
+- **測試**：`tests/games/quick-bots.test.ts`（範圍、預設、`levels` 格式）、`tests/components/QuickPlay.test.tsx`（預設 5、1 到 8、各自選）、`tests/worker/room-table-bots.test.ts`「one person and a full table of computers」（七款各一人＋滿座電腦、難度交錯，房間下完一局；等待室加到滿、多的兩個被拒）、`e2e/quick-play.spec.ts`（手機一鍵德州撲克 5 個電腦開局、桌機 8 個電腦各自難度）。
 ### 4.56 路線圖外：PWA 的快取與新版本提示（2026-11-21，`feat/lobby-quickplay-pwa`）
 
 `e7-t09`（#48）已經有 manifest、圖示、只回離線頁的 service worker 與安裝提示。這批把 service worker 改成「App 殼＋靜態資產」快取、加上新版本提示，安裝提示可以關。
@@ -1559,7 +1568,18 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **限制（照實寫）**：(1) 老街沒有主路導引，所以頂尖腳本與專家在老街的台階是收油跳過，不會甩尾起跳；人可以。(2) 燈籠巷的牆是素色高牆（沒有個別的店屋場景）。(3) 台階讓困難電腦車每圈慢約 2 秒（坡頂收油）。
 
-### 4.69 路線圖外：觀音山的專屬地標、真的海（2026-11-22，`feat/kart-landmarks-sea`）
+### 4.69 路線圖外：全螢幕遊玩（網頁與 PWA）（2026-11-22，#148，`feat/fullscreen-play`）
+
+- **共用 API**（`src/lib/fullscreen.ts`）：全站只有一個全螢幕，對象是整頁（`document.documentElement`），不是某個元素：等待室變比賽、比賽變結果都不用重新進入，`<dialog>`（top layer）與 toast 照常。`enterFullscreen()`（要在點擊或按鍵裡呼叫；`requestFullscreen({ navigationUI: 'hide' })`，舊 Safari 用 `webkit` 前綴）、`exitFullscreen()`（暫停選單的「離開全螢幕」就呼叫它）、`toggleFullscreen()`、`fullscreenMode()`（`'off' | 'fullscreen' | 'focus'`）、`subscribeFullscreen`、React 的 `useFullscreenMode()`。
+- **專注模式**：沒有 Fullscreen API 或被拒（iPhone Safari、沒權限的 iframe）時退回，和 #141 陞官圖同一個做法：`<html data-focus-mode>`，TopBar 藏起來（`TopBar.tsx`）；第一次會 toast 說明，iPhone 上提示「加到主畫面」才能沒有瀏覽器列。陞官圖自己的圖版全螢幕（`useImmersive.ts`）不動。
+- **Esc**：真全螢幕時 Esc 是瀏覽器的（頁面攔不到），離開後頁面靠 `fullscreenchange`（含 `webkitfullscreenchange`）跟上；Chrome／Edge 桌機進入後用 Keyboard Lock 保留 Esc（`navigator.keyboard.lock(['Escape'])`），所以比賽的 Esc 先開暫停選單、長按 Esc 才離開全螢幕。專注模式沒有瀏覽器幫忙，Esc 由這裡處理，但有 `<dialog open>` 或畫面自己用掉這個 Esc（`event.preventDefault()`）時不動作——**要自己用 Esc 的畫面（暫停選單）請 `preventDefault()`**。
+- **自動全螢幕**（設定，預設關，`localStorage` `tku-arcade.fullscreen.auto`）：`autoFullscreen()`／`setAutoFullscreen()`／`useAutoFullscreen()`；瀏覽器只准從使用者動作進全螢幕，所以 `armAutoFullscreen()` 掛一次性的 `keydown`／`pointerdown`（捕獲階段，Esc 除外），比賽的第一個鍵或第一下觸控就進去；只用真全螢幕，不會無預警進專注模式。
+- **手機轉橫**：`lockLandscape()`／`unlockOrientation()`（`screen.orientation.lock('landscape')`，Chrome Android 只在全螢幕或已安裝的 app 有效，其他瀏覽器拒絕就維持現有的轉橫提示）。`src/kart/race/useRaceFullscreen.ts` 在比賽中：掛自動全螢幕、觸控裝置嘗試鎖橫（一進來先試一次給已安裝的 app，進全螢幕時再試）、離開比賽解鎖。
+- **按鈕**（`src/components/FullscreenButton.tsx`，自己的 lazy chunk，字串 `shared/games/i18n.fullscreen.ts` 由它登記、`screenMessages.ts` 列給 check-i18n）：每個房間標題列（桌遊等待室與遊戲中、卡丁車觀戰與結果）、卡丁車單機選單（`SpikePage.tsx`，`landscape`：進全螢幕順便鎖橫）；卡丁車等待室的在下一個 PR（§4.70）。比賽中由暫停選單（`feat/kart-race-flow`）提供。
+- **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
+- **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
+
+### 4.70 路線圖外：觀音山的專屬地標、真的海（2026-11-22，`feat/kart-landmarks-sea`）
 
 `NEXT.md` §5 的「觀音山的專屬地標（#94）」與「海是貼地的平面（#115）」。全部程式產生（`ASSETS.md`）。
 

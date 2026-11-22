@@ -34,6 +34,9 @@ const WaitingRoom = lazy(() =>
   import('../components/WaitingRoom.tsx').then(({ WaitingRoom }) => ({ default: WaitingRoom })),
 )
 
+// 2026-11-22: full screen (src/lib/fullscreen.ts), its button and words a small chunk of their own
+const FullscreenButton = lazy(() => import('../components/FullscreenButton.tsx'))
+
 // e1-t16: only a room with a password, and only for someone new, ever needs it
 const PasswordForm = lazy(() => import('../components/PasswordForm.tsx'))
 
@@ -311,6 +314,9 @@ function RoomHeading({
       {gameId !== undefined && (
         <HeadingAction>
           {extra}
+          <Suspense>
+            <FullscreenButton iconOnly />
+          </Suspense>
           <HowToPlay gameId={gameId} edition={edition} />
         </HeadingAction>
       )}

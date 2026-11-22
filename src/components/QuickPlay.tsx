@@ -1,13 +1,14 @@
 // The lobby's "Play the computer" (2026-11-21, docs/ARCHITECTURE.md §4.55): every table game the
 // room plays computer seats in (GameMeta.computer) and the kart's two ways to play alone, one tap
-// each. A table game opens a private room with enough computer players for the game's fewest
-// (shared/games/quickBots.ts), whose game starts as soon as this person joins it; the kart goes
+// each. A table game opens a private room with as many computer players as the person picks on its
+// tile (2026-11-22: one up to a full table, a lively number first; shared/games/quickBots.ts), all at
+// one level or each at its own, whose game starts as soon as this person joins it; the kart goes
 // straight to its own page. Its own lazy chunk, after the first paint, like the public rooms.
 import { useState } from 'react'
 import styled from 'styled-components'
 import { LOBBY_GAMES } from '../../shared/games/lobby.ts'
-import { QUICK_BOT_LEVEL, quickBotCount } from '../../shared/games/quickBots.ts'
-import { TABLE_BOT_LEVELS } from '../../shared/games/tableBots.ts'
+import { QUICK_BOT_LEVEL, quickBotCount, quickBotRange } from '../../shared/games/quickBots.ts'
+import { TABLE_BOT_LEVELS, TABLE_BOT_NAMES, type TableBotLevel } from '../../shared/games/tableBots.ts'
 import type { QuickBots } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import { useNavigate } from '../lib/useRouter.ts'
@@ -27,11 +28,25 @@ export interface QuickPlayProps {
 
 const COMPUTER_GAMES = LOBBY_GAMES.filter((game) => game.meta.computer === true)
 const KART_LISTED = LOBBY_GAMES.some((game) => game.id === 'kart')
+/** The level switch's own choice for "each computer player at its own level" */
+const EACH = 'each'
 
 export default function QuickPlay({ disabled, paused, onPlay }: QuickPlayProps) {
   const t = useT()
   const navigate = useNavigate()
   const [level, setLevel] = useState<string>(QUICK_BOT_LEVEL)
+  // Per game, what the person changed: how many, and (picking each) the level of each in turn
+  const [counts, setCounts] = useState<Record<string, number>>({})
+  const [each, setEach] = useState<Record<string, string[]>>({})
+  const levelOf = (gameId: string, index: number) =>
+    (each[gameId]?.[index] ?? QUICK_BOT_LEVEL) as TableBotLevel
+  const cycle = (gameId: string, index: number, count: number) =>
+    setEach((was) => {
+      const now = Array.from({ length: count }, (_, at) => was[gameId]?.[at] ?? QUICK_BOT_LEVEL)
+      const at = (TABLE_BOT_LEVELS as readonly string[]).indexOf(now[index])
+      now[index] = TABLE_BOT_LEVELS[(at + 1) % TABLE_BOT_LEVELS.length]
+      return { ...was, [gameId]: now }
+    })
   return (
     <Box aria-labelledby="quick-play-title" data-testid="quick-play">
       <Top>
@@ -43,10 +58,10 @@ export default function QuickPlay({ disabled, paused, onPlay }: QuickPlayProps) 
           <span aria-hidden="true">{t('lobby.quick.level')}</span>
           <SegmentedSwitch
             label={t('lobby.quick.level')}
-            options={TABLE_BOT_LEVELS.map((one) => ({
-              value: one,
-              label: t(`lobby.quick.level.${one}`),
-            }))}
+            options={[
+              ...TABLE_BOT_LEVELS.map((one) => ({ value: one, label: t(`lobby.quick.level.${one}`) })),
+              { value: EACH, label: t('lobby.quick.level.each') },
+            ]}
             value={level}
             onChange={setLevel}
           />
@@ -55,19 +70,68 @@ export default function QuickPlay({ disabled, paused, onPlay }: QuickPlayProps) 
       <List>
         {COMPUTER_GAMES.map((game) => {
           const name = t(`${game.meta.i18nKey}.name`)
-          const count = quickBotCount(game.meta)
+          const range = quickBotRange(game.meta, TABLE_BOT_NAMES.length)
+          const count = counts[game.id] ?? quickBotCount(game.id, game.meta)
+          const set = (next: number) =>
+            setCounts((was) => ({ ...was, [game.id]: Math.min(range.max, Math.max(range.min, next)) }))
+          const levels = Array.from({ length: count }, (_, index) => levelOf(game.id, index))
+          const bots: QuickBots =
+            level === EACH ? { count, level: QUICK_BOT_LEVEL, levels } : { count, level }
           return (
             <li key={game.id}>
               <Tile $hue={gameHue(game.id)}>
                 <Name>{name}</Name>
-                <Facts>
+                <Facts aria-live="polite">
                   {t(count === 1 ? 'lobby.quick.versusOne' : 'lobby.quick.versus', { count })}
                 </Facts>
+                <Stepper>
+                  <Button
+                    $size="sm"
+                    $variant="secondary"
+                    disabled={count <= range.min}
+                    aria-label={t('lobby.quick.fewer', { game: name })}
+                    onClick={() => set(count - 1)}
+                    data-quick-fewer={game.id}
+                  >
+                    {t('lobby.quick.minus')}
+                  </Button>
+                  <Count data-quick-count={game.id}>{count}</Count>
+                  <Button
+                    $size="sm"
+                    $variant="secondary"
+                    disabled={count >= range.max}
+                    aria-label={t('lobby.quick.more', { game: name })}
+                    onClick={() => set(count + 1)}
+                    data-quick-more={game.id}
+                  >
+                    {t('lobby.quick.plus')}
+                  </Button>
+                </Stepper>
+                {level === EACH && (
+                  <Chips>
+                    {levels.map((one, index) => (
+                      <Chip
+                        key={index}
+                        type="button"
+                        $easy={one === 'easy'}
+                        aria-label={t('lobby.quick.botLevel', {
+                          n: index + 1,
+                          game: name,
+                          level: t(`lobby.quick.level.${one}`),
+                        })}
+                        onClick={() => cycle(game.id, index, count)}
+                        data-quick-bot={`${game.id}-${index + 1}`}
+                      >
+                        {t('lobby.quick.botChip', { n: index + 1, level: t(`lobby.quick.level.${one}`) })}
+                      </Chip>
+                    ))}
+                  </Chips>
+                )}
                 <Button
                   $size="sm"
                   disabled={disabled || paused.includes(game.id)}
                   aria-label={t('lobby.quick.playNamed', { game: name })}
-                  onClick={() => onPlay(game.id, { count, level })}
+                  onClick={() => onPlay(game.id, bots)}
                   data-quick={game.id}
                 >
                   {t('lobby.quick.play')}
@@ -194,7 +258,46 @@ const Name = styled.p`
 `
 
 const Facts = styled.p`
-  margin: 0 0 ${space.sm}px;
+  margin: 0;
   color: ${color.muted};
   font-size: ${fontSize.sm}px;
+`
+
+// - 5 +: how many computer players, one up to a full table
+const Stepper = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${space.xs}px;
+  margin-bottom: ${space.xs}px;
+
+  & > button {
+    min-width: 32px;
+    padding-inline: 0;
+  }
+`
+
+const Count = styled.span`
+  min-width: 2ch;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+`
+
+// Picking each: one small button per computer player, a tap moves it to the next level
+const Chips = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${space.xs}px;
+  margin-bottom: ${space.xs}px;
+`
+
+const Chip = styled.button<{ $easy: boolean }>`
+  min-height: 28px;
+  padding: 0 ${space.xs}px;
+  color: ${(p) => (p.$easy ? color.muted : color.text)};
+  background: ${(p) => (p.$easy ? color.sunken : color.surface)};
+  border: 1px solid ${(p) => (p.$easy ? color.border : color.accent)};
+  font: inherit;
+  font-size: ${fontSize.sm}px;
+  cursor: pointer;
 `

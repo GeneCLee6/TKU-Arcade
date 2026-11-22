@@ -1,4 +1,4 @@
-// 2026-11-22 (#115, docs/ARCHITECTURE.md §4.66): real water for the tracks by the sea and the river.
+// 2026-11-22 (#115, docs/ARCHITECTURE.md §4.70): real water for the tracks by the sea and the river.
 // The water used to be a flat plane with a scrolling picture on it; now, on the medium and high
 // pictures, it is a lit surface: the deep water darker and bluer, the shallows by the shore lighter
 // and greener with a line of foam where it meets the land, waves that catch the sun (the surface's

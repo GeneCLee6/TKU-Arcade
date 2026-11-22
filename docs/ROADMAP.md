@@ -205,6 +205,8 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #145 | 2026-11-22 | `feat/kart-wall-slide-landing` | 貼牆滑行、落地時機噴、駕訓第 11 課；摩托車引擎聲、聲音依畫質分級；車身細節貼圖（低畫質不載） |
 | #150 | 2026-11-22 | `feat/kart-landmarks-sea` | 觀音山坡道的稜線、步道涼亭、廟、八里渡船頭遠景；海與河的水面（中：光照的湧浪、深淺、白浪；高：再加頂點起伏；低：平面照舊） |
 | #146 | 2026-11-22 | `feat/kart-track-routes` | 燈籠老街的燈籠巷（第二條捷徑，穿縫）、漁人碼頭與老街各一個接彎的台階；`oldstreet@11`、`harbour@15` |
+| #147 | 2026-11-22 | `feat/table-bots-many` | 「跟電腦玩」自選電腦數量（1 到滿座，德州撲克預設 5）與各自難度；等待室「空位全部坐滿」 |
+| #148 | 2026-11-22 | `feat/fullscreen-play` | 全螢幕遊玩：共用 `src/lib/fullscreen.ts`（整頁 Fullscreen API、iPhone 退回專注模式並提示加到主畫面、Keyboard Lock 保留 Esc）、房間標題與卡丁車選單的按鈕、比賽自動全螢幕設定與手機鎖橫、PWA `display_override` |
 
 ## Phase O · M4 社群
 

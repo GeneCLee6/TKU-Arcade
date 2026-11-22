@@ -1,4 +1,4 @@
-// 2026-11-22 (#94, docs/ARCHITECTURE.md §4.66): Guanyin Hill Road's own scenery. Until now the
+// 2026-11-22 (#94, docs/ARCHITECTURE.md §4.70): Guanyin Hill Road's own scenery. Until now the
 // track had only what every track has (trees, cone hills, the festival); now the places that make
 // it the hill across the river from Tamsui, all our own low-poly shapes, nothing copied from a photo,
 // a map or another game:

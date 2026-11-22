@@ -14,7 +14,7 @@ import {
 import { buildWater, waterDepths, type WaterOptions } from '../../src/kart/art/seaWater.ts'
 import { QUALITY } from '../../src/kart/quality.ts'
 
-// 2026-11-22 (#94, #115; docs/ARCHITECTURE.md §4.67): Guanyin Hill Road's landmarks and the real water
+// 2026-11-22 (#94, #115; docs/ARCHITECTURE.md §4.70): Guanyin Hill Road's landmarks and the real water
 
 const guanyin = raceTrack('guanyin')!
 
