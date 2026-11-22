@@ -178,7 +178,7 @@ npm run build && node scripts/kart-fps.mjs --base http://localhost:<port> \
 - 改了畫面（新賽道、新車、新特效）就跑一次 §1 的指令，前後各一份 JSON，貼到 PR。看 draw calls 與 JS ms；fps 只在同一台、沒有別的工作時才比。
 - **實機**：擁有者手上的手機開 `/kart/spike`，統計面板的 fps、drawing buffer；或接 USB 用 Chrome 的 `chrome://inspect` 看 `__kartSpike.render` 與 `jsMs`。
 
-## 10. 聲音依畫質分級、車身細節（2026-11-22，`feat/kart-wall-slide-landing`）
+## 10. 聲音依畫質分級、車身細節（2026-11-22，#145，`feat/kart-wall-slide-landing`）
 
 ### 10.1 聲音（#105，`src/kart/audio/tiers.ts`）
 

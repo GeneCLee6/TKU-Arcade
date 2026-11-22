@@ -1496,7 +1496,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **`check-budget.mjs`**：一個畫面「首屏之後才載」的東西，改算它自己（和它靜態 import 的、不含入口與房間頁）的全部動態 import。以前只看畫面 chunk 本身的動態 import，所以 `fullData.ts` 載的 `fullSquare.ts` 被當成一款「遊戲」多印一行；現在它和 `FullBoard`、`fullWords` 都列在完整版的「after the first paint」（32.4 kB，不限）。
 - **lint**：`tests/worker/room-robustness.test.ts` 的兩個 `no-unsafe-optional-chaining`（`game?.view as …` 再取 `.you`）改成 `game!.view`；`npm run lint` 0 警告。
 
-### 4.65 路線圖外：貼牆滑行、落地時機噴、駕訓第 11 課、摩托車引擎聲、聲音分級、車身細節（2026-11-22，`feat/kart-wall-slide-landing`）
+### 4.65 路線圖外：貼牆滑行、落地時機噴、駕訓第 11 課、摩托車引擎聲、聲音分級、車身細節（2026-11-22，#145，`feat/kart-wall-slide-landing`）
 
 - **貼牆滑行**（`shared/kart/walls.ts`）：新 `WALL_SLIDE`（`slideAngle` 12°、`scrapeShare` 0.6）與純函式 `slideShare(headOn, slideAngle)`：碰牆時速度和牆的夾角在 `tuning.wallSlideAngle`（`KART_TUNING` 新的一項，12°，調參面板「貼牆滑行角度」，牆一組）以內，沿牆損失與 `hitSpeed` 乘 (sin 夾角 ÷ sin 上限)²，那一步的擦牆拖曳 ×0.6；`WallResult.sliding` 標出整步只有滑行。只有 `MODEL_CLASSIC` 會滑，街機（舊）照舊。撞牆反應全在 `collideWalls` 裡的這兩個值，和 `feat/kart-track-format-v2` 的高度碰撞（`wall.top`）不重疊。黑鳶 `FLAGSHIP_TRAITS.wallSlideAngle` ×0.5。
 - **落地時機噴**（`shared/kart/terrain.ts`）：`TERRAIN_TUNING.landingTapWindow` 0.1 s、`landingTimedBoost` 0.75 s；`KartState` 多 `airTap`、`landWindow`、`timedLandings`（只在有地形的賽道）。`stepAir` 記空中最後一次新按（`pressedAfresh`：沒按著→按下，或 `throttleTap`），`settleTerrain` 在落地時看它，或開 `landWindow` 讓落地後的新按補上；加速是 `max`（取代平常的 0.5 s 落地加速）。`stepOnTerrain` 保留 `timedLandings`。大字 `callouts.ts` 的 `landing`（「落地時機噴！」）。

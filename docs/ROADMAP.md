@@ -200,6 +200,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #140 | 2026-11-22 | `feat/kart-polish-2` | 黑鳶目標定案；觸控噴射鍵噴射中、直拿道具欄置中；電腦車看牆（困難重撞 −43%）、團隊賽留存量等變藍；鍵帽字母、多支手把 |
 | #141 | 2026-11-22 | `feat/promotion-focus-inert` | 陞官圖全螢幕／專注模式時頁面其他部分 inert、焦點留在圖版；光譜偶發對比不足查明是 axe 讀到一半重畫 |
 | #142 | 2026-11-22 | `feat/kart-watch-portrait-promotion-lazy` | 觀戰與重播直拿道具欄置中、小地圖靠左；陞官圖完整版首屏 146.2 → 139.7 kB；lint 0 警告 |
+| #145 | 2026-11-22 | `feat/kart-wall-slide-landing` | 貼牆滑行、落地時機噴、駕訓第 11 課；摩托車引擎聲、聲音依畫質分級；車身細節貼圖（低畫質不載） |
 
 ## Phase O · M4 社群
 
