@@ -1579,6 +1579,17 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
 - **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
 
+
+### 4.71 路線圖外：房間連線的穩定度（2026-11-22，`feat/net-stability-bots`，#PRNET）
+
+擁有者：「常常連線不穩。」原因、修法與前後數字在 `docs/NETWORK.md`。架構上的改變：
+
+- **協定**：`STALE_AFTER_MS` 45 → 90 s（背景分頁的 ping 一分鐘一次也不會被關）；頁面自己的「三次 ping 沒回就換」不再綁這個數字。4429 改成可重試的關閉碼（`canReconnectAfter`）。`/ws/<id>?v=2&resume=1`：斷線後的重連嘗試，Worker 在 `socket` 桶用完後再拿 `resume` 桶（240／分）。沒有升版。
+- **頁面**（`connectRoom`）：第一次連線失敗重試 20 s；4429 後至少等 20 s；重連期間 `send` 排隊（16 個、10 s），`welcome` 後送出，逾時的給 `onUnsent`；`send(message, false)` 不排隊（聊天、`set_look`、`leave`、替電腦車送的動作）；`onResumed`（重連 `welcome` 後、頁面隱藏 ≥ 1 s 再出現）→ `RoomRealtime.onResume` → 卡丁車重新對時；`reconnectNow()`；也聽 Page Lifecycle 的 `resume`。
+- **畫面**：`ConnectionBanner.tsx`（1 s 後出現、6 s 後「立刻重試」、回來時「已重新連線。」2.5 s）。
+- **RoomDO**：跑到 `webSocketMessage` 的 `ping` 也記心跳。
+- **工具**：`scripts/net-soak.ts`（`npm run net:soak`）；`e2e/network.spec.ts`。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

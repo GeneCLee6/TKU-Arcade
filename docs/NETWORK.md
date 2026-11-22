@@ -41,7 +41,7 @@ npm run net:soak -- --url https://tku-arcade-pr-<號>.genelee-pro.workers.dev --
 
 | 情境 | 修之前 | 修之後 |
 | --- | --- | --- |
-| 本機 dev（Miniflare），3 人 5 分鐘，ping 60 s | **18 次 4408**（每人每小時 72 次），每次 22–37 ms 回來 | AFTER_LOCAL_60 |
+| 本機 dev（Miniflare），3 人 5 分鐘，ping 60 s | **18 次 4408**（每人每小時 72 次），每次 22–37 ms 回來 | **0 次** |
 | 預覽站（真 Cloudflare，#147 的預覽＝修之前），3 人 15 分鐘，ping 15 s | 0 次 | AFTER_PREVIEW_15 |
 | 預覽站，2 人 15 分鐘，ping 60 s | **29 次 4408**（每人每小時 58 次），重連 p50 322 ms、p90 711 ms、最慢 1.17 s | AFTER_PREVIEW_60 |
 
