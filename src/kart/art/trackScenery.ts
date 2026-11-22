@@ -19,6 +19,7 @@ type SkillWalls = typeof import('./skillWalls.ts')
 type SkillCues = typeof import('./skillCues.ts')
 type LocalPlan = typeof import('./localPlan.ts')
 type LocalArt = typeof import('./localArt.ts')
+type GuanyinArt = typeof import('./guanyinArt.ts')
 
 /** What a track's own quarter is built with; a part is there only on its track */
 export interface TrackScenery {
@@ -32,6 +33,8 @@ export interface TrackScenery {
   readonly lanes?: LanesArt
   /** The four technical tracks (mangrove, fort, danhai, datun) */
   readonly local?: { readonly plan: LocalPlan; readonly art: LocalArt }
+  /** Guanyin Hill Road (2026-11-22): the ridge, the pavilion, the temple, the river and its pier */
+  readonly guanyin?: GuanyinArt
 }
 
 /** A track with nothing of its own (the test oval, Riverside, Guanyin, one from the editor) */
@@ -71,6 +74,7 @@ const LOADERS: Readonly<Record<string, () => Promise<TrackScenery>>> = {
     const [lanes, kit] = await Promise.all([import('./lanesArt.ts'), skill()])
     return { lanes, skill: kit }
   },
+  guanyin: async () => ({ guanyin: await import('./guanyinArt.ts') }),
   mangrove: local,
   fort: local,
   danhai: local,

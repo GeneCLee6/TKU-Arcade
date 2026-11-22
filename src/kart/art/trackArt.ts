@@ -33,7 +33,7 @@ import {
 import { roadClearance, roadDistances, scatter } from '../../../shared/kart/scenery.ts'
 import { cantOf } from '../../../shared/kart/levels.ts'
 import { roadDirection, trackBounds, type Track } from '../../../shared/kart/track.ts'
-import { kartScene, kartThemes, type KartTheme } from '../../styles/kartTokens.ts'
+import { kartScene, kartThemes, waterScene, type KartTheme } from '../../styles/kartTokens.ts'
 import { buildCornerDressing, buildCornerSigns } from './cornerArt.ts'
 import { buildCrossings } from './crossingArt.ts'
 import { buildFestival } from './festival.ts'
@@ -41,6 +41,7 @@ import { buildForks } from './forkArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
 import { buildObstacleArt } from './obstacleArt.ts'
+import { buildWater, type Water, type WaterLevel } from './seaWater.ts'
 import { loadedScenery, type TrackScenery } from './trackScenery.ts'
 import { loadTrackCuesOn, onTrackCuesChange } from '../trackCues.ts'
 import {
@@ -58,6 +59,8 @@ export interface ArtLevel {
   readonly density: number
   readonly shadows: boolean
   readonly anisotropy: number
+  /** The water (2026-11-22, seaWater.ts): 0 the flat picture (and when left out), 1 lit, 2 lifting too */
+  readonly water?: WaterLevel
 }
 
 export interface TrackArt {
@@ -353,6 +356,9 @@ export function buildTrackArt(
 
   // 2026-11-18: the four technical tracks' own scenery (localArt.ts); null for any other track
   const local = quarter.local ? quarter.local.plan.localPlan(track, level.density) : null
+  // 2026-11-22: Guanyin Hill Road's own (guanyinArt.ts); its river keeps the far hills out of it
+  const guanyinPlan =
+    track.id === 'guanyin' && quarter.guanyin ? quarter.guanyin.guanyinPlan(track) : null
   // 2026-11-20: the three tracks to learn by heart, dressed (skillWalls.ts, wharfArt.ts, lanesArt.ts,
   // worksArt.ts) and their technical places shown (skillCues.ts)
   const skillArt = quarter.skill ?? null
@@ -577,7 +583,8 @@ export function buildTrackArt(
       (!tamkang || tamkangArt.tamkangTreeFits(x, z)) &&
       (!oldStreet || oldStreetArt.oldStreetTreeFits(x, z)) &&
       (!local || local.fits(x, z)) &&
-      skillFits(x, z),
+      skillFits(x, z) &&
+      (!guanyinPlan || quarter.guanyin!.guanyinFits(guanyinPlan, x, z)),
   })
   const trunks = new InstancedMesh(
     keep(new CylinderGeometry(0.22, 0.32, 2.2, 6)),
@@ -672,7 +679,8 @@ export function buildTrackArt(
       // At the campus, none stands in the river: the mountain across it is its own (tamkangArt.ts)
       if (
         (tamkang && tamkangArt.inTamkangRiver(matrix.elements[12]!, matrix.elements[14]!, 160)) ||
-        (oldStreet && oldStreetArt.inOldStreetRiver(matrix.elements[12]!, matrix.elements[14]!, 160))
+        (oldStreet && oldStreetArt.inOldStreetRiver(matrix.elements[12]!, matrix.elements[14]!, 160)) ||
+        (guanyinPlan !== null && matrix.elements[12]! > guanyinPlan.riverX - 120)
       ) {
         matrix.scale(new Vector3(0.001, 0.001, 0.001))
       }
@@ -827,24 +835,39 @@ export function buildTrackArt(
             ? tamkangArt.tamkangFestivalFits(x, z)
             : oldStreet
               ? oldStreetArt.oldStreetTreeFits(x, z)
-              : !inRiver(x) && (!local || local.fits(x, z)) && skillFits(x, z),
+              : !inRiver(x) &&
+                (!local || local.fits(x, z)) &&
+                skillFits(x, z) &&
+                // Guanyin Hill Road (2026-11-22): nothing in its river, nor on its landmarks
+                (!guanyinPlan || quarter.guanyin!.guanyinFits(guanyinPlan, x, z)),
     },
   )
 
   // ── Riverside: the river, its banks, a bridge, and a brick town beyond ──
-  let water: Texture | null = null
+  let riverWater: Water | null = null
   if (river) {
     const width = river.maxX - river.minX
     const span = box.maxZ - box.minZ + 1400
-    const surface = new Mesh(
-      keep(new PlaneGeometry(width, span)),
-      own(new MeshLambertMaterial({ map: textures.water })),
+    // 2026-11-22 (#115, seaWater.ts): real water on the medium and high pictures, the old plane on
+    // low; shallow along both banks, small swells
+    riverWater = buildWater(
+      { keep, own, ownTexture },
+      {
+        x: (river.minX + river.maxX) / 2,
+        z: centreZ,
+        width,
+        depth: span,
+        y: 0.05,
+        depthAt: (x) => Math.min(x - river.minX, river.maxX - x) / (width / 3),
+        ...waterScene.river,
+        sky: theme.skyHorizon,
+        flatMap: textures.water,
+        swell: 0.25,
+        overGround: true,
+      },
+      level.water ?? 0,
     )
-    textures.water.repeat.set(width / 14, span / 14)
-    surface.rotation.x = -Math.PI / 2
-    surface.position.set((river.minX + river.maxX) / 2, 0.05, centreZ)
-    group.add(shadowed(surface, false))
-    water = textures.water
+    group.add(shadowed(riverWater.mesh, false))
     for (const bankX of [river.minX - 3, river.maxX + 3]) {
       const bank = new Mesh(
         keep(new PlaneGeometry(6, span)),
@@ -982,6 +1005,18 @@ export function buildTrackArt(
   skillCues?.setVisible(loadTrackCuesOn())
   const stopCues = skillCues ? onTrackCuesChange((on) => skillCues.setVisible(on)) : null
 
+  // ── Guanyin Hill Road's landmarks (2026-11-22, guanyinArt.ts): the ridge, the pavilion, the
+  // temple, the river and its ferry pier ──
+  const guanyinScenery =
+    guanyinPlan && quarter.guanyin
+      ? quarter.guanyin.buildGuanyin(
+          { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
+          guanyinPlan,
+          groundAt,
+          level.water ?? 0,
+        )
+      : null
+
   // ── The four technical tracks: each one's own landmark (2026-11-18) ──
   const localScenery =
     local && quarter.local
@@ -1007,12 +1042,13 @@ export function buildTrackArt(
   return {
     group,
     update(seconds) {
-      if (water) water.offset.set(seconds * 0.012, seconds * 0.04)
+      riverWater?.update(seconds)
       harbourScenery?.update(seconds)
       festival.update(seconds)
       tamkangScenery?.update(seconds)
       oldStreetScenery?.update(seconds)
       localScenery?.update(seconds)
+      guanyinScenery?.update(seconds)
       worksScenery?.update(seconds)
       wharfScenery?.update(seconds)
       skillCues?.update(seconds)

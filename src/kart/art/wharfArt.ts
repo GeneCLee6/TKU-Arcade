@@ -4,10 +4,10 @@
 // to the east with its yellow edge, bollards and two gantry cranes reaching out over the water; a
 // container ship alongside and two workboats. Our own simple shapes, placed from the track so that
 // nothing stands on any road; no real port, ship or company copied. Seeded: the same yard each time.
-import { BoxGeometry, InstancedMesh, Mesh, MeshLambertMaterial, PlaneGeometry, Color } from 'three'
+import { BoxGeometry, InstancedMesh, Color } from 'three'
 import { scatter } from '../../../shared/kart/scenery.ts'
 import { trackBounds, type Track } from '../../../shared/kart/track.ts'
-import { wharfScene } from '../../styles/kartTokens.ts'
+import { kartThemes, waterScene, wharfScene } from '../../styles/kartTokens.ts'
 import {
   addBatch,
   Batch,
@@ -20,6 +20,7 @@ import {
   type Footprint,
   type Point3,
 } from './skillKit.ts'
+import { buildWater } from './seaWater.ts'
 import type { ArtKit } from './trackArt.ts'
 
 export interface WharfPlan {
@@ -106,26 +107,27 @@ export function buildWharf(kit: ArtKit, plan: WharfPlan): { update(seconds: numb
 
   // ── The sea and the quay's edge ──
   const seaWidth = 900
-  const water = kit.textures.water.clone()
-  kit.ownTexture(water)
-  water.needsUpdate = true
-  water.repeat.set(seaWidth / 16, (south - north) / 16)
-  const sea = new Mesh(
-    kit.keep(new PlaneGeometry(seaWidth, south - north)),
-    kit.own(
-      new MeshLambertMaterial({
-        color: wharfScene.sea,
-        map: water,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1,
-      }),
-    ),
+  // 2026-11-22 (#115, seaWater.ts): real water on the medium and high pictures; just over the land's
+  // grass, which it hides; the quay stands higher than both
+  const sea = buildWater(
+    kit,
+    {
+      x: seaX + seaWidth / 2,
+      z: (north + south) / 2,
+      width: seaWidth,
+      depth: south - north,
+      y: 0.04,
+      depthAt: (x) => (x - seaX) / 60,
+      ...waterScene.wharf,
+      sky: kartThemes.day.skyHorizon,
+      flatMap: kit.textures.water,
+      flatColor: wharfScene.sea,
+      flatRepeat: 16,
+      overGround: true,
+    },
+    kit.level.water ?? 0,
   )
-  sea.rotation.x = -Math.PI / 2
-  // Just over the land's grass, which it hides; the quay stands higher than both
-  sea.position.set(seaX + seaWidth / 2, 0.04, (north + south) / 2)
-  group.add(kit.shadowed(sea, false))
+  group.add(kit.shadowed(sea.mesh, false))
 
   const solid = new Batch()
   const quayY = 0.7
@@ -296,7 +298,7 @@ export function buildWharf(kit: ArtKit, plan: WharfPlan): { update(seconds: numb
 
   return {
     update(seconds) {
-      water.offset.set(seconds * 0.01, seconds * 0.03)
+      sea.update(seconds)
     },
   }
 }

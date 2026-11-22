@@ -493,6 +493,44 @@ export const skillCue = {
 } as const
 
 /**
+ * 2026-11-22 (#94): Guanyin Hill Road's own scenery (src/kart/art/guanyinArt.ts): the ridge, the
+ * trail pavilion, the temple, the river and the ferry pier
+ */
+export const guanyinScene = {
+  ridgeFoot: '#3F6B45',
+  ridgeTop: '#7E9C8A',
+  stone: '#B9B2A4',
+  pillar: '#B0362B',
+  wood: '#7A4E2D',
+  roof: '#3E5A4C',
+  gold: '#D9A441',
+  wall: '#E6DCC8',
+  door: '#7E1F1A',
+  ridge: '#C9A043',
+  bronze: '#6E5636',
+  lantern: '#FF6A3D',
+  riverDeep: '#1E4F63',
+  riverShallow: '#4E9C8E',
+  riverFlat: '#7FB3C2',
+  foam: '#EEF4F0',
+  concrete: '#A9A9A2',
+  pile: '#5A5650',
+  post: '#2E2F33',
+  hull: '#2B5F8E',
+  cabin: '#F1EFE8',
+  window: '#9FE3FF',
+  band: '#C23B2E',
+  funnel: '#D24A35',
+} as const
+
+/** 2026-11-22 (#115, seaWater.ts): each body of water's deep, shallow and foam colours */
+export const waterScene = {
+  harbour: { deep: '#1C4766', shallow: '#3F8F95', foam: '#F2E6DC' },
+  wharf: { deep: '#1E5A86', shallow: '#47ABAE', foam: '#EEF5F4' },
+  river: { deep: '#2A5F6E', shallow: '#5E9F8E', foam: '#E9F0EA' },
+} as const
+
+/**
  * 2026-11-22 (#103): the moving obstacles (src/kart/art/obstacleArt.ts): the level crossing's posts,
  * striped arms and lamps, the container trolleys' rails, frames and beacons, the stop line
  */
