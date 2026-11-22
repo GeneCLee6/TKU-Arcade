@@ -235,7 +235,7 @@ export interface SpikeTrial {
   /** 2026-11-20 (§4.43): a race's fly round the grid before the countdown, not skipped */
   readonly intro: boolean
   /**
-   * 2026-11-22 (§4.72): during the opening, the driver in front of the camera (their place in the
+   * 2026-11-22 (§4.73): during the opening, the driver in front of the camera (their place in the
    * race's list, the pole first); null otherwise, or when not presented here
    */
   readonly presenting: number | null
@@ -340,6 +340,11 @@ export interface SpikeNet {
   readonly gridSpots?: () => readonly Spot[]
   /** 2026-11-20 (§4.47): this kart's place now, 1 for the lead: a place gained, a fist in the air */
   readonly place?: () => number
+  /**
+   * 2026-11-23 (#152): whether the room's clock is settled here (shared/kart/net.ts's
+   * `clockSettled`); the opening presents its drivers only from then on. Absent: always
+   */
+  readonly clockSettled?: () => boolean
   /** After each step: the race so far, the input it ran with, and whether the kart was reset */
   afterStep(trial: Trial, input: KartInput, reset: boolean): void
   /** The other karts as drawn now, to bump into (e9-t09) */
@@ -636,7 +641,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   // §4.43: the fly round skipped (any key or touch), and when this kart crossed the line
   let skipped = false
   let finishedAt: number | null = null
-  // 2026-11-22 (§4.72): the countdown left at the last frame, for the 3, 2, 1 and GO beeps
+  // 2026-11-22 (§4.73): the countdown left at the last frame, for the 3, 2, 1 and GO beeps
   let beepFrom: number | null = null
   let wasPaused = false
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
@@ -652,7 +657,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     } else if (now - firstFrameAt >= TELEMETRY_AFTER_MS && !reported) {
       report(((debug.frames + 1) * 1000) / (now - firstFrameAt), loadMs, options.quality ?? 'high')
     }
-    // 2026-11-22 (§4.72): paused (a race with no one else in it, raceClock.ts), no time passes: no
+    // 2026-11-22 (§4.73): paused (a race with no one else in it, raceClock.ts), no time passes: no
     // step, no countdown, nothing moves; the picture is still drawn (the menu blurs it)
     const paused = isRacePaused()
     const frameMs = lastFrame === undefined || paused || wasPaused ? 0 : now - lastFrame
@@ -903,11 +908,14 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     // it, unless skipped, a fly round the grid (§4.43); at the finish the camera swings to the front
     const reduced = reducedMotion?.matches ?? false
     const left = net && trial?.phase === 'countdown' ? net.countdown() : null
+    // 2026-11-23 (#152): the drivers only once the room's clock is settled here (netRace.ts), so that
+    // every screen in the room shows the same one at the same moment; the whole grid until then
+    const settled = net?.clockSettled?.() ?? true
     const introNow = !!net?.gridSpots && trial?.phase === 'countdown' && inIntro(left) && !skipped
-    // 2026-11-22 (§4.72): how the opening is shown here, each driver in turn by default
+    // 2026-11-22 (§4.73): how the opening is shown here, each driver in turn by default
     const settings = loadSettings()
     const opening = { drivers: settings.driverIntro, flyby: settings.flyby }
-    const spotsNow = introNow && net?.gridSpots ? net.gridSpots() : null
+    const spotsNow = introNow && settled && net?.gridSpots ? net.gridSpots() : null
     const stage = spotsNow ? openingStage(left, spotsNow.length) : null
     const presenting = opening.drivers && stage?.kind === 'present' ? stage.index : null
     // The start's beeps: 3, 2, 1 and GO, by the room's countdown in a race, this run's in a trial
@@ -930,7 +938,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     } else if (net?.gridSpots && trial?.phase === 'countdown') {
       const spots = net.gridSpots()
       shot =
-        (introNow ? openingShot(spots, left, opening, reduced, current.y ?? 0) : null) ??
+        (introNow && settled ? openingShot(spots, left, opening, reduced, current.y ?? 0) : null) ??
         countdownShot(spots, left, reduced, current.y ?? 0)
     }
     if (shot || directed) scene.shot(shot)

@@ -46,6 +46,7 @@ import {
 } from '../../lib/fullscreen.ts'
 import { inertOthers } from '../../lib/inertOthers.ts'
 import { memberName } from '../../lib/memberName.ts'
+import { nameFit } from './nameFit.ts'
 import { Link } from '../../lib/router.tsx'
 import { displayType, monoType } from '../../styles/esports.ts'
 import { kartBodies } from '../../styles/kartTokens.ts'
@@ -557,7 +558,7 @@ function PlaceCard({ seat, member, isYou, viewerIsHost, team, stage, onManage }:
       data-state={state}
       data-testid="kart-lobby-place"
     >
-      <Picture $swatch={swatch}>
+      <Picture $swatch={swatch} $seat={seat}>
         {pick && (
           <Flat $shown={stage === null} data-flat="">
             <KartArt kart={pick.kart} driver={pick.driver} />
@@ -604,7 +605,14 @@ function PlaceCard({ seat, member, isYou, viewerIsHost, team, stage, onManage }:
         )}
       </Picture>
       <Plate $team={team}>
-        <Who data-testid={member.bot ? 'bot-member' : undefined}>{name}</Who>
+        <Who
+          $fit={nameFit(name)}
+          data-testid={member.bot ? 'bot-member' : undefined}
+          data-name=""
+          title={name}
+        >
+          {name}
+        </Who>
         <Kart>
           <span>{kartName}</span>
           {pick && <span> · {t(`kart.driver.${pick.driver}`)}</span>}
@@ -1026,7 +1034,21 @@ const Place = styled.li<{ $state: PlaceState; $swatch: string }>`
   }
 `
 
-const Picture = styled.div<{ $swatch: string }>`
+/**
+ * 2026-11-23 (#151): a phone draws each picture once (lobbyStage.ts); the card sways it a little,
+ * each card at its own point of the sway, which costs the compositor nothing
+ */
+const idleSway = keyframes`
+  0%, 100% { transform: translateY(0) rotate(-0.7deg) scale(1); }
+  50% { transform: translateY(-1.6%) rotate(0.7deg) scale(1.02); }
+`
+const SWAYED = [
+  '(prefers-reduced-motion: no-preference) and (pointer: coarse)',
+  '(prefers-reduced-motion: no-preference) and (max-width: 499px)',
+  '(prefers-reduced-motion: no-preference) and (max-height: 499px)',
+].join(', ')
+
+const Picture = styled.div<{ $swatch: string; $seat?: number }>`
   position: relative;
   min-height: 0;
   background: radial-gradient(
@@ -1041,6 +1063,15 @@ const Picture = styled.div<{ $swatch: string }>`
     display: block;
     width: 100%;
     height: 100%;
+  }
+
+  @media ${SWAYED} {
+    canvas {
+      transform-origin: 50% 92%;
+      animation: ${idleSway} 5.6s ease-in-out infinite;
+      animation-delay: ${({ $seat = 0 }) => -($seat * 0.9).toFixed(1)}s;
+      will-change: transform;
+    }
   }
 
   @media ${UPRIGHT} {
@@ -1170,13 +1201,25 @@ const Plate = styled.div<{ $team?: 0 | 1 }>`
   }
 `
 
-const Who = styled.span`
+const Who = styled.span<{ $fit: number }>`
   ${displayType}
   overflow: hidden;
-  font-size: clamp(${fontSize.sm}px, 1.6vh + 6px, ${fontSize.lg}px);
+  font-size: calc(clamp(${fontSize.sm}px, 1.6vh + 6px, ${fontSize.lg}px) * ${({ $fit }) => $fit});
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  /* 2026-11-23 (#151): a phone on its side cut long names (and a computer's tag) off: shrunk, and
+     on two lines if it still does not fit */
+  @media ${SHORT} {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.08;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
 `
+
 
 const Kart = styled.span`
   overflow: hidden;

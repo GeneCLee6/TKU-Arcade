@@ -25,6 +25,7 @@
 // the physics: about 1.5 m wide and 2.6 m long (KART_RADIUS 1.2).
 import {
   AdditiveBlending,
+  Box3,
   BoxGeometry,
   CanvasTexture,
   CircleGeometry,
@@ -60,7 +61,7 @@ import {
   type BoostReading,
 } from '../boostFx.ts'
 import { bodyDetailTexture, wearDecal, type BodyDetailLevel } from './bodyDetail.ts'
-import { buildDriver } from './driverModel.ts'
+import { buildDriver, STANDING_HIP } from './driverModel.ts'
 import { blendPose, gesturePose, REST, type DriverGesture, type GesturePose } from '../driverGestures.ts'
 import { buildKartBody } from './vehicleBodies.ts'
 import {
@@ -148,6 +149,36 @@ export interface KartModel {
   dispose(): void
 }
 
+/**
+ * 2026-11-23: the box round what is solid and shown of `root` (not the glows, the flames or anything
+ * hidden), in its parent's frame as it stands now: where a standing driver goes, and how the race
+ * room's cards frame a kart (src/kart/lobby/lobbyStage.ts)
+ */
+export function solidBox(root: Object3D, into = new Box3()): Box3 {
+  into.makeEmpty()
+  root.updateMatrixWorld(true)
+  const inverse = root.parent ? root.parent.matrixWorld.clone().invert() : null
+  const part = new Box3()
+  root.traverseVisible((object) => {
+    if (!(object instanceof Mesh)) return
+    const material = object.material as Material | Material[]
+    const glow = (Array.isArray(material) ? material : [material]).some(
+      (one) => one.blending === AdditiveBlending || one.transparent,
+    )
+    if (glow) return
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox()
+    part.copy(object.geometry.boundingBox!).applyMatrix4(object.matrixWorld)
+    if (inverse) part.applyMatrix4(inverse)
+    into.union(part)
+  })
+  return into
+}
+
+/** Standing (the race room): this far out from the kart's side, this far ahead of the seat, turned so */
+const STAND_ACROSS = 0.34
+const STAND_AHEAD = -0.35
+const STAND_TURN = 0.22
+
 /** How high the body floats over the road, metres */
 const HOVER = 0.27
 /** How far a bike leans into a turn on grip, flat out and at full lock, radians (about 30°) */
@@ -180,6 +211,11 @@ export interface KartDetail {
    * where the scene has shadows)
    */
   readonly shadowProxy?: boolean
+  /**
+   * 2026-11-23 (#151): the driver standing in front of the kart, a little to one side, facing the
+   * same way (the race room's place cards, src/kart/lobby/lobbyStage.ts); in a race they sit
+   */
+  readonly standing?: boolean
 }
 
 /** The racing number, slanted, with a bar under it: white over the driver's colour */
@@ -565,10 +601,20 @@ export function buildKartModel(
   }
 
   // The driver (driverModel.ts), mounted at the seat: seated in a kart, astride a bike
-  const crouch = bike?.crouch ?? 0
-  const driver = buildDriver(kit, driverId, bike !== undefined)
-  driver.group.position.set(0, seat.y, seat.z)
-  chassis.add(driver.group)
+  const standing = extra.standing ?? false
+  const crouch = standing ? 0 : (bike?.crouch ?? 0)
+  // Standing, they stand on the ground beside the cockpit, off to the left of it as seen from in
+  // front, turned a little towards the kart
+  const driver = buildDriver(kit, driverId, bike !== undefined && !standing, standing)
+  if (standing) {
+    const box = solidBox(chassis)
+    driver.group.position.set(box.max.x + STAND_ACROSS, STANDING_HIP, seat.z + STAND_AHEAD)
+    driver.group.rotation.y = STAND_TURN
+    group.add(driver.group)
+  } else {
+    driver.group.position.set(0, seat.y, seat.z)
+    chassis.add(driver.group)
+  }
 
   // Where the thruster mouths are with the shape closed, in the kart's own frame
   group.updateMatrixWorld(true)
@@ -579,6 +625,7 @@ export function buildKartModel(
   })
   // Everything built: one mesh for each material in each moving part
   flatten(chassis, keep, shadows, paintAll)
+  if (standing) flatten(driver.group, keep, shadows, paintAll)
 
   // 2026-11-20 (docs/KART-PERF.md): the far version, closed and open, and the shadow's stand-in, all
   // made from the parts as they now stand (at rest), riding on the chassis so that they still bob,
@@ -779,22 +826,24 @@ export function buildKartModel(
       )
       const g = gestured
       const { torso, head, arms } = driver
-      torso.rotation.z = lean + Math.sin(sway) * 0.3 * dazed
+      // On their feet (the race room) nothing of the drive moves them: only the gesture
+      const drive = standing ? 0 : 1
+      torso.rotation.z = (lean + Math.sin(sway) * 0.3 * dazed) * drive
       torso.rotation.x =
-        crouch + thrown * (bike ? 0.6 : 1) + Math.cos(sway * 0.7) * 0.12 * dazed + g.torsoBack
+        (crouch + thrown * (bike ? 0.6 : 1) + Math.cos(sway * 0.7) * 0.12 * dazed) * drive + g.torsoBack
       torso.position.y = seatedY + g.bounce
-      head.rotation.y = -look.steer * 0.3 - look.drift * 0.15 + g.headTurn
-      head.rotation.z = Math.sin(sway * 1.3 + 1) * 0.35 * dazed
+      head.rotation.y = (-look.steer * 0.3 - look.drift * 0.15) * drive + g.headTurn
+      head.rotation.z = Math.sin(sway * 1.3 + 1) * 0.35 * dazed * drive
       head.rotation.x =
-        -crouch * 0.9 - thrown * 0.5 + Math.cos(sway * 1.1) * 0.2 * dazed + g.headUp
+        (-crouch * 0.9 - thrown * 0.5 + Math.cos(sway * 1.1) * 0.2 * dazed) * drive + g.headUp
       bar.rotation.y = -look.steer * 0.45
       // The arms stay on the bar: they reach as the torso goes back, and follow the bar round;
       // a gesture lifts them off it (raised about the shoulder, then out to the side)
       for (const [index, arm] of arms.entries()) {
         const left = index === 0
         arm.rotation.set(
-          -thrown * (bike ? 0.5 : 0.9) - 0.3 * dazed + (left ? g.leftUp : g.rightUp),
-          -look.steer * 0.3,
+          (-thrown * (bike ? 0.5 : 0.9) - 0.3 * dazed) * drive + (left ? g.leftUp : g.rightUp),
+          -look.steer * 0.3 * drive,
           left ? g.leftOut : -g.rightOut,
         )
       }

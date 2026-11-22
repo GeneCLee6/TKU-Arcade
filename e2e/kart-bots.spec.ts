@@ -49,7 +49,7 @@ test('one person races a computer kart in an item race, from the menu to the res
   await setup.getByTestId('kart-bots-start').click()
 
   await expect(page.getByTestId('kart-race')).toBeVisible({ timeout: 30_000 })
-  // 2026-11-22 (§4.72): each driver presented first (the computer, then you), with their place on the
+  // 2026-11-22 (§4.73): each driver presented first (the computer, then you), with their place on the
   // grid and their kart; skipped by a key
   const card = page.getByTestId('kart-driver-card')
   await expect(card).toBeVisible({ timeout: 30_000 })
@@ -86,7 +86,7 @@ test('one person races a computer kart in an item race, from the menu to the res
   await expect
     .poll(async () => (await race(page))?.pickups ?? 0, { timeout: 90_000 })
     .toBeGreaterThan(0)
-  // 2026-11-22 (§4.72): Esc pauses: the menu, and the race stands still (no physics step, the room's
+  // 2026-11-22 (§4.73): Esc pauses: the menu, and the race stands still (no physics step, the room's
   // clock with it), then goes on where it was
   const ticks = () =>
     page.evaluate(() => (window as unknown as { __kartSpike?: { tick: number } }).__kartSpike?.tick ?? 0)

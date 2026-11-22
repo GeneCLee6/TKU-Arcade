@@ -155,3 +155,30 @@ export function clockOffset(samples: readonly ClockSample[]): number | null {
   }
   return best ? best.server - (best.sent + best.received) / 2 : null
 }
+
+/** The clock is settled once this many of the quickest answers ... */
+export const CLOCK_SETTLE_SAMPLES = 3
+/** ... read the offset within this much of each other, ms */
+export const CLOCK_SETTLE_SPREAD_MS = 40
+/** A jittery network that never agrees so closely is taken as settled after this many answers */
+export const CLOCK_SETTLE_ANYWAY = 8
+
+/**
+ * 2026-11-23 (#152): whether the offset can be trusted yet. Two screens in one room showed the
+ * opening's drivers a turn (0.7 s) apart: the first answer had come back while the page was busy
+ * building the race (its round trip 1.4 s, its offset half of that out), and it stood until a quicker
+ * one came. Settled when the CLOCK_SETTLE_SAMPLES quickest answers agree to CLOCK_SETTLE_SPREAD_MS: a
+ * page held up while an answer waited reads it late by however long, so answers that agree were
+ * read on time (a slow but steady network agrees too: its delays are the same each way each time).
+ * A page can only send a ping when it is free, so a hold-up spoils an answer or two at most: after
+ * CLOCK_SETTLE_ANYWAY the quickest is good enough on any network
+ */
+export function clockSettled(samples: readonly ClockSample[]): boolean {
+  if (samples.length < CLOCK_SETTLE_SAMPLES) return false
+  if (samples.length >= CLOCK_SETTLE_ANYWAY) return true
+  const quickest = [...samples]
+    .sort((a, b) => a.received - a.sent - (b.received - b.sent))
+    .slice(0, CLOCK_SETTLE_SAMPLES)
+    .map((sample) => sample.server - (sample.sent + sample.received) / 2)
+  return Math.max(...quickest) - Math.min(...quickest) <= CLOCK_SETTLE_SPREAD_MS
+}

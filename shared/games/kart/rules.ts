@@ -65,6 +65,7 @@ import {
 } from '../../kart/team.ts'
 import { TEAM_BOOST } from '../../kart/teamBoost.ts'
 import { courseOf, type Track } from '../../kart/track.ts'
+import { tickAtMs } from '../../kart/obstacles.ts'
 import { CLOSE_AFTER_FINISH_MS, closeAt, countdownMs } from '../../kart/opening.ts'
 import { formatTime } from '../../kart/timeTrial.ts'
 import { CUSTOM_PREFIX, isCustomId, isTrackCode } from '../../kart/editor/custom.ts'
@@ -1001,6 +1002,11 @@ function judgeItem(
     vx: last.vx,
     vz: last.vz,
   }
+  // 2026-11-23 (#150): the moving obstacles at this moment, by the race clock (obstacles.ts), which
+  // a hailstone stops at and a puddle lies clear of
+  const obstacles = courseOf(track).obstacles
+  const blockers =
+    obstacles && state.goAt !== null ? { obstacles, tick: tickAtMs(state.goAt, now) } : undefined
   const ahead = racing.slice(0, place)
   // The kart right ahead, whoever it is: a tow pulls towards a team-mate as well as anyone
   const towed = ahead[ahead.length - 1]
@@ -1076,18 +1082,18 @@ function judgeItem(
         heading: there.heading,
         speed: Math.hypot(there.vx, there.vz),
       }
-      return thrown(layFog(state.used, thrower, target, now, courseOf(track).walls), [next.seat])
+      return thrown(layFog(state.used, thrower, target, now, courseOf(track).walls, blockers), [next.seat])
     }
     case 'skip': {
       const warp = skipTo(track, seat, last.x, last.z, own.nextGate, own.crossings)
       return warp ? letJump(applied([], [warp])) : []
     }
     case 'decoy':
-      return thrown(dropDecoy(state.used, thrower, now))
+      return thrown(dropDecoy(state.used, thrower, now, blockers))
     case 'hail':
-      return thrown(throwHail(state.used, thrower, now, courseOf(track).walls))
+      return thrown(throwHail(state.used, thrower, now, courseOf(track).walls, blockers))
     case 'puddle':
-      return thrown(dropPuddle(state.used, thrower, now))
+      return thrown(dropPuddle(state.used, thrower, now, blockers))
     case 'cloud':
       if (!next || !there || distance > SHOT_TUNING.cloudReach) return []
       return thrown(sendCloud(state.used, thrower, next.seat, distance, now), [next.seat])
