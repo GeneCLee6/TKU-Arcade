@@ -21,6 +21,7 @@ import {
 } from './physics.ts'
 import { settleTerrain, stepOnTerrain, type Terrain, type TerrainEvent } from './terrain.ts'
 import type { GateLine } from './branches.ts'
+import { obstacleWalls, type Obstacle } from './obstacles.ts'
 import { gateCrossing, type BoostPad, type Gate, type RoadPoint } from './track.ts'
 import { collideWalls, KART_RADIUS, wallClearance, type Wall } from './walls.ts'
 
@@ -54,6 +55,11 @@ export interface Course {
    * the steps they always took
    */
   readonly terrain?: Terrain
+  /**
+   * Moving obstacles (2026-11-22, obstacles.ts), placed; absent on a track without any. They are in
+   * the way only for a step given the race clock (`stepRun`'s `tick`)
+   */
+  readonly obstacles?: readonly Obstacle[]
 }
 
 /** Whether (x, z) is on `pad`: within half its length along its heading and half its width across */
@@ -333,6 +339,11 @@ export function stepRun(
   course: Course,
   tuning: KartTuning = KART_TUNING,
   rules: KartRules = DEFAULT_RULES,
+  /**
+   * The race clock (2026-11-22): steps since GO. Given, and on a course with moving obstacles, the
+   * obstacles in the way at that step are walls too (obstacles.ts); left out, there are none
+   */
+  tick?: number,
 ): Run {
   const resetPressed = (input.reset ?? false) && !run.resetHeld
   if (resetPressed) return { ...resetRun(run), resetHeld: true }
@@ -347,7 +358,15 @@ export function stepRun(
     hitSpeed,
     touching,
   } = collideWalls(run.kart, moved, course.walls, tuning)
-  let kart = afterWalls(walled, hitSpeed, touching, course, tuning)
+  // The moving obstacles, after the fixed walls: the same push, on the move the walls left
+  const blocking =
+    tick !== undefined && course.obstacles ? obstacleWalls(course.obstacles, tick) : null
+  const blocked =
+    blocking && blocking.length > 0 ? collideWalls(run.kart, walled, blocking, tuning) : null
+  const hitSpeedAll = blocked ? Math.max(hitSpeed, blocked.hitSpeed) : hitSpeed
+  const touchingAll = touching || (blocked?.touching ?? false)
+  const impactAll = blocked ? Math.max(impact, blocked.impact) : impact
+  let kart = afterWalls(blocked?.state ?? walled, hitSpeedAll, touchingAll, course, tuning)
   // On a track with terrain: take off, land, or sit on the ground
   let terrainEvent: TerrainEvent | undefined
   if (terrain) {
@@ -380,8 +399,8 @@ export function stepRun(
       safe: passed.safe,
       candidate: null,
       candidateSeconds: 0,
-      impact,
-      hitSpeed,
+      impact: impactAll,
+      hitSpeed: hitSpeedAll,
       resetHeld: input.reset ?? false,
       resets: run.resets,
       nextGate: passed.nextGate,
@@ -393,7 +412,7 @@ export function stepRun(
   // Forwards, not just fast: a place passed in reverse would face the wrong way
   const forward = kart.vx * Math.sin(kart.heading) - kart.vz * Math.cos(kart.heading)
   const clear =
-    !touching &&
+    !touchingAll &&
     forward >= SAFE_MIN_SPEED &&
     wallClearance(course.walls, kart.x, kart.z) >= Math.max(SAFE_CLEARANCE, KART_RADIUS)
   if (!clear) {
@@ -416,8 +435,8 @@ export function stepRun(
     safe,
     candidate,
     candidateSeconds,
-    impact,
-    hitSpeed,
+    impact: impactAll,
+    hitSpeed: hitSpeedAll,
     resetHeld: input.reset ?? false,
     resets: run.resets,
     nextGate,

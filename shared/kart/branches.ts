@@ -21,6 +21,7 @@
 //
 // A track with no branches has none of this: every function here leaves it exactly as it was. Pure.
 import type { Spot } from './course.ts'
+import { hasLevels, levelPenalty, rememberLevels } from './levels.ts'
 import type { Gate, RoadPoint } from './track.ts'
 import type { Wall } from './walls.ts'
 
@@ -166,7 +167,9 @@ function clipWall(wall: Wall, inside: (x: number, z: number) => boolean): Wall[]
   return kept.map(([from, to]) => {
     const a = at(from / pieces)
     const b = at(to / pieces)
-    return { ax: round(a.x), az: round(a.z), bx: round(b.x), bz: round(b.z) }
+    const piece = { ax: round(a.x), az: round(a.z), bx: round(b.x), bz: round(b.z) }
+    // A kerb at a crossing (2026-11-22, levels.ts) keeps its foot and top
+    return wall.base === undefined ? piece : { ...piece, top: wall.top, base: wall.base }
   })
 }
 
@@ -306,12 +309,14 @@ function nearestWall(walls: readonly Wall[], x: number, z: number): number {
   return best
 }
 
-/** The road point nearest (x, z) */
-function nearestPoint(points: readonly RoadPoint[], x: number, z: number): number {
+/** The road point nearest (x, z); at a crossing (2026-11-22, levels.ts), of the road at height `y` */
+function nearestPoint(points: readonly RoadPoint[], x: number, z: number, y?: number): number {
   let best = 0
   let bestDistance = Infinity
+  const levels = y !== undefined && hasLevels(points)
   points.forEach((point, index) => {
-    const distance = (point.x - x) ** 2 + (point.z - z) ** 2
+    const distance =
+      (point.x - x) ** 2 + (point.z - z) ** 2 + (levels ? levelPenalty(point.y ?? 0, y) : 0)
     if (distance < bestDistance) {
       bestDistance = distance
       best = index
@@ -636,6 +641,8 @@ export function routeRoad(
     for (let skip = index + 1; skip < fork.to; skip++) main[skip] = road.length
     index = fork.to - 1
   }
+  // A route over a road that crosses itself crosses itself too (2026-11-22, levels.ts)
+  if (hasLevels(track.road)) rememberLevels(road)
   return { road, jumps, from, main }
 }
 
@@ -648,6 +655,8 @@ export function placeOnTrack(
   forks: readonly (readonly RoadPoint[])[],
   x: number,
   z: number,
+  /** The car's height: at a crossing (2026-11-22), the road it is on */
+  y?: number,
 ): { fork: number; index: number; dx: number; dz: number } {
   let fork = -1
   let best = roadDepth(road, true, x, z)
@@ -659,7 +668,7 @@ export function placeOnTrack(
     }
   })
   const points = fork < 0 ? road : forks[fork]!
-  const index = nearestPoint(points, x, z)
+  const index = nearestPoint(points, x, z, y)
   return { fork, index, ...pathDirection(points, index, fork < 0) }
 }
 

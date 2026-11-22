@@ -12,6 +12,10 @@
 //   then:      i16 heading × 10 000, i16 vx × 100, i16 vz × 100, i8 steer × 100,
 //              u8 finish-line crossings, u8 next gate                        (9 bytes)
 //
+// 2026-11-22 (#94: the frame's FLAG_AIRBORNE was not kept): the crossings byte's bit 7 says the kart
+// was in the air (crossings never come near 128). A tape from before has it clear, and reads as it
+// did; the replay says it knows (`Replay.airborne`, the packed replay's version 2)
+//
 // So 15 bytes a sample against the wire's 32, ten a second against twenty. A delta is taken from the
 // position as decoded, not as sent, so rounding never adds up along a race.
 //
@@ -58,7 +62,12 @@ export interface ReplaySample {
   readonly driftDirection: -1 | 0 | 1
   readonly crossings: number
   readonly nextGate: number
+  /** In the air, off a jump (2026-11-22): only ever present when true */
+  readonly airborne?: true
 }
+
+/** The crossings byte's bit for a kart in the air (2026-11-22) */
+const AIRBORNE = 0x80
 
 /** An item used, by race tick (the room's `events`, its server time turned into ticks from GO) */
 export interface ReplayEvent {
@@ -117,6 +126,11 @@ export interface Replay {
   readonly shots?: readonly KartShot[]
   /** A team race only; absent in any other, and in a replay from before */
   readonly teams?: ReplayTeams
+  /**
+   * 2026-11-22: the samples say when each kart was in the air (`ReplaySample.airborne`). Absent in a
+   * replay from before, whose karts' flights are guessed from the jumps, as they always were
+   */
+  readonly airborne?: true
 }
 
 // ── Coding one kart's samples ────────────────────────────────────────────────────────────────
@@ -202,7 +216,10 @@ export function createKartTape(): KartTape {
       view.setInt16(length + 2, i16(frame.vx * SPEED_SCALE), true)
       view.setInt16(length + 4, i16(frame.vz * SPEED_SCALE), true)
       view.setInt8(length + 6, clamp(Math.round(frame.steer * 100), -100, 100))
-      view.setUint8(length + 7, byte(frame.crossings))
+      view.setUint8(
+        length + 7,
+        clamp(Math.round(frame.crossings), 0, AIRBORNE - 1) | (frame.airborne ? AIRBORNE : 0),
+      )
       view.setUint8(length + 8, byte(frame.nextGate))
       length += TAIL_BYTES
       count++
@@ -263,8 +280,9 @@ export function decodeTape(bytes: Uint8Array): ReplaySample[] {
       skidding: (head & FLAG_SKIDDING) !== 0,
       finished: (head & FLAG_FINISHED) !== 0,
       driftDirection: way === 1 ? -1 : way === 2 ? 1 : 0,
-      crossings: view.getUint8(at + 7),
+      crossings: view.getUint8(at + 7) & (AIRBORNE - 1),
       nextGate: view.getUint8(at + 8),
+      ...((view.getUint8(at + 7) & AIRBORNE) !== 0 ? { airborne: true as const } : {}),
     }
     at += TAIL_BYTES
     samples.push(sample)
@@ -569,6 +587,7 @@ export function createReplayRecorder(first: RecordedView): ReplayRecorder {
         held: [...held].sort((a, b) => a.tick - b.tick),
         ...(shots.size > 0 ? { shots: [...shots.values()] } : {}),
         ...(latest.teams ? { teams: { burns: [...burns], gauges: [...gauges] } } : {}),
+        airborne: true,
       }
     },
   }

@@ -318,7 +318,7 @@ describe('frame rate independence with walls', () => {
   })
 })
 
-// 2026-11-22 (docs/KART-FEEL.md §20): the wall slide, the classic feel's. A car laid along a wall,
+// 2026-11-22 (docs/KART-FEEL.md §22): the wall slide, the classic feel's. A car laid along a wall,
 // its nose a few degrees in, slides along it: little lost, the combo kept. Steeper is a hit as ever
 describe('the wall slide', () => {
   /** 1.5 s at the wall at `nose` degrees in and `steer`, from top speed: the speed left, and the gap */

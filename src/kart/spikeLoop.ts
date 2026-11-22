@@ -40,6 +40,8 @@ import {
   type TrialPhase,
 } from '../../shared/kart/timeTrial.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
+import { obstaclesOf } from '../../shared/kart/obstacles.ts'
+import { obstacleCues } from './obstacleCues.ts'
 import { startRun, stepRun, type Run, type Spot } from '../../shared/kart/course.ts'
 import {
   CELEBRATE_SECONDS,
@@ -610,6 +612,10 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let forced: BoostKind | null = null
   // A hill track (2026-11-17): landings, for the dust and the thump
   let landings = 0
+  // 2026-11-22 (obstacles.ts): the moving obstacles, drawn by the race clock (steps since GO; still
+  // in the countdown, running on after the finish for the look of it), and their bells and horns
+  const obstacles = track ? obstaclesOf(track) : []
+  let obstacleTick = 0
 
   let statsFrom: number | undefined
   let statsFrames = 0
@@ -747,6 +753,15 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       } else {
         run = stepRun(run, input, course, tuning, rules)
       }
+      if (obstacles.length > 0 && trial) {
+        const was = obstacleTick
+        obstacleTick = trial.phase === 'racing' ? trial.steps : trial.phase === 'finished' ? was + 1 : 0
+        if (trial.phase === 'racing') {
+          for (const cue of obstacleCues(obstacles, was, obstacleTick, run.kart.x, run.kart.z)) {
+            audio.cue({ kind: cue })
+          }
+        }
+      }
       if (run.resets !== before.resets) {
         // A jump, not a move: nothing to draw in between, and the camera starts behind the car
         previous = run.kart
@@ -858,6 +873,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       ...ownGesture(now),
     }
     const pose = poseBetween(previous, current, clock.alpha)
+    if (obstacles.length > 0) {
+      scene.clock(obstacleTick + (trial && trial.phase !== 'countdown' ? clock.alpha : 0))
+    }
     const hitFrame = net?.fx?.(pose)
     if (hitFrame) {
       scene.hits(hitFrame, frameMs / 1000)

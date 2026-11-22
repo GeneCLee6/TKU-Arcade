@@ -7,6 +7,7 @@
 // it is less straight than it was.
 import { describe, expect, it } from 'vitest'
 import { roadShape } from '../../scripts/kart/shape.ts'
+import { inZone, LEVEL_CLEARANCE, ZONE_PAD } from '../../shared/kart/levels.ts'
 import { KART_TUNING } from '../../shared/kart/physics.ts'
 import { roadClearance } from '../../shared/kart/scenery.ts'
 import { seconds, startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
@@ -32,7 +33,7 @@ const PLAN: Record<
     jumps: 1,
     hilly: true,
   },
-  harbour: { key: 'harbour@13', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
+  harbour: { key: 'harbour@14', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
   tamkang: { key: 'tamkang@13', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
   oldstreet: { key: 'oldstreet@10', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
   guanyin: { key: 'guanyin@9', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },
@@ -45,11 +46,14 @@ const PLAN: Record<
   // is a straight line, so they are straighter than the technical four
   // 2026-11-20: the wharf's shed lane is a branch (branches.ts), its records afresh; then (revision
   // 3) the road round the shed reaches further out and the lane is half as long as it
-  // 2026-11-22: every one raised again for the wall slide and the timed landing (KART-FEEL §20)
+  // 2026-11-22: every one raised again for the wall slide and the timed landing (KART-FEEL §22)
   wharf: { key: 'wharf@4', straight: 0.36, was: 0.36, longest: 230, jumps: 2, hilly: true },
   lanes: { key: 'lanes@2', straight: 0.4, was: 0.4, longest: 220, jumps: 3, hilly: true },
   // 2026-11-20, the first with branches (branches.test.ts and skillTracks.test.ts have its own)
   works: { key: 'works@2', straight: 0.4, was: 0.4, longest: 220, jumps: 1, hilly: true },
+  // 2026-11-22, the technical showcase (levels.test.ts has its own): a figure of eight whose two
+  // arms run straight over and under each other, so a little straighter than the rest
+  zhuwei: { key: 'zhuwei@2', straight: 0.44, was: 0.44, longest: 270, jumps: 1, hilly: true },
 }
 
 const load = (id: RaceTrackId): Track => raceTrack(id)!
@@ -83,7 +87,11 @@ describe.each(RACE_TRACK_IDS)('the redrawn %s', (id) => {
       for (let j = i + 1; j < road.length; j++) {
         if (alongRoad(road, i, j) < Math.max(90, (road[i]!.width + road[j]!.width) * 1.2)) continue
         const gap = Math.hypot(road[i]!.x - road[j]!.x, road[i]!.z - road[j]!.z)
-        if (gap <= (road[i]!.width + road[j]!.width) / 2 + 4) {
+        // 2026-11-22 (levels.ts): over or under itself at a crossing, high enough apart
+        const levelled =
+          inZone(track.crossings ?? [], road[i]!.x, road[i]!.z, ZONE_PAD) &&
+          Math.abs((road[i]!.y ?? 0) - (road[j]!.y ?? 0)) >= LEVEL_CLEARANCE
+        if (!levelled && gap <= (road[i]!.width + road[j]!.width) / 2 + 4) {
           throw new Error(`road ${i} and ${j} are ${gap.toFixed(1)} m apart`)
         }
       }

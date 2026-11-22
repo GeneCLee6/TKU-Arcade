@@ -66,7 +66,9 @@ function hasher() {
 
 /** The hard bot (as it was until 2026-11-22, goldenHard.ts), three laps (or 200 s), every step hashed */
 function trackHash(id: string, seed: number, tuning: KartTuning): { hash: string; steps: number } {
-  const track = raceTrack(id)!
+  // 2026-11-22: without the harbour's moving obstacles (obstacles.ts), which this hard bot of old
+  // does not know of: the physics on the layout is what is locked
+  const track = { ...raceTrack(id)!, obstacles: undefined }
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
   const brain = createBotBrain(GOLDEN_HARD, track.road, tuning, seed)
@@ -154,7 +156,7 @@ const GOLDEN_ARENA = '72389793'
 // a novice not"): the gauge goes by the quality of the drift (a bonus at the exit for an instant
 // boost, by its timing and the combo), it fills in a boost too, and a perfectly timed instant boost
 // is longer and stronger. The hard bot's hands are the same; it is the physics that changed.
-// Taken again 2026-11-22: the wall slide (walls.ts; docs/KART-FEEL.md §20), a contact at a shallow
+// Taken again 2026-11-22: the wall slide (walls.ts; docs/KART-FEEL.md §22), a contact at a shallow
 // angle a slide along the wall rather than a hit. The arcade (old) preset has none: its hashes stand
 const CLASSIC_GOLDEN: Record<string, { hash: string; steps: number }> = {
   harbour: { hash: 'f18d06b9', steps: 7049 },

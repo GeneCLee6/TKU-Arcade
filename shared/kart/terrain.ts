@@ -39,6 +39,14 @@ import {
   type KartTuning,
 } from './physics.ts'
 import { pathDirection, type Fork } from './branches.ts'
+import {
+  cantOf,
+  inZone,
+  LEVEL_CLEARANCE,
+  LEVEL_STEP,
+  ZONE_PAD,
+  type Crossing,
+} from './levels.ts'
 import { gateCrossing, roadDirection, type Gate, type RoadPoint } from './track.ts'
 
 /** The terrain's own numbers, apart from KART_TUNING so that the tuning panel and presets stay as they were */
@@ -64,7 +72,7 @@ export const TERRAIN_TUNING = {
   /** ... and lasts this long, as a release boost does */
   landingBoost: 0.5,
   /**
-   * The timed landing (2026-11-22, docs/KART-FEEL.md §20): a fresh press of the throttle within this
+   * The timed landing (2026-11-22, docs/KART-FEEL.md §22): a fresh press of the throttle within this
    * long before the wheels touch, or after, on a landing that earns the boost above (long enough in
    * the air, the nose in line) ...
    */
@@ -95,6 +103,13 @@ export const TERRAIN_TUNING = {
   slopeMass: 5,
   slopeMassGrade: 0.03,
   slopeMassMax: 0.06,
+  /**
+   * 2026-11-22 (levels.ts): a banked bend. Steering towards its low side (into the bend), the kart's
+   * way and nose swing on by this much lateral pull, m/s² for each unit of the lean (tan): what the
+   * road's tilt lends the tyres. Its speed is kept as it is, so the bank gives no speed, only a
+   * tighter line at the same speed
+   */
+  bankGravity: 14,
 } as const
 
 export type TerrainTuning = { readonly [K in keyof typeof TERRAIN_TUNING]: number }
@@ -122,6 +137,8 @@ export interface TerrainPoint {
   readonly x: number
   readonly z: number
   readonly y: number
+  /** A banked road point (2026-11-22, levels.ts): tan of its lean, + its left kerb higher */
+  readonly cant?: number
 }
 
 export interface Terrain {
@@ -135,18 +152,26 @@ export interface Terrain {
    */
   readonly forks?: readonly (readonly (TerrainPoint & { readonly half: number })[])[]
   readonly halves?: readonly number[]
+  /**
+   * Where the main road runs over itself (2026-11-22, levels.ts): round each, the ground is the road
+   * the car is on, by its height. Absent on a track without (`halves` is then given too)
+   */
+  readonly crossings?: readonly Crossing[]
+  /** Whether any road point leans (2026-11-22): absent when none does */
+  readonly banked?: true
 }
 
 type TerrainSource = {
   readonly road: readonly RoadPoint[]
   readonly jumps?: readonly number[]
   readonly forks?: readonly Pick<Fork, 'path' | 'jumps'>[]
+  readonly crossings?: readonly Crossing[]
 }
 
-/** Whether a track has any terrain: a height on any road point, or a jump */
+/** Whether a track has any terrain: a height on any road point, a lean, or a jump */
 export const hasTerrain = (track: TerrainSource): boolean =>
   (track.jumps?.length ?? 0) > 0 ||
-  track.road.some((point) => point.y !== undefined) ||
+  track.road.some((point) => point.y !== undefined || point.bank !== undefined) ||
   (track.forks ?? []).some(
     (fork) => fork.jumps.length > 0 || fork.path.some((point) => point.y !== undefined),
   )
@@ -155,7 +180,19 @@ export const hasTerrain = (track: TerrainSource): boolean =>
 export function terrainOf(track: TerrainSource): Terrain | null {
   if (!hasTerrain(track)) return null
   const { road } = track
-  const points = road.map((point) => ({ x: point.x, z: point.z, y: point.y ?? 0 }))
+  const banked = road.some((point) => (point.bank ?? 0) !== 0)
+  const points: TerrainPoint[] = road.map((point) =>
+    banked && point.bank
+      ? { x: point.x, z: point.z, y: point.y ?? 0, cant: cantOf(point) }
+      : { x: point.x, z: point.z, y: point.y ?? 0 },
+  )
+  // Crossings and leans are new (2026-11-22): a track with neither has the terrain it had
+  const more = {
+    ...(banked ? { banked: true as const } : {}),
+    ...(track.crossings && track.crossings.length > 0
+      ? { crossings: track.crossings, halves: road.map((point) => point.width / 2) }
+      : {}),
+  }
   const lips = (track.jumps ?? []).map((index): Lip => {
     const point = road[index]!
     const { dx, dz } = roadDirection(road, index)
@@ -178,7 +215,7 @@ export function terrainOf(track: TerrainSource): Terrain | null {
     }
   })
   const forks = track.forks ?? []
-  if (forks.length === 0) return { points, lips }
+  if (forks.length === 0) return { points, lips, ...more }
   forks.forEach((fork, k) => {
     for (const index of fork.jumps) {
       const point = fork.path[index]!
@@ -209,6 +246,7 @@ export function terrainOf(track: TerrainSource): Terrain | null {
     forks: forks.map((fork) =>
       fork.path.map((point) => ({ x: point.x, z: point.z, y: point.y ?? 0, half: point.width / 2 })),
     ),
+    ...more,
   }
 }
 
@@ -220,18 +258,34 @@ export interface Ground {
   readonly gz: number
   /** How far (x, z) is from the centre line, metres */
   readonly distance: number
+  /**
+   * On a banked road (2026-11-22): tan of its lean here (+ the left kerb higher) and the road's right
+   * as a unit vector. The slope above is still the one along the road; absent where it is level
+   */
+  readonly cant?: number
+  readonly rx?: number
+  readonly rz?: number
 }
 
 /**
  * The ground under (x, z): the height of the nearest centre-line segment, interpolated along it,
- * and that segment's slope. The road being flat across, the slope points along the road
+ * and that segment's slope. The road being flat across, the slope points along the road; a banked
+ * road (2026-11-22) leans across, its height there moved by how far right of the centre line the
+ * place is. At a crossing (levels.ts), `near` is the car's height a moment ago: of the roads there,
+ * the one it is on (`groundOnLevels`); left out, the lowest
  */
-export function groundAt(terrain: Terrain, x: number, z: number): Ground {
+export function groundAt(terrain: Terrain, x: number, z: number, near?: number): Ground {
+  if (terrain.crossings && inZone(terrain.crossings, x, z, ZONE_PAD)) {
+    const level = groundOnLevels(terrain, x, z, near)
+    if (level) return level
+  }
   if (terrain.forks) return groundOfRoads(terrain, terrain.forks, x, z)
   const { points } = terrain
   const count = points.length
   let best = Infinity
   let ground: Ground = { y: points[0]?.y ?? 0, gx: 0, gz: 0, distance: Infinity }
+  let found = -1
+  let foundT = 0
   for (let index = 0; index < count; index++) {
     const a = points[index]!
     const b = points[(index + 1) % count]!
@@ -247,8 +301,123 @@ export function groundAt(terrain: Terrain, x: number, z: number): Ground {
     best = distance
     const rise = (b.y - a.y) / lengthSq
     ground = { y: a.y + (b.y - a.y) * t, gx: rise * sx, gz: rise * sz, distance: 0 }
+    found = index
+    foundT = t
   }
-  return { ...ground, distance: Math.sqrt(best) }
+  const flat = { ...ground, distance: Math.sqrt(best) }
+  if (!terrain.banked || found < 0) return flat
+  return bankedGround(flat, points[found]!, points[(found + 1) % count]!, foundT, x, z)
+}
+
+/** The ground of a banked segment ab at share t: its height moved across the road, and its lean */
+function bankedGround(
+  ground: Ground,
+  a: TerrainPoint,
+  b: TerrainPoint,
+  t: number,
+  x: number,
+  z: number,
+): Ground {
+  const cant = (a.cant ?? 0) + ((b.cant ?? 0) - (a.cant ?? 0)) * t
+  if (cant === 0) return ground
+  const length = Math.hypot(b.x - a.x, b.z - a.z) || 1
+  const dx = (b.x - a.x) / length
+  const dz = (b.z - a.z) / length
+  // The road's right, facing along it, is (-dz, dx)
+  const across = (x - (a.x + (b.x - a.x) * t)) * -dz + (z - (a.z + (b.z - a.z) * t)) * dx
+  return { ...ground, y: ground.y - across * cant, cant, rx: -dz, rz: dx }
+}
+
+/** Of the roads (x, z) is this far outside or less, metres, the one a car may be on */
+const LEVEL_MARGIN = 3
+
+/**
+ * The ground at a crossing (2026-11-22, levels.ts): of the roads (x, z) is on (or within
+ * LEVEL_MARGIN of), the highest whose surface is at most LEVEL_STEP above `near`, the car's height
+ * a moment ago: the road it was on, carried on (none such, or no `near`: the lowest). Of that road,
+ * the segment (x, z) is deepest inside. Null when it is on no road at all (the plain rule holds)
+ */
+function groundOnLevels(
+  terrain: Terrain,
+  x: number,
+  z: number,
+  near: number | undefined,
+): Ground | null {
+  type Candidate = { y: number; depth: number; gx: number; gz: number }
+  const candidates: Candidate[] = []
+  let nearest = Infinity
+  const visit = (
+    points: readonly TerrainPoint[],
+    half: (index: number) => number,
+    closed: boolean,
+  ) => {
+    const count = points.length
+    const last = closed ? count : count - 1
+    for (let index = 0; index < last; index++) {
+      const a = points[index]!
+      const b = points[(index + 1) % count]!
+      const sx = b.x - a.x
+      const sz = b.z - a.z
+      const lengthSq = sx * sx + sz * sz
+      if (lengthSq === 0) continue
+      const t = Math.max(0, Math.min(1, ((x - a.x) * sx + (z - a.z) * sz) / lengthSq))
+      const distance = Math.hypot(x - (a.x + sx * t), z - (a.z + sz * t))
+      nearest = Math.min(nearest, distance)
+      const depth = half(index) + (half((index + 1) % count) - half(index)) * t - distance
+      if (depth <= -LEVEL_MARGIN) continue
+      const rise = (b.y - a.y) / lengthSq
+      candidates.push({ y: a.y + (b.y - a.y) * t, depth, gx: rise * sx, gz: rise * sz })
+    }
+  }
+  const halves = terrain.halves ?? []
+  visit(terrain.points, (index) => halves[index] ?? 0, true)
+  for (const fork of terrain.forks ?? []) visit(fork, (index) => fork[index]!.half, false)
+  if (candidates.length === 0) return null
+  let level = -Infinity
+  if (near !== undefined) {
+    for (const one of candidates) if (one.y <= near + LEVEL_STEP && one.y > level) level = one.y
+  }
+  if (level === -Infinity) {
+    level = Infinity
+    for (const one of candidates) level = Math.min(level, one.y)
+  }
+  let best: Candidate = candidates[0]!
+  let bestDepth = -Infinity
+  for (const one of candidates) {
+    if (Math.abs(one.y - level) >= LEVEL_CLEARANCE / 2 || one.depth <= bestDepth) continue
+    best = one
+    bestDepth = one.depth
+  }
+  return { y: best.y, gx: best.gx, gz: best.gz, distance: nearest }
+}
+
+/**
+ * The lowest road surface within `margin` metres of (x, z) at a crossing, for the ground drawn
+ * under it (hillArt.ts): the underpass's, not the viaduct's over it. Null away from any crossing
+ */
+export function lowestRoadNear(
+  terrain: Terrain,
+  x: number,
+  z: number,
+  margin: number,
+): number | null {
+  if (!terrain.crossings || !inZone(terrain.crossings, x, z, ZONE_PAD + margin)) return null
+  let low = Infinity
+  const halves = terrain.halves ?? []
+  const count = terrain.points.length
+  for (let index = 0; index < count; index++) {
+    const a = terrain.points[index]!
+    const b = terrain.points[(index + 1) % count]!
+    const sx = b.x - a.x
+    const sz = b.z - a.z
+    const lengthSq = sx * sx + sz * sz
+    if (lengthSq === 0) continue
+    const t = Math.max(0, Math.min(1, ((x - a.x) * sx + (z - a.z) * sz) / lengthSq))
+    const distance = Math.hypot(x - (a.x + sx * t), z - (a.z + sz * t))
+    if (distance - (halves[index] ?? 0) > margin) continue
+    low = Math.min(low, a.y + (b.y - a.y) * t)
+  }
+  return low === Infinity ? null : low
 }
 
 /**
@@ -286,12 +455,18 @@ function groundOfRoads(
       bestDepth = depth
       const rise = (b.y - a.y) / lengthSq
       ground = { y: a.y + (b.y - a.y) * t, gx: rise * sx, gz: rise * sz, distance: 0 }
+      chosen = { a, b, t }
     }
   }
+  let chosen: { a: TerrainPoint; b: TerrainPoint; t: number } | null = null
   const halves = terrain.halves ?? []
   visit(terrain.points, (index) => halves[index] ?? 0, true)
   for (const fork of forks) visit(fork, (index) => fork[index]!.half, false)
-  return { ...ground, distance: nearest }
+  const found = { ...ground, distance: nearest }
+  // A banked main road (2026-11-22); a branch never leans
+  if (!terrain.banked || !chosen) return found
+  const { a, b, t } = chosen as { a: TerrainPoint; b: TerrainPoint; t: number }
+  return bankedGround(found, a, b, t, x, z)
 }
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value))
@@ -406,7 +581,7 @@ export function stepOnTerrain(
   numbers: TerrainTuning = TERRAIN_TUNING,
 ): KartState {
   if (airborne(state)) return stepAir(state, input, tuning, numbers)
-  const ground = groundAt(terrain, state.x, state.z)
+  const ground = groundAt(terrain, state.x, state.z, state.y)
   const grade = gradeOf(ground, state.vx, state.vz)
   const limitScale =
     1 -
@@ -415,6 +590,7 @@ export function stepOnTerrain(
     slopeWeight(tuning, grade, numbers)
   const next = stepKart(state, input, tuning, rules, limitScale)
   let { vx, vz } = next
+  let heading = next.heading
   const speed = Math.hypot(vx, vz)
   if (speed > 0.5 && grade !== 0) {
     // Gravity along the slope: back down it, whichever way the car is going
@@ -422,10 +598,26 @@ export function stepOnTerrain(
     vx *= kept
     vz *= kept
   }
+  if (ground.cant !== undefined && speed > 1) {
+    // A banked bend (2026-11-22): steering towards its low side, the bank's pull swings the kart's
+    // way and nose on together, its speed kept
+    const low = Math.sign(ground.cant)
+    const into = Math.max(0, clamp(input.steer, -1, 1) * low)
+    if (into > 0) {
+      const turn = (low * numbers.bankGravity * Math.abs(ground.cant) * into * STEP_SECONDS) / speed
+      const cos = Math.cos(turn)
+      const sin = Math.sin(turn)
+      const turnedX = vx * cos - vz * sin
+      vz = vz * cos + vx * sin
+      vx = turnedX
+      heading = wrapAngle(heading + turn)
+    }
+  }
   return {
     ...next,
     vx,
     vz,
+    heading,
     y: state.y ?? ground.y,
     vy: 0,
     air: 0,
@@ -454,7 +646,7 @@ export function settleTerrain(
   maxStoredBoosts = 2,
 ): { kart: KartState; event: TerrainEvent } {
   if (airborne(after)) {
-    const ground = groundAt(terrain, after.x, after.z)
+    const ground = groundAt(terrain, after.x, after.z, after.y)
     if ((after.y ?? 0) > ground.y) return { kart: after, event: 'none' }
     const air = after.air ?? 0
     const speed = Math.hypot(after.vx, after.vz)
@@ -570,7 +762,7 @@ export function settleTerrain(
       event: 'takeoff',
     }
   }
-  const y = groundAt(terrain, after.x, after.z).y
+  const y = groundAt(terrain, after.x, after.z, after.y).y
   const window = before.landWindow ?? 0
   if (window <= 0) return { kart: { ...after, y }, event: 'none' }
   // Just down: a fresh press now times the landing, its boost the timed one (in place of the plain
@@ -601,8 +793,10 @@ export function heightGuess(
   z: number,
   speed: number,
   numbers: TerrainTuning = TERRAIN_TUNING,
+  /** At a crossing (2026-11-22): the height it was drawn at a moment ago, to keep it on its road */
+  near?: number,
 ): number {
-  const ground = groundAt(terrain, x, z).y
+  const ground = groundAt(terrain, x, z, near).y
   if (speed < numbers.jumpMinSpeed) return ground
   let best = ground
   for (const lip of terrain.lips) {
@@ -630,7 +824,7 @@ export function pitchOf(
   y: number,
   numbers: TerrainTuning = TERRAIN_TUNING,
 ): number {
-  const ground = groundAt(terrain, x, z)
+  const ground = groundAt(terrain, x, z, y)
   const fx = Math.sin(heading)
   const fz = -Math.cos(heading)
   if (y <= ground.y + 0.05 || speed < 1) return Math.atan(ground.gx * fx + ground.gz * fz)
@@ -643,4 +837,38 @@ export function pitchOf(
     break
   }
   return clamp(Math.atan(slope), -0.5, 0.5)
+}
+
+/**
+ * The body's roll for drawing, radians (+ its right side down), on a banked road (2026-11-22): the
+ * road's lean as seen across the kart's own way. 0 on a level road and in the air
+ */
+export function rollOf(terrain: Terrain, x: number, z: number, heading: number, y: number): number {
+  if (!terrain.banked) return 0
+  const ground = groundAt(terrain, x, z, y)
+  if (ground.cant === undefined || y > ground.y + 0.05) return 0
+  // The kart's right is (cos h, sin h); the road falls by `cant` a metre towards the road's right
+  return Math.atan(ground.cant * (Math.cos(heading) * ground.rx! + Math.sin(heading) * ground.rz!))
+}
+
+/**
+ * How high each kart seen only on the plan is (another racer's frames, a ghost, a replay), kept
+ * kart by kart (2026-11-22): the height worked out for it a moment ago keeps it on its own road at a
+ * crossing (`groundAt`'s `near`). `airborne` false keeps it on the road; true, or not known, the
+ * guess of heightGuess decides. 0 for every kart on a flat track
+ */
+export function createHeightKeeper(
+  terrain: Terrain | null,
+): (id: number | string, x: number, z: number, speed: number, airborne?: boolean) => number {
+  const last = new Map<number | string, number>()
+  return (id, x, z, speed, airborne) => {
+    if (!terrain) return 0
+    const near = last.get(id)
+    const y =
+      airborne === false
+        ? groundAt(terrain, x, z, near).y
+        : heightGuess(terrain, x, z, speed, TERRAIN_TUNING, near)
+    last.set(id, y)
+    return y
+  }
 }

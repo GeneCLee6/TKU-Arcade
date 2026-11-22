@@ -20,6 +20,7 @@
 // another with the legs between them short, the third leg kinked by a chicane; a run west under
 // the hill; a fast right along the beach; the beach chicane through its narrow gate; and the right
 // onto the seafront. Written in metres now (the scenery still places itself in drawn units).
+import type { ObstacleJson } from '../obstacles.ts'
 import { TRACK_FORMAT, type TrackJson } from '../track.ts'
 import { circuit, type CircuitPoint } from './circuit.ts'
 
@@ -119,6 +120,19 @@ const made = circuit({
   ],
 })
 
+/**
+ * 2026-11-22 (#103, obstacles.ts): the quay's two container trolleys, sliding across the road out
+ * of step with each other (one holds left while the other holds right, so the way through is a
+ * weave), and the level crossing under the hill: a boom over each half of the road, the left down
+ * while the right is up and then the other way round, never both. Steps of 1/60 s from GO
+ */
+export const HARBOUR_OBSTACLES: readonly ObstacleJson[] = [
+  { kind: 'slider', at: 44, length: 6.1, size: 12, a: -7.6, b: 7.6, period: 360, shift: 0, move: 72, warn: 48 },
+  { kind: 'slider', at: 53, length: 6.1, size: 12, a: 7, b: -7, period: 360, shift: 0, move: 72, warn: 48 },
+  { kind: 'boom', at: 346.5, from: -16.2, to: 0, period: 480, shift: 60, closed: 150, warn: 60 },
+  { kind: 'boom', at: 346.5, from: 0, to: 16.2, period: 480, shift: 300, closed: 150, warn: 60 },
+]
+
 export const HARBOUR: TrackJson = {
   format: TRACK_FORMAT,
   id: 'harbour',
@@ -134,7 +148,9 @@ export const HARBOUR: TrackJson = {
   // 7: the classic feel (2026-11-17): the physics changed, so the old times are set aside
   // 10: redrawn round four switchback hairpins (2026-11-18)
   // 11: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
-  revision: 13,
+  // 13: the quay's sliding containers and the level crossing's booms (2026-11-22, obstacles.ts)
+  // 14: the wall slide and the timed landing (2026-11-22, docs/KART-FEEL.md §22)
+  revision: 14,
   laps: 3,
   road: made.road,
   gates: made.gates,
@@ -145,4 +161,5 @@ export const HARBOUR: TrackJson = {
   boostPads: made.boostPads,
   itemBoxes: [],
   decor: [],
+  obstacles: HARBOUR_OBSTACLES,
 }

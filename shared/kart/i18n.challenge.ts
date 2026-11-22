@@ -21,6 +21,7 @@ const en = {
   // The challenge tracks (shared/kart/tracks/challenge.ts): working names, docs/KART-WORLD.md §6
   'kart.challenge.track.ch-needle': 'Needle Lane',
   'kart.challenge.track.ch-hop': 'Hop Yard',
+  'kart.challenge.track.ch-lock': 'Lock Gate Lane',
   'kart.challenge.laps': '{laps} laps',
   'kart.challenge.lap': '1 lap',
   'kart.challenge.stars': '{stars} of 3 stars',
@@ -66,6 +67,8 @@ const en = {
   'kart.challenge.mission.drywin': 'Dry Win',
   'kart.challenge.mission.combo15': 'Fifteen in a Row',
   'kart.challenge.mission.lastone': 'Last One In',
+  'kart.challenge.mission.lockgate': 'Mind the Gate',
+  'kart.challenge.mission.lockrun': 'Lock Gate Sprint',
 
   'kart.challenge.goal.finish': 'Finish the race',
   'kart.challenge.goal.combo': 'Reach a combo of {target}',
@@ -142,6 +145,7 @@ const zhTW: Record<KartChallengeKey, string> = {
   'kart.challenge.track': '賽道',
   'kart.challenge.track.ch-needle': '針眼巷',
   'kart.challenge.track.ch-hop': '跳台場',
+  'kart.challenge.track.ch-lock': '閘門巷',
   'kart.challenge.laps': '{laps} 圈',
   'kart.challenge.lap': '1 圈',
   'kart.challenge.stars': '{stars} / 3 顆星',
@@ -187,6 +191,8 @@ const zhTW: Record<KartChallengeKey, string> = {
   'kart.challenge.mission.drywin': '不靠氮氣奪冠',
   'kart.challenge.mission.combo15': '十五連段',
   'kart.challenge.mission.lastone': '撐到最後',
+  'kart.challenge.mission.lockgate': '看準閘門',
+  'kart.challenge.mission.lockrun': '閘門衝刺',
 
   'kart.challenge.goal.finish': '跑完全程',
   'kart.challenge.goal.combo': '連段達到 {target}',

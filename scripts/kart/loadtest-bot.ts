@@ -65,7 +65,7 @@ import { courseOf, type Track } from '../../shared/kart/track.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { applyKart, loadoutByte, lookOf, type DriverId, type KartId } from '../../shared/kart/karts.ts'
 import type { KartView } from '../../shared/games/kart/types.ts'
-import { autopilot } from '../../src/kart/race/autopilot.ts'
+import { createAutopilot } from '../../src/kart/race/autopilot.ts'
 import { count, emptyTraffic, since, type BotTally, type DownTraffic, type UpTraffic } from './loadtest-report.ts'
 
 /** Clock pings as netRace.ts sends them: a quick few, then one every 2 s; the best of 10 wins */
@@ -130,6 +130,8 @@ export class Bot {
 
   private readonly options: BotOptions
   private readonly tuning: KartTuning
+  /** The autopilot's hands, made with the race */
+  private pilot: ((trial: Trial) => KartInput) | null = null
   private readonly body: number
   private readonly up: UpTraffic = { frame: emptyTraffic(), item: emptyTraffic(), clock: emptyTraffic(), json: emptyTraffic() }
   private readonly down: DownTraffic = { relay: emptyTraffic(), clock: emptyTraffic(), json: emptyTraffic() }
@@ -419,7 +421,9 @@ export class Bot {
   private step(game: KartView): void {
     const course = this.course!
     let trial = this.trial!
-    const input = this.teamDrift(this.seekBox(trial, autopilot(trial, course.road), game), trial, game)
+    // 2026-11-22: minding the moving obstacles (bots/obstacleSense.ts), each bot with hands of its own
+    this.pilot ??= createAutopilot(this.track!, this.tuning)
+    const input = this.teamDrift(this.seekBox(trial, this.pilot(trial), game), trial, game)
     if (trial.phase === 'countdown') {
       const server = this.serverNow()
       const left = game.goAt === null || server === null ? null : (game.goAt - server) / 1000

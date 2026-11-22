@@ -225,7 +225,7 @@ describe('jumps', () => {
     }
   })
 
-  // 2026-11-22 (docs/KART-FEEL.md §20): the timed landing. The plain landing's flight, flown again
+  // 2026-11-22 (docs/KART-FEEL.md §22): the timed landing. The plain landing's flight, flown again
   // with the throttle let go in the air and pressed afresh at `press` steps from the touch-down
   function timed(press: number) {
     const plain = flight(50)

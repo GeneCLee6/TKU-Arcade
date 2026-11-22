@@ -4,11 +4,12 @@
 // other. Pure: the Worker and the browser run the same code (docs/KART-NETCODE.md).
 import { trackLines } from './branches.ts'
 import { linesOf, passGates, respawnNear, type Spot } from './course.ts'
+import { throughObstacle } from './obstacles.ts'
 import { applyKart, KART_IDS, type KartId } from './karts.ts'
 import { ARCADE_TUNING, KART_TUNING, type KartState } from './physics.ts'
 import { TEAM_BOOST } from './teamBoost.ts'
 import { courseOf, type Track } from './track.ts'
-import { KART_RADIUS } from './walls.ts'
+import { KART_BODY_HEIGHT, KART_RADIUS } from './walls.ts'
 import type { KartFrame } from './net.ts'
 import type { Warp } from './items.ts'
 
@@ -162,7 +163,8 @@ export type Verdict =
   /** Taken: `lapAt` is set when this frame finished a lap, with the race time (ms) it did so */
   | { readonly kind: 'taken'; readonly tracked: Tracked; readonly lapAt: number | null }
 
-export type RefusedWhy = 'speed' | 'tick' | 'jump' | 'reset' | 'old' | 'far'
+/** `obstacle` (2026-11-22): through a boom that was down, or into a sliding box (obstacles.ts) */
+export type RefusedWhy = 'speed' | 'tick' | 'jump' | 'reset' | 'old' | 'far' | 'obstacle'
 
 export interface JudgeContext {
   readonly track: Track
@@ -247,6 +249,12 @@ export function judgeFrame(tracked: Tracked, frame: KartFrame, context: JudgeCon
       const seconds = Math.max((frame.tick - last.tick) / 60, (now - tracked.lastAt) / 1000) + 0.1
       if (Math.hypot(frame.x - last.x, frame.z - last.z) > cap * seconds + JUMP_SLACK) {
         return refuse('jump')
+      }
+      // Moving obstacles (2026-11-22): a boom down the whole move is a wall, and so is a sliding
+      // box, by the race clock the frame itself carries (obstacles.ts)
+      const obstacles = courseOf(track).obstacles
+      if (obstacles && throughObstacle(obstacles, last, last.tick, frame, frame.tick, frame.airborne)) {
+        return refuse('obstacle')
       }
     }
   }
@@ -341,6 +349,11 @@ export function bumpKart(
     readonly mass?: number
     /** The other's circle, metres (karts.ts's `kartRadius`): a kart's when not given */
     readonly radius?: number
+    /**
+     * Its height (2026-11-22): on a track with terrain, a kart more than a body's height above or
+     * below this one (on the viaduct over it, in the air) passes by. Left out: no height to go by
+     */
+    readonly y?: number
   }[],
   mass = 1,
   /** This kart's own circle */
@@ -349,6 +362,12 @@ export function bumpKart(
   let { x, z, vx, vz } = kart
   let hit = 0
   for (const other of others) {
+    if (
+      kart.y !== undefined &&
+      other.y !== undefined &&
+      Math.abs(kart.y - other.y) > KART_BODY_HEIGHT
+    )
+      continue
     const reach = radius + (other.radius ?? KART_RADIUS)
     const dx = x - other.x
     const dz = z - other.z

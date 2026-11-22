@@ -84,14 +84,12 @@ function raceDigest(track: Track): string {
  * Taken on main at fb5f7e1: [track digest, race digest]. 2026-11-21: the track digests taken again
  * with the grid in one row and the time trial's own start (shared/kart/startLine.ts); the races,
  * driven from that start, are the very same. 2026-11-22: riverside's, harbour's and tamkang's
- * track digests taken again for their settled names (docs/KART-WORLD.md §0; only `name` changed).
- * Later that day every digest taken again: each revision raised, and the wall slide and the timed
- * landing in the physics (docs/KART-FEEL.md §20); the lanes' race, which touches no wall at a
- * slant and lands no jump the new way, is the very same
+ * track digests taken again for their settled names (docs/KART-WORLD.md §0; only `name` changed)
  */
+// 2026-11-22 (#145): every digest taken again: each revision raised, and the wall slide and the
+// timed landing in the physics (docs/KART-FEEL.md §22); the lanes' race is the very same
 const TRACKS: Record<string, readonly [string, string]> = {
   riverside: ['7d5b57b8', '7cffd72b'],
-  harbour: ['3dc50b6a', 'f7e6b09a'],
   tamkang: ['b31f94db', '942dad15'],
   guanyin: ['233004ea', '09cf9011'],
   mangrove: ['0268a3b6', 'ece42fe7'],
@@ -103,6 +101,8 @@ const TRACKS: Record<string, readonly [string, string]> = {
   // on purpose, their revisions raised; these are what they were
   // wharf: ['e842a0a2', '59e4d97c'],
   // oldstreet: ['3dbf1196', '83885996'],
+  // 2026-11-22: the harbour has moving obstacles (shared/kart/obstacles.ts), its revision raised
+  // harbour: ['86bba381', 'bcba2291'],
 }
 
 /** Three editor tracks: the starter, and the starter with a hill and with a jump on its long straight */
@@ -120,10 +120,7 @@ const SPECS: Record<string, TrackSpec> = (() => {
   }
 })()
 
-/**
- * Taken on main at fb5f7e1: each editor track's [id, track digest] (the digests again 2026-11-21: the
- * grid in one row; and 2026-11-22: CUSTOM_REVISION 8)
- */
+/** Taken on main at fb5f7e1: each editor track's [id, track digest] (the digests again 2026-11-21: the grid in one row) */
 const CUSTOM: Record<string, readonly [string, string]> = {
   starter: ['custom-164wwb3lbtz', '011a2e9f'],
   hill: ['custom-ih8shvnxar', '1391ffbf'],

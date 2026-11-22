@@ -973,6 +973,7 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
     'Hillside Lanes',
     // 2026-11-20: the first with real branches
     'Viaduct Works',
+    'Zhuwei Flyover',
   ])
   await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
   await expect(page.getByText('Time trial')).toBeVisible()
@@ -1123,7 +1124,7 @@ test('the garage recommends the track’s quickest karts, and the season flagshi
   })
   await page.goto('/kart?track=harbour')
   await expect(page.locator('canvas')).toBeVisible()
-  await expect(page.getByTestId('kart-course-meta')).toContainText('Egret · Hornet · Humpback')
+  await expect(page.getByTestId('kart-course-meta')).toContainText('Hornet · Humpback · Egret')
   await page.getByTestId('kart-garage-open').click()
   const garage = page.getByTestId('kart-garage')
   const meta = garage.getByTestId('kart-meta')

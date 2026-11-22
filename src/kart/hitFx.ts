@@ -54,6 +54,9 @@ export type ItemCue =
   | { readonly kind: 'bounce' }
   | { readonly kind: 'fogged' }
   | { readonly kind: 'jammed' }
+  /** 2026-11-22: a boom ahead warned of or down (its bell), a container ahead about to slide (a horn) */
+  | { readonly kind: 'bell' }
+  | { readonly kind: 'horn' }
 
 /** The model's offset from where the physics has it: turned round, lifted, rolled */
 export interface SpinPose {

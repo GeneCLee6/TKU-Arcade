@@ -30,6 +30,8 @@ export interface WatchFrame {
   readonly props: ItemProps | null
   /** A hit's spins and bursts (2026-11-17, hitFx.ts); null or absent for none */
   readonly hits?: HitFrame | null
+  /** The race clock, steps since GO (2026-11-22): where the moving obstacles are drawn */
+  readonly tick?: number
 }
 
 export interface WatchLoopOptions {
@@ -64,6 +66,7 @@ export function startWatchLoop(container: HTMLElement, options: WatchLoopOptions
     buttons = pressed
     const watched = options.frame(seconds)
     if (watched.hits) scene.hits(watched.hits, seconds)
+    if (watched.tick !== undefined) scene.clock(watched.tick)
     scene.others(watched.karts, seconds)
     if (watched.props) scene.items(watched.props, seconds)
     const kart = watched.karts.find((one) => one.id === watched.follow)

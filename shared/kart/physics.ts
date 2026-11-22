@@ -147,7 +147,7 @@ export interface KartState {
   readonly airHeld?: number
   readonly driftJumps?: number
   /**
-   * The timed landing (2026-11-22, terrain.ts; docs/KART-FEEL.md §20): seconds since the throttle
+   * The timed landing (2026-11-22, terrain.ts; docs/KART-FEEL.md §22): seconds since the throttle
    * was last pressed afresh in this flight, the seconds left after a landing in which a fresh press
    * still times it, and how many timed landings there have been. Only on a track with terrain, never
    * before a car first takes off

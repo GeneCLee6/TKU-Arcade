@@ -20,7 +20,7 @@ export interface TrackMeta {
 /** By track id: the built-in tracks `npm run kart:feel` drives */
 export const TRACK_META: Readonly<Record<string, TrackMeta>> = {
   riverside: { podium: ['shrimp', 'heron', 'squid'], character: ['fast', 'descent'] },
-  harbour: { podium: ['heron', 'hornet', 'whale'], character: ['fast', 'flat'] },
+  harbour: { podium: ['hornet', 'whale', 'heron'], character: ['fast', 'flat'] },
   tamkang: { podium: ['heron', 'shrimp', 'marlin'], character: ['fast'] },
   oldstreet: { podium: ['heron', 'dolphin', 'marlin'], character: ['fast', 'flat'] },
   guanyin: { podium: ['petrel', 'heron', 'swift'], character: ['fast', 'climb'] },
@@ -31,6 +31,8 @@ export const TRACK_META: Readonly<Record<string, TrackMeta>> = {
   wharf: { podium: ['comet', 'hermit', 'crab'], character: ['descent'] },
   lanes: { podium: ['dolphin', 'marlin', 'tide'], character: ['fast', 'descent'] },
   works: { podium: ['dolphin', 'pelican', 'ray'], character: ['technical'] },
+  // 2026-11-22: the technical showcase (`npm run kart:meta -- --tracks zhuwei`): wide bends, long arms
+  zhuwei: { podium: ['heron', 'dolphin', 'marlin'], character: ['fast'] },
 }
 
 /** A track's recommendations, or null for one without (a custom track, the test oval) */

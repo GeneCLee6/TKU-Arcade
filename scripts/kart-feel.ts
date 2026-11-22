@@ -126,7 +126,7 @@ for (const [name, tuning] of CHOSEN) {
     }
     // 2026-11-22: the master's timed landings (on a track without a guide the master is the expert
     // with the timed landing), and what they are worth against holding the
-    // throttle through the air as everyone else does (docs/KART-FEEL.md §20)
+    // throttle through the air as everyone else does (docs/KART-FEEL.md §22)
     if (trackHasJumps(id)) {
       const plain = { ...FEEL_DRIVERS.master, skill: { ...FEEL_DRIVERS.master.skill, landTap: false } }
       const without = mean(

@@ -46,6 +46,9 @@ export const kartScene = {
   hill: '#4E7D55',
   hillFar: '#7FA3A8',
   metal: '#9AA3AD',
+  // 2026-11-22 (crossingArt.ts): a viaduct's deck and the underpass's walls beneath it
+  concrete: '#B9B5AC',
+  concreteDark: '#6E6A63',
   tyre: '#222326',
   seat: '#E4572E',
   lamp: '#FFF4C2',
@@ -487,6 +490,24 @@ export const skillCue = {
   hazard: '#F2C230',
   hazardDark: '#1B1B1F',
   post: '#2B2D33',
+} as const
+
+/**
+ * 2026-11-22 (#103): the moving obstacles (src/kart/art/obstacleArt.ts): the level crossing's posts,
+ * striped arms and lamps, the container trolleys' rails, frames and beacons, the stop line
+ */
+export const obstacleScene = {
+  post: '#3A3D44',
+  housing: '#1E2024',
+  armRed: '#D7263D',
+  armWhite: '#F4F1EA',
+  lampRed: '#FF3B30',
+  lampGreen: '#34E07A',
+  lampAmber: '#FFB02E',
+  rail: '#5C6068',
+  trolley: '#F2C230',
+  containers: ['#1F6FB2', '#C0392B', '#2E8B57', '#E67E22'],
+  stopLine: '#F4F1EA',
 } as const
 
 /** 2026-11-20: the Wharf Warehouses' own scenery (src/kart/art/wharfArt.ts) */

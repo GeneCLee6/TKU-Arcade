@@ -37,6 +37,11 @@ export interface Turn extends PieceBase {
   readonly angle: number
   /** Of the centre line, metres */
   readonly radius: number
+  /**
+   * How far the road leans into the bend, degrees (2026-11-22, levels.ts): its outside raised,
+   * eased in and out at the ends. Left out (every older code): level
+   */
+  readonly bank?: number
 }
 
 /**
@@ -62,7 +67,18 @@ export interface Jump extends PieceBase {
   readonly height: number
 }
 
-export type Piece = Straight | Turn | Slope | Jump
+/**
+ * A straight over or under (2026-11-22, levels.ts): the road climbs `rise` metres over its first
+ * third (a viaduct) or falls that far (an underpass, `rise` below zero), holds it through its middle
+ * third and comes back over its last. Another stretch of road may cross it there, under or over
+ */
+export interface Overpass extends PieceBase {
+  readonly kind: 'overpass'
+  readonly length: number
+  readonly rise: number
+}
+
+export type Piece = Straight | Turn | Slope | Jump | Overpass
 
 /** The jump ramp's length, from the road to its lip, metres */
 export const RAMP_LENGTH = 14
@@ -79,7 +95,16 @@ export interface Bypass {
   readonly side: -1 | 1
   readonly offset: number
   readonly width: number
+  /**
+   * What stands on it (2026-11-22, #113): a jump in its middle, a wall that leaves only the first
+   * few metres of its mouth open, or a wall across it with a slot. Left out: nothing
+   */
+  readonly feature?: BypassFeature
 }
+
+/** What a bypass may have on it (2026-11-22) */
+export const BYPASS_FEATURES = ['jump', 'wall', 'slot'] as const
+export type BypassFeature = (typeof BYPASS_FEATURES)[number]
 
 export interface TrackSpec {
   /** What its maker called it; may be empty (the page then says "untitled") */
@@ -129,6 +154,14 @@ export const LIMITS = {
   maxBypassOffset: 90,
   minBypassWidth: 10,
   maxBypassWidth: 30,
+  // Banked bends and roads over roads (2026-11-22, levels.ts)
+  /** Degrees a bend leans at the most */
+  maxBank: 15,
+  minOverpass: 180,
+  maxOverpass: 400,
+  /** Metres up or down, either way */
+  minOverpassRise: 3.5,
+  maxOverpassRise: 9,
 } as const
 
 /** Rounds to the tenth that every number in a spec is kept to */
@@ -147,7 +180,7 @@ export const turn = (
   angle: number,
   radius: number,
   width = 36,
-  more: Partial<PieceBase> = {},
+  more: Partial<PieceBase> & { bank?: number } = {},
 ): Turn => ({ kind: 'turn', angle, radius, width, pad: 'none', boxes: false, ...more })
 
 export const slope = (
@@ -156,6 +189,14 @@ export const slope = (
   width = 36,
   more: Partial<PieceBase> = {},
 ): Slope => ({ kind: 'slope', length, rise, width, pad: 'none', boxes: false, ...more })
+
+/** A straight over (rise above zero) or under (below) another stretch of road (2026-11-22) */
+export const overpass = (
+  length = 220,
+  rise = 4.5,
+  width = 36,
+  more: Partial<PieceBase> = {},
+): Overpass => ({ kind: 'overpass', length, rise, width, pad: 'none', boxes: false, ...more })
 
 export const jump = (length = 80, height = 2.5, width = 36): Jump => ({
   kind: 'jump',

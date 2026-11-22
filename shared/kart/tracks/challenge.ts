@@ -10,6 +10,7 @@
 // - Hop Yard (跳台場, about 0.95 km, hilly): three drops off loading steps, each straight into a
 //   corner, and a long fast sweep home on a crest. Taken square, a drop puts the car into the
 //   outside wall; the drift jump lands it already turning.
+import type { ObstacleJson } from '../obstacles.ts'
 import { TRACK_FORMAT, type Track, type TrackJson } from '../track.ts'
 import { parseTrack } from '../track.ts'
 import { circuit } from './circuit.ts'
@@ -165,7 +166,106 @@ export const CHALLENGE_HOP: TrackJson = {
   jumps: hopMade.jumps,
 }
 
-export const CHALLENGE_TRACK_IDS = ['ch-needle', 'ch-hop'] as const
+// 2026-11-22 (#103, obstacles.ts): Lock Gate Lane (閘門巷, a working name, about 0.9 km, 26 m wide),
+// a loop round a dock basin with the moving obstacles in it: a boom across the whole road on the
+// first straight (wait for it, or time the run-up), a container sliding across the back straight,
+// and the two half-booms of a level crossing on the way home, one down while the other is up
+const LOCK_WIDTH = 26
+
+const lockLaid = lay(
+  [
+    line(60, LOCK_WIDTH),
+    line(70, LOCK_WIDTH, { mark: 'boom' }),
+    line(50, LOCK_WIDTH),
+    right(90, 30, LOCK_WIDTH),
+    line(40, LOCK_WIDTH),
+    left(60, 34, LOCK_WIDTH),
+    right(150, 30, LOCK_WIDTH),
+    line(70, LOCK_WIDTH),
+    line(40, LOCK_WIDTH, { mark: 'slide' }),
+    fitted(LOCK_WIDTH),
+    right(90, 30, LOCK_WIDTH),
+    line(50, LOCK_WIDTH, { mark: 'cross' }),
+    fitted(LOCK_WIDTH),
+    right(90, 30, LOCK_WIDTH),
+  ],
+  { width: LOCK_WIDTH },
+)
+
+const lockMade = circuit({
+  control: lockLaid.control,
+  sample: LAY_SAMPLE,
+  line: [0, 0],
+})
+
+/** Lock Gate Lane's obstacles, at their marks: steps of 1/60 s from GO */
+export const LOCK_OBSTACLES: readonly ObstacleJson[] = [
+  // The lock gate: down over the whole road for 2 s of every 5, a second's warning
+  {
+    kind: 'boom',
+    // Half-way between two gates, well clear of their respawn points
+    at: lockMade.nearest(...lockLaid.marks.boom!) + 2.5,
+    from: -LOCK_WIDTH / 2,
+    to: LOCK_WIDTH / 2,
+    period: 300,
+    shift: 150,
+    closed: 120,
+    warn: 60,
+  },
+  // A container on its trolley, across the back straight and back every 6 s
+  {
+    kind: 'slider',
+    at: lockMade.nearest(...lockLaid.marks.slide!) - 2.5,
+    length: 6.1,
+    size: 10,
+    a: -5,
+    b: 5,
+    period: 360,
+    shift: 0,
+    move: 72,
+    warn: 48,
+  },
+  // The level crossing: the left half down, then the right
+  {
+    kind: 'boom',
+    at: lockMade.nearest(...lockLaid.marks.cross!),
+    from: -LOCK_WIDTH / 2,
+    to: 0,
+    period: 360,
+    shift: 0,
+    closed: 120,
+    warn: 48,
+  },
+  {
+    kind: 'boom',
+    at: lockMade.nearest(...lockLaid.marks.cross!),
+    from: 0,
+    to: LOCK_WIDTH / 2,
+    period: 360,
+    shift: 180,
+    closed: 120,
+    warn: 48,
+  },
+]
+
+export const CHALLENGE_LOCK: TrackJson = {
+  format: TRACK_FORMAT,
+  id: 'ch-lock',
+  name: { en: 'Lock Gate Lane', 'zh-TW': '閘門巷' },
+  theme: 'day',
+  laps: 3,
+  road: lockMade.road,
+  gates: lockMade.gates,
+  respawns: lockMade.respawns,
+  grid: lockMade.grid,
+  walls: [],
+  boostPads: [],
+  itemBoxes: [],
+  decor: [],
+  obstacles: LOCK_OBSTACLES,
+}
+
+export const CHALLENGE_TRACK_IDS = ['ch-needle', 'ch-hop', 'ch-lock'] as const
 export type ChallengeTrackId = (typeof CHALLENGE_TRACK_IDS)[number]
 
 export const isChallengeTrackId = (value: unknown): value is ChallengeTrackId =>
@@ -174,6 +274,7 @@ export const isChallengeTrackId = (value: unknown): value is ChallengeTrackId =>
 const JSONS: Readonly<Record<ChallengeTrackId, TrackJson>> = {
   'ch-needle': CHALLENGE_NEEDLE,
   'ch-hop': CHALLENGE_HOP,
+  'ch-lock': CHALLENGE_LOCK,
 }
 
 const parsed = new Map<ChallengeTrackId, Track>()

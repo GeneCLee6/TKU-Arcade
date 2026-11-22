@@ -24,11 +24,19 @@ export interface Ghost {
    * have none: the kart they were driven in is not known (src/kart/records.ts)
    */
   readonly kart?: KartId
+  /**
+   * When it was in the air (2026-11-22, #94): the samples at which it took off and landed, in turn
+   * (the first a take-off). Ghosts kept before then, and any on a flat track, have none: their
+   * flights are guessed from the jumps, as they always were
+   */
+  readonly air?: readonly number[]
 }
 
 export interface GhostRecorder {
   readonly track: string
   readonly samples: number[]
+  /** The samples at which it took off and landed, once it has been on a track with terrain */
+  air?: number[]
 }
 
 export const startRecording = (track: string): GhostRecorder => ({ track, samples: [] })
@@ -37,9 +45,15 @@ export const startRecording = (track: string): GhostRecorder => ({ track, sample
 export function recordStep(
   recorder: GhostRecorder,
   step: number,
-  pose: { x: number; z: number; heading: number },
+  /** `air`: the kart's time in the air (terrain.ts), absent on a flat track */
+  pose: { x: number; z: number; heading: number; air?: number },
 ): void {
   if (step % GHOST_STEPS !== 0) return
+  if (pose.air !== undefined) {
+    const air = (recorder.air ??= [])
+    const flying = air.length % 2 === 1
+    if (pose.air > 0 !== flying) air.push(recorder.samples.length / 3)
+  }
   // + 0: no -0, which JSON would bring back as 0
   recorder.samples.push(
     Math.round(pose.x * 100) / 100 + 0,
@@ -58,6 +72,7 @@ export const finishRecording = (
   total,
   laps: [...laps],
   samples: [...recorder.samples],
+  ...(recorder.air ? { air: [...recorder.air] } : {}),
 })
 
 /** Shortest turn from a to b, so that a heading crossing ±π does not spin round */
@@ -72,7 +87,7 @@ const turnBetween = (a: number, b: number) => {
 export function ghostAt(
   ghost: Ghost,
   steps: number,
-): { x: number; z: number; heading: number } | null {
+): { x: number; z: number; heading: number; airborne?: boolean } | null {
   const count = ghost.samples.length / 3
   if (count === 0) return null
   const at = Math.max(0, steps / GHOST_STEPS)
@@ -81,11 +96,15 @@ export function ghostAt(
   const t = Math.min(1, at - index)
   const read = (sample: number, offset: number) => ghost.samples[sample * 3 + offset]!
   const heading = read(index, 2)
-  return {
+  const pose = {
     x: read(index, 0) + (read(next, 0) - read(index, 0)) * t,
     z: read(index, 1) + (read(next, 1) - read(index, 1)) * t,
     heading: heading + turnBetween(heading, read(next, 2)) * t,
   }
+  if (!ghost.air) return pose
+  // In the air from each take-off to the landing after it
+  const sample = t < 0.5 ? index : next
+  return { ...pose, airborne: ghost.air.filter((at) => at <= sample).length % 2 === 1 }
 }
 
 /** A ghost from storage, or null when it is not one (an old format, a hand edit, another track) */
@@ -99,6 +118,20 @@ export function parseGhost(value: unknown, track: string): Ghost | null {
   if (!Array.isArray(samples) || samples.length % 3 !== 0 || samples.length > MAX_SAMPLES * 3)
     return null
   if (!samples.every((sample) => typeof sample === 'number' && Number.isFinite(sample))) return null
+  // Its flights (2026-11-22): rising sample numbers within the run; anything else is set aside
+  const air = ghost.air
+  const flights =
+    Array.isArray(air) &&
+    air.length <= MAX_SAMPLES &&
+    air.every(
+      (at, index) =>
+        Number.isInteger(at) &&
+        at >= 0 &&
+        at <= samples.length / 3 &&
+        (index === 0 || at > (air[index - 1] as number)),
+    )
+      ? (air as number[])
+      : null
   return {
     track,
     format: 1,
@@ -107,6 +140,7 @@ export function parseGhost(value: unknown, track: string): Ghost | null {
     samples: samples as number[],
     // A kart it does not know (a hand edit, a kart since removed) is as good as none
     ...(isKartId(ghost.kart) ? { kart: ghost.kart } : {}),
+    ...(flights ? { air: flights } : {}),
   }
 }
 
