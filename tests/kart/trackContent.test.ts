@@ -11,7 +11,7 @@ import { createTrackBrain } from '../../src/kart/bots/routes.ts'
 import { BOT_SKILLS, DIFFICULTIES, type Difficulty } from '../../src/kart/bots/skill.ts'
 import { findSlots, wallRuns } from '../../src/kart/art/skillWalls.ts'
 
-// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.66): the lantern alley, the old street's second
+// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.67): the lantern alley, the old street's second
 // shortcut, and the steps into a corner on the harbour and the old street
 
 const oldstreet = raceTrack('oldstreet')!
