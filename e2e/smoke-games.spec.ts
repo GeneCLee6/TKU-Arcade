@@ -127,7 +127,15 @@ for (const game of GAMES.filter((g) => !pickedGames || pickedGames.includes(g.id
 // 2026-11-21, the four more: short games, or a set part of one (`enough`, on the person's view), to
 // keep the CI's time down: the first round over and the next one started by the person (the
 // computers leave that button to the people), or ten turns of tiles
-type BotGame = { id: string; options?: Record<string, unknown>; enough?: (view: Record<string, unknown>) => boolean }
+// 2026-11-23, four more: twelve turns of kite, lantern's first level cleared (or the night over), one
+// level of silent-table, six cards of misery. Lantern and silent-table time their own computers
+type BotGame = {
+  id: string
+  options?: Record<string, unknown>
+  enough?: (view: Record<string, unknown>) => boolean
+  /** The person's moves to pick from: lantern's person never toggles moonlight, which would start the computers' count over and over */
+  allow?: (action: unknown) => boolean
+}
 const BOT_GAMES: BotGame[] = [
   { id: 'promotion' },
   { id: 'traders' },
@@ -136,6 +144,15 @@ const BOT_GAMES: BotGame[] = [
   { id: 'secret-scroll', options: { length: 'short' }, enough: (view) => Number(view.round ?? 1) >= 2 },
   { id: 'wasabi', options: { goal: 1 } },
   { id: 'tiles', options: { clock: 60 }, enough: (view) => Number(view.turnNo ?? 0) >= 10 },
+  { id: 'kite', enough: (view) => Number(view.turnNumber ?? 0) >= 12 },
+  {
+    id: 'lantern',
+    options: { levelTable: 'taster' },
+    enough: (view) => Number(view.level ?? 1) >= 2,
+    allow: (action) => (action as { type?: string }).type !== 'moon',
+  },
+  { id: 'silent-table', options: { levelsToWin: 1, failureLimit: 1 } },
+  { id: 'misery', enough: (view) => Number(view.turnNo ?? 0) >= 6 },
 ]
 
 for (const game of BOT_GAMES.filter((g) => !pickedGames || pickedGames.includes(g.id))) {
@@ -180,7 +197,7 @@ for (const game of BOT_GAMES.filter((g) => !pickedGames || pickedGames.includes(
         }
         let nextLook = 20
         while (!host.view?.game?.over && !enough()) {
-          await playOn(seats, pick, log, (l) => l.actions >= nextLook || enough())
+          await playOn(seats, pick, log, (l) => l.actions >= nextLook || enough(), 1500, game.allow)
           await checkLayout(page, `${screen.name} after ${log.actions} moves`, problems, screen.zh)
           nextLook += 20
         }

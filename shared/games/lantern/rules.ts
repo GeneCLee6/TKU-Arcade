@@ -12,7 +12,9 @@
 //   lower ones), so the avenue is always in rising order and a light only has to look at the hands.
 //
 // docs/PRD/e15-lantern-lane.md has the rules and every detail decided here.
+import { lanternBot, lanternBotTime } from './bot.ts'
 import { lanternInfo } from './info.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
 import type {
@@ -182,6 +184,18 @@ const lastToAgree = (state: LanternState, player: LanternPlayer): boolean =>
 export const lantern: GameModule<LanternState, LanternAction, LanternView, LanternOptions> = {
   ...lanternInfo,
   meta: GAME_META.lantern,
+  // Computer players, played by the room (bot.ts), each on its own clock: the wait is the whole game.
+  // Moonlight is never in what they are asked about: they only agree to it, by themselves
+  bots: TABLE_BOTS,
+  bot(view, legal) {
+    return lanternBot(view, legal)
+  },
+  botTime(view, _legal, level, rng) {
+    return lanternBotTime(view, level, rng)
+  },
+  botLeaves(action) {
+    return action.type === 'moon'
+  },
 
   init(seats, options, rng) {
     const players = seats.map(

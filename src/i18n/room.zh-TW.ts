@@ -147,6 +147,7 @@ export const roomZhTW: Record<RoomMessageKey, string> = {
   'room.bot.name.drizzle': '細雨',
   'room.bot.name.osmanthus': '桂花',
   'room.bot.name.abacus': '算盤',
+  'room.bot.name.lighthouse': '燈塔',
   // C2
   'room.panel.chatUnread': '聊天（{count} 則新訊息）',
   'room.panel.members': '成員',

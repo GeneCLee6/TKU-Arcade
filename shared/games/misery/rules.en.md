@@ -42,6 +42,10 @@ If the player who should place the card is away, the host can skip them: the try
 
 Every event and index was written for this site. There are nearly 400 cards in 12 categories, in Chinese only for now.
 
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats (or fill them all), each at **Easy** or **Normal**. They see every line, the card on the table's category and title (never its index), the tries so far and the last card shown, but they **do not read the title**: a computer cannot weigh how miserable an event sounds, so it counts. Normal takes the indexes of the cards on the public card list that nobody has seen yet, in the same category, drops the ranges earlier wrong tries ruled out, and puts the card in the gap of its own line that holds the most of them. Easy goes by the numbers alone: every index from 1 to 100 alike, so a wider gap is likelier, picked at random by its width, ignoring the category and earlier tries. When a computer draws the next card, it leaves the shown one up for a few seconds first.
+
 ## Players
 
 2 to 10 players. A game takes about 25 minutes.

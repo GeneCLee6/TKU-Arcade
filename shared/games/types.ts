@@ -384,6 +384,19 @@ export interface GameModule<
   bot?(view: V, legal: readonly A[], level: string, rng: Rng): A | null
 
   /**
+   * A game where several seats may act at any moment (2026-11-23: lantern, silent-table; misery for
+   * its longer look at a reveal): how long, in ms from the game's last change, this computer seat
+   * waits before it moves, or null when it has nothing to do until something changes (it already
+   * said ready and is content). With this the room keeps a clock for every computer seat at once,
+   * instead of moving the first one in seat order 0.6–1.5 s after its turn came, and asks `bot` once
+   * a seat's time is up; any change starts every clock over. Asked with `legal` as `bot` gets it,
+   * also when that is empty. `rng` is seeded from the game, the step and the seat, so the same moment
+   * always gives the same wait (the room works it out again after waking up). Cheap, never throws,
+   * pure
+   */
+  botTime?(view: V, legal: readonly A[], level: string, rng: Rng): number | null
+
+  /**
    * Actions a computer seat leaves to the people and the clock (2026-11-21): ones any seat at the
    * table may send to move everyone on, such as "next round" after a round's score. Were a computer
    * to press it, the people would see the score for only a moment. The room drops these from what

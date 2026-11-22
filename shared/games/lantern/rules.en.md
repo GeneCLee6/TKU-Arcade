@@ -69,6 +69,10 @@ Set by the host in the waiting room.
 
 The table waits for every hand. If a player is away, the host can skip them: during the focus their hand goes up; during a level, if everyone else wants moonlight their vote completes it, otherwise their lowest lantern is lit right then (so the host decides when).
 
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats (or fill them all), each at **Easy** or **Normal**. They know only their own lanterns, how many everyone holds and what is on the avenue, and they do not talk either: every time something changes at the table they start counting again, and light their lowest lantern after about as long as it is far above the last one on the avenue (about 0.28 s per number, after a beat of under a second). The bigger the gap, the longer they wait; count at the same pace and you will rarely clash. Normal counts steadily; Easy often counts too fast or too slow. They raise a hand soon after a level is dealt, and agree to moonlight as soon as anyone asks, but never ask first.
+
 ## Players
 
 2 to 6 players. A game takes about 20 minutes.

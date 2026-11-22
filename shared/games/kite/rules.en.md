@@ -54,6 +54,10 @@ Spectators never see anyone's kites, so that nobody can peek at their own hand f
 
 If the player whose turn it is is away, the host can skip them: their turn passes with nothing done.
 
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats (or fill them all), each at **Easy** or **Normal**. They know only what a person in their seat would: everyone else's kites, what the notes told them about their own, and the kites flying and set aside. Normal passes and reads notes by one common convention: a note's focus is the newest kite it points at that no earlier note pointed at; if a kite fitting the note could fly right now it means "fly it", otherwise "keep it". So Normal passes only notes whose focus really flies now, or warns the next player off setting aside a kite that cannot be replaced (a 5, or the last copy). On its turn it flies a kite it is sure of, then passes a useful note, then flies a kite it was told to fly, else sets aside a kite it knows is useless or its oldest kite no note pointed at. People need not follow the convention, but it helps to know it. Easy is careful: it flies only kites the notes alone prove, points notes at anything flyable, and otherwise sets aside its oldest kite.
+
 ## Players
 
 2 to 5 players. A game takes about 30 minutes.

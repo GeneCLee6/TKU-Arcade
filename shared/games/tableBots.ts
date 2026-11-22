@@ -18,6 +18,8 @@ export const TABLE_BOT_NAMES = [
   'drizzle',
   'osmanthus',
   'abacus',
+  // 2026-11-23: misery seats ten
+  'lighthouse',
 ] as const
 
 /** What a module with a `bot` puts in `bots` */

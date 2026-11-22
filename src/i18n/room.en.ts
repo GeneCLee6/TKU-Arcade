@@ -154,6 +154,7 @@ export const roomEn = {
   'room.bot.name.drizzle': 'Drizzle',
   'room.bot.name.osmanthus': 'Osmanthus',
   'room.bot.name.abacus': 'Abacus',
+  'room.bot.name.lighthouse': 'Lighthouse',
   // C2: the game's side panel and its drawer on a phone
   'room.panel.chatUnread': 'Chat ({count} new)',
   'room.panel.members': 'Members',
