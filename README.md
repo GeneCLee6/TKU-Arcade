@@ -79,4 +79,4 @@ Same stack and planning method as [TKU BridgeTable](https://github.com/GeneCLee6
 
 ## License
 
-The source is public for review; no open-source licence has been chosen yet. Game names, artwork, characters, tracks, audio and prompt decks are original works of the project and are not licensed for reuse.
+The source is public for review only. No open-source licence has been chosen, so all rights are reserved: you may read the code, but not copy, modify or redistribute it. Game names, artwork, characters, tracks, audio and prompt decks are original works of the project and are not licensed for reuse.

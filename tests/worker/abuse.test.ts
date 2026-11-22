@@ -19,7 +19,7 @@ import {
 } from '../../worker/address.ts'
 import type { Env } from '../../worker/app.ts'
 import { forgetOwnerLockouts, ownerRefusal, sameKey } from '../../worker/owner.ts'
-import { FixedWindowLimit, takeShared } from '../../worker/rate-limit.ts'
+import { FixedWindowLimit, SHARED_LIMITS, takeShared } from '../../worker/rate-limit.ts'
 import { RoomHost } from '../../worker/room-host.ts'
 import { handleRooms, handleRoomSocket } from '../../worker/rooms.ts'
 import { newRoomId } from '../../shared/room-id.ts'
@@ -103,16 +103,18 @@ describe('new rooms across instances', () => {
     })
   const url = new URL('https://x/api/rooms')
 
-  it('are 5 a minute per address through the LimiterDO, keyed by the hash', async () => {
+  // 2026-11-22: the owner raised 5 to 10 (a campus Wi-Fi shares one address)
+  it('are 10 a minute per address through the LimiterDO, keyed by the hash', async () => {
+    expect(SHARED_LIMITS.create).toBe(10)
     const limiter = fakeLimiter()
     const env = { LIMITER: limiter } as unknown as Env
     const limit = new FixedWindowLimit(30, 600)
     const statuses: number[] = []
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 11; i++) {
       statuses.push((await handleRooms(post('198.51.100.7'), env, url, limit, i)).status)
     }
-    // An unknown game gets as far as the body: 400; the sixth not even that
-    expect(statuses).toEqual([400, 400, 400, 400, 400, 429])
+    // An unknown game gets as far as the body: 400; the eleventh not even that
+    expect(statuses).toEqual([...Array<number>(10).fill(400), 429])
     expect([...limiter.counts.keys()]).toEqual([`create:${await addressKey('198.51.100.7')}`])
     // Someone else is not held up
     expect((await handleRooms(post('198.51.100.8'), env, url, limit, 7)).status).toBe(400)
@@ -127,7 +129,7 @@ describe('new rooms across instances', () => {
   })
 
   // 2026-11-21: the lobby's "Play the computer" is one room, made by one POST, so it counts once
-  it('count a room opened with computer players once, against the same 5', async () => {
+  it('count a room opened with computer players once, against the same 10', async () => {
     const limiter = fakeLimiter()
     const room = { create: vi.fn(async () => true) }
     const lobby = { claimCode: vi.fn(async () => null) }
@@ -146,9 +148,9 @@ describe('new rooms across instances', () => {
         headers: { 'cf-connecting-ip': '198.51.100.9' },
       })
     const statuses: number[] = []
-    for (let i = 0; i < 6; i++) statuses.push((await handleRooms(quick(i), env, url, limit, i)).status)
-    expect(statuses).toEqual([201, 201, 201, 201, 201, 429])
-    expect(room.create).toHaveBeenCalledTimes(5)
+    for (let i = 0; i < 11; i++) statuses.push((await handleRooms(quick(i), env, url, limit, i)).status)
+    expect(statuses).toEqual([...Array<number>(10).fill(201), 429])
+    expect(room.create).toHaveBeenCalledTimes(10)
   })
 })
 

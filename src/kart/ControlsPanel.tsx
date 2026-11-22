@@ -24,7 +24,7 @@ import type { MessageParams } from '../i18n/t.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
 import { keyLabel, padLabel, readGamepad } from './devices.ts'
 import { VolumeSliders } from './audio/VolumeSliders.tsx'
-import { CoachSwitch } from './school/CoachTip.tsx'
+import { CoachSwitch, TrackCuesSwitch } from './school/CoachTip.tsx'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -269,6 +269,8 @@ export const ControlsPanel = memo(function ControlsPanel({
         </label>
         {/* 2026-11-20 (§4.50): the tips during a race */}
         <CoachSwitch t={t} />
+        {/* 2026-11-22 (owner): the marks on the tracks to learn by heart */}
+        <TrackCuesSwitch t={t} />
       </Rules>
       <VolumeSliders t={t} />
     </Panel>

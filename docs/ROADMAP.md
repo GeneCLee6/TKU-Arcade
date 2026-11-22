@@ -189,6 +189,8 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #129 | 2026-11-21 | `feat/kart-room-lobby` | 卡丁車等待室（8 格、準備）與同一條起跑線 |
 | #130 | 2026-11-21 | `feat/kart-meta-flagship` | 每張圖的最快車與第一季旗艦「黑鳶」 |
 | #131 | 2026-11-21 | `feat/kart-challenges` | 挑戰模式：計時獎牌與 24 關任務 |
+| #132 | 2026-11-22 | `docs/next-restructure` | NEXT 重整成短交接手冊、歷史搬到 `docs/history/`、本表 |
+| #133 | 2026-11-22 | `feat/platform-decisions-docs` | 擁有者平台決定：建房每分鐘 10 間、PRD 連線上限對齊實作、賽道技術提示開關 |
 
 ## Phase O · M4 社群
 
