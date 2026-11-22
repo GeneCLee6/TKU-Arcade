@@ -55,7 +55,8 @@ export interface Driver {
   readonly hands: Hands
 }
 
-const STEADY: Hands = {
+/** Hands that add nothing to the brain's: the computer karts' own (scripts/kart-bots.ts) */
+export const STEADY_HANDS: Hands = {
   shake: 0,
   lapses: 0,
   lapseSteps: [0, 0],
@@ -137,8 +138,10 @@ export const DRIVERS: Readonly<Record<DriverId, Driver>> = {
       startBoost: 1,
       // Fires a charge anywhere short of a real corner, so that the stock is never full for long
       boostAt: 0.6,
+      // People's hands: the computer karts' care at the wall is theirs (2026-11-22, #100)
+      wallCare: 0,
     },
-    hands: { ...STEADY, shake: 0.02 },
+    hands: { ...STEADY_HANDS, shake: 0.02 },
   },
   // 2026-11-19 (owner: "it is too easy to become an expert ... know the map by heart"): the expert's
   // hands, and the track known by heart (shared/kart/tracks/guide.ts): its technical line through
@@ -158,9 +161,11 @@ export const DRIVERS: Readonly<Record<DriverId, Driver>> = {
       releaseBoosts: 1,
       startBoost: 1,
       boostAt: 0.6,
+      // People's hands: the computer karts' care at the wall is theirs (2026-11-22, #100)
+      wallCare: 0,
       tricks: true,
     },
-    hands: { ...STEADY, shake: 0.02 },
+    hands: { ...STEADY_HANDS, shake: 0.02 },
   },
 }
 

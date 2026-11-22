@@ -7,6 +7,8 @@ const en = {
   'kart.touch.brake': 'Brake',
   'kart.touch.drift': 'Drift',
   'kart.touch.boost': 'Boost',
+  // 2026-11-22 (#100): on the button while a boost burns
+  'kart.touch.boosting': 'Boosting',
   'kart.touch.item': 'Item',
   'kart.touch.reset': 'Reset',
   'kart.touch.steer': 'Steer',
@@ -39,6 +41,7 @@ const zhTW: Record<KartTouchKey, string> = {
   'kart.touch.brake': '煞車',
   'kart.touch.drift': '甩尾',
   'kart.touch.boost': '噴射',
+  'kart.touch.boosting': '噴射中',
   'kart.touch.item': '道具',
   'kart.touch.reset': '復位',
   'kart.touch.steer': '轉向',

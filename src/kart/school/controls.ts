@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import type { KartMessageKey } from '../../../shared/kart/i18n.ts'
 import { activeControls, type Bindings, type KartAction } from '../../../shared/kart/input.ts'
 import type { MessageParams } from '../../i18n/t.ts'
-import { keyLabel, padLabel, readGamepad } from '../devices.ts'
+import { keyLabel, padLabel, readGamepad, useKeyLayout } from '../devices.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -65,6 +65,8 @@ export function controlLabels(
  */
 export function useInputDevice(touch: boolean): InputDevice {
   const [device, setDevice] = useState<'keys' | 'pad'>('keys')
+  // The keys' names follow the keyboard's layout once the browser has said it
+  useKeyLayout()
   useEffect(() => {
     const onKey = () => setDevice('keys')
     const timer = window.setInterval(() => {

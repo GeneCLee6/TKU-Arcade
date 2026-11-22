@@ -117,6 +117,27 @@ const LANE_LEAD = 6
 /** ... but a bend this tight or tighter, metres, is taken down the middle, and one twice as wide in full */
 const LINE_TIGHT = 35
 
+/**
+ * Watching the wall (2026-11-22, #100; skill.wallCare, docs/KART-FEEL.md §13.5). The arcs tried from
+ * where the kart is, as shares of the grip's whole turn; the steps each is followed in; how near the
+ * road's edge the kart's middle may come, metres (its radius and a little); how far along the road
+ * a step is looked for, road points
+ */
+const CARE_ARCS = [1, 0.6, 0.25, 0, -0.25, -0.6, -1] as const
+const CARE_STEPS = 8
+const CARE_MARGIN = 1.8
+const CARE_SEARCH = 24
+/**
+ * Out of a drift: the line the hands mean to drive is watched this far ahead, seconds; where it
+ * meets the edge, another arc is steered. Where none of the arcs stays on the road this long, the
+ * hands lift, keep a charge and the instant boost's press for later; and brake when it is under
+ * CARE_BRAKE of that
+ */
+const CARE_GRIP = 0.5
+const CARE_WARY = 0.8
+const CARE_BRAKE = 0.45
+const NO_EDGE = { own: Infinity, best: Infinity, steer: 0 } as const
+
 type Move =
   | { readonly kind: 'none' }
   | { readonly kind: 'tap'; readonly direction: -1 | 1; readonly steps: number }
@@ -137,6 +158,24 @@ const NONE: Move = { kind: 'none' }
 export interface BotSense {
   /** The share of the kart's top speed to drive at now (the skill's, after the rubber band) */
   readonly speedShare: number
+  /** A team race: how full the kart's team's gauge is, 0 to 1 (team.ts); left out in any other */
+  readonly teamGauge?: number
+}
+
+/**
+ * A team race (2026-11-22, #102): whether the hands keep their last red charge rather than fire it,
+ * for the team's gauge to turn it blue (a blue boost burns longer and faster, team.ts). Only with
+ * the gauge at least `from` full, none of the charges blue already, and one charge left: with two,
+ * one is fired and one kept. Pure
+ */
+export function keepsForBlue(
+  stored: number,
+  blue: number,
+  teamGauge: number | undefined,
+  from: number | undefined,
+): boolean {
+  if (teamGauge === undefined || from === undefined) return false
+  return blue === 0 && stored === 1 && teamGauge >= from
 }
 
 export type BotBrain = (trial: Trial, sense: BotSense) => KartInput
@@ -336,6 +375,83 @@ export function createBotBrain(
     return sum
   }
 
+  /** The road point nearest (x, z), looked for from `from` onwards: the arcs below go forward */
+  const nearFrom = (x: number, z: number, from: number): number => {
+    const count = road.length
+    let best = from
+    let least = Infinity
+    for (let k = -2; k <= CARE_SEARCH; k++) {
+      const index = (((from + k) % count) + count) % count
+      const point = road[index]!
+      const distance = (point.x - x) ** 2 + (point.z - z) ** 2
+      if (distance < least) {
+        least = distance
+        best = index
+      }
+    }
+    return best
+  }
+
+  /** How long the kart stays on the road turning `turn` rad/s from here, seconds; Infinity: all of `seconds` */
+  const onRoadFor = (
+    x: number,
+    z: number,
+    speed: number,
+    travel: number,
+    nearest: number,
+    turn: number,
+    seconds: number,
+  ): number => {
+    const dt = seconds / CARE_STEPS
+    let px = x
+    let pz = z
+    let heading = travel
+    let at = nearest
+    for (let step = 1; step <= CARE_STEPS; step++) {
+      heading += turn * dt
+      px += Math.sin(heading) * speed * dt
+      pz -= Math.cos(heading) * speed * dt
+      at = nearFrom(px, pz, at)
+      const point = road[at]!
+      const { dx, dz } = roadDirection(road, at)
+      // Metres to the right of the middle: the road's right is (-dz, dx)
+      const across = (px - point.x) * -dz + (pz - point.z) * dx
+      if (Math.abs(across) > point.width / 2 - CARE_MARGIN) return step * dt
+    }
+    return Infinity
+  }
+
+  /**
+   * Watching the wall (skill.wallCare): from here, at this speed, on the arc the hands mean to
+   * drive (`steer`, a share of the grip's turn) and on a few others up to `turnMost` either way, how
+   * soon the kart leaves the road. `own` for the hands' arc, `best` for the best of all (Infinity:
+   * one keeps it on the road for `seconds`), and `steer` the stick for the arc that lasts, the
+   * nearest to the hands' own among those that do
+   */
+  const edgeAhead = (
+    x: number,
+    z: number,
+    speed: number,
+    travel: number,
+    nearest: number,
+    gripTurn: number,
+    steer: number,
+    seconds: number,
+  ): { own: number; best: number; steer: number } => {
+    const own = onRoadFor(x, z, speed, travel, nearest, gripTurn * steer, CARE_GRIP)
+    if (own === Infinity || speed < 20) return { own: Infinity, best: Infinity, steer }
+    let best = own
+    let chosen = steer
+    for (const share of CARE_ARCS) {
+      const lasts = onRoadFor(x, z, speed, travel, nearest, gripTurn * share, seconds)
+      if (lasts > best || (lasts === best && Math.abs(share - steer) < Math.abs(chosen - steer))) {
+        best = lasts
+        chosen = share
+      }
+    }
+    return { own, best, steer: chosen }
+  }
+
   let move: Move = NONE
   /** Straight down the middle for a jump: set each step before the line is worked out */
   let jumpLine = false
@@ -344,6 +460,8 @@ export function createBotBrain(
   /** Metres of road still to be driven on the safe line by hands that know the technical one */
   let fallback = 0
   let wasDrifting = false
+  /** The way of travel a step ago (watching the wall) */
+  let lastTravel: number | null = null
   let boostPressed = false
   let lastTap: -1 | 1 = 1
   let startPlan: boolean | null = null
@@ -528,20 +646,34 @@ export function createBotBrain(
     takeOffMost: number,
     /** Lining up for a slot: no new drift, no boost fired */
     lineUp: boolean,
+    /** Watching the wall: how soon the road's edge comes, on the hands' line and the best (edgeAhead) */
+    edge: { readonly own: number; readonly best: number; readonly steer: number },
   ): KartInput => {
     wasDrifting = kart.drifting
+    // Watching the wall (2026-11-22, #100): out of a drift, an edge coming that no line the kart
+    // has can miss at this speed: off the throttle, no charge fired, an instant boost waits; nearer,
+    // the brake. The hands' own line meeting the edge: the line that lasts instead
+    const wary = !kart.drifting && edge.best < CARE_WARY
+    const braking = wary && edge.best < CARE_WARY * CARE_BRAKE && speed > 30
+    const safe = (steer: number) => (!kart.drifting && edge.own < Infinity ? edge.steer : steer)
+    // ... and in a drift, its own line meeting the edge (a drift held on into the next bend the other
+    // way): let go once it has earned its instant boost, scrub speed off in it until then
+    const outOfRoom = kart.drifting && edge.own < Infinity
     const boostAt = skill.boostAt ?? 0.4
     const straight = Math.abs(later) < gripTurn * boostAt && Math.abs(want) < gripTurn * boostAt
     // A team boost held (a team race) is fired like a charge, once nothing else burns
     const teamReady = (kart.teamBoosts ?? 0) > 0 && kart.boostSeconds === 0
     const fire =
       !boostPressed &&
+      !wary &&
       (kart.teamSeconds ?? 0) === 0 &&
       straight &&
       !kart.drifting &&
       // One boost at a time (2026-11-18): the key does nothing while a boost runs
       kart.boostSeconds === 0 &&
-      (teamReady || kart.storedBoosts > 0)
+      (teamReady ||
+        (kart.storedBoosts > 0 &&
+          !keepsForBlue(kart.storedBoosts, kart.teamBoosts ?? 0, sense.teamGauge, skill.teamSave)))
     boostPressed = fire
     const calm =
       kart.boostSeconds === 0 &&
@@ -556,20 +688,23 @@ export function createBotBrain(
     // (easing off at their own top speed and coming back on): the throttle stays as it was
     const waiting = kart.burstReady || kart.releaseWindow > 0
     const gas = waiting && !dashPlan ? kart.throttleHeld : !cruising
-    const base = { ...NO_INPUT, throttle: gas, boost: fire }
+    const base = { ...NO_INPUT, throttle: gas && !wary, boost: fire, brake: braking }
 
     if (move.kind === 'tap' || move.kind === 'double') move = NONE
     if (move.kind === 'lift') {
       // A dash waiting (the car still sliding, or just straightened): lift, then press afresh
       const { steps, double, counter, wait = 0 } = move
-      const steer = counter !== undefined && kart.slideDirection !== 0 ? counter : gripSteer
+      // The counter-steer is what pulls the slide straight: never changed; once straight, the safe line
+      const steer =
+        counter !== undefined && kart.slideDirection !== 0 ? counter : safe(gripSteer)
       if (wait > 0) {
         // Slow hands: the drift is let go, the throttle still down for a moment
         move = { kind: 'lift', steps, double, counter, wait: wait - 1 }
         return { ...base, throttle: kart.throttleHeld, steer }
       }
-      if (steps > 0) {
-        move = { kind: 'lift', steps: steps - 1, double, counter }
+      if (steps > 0 || wary) {
+        // Watching the wall: the fresh press that fires the instant boost waits for the room
+        move = { kind: 'lift', steps: Math.max(0, steps - 1), double, counter }
         return { ...base, throttle: false, steer }
       }
       move = NONE
@@ -637,7 +772,8 @@ export function createBotBrain(
         Math.sign(want) !== dir ||
         (Math.abs(want) < gripTurn * CLASSIC_END_NOW &&
           Math.abs(later) < gripTurn * CLASSIC_END_LATER)
-      const done = (kart.driftSeconds > 0.15 && over && !earning) || lineUp
+      const done =
+        (kart.driftSeconds > 0.15 && over && (!earning || (outOfRoom && kart.burstReady))) || lineUp
       if (done) {
         // Out of the corner: let go, counter-steer and lift, then press afresh for the dash; or
         // just let go
@@ -650,7 +786,7 @@ export function createBotBrain(
         return { ...base, steer: gripSteer }
       }
       // More corner than even a tight drift turns: scrub speed off with the brake, still drifting
-      const tooTight = into > 1.25 && speed > 30
+      const tooTight = (into > 1.25 || (outOfRoom && !kart.burstReady)) && speed > 30
       return {
         ...base,
         throttle: base.throttle && !tooTight,
@@ -686,7 +822,7 @@ export function createBotBrain(
       (Math.abs(want) > turnMost * BRAKE_AT || Math.abs(later) > turnMost * (speed / t.topSpeed)) &&
       speed > 30
     const throttle = base.throttle && !brake
-    return { ...base, throttle, brake, steer: gripSteer }
+    return { ...base, throttle, brake: brake || braking, steer: safe(gripSteer) }
   }
 
   const think = (trial: Trial, sense: BotSense): KartInput => {
@@ -792,7 +928,21 @@ export function createBotBrain(
     const later = pursuit(kart.x, kart.z, nearest, 30 + speed * 0.9, speed, travel)
     const gripTurn = t.turnRate * (1 - t.turnLossAtTopSpeed * Math.min(1, speed / t.topSpeed))
     const slip = Math.abs(wrap(kart.heading - travel))
+    const gripSteerNow = clampSteer(noseWant / gripTurn)
     if (classic) {
+      // In a drift, the line the kart is on: its way of travel coming round as it is now
+      const travelRate = lastTravel === null ? 0 : wrap(travel - lastTravel) * 60
+      lastTravel = travel
+      const care = skill.wallCare ?? 0
+      const watching = care > 0 && (kart.air ?? 0) === 0 && speed >= 20
+      const edge = !watching
+        ? NO_EDGE
+        : kart.drifting
+          ? { ...NO_EDGE, own: onRoadFor(kart.x, kart.z, speed, travel, nearest, travelRate, care) }
+          : // A technical line (the guide's slots and branches) is driven as it is
+            tricks
+            ? NO_EDGE
+            : edgeAhead(kart.x, kart.z, speed, travel, nearest, gripTurn, gripSteerNow, CARE_WARY)
       return classicHands(
         kart,
         sense,
@@ -808,6 +958,7 @@ export function createBotBrain(
         slots.length > 0 &&
           fallback === 0 &&
           slotAhead(kart.x, kart.z, nearest, SLOT_CALM) !== null,
+        edge,
       )
     }
 
