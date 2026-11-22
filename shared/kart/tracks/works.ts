@@ -31,12 +31,25 @@ import type { Wall } from '../walls.ts'
 import { circuit } from './circuit.ts'
 import { fence, guideFor, type TrackGuide } from './guide.ts'
 import { fitted, lay, LAY_SAMPLE, layBranch, left, line, right } from './lay.ts'
+import { blockDetour, straightPlatform } from './platform.ts'
 import { FENCE_HEIGHT, SHED_HEIGHT } from './wharf.ts'
 
 const W = 34
 const DECK = 14
 const ALLEY = 14
 const CUT = 13
+/**
+ * The long shed's roof (2026-11-23, revision 3; shared/kart/ledges.ts): the road up its ramp and
+ * beside its face; the ramp's height, the roof's, its width; its face, how far right of the road's
+ * line it is and the line the roof then runs on (the road comes back on it after the shed)
+ */
+const ROOF_ROAD = 28
+const ROOF_LIP = 3
+const ROOF_TOP = 3.2
+const ROOF_WIDTH = 12
+const ROOF_FACE = 30
+const ROOF_SIDE = 21
+const ROOF_LINE = ROOF_SIDE + (ROOF_SIDE / ROOF_FACE) * 15
 
 const laid = lay(
   [
@@ -76,12 +89,12 @@ const laid = lay(
     right(45, 70, W, { mark: 'sweepOut' }),
     fitted(W, { mid: 'pad2' }),
     right(90, 45, 36),
-    // Home along the river: a swing out round the pumping house and back
+    // Home along the river: up the foundry's loading ramp, round the long shed and back (its roof
+    // a high platform, 2026-11-23), and on to the line
+    line(60, ROOF_ROAD, { mark: 'roofLip' }),
+    line(70, ROOF_ROAD),
+    ...blockDetour(-1, 36, 24, 20, 34, 'roof', { shift: ROOF_LINE }),
     line(60, 36),
-    left(30, 70, 36),
-    right(60, 70, 36, { mid: 'pumpMid' }),
-    left(30, 70, 36),
-    line(90, 36),
   ],
   { width: 36, height: 0 },
 )
@@ -90,7 +103,10 @@ const made = circuit({
   control: laid.control,
   sample: LAY_SAMPLE,
   line: [0, 0],
-  jumps: [[...laid.marks.lipA!, 2.5]],
+  jumps: [
+    [...laid.marks.lipA!, 2.5],
+    [...laid.marks.roofLip!, ROOF_LIP],
+  ],
   pads: [
     [...laid.marks.pad1!, 8],
     [...laid.marks.pad2!, -7],
@@ -167,16 +183,33 @@ const cut = layBranch(
   CUT,
 )
 
+// The long shed's roof (2026-11-23): from the ramp's lip, off to the right, to where the road is
+// back on the roof's line, a drop at its end
+const roofFrom = at('roofLip')
+const roofTo = at('roofBack') + 4
+const roof = straightPlatform(road, roofFrom, roofTo, {
+  width: ROOF_WIDTH,
+  mouth: ROOF_ROAD - 4,
+  end: 10,
+  face: ROOF_FACE,
+  side: ROOF_SIDE,
+  merge: 0,
+  top: ROOF_TOP,
+  downAt: 72,
+  down: 0,
+  // Halfway along, a gap between two of the shed's roof spans: a pit with a ramp out of it
+  gaps: [{ at: 50, length: 10, depth: 1.5 }],
+})
+
 const branches: BranchJson[] = [
   { from: deckFrom, to: deckTo, road: deck.road },
   { from: alleyFrom, to: alleyTo, road: alley.road },
   { from: cutFrom, to: cutTo, road: cut.road },
+  roof,
 ]
-const [deckPath, alleyPath, cutPath] = branches.map((branch) => branchPath(road, branch)) as [
-  RoadPoint[],
-  RoadPoint[],
-  RoadPoint[],
-]
+const [deckPath, alleyPath, cutPath, roofPath] = branches.map((branch) =>
+  branchPath(road, branch),
+) as [RoadPoint[], RoadPoint[], RoadPoint[], RoadPoint[]]
 
 /** The point of a branch's own centre line nearest a named place of its laying */
 const nearestOn = (path: readonly RoadPoint[], place: readonly [number, number]) =>
@@ -240,10 +273,10 @@ export const WORKS_GUIDE: TrackGuide = guideFor(road).build()
 const pseudoForks = branches.map((branch, index) => ({
   from: branch.from,
   to: branch.to,
-  path: [deckPath, alleyPath, cutPath][index]!,
-  jumps: [] as number[],
+  path: [deckPath, alleyPath, cutPath, roofPath][index]!,
+  jumps: (branch.jumps ?? []).map((lip) => lip + 1),
 }))
-const route = routeRoad({ road, jumps: made.jumps, forks: pseudoForks }, [0, 1, 2])
+const route = routeRoad({ road, jumps: made.jumps, forks: pseudoForks }, [0, 1, 2, 3])
 /** The route's point for a main road point, and for a point of branch k's centre line */
 const onMain = (index: number) => route.main[index]!
 const onFork = (k: number, index: number) => route.main[branches[k]!.from]! + index
@@ -267,6 +300,9 @@ guide.slot(onFork(1, alleySlot), ALLEY_SLOT_AT)
 guide.tech
   .hold(onMain(crest) - 12, onMain(crest) - 4, -10, 2.5)
   .chord([onMain(crest) - 4, -10], [onFork(2, 5), 0], 2)
+// The long shed's roof (2026-11-23): up the ramp on its left, so as to cross it slanting right
+const roofLip = onMain(roofFrom)
+guide.tech.hold(roofLip - 12, roofLip - 4, -8, 2).chord([roofLip - 4, -8], [roofLip + 3, 0], 1.5)
 export const WORKS_ROUTE_GUIDE: TrackGuide = guide.build()
 
 // Boost pads: one on the deck, one down the alley past its slot, one through the cut: what the
@@ -287,7 +323,8 @@ export const WORKS: TrackJson = {
   id: 'works',
   // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Viaduct Works', 'zh-TW': '高架廠區' },
-  revision: 2,
+  // 3: the long shed's roof, a high platform (2026-11-23)
+  revision: 3,
   theme: 'sunset',
   laps: 3,
   road,

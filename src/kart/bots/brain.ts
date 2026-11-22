@@ -225,6 +225,11 @@ export function createBotBrain(
    * by skill (`tricks`), the line through its shortcuts and the drift jumps that line asks for
    */
   guide?: TrackGuide,
+  /**
+   * Lips flown onto a high platform (2026-11-23, shared/kart/ledges.ts): left at full speed, never
+   * lifted for to come down before the road turns (the platform is where the flight comes down)
+   */
+  flyLips: readonly number[] = [],
 ): BotBrain {
   const t = tuning
   const rng = createRng(seed)
@@ -331,6 +336,7 @@ export function createBotBrain(
   // cue) is the fast one
   const takeOff = new Map<number, number>()
   for (const lip of jumps) {
+    if (flyLips.includes(lip)) continue
     const count = road.length
     let turned = 0
     let run = 0
@@ -942,7 +948,8 @@ export function createBotBrain(
     if (carrying && !kart.drifting) carrying = null
     const jumpNear = jump.ahead < JUMP_CLEAR + speed * JUMP_SECONDS
     if (jumpNear && (move.kind === 'tap' || move.kind === 'double')) move = NONE
-    jumpLine = jumpNear
+    // ... down the middle, but for a lip flown onto a platform: its line slants off it (the guide's)
+    jumpLine = jumpNear && !flyLips.includes(jump.lip)
     const takeOffMost = !jumpNear
       ? Infinity
       : cue

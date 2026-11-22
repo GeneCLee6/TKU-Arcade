@@ -115,6 +115,7 @@ export const TRACK_SONGS: Record<RaceTrackId, SongId> = {
   guanyin: 'ridge',
   datun: 'ridge',
   zhuwei: 'steel',
+  breakwater: 'sunset',
 }
 
 /** A track made in the editor, or a test one, goes by its sky */

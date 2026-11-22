@@ -8,9 +8,12 @@
 // drift that misses the lane's mouth meets the island's nose); four square corners on end round
 // the blocks, each a drift; and an S through a last gate onto the straight. Flat. The layout is
 // ours; no other game's track was looked at.
+import { branchPath, gatesClearOf, routeRoad, type BranchJson } from '../branches.ts'
 import { TRACK_FORMAT, type TrackJson } from '../track.ts'
 import { circuit } from './circuit.ts'
+import { guideFor, type TrackGuide } from './guide.ts'
 import { fitted, lay, LAY_SAMPLE, left, line, right } from './lay.ts'
+import { blockDetour, straightPlatform } from './platform.ts'
 
 /** The roundabout: its road is this wide, and road points this wide or wider carry the island */
 export const ROUNDABOUT_WIDTH = 84
@@ -20,6 +23,19 @@ export const ROUNDABOUT_RADIUS = 60
 /** Where the island lies across it, metres right of the middle: inside it is the shortcut */
 export const ISLAND_INNER = 16
 export const ISLAND_OUTER = 20
+
+/**
+ * The night market's roofs (2026-11-23, revision 3): the road up the ramp and beside the face; the
+ * ramp's height, the roofs'; their width, face, how far left of the road's line they are and the
+ * line they then run on (the road comes back on it after the blocks)
+ */
+const ROOFS_ROAD = 28
+const ROOFS_LIP = 2.5
+const ROOFS_TOP = 2.9
+const ROOFS_WIDTH = 12
+const ROOFS_FACE = 34
+const ROOFS_SIDE = 21
+const ROOFS_LINE = ROOFS_SIDE + (ROOFS_SIDE / ROOFS_FACE) * 15
 
 const laid = lay(
   [
@@ -42,15 +58,12 @@ const laid = lay(
     right(180, ROUNDABOUT_RADIUS, ROUNDABOUT_WIDTH, { mid: 'island' }),
     line(80, 34),
     left(90, 38, 32),
-    line(40, 32, { mid: 'pad2' }),
-    // The blocks: four square corners on end
-    right(90, 36, 30),
-    line(24, 30),
-    left(90, 36, 30),
-    line(24, 30),
-    left(90, 36, 30),
-    line(24, 30),
-    right(90, 36, 30),
+    // The blocks: four square corners on end, round the night market's roofs. Since 2026-11-23 a
+    // ramp before them, a straight to come down on, and the roofs a high platform on the left,
+    // straight on past them (shared/kart/ledges.ts); the road comes back on the roofs' line
+    line(70, ROOFS_ROAD, { mid: 'pad2', mark: 'roofsLip' }),
+    line(64, ROOFS_ROAD),
+    ...blockDetour(1, 36, 24, 24, 30, 'roofs', { shift: ROOFS_LINE }),
     // Home: a right, a row of boxes, an S through the last gate, and the right onto the straight
     fitted(34, { mid: 'pad3' }),
     right(90, 40, 34),
@@ -60,7 +73,8 @@ const laid = lay(
     left(60, 45, 32),
     line(30, 34),
     right(90, 34, 36),
-    line(110, 38),
+    // 2026-11-23: longer by the roofs' ramp and landing straight on the far side
+    line(210, 38),
   ],
   { width: 38 },
 )
@@ -69,6 +83,7 @@ const made = circuit({
   control: laid.control,
   sample: LAY_SAMPLE,
   line: [0, 0],
+  jumps: [[...laid.marks.roofsLip!, ROOFS_LIP]],
   pads: [
     [...laid.marks.pad1!, 8],
     [...laid.marks.pad2!, -7],
@@ -84,21 +99,61 @@ const made = circuit({
   ],
 })
 
+const at = (mark: string) => made.nearest(...laid.marks[mark]!)
+// The roofs: from the ramp's lip, off to the left, to where the road is back on their line, a
+// drop at the end (2026-11-23)
+const roofs = straightPlatform(made.road, at('roofsLip'), at('roofsBack') + 4, {
+  width: ROOFS_WIDTH,
+  mouth: ROOFS_ROAD - 4,
+  end: 10,
+  face: ROOFS_FACE,
+  side: -ROOFS_SIDE,
+  merge: 0,
+  top: ROOFS_TOP,
+  downAt: 70,
+  down: 0,
+  gaps: [{ at: 46, length: 10, depth: 1.5 }],
+})
+const branches: BranchJson[] = [roofs]
+const cleared = gatesClearOf(made.road, made.gates, made.respawns, branches)
+
+// ── The lines (2026-11-23) ──
+// The main road: one line for everyone
+export const DANHAI_GUIDE: TrackGuide = guideFor(made.road).build()
+// The route over the roofs (routes.ts drives it): up the ramp on its right, so as to cross it
+// slanting to the left
+const roofsPath = branchPath(made.road, roofs)
+const route = routeRoad(
+  {
+    road: made.road,
+    jumps: made.jumps,
+    forks: [{ from: roofs.from, to: roofs.to, path: roofsPath, jumps: (roofs.jumps ?? []).map((lip) => lip + 1) }],
+  },
+  [0],
+)
+const routeLines = guideFor(route.road)
+const roofsLip = route.main[roofs.from]!
+routeLines.tech.hold(roofsLip - 12, roofsLip - 4, 7, 2).chord([roofsLip - 4, 7], [roofsLip + 3, 0], 1.5)
+export const DANHAI_ROUTE_GUIDE: TrackGuide = routeLines.build()
+
 export const DANHAI: TrackJson = {
   format: TRACK_FORMAT,
   id: 'danhai',
   // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Danhai Night Circuit', 'zh-TW': '淡海夜城' },
-  revision: 2,
+  // 3: the night market's roofs, a high platform (2026-11-23)
+  revision: 3,
   theme: 'night',
   laps: 3,
   road: made.road,
-  gates: made.gates,
-  respawns: made.respawns,
+  gates: cleared.gates,
+  respawns: cleared.respawns,
   grid: made.grid,
   solo: made.solo,
   walls: made.walls,
   boostPads: made.boostPads,
   itemBoxes: made.itemBoxes,
   decor: [],
+  jumps: made.jumps,
+  branches,
 }
