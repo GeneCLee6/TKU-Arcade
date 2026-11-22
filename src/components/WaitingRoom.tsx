@@ -97,21 +97,21 @@ export function WaitingRoom({
 
   // Sharing the room: its number, link and QR code, whether it is listed, its password
   const invite = (
-      <Invite roomId={roomId} code={view.room.code ?? null}>
-        <Visibility
-          isPublic={view.room.public === true}
-          locked={view.room.password !== undefined}
-          onSet={isHost ? onSetPublic : undefined}
-        />
-        {(isHost || view.room.password !== undefined) && (
-          <Suspense>
-            <RoomPasswordSetting
-              password={view.room.password ?? null}
-              onSet={isHost ? onSetPassword : undefined}
-            />
-          </Suspense>
-        )}
-      </Invite>
+    <Invite roomId={roomId} code={view.room.code ?? null}>
+      <Visibility
+        isPublic={view.room.public === true}
+        locked={view.room.password !== undefined}
+        onSet={isHost ? onSetPublic : undefined}
+      />
+      {(isHost || view.room.password !== undefined) && (
+        <Suspense>
+          <RoomPasswordSetting
+            password={view.room.password ?? null}
+            onSet={isHost ? onSetPassword : undefined}
+          />
+        </Suspense>
+      )}
+    </Invite>
   )
   // The game and its options; the host's way to end the room
   const setup = (

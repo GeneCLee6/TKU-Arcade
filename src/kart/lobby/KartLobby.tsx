@@ -686,6 +686,8 @@ function ToolIcon({ d }: { d: string }) {
 const UPRIGHT = '(orientation: portrait) and (max-width: 700px)'
 /** A short screen (a phone on its side): everything a size smaller */
 const SHORT = '(max-height: 520px)'
+/** Too narrow for the title beside the tools: upright, or a small window */
+const NARROW = `${UPRIGHT}, (max-width: 640px)`
 
 const sweep = keyframes`
   0% { transform: translateX(-40%) skewX(-18deg); opacity: 0; }
@@ -791,8 +793,8 @@ const TopBar = styled.header`
     padding: 2px ${space.xs}px;
   }
 
-  /* Upright: the title on a row of its own, the tools under it */
-  @media ${UPRIGHT} {
+  /* Narrow: the title on a row of its own, the tools under it */
+  @media ${NARROW} {
     flex-wrap: wrap;
     justify-content: space-between;
   }
@@ -837,7 +839,7 @@ const TitleBlock = styled.div`
   gap: ${space.xs}px ${space.md}px;
   min-width: 0;
 
-  @media ${UPRIGHT} {
+  @media ${NARROW} {
     order: -1;
     flex-basis: 100%;
   }
