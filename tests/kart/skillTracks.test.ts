@@ -550,8 +550,9 @@ describe('the Viaduct Works', () => {
   const [deck, alley, cut] = track.forks!
 
   it('has three branches, each a road of its own that skips a good part of the lap', () => {
-    expect(track.forks).toHaveLength(3)
-    for (const fork of track.forks!) {
+    // 2026-11-23: and a fourth, the long shed's roof, a high platform (ledges.test.ts has its own)
+    expect(track.forks).toHaveLength(4)
+    for (const fork of track.forks!.filter((one) => one.rise === undefined)) {
       const mainLength = fork.to - fork.from
       expect(fork.path.length).toBeLessThan(mainLength)
       expect(fork.count).toBeGreaterThanOrEqual(3)

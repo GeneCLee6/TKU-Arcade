@@ -92,10 +92,11 @@ beforeEach(() => {
 
 describe('the missions', () => {
   // 2026-11-22 (#103): two more on Lock Gate Lane, one in technique, one in master
-  it('are 26, six or seven to a chapter, each with a name, on a track that exists', () => {
-    expect(MISSIONS).toHaveLength(26)
+  it('are 29, six to nine to a chapter, each with a name, on a track that exists', () => {
+    // 2026-11-23: three of high platforms (ledges.ts), one in technique and two in master
+    expect(MISSIONS).toHaveLength(29)
     expect(new Set(MISSIONS.map((one) => one.id)).size).toBe(MISSIONS.length)
-    expect(CHAPTER_IDS.map((chapter) => missionsOf(chapter).length)).toEqual([6, 7, 7, 6])
+    expect(CHAPTER_IDS.map((chapter) => missionsOf(chapter).length)).toEqual([6, 8, 9, 6])
     for (const one of MISSIONS) {
       expect(missionTrack(one.track).id).toBe(one.track)
       const key = `kart.challenge.mission.${one.id}` as keyof (typeof KART_CHALLENGE_MESSAGES)['en']
@@ -127,6 +128,9 @@ describe('the missions', () => {
     expect(missionContext(slots, missionTrack(slots.track), KART_TUNING).gates).toHaveLength(3)
     const branches = missionOf('branches')
     expect(missionContext(branches, missionTrack(branches.track), KART_TUNING).forkCount).toBe(3)
+    // ... and a platforms mission its platforms (2026-11-23)
+    const roofs = missionOf('roofs')
+    expect(missionContext(roofs, missionTrack(roofs.track), KART_TUNING).platforms).toEqual([0, 1, 2])
   })
 })
 
@@ -206,6 +210,27 @@ describe('the judge of a mission driven alone', () => {
     expect(good.done).toBe(true)
     const missed = run(all, [step({ fork: 0 }), step({ laps: 1 })], withForks)
     expect(missed).toMatchObject({ failed: true, why: 'branchMissed' })
+  })
+
+  it('the platforms: up onto every one every lap, by the platform reached (2026-11-23)', () => {
+    const all = mission({ kind: 'platforms', laps: 2 })
+    const withPlatforms = { ...context, platforms: [1, 3] }
+    const good = run(
+      all,
+      [
+        step({ platform: 1 }),
+        step({ platform: 3 }),
+        step({ laps: 1 }),
+        step({ platform: 3 }),
+        step({ platform: 1 }),
+        step({ laps: 2 }),
+      ],
+      withPlatforms,
+    )
+    expect(good.done).toBe(true)
+    // Down the branch below a platform is not up on it
+    const missed = run(all, [step({ platform: 1, fork: 3 }), step({ laps: 1 })], withPlatforms)
+    expect(missed).toMatchObject({ failed: true, why: 'platformMissed' })
   })
 
   it('the boost cover, judged at the finish', () => {

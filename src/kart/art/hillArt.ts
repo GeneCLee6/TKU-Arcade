@@ -32,9 +32,16 @@ const MARGIN = 260
  * The terrain the ground follows: the road's, but with each jump's ramp taken out (the ramp is a
  * wedge standing on the road, not a hump in the hillside)
  */
-function groundTerrain(terrain: Terrain): Terrain {
+function groundTerrain(terrain: Terrain, rises: readonly (number | undefined)[] = []): Terrain {
   const points = terrain.points.map((point) => ({ ...point }))
-  const forks = terrain.forks?.map((fork) => fork.map((point) => ({ ...point })))
+  // A high platform (2026-11-23, ledgeArt.ts) stands on a building, not on a hump of earth: the
+  // ground under it stays at its face's foot
+  const forks = terrain.forks?.map((fork, k) => {
+    const rise = rises[k]
+    if (rise === undefined) return fork.map((point) => ({ ...point }))
+    const foot = fork[rise - 1]!.y
+    return fork.map((point, index) => (index >= rise ? { ...point, y: Math.min(point.y, foot) } : { ...point }))
+  })
   const count = points.length
   for (const lip of terrain.lips) {
     // A branch's ramp (2026-11-20): on its own centre line, which is open at both ends
@@ -74,7 +81,10 @@ export function hillGround(
 ): ((x: number, z: number) => number) | null {
   const terrain = terrainOf(track)
   if (!terrain) return null
-  const ground = groundTerrain(terrain)
+  const ground = groundTerrain(
+    terrain,
+    (track.forks ?? []).map((fork) => fork.rise),
+  )
   return (x, z) => {
     // At a crossing (2026-11-22): the ground at the underpass beside it, the viaduct over it on its
     // deck (crossingArt.ts), not on a bank of earth across the underpass

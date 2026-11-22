@@ -1,6 +1,7 @@
 // Every track a race can be run on, by id (list.ts has the ids alone, for the first load). The
 // Worker judges laps on these (shared/games/kart/rules.ts) and the race screen draws them, so both
 // sides always agree on the gates.
+import { BREAKWATER } from './breakwater.ts'
 import { CUSTOM_PREFIX, customTrack, isCustomId } from '../editor/custom.ts'
 import { parseTrack, type Track, type TrackJson } from '../track.ts'
 import { DANHAI } from './danhai.ts'
@@ -32,6 +33,7 @@ export const RACE_TRACKS: Readonly<Record<RaceTrackId, TrackJson>> = {
   lanes: LANES,
   works: WORKS,
   zhuwei: ZHUWEI,
+  breakwater: BREAKWATER,
 }
 
 const parsed = new Map<string, Track>()

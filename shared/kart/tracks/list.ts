@@ -21,6 +21,8 @@ export const RACE_TRACK_IDS = [
   'works',
   // 2026-11-22: the technical showcase, a figure of eight over itself (shared/kart/levels.ts)
   'zhuwei',
+  // 2026-11-23: the high-platform track, three roofs beside the road (shared/kart/ledges.ts)
+  'breakwater',
 ] as const
 
 export type RaceTrackId = (typeof RACE_TRACK_IDS)[number]

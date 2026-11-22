@@ -33,6 +33,8 @@ export interface Sample {
   readonly resets: number
   /** The branch the kart is on (shared/kart/branches.ts's `forkAt`), -1 the main road */
   readonly fork: number
+  /** The high platform the kart is up on (shared/kart/ledges.ts's `onPlatform`), -1 none */
+  readonly platform?: number
 }
 
 /** A step of the game loop (spikeLoop.ts's SpikeStep) as a sample; null off a track */
@@ -46,6 +48,8 @@ export function sampleOf(
     readonly hitBefore: number
   },
   forkAt: (x: number, z: number) => number = () => -1,
+  /** 2026-11-23: the high platform a kart is up on, -1 none */
+  platformAt: (kart: KartState) => number = () => -1,
 ): Sample | null {
   const { trial } = step
   if (!trial) return null
@@ -61,6 +65,7 @@ export function sampleOf(
     hitBefore: step.hitBefore,
     resets: trial.run.resets,
     fork: forkAt(step.after.x, step.after.z),
+    platform: platformAt(step.after),
   }
 }
 
@@ -75,6 +80,7 @@ export type FailReason =
   | 'slotAround'
   | 'slotWall'
   | 'branchMissed'
+  | 'platformMissed'
   | 'lowCover'
   | 'place'
   | 'eliminated'
@@ -125,6 +131,8 @@ export interface JudgeContext {
   readonly gates?: readonly GateLine[]
   /** The branches mission: how many branches the track has */
   readonly forkCount?: number
+  /** The platforms mission: the track's high platforms, as their branches' indices */
+  readonly platforms?: readonly number[]
 }
 
 /** Only a crossing this near the road's middle is a crossing of a slot's wall */
@@ -143,6 +151,7 @@ export function targetOf(mission: Mission, context: Pick<JudgeContext, 'gates'>)
       return (context.gates?.length ?? 0) * mission.laps
     case 'finish':
     case 'branches':
+    case 'platforms':
       return mission.laps
     default:
       return mission.target ?? 1
@@ -255,6 +264,19 @@ export function judgeStep(
       if (sample.laps > next.laps) {
         const all = (1 << (context.forkCount ?? 0)) - 1
         if ((forks & all) !== all) return failed(next, 'branchMissed')
+        next = { ...next, forks: 0, laps: sample.laps, count: lapsDone }
+        if (lapsDone >= target) return passed(next, lapsDone, steps)
+      }
+      break
+    }
+    case 'platforms': {
+      // As the branches mission, by the platforms reached rather than the branches driven
+      const up = sample.platform ?? -1
+      const forks = up >= 0 ? next.forks | (1 << up) : next.forks
+      next = { ...next, forks }
+      if (sample.laps > next.laps) {
+        const all = (context.platforms ?? []).reduce((bits, fork) => bits | (1 << fork), 0)
+        if ((forks & all) !== all) return failed(next, 'platformMissed')
         next = { ...next, forks: 0, laps: sample.laps, count: lapsDone }
         if (lapsDone >= target) return passed(next, lapsDone, steps)
       }

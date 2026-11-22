@@ -35,6 +35,11 @@ export interface BranchJson {
   readonly road: readonly RoadPoint[]
   /** Jump lips, as indices into `road` (terrain.ts) */
   readonly jumps?: readonly number[]
+  /**
+   * A high platform (2026-11-23, ledges.ts): the point of `road` where the platform begins, its
+   * road stepping straight up there (a face only a flier clears). Left out on any other branch
+   */
+  readonly rise?: number
 }
 
 /** A branch, checked, with what it adds to the race worked out */
@@ -48,6 +53,8 @@ export interface Fork {
   readonly path: readonly RoadPoint[]
   /** Jump lips, as indices into `path` */
   readonly jumps: readonly number[]
+  /** A high platform (2026-11-23, ledges.ts): where it begins, as an index into `path` */
+  readonly rise?: number
   /** The main gates it goes round: the first one's index and how many (0: none) */
   readonly first: number
   readonly count: number
@@ -356,7 +363,14 @@ export function parseBranches(
   const count = road.length
   if (count < 4) return []
   const before = problems.length
-  const drafts: { from: number; to: number; path: RoadPoint[]; jumps: number[]; at: string }[] = []
+  const drafts: {
+    from: number
+    to: number
+    path: RoadPoint[]
+    jumps: number[]
+    rise?: number
+    at: string
+  }[] = []
   let total = count
   value.forEach((item, index) => {
     const at = `branches[${index}]`
@@ -364,7 +378,7 @@ export function parseBranches(
       problems.push(`${at}: not an object`)
       return
     }
-    const { from, to, road: own, jumps } = item as Record<string, unknown>
+    const { from, to, road: own, jumps, rise } = item as Record<string, unknown>
     if (
       !Number.isInteger(from) ||
       !Number.isInteger(to) ||
@@ -398,11 +412,20 @@ export function parseBranches(
       problems.push(`${at}.jumps: each a point of its road, once`)
       return
     }
+    // A platform's first point (2026-11-23, ledges.ts checks the rest once the branch is sound)
+    if (
+      rise !== undefined &&
+      (!Number.isInteger(rise) || (rise as number) < 1 || (rise as number) >= points.length)
+    ) {
+      problems.push(`${at}.rise: a point of its road, not the first`)
+      return
+    }
     drafts.push({
       from: from as number,
       to: to as number,
       path,
       jumps: lips.map((lip) => lip + 1),
+      ...(rise !== undefined ? { rise: (rise as number) + 1 } : {}),
       at,
     })
   })
@@ -437,6 +460,8 @@ export function parseBranches(
         !draft.jumps.includes(index) &&
         // A branch that leaves from a jump lip of the main road falls away with it, flown over
         !(index === 0 && mainJumps.includes(draft.from)) &&
+        // A platform's face (2026-11-23, ledges.ts): straight up, flown over
+        !(draft.rise !== undefined && index === draft.rise - 1) &&
         Math.abs((b.y ?? 0) - (a.y ?? 0)) > maxGrade * run
       ) {
         problems.push(`${at}: point ${index} steeper than ${maxGrade} to the next`)
@@ -490,7 +515,8 @@ export function parseBranches(
       problems.push(`${at}: the gates it goes round are not in a row`)
     }
     const along = distances(path)
-    const startAt = along[first]!
+    // On a platform (2026-11-23) the stand-ins are on the platform, never in front of its face
+    const startAt = along[Math.max(first, draft.rise ?? 0)]!
     const endAt = along[last]!
     const own: Gate[] = []
     const respawns: Spot[] = []
@@ -531,6 +557,7 @@ export function parseBranches(
       to: draft.to,
       path,
       jumps: draft.jumps,
+      ...(draft.rise !== undefined ? { rise: draft.rise } : {}),
       first: skipped[0] ?? 0,
       count: skipped.length,
       gates: own,

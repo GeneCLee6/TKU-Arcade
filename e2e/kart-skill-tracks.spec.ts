@@ -49,7 +49,8 @@ for (const [id, name] of TRACKS) {
     // The sheds, the rows and the fences are drawn on the map, over the road
     // (the works has fewer walls, and its branches drawn as roads of their own)
     await expect.poll(() => map.locator('line').count()).toBeGreaterThan(id === 'works' ? 8 : 40)
-    if (id === 'works') await expect(page.getByTestId('kart-minimap-branch')).toHaveCount(3)
+    // 2026-11-23: and the long shed's roof, a high platform, a fourth
+    if (id === 'works') await expect(page.getByTestId('kart-minimap-branch')).toHaveCount(4)
     await expect(page.getByTestId('kart-race-clock')).toBeVisible({ timeout: 20_000 })
     await expect
       .poll(async () => (await spike(page))?.frames ?? 0, { timeout: 40_000 })
@@ -82,6 +83,7 @@ test('the race against the computer and the Backstreet Cup offer the two tracks'
     'Hillside Lanes',
     'Viaduct Works',
     'Zhuwei Flyover',
+    'Breakwater Roofs',
   ])
 })
 
@@ -106,8 +108,8 @@ test('the driver who knows the works takes its branches: the map draws them, the
   await prepare(page)
   await page.goto('/kart/spike?track=works&autopilot=master')
   await expect(page.locator('canvas')).toBeVisible()
-  // Three branches on the map, each a road of its own
-  await expect(page.getByTestId('kart-minimap-branch')).toHaveCount(3)
+  // Three branches on the map, each a road of its own, and the long shed's roof (2026-11-23)
+  await expect(page.getByTestId('kart-minimap-branch')).toHaveCount(4)
   // The loading deck is entered by a drift jump off the first ramp, a few seconds from GO
   await expect
     .poll(async () => (await spike(page))?.state.driftJumps ?? 0, { timeout: 150_000 })

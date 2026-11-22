@@ -38,6 +38,7 @@ import { buildCornerDressing, buildCornerSigns } from './cornerArt.ts'
 import { buildCrossings } from './crossingArt.ts'
 import { buildFestival } from './festival.ts'
 import { buildForks } from './forkArt.ts'
+import { buildLedges } from './ledgeArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
 import { buildObstacleArt } from './obstacleArt.ts'
@@ -808,6 +809,11 @@ export function buildTrackArt(
     if (!harbour && !oldStreet) group.add(buildHillGround(kit, hillAt))
     for (const ramp of buildJumpRamps(kit)) group.add(ramp)
   }
+  // ── High platforms (2026-11-23, ledgeArt.ts): the buildings under them, their faces, their cues ──
+  const ledgeArt = buildLedges(
+    { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
+    groundAt,
+  )
   // ── A road over a road (2026-11-22, crossingArt.ts): the viaduct's deck, the underpass's walls ──
   buildCrossings({ track, level, group, textures, keep, own, ownTexture, standard, shadowed, place })
 
@@ -1004,6 +1010,9 @@ export function buildTrackArt(
   // 2026-11-22: the controls panel's switch hides the marks, also in a race already running
   skillCues?.setVisible(loadTrackCuesOn())
   const stopCues = skillCues ? onTrackCuesChange((on) => skillCues.setVisible(on)) : null
+  // ... and the high platforms' (2026-11-23)
+  ledgeArt?.setVisible(loadTrackCuesOn())
+  const stopLedgeCues = ledgeArt ? onTrackCuesChange((on) => ledgeArt.setVisible(on)) : null
 
   // ── Guanyin Hill Road's landmarks (2026-11-22, guanyinArt.ts): the ridge, the pavilion, the
   // temple, the river and its ferry pier ──
@@ -1052,12 +1061,14 @@ export function buildTrackArt(
       worksScenery?.update(seconds)
       wharfScenery?.update(seconds)
       skillCues?.update(seconds)
+      ledgeArt?.update(seconds)
     },
     clock(tick) {
       obstacleArt?.clock(tick)
     },
     dispose() {
       stopCues?.()
+      stopLedgeCues?.()
       for (const geometry of geometries) geometry.dispose()
       for (const material of materials) material.dispose()
       for (const texture of extraTextures) texture.dispose()

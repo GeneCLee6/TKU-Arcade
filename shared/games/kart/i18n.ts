@@ -25,6 +25,7 @@ const en = {
   'games.kart.track.wharf': 'Wharf Warehouses',
   'games.kart.track.works': 'Viaduct Works',
   'games.kart.track.zhuwei': 'Zhuwei Flyover',
+  'games.kart.track.breakwater': 'Breakwater Roofs',
   'games.kart.track.lanes': 'Hillside Lanes',
   // e10-t08: a track made in the editor (/kart/editor), given as its link
   'games.kart.track.custom': 'A track from the editor',
@@ -87,6 +88,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.track.wharf': '碼頭倉庫',
   'games.kart.track.works': '高架廠區',
   'games.kart.track.zhuwei': '竹圍高架',
+  'games.kart.track.breakwater': '防波堤屋頂',
   'games.kart.track.lanes': '山城坡巷',
   'games.kart.track.custom': '自訂賽道（編輯器）',
   'games.kart.option.custom': '自訂賽道',

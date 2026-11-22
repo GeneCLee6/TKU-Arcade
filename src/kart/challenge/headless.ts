@@ -2,6 +2,7 @@
 // page runs it: a mission on its own with a driver's hands on the kart (src/kart/bots/drivers.ts),
 // and the time trial of a track for its medals. `npm run kart:medals` and the tests use it. Pure.
 import { forkAt } from '../../../shared/kart/branches.ts'
+import { onPlatform, trackLedges } from '../../../shared/kart/ledges.ts'
 import { GHOST_STEPS, ghostAt, recordStep, startRecording, type Ghost } from '../../../shared/kart/ghost.ts'
 import { applyKart } from '../../../shared/kart/karts.ts'
 import {
@@ -47,8 +48,20 @@ export function missionContext(
     ...(mission.kind === 'slots'
       ? { gates: gateLines(track.road, trackGuide(track.id)?.slots ?? []) }
       : {}),
-    ...(mission.kind === 'branches' ? { forkCount: track.forks?.length ?? 0 } : {}),
+    // A high platform (2026-11-23) is a branch of its own mission, not of this one; the tracks lay
+    // theirs after their other branches
+    ...(mission.kind === 'branches'
+      ? { forkCount: (track.forks ?? []).filter((fork) => fork.rise === undefined).length }
+      : {}),
+    ...(mission.kind === 'platforms' ? { platforms: trackLedges(track).map((ledge) => ledge.fork) } : {}),
   }
+}
+
+/** Which high platform a kart is up on (2026-11-23): a function of the kart, -1 none */
+export function platformFinder(track: Track): (kart: { x: number; z: number; y?: number }) => number {
+  const ledges = trackLedges(track)
+  if (ledges.length === 0) return () => -1
+  return (kart) => onPlatform(track, ledges, kart)
 }
 
 /** Where a kart is among a track's branches: a function of its place, -1 the main road */
@@ -93,6 +106,7 @@ export function runMission(
   const course = trialCourse(track, mission.laps)
   const context = missionContext(mission, track, tuning, table)
   const findFork = forkFinder(track)
+  const findPlatform = platformFinder(track)
   const hands = makeDriver(track, tuning)
   const drive = mission.rules?.noN2O ? withoutN2O(hands) : hands
   const cap = Math.round(((context.limit ?? 120 * mission.laps) + 10) / STEP_SECONDS)
@@ -112,6 +126,7 @@ export function runMission(
         hitBefore: before.hitSpeed,
       },
       findFork,
+      findPlatform,
     )
     if (sample) judge = judgeStep(mission, judge, sample, context)
     if (judge.done || judge.failed) break
