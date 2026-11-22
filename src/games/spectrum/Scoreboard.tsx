@@ -7,7 +7,6 @@ import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { useT } from '../../i18n/useT.ts'
 import { displayType, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { byScore, gains } from './screenState.ts'
 
 /** Everyone's total, highest first, with what this round added once it is revealed */

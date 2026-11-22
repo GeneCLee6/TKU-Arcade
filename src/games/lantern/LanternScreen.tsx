@@ -9,7 +9,6 @@ import { glass, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { Lantern, type LanternLook } from './Lantern.tsx'
-import './messages.ts'
 import { answerKey, moonVotes, newsLines, promptOf, unlit } from './screenState.ts'
 
 /** If the room never answers a press, the button comes back after this */

@@ -5,7 +5,6 @@ import { Heading, List, Row, Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { seatColor } from '../../styles/tokens.ts'
 import { Body, Choice, Choices, Count, Muted, Name, Pill, Tag, Top } from './bluffParts.ts'
-import './messages.ts'
 import { deciders } from './screenState.ts'
 
 /** A seat to vote for or give the sticker to; `null` is "no sticker"; `undefined`, nothing picked yet */

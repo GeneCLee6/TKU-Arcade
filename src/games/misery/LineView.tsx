@@ -5,7 +5,6 @@ import { useT } from '../../i18n/useT.ts'
 import { SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { CardFace } from './MiseryCardFace.tsx'
-import './messages.ts'
 import { gapText } from './screenState.ts'
 
 export interface LineViewProps {

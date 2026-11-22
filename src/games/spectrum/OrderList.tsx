@@ -4,7 +4,6 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import { useT } from '../../i18n/useT.ts'
 import { clippedFill, displayType, slantClip } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { moveSeat } from './order.ts'
 
 export type OrderItem = { seat: SeatId; name: string; text: string }

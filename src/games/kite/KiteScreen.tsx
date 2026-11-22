@@ -16,7 +16,6 @@ import { glass, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { EmptySlot, KiteCard } from './KiteCard.tsx'
-import './messages.ts'
 import {
   ALL_RANKS,
   discardsBySuit,

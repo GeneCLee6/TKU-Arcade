@@ -1,6 +1,5 @@
 import type { TradersCard } from '../../../shared/games/traders/types.ts'
 import { useT } from '../../i18n/useT.ts'
-import './messages.ts'
 
 /** A card's words for a screen reader: its name, the good it gives, its points and cost */
 export function useCardLabel(): (card: TradersCard) => string {

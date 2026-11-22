@@ -5,7 +5,6 @@ import { Button } from '../../components/Button.tsx'
 import { useT } from '../../i18n/useT.ts'
 import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { playerOf, raiseSizes, toCallOf } from './screenState.ts'
 
 /**

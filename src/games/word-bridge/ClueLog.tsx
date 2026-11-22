@@ -4,7 +4,6 @@ import type { WbView } from '../../../shared/games/word-bridge/types.ts'
 import { Heading, Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { clueCount, turnsOf } from './screenState.ts'
 
 /** Every clue so far, newest first, with what each pick turned out to be */

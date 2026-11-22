@@ -5,7 +5,6 @@ import { Button } from '../../components/Button.tsx'
 import { useLanguage, useT } from '../../i18n/useT.ts'
 import { glass } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 
 /**
  * Your word, as big as a phone allows: the only secret this game has, cut by the server into your

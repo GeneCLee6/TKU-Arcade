@@ -7,7 +7,6 @@ import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { glass } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { actChoices, actKey, CLAIMS, isBluff, roleKey } from './screenState.ts'
 
 const COSTS: Partial<Record<PalaceAct, number>> = { storm: 7, arrest: 3 }

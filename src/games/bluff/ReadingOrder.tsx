@@ -7,7 +7,6 @@ import { useT } from '../../i18n/useT.ts'
 import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { Muted, Name, Pill } from './bluffParts.ts'
-import './messages.ts'
 import { readingStatus } from './screenState.ts'
 
 /** Who reads in what order, who reads now, and a call-out when it is you */

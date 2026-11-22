@@ -5,7 +5,6 @@ import type { Card } from '../../../shared/poker/hand.ts'
 import { useT } from '../../i18n/useT.ts'
 import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { CardBack, CardFace, CardSlot } from './PokerCard.tsx'
 import { seatSpots } from './screenState.ts'
 

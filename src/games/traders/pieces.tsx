@@ -5,7 +5,6 @@ import { useLanguage, useT } from '../../i18n/useT.ts'
 import { fontSize, space } from '../../styles/tokens.ts'
 import { tradersPieces as piece } from '../../styles/tradersTokens.ts'
 import { FILL, INK } from './goodColors.ts'
-import './messages.ts'
 
 // The game's pieces, drawn in code (no asset files): the five goods and gold as tokens, a card, a
 // patron. Each good has a shape as well as a colour, so that nobody needs to tell colours apart.
