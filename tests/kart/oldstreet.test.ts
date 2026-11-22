@@ -95,7 +95,7 @@ describe('the old street (N2 item track)', () => {
     expect(track.id).toBe('oldstreet')
     expect(RACE_TRACK_IDS).toContain('oldstreet')
     expect(raceTrack('oldstreet')?.road).toEqual(track.road)
-    expect(recordKey(track)).toBe('oldstreet@10')
+    expect(recordKey(track)).toBe('oldstreet@11')
     // The line is on the promenade, driven northwards (-z); the grid is behind it
     expect(track.road[0]!.x).toBeCloseTo(0)
     for (const place of track.grid) {
@@ -117,7 +117,8 @@ describe('the old street (N2 item track)', () => {
     )
     // Each lane, from the island to the kerb, measured on the walls themselves
     const kerbWalls = kerbs(track.road)
-    for (const wall of track.walls) {
+    // The island's walls (2026-11-22: the lantern alley's doorway, a wall with a top, is not one)
+    for (const wall of track.walls.filter((one) => one.top === undefined)) {
       for (const end of [
         { x: wall.ax, z: wall.az },
         { x: wall.bx, z: wall.bz },
@@ -155,7 +156,9 @@ describe('the old street (N2 item track)', () => {
   })
 
   it('splits the fork with a closed island of walls, clear of the respawns and the grid', () => {
-    const track = load()
+    // The island's walls alone (2026-11-22: the lantern alley's doorway has a top)
+    const loaded = load()
+    const track = { ...loaded, walls: loaded.walls.filter((one) => one.top === undefined) }
     const { first, last } = islandSpan(track.road)
     expect(first).toBeGreaterThan(0)
     expect(last - first).toBeGreaterThan(30)
