@@ -40,6 +40,8 @@ const pointing = (dx: number, dz: number) => Math.atan2(-dx, -dz)
 
 export interface SkillCues {
   update(seconds: number): void
+  /** Shows or hides every mark (the controls panel's track cues switch, ../trackCues.ts) */
+  setVisible(on: boolean): void
 }
 
 export function buildSkillCues(
@@ -169,6 +171,7 @@ export function buildSkillCues(
   }
 
   // ── Drawn ──
+  const drawn: InstancedMesh[] = []
   const chevron = chevronTexture(kit)
   const flat = kit.keep(new PlaneGeometry(CHEVRON * 0.8, CHEVRON))
   flat.rotateX(-Math.PI / 2)
@@ -189,6 +192,7 @@ export function buildSkillCues(
     marks.forEach((mark, index) => kit.place(mesh, index, mark.x, mark.y, mark.z, [1, 1, 1], mark.turn))
     mesh.renderOrder = 1
     kit.group.add(mesh)
+    drawn.push(mesh)
   }
   paint(pathMarks, skillCue.path)
   paint(jumpMarks, skillCue.jump)
@@ -201,6 +205,7 @@ export function buildSkillCues(
     const mesh = new InstancedMesh(lamp, material, where.length)
     where.forEach((one, index) => kit.place(mesh, index, one.x, one.y, one.z, [1, 1, 1]))
     kit.group.add(mesh)
+    drawn.push(mesh)
     pulsing.push({ material, base: new Color(hex), phase })
   }
   lamps(pathLamps, skillCue.path, 0)
@@ -211,6 +216,7 @@ export function buildSkillCues(
     const mesh = new InstancedMesh(kit.keep(new BoxGeometry(0.22, 1, 0.5)), material, strips.length)
     strips.forEach((one, index) => kit.place(mesh, index, one.x, one.y, one.z, [1, one.height, 1], one.turn))
     kit.group.add(mesh)
+    drawn.push(mesh)
   }
   if (posts.length > 0) {
     const mesh = new InstancedMesh(
@@ -220,6 +226,7 @@ export function buildSkillCues(
     )
     posts.forEach((one, index) => kit.place(mesh, index, one.x, one.y + POST_HEIGHT / 2, one.z, [1, 1, 1]))
     kit.group.add(kit.shadowed(mesh))
+    drawn.push(mesh)
   }
 
   return {
@@ -229,6 +236,9 @@ export function buildSkillCues(
         const beat = 0.55 + 0.45 * Math.max(0, Math.sin((seconds * 1.6 + one.phase) * Math.PI * 2))
         one.material.color.copy(one.base).multiplyScalar(beat)
       }
+    },
+    setVisible(on) {
+      for (const mesh of drawn) mesh.visible = on
     },
   }
 }
