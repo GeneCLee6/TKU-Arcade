@@ -9,10 +9,11 @@
 // -- --karts: every vehicle with the same hands too, -- --only-karts: only that, -- --who expert: one driver,
 // -- --vehicles swift,tide: only these vehicles; -- --school: the driving school's lessons instead)
 import { isKartId, KART_IDS } from '../shared/kart/karts.ts'
+import { trackLedges } from '../shared/kart/ledges.ts'
 import { ARCADE_TUNING, KART_TUNING } from '../shared/kart/physics.ts'
 import { trackGuide } from '../shared/kart/tracks/guides.ts'
 import { raceTrack } from '../shared/kart/tracks/registry.ts'
-import { DRIVER_IDS, type Measure } from './kart/drivers.ts'
+import { DRIVER_IDS, type Driver, type Measure } from './kart/drivers.ts'
 import { FEEL_DRIVERS, FEEL_TRACKS, feelRace, vehicleTable } from './kart/feel.ts'
 import { roadShape } from './kart/shape.ts'
 import { createDriver } from '../src/kart/bots/drivers.ts'
@@ -139,6 +140,33 @@ for (const [name, tuning] of CHOSEN) {
         `${''.padEnd(12)}timed landings: ${timed.toFixed(1)} a race, ${(without - top).toFixed(2)} s (${(((without - top) / without) * 100).toFixed(2)}%) against holding the throttle through the air`,
       )
     }
+  }
+}
+
+// 2026-11-23 (docs/KART-FEEL.md §24): what the high platforms are worth, track by track: the
+// master flying onto them against the same master kept to the main road there (`platforms: false`),
+// and the expert, who never goes for them. Each platform's least speed off its lip beside
+if (!ONLY_KARTS) {
+  const grounded: Driver = {
+    ...FEEL_DRIVERS.master,
+    skill: { ...FEEL_DRIVERS.master.skill, platforms: false },
+  }
+  console.log(`
+high platforms (classic): the mean of ${SEEDS} race${SEEDS > 1 ? 's' : ''} each, three laps`)
+  console.log('track       need (m/s)        master  platforms  kept off  saved          expert')
+  for (const id of FEEL_TRACKS) {
+    const track = raceTrack(id)!
+    const ledges = trackLedges(track)
+    if (ledges.length === 0) continue
+    const of = (driver: Driver) =>
+      Array.from({ length: SEEDS }, (_, at) => feelRace(id, driver, KART_TUNING, (at + 1) * 7))
+    const up = of(FEEL_DRIVERS.master)
+    const kept = mean(of(grounded).map((run) => run.seconds))
+    const expert = mean(of(FEEL_DRIVERS.expert).map((run) => run.seconds))
+    const top = mean(up.map((run) => run.seconds))
+    console.log(
+      `${id.padEnd(12)}${ledges.map((one) => one.need.toFixed(1)).join(' / ').padEnd(18)}${top.toFixed(1).padEnd(8)}${mean(up.map((run) => run.platforms)).toFixed(1).padEnd(11)}${kept.toFixed(1).padEnd(10)}${`${(kept - top).toFixed(1)} s (${(((kept - top) / kept) * 100).toFixed(1)}%)`.padEnd(15)}${expert.toFixed(1)}`,
+    )
   }
 }
 

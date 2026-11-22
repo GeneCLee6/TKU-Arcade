@@ -493,6 +493,22 @@ export const skillCue = {
 } as const
 
 /**
+ * 2026-11-23 (src/kart/art/ledgeArt.ts): the high platforms' buildings, by track: the walls under
+ * each roof, its parapet, and the face a flier clears (striped in skillCue's hazard colours)
+ */
+export const ledgeScene = {
+  walls: {
+    wharf: '#3E7CA8',
+    works: '#A7836A',
+    danhai: '#4A4E63',
+    breakwater: '#B9B3A6',
+    other: '#9A958C',
+  },
+  parapet: '#E8E2D4',
+  window: '#F5D27A',
+} as const
+
+/**
  * 2026-11-22 (#103): the moving obstacles (src/kart/art/obstacleArt.ts): the level crossing's posts,
  * striped arms and lamps, the container trolleys' rails, frames and beacons, the stop line
  */

@@ -73,7 +73,7 @@ const en = {
   'kart.school.how.start':
     'Watch the countdown. Press and hold {throttle} during the “1”, or within a quarter of a second after GO. Earlier is only a small boost.',
   'kart.school.how.jump':
-    'Start the drift before the ramp: about 0.3 s before the lip, hold {drift} and steer {right}, so the tail is already out, and keep holding through the air. Land, let go, press {throttle}.',
+    'Start the drift before the ramp: about 0.3 s before the lip, hold {drift} and steer {right}, so the tail is already out, and keep holding through the air. Land, let go, press {throttle}. The same slant off a lip takes you onto a high platform (the amber lamps along its face): the kart flies the way it leaves the ramp, so leave it already heading for the face, and fast: a charge of N2O fired up the ramp, or the instant boost out of the bend before it.',
   'kart.school.how.landing':
     'Go over the jump straight, the nose in line. In the air let go of {throttle}, and press it again just as the kart touches down: within a tenth of a second before or after is a timed landing, a longer boost than holding {throttle} through the air.',
   'kart.school.how.gap':
@@ -202,7 +202,7 @@ const zhTW: Record<KartSchoolKey, string> = {
   'kart.school.how.start':
     '看著倒數。在「1」那一秒內按住 {throttle}，或 GO 之後 0.25 秒內按下。更早按只有小加速。',
   'kart.school.how.jump':
-    '跳台前就開始甩：起跳前約 0.3 秒按住 {drift} 並往 {right} 打，讓車尾先甩出去，空中一直按著。落地後放開、按 {throttle}。',
+    '跳台前就開始甩：起跳前約 0.3 秒按住 {drift} 並往 {right} 打，讓車尾先甩出去，空中一直按著。落地後放開、按 {throttle}。同樣斜著離開跳台，就能飛上高台（側牆頂上一排琥珀燈的那種）：車子會照離開跳台的方向飛，所以起跳時車頭就要朝著高台，而且要夠快——上坡時噴一個 N2O，或前一個彎甩出瞬間加速。',
   'kart.school.how.landing':
     '直直飛過跳台、車頭對正。在空中先放開 {throttle}，車子快碰地時再按：落地前後十分之一秒內就是落地時機噴，比一路按著 {throttle} 落地的加速更長。',
   'kart.school.how.gap':

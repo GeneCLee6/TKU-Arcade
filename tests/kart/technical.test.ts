@@ -54,12 +54,12 @@ const PLAN: Record<
   lanes: { key: 'lanes@2', straight: 0.4, was: 0.4, longest: 220, jumps: 3, hilly: true },
   // 2026-11-20, the first with branches (branches.test.ts and skillTracks.test.ts have its own)
   // 2026-11-23: the long shed's roof (revision 3)
-  works: { key: 'works@3', straight: 0.42, was: 0.42, longest: 220, jumps: 2, hilly: true },
+  works: { key: 'works@3', straight: 0.42, was: 0.42, longest: 250, jumps: 2, hilly: true },
   // 2026-11-22, the technical showcase (levels.test.ts has its own): a figure of eight whose two
   // arms run straight over and under each other, so a little straighter than the rest
   zhuwei: { key: 'zhuwei@2', straight: 0.44, was: 0.44, longest: 270, jumps: 1, hilly: true },
   // 2026-11-23, the high-platform track: three ramps, each with a straight to come down on
-  breakwater: { key: 'breakwater', straight: 0.5, was: 0.5, longest: 300, jumps: 3, hilly: true },
+  breakwater: { key: 'breakwater', straight: 0.5, was: 0.5, longest: 370, jumps: 3, hilly: true },
 }
 
 const load = (id: RaceTrackId): Track => raceTrack(id)!

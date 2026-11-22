@@ -34,7 +34,7 @@ test('/kart’s menu opens the challenges: chapters, and the medal wall', async 
   const riverside = page.getByTestId('kart-challenge-medal-riverside')
   await expect(riverside).toContainText('Bronze')
   await expect(riverside).toContainText('???')
-  await expect(page.getByTestId('kart-challenge-medals').getByRole('article')).toHaveCount(13)
+  await expect(page.getByTestId('kart-challenge-medals').getByRole('article')).toHaveCount(14)
 
   await page.getByTestId('kart-challenge-exit').click()
   await expect(page.locator('canvas')).toBeVisible()

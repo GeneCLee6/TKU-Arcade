@@ -94,7 +94,9 @@ const TRACKS: Record<string, readonly [string, string]> = {
   guanyin: ['233004ea', '09cf9011'],
   mangrove: ['0268a3b6', 'ece42fe7'],
   fort: ['0d5d475b', 'ad851a43'],
-  danhai: ['ee3baecd', '0adde0a5'],
+  // 2026-11-23: Danhai has a high platform now (a branch, ledges.ts), its revision raised; this is
+  // what it was
+  // danhai: ['ee3baecd', '0adde0a5'],
   datun: ['c1fb29ca', '30d3c497'],
   lanes: ['f0104bee', 'e46f40e5'],
   // 2026-11-20: the wharf (a branch now) and the old street (redrawn for its boost cover) changed

@@ -59,6 +59,7 @@ import { broadcast, broadcastSolid, slam, ticker } from '../ui/broadcast.ts'
 import { supportsWebGL2 } from '../webgl.ts'
 import {
   forkFinder,
+  platformFinder,
   missionContext,
   missionTrack,
   targetGhost,
@@ -501,6 +502,7 @@ function MissionRun({ mission, onResult, onAgain, onNext, onList }: RunProps) {
   useEffect(() => {
     if (!stage.current || failure || !engine) return
     const findFork = forkFinder(track)
+    const findPlatform = platformFinder(track)
     const pilot: ((trial: Trial) => KartInput) | null = autopiloted
       ? createDriver(DRIVERS.master, track, setup.controls.tuning, 7)
       : null
@@ -533,7 +535,7 @@ function MissionRun({ mission, onResult, onAgain, onNext, onList }: RunProps) {
             }
           : {}),
         onStep: (step: SpikeStep) => {
-          const sample = sampleOf(step, findFork)
+          const sample = sampleOf(step, findFork, findPlatform)
           if (!sample) return
           judge.current = judgeStep(mission, judge.current, sample, context)
           const next = shownOf(judge.current)

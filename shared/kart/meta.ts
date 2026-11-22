@@ -26,13 +26,17 @@ export const TRACK_META: Readonly<Record<string, TrackMeta>> = {
   guanyin: { podium: ['petrel', 'heron', 'swift'], character: ['fast', 'climb'] },
   mangrove: { podium: ['heron', 'skipper', 'marlin'], character: ['technical', 'flat'] },
   fort: { podium: ['hornet', 'comet', 'pelican'], character: ['technical', 'climb'] },
-  danhai: { podium: ['comet', 'heron', 'tide'], character: ['technical', 'flat'] },
+  // 2026-11-23 (`npm run kart:meta -- --tracks wharf,works,danhai,breakwater`): the podiums of the
+  // four tracks with a high platform (shared/kart/ledges.ts), the master flying onto them
+  danhai: { podium: ['dolphin', 'pelican', 'ray'], character: ['technical'] },
   datun: { podium: ['dolphin', 'marlin', 'otter'], character: ['technical'] },
-  wharf: { podium: ['comet', 'hermit', 'crab'], character: ['descent'] },
+  wharf: { podium: ['shrimp', 'marlin', 'otter'], character: ['descent'] },
   lanes: { podium: ['dolphin', 'marlin', 'tide'], character: ['fast', 'descent'] },
-  works: { podium: ['dolphin', 'pelican', 'ray'], character: ['technical'] },
+  works: { podium: ['dolphin', 'otter', 'swift'], character: ['technical'] },
   // 2026-11-22: the technical showcase (`npm run kart:meta -- --tracks zhuwei`): wide bends, long arms
   zhuwei: { podium: ['heron', 'dolphin', 'marlin'], character: ['fast'] },
+  // 2026-11-23: three high platforms; the fastest kart (the egret, speed +2) on top
+  breakwater: { podium: ['heron', 'ray', 'dolphin'], character: ['fast'] },
 }
 
 /** A track's recommendations, or null for one without (a custom track, the test oval) */

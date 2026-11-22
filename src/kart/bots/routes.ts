@@ -41,7 +41,7 @@ export const ROUTE_LOOK = 16
  */
 export const LEDGE_COMMIT = 24
 const LEDGE_HOPE = 6
-export const LEDGE_MARGIN = 1
+export const LEDGE_MARGIN = 3
 const LEDGE_FIRE = 140
 /**
  * Stopped against a platform's face (on the ground in front of it, this slow, facing it within
@@ -59,6 +59,8 @@ const BACK_STEPS = 45
  */
 const AIM_FROM = 60
 const AIM_GAIN = 3
+/** ... and within this of the lip, metres, from where the kart will cross it */
+const AIM_NEAR = 25
 /** ... at the point this share of the way from the lip's middle to the face's (1: the face's) */
 const AIM_SHARE = 1
 
@@ -224,7 +226,17 @@ export function createTrackBrain(
       // A point on the way from the lip's middle to the face's: through the mouth, slanting
       const tx = aim.lip.x + (aim.faceX - aim.lip.x) * AIM_SHARE
       const tz = aim.lip.z + (aim.faceZ - aim.lip.z) * AIM_SHARE
-      const want = Math.atan2(tx - kart.x, -(tz - kart.z))
+      // ... seen from where the kart will cross the lip's line on the way it is going now
+      const speed = Math.hypot(kart.vx, kart.vz) || 1
+      const ux = kart.vx / speed
+      const uz = kart.vz / speed
+      const toLip = (aim.lip.x - kart.x) * aim.lip.dx + (aim.lip.z - kart.z) * aim.lip.dz
+      const along = Math.max(0.3, ux * aim.lip.dx + uz * aim.lip.dz)
+      const crossX = kart.x + ux * Math.max(0, toLip / along)
+      const crossZ = kart.z + uz * Math.max(0, toLip / along)
+      // (from afar, from the kart itself: the way it is going says little yet)
+      const near = toLip < AIM_NEAR
+      const want = Math.atan2(tx - (near ? crossX : kart.x), -(tz - (near ? crossZ : kart.z)))
       const steer = Math.max(-1, Math.min(1, wrapAngle(want - travel) * AIM_GAIN))
       chosen = { ...chosen, steer, drift: false }
     }
