@@ -218,7 +218,7 @@ export interface RaceViewProps {
    */
   onStep?: (step: SpikeStep) => void
   /**
-   * 2026-11-22 (§4.70): the menu over the race (Esc, Start, the button): what it offers, and whether
+   * 2026-11-22 (§4.72): the menu over the race (Esc, Start, the button): what it offers, and whether
    * the race stops while it is open (a race with no one else in it) or goes on (a room's)
    */
   pause?: RacePause
@@ -309,7 +309,7 @@ export default function RaceView({
     tuning: applyKart(loadTuning().tuning, loadout.body),
     enabled: true,
   }))
-  // 2026-11-22 (§4.70): what the loop reads every frame: the keys changed in the menu's controls, and
+  // 2026-11-22 (§4.72): what the loop reads every frame: the keys changed in the menu's controls, and
   // none while a room's menu is open (the race goes on, the kart takes no keys)
   const liveControls = useRef(settings)
   // 2026-11-20 (§4.50): a tip for a technique not yet used (not for a kart driving itself)
@@ -495,7 +495,7 @@ export default function RaceView({
     const timer = window.setTimeout(() => setPlaceShift(undefined), PLACE_SHIFT_MS)
     return () => window.clearTimeout(timer)
   }, [placeShift])
-  // 2026-11-22 (§4.70): after the first finish, the seconds left to everyone still out, with a tock
+  // 2026-11-22 (§4.72): after the first finish, the seconds left to everyone still out, with a tock
   // for each (shared/kart/opening.ts; the room closes the race at that moment)
   const closing = closeAt(view)
   const [closeTicks, setCloseLeft] = useState<number | null>(null)
@@ -576,7 +576,7 @@ export default function RaceView({
   // The track's name on the fly round's card; a custom track has none of its own here
   const courseKey = `kart.course.${view.track}`
   const courseTitle = courseKey in KART_MESSAGES.en ? t(courseKey as KartMessageKey) : null
-  // 2026-11-22 (§4.70): the driver in front of the camera during the opening
+  // 2026-11-22 (§4.72): the driver in front of the camera during the opening
   const presented = trial?.presenting != null ? view.racers[trial.presenting] : undefined
   const presentedLook = presented
     ? presented.seat === seat

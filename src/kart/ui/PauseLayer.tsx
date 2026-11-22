@@ -1,5 +1,5 @@
 // 2026-11-22 (owner: "against the computer, Esc pauses and opens the main menu: back to the lobby or
-// other settings"; docs/ARCHITECTURE.md §4.70): the menu over a race. Esc, Start on a gamepad or the
+// other settings"; docs/ARCHITECTURE.md §4.72): the menu over a race. Esc, Start on a gamepad or the
 // button on the screen opens it. A race with no one else in it (the time trial, against the computer,
 // a Grand Prix, the school, a challenge) stops while it is open: the race clock (race/raceClock.ts)
 // stands still, the music drops and the effects fall silent (audio/bus.ts). A room's race does not

@@ -235,7 +235,7 @@ export interface SpikeTrial {
   /** 2026-11-20 (§4.43): a race's fly round the grid before the countdown, not skipped */
   readonly intro: boolean
   /**
-   * 2026-11-22 (§4.70): during the opening, the driver in front of the camera (their place in the
+   * 2026-11-22 (§4.72): during the opening, the driver in front of the camera (their place in the
    * race's list, the pole first); null otherwise, or when not presented here
    */
   readonly presenting: number | null
@@ -636,7 +636,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   // §4.43: the fly round skipped (any key or touch), and when this kart crossed the line
   let skipped = false
   let finishedAt: number | null = null
-  // 2026-11-22 (§4.70): the countdown left at the last frame, for the 3, 2, 1 and GO beeps
+  // 2026-11-22 (§4.72): the countdown left at the last frame, for the 3, 2, 1 and GO beeps
   let beepFrom: number | null = null
   let wasPaused = false
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
@@ -652,7 +652,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     } else if (now - firstFrameAt >= TELEMETRY_AFTER_MS && !reported) {
       report(((debug.frames + 1) * 1000) / (now - firstFrameAt), loadMs, options.quality ?? 'high')
     }
-    // 2026-11-22 (§4.70): paused (a race with no one else in it, raceClock.ts), no time passes: no
+    // 2026-11-22 (§4.72): paused (a race with no one else in it, raceClock.ts), no time passes: no
     // step, no countdown, nothing moves; the picture is still drawn (the menu blurs it)
     const paused = isRacePaused()
     const frameMs = lastFrame === undefined || paused || wasPaused ? 0 : now - lastFrame
@@ -904,7 +904,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     const reduced = reducedMotion?.matches ?? false
     const left = net && trial?.phase === 'countdown' ? net.countdown() : null
     const introNow = !!net?.gridSpots && trial?.phase === 'countdown' && inIntro(left) && !skipped
-    // 2026-11-22 (§4.70): how the opening is shown here, each driver in turn by default
+    // 2026-11-22 (§4.72): how the opening is shown here, each driver in turn by default
     const settings = loadSettings()
     const opening = { drivers: settings.driverIntro, flyby: settings.flyby }
     const spotsNow = introNow && net?.gridSpots ? net.gridSpots() : null

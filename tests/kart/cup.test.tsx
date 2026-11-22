@@ -36,7 +36,7 @@ import { trophyShape } from '../../src/kart/cup/trophyShape.ts'
 // The menu song is fetched after the screen is up; a test file can end first, and the late import
 // then fails the run (EnvironmentTeardownError, seen in CI 2026-11-22). No song is tested here.
 vi.mock('../../src/kart/audio/useMenuMusic.ts', () => ({ useMenuMusic: () => {} }))
-// 2026-11-22 (§4.70): the 3D podium comes first; here only its skip button
+// 2026-11-22 (§4.72): the 3D podium comes first; here only its skip button
 vi.mock('../../src/kart/ceremony/PodiumCeremony.tsx', () => ({
   default: ({ onDone }: { onDone: () => void }) => (
     <button type="button" data-testid="kart-podium-skip" onClick={onDone} />

@@ -178,7 +178,7 @@ export function introShot(
   }
 }
 
-// ── Each driver presented (2026-11-22, docs/ARCHITECTURE.md §4.70) ────────────────────────────────
+// ── Each driver presented (2026-11-22, docs/ARCHITECTURE.md §4.72) ────────────────────────────────
 //
 // Before the 3, 2, 1, the camera stands in front of each kart in turn (grid order, the pole first),
 // low and close, looking at the driver's face, and drifts a little across it during the driver's

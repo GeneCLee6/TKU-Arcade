@@ -137,9 +137,12 @@ test('two people and a computer kart race one lap in one room', async ({ browser
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
   // Only the host gets the computer karts' panel
   await expect(bob.getByTestId('kart-room-bots')).toHaveCount(0)
-  // 2026-11-22: the easy one, behind: the room's ten seconds after the first finish count down
+  // 2026-11-22: the computer karts are in the waiting room's Room panel; the easy one, behind: the
+  // room's ten seconds after the first finish count down
+  await ann.getByTestId('kart-lobby-settings').click()
   await ann.getByTestId('kart-room-bots-level').selectOption('easy')
   await ann.getByTestId('kart-room-bots-add').click()
+  await ann.getByRole('button', { name: 'Close' }).click()
   for (const page of [ann, bob]) {
     await expect(page.getByTestId('bot-member')).toHaveText(/\(CPU\)$/)
   }
@@ -154,7 +157,7 @@ test('two people and a computer kart race one lap in one room', async ({ browser
   for (const page of [ann, bob]) {
     await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 90_000 }).toBe(2)
   }
-  // 2026-11-22 (§4.70): Esc in a room opens the menu, and the race goes on
+  // 2026-11-22 (§4.72): Esc in a room opens the menu, and the race goes on
   await bob.keyboard.press('Escape')
   await expect(bob.getByTestId('kart-pause-live')).toBeVisible()
   await expect(bob.getByTestId('kart-pause-leave')).toBeVisible()

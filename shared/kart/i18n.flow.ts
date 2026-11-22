@@ -1,4 +1,4 @@
-// The race's flow (owner 2026-11-22; docs/ARCHITECTURE.md §4.70): the pause menu, the settings, each
+// The race's flow (owner 2026-11-22; docs/ARCHITECTURE.md §4.72): the pause menu, the settings, each
 // driver presented before the start, the countdown after the first finish and the podium. Merged
 // into KART_MESSAGES (i18n.ts), so the same check covers them. `en` is the source.
 const en = {

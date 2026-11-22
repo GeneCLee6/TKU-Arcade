@@ -238,7 +238,7 @@ export function createKartScene(
   const settings = QUALITY[quality]
   const farAt = FAR_KART[quality]
   const software = softwareRenderer()
-  // 2026-11-22 (§4.70): the effects level may develop the picture less than the quality would
+  // 2026-11-22 (§4.72): the effects level may develop the picture less than the quality would
   const raceSettings = loadSettings()
   const postLevel = software ? 'off' : cappedPost(settings.post, raceSettings.effects)
   const shakeScale = raceSettings.shake ? 1 : 0

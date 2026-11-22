@@ -1,4 +1,4 @@
-// 2026-11-22 (owner: "against the computer, Esc pauses"; docs/ARCHITECTURE.md §4.70): the clock a
+// 2026-11-22 (owner: "against the computer, Esc pauses"; docs/ARCHITECTURE.md §4.72): the clock a
 // race in this browser runs by, which a pause stops. Everything that times a race here reads it in
 // place of performance.now() and Date.now(): the race loop's steps (spikeLoop.ts), the room's clock
 // and its pings (netRace.ts), the computer karts and the race room in this browser (bots/). Stopped,

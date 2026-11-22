@@ -45,7 +45,7 @@ test('a one-race cup from the menu to the podium, kept across reloads', async ({
   await expect(results.getByTestId('kart-bots-again')).toHaveCount(0)
   await results.getByTestId('kart-cup-next').click()
 
-  // 2026-11-22 (§4.70): the cup's top three on the 3D podium first, skipped by its button
+  // 2026-11-22 (§4.72): the cup's top three on the 3D podium first, skipped by its button
   await expect(page.getByTestId('kart-podium')).toBeVisible()
   await page.getByTestId('kart-podium-skip').click()
   const podium = page.getByTestId('kart-cup-podium')

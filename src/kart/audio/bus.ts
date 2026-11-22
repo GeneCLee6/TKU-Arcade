@@ -31,7 +31,7 @@ let bus: (KartBus & {
 }) | null = null
 let applied = ''
 /**
- * 2026-11-22 (the pause menu, docs/ARCHITECTURE.md §4.70): while paused the music drops to this
+ * 2026-11-22 (the pause menu, docs/ARCHITECTURE.md §4.72): while paused the music drops to this
  * share and the effects and the ambience fall silent (the engine would idle on otherwise)
  */
 export const PAUSED_MUSIC = 0.3

@@ -29,6 +29,15 @@ const en = {
   'games.kart.lobby.map': 'The track from above',
   'games.kart.lobby.spectators': 'Watching',
   'games.kart.lobby.sameLine': 'Every kart starts side by side on the same line.',
+  'games.kart.lobby.racers': '{count}/{max} racers',
+  'games.kart.lobby.room': 'Room',
+  'games.kart.lobby.roomTitle': 'Room settings',
+  'games.kart.lobby.manage': 'Manage {name}',
+  'games.kart.lobby.quickest': 'Quickest here',
+  'games.kart.lobby.yourKart': 'Your kart',
+  'games.kart.lobby.sideways': 'Turn your phone sideways to see the whole line-up.',
+  'games.kart.lobby.watchingList': 'Watching: {names}',
+  'games.kart.lobby.lineUp': 'The racers',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -59,6 +68,15 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.lobby.map': '賽道俯視圖',
   'games.kart.lobby.spectators': '觀戰中',
   'games.kart.lobby.sameLine': '所有車並排在同一條起跑線上出發。',
+  'games.kart.lobby.racers': '{count}/{max} 位車手',
+  'games.kart.lobby.room': '房間',
+  'games.kart.lobby.roomTitle': '房間設定',
+  'games.kart.lobby.manage': '管理 {name}',
+  'games.kart.lobby.quickest': '這張圖最快',
+  'games.kart.lobby.yourKart': '你的車',
+  'games.kart.lobby.sideways': '把手機轉橫，就能看到完整的出賽陣容。',
+  'games.kart.lobby.watchingList': '觀戰：{names}',
+  'games.kart.lobby.lineUp': '車手',
 }
 
 export const kartLobbyMessages = { en, 'zh-TW': zhTW }

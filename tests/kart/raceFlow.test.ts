@@ -47,7 +47,7 @@ import { gesturePose } from '../../src/kart/driverGestures.ts'
 import { bytes, driveFrames } from './raceDriver.ts'
 
 // 2026-11-22 (owner: "Esc pauses, a ten-second countdown after the first finish, a podium, each
-// driver's face at the start, sounds for 3-2-1-GO, a settings menu"; docs/ARCHITECTURE.md §4.70)
+// driver's face at the start, sounds for 3-2-1-GO, a settings menu"; docs/ARCHITECTURE.md §4.72)
 
 const track = raceTrack('riverside') as Track
 const GO = 1_000_000

@@ -1,4 +1,4 @@
-// 2026-11-22 (owner: "at the end, an animated podium for the top three"; docs/ARCHITECTURE.md §4.70):
+// 2026-11-22 (owner: "at the end, an animated podium for the top three"; docs/ARCHITECTURE.md §4.72):
 // after every race against others (a room, against the computer, each race of a Grand Prix, and the
 // cup's final podium), before the results. The 3D stage (podiumStage.ts) with each place's name plate
 // slammed in over it as its light comes up, confetti with the winner, about seven seconds, then the

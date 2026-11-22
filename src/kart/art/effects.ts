@@ -260,7 +260,7 @@ export function createKartEffects(
   const SKIDS = lite ? 1200 : FULL_SKIDS
   const RIBBON = lite ? 16 : FULL_RIBBON
   const texture = softTexture()
-  // 2026-11-22 (§4.70, src/kart/settings.ts): the effects level lays fewer of them
+  // 2026-11-22 (§4.72, src/kart/settings.ts): the effects level lays fewer of them
   const share = PARTICLE_SHARE[loadSettings().effects]
   let clock = 0
 

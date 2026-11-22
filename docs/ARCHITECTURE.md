@@ -1575,11 +1575,36 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **Esc**：真全螢幕時 Esc 是瀏覽器的（頁面攔不到），離開後頁面靠 `fullscreenchange`（含 `webkitfullscreenchange`）跟上；Chrome／Edge 桌機進入後用 Keyboard Lock 保留 Esc（`navigator.keyboard.lock(['Escape'])`），所以比賽的 Esc 先開暫停選單、長按 Esc 才離開全螢幕。專注模式沒有瀏覽器幫忙，Esc 由這裡處理，但有 `<dialog open>` 或畫面自己用掉這個 Esc（`event.preventDefault()`）時不動作——**要自己用 Esc 的畫面（暫停選單）請 `preventDefault()`**。
 - **自動全螢幕**（設定，預設關，`localStorage` `tku-arcade.fullscreen.auto`）：`autoFullscreen()`／`setAutoFullscreen()`／`useAutoFullscreen()`；瀏覽器只准從使用者動作進全螢幕，所以 `armAutoFullscreen()` 掛一次性的 `keydown`／`pointerdown`（捕獲階段，Esc 除外），比賽的第一個鍵或第一下觸控就進去；只用真全螢幕，不會無預警進專注模式。
 - **手機轉橫**：`lockLandscape()`／`unlockOrientation()`（`screen.orientation.lock('landscape')`，Chrome Android 只在全螢幕或已安裝的 app 有效，其他瀏覽器拒絕就維持現有的轉橫提示）。`src/kart/race/useRaceFullscreen.ts` 在比賽中：掛自動全螢幕、觸控裝置嘗試鎖橫（一進來先試一次給已安裝的 app，進全螢幕時再試）、離開比賽解鎖。
-- **按鈕**（`src/components/FullscreenButton.tsx`，自己的 lazy chunk，字串 `shared/games/i18n.fullscreen.ts` 由它登記、`screenMessages.ts` 列給 check-i18n）：每個房間標題列（桌遊等待室與遊戲中、卡丁車觀戰與結果）、卡丁車單機選單（`SpikePage.tsx`，`landscape`：進全螢幕順便鎖橫）；卡丁車等待室的在下一個 PR（§4.70）。比賽中由暫停選單（`feat/kart-race-flow`）提供。
+- **按鈕**（`src/components/FullscreenButton.tsx`，自己的 lazy chunk，字串 `shared/games/i18n.fullscreen.ts` 由它登記、`screenMessages.ts` 列給 check-i18n）：每個房間標題列（桌遊等待室與遊戲中、卡丁車觀戰與結果）、卡丁車單機選單（`SpikePage.tsx`，`landscape`：進全螢幕順便鎖橫）、卡丁車等待室（§4.70）。比賽中由暫停選單（`feat/kart-race-flow`）提供。
 - **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
 - **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
 
-### 4.70 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，#152，`feat/kart-race-flow`）
+### 4.70 路線圖外：卡丁車等待室滿版（一頁、橫向、車手為主角）（2026-11-22，#151，`feat/kart-lobby-fullscreen`）
+
+擁有者：「大廳準備階段的畫面要像跑跑一樣，全螢幕都是房主跟車手，現在的版面配置很醜也很空曠，要一頁就塞滿，橫向的寬的…總之要電競化專業化」。照規則 1 只學「準備畫面滿版、車手為主角」的類型排版；版面、美術、圖示是自己的（`IP-CHECKLIST.md`）。
+
+- **滿版**（`src/kart/lobby/KartLobby.tsx`）：等待室本身 `position: fixed; inset: 0`（z-index 9：蓋過頁面與 TopBar 5，在 toast 10、更新提示 11 之下），一頁不捲動；`inertOthers` 讓後面的房間標題、頁尾連結不能 Tab 到、`<html>` 的 `overflow: hidden`。重新連線的橫幅（`RoomPage.tsx` 的 `ConnectionStatus`）提高到 z-index 10 並 `data-inert-keep`，蓋在等待室上面。
+- **版面**：上方一條轉播風格的列（返回大廳、「出賽陣容」標題、`n/8 位車手`、工具鈕：邀請、聊天（未讀數）、團隊賽才有的分隊、房間（房主是「房間設定」）、怎麼玩、全螢幕）；主體左邊 8 格、右邊側欄（`clamp(170px, 22vw, 320px)`）：賽道卡（`TrackCard.tsx`：名稱、俯視圖撐滿剩下的高度、圈數／模式／團隊賽、「這張圖最快」三台 `trackMeta`）、車庫鈕（顯示自己的車與車手）、大的「準備」（房主「開始遊戲」，等全員時發光脈動；不能開始時說在等誰）、站起來、觀戰名單。8 格是 4×2；`Line` 是 `container-type: size`，容器寬高比 ≥ 3:1（超寬螢幕）時改 8×1。
+- **每格**：3D 車手正面（`lobbyStage.ts`）佔滿上方、底下名牌條：名字、車款·車手、車系／等級／電腦難度／隊名標籤、準備狀態大字（準備完成＝綠框、閃一下、字「砸進來」`slam`；房主＝主題色框）；左上號位 `01`～`08`、房主皇冠、電腦、你；房主在別人的格子右上有「⋯」開管理對話框（電腦車移除、轉移房主、踢出，原本擠在格子裡的按鈕）。名牌條上緣是隊色（團隊賽）或主題色。空位：大「＋」、入座、房主在第一個空位「加電腦車」（一按一台，難度用房間設定裡的）。
+- **3D 的成本**（`lobbyStage.ts`）：還是一個共用 renderer 畫完複製到各格。離屏畫面跟著格子大小（`ResizeObserver`，20 px 一階，最大 380×420、最小 80），所有格子共用一個尺寸；鏡頭距離依寬高比算到車寬剛好放進格子（3.1～5.8），高的格子鏡頭抬高一點。像素比桌機 ≤ 1.5、手機 1；每幀畫的格數桌機 8、手機 3（`pointer: coarse` 或短邊 < 500），33 ms 一幀，看不到或分頁隱藏不畫，`prefers-reduced-motion` 每格只畫一次。three.js 照舊等卡片出現後才 lazy 載。
+- **沒有 WebGL（或 3D 還沒來）**：`KartArt.tsx` 平面畫：車的正面（車殼、輪、霓虹線用 `kartBodies` 的顏色）＋安全帽與面罩（`kartDrivers`）＋地上光暈；3D 來了就藏起來。
+- **直拿手機**（`orientation: portrait` 且寬 ≤ 700）：改成可以捲的列表（每位一列：左邊 96 px 平面圖、右邊名牌），側欄在上、最上面一條「把手機轉橫」提示；3D 不畫（canvas 隱藏，`IntersectionObserver` 看不到就不畫）。
+- **工具收進對話框**：邀請（房號、連結、QR、公開／私人、密碼，`WaitingRoom.tsx` 的 `invite`）、房間（`GameSetup` 選賽道與選項、解散、房主的電腦車 `RoomBots`、每個人自己的「進比賽時自動全螢幕」勾選）、分隊（`RoomTeams`）、聊天（對話框裡的 `ChatPanel`；`RoomPage` 對卡丁車等待室不再放右欄聊天或手機底部聊天列，改傳 `chat`＝`{ panel, messages, unreadCount }` 進來。**聊天面板與 `chatState` 由 `RoomPage` 做好傳下去，不在 `KartLobby` 或 `WaitingRoom` import**：兩層 lazy 之下再 import 房間 chunk 裡的模組，rolldown 會把它們（連同 `MemberEntry`、`Drawer`、`Countdown` 等）拆成獨立小 chunk，每款遊戲首屏多 3.3 kB——實測卡丁車 135.0 → 138.4 kB）、車庫、管理某人。`WaitingRoom` 新的 props：`chat`、`onLeave`；`KartLobby` 的 `side` 拆成 `invite`、`setup`。
+- **全螢幕**（§4.69）：上方列的全螢幕鈕（`landscape`：手機進全螢幕順便鎖橫）；「自動全螢幕」打開時，按「準備」或「開始遊戲」就是瀏覽器要的那一下，直接進全螢幕。
+- **字串**：`shared/games/kart/i18n.lobby.ts` 多 9 個（`racers`、`room`、`roomTitle`、`manage`、`quickest`、`yourKart`、`sideways`、`watchingList`、`lineUp`）；`TrackCard` 的「各自為戰」不再寫（團隊賽才寫）。
+- **測試**：`tests/kart/lobby.test.tsx` 多 4 個（房間面板裡的電腦車與自動全螢幕設定、只有房主有管理鈕且能移除電腦車、車手數、3D 來之前的平面圖與最快車）；`e2e/kart-lobby.spec.ts`（新）：1280×720 與 844×390（觸控）房主＋Bob＋6 台電腦車：滾輪不動、等待室沒有捲動、8 格都完整在畫面內且高度 > 畫面 1/3、準備流程、axe 0 serious（含房間設定對話框）、聊天未讀數；等待室全螢幕進出；390×844 直拿是列表＋轉橫提示＋axe。`kart-race`／`kart-loading`／`kart-team`／`kart-editor` 改成從面板操作（房間設定、分隊、空位的加電腦車）。截圖：`KART_LOBBY_SHOTS=1` 時存到 `test-results/kart-lobby-*.png`。
+
+### 4.71 路線圖外：房間連線的穩定度（2026-11-22，`feat/net-stability-bots`，#149）
+
+擁有者：「常常連線不穩。」原因、修法與前後數字在 `docs/NETWORK.md`。架構上的改變：
+
+- **協定**：`STALE_AFTER_MS` 45 → 90 s（背景分頁的 ping 一分鐘一次也不會被關）；頁面自己的「三次 ping 沒回就換」不再綁這個數字。4429 改成可重試的關閉碼（`canReconnectAfter`）。`/ws/<id>?v=2&resume=1`：斷線後的重連嘗試，Worker 在 `socket` 桶用完後再拿 `resume` 桶（240／分）。沒有升版。
+- **頁面**（`connectRoom`）：第一次連線失敗重試 20 s；4429 後至少等 20 s；重連期間 `send` 排隊（16 個、10 s），`welcome` 後送出，逾時的給 `onUnsent`；`send(message, false)` 不排隊（聊天、`set_look`、`leave`、替電腦車送的動作）；`onResumed`（重連 `welcome` 後、頁面隱藏 ≥ 1 s 再出現）→ `RoomRealtime.onResume` → 卡丁車重新對時；`reconnectNow()`；也聽 Page Lifecycle 的 `resume`。
+- **畫面**：`ConnectionBanner.tsx`（1 s 後出現、6 s 後「立刻重試」、回來時「已重新連線。」2.5 s）。
+- **RoomDO**：跑到 `webSocketMessage` 的 `ping` 也記心跳。
+- **工具**：`scripts/net-soak.ts`（`npm run net:soak`）；`e2e/network.spec.ts`。
+
+### 4.72 路線圖外：比賽流程電競化（暫停選單、車手亮相、倒數音效、完賽 10 秒倒數、頒獎台、設定）（2026-11-22，#152，`feat/kart-race-flow`）
 
 擁有者 2026-11-22：「按 esc 就可以暫停然後可以打開主選單……當第一台車完賽後倒數 10 秒，到了的車才能排名，然後最後要有前 3 名頒獎畫面動畫……地圖一開始要有每個車手的正面動畫，然後才是 321 倒數，倒數要有音效，GO 也要有音效，選單可以調節音量音效大小，動畫特效等等。」流程是類型慣例；畫面、聲音、文字全部自己做（`IP-CHECKLIST.md` 卡丁車 2026-11-22 補記）。
 
@@ -1625,16 +1650,6 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **測試**：`tests/kart/raceFlow.test.ts`（開場 8 人 ≤ 10 s、亮相 ≤ 6 s、照順序每位車手、鏡頭在車手正前方且最後接上全景、關掉亮相改繞場；倒數音效 3、2、1、GO 各一次且 GO 較亮；完賽倒數音效；伺服器 10 秒後第一個 frame 結束比賽、未完賽依進度排名、看不到的依圈數、壞的 progress 拒絕、玩家不能 close；團隊賽計分；暫停時比賽時鐘與房間時鐘一起停、恢復後不補時間、0 秒的一幀不跑物理；設定預設與逐欄回復、特效上限；頒獎台只放完賽的前三名、揭曉順序與時間、鏡頭、舉獎盃姿勢）；`tests/games/kart.test.ts`、`tests/worker/room-realtime.test.ts`、`tests/kart/roomBots.test.ts`（倒數改 `countdownMs(n)`、close 計時器）；e2e `kart-bots`（亮相卡、Esc 暫停時 tick 不動、設定、繼續後再動、頒獎台後才是結果）、`kart-race`（多人房 Esc 只開選單、完賽倒數、頒獎台、結果）、`kart-cup`（每場與總頒獎台）、`kart-watch-portrait`。
 
-
-### 4.71 路線圖外：房間連線的穩定度（2026-11-22，`feat/net-stability-bots`，#149）
-
-擁有者：「常常連線不穩。」原因、修法與前後數字在 `docs/NETWORK.md`。架構上的改變：
-
-- **協定**：`STALE_AFTER_MS` 45 → 90 s（背景分頁的 ping 一分鐘一次也不會被關）；頁面自己的「三次 ping 沒回就換」不再綁這個數字。4429 改成可重試的關閉碼（`canReconnectAfter`）。`/ws/<id>?v=2&resume=1`：斷線後的重連嘗試，Worker 在 `socket` 桶用完後再拿 `resume` 桶（240／分）。沒有升版。
-- **頁面**（`connectRoom`）：第一次連線失敗重試 20 s；4429 後至少等 20 s；重連期間 `send` 排隊（16 個、10 s），`welcome` 後送出，逾時的給 `onUnsent`；`send(message, false)` 不排隊（聊天、`set_look`、`leave`、替電腦車送的動作）；`onResumed`（重連 `welcome` 後、頁面隱藏 ≥ 1 s 再出現）→ `RoomRealtime.onResume` → 卡丁車重新對時；`reconnectNow()`；也聽 Page Lifecycle 的 `resume`。
-- **畫面**：`ConnectionBanner.tsx`（1 s 後出現、6 s 後「立刻重試」、回來時「已重新連線。」2.5 s）。
-- **RoomDO**：跑到 `webSocketMessage` 的 `ping` 也記心跳。
-- **工具**：`scripts/net-soak.ts`（`npm run net:soak`）；`e2e/network.spec.ts`。
 
 ## 5. i18n
 
