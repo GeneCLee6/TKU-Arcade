@@ -7,7 +7,7 @@
 //
 // Its parts: resume, restart, the settings (SettingsPanel), back to /kart's menu, back to the lobby;
 // in a room only the settings and leaving the room. Whatever the page leaves out is not shown.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import styled, { css, keyframes } from 'styled-components'
 import type { KartMessageKey } from '../../../shared/kart/i18n.ts'
 import type { MessageParams } from '../../i18n/t.ts'
@@ -15,14 +15,16 @@ import { Button } from '../../components/Button.tsx'
 import { displayType, monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { duckKartBus } from '../audio/bus.ts'
-import { ControlsPanel } from '../ControlsPanel.tsx'
 import { loadBindings, loadRules, saveBindings, saveRules } from '../devices.ts'
 import { pauseRace, resumeRace } from '../race/raceClock.ts'
 import { exitFullscreen, useFullscreenMode } from '../../lib/fullscreen.ts'
 import { broadcastSolid, ticker } from './broadcast.ts'
-import { SettingsPanel } from './SettingsPanel.tsx'
 import type { Bindings } from '../../../shared/kart/input.ts'
 import type { KartRules } from '../../../shared/kart/physics.ts'
+
+// 2026-11-23 (docs/KART-PERF.md §11): the settings and the keys, only once asked for (menuPanels.ts)
+const SettingsPanel = lazy(() => import('./menuPanels.ts').then((m) => ({ default: m.SettingsPanel })))
+const ControlsPanel = lazy(() => import('./menuPanels.ts').then((m) => ({ default: m.ControlsPanel })))
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -226,7 +228,9 @@ export function PauseLayer({
             {showing === 'settings' && (
               <>
                 <Scroll>
-                  <SettingsPanel t={t} onControls={() => show('controls')} />
+                  <Suspense>
+                    <SettingsPanel t={t} onControls={() => show('controls')} />
+                  </Suspense>
                 </Scroll>
                 <div>
                   <Button type="button" onClick={() => show('menu')} data-testid="kart-settings-done">
@@ -237,24 +241,26 @@ export function PauseLayer({
             )}
           </Card>
           {showing === 'controls' && (
-            <ControlsPanel
-              t={t}
-              bindings={controls.bindings}
-              rules={controls.rules}
-              onBindings={(bindings) => {
-                const next = { ...controls, bindings }
-                setControls(next)
-                onControls?.(next)
-                return saveBindings(bindings)
-              }}
-              onRules={(rules) => {
-                const next = { ...controls, rules }
-                setControls(next)
-                onControls?.(next)
-                return saveRules(rules)
-              }}
-              onClose={() => show('settings')}
-            />
+            <Suspense>
+              <ControlsPanel
+                t={t}
+                bindings={controls.bindings}
+                rules={controls.rules}
+                onBindings={(bindings) => {
+                  const next = { ...controls, bindings }
+                  setControls(next)
+                  onControls?.(next)
+                  return saveBindings(bindings)
+                }}
+                onRules={(rules) => {
+                  const next = { ...controls, rules }
+                  setControls(next)
+                  onControls?.(next)
+                  return saveRules(rules)
+                }}
+                onClose={() => show('settings')}
+              />
+            </Suspense>
           )}
         </Veil>
       )}

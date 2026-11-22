@@ -11,6 +11,7 @@ import type { KartId } from '../../../shared/kart/karts.ts'
 import type { Track } from '../../../shared/kart/track.ts'
 import { bodiesLoaded, familiesOf, familyLoaded, loadBodyFamily } from '../art/bodyLoad.ts'
 import { loadedScenery, loadTrackScenery } from '../art/trackScenery.ts'
+import { loadedFeatures, loadTrackFeatures, type FeatureSource } from '../art/trackFeatures.ts'
 import { loadedSong, loadSong, songFor } from '../audio/songs.ts'
 
 /** A chunk that is fetched once and kept; a failed fetch is forgotten, so that asking again tries again */
@@ -52,8 +53,11 @@ export const SCENE_ENGINE = engineSlot(() => import('../Scene.ts'))
 
 export interface KartLoadPlan<E> {
   readonly engine: EngineSlot<E>
-  /** The track to draw; null for the test yard */
-  readonly track: Pick<Track, 'id' | 'theme'> | null
+  /**
+   * The track to draw; null for the test yard. 2026-11-23: given whole, the parts of what it has
+   * (trackFeatures.ts) come too; known by its id alone (a prefetch), only its own quarter
+   */
+  readonly track: (FeatureSource & Pick<Track, 'id' | 'theme'>) | null
   /** The vehicles that will be on it, as far as they are known (any other is fetched when it shows) */
   readonly bodies?: readonly KartId[]
   /** Whether its song plays (a race; not the editor's view) */
@@ -70,12 +74,14 @@ const ENGINE_WEIGHT = 8
 const SCENERY_WEIGHT = 2
 const FAMILY_WEIGHT = 1
 const SONG_WEIGHT = 1
+const FEATURE_WEIGHT = 1
 
 /** The engine, if the whole plan is here already (nothing to wait for, no loading screen) */
 export function peekKartLoad<E>(plan: KartLoadPlan<E>): E | null {
   const engine = plan.engine.peek()
   if (!engine) return null
   if (plan.track && !loadedScenery(plan.track)) return null
+  if (plan.track && !loadedFeatures(plan.track)) return null
   if (plan.bodies && !bodiesLoaded(plan.bodies)) return null
   if (plan.music && !loadedSong(songFor(plan.track))) return null
   return engine
@@ -88,6 +94,9 @@ function partsOf<E>(plan: KartLoadPlan<E>): { weight: number; load: () => Promis
   const track = plan.track
   if (track && !loadedScenery(track)) {
     parts.push({ weight: SCENERY_WEIGHT, load: () => loadTrackScenery(track) })
+  }
+  if (track && !loadedFeatures(track)) {
+    parts.push({ weight: FEATURE_WEIGHT, load: () => loadTrackFeatures(track) })
   }
   for (const family of familiesOf(plan.bodies ?? [])) {
     if (!familyLoaded(family))

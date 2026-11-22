@@ -29,16 +29,11 @@ import {
 } from 'three'
 import type { Track } from '../../../shared/kart/track.ts'
 import { kartNight } from '../../styles/kartTokens.ts'
-import type { Quality } from '../quality.ts'
 import type { KartModel } from './kartModel.ts'
 
-export type HeadlightLevel = 'spot' | 'pool' | 'off'
-
-/** High: a real light on the own kart; medium (or a processor drawing high): the pools; low: none */
-export function headlightLevel(quality: Quality, software: boolean): HeadlightLevel {
-  if (quality === 'low') return 'off'
-  return quality === 'high' && !software ? 'spot' : 'pool'
-}
+// 2026-11-23: in headlights.ts, which the scene reads on every track (this module comes only for a night)
+import type { HeadlightLevel } from './headlights.ts'
+export { headlightLevel, type HeadlightLevel } from './headlights.ts'
 
 /** The beam's pool on the road: this wide at its far end and this long, metres, from the nose on */
 const BEAM_WIDTH = 7

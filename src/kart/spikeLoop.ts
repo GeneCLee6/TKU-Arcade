@@ -663,6 +663,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     const frameMs = lastFrame === undefined || paused || wasPaused ? 0 : now - lastFrame
     lastFrame = now
     wasPaused = paused
+    // 2026-11-23 (docs/KART-PERF.md §11): and the picture behind the menu is drawn once, not every frame
+    scene.hold(paused)
 
     const { bindings, rules, tuning, enabled } = options.controls()
     const pad = readGamepad()

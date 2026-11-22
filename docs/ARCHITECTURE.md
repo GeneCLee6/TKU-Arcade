@@ -1742,6 +1742,20 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **模擬手機巡檢**（`e2e/phones.spec.ts`，不進 CI）：iPhone（WebKit 375 × 812、390 × 844 中文）與 Android（Chromium 412 × 915）各走大廳、展開「跟電腦玩」、德州撲克對電腦一手、卡丁車等待室（直拿與橫拿）、`/kart?bots` 開場亮相，用 `e2e/sweep.ts` 的 `checkLayout`（橫向捲動、裸 key、被擋的按鈕、被截斷的字）與 `checkAxe`（serious 以上）。找到並修了：德州撲克手機座位名字被硬切（「Heron (CPU)」成「Heron (C」；`Table.tsx` 名字改最多兩行）、卡丁車等待室中文「加電腦車」的無障礙名稱不含看得到的字（axe `label-content-name-mismatch`）、收合列按鈕在 WebKit 沒靠右；`npm run test:sweep` 手機那兩種另外抓到德州撲克蓋牌座位整格半透明，連它亮出來的牌也淡掉（方塊 10 對比 1.9:1，axe serious），改成只淡座位的字。開發模式 React 掛兩次時 Safari 把「連線中就關掉的 socket」記成錯誤，只在 dev server 出現，列為提醒不擋。`E2E_PORT=5199 npx playwright test phones.spec.ts --workers=1`；`PHONE_SHOTS=1` 存截圖到 `test-results/phones/`。
 - **CI**：`sweep` job 在巡檢前多跑 `e2e/mobile.spec.ts`（`playwright.config.ts` 設了 `E2E_PORT` 就自己起 dev server），約一分半。
 
+### 4.80 路線圖外：卡丁車第二輪效能與預算（2026-11-23，#160，`feat/kart-perf-2`）
+
+擁有者 2026-11-22：「整夜繼續開發」「電競化專業化」，朋友多半用手機玩。#124 之後加了障礙物、立體交叉、車身貼圖、真的海、等待室 8 個 3D 車手、頒獎台、高台，卡丁車 chunk 合計 567.8／600 kB。量法、前後表在 `KART-PERF.md` §11。
+
+- **量測腳本**（`scripts/kart-fps.mjs`）：在頁面裡包住 WebGL（`bufferData`、`texImage2D`／`texStorage2D`、`renderbufferStorage(Multisample)`、刪除、`WEBGL_lose_context`），每列多一欄 GPU 記憶體（不含畫布本身）；`--scene podium|lobby|soak` 量頒獎台、等待室（8 位車手，要 Worker：`npm run preview`）、連續 N 場一圈賽（每場結果畫面強制 GC 後記 JS heap、GPU、DOM 節點、監聽器）；`--pause 4` 量暫停選單蓋著時的成本；`--track all` 包含 `zhuwei`、`breakwater`。
+- **賽道的「有才有」零件**（`src/kart/art/trackFeatures.ts`、`trackParts.ts`）：岔路（`forkArt`）、高台（`ledgeArt`）、立體交叉（`crossingArt`）、會動的障礙物（`obstacleArt`）、夜間燈光（`nightLights`）不再跟引擎一起載，合成**一個** lazy chunk。要不要載看賽道自己的資料（`forks`／`branches`、`crossings`、`obstacles`、夜間主題），不看 id，所以編輯器的賽道也對；寧可多載。`kartLoad.ts` 的計畫拿到整條賽道時一起載（只有 id 的預先下載只載專屬場景）；`buildTrackArt` 多一個參數 `features`（預設 `loadedFeatures(track)`），`Scene.ts` 的夜燈從那裡拿；`headlightLevel` 搬到 `art/headlights.ts`（每張圖都要問）。`tests/kart/trackFeatures.test.ts` 逐張內建賽道檢查「美術要畫的都在清單裡」。
+- **選單的面板**（`src/kart/ui/menuPanels.ts`）：車庫、對戰電腦設定、大獎賽、調校、操作設定、設定、觸控設定合成一個 lazy chunk，第一次打開任何一個才下載（`React.lazy`，各自的 `Suspense` 不蓋住暫停層）。`?autopilot=<driver>`（測試用的電腦車駕駛）要的電腦車大腦改成用到才載。
+- **暫停時不重畫**（`KartScene.hold`）：單機暫停時世界不動，`draw`／`watch` 畫一幀之後就不畫，畫布尺寸變了或解除暫停才再畫；暫停選單後面的模糊照舊（瀏覽器保留最後一幀）。
+- **手機跟不上時放棄平滑邊緣**（`resolution.ts` 的 `starved`、`post.ts` 的 `shed`）：動態解析度已經降到底（該畫質的 60%）還連續 `SHED_SECONDS` 3 秒低於 50 fps，就把後處理場景緩衝的 MSAA 拿掉（這場比賽不再恢復）；跟得上的機器永遠不會走到這步。
+- **水面依邊長、依遠近切格**（`seaWater.ts`）：高畫質的浪要頂點，原本兩邊都照長邊切（最多 220 × 220 = 97 000 個三角形），60 m 寬、2 km 長的河橫向每 27 cm 一個頂點，3 km 見方的海每 15 m 一個。改成：賽道範圍（`WaterOptions.near`，呼叫端給 `trackBounds`）外加 `NEAR_MARGIN` 150 m 內每 12 m 一列（`WAVE_VERTEX`，比原本還密），往外每列間距 ×1.4、最寬 240 m（`waveTicks`、`gradedPlane`，頂點順序與法線同 `PlaneGeometry`）；沒給 `near` 的照邊長平均切。浪的公式、shader 不變。
+- **頁面共用的貼圖會留住舊 renderer**（`art/sharedTextures.ts`）：three.js 每個 renderer 上傳貼圖時在貼圖上掛一個 `dispose` 監聽；活得跟頁面一樣久的貼圖（我們的車身細節 `bodyDetail.ts`、three.js 自己的標準材質查表 DFG LUT，模組層級單例、沒匯出）就把每個用過的 renderer 整個留住（WebGLState、buffer 物件、closure）。比賽、頒獎台、車庫、等待室的 renderer 在 `dispose` 開頭呼叫 `releaseSharedTextures(renderer, scene)`：從畫過的材質的 uniforms 找到那張查表（找到一次就記住），連同車身細節一起 `dispose()`（只釋放 GPU 副本與監聽，貼圖本身照用，下一幀重新上傳）。
+- **正式建置不同步讀 shader 記錄**：`renderer.debug.checkShaderErrors` 在 `import.meta.env.PROD` 關掉，比賽中第一次出現的道具、特效的 shader 不會因為讀編譯記錄卡住一幀；`npm run dev` 照舊檢查。
+- **預算**（`scripts/check-budget.mjs`）：多一列「從選單進一場比賽要等的」（`/kart` 頁面＋引擎＋最重的賽道專屬場景＋賽道零件＋所有車系，不含主站），上限 480 kB；原本的「卡丁車全部 chunk」600 kB 照舊。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

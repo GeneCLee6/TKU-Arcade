@@ -19,6 +19,7 @@ import { kartParts, kartThemes } from '../../styles/kartTokens.ts'
 import { loadBodies } from '../art/bodyLoad.ts'
 import { buildKartModel, type KartModel } from '../art/kartModel.ts'
 import { BODY_DETAIL } from '../art/bodyDetail.ts'
+import { releaseSharedTextures } from '../art/sharedTextures.ts'
 import { loadQuality } from '../quality.ts'
 import { bodyReady } from '../art/vehicleBodies.ts'
 import { buildKartEnvironment } from '../art/kartParts.ts'
@@ -207,6 +208,7 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
     },
     dispose() {
       disposed = true
+      releaseSharedTextures(renderer, scene)
       cancelAnimationFrame(frame)
       observer?.disconnect()
       canvas.removeEventListener('pointerdown', onDown)

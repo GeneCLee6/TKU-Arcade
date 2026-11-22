@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { MIN_SHARE, nextResolution, startResolution, type Resolution } from '../../src/kart/resolution.ts'
+import {
+  MIN_SHARE,
+  nextResolution,
+  SHED_SECONDS,
+  startResolution,
+  type Resolution,
+} from '../../src/kart/resolution.ts'
 
 /** `seconds` of frames at `fps` */
 function run(state: Resolution, fps: number, seconds: number): Resolution {
@@ -27,6 +33,17 @@ describe('dynamic resolution (docs/KART-PERF.md)', () => {
     expect(run(down, 60, 10).ratio).toBe(down.ratio)
     // Long after, it is tried again
     expect(run(down, 60, 40).ratio).toBe(1.5)
+  })
+
+  // 2026-11-23 (docs/KART-PERF.md §11): the scene gives up the edges' smoothing past SHED_SECONDS
+  it('counts the seconds too slow at the floor, and only there', () => {
+    expect(run(startResolution(2), 60, 60).starved).toBe(0)
+    // On the way down it is not starved yet: there were fewer pixels still to give up
+    expect(run(startResolution(1.5), 40, 1.05).starved).toBe(0)
+    const floor = run(startResolution(1.5), 20, 60)
+    expect(floor.starved).toBeGreaterThanOrEqual(SHED_SECONDS)
+    // A good second at the floor starts the count again
+    expect(run(floor, 55, 1.05).starved).toBe(0)
   })
 
   it('does not count a hitch (a hidden tab, a stall)', () => {
