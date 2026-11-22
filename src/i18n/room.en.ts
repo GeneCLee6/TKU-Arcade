@@ -139,6 +139,7 @@ export const roomEn = {
   'room.bot.level.easy': 'Easy',
   'room.bot.level.normal': 'Normal',
   'room.bot.add': 'Add a computer player',
+  'room.bot.fill': 'Fill every free seat ({count})',
   'room.bot.full': 'Every seat is taken.',
   'room.bot.note': 'Short a player or two? Computer players take a seat and play their own turns. They only see what a person in their seat would.',
   'room.bot.tag': '{name} (CPU)',

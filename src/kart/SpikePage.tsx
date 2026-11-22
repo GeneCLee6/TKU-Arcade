@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { setSoundOn, useSoundOn } from '../lib/sound.ts'
 import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
 import { KART_BODIES, loadBody, loadDriver, saveBody, saveDriver, type KartBody } from './bodies.ts'
@@ -56,6 +56,9 @@ import { broadcastSolid } from './ui/broadcast.ts'
 import { CoachTip } from './school/CoachTip.tsx'
 import { useCoach } from './school/useCoach.ts'
 import { answerInvite, shouldInvite } from './school/store.ts'
+
+// 2026-11-22: full screen (src/lib/fullscreen.ts), its button a small chunk of its own
+const FullscreenButton = lazy(() => import('../components/FullscreenButton.tsx'))
 
 registerMessages(KART_MESSAGES)
 
@@ -577,6 +580,9 @@ export function SpikePage({
               {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
             </Button>
           )}
+          <Suspense>
+            <FullscreenButton landscape />
+          </Suspense>
         </Buttons>
       </TopRow>
       {showNumbers && stats && (

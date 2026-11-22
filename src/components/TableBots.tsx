@@ -1,5 +1,6 @@
 // 2026-11-20: the host's computer players in a table game's waiting room (hold'em, promotion,
-// traders; 2026-11-21 palace, secret-scroll, wasabi, tiles: GameMeta.computer), its own lazy chunk. A level and a button: the room puts each one in the
+// traders; 2026-11-21 palace, secret-scroll, wasabi, tiles: GameMeta.computer), its own lazy chunk.
+// A level and two buttons, one more or (2026-11-22) every free seat at once: the room puts each one in the
 // lowest free seat, names it and plays its turns itself (worker/room-host.ts); each shows in the seat
 // list with the host's way to remove it. The kart's computer karts have their own panel
 // (src/kart/bots/RoomBots.tsx), since the host's browser drives those.
@@ -38,14 +39,27 @@ export default function TableBots({ free, onAdd }: TableBotsProps) {
             ))}
           </select>
         </Field>
-        <Button
-          $variant="secondary"
-          disabled={free <= 0}
-          onClick={() => onAdd(level)}
-          data-testid="table-bots-add"
-        >
-          {t('room.bot.add')}
-        </Button>
+        <Buttons>
+          <Button
+            $variant="secondary"
+            disabled={free <= 0}
+            onClick={() => onAdd(level)}
+            data-testid="table-bots-add"
+          >
+            {t('room.bot.add')}
+          </Button>
+          {/* One add_bot per free seat: the room seats each in the lowest free one, as for one */}
+          <Button
+            $variant="secondary"
+            disabled={free <= 1}
+            onClick={() => {
+              for (let one = 0; one < free; one++) onAdd(level)
+            }}
+            data-testid="table-bots-fill"
+          >
+            {t('room.bot.fill', { count: free })}
+          </Button>
+        </Buttons>
       </Row>
       {free <= 0 && <Muted>{t('room.bot.full')}</Muted>}
       <Muted>{t('room.bot.note')}</Muted>
@@ -58,6 +72,12 @@ const Row = styled.div`
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: ${space.sm}px;
+`
+
+const Buttons = styled.div`
+  display: flex;
+  flex-wrap: wrap;
   gap: ${space.sm}px;
 `
 

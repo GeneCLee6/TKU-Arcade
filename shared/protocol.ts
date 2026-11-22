@@ -541,8 +541,11 @@ export type CreateRoomRequest = {
   bots?: QuickBots
 }
 
-/** CreateRoomRequest.bots */
-export type QuickBots = { count: number; level: string }
+/**
+ * CreateRoomRequest.bots: `count` computer players at `level`, or (2026-11-22) each at its own
+ * `levels[i]`, in seat order, when the person picked one each
+ */
+export type QuickBots = { count: number; level: string; levels?: string[] }
 
 /** 201 from POST /api/rooms */
 /** `code`: the room's short number, null when none could be given (the link still works) */

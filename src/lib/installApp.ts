@@ -23,7 +23,10 @@ const changed = () => {
 export function isStandalone(): boolean {
   if (typeof window === 'undefined') return false
   const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true
-  return iosStandalone || window.matchMedia?.('(display-mode: standalone)').matches === true
+  if (iosStandalone || window.matchMedia?.('(display-mode: standalone)').matches === true) return true
+  // 2026-11-22: the manifest asks for full screen first (display_override); a page the browser shows
+  // full screen through the Fullscreen API matches it too, so that one does not count
+  return window.matchMedia?.('(display-mode: fullscreen)').matches === true && !document.fullscreenElement
 }
 
 /** An Android phone in a browser tab: a browser without Chrome's install offer has it in its menu */
