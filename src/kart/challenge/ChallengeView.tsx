@@ -606,7 +606,7 @@ function MissionRun({ mission, onResult, onAgain, onNext, onList }: RunProps) {
       {trial && trial.phase !== 'finished' && !shown.done && !shown.failed && (
         <RaceCenter t={t} trial={trial} onRestart={onAgain} />
       )}
-      <TouchControls t={t} touch={touch} />
+      <TouchControls t={t} touch={touch} hud={hud} maxStored={setup.controls.tuning.maxStoredBoosts} />
       <Bottom $touch={touch.shown}>
         <Hud t={t} hud={hud} maxStored={setup.controls.tuning.maxStoredBoosts} dense={touch.shown} />
       </Bottom>
@@ -1098,7 +1098,7 @@ function MedalScreen({
       {hud.boosting && <BoostVeil aria-hidden="true" />}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       {trial && trial.phase !== 'finished' && <RaceCenter t={t} trial={trial} onRestart={onAgain} />}
-      <TouchControls t={t} touch={touch} />
+      <TouchControls t={t} touch={touch} hud={hud} maxStored={setup.controls.tuning.maxStoredBoosts} />
       <Bottom $touch={touch.shown}>
         <Hud t={t} hud={hud} maxStored={setup.controls.tuning.maxStoredBoosts} dense={touch.shown} />
       </Bottom>

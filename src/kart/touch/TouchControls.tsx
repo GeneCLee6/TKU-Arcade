@@ -15,6 +15,7 @@ import type { MessageParams } from '../../i18n/t.ts'
 import { displayType } from '../../styles/esports.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
 import type { TouchControlsState } from './useTouchControls.ts'
+import { boostButtonLook, type BoostCell, type BoostHud } from './boostButton.ts'
 import { TouchSettingsPanel } from './TouchSettingsPanel.tsx'
 import { GAP, SLIDER_REACH, SLIDER_WIDTH, SMALL, STEER_SCALE } from './touchLayout.ts'
 
@@ -34,12 +35,20 @@ interface TouchControlsProps {
   readonly touch: TouchControlsState
   /** An item race: the item button shows */
   readonly items?: boolean
+  /**
+   * The HUD and how many charges the kart holds at most (2026-11-22, #100): the BOOST button shows
+   * a boost burning, and the charges held (boostButton.ts)
+   */
+  readonly hud?: BoostHud
+  readonly maxStored?: number
 }
 
 export const TouchControls = memo(function TouchControls({
   t,
   touch,
   items = false,
+  hud,
+  maxStored = 0,
 }: TouchControlsProps) {
   const { source, shown, settings, changeSettings } = touch
   const fingers = useRef(new Map<number, Finger>())
@@ -48,6 +57,7 @@ export const TouchControls = memo(function TouchControls({
   const [open, setOpen] = useState(false)
   const opener = useRef<HTMLButtonElement>(null)
   const size = buttonPx(settings)
+  const boost = hud ? boostButtonLook(hud, maxStored) : null
 
   /** The pressed look, outside React: it changes with every finger */
   const paint = useCallback((held: ReadonlySet<TouchButton>) => {
@@ -232,8 +242,26 @@ export const TouchControls = memo(function TouchControls({
           <Pad data-touch="brake" data-testid="kart-touch-brake" $tone="brake" aria-hidden="true">
             {t('kart.touch.brake')}
           </Pad>
-          <Pad data-touch="boost" data-testid="kart-touch-boost" $tone="boost" aria-hidden="true">
-            {t('kart.touch.boost')}
+          <Pad
+            data-touch="boost"
+            data-testid="kart-touch-boost"
+            data-boost={boost?.state}
+            data-locked={boost?.locked || undefined}
+            $tone="boost"
+            aria-hidden="true"
+            style={boost ? ({ '--boost-left': boost.left } as CSSProperties) : undefined}
+          >
+            {boost?.state === 'burning' && <BoostRing />}
+            <PadWord $small={boost?.state === 'burning'}>
+              {t(boost?.state === 'burning' ? 'kart.touch.boosting' : 'kart.touch.boost')}
+            </PadWord>
+            {boost && boost.cells.length > 0 && (
+              <Cells data-testid="kart-touch-boost-cells">
+                {boost.cells.map((cell, index) => (
+                  <Cell key={index} data-cell={cell} $cell={cell} />
+                ))}
+              </Cells>
+            )}
           </Pad>
           <Pad
             data-touch="throttle"
@@ -400,6 +428,7 @@ const toneColour: Record<Tone, string> = {
 
 const Pad = styled.span<{ $tone: Tone; $steer?: boolean; $tall?: boolean }>`
   ${displayType}
+  position: relative;
   display: grid;
   place-items: center;
   box-sizing: border-box;
@@ -425,6 +454,58 @@ const Pad = styled.span<{ $tone: Tone; $steer?: boolean; $tall?: boolean }>`
     color: ${color.onAccent};
     background: ${({ $tone }) => toneColour[$tone]};
   }
+
+  /* BOOST with nothing to fire, or while the classic feel's one boost burns: dimmed, a press does nothing */
+  &[data-boost='empty'],
+  &[data-locked] {
+    border-style: dashed;
+    color: ${color.muted};
+    background: color-mix(in srgb, ${color.bg} 85%, transparent);
+  }
+`
+
+/** The word on a button; while a boost burns BOOST says so, smaller to fit */
+const PadWord = styled.span<{ $small: boolean }>`
+  font-size: ${({ $small }) => ($small ? 11 : fontSize.sm)}px;
+  letter-spacing: ${({ $small }) => ($small ? '0.02em' : 'normal')};
+`
+
+/** The burning boost: a ring round BOOST that runs down with it (--boost-left, 0 to 1) */
+const BoostRing = styled.i`
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: conic-gradient(
+    ${color.magenta} calc(var(--boost-left, 0) * 360deg),
+    color-mix(in srgb, ${color.magenta} 20%, transparent) 0
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  pointer-events: none;
+`
+
+const cellColour: Record<BoostCell, string> = {
+  charge: color.magenta,
+  red: color.teamRed,
+  blue: color.teamBoost,
+  empty: 'transparent',
+}
+
+/** The charges held, one cell each, under the word */
+const Cells = styled.span`
+  position: absolute;
+  bottom: 18%;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  gap: 3px;
+`
+
+const Cell = styled.i<{ $cell: BoostCell }>`
+  width: 9px;
+  height: 6px;
+  border-radius: 1px;
+  border: 1px solid ${({ $cell }) => ($cell === 'empty' ? color.border : cellColour[$cell])};
+  background: ${({ $cell }) => cellColour[$cell]};
 `
 
 const Small = styled.span`

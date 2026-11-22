@@ -20,7 +20,7 @@ import { applyKart, type DriverId, type KartId } from '../../../shared/kart/kart
 import { isTeamId, scoreTeams, type TeamId } from '../../../shared/kart/team.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
 import type { Callout } from '../callouts.ts'
-import { keyLabel, loadBindings, loadRules, loadTuning } from '../devices.ts'
+import { keyLabel, loadBindings, loadRules, loadTuning, useKeyLayout } from '../devices.ts'
 import { BoostVeil, CALLOUT_CLEAR, CalloutText, Hud } from '../Hud.tsx'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
@@ -31,7 +31,7 @@ import { RACE_ENGINE } from '../load/kartLoad.ts'
 import { KartLoading } from '../load/KartLoading.tsx'
 import { useKartLoad } from '../load/useKartLoad.ts'
 import { autopilot, driftingAutopilot } from './autopilot.ts'
-import { ITEM_SLOT_PORTRAIT_TOP, ItemNote, ItemSlot } from './ItemHud.tsx'
+import { ITEM_SLOT_UPRIGHT_TOP, ItemNote, ItemSlot, MAP_UNDER_ITEM_SLOT } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
 import { FogVeil, StunHud } from './HitHud.tsx'
 import { createRaceNet, type NameTag, type RaceNet } from './netRace.ts'
@@ -232,6 +232,8 @@ export default function RaceView({
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
   const [failure, setFailure] = useState(() => !supportsWebGL2())
+  // The item key's name follows the keyboard's layout once the browser has said it
+  useKeyLayout()
   const [hud, setHud] = useState<SpikeHud>(EMPTY_HUD)
   const [trial, setTrial] = useState<SpikeTrial>()
   const [callout, setCallout] = useState<{ callout: Callout; id: number }>()
@@ -561,7 +563,13 @@ export default function RaceView({
           </Tag>
         ))}
       </Tags>
-      <TouchControls t={t} touch={touch} items={view.mode === 'items'} />
+      <TouchControls
+        t={t}
+        touch={touch}
+        items={view.mode === 'items'}
+        hud={hud}
+        maxStored={settings.tuning.maxStoredBoosts}
+      />
       <TopLeft>
         <PlacePanel
           data-testid="kart-place"
@@ -593,7 +601,9 @@ export default function RaceView({
           </Unstable>
         )}
       </TopLeft>
-      {view.mode === 'items' && <ItemSlot t={t} item={me?.item ?? null} keyName={itemKey} />}
+      {view.mode === 'items' && (
+        <ItemSlot t={t} item={me?.item ?? null} keyName={itemKey} centred />
+      )}
       {stun && <StunHud key={`stun-${stun.id}`} t={t} ms={stun.ms} />}
       {fog !== undefined && (
         <FogVeil key={`fog-${fog}`} t={t} ms={SHOT_TUNING.fogBlindMs} />
@@ -602,7 +612,10 @@ export default function RaceView({
       {hud.teamBoosting && <TeamVeil aria-hidden="true" data-testid="kart-team-veil" />}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       <CoachTip t={t} coach={coach} bindings={settings.bindings} touch={touch.shown} />
-      <MapCorner $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}>
+      <MapCorner
+        $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}
+        $items={view.mode === 'items'}
+      >
         {trial && <RaceClock ref={clock} t={t} trial={trial} />}
         <Minimap
           ref={minimap}
@@ -714,7 +727,7 @@ const Page = styled.main`
     }
 
     @media (max-width: 560px) and (orientation: portrait) {
-      ${CALLOUT_CLEAR}: ${ITEM_SLOT_PORTRAIT_TOP + 64}px;
+      ${CALLOUT_CLEAR}: ${ITEM_SLOT_UPRIGHT_TOP + 64}px;
     }
   }
 `
@@ -799,7 +812,7 @@ const Unstable = styled.p`
 
 // With the touch buttons on a phone held sideways: the map beside the clock, and over the steering
 // (on the left, under the place, unless left-handed)
-const MapCorner = styled.div<{ $touch: 'left' | 'right' | null }>`
+const MapCorner = styled.div<{ $touch: 'left' | 'right' | null; $items: boolean }>`
   position: absolute;
   top: ${space.sm}px;
   right: ${space.sm}px;
@@ -807,6 +820,24 @@ const MapCorner = styled.div<{ $touch: 'left' | 'right' | null }>`
   justify-items: end;
   gap: ${space.xs}px;
   pointer-events: none;
+
+  /*
+   * 2026-11-22 (#100): a phone held upright in an item race has the item slot in the middle under the
+   * clock (ItemHud.tsx); the map goes under it on the left, where neither the HUD (right) nor the
+   * steering (bottom left) is, the clock staying at the top right. The page is fixed to the screen,
+   * so the screen's corner is the page's
+   */
+  ${({ $items }) =>
+    $items &&
+    css`
+      @media (max-width: 560px) and (orientation: portrait) {
+        & > [data-testid='kart-minimap'] {
+          position: fixed;
+          top: ${MAP_UNDER_ITEM_SLOT}px;
+          left: ${space.sm}px;
+        }
+      }
+    `}
 
   ${({ $touch }) =>
     $touch &&

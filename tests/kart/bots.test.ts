@@ -113,14 +113,16 @@ describe('the expert computer kart and the rubber band', () => {
         const input = brain(trial, { speedShare })
         const { kart } = trial.run
         const calm = kart.boostSeconds === 0 && kart.miniSeconds === 0 && !kart.drifting
-        if (trial.phase === 'racing' && calm && !input.throttle) count++
+        // 2026-11-22: and over the share (it also lifts where it watches the wall, at any speed)
+        const over = Math.hypot(kart.vx, kart.vz) > KART_TUNING.topSpeed * speedShare
+        if (trial.phase === 'racing' && calm && over && !input.throttle) count++
         trial = stepTrial(trial, input, course)
       }
       return count
     }
     const eased = bandedShare(BOT_SKILLS.expert.topSpeedShare, RUBBER_BAND.fullLead)
     expect(eased).toBeLessThan(1)
-    expect(lifts(eased)).toBeGreaterThan(lifts(1) + 100)
+    expect(lifts(eased)).toBeGreaterThan(lifts(1) + 60)
   }, 60_000)
 })
 
