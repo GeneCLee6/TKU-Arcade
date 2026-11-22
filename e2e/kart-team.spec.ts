@@ -31,6 +31,8 @@ test('two people on opposite sides and a computer kart race a team race', async 
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
 
   // Nobody has chosen: Ann red, Bob blue. They swap, each picking their own side
+  // (2026-11-22: the sides are in the waiting room's Teams panel)
+  for (const page of [ann, bob]) await page.getByTestId('kart-lobby-teams').click()
   const annTeams = ann.getByTestId('kart-room-teams')
   const bobTeams = bob.getByTestId('kart-room-teams')
   await expect(annTeams.getByTestId('kart-team-sizes')).toHaveText('Sunset 1 v Estuary 1')
@@ -39,8 +41,10 @@ test('two people on opposite sides and a computer kart race a team race', async 
   // Only the host can move someone else
   await expect(bobTeams.getByRole('button', { name: 'Put Ann on Sunset' })).toHaveCount(0)
   // The host adds a computer kart, which fills the smaller side, and then moves it to blue
-  await ann.getByTestId('kart-room-bots-add').click()
+  await ann.getByRole('button', { name: 'Close' }).click()
+  await ann.getByTestId('kart-lobby-add-bot').click()
   await expect(ann.getByTestId('bot-member')).toHaveText(/\(CPU\)$/)
+  await ann.getByTestId('kart-lobby-teams').click()
   await expect(annTeams.locator('li')).toHaveCount(3)
   await annTeams.locator('li').nth(2).getByTestId('kart-team-blue').click()
   for (const teams of [annTeams, bobTeams]) {
@@ -49,6 +53,7 @@ test('two people on opposite sides and a computer kart race a team race', async 
     await expect(teams.locator('li').nth(1)).toHaveAttribute('data-team', 'red')
     await expect(teams.locator('li').nth(2)).toHaveAttribute('data-team', 'blue')
   }
+  for (const page of [ann, bob]) await page.getByRole('button', { name: 'Close' }).click()
   // 2026-11-21: the race waits for everyone to be ready (shared/protocol.ts 8.)
   await bob.getByTestId('kart-lobby-ready').click()
   await expect(ann.getByTestId('kart-lobby-waiting')).toHaveText('Everyone is ready')

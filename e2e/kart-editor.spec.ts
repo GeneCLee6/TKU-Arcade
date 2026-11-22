@@ -74,6 +74,9 @@ test('a race room on a track from the editor: pasted by the host, raced by two',
   await joinRoom(ann, `/r/${id}?autopilot`, 'Ann')
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
   // The host picks a custom track and pastes the link; a bad one is refused on the spot
+  // (2026-11-22: the room's options are in the waiting room's Room settings)
+  await ann.getByTestId('kart-lobby-settings').click()
+  await bob.getByTestId('kart-lobby-settings').click()
   await ann.getByRole('combobox', { name: 'Track' }).selectOption('custom')
   await ann.getByTestId('kart-custom-paste').fill('https://example.com/kart?custom=nope')
   await ann.getByTestId('kart-custom-use').click()
@@ -83,6 +86,7 @@ test('a race room on a track from the editor: pasted by the host, raced by two',
   // Everyone sees which track it is
   for (const page of [ann, bob]) {
     await expect(page.getByTestId('kart-custom-summary').first()).toContainText('Test Loop')
+    await page.getByRole('button', { name: 'Close' }).click()
   }
   // 2026-11-21: the race waits for everyone to be ready (shared/protocol.ts 8.)
   await bob.getByTestId('kart-lobby-ready').click()
