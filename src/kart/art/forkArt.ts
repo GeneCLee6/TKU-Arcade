@@ -181,8 +181,10 @@ export function buildForks(kit: ArtKit): void {
       )
     }
   }
-  // The kerbs as the physics has them: every wall but the track's own extra ones, which come last
-  const kerbs = track.allWalls.slice(0, track.allWalls.length - track.walls.length)
+  // The kerbs as the physics has them: every wall but the track's own extra ones, which come last,
+  // and the high platforms' faces before them (2026-11-23: ledgeArt.ts draws those as buildings)
+  const faces = forks.filter((fork) => fork.rise !== undefined).length
+  const kerbs = track.allWalls.slice(0, track.allWalls.length - track.walls.length - faces)
   group.add(
     shadowed(
       new Mesh(

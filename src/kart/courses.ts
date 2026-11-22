@@ -15,6 +15,7 @@ import { TEST_OVAL } from '../../shared/kart/tracks/testOval.ts'
 import { WHARF } from '../../shared/kart/tracks/wharf.ts'
 import { WORKS } from '../../shared/kart/tracks/works.ts'
 import { ZHUWEI } from '../../shared/kart/tracks/zhuwei.ts'
+import { BREAKWATER } from '../../shared/kart/tracks/breakwater.ts'
 
 /**
  * What /kart/spike drives on: the walled yard of J3, J4's test oval, J5's first track, N1's second or
@@ -41,6 +42,8 @@ export type SpikeCourse =
   | 'works'
   // 2026-11-22: the technical showcase, over and under itself (shared/kart/levels.ts)
   | 'zhuwei'
+  // 2026-11-23: the high-platform track (shared/kart/ledges.ts)
+  | 'breakwater'
 
 export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'arena',
@@ -58,6 +61,7 @@ export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'lanes',
   'works',
   'zhuwei',
+  'breakwater',
 ]
 
 const TRACKS = {
@@ -75,6 +79,7 @@ const TRACKS = {
   lanes: LANES,
   works: WORKS,
   zhuwei: ZHUWEI,
+  breakwater: BREAKWATER,
 } as const
 
 /** A course's track, checked like any track file; null for the yard, which is not a track */

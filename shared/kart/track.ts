@@ -5,7 +5,15 @@
 //
 // Coordinates are metres on the ground plane: x to the right, z towards the viewer, as in
 // physics.ts; heading 0 faces -z and grows clockwise.
-import { forkKerbs, parseBranches, rememberForks, trackLines, type BranchJson, type Fork } from './branches.ts'
+import {
+  forkKerbs,
+  parseBranches,
+  rememberForks,
+  roadDepth,
+  trackLines,
+  type BranchJson,
+  type Fork,
+} from './branches.ts'
 import type { Course, Spot } from './course.ts'
 import {
   findCrossings,
@@ -18,6 +26,7 @@ import {
   ZONE_PAD,
   type Crossing,
 } from './levels.ts'
+import { checkLedge, ledgeFaces } from './ledges.ts'
 import { obstaclesOf, parseObstacles, type ObstacleJson } from './obstacles.ts'
 import { terrainOf, type Terrain } from './terrain.ts'
 import type { Wall } from './walls.ts'
@@ -340,6 +349,11 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
           jumps,
           walls,
         )
+  // High platforms (2026-11-23, ledges.ts): each checked against the main road and its lip
+  forks.forEach((fork, index) => {
+    if (fork.rise === undefined) return
+    checkLedge(road, fork, fork.rise, jumps, `branches[${index}]`, (x, z) => roadDepth(road, true, x, z), problems)
+  })
   // Moving obstacles (2026-11-22): checked against the main road
   const obstacles =
     json.obstacles === undefined || road.length < 4 ? [] : parseObstacles(json.obstacles, road, problems)
@@ -437,6 +451,7 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
               to: fork.to,
               road: fork.path.slice(1, -1),
               ...(fork.jumps.length > 0 ? { jumps: fork.jumps.map((lip) => lip - 1) } : {}),
+              ...(fork.rise !== undefined ? { rise: fork.rise - 1 } : {}),
             }),
           ),
         }
@@ -457,7 +472,8 @@ export function parseTrack(json: unknown): { track: Track } | { problems: string
   return {
     track: {
       ...base,
-      allWalls: [...forkKerbs(road, roadKerbs, forks), ...walls],
+      // A platform's face (2026-11-23, ledges.ts) is a wall with a foot and a top
+      allWalls: [...forkKerbs(road, roadKerbs, forks), ...ledgeFaces(forks), ...walls],
       forks,
       ...levelled,
     },

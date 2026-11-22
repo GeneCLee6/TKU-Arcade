@@ -1675,7 +1675,6 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - 多人房：每個人自己播（`game.over` 之後，用 `goAt` 記這一場播過了），跳過只影響自己。
 
 **測試**：`tests/kart/raceFlow.test.ts`（開場 8 人 ≤ 10 s、亮相 ≤ 6 s、照順序每位車手、鏡頭在車手正前方且最後接上全景、關掉亮相改繞場；倒數音效 3、2、1、GO 各一次且 GO 較亮；完賽倒數音效；伺服器 10 秒後第一個 frame 結束比賽、未完賽依進度排名、看不到的依圈數、壞的 progress 拒絕、玩家不能 close；團隊賽計分；暫停時比賽時鐘與房間時鐘一起停、恢復後不補時間、0 秒的一幀不跑物理；設定預設與逐欄回復、特效上限；頒獎台只放完賽的前三名、揭曉順序與時間、鏡頭、舉獎盃姿勢）；`tests/games/kart.test.ts`、`tests/worker/room-realtime.test.ts`、`tests/kart/roomBots.test.ts`（倒數改 `countdownMs(n)`、close 計時器）；e2e `kart-bots`（亮相卡、Esc 暫停時 tick 不動、設定、繼續後再動、頒獎台後才是結果）、`kart-race`（多人房 Esc 只開選單、完賽倒數、頒獎台、結果）、`kart-cup`（每場與總頒獎台）、`kart-watch-portrait`。
-
 ### 4.74 路線圖外：卡丁車第三輪細修（亮相同步、道具撞障礙物、老街主路導引、等待室站姿與手機省電、文件撞號）（2026-11-23，`feat/kart-polish-3`）
 
 - **亮相多人同步**（#152 觀察：同一台機器兩個瀏覽器差一位車手）：亮相本來就只看伺服器的 `goAt` 與對時後的時鐘，差在**對時還沒收斂**。量到的原因：比賽畫面是在「載完」那一刻才開始對時（`createRaceNet`），而最後一個載完的人一送出 `loaded`，房間就定 `goAt` 開始亮相——他的頭幾個對時答覆是在建場景、編著色器的忙碌主執行緒上讀到的，來回時間被拉長、時差偏掉半個來回（實測一位 0.4 s）。修法三層：(1) `shared/kart/net.ts` 的 `clockSettled`：來回最短的 3 個答覆推出的時差彼此差 ≤ 40 ms 才算「收斂」（被拖延的答覆延遲不會一樣），8 個答覆之後不管怎樣都算（抖動大的網路）；(2) `netRace.ts` 沒收斂前每 120 ms ping 一次、收斂後 2 s 一次（原本是固定 5 個 250 ms 再 2 s）；(3) `RaceView.tsx` 等**對時收斂**（最多 4 s）才送 `loaded`，所以房間開始亮相時每個畫面都已經收斂；`spikeLoop.ts` 在還沒收斂時不帶車手、只給起跑格全景（`SpikeNet.clockSettled`）。`__kartRace` 多 `settled`、`settledAt`、`begunAt`、`goAt` 給測試讀。
@@ -1705,6 +1704,22 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **伺服器驗證**（`build.ts`，房間經 `custom.ts` 跑同一套）：新的問題 `obstacle`：在起終點線前 60 m 內或起跑格後 40 m（＋`LINE_BACK`）內、在立體交叉的範圍（`inZone`，多 10 m）內、超過 16 個；復位點先自動往前移出障礙物範圍（`gatesClearOfObstacles`，和立體交叉的做法一樣，連同那道門），移不出來（12 個路點內）才算問題。
 - **地圖**（`MapView.tsx`）：欄杆是粉紅虛線、貨櫃是它滑過的整段半透明框（`kartEditor.obstacle`）。
 - **測試**：`tests/kart/editorObstacles.test.ts`（代碼來回、舊代碼不變、壞的週期／相位拒絕、三種片段都是合法賽道且復位點不在障礙物裡、整條與半邊、起點與起跑格拒絕、立體交叉拒絕）；e2e `kart-editor`（從片段庫加半邊欄杆與貨櫃、改週期、地圖上兩個、移到起點被擋）。
+
+### 4.77 路線圖外：高台捷徑（2026-11-23，#156，`feat/kart-high-platforms`）
+
+擁有者：「卡丁車多設計一些要技術並且速度夠快才能上去的高台捷徑，技術跟車款可以縮短時間」。
+
+- **模型**（`shared/kart/ledges.ts`）：高台是一條岔路（`branches.ts`），`BranchJson.rise` 標出平台第一個點；`Fork.rise` 是它在 `path` 的索引。岔路必須從主路的跳台（`jumps`）出發；`rise` 前一點（面牆的腳）到 `rise` 這一段可以直上（不受 `MAX_GRADE`），面牆至少 `LEDGE_MIN_STEP` 2.5 m 高、頂端不高於跳台 `LEDGE_MAX_ABOVE` 1.2 m、離跳台 ≥ 12 m、整面在主路外；岔路在主路上（口與盡頭）的點高度必須和主路一樣（±0.6 m，`LEDGE_MATCH`），否則「最深的那條路」會把主路上的車抬上去。`parseTrack` 用 `checkLedge` 檢查，並把面牆（`faceOf`：跨岔路、`base` = 腳下 −1.5 m、`top` = 平台高）加進 `allWalls`（在路緣之後、賽道自己的牆之前）。**沒有平台的賽道一個 byte 都沒變**（沒有 `rise`、不加牆）。
+- **門檻是純函式**：飛行就是 `terrain.ts` 的拋物線（向上速度＝沿路速度 × `jumpLift` 0.18、重力 30、水平速度不變）。`speedToClear(rise, reach, cos)` = √(15·reach² / (0.18·cos·reach − rise))；`Ledge.need` 是從跳台中點沿直線飛到面牆中點的最低起跳速度。`flightToFace(ledge, x, z, vx, vz)` 預測一次起跳的結果：`on`（越過牆頂）、`short`（撞牆落回主路）、`wide`（偏出牆的兩端）、`grounded`（太慢不起跳）。
+- **為什麼不會卡死**：面牆前面那一段（岔路的口）就是主路的高度，撞牆後落在那裡，往回或往主路開就好；電腦車在牆前停住、車頭朝牆時先倒車 0.75 秒（`routes.ts` 的 `BACK_*`）。平台本身窄（11–13 m），中間可以有**縫**（`platform.ts` 的 `gaps`：一個跳台、1.5–1.6 m 深的坑、0.35 坡度爬出來），盡頭是**落差**（最後一個高點是跳台，掉回主路）。平台盡頭與主路重疊的那幾點只有 10 m 寬（`end`），主路上的車不會被當成在岔路上（不會誤判逆向）。
+- **賽道作者的工具**（`shared/kart/tracks/platform.ts`）：`blockDetour(side, radius, out, along, width, mark, { shift })`：主路繞一棟建築再回來，回來時往另一側平移 `shift`；`straightPlatform(road, from, to, plan)`：從跳台斜出去（`side`、`face`），過牆後 `bend` 公尺內轉回和路平行，走到主路回來的那條線上，以落差結束。`platformRoad` 把面牆前的點壓到主路高度、在牆腳後 0.6 m 插入牆頂的點。設計輔助：`node --experimental-strip-types scripts/kart/ledge-check.ts <id>`（每座平台的門檻、角度、省多少公尺），`scripts/kart/track-svg.ts` 會畫岔路、平台與面牆。
+- **伺服器裁定**：照 #144 的路段判定，不用改 `judgeFrame`：平台是岔路，替身檢查點放在平台上（`parseBranches` 的替身從 `rise` 之後才放，牆前的口不放），平面上照算；`tests/kart/ledges.test.ts` 用沿主路與沿「三座都走」的路線各跑三圈的封包驗過圈時。
+- **電腦車**（`src/kart/bots/routes.ts`）：會背圖的（`skill.tricks`：專家電腦車、頂尖腳本）在入口前 `LEDGE_FIRE` 140 m 內看自己夠不夠快（`ledgeChoice`，純函式）：差 6 m/s 以內還在加速就先準備走；不夠又有存量就噴一個 N2O；離跳台 24 m（`LEDGE_COMMIT`）時定案，要比門檻快 1 m/s 才走，否則走主路。走的話從 60 m 前開始把行進方向對準面牆中點（`AIM_*`）；`brain.ts` 多一個 `flyLips`：這些跳台不為了「落地前要轉彎」而收油，也不強制走路中間。困難以下一律走主路。`skill.platforms: false` 讓會背圖的手也不上平台（`kart:feel` 拿來量平台值多少）。
+- **畫面**（`src/kart/art/ledgeArt.ts`）：平台下面的建築（兩側牆從地面到路緣、女兒牆、一排亮窗）、面牆的黃黑警示條紋（一直都畫）；琥珀色提示（`skillCue.jump`，#115，受「賽道技術提示」開關控制）：跳台前三個斜向平台的箭頭、面牆頂一排燈、兩端各一根燈柱。`forkArt.ts` 不再把面牆畫成護欄；`hillArt.ts` 的地面在平台底下維持牆腳的高度（是建築，不是土丘）。
+- **賽道**：碼頭倉庫 `wharf@5`（貨櫃堆頂）、高架廠區 `works@3`（長廠房屋頂）、淡海夜城 `danhai@3`（夜市屋頂，第一次有地形）、新賽道 **防波堤屋頂** `breakwater`（暫名，三座：防波堤頂、魚市場屋頂、網寮屋頂）。數字見 `KART-FEEL.md` §26。
+- **挑戰與駕訓**：任務新種類 `platforms`（每圈都要上每座高台，`judge.ts` 的 `Sample.platform` 由 `onPlatform` 算），三關：技術章「屋頂飛馳」`roofs`、高手章「廠房屋頂」`shedroof`、「不噴上貨櫃」`stackdry`（禁 N2O）。駕訓第 8 課（甩尾起跳）的說明補一段高台。
+- **測試**：`tests/kart/ledges.test.ts`（拋物線與門檻、快一點上得去慢一點撞牆落回主路不重置、預測、格式拒絕、四張賽道的門檻與省的距離、伺服器圈時、電腦車的選擇與噴射）；`technical.test.ts` 的四張圖、`challenge.test.ts` 的章節數。
+- **限制（照實寫）**：(1) 只有「從主路跳台斜飛到旁邊平台」一種形狀；平台不能在主路正上方（岔路必須離開主路）。(2) 平台沒有「掉下去落回主路」的開放邊：側邊是牆，失誤是撞牆或掉進縫。(3) 電腦車對準靠一個簡單的追點；斜角 40° 的網寮屋頂偶爾會偏。(4) 平台的建築是方塊，沒有各圖專屬造型。
 
 ## 5. i18n
 
