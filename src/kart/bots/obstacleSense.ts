@@ -1,4 +1,4 @@
-// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.64): the computer's hands and the moving obstacles
+// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.65): the computer's hands and the moving obstacles
 // (shared/kart/obstacles.ts). Laid over the hands of routes.ts, so that brain.ts itself knows
 // nothing of them: on a track without obstacles the hands are exactly what they were.
 //

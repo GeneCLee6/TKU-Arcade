@@ -1,4 +1,4 @@
-// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.64): moving obstacles. A track may list booms that come
+// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.65): moving obstacles. A track may list booms that come
 // down across part of the road and go up again, and containers that slide across it, each on a
 // cycle of its own. What any of them is doing is a pure function of the race clock (the steps of
 // 1/60 s since GO, the `tick` every frame already carries; net.ts), so that every browser, the

@@ -403,7 +403,7 @@ JSON patch 少約 **73–76%**（本機 1.52 → 0.36、預覽站 1.46 → 0.40 
 
 ## 21. 會動的障礙物：比賽時鐘的純函式、伺服器把關著的閘門當牆（2026-11-22，`feat/kart-track-content`）
 
-賽道可以有升降欄杆與滑動貨櫃（`ARCHITECTURE.md` §4.64）。**協定沒有變**：frame 格式、`PROTOCOL_VERSION`、op、patch 都一樣。
+賽道可以有升降欄杆與滑動貨櫃（`ARCHITECTURE.md` §4.65）。**協定沒有變**：frame 格式、`PROTOCOL_VERSION`、op、patch 都一樣。
 
 - **不用同步**：障礙物在第幾步是什麼狀態，只由 GO 起算的步數決定（`shared/kart/obstacles.ts` 的 `boomState`／`sliderState`）。每個瀏覽器用自己的 `trial.steps` 跑物理（就是它送出的 frame 的 `tick`），伺服器用 frame 的 `tick` 裁定，觀戰用房間的 GO 換算、重播用錄下的 tick——四個地方算出同一個狀態，不需要額外訊息。
 - **伺服器裁定**（`judgeFrame`，一般的移動才看）：從上一個 frame 到這一個 frame 的線段穿過一支「兩個 tick 都關著、而且中間一直關著」的欄杆 → 拒收（`refused`，原因 `obstacle`）；剛好在這段時間裡放下或抬起的不拒收（給客戶端好處，不冤枉人）。位置在那個 tick 的貨櫃裡超過 0.6 m → 拒收；在空中（`FLAG_AIRBORNE`）的不看貨櫃。拒收的效果和速度、跳躍的拒收一樣：伺服器停在上一個位置、不數門，持續 `RESYNC_AFTER_MS` 後重新同步——穿牆不會多數到門、也不會被當成跑完一圈。

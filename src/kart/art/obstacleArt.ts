@@ -1,4 +1,4 @@
-// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.64): the moving obstacles drawn (shared/kart/obstacles.ts).
+// 2026-11-22 (#103, docs/ARCHITECTURE.md §4.65): the moving obstacles drawn (shared/kart/obstacles.ts).
 // Our own shapes from boxes and spheres, no model or picture file:
 //
 // - a boom: a grey post outside the kerb with a lamp housing, and a red-and-white striped arm

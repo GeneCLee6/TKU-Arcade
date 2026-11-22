@@ -31,6 +31,7 @@ import { useKartLoad } from '../load/useKartLoad.ts'
 import {
   Fallback,
   MapCorner,
+  WatchTop,
   NameTag,
   TagLayer,
   TopLeft,
@@ -299,28 +300,30 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
           </NameTag>
         ))}
       </TagLayer>
-      <TopLeft>
-        <WatchedPanel
+      <WatchTop>
+        <TopLeft>
+          <WatchedPanel
+            t={t}
+            name={name}
+            place={follow === null ? 0 : order.indexOf(follow) + 1}
+            total={view.racers.length}
+            detail={detail}
+          />
+          {view.teams && (
+            <>
+              <TeamScore t={t} totals={runningScore(order, view.racers).totals} mine={null} />
+              <TeamGauges t={t} gauge={view.teams.gauge} />
+            </>
+          )}
+        </TopLeft>
+        <WatchedItem
           t={t}
-          name={name}
-          place={follow === null ? 0 : order.indexOf(follow) + 1}
-          total={view.racers.length}
-          detail={detail}
+          item={view.mode === 'items' && follow !== null ? (racer?.item ?? null) : undefined}
         />
-        {view.teams && (
-          <>
-            <TeamScore t={t} totals={runningScore(order, view.racers).totals} mine={null} />
-            <TeamGauges t={t} gauge={view.teams.gauge} />
-          </>
-        )}
-      </TopLeft>
-      <WatchedItem
-        t={t}
-        item={view.mode === 'items' && follow !== null ? (racer?.item ?? null) : undefined}
-      />
-      <MapCorner>
-        <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} />
-      </MapCorner>
+        <MapCorner>
+          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} />
+        </MapCorner>
+      </WatchTop>
       <WatchControls
         t={t}
         overhead={overhead}
