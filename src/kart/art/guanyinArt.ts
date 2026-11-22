@@ -297,6 +297,7 @@ export function buildGuanyin(
       sky: kartThemes.day.skyHorizon,
       flatMap: kit.textures.water,
       flatColor: guanyinScene.riverFlat,
+      near: box,
     },
     waterLevel,
   )

@@ -1,4 +1,4 @@
-// The time trial's leaderboard (2026-11-23; docs/ARCHITECTURE.md §4.80): the board screen and the
+// The time trial's leaderboard (2026-11-23; docs/ARCHITECTURE.md §4.81): the board screen and the
 // results' upload card. Registered by their own lazy chunks (src/kart/board/), not merged into
 // KART_MESSAGES; the menu's way in and the chase banner are in i18n.menu.ts. `npm run check-i18n`
 // checks them. `en` is the source.

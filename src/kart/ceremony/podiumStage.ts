@@ -26,6 +26,7 @@ import {
 } from 'three'
 import { kartPodium } from '../../styles/kartTokens.ts'
 import { loadBodies } from '../art/bodyLoad.ts'
+import { releaseSharedTextures } from '../art/sharedTextures.ts'
 import { buildKartEnvironment } from '../art/kartParts.ts'
 import { buildKartModel, type KartModel } from '../art/kartModel.ts'
 import {
@@ -240,6 +241,7 @@ export function createPodiumStage(
   return {
     dispose() {
       disposed = true
+      releaseSharedTextures(renderer, scene)
       cancelAnimationFrame(frame)
       observer?.disconnect()
       for (const { model } of models) {

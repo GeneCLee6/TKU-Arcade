@@ -1,4 +1,4 @@
-// The results' "upload to the leaderboard" card (2026-11-23, docs/ARCHITECTURE.md §4.80): asks for
+// The results' "upload to the leaderboard" card (2026-11-23, docs/ARCHITECTURE.md §4.81): asks for
 // the nickname (the site's own, src/lib/nickname.ts, filled in when there is one), offers to send new
 // bests by themselves from then on, and says where the run now ranks. Its own lazy chunk: a time trial
 // loads it only once a run on a board track has finished.

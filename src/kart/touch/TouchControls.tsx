@@ -1,5 +1,7 @@
 import {
+  lazy,
   memo,
+  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -16,8 +18,12 @@ import { displayType } from '../../styles/esports.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
 import type { TouchControlsState } from './useTouchControls.ts'
 import { boostButtonLook, type BoostCell, type BoostHud } from './boostButton.ts'
-import { TouchSettingsPanel } from './TouchSettingsPanel.tsx'
 import { GAP, SLIDER_REACH, SLIDER_WIDTH, SMALL, STEER_SCALE } from './touchLayout.ts'
+
+// 2026-11-23 (docs/KART-PERF.md §11): the buttons' own settings, only once the gear is pressed (menuPanels.ts)
+const TouchSettingsPanel = lazy(() =>
+  import('../ui/menuPanels.ts').then((m) => ({ default: m.TouchSettingsPanel })),
+)
 
 // 2026-11-17 (docs/ARCHITECTURE.md §4.25): the buttons a phone drives with. Shown on a coarse
 // pointer or after the first touch; a driving key or a gamepad hides them again. Every finger is
@@ -279,12 +285,14 @@ export const TouchControls = memo(function TouchControls({
       </Cluster>
       <Rotate role="note">{t('kart.touch.rotate')}</Rotate>
       {open && (
-        <TouchSettingsPanel
-          t={t}
-          settings={settings}
-          onSettings={changeSettings}
-          onClose={closeSettings}
-        />
+        <Suspense>
+          <TouchSettingsPanel
+            t={t}
+            settings={settings}
+            onSettings={changeSettings}
+            onClose={closeSettings}
+          />
+        </Suspense>
       )}
     </Layer>
   )

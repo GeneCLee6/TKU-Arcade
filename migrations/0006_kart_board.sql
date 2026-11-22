@@ -1,4 +1,4 @@
--- The kart time trial's leaderboard (docs/ARCHITECTURE.md §4.80, worker/kartBoard.ts): one row per
+-- The kart time trial's leaderboard (docs/ARCHITECTURE.md §4.81, worker/kartBoard.ts): one row per
 -- nickname per board, a board being a built-in track at one layout revision. A row holds that
 -- nickname's best run and its replay file (.tkureplay, deflated, about 10 to 25 kB; a BLOB here
 -- rather than R2: no bucket to set up, and a board of a hundred is a few MB). The replay is the last

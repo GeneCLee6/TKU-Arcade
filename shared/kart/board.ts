@@ -1,4 +1,4 @@
-// The time trial's site-wide leaderboard (2026-11-23, docs/ARCHITECTURE.md §4.80): what the browser
+// The time trial's site-wide leaderboard (2026-11-23, docs/ARCHITECTURE.md §4.81): what the browser
 // and the Worker agree on. Every built-in race track (list.ts; not the challenge tracks, not a custom
 // track) has one board per revision of its layout; a nickname keeps its best run there, with the run's
 // replay file (replayFile.ts) as proof and as a ghost for anyone to chase. No account yet (E11's F1):

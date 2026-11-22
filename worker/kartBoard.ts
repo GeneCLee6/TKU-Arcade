@@ -1,4 +1,4 @@
-// The kart time trial's site-wide leaderboard (2026-11-23, docs/ARCHITECTURE.md §4.80; shared/kart/
+// The kart time trial's site-wide leaderboard (2026-11-23, docs/ARCHITECTURE.md §4.81; shared/kart/
 // board.ts). D1 keeps one row per nickname per board (migrations/0006_kart_board.sql) with the run's
 // replay file; an upload is read strictly and judged sample by sample (shared/kart/boardCheck.ts)
 // before anything is written, and a refusal is logged with its reason (docs/SECURITY.md §11).

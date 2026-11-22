@@ -97,7 +97,7 @@ export function RaceCenter({
   onRestart: () => void
   /** 2026-11-17: opens the garage, to race again in another kart */
   onGarage?: () => void
-  /** 2026-11-23 (§4.80): under the laps, the leaderboard's upload card */
+  /** 2026-11-23 (§4.81): under the laps, the leaderboard's upload card */
   extra?: ReactNode
 }) {
   if (trial.phase === 'countdown') {

@@ -1,4 +1,4 @@
-// A board row's ghost to race against in the time trial (2026-11-23, §4.80): what the leaderboard
+// A board row's ghost to race against in the time trial (2026-11-23, §4.81): what the leaderboard
 // hands /kart's time trial. A type alone, so that the time trial's page does not load the board.
 import type { Ghost } from '../../../shared/kart/ghost.ts'
 

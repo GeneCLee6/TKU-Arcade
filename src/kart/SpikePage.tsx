@@ -4,7 +4,6 @@ import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
 import { KART_BODIES, loadBody, loadDriver, saveBody, saveDriver, type KartBody } from './bodies.ts'
 import { applyKart, type DriverId } from '../../shared/kart/karts.ts'
 import { trackMeta } from '../../shared/kart/meta.ts'
-import { GaragePanel } from './roster/GaragePanel.tsx'
 import styled, { css, keyframes } from 'styled-components'
 import { KART_MESSAGES, type KartMessageKey } from '../../shared/kart/i18n.ts'
 import { KART_ACTIONS, type Bindings, type KartAction } from '../../shared/kart/input.ts'
@@ -15,7 +14,6 @@ import { useT } from '../i18n/useT.ts'
 import { Link } from '../lib/router.tsx'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
 import type { Callout } from './callouts.ts'
-import { ControlsPanel } from './ControlsPanel.tsx'
 import {
   keyLabel,
   loadBindings,
@@ -39,15 +37,11 @@ import { RACE_ENGINE } from './load/kartLoad.ts'
 import { KartLoading } from './load/KartLoading.tsx'
 import { useKartLoad } from './load/useKartLoad.ts'
 import { KART_COMPACT } from './layout.ts'
-import { TuningPanel } from './TuningPanel.tsx'
-import { BotSetupPanel } from './bots/BotSetupPanel.tsx'
 import type { BotSetup } from './bots/setup.ts'
 import { customTrack } from '../../shared/kart/editor/custom.ts'
 import type { Track } from '../../shared/kart/track.ts'
 import { codeInAddress } from './editor/link.ts'
-import { createDriver, DRIVER_IDS, DRIVERS } from './bots/drivers.ts'
 import { createAutopilot } from './race/autopilot.ts'
-import { CupSetupPanel } from './cup/CupSetupPanel.tsx'
 import type { CupRun } from './cup/cupRun.ts'
 import { GhostPicker } from './GhostPicker.tsx'
 import { loadGhostPick, saveGhostPick, type GhostPick } from './records.ts'
@@ -56,14 +50,21 @@ import { useTouchControls } from './touch/useTouchControls.ts'
 import { touchBottom, touchCorner, touchSpace } from './touch/touchLayout.ts'
 import { broadcastSolid } from './ui/broadcast.ts'
 import { PauseLayer } from './ui/PauseLayer.tsx'
-import { SettingsDialog } from './ui/SettingsPanel.tsx'
 import { CoachTip } from './school/CoachTip.tsx'
 import { useCoach } from './school/useCoach.ts'
 import { answerInvite, shouldInvite } from './school/store.ts'
 
 // 2026-11-22: full screen (src/lib/fullscreen.ts), its button a small chunk of its own
 const FullscreenButton = lazy(() => import('../components/FullscreenButton.tsx'))
-// 2026-11-23 (§4.80): the leaderboard's upload card, loaded once a board run has finished
+// 2026-11-23 (docs/KART-PERF.md §11): the menu's panels, fetched when the first of them is opened (a
+// moment on a phone) rather than with the page, all in one chunk (menuPanels.ts)
+const GaragePanel = lazy(() => import('./ui/menuPanels.ts').then((m) => ({ default: m.GaragePanel })))
+const ControlsPanel = lazy(() => import('./ui/menuPanels.ts').then((m) => ({ default: m.ControlsPanel })))
+const TuningPanel = lazy(() => import('./ui/menuPanels.ts').then((m) => ({ default: m.TuningPanel })))
+const BotSetupPanel = lazy(() => import('./ui/menuPanels.ts').then((m) => ({ default: m.BotSetupPanel })))
+const CupSetupPanel = lazy(() => import('./ui/menuPanels.ts').then((m) => ({ default: m.CupSetupPanel })))
+const SettingsDialog = lazy(() => import('./ui/menuPanels.ts').then((m) => ({ default: m.SettingsDialog })))
+// 2026-11-23 (§4.81): the leaderboard's upload card, loaded once a board run has finished
 const BoardUpload = lazy(() => import('./board/BoardUpload.tsx'))
 
 registerMessages(KART_MESSAGES)
@@ -136,7 +137,7 @@ export function SpikePage({
   /** 2026-11-21 (§4.60): /kart's menu opens the challenge mode (src/kart/challenge/) */
   onChallenge?: () => void
   /**
-   * 2026-11-23 (§4.80): /kart's menu opens the leaderboard (src/kart/board/), on a track or the
+   * 2026-11-23 (§4.81): /kart's menu opens the leaderboard (src/kart/board/), on a track or the
    * week's; a time trial's results then offer to upload the run
    */
   onBoard?: (track?: string) => void
@@ -194,15 +195,18 @@ export function SpikePage({
   const [autopiloted] = useState(() => new URLSearchParams(window.location.search).has('autopilot'))
   // 2026-11-18: `?autopilot=expert` (or average, or novice) shows one of the drivers `npm run
   // kart:feel` measures with (bots/drivers.ts), to watch how each one's lap goes
-  const [pilot] = useState(() => {
-    const asked = new URLSearchParams(window.location.search).get('autopilot')
-    return DRIVER_IDS.find((id) => id === asked)
-  })
+  // (2026-11-23, docs/KART-PERF.md §11: the drivers bring the computer's brain, fetched only then)
+  const [asked] = useState(() => new URLSearchParams(window.location.search).get('autopilot') || null)
+  const [drivers, setDrivers] = useState<typeof import('./bots/drivers.ts') | null>(null)
+  useEffect(() => {
+    if (asked) void import('./bots/drivers.ts').then(setDrivers)
+  }, [asked])
+  const pilot = drivers?.DRIVER_IDS.find((id) => id === asked)
   const minimap = useRef<MinimapHandle>(null)
   const clock = useRef<RaceClockHandle>(null)
   const race = useRef<{ restart: () => void } | null>(null)
   const [trial, setTrial] = useState<SpikeTrial>()
-  // 2026-11-23 (§4.80): the last run recorded for the leaderboard, offered at its results
+  // 2026-11-23 (§4.81): the last run recorded for the leaderboard, offered at its results
   const [boardRun, setBoardRun] = useState<BoardRunDone | null>(null)
   const chasing = chase && chase.track === course ? chase : null
   const chaseGhost = chasing?.ghost
@@ -239,6 +243,7 @@ export function SpikePage({
 
   useEffect(() => {
     if (!stage.current || !engine) return
+    if (asked && !drivers) return
     try {
       return engine.startSpikeLoop(stage.current, {
         controls: () => controls.current,
@@ -249,8 +254,8 @@ export function SpikePage({
         ...(course === 'custom' ? { track: track ?? undefined } : { course }),
         ...(autopiloted && track
           ? {
-              autopilot: pilot
-                ? createDriver(DRIVERS[pilot], track, controls.current.tuning, 7)
+              autopilot: pilot && drivers
+                ? drivers.createDriver(drivers.DRIVERS[pilot], track, controls.current.tuning, 7)
                 : createAutopilot(track, controls.current.tuning),
             }
           : {}),
@@ -280,7 +285,7 @@ export function SpikePage({
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, track, autopiloted, pilot, quality, body, driver, ghostPick, touchSource, coachStep, engine, hasBoard, chaseGhost])
+  }, [course, track, autopiloted, asked, drivers, pilot, quality, body, driver, ghostPick, touchSource, coachStep, engine, hasBoard, chaseGhost])
 
   const switchCourse = (next: PlayCourse) => {
     const url = new URL(window.location.href)
@@ -752,14 +757,16 @@ export function SpikePage({
           )}
         </Hint>
       </Bottom>
-      {open === 'settings' && (
-        <SettingsDialog
-          t={t}
-          onClose={() => setOpen(undefined)}
-          onControls={() => setOpen('controls')}
-          onQuality={setQuality}
-        />
-      )}
+      <Suspense>
+        {open === 'settings' && (
+          <SettingsDialog
+            t={t}
+            onClose={() => setOpen(undefined)}
+            onControls={() => setOpen('controls')}
+            onQuality={setQuality}
+          />
+        )}
+      </Suspense>
       {play && (
         <PauseLayer
           t={t}
@@ -769,40 +776,42 @@ export function SpikePage({
           onRestart={() => race.current?.restart()}
         />
       )}
-      {open === 'tuning' && (
-        <TuningPanel t={t} tuning={tuning} onTuning={changeTuning} onClose={closeTuning} />
-      )}
-      {open === 'garage' && (
-        <GaragePanel
-          t={t}
-          kart={garagePick.body ?? body}
-          driver={garagePick.driver ?? driver}
-          onKart={pickGarageBody}
-          onDriver={pickGarageDriver}
-          onClose={closeGarage}
-          track={course === 'custom' ? undefined : course}
-        />
-      )}
-      {open === 'bots' && onBotRace && (
-        <BotSetupPanel
-          t={t}
-          onStart={onBotRace}
-          onClose={closeBots}
-          onGrandPrix={onCup ? () => setOpen('cup') : undefined}
-          custom={custom ? { code: custom.code, name: customName } : undefined}
-        />
-      )}
-      {open === 'cup' && onCup && <CupSetupPanel t={t} onCup={onCup} onClose={closeCup} />}
-      {controlsOpen && (
-        <ControlsPanel
-          t={t}
-          bindings={bindings}
-          rules={rules}
-          onBindings={changeBindings}
-          onRules={changeRules}
-          onClose={closeControls}
-        />
-      )}
+      <Suspense>
+        {open === 'tuning' && (
+          <TuningPanel t={t} tuning={tuning} onTuning={changeTuning} onClose={closeTuning} />
+        )}
+        {open === 'garage' && (
+          <GaragePanel
+            t={t}
+            kart={garagePick.body ?? body}
+            driver={garagePick.driver ?? driver}
+            onKart={pickGarageBody}
+            onDriver={pickGarageDriver}
+            onClose={closeGarage}
+            track={course === 'custom' ? undefined : course}
+          />
+        )}
+        {open === 'bots' && onBotRace && (
+          <BotSetupPanel
+            t={t}
+            onStart={onBotRace}
+            onClose={closeBots}
+            onGrandPrix={onCup ? () => setOpen('cup') : undefined}
+            custom={custom ? { code: custom.code, name: customName } : undefined}
+          />
+        )}
+        {open === 'cup' && onCup && <CupSetupPanel t={t} onCup={onCup} onClose={closeCup} />}
+        {controlsOpen && (
+          <ControlsPanel
+            t={t}
+            bindings={bindings}
+            rules={rules}
+            onBindings={changeBindings}
+            onRules={changeRules}
+            onClose={closeControls}
+          />
+        )}
+      </Suspense>
     </Page>
   )
 }
@@ -995,7 +1004,7 @@ const MapCorner = styled.div<{ $touch: 'left' | 'right' | null }>`
   ${({ $touch }) => $touch && touchCorner($touch)}
 `
 
-// 2026-11-23 (§4.80): whose ghost from the leaderboard races along, and a way to stop
+// 2026-11-23 (§4.81): whose ghost from the leaderboard races along, and a way to stop
 const ChaseBanner = styled.div`
   ${broadcastSolid}
   display: flex;

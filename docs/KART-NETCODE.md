@@ -228,7 +228,7 @@
 
 ### 11.5 排行榜的重播驗證（2026-11-23，`feat/kart-leaderboard`）
 
-計時賽排行榜（`ARCHITECTURE.md` §4.80）把一趟計時賽錄成和房間重播同一種帶子（每 6 tick 一個樣本，`createKartTape`），上傳時伺服器把每個樣本當成一個 live frame 交給 `judgeFrame`，所以「伺服器怎麼判一台車」只有一份程式。和房間判 live frame 的差別（`shared/kart/boardCheck.ts`）：
+計時賽排行榜（`ARCHITECTURE.md` §4.81）把一趟計時賽錄成和房間重播同一種帶子（每 6 tick 一個樣本，`createKartTape`），上傳時伺服器把每個樣本當成一個 live frame 交給 `judgeFrame`，所以「伺服器怎麼判一台車」只有一份程式。和房間判 live frame 的差別（`shared/kart/boardCheck.ts`）：
 
 - **時鐘**：房間用伺服器收到 frame 的時間（`now`）對 GO；重播沒有伺服器時間，`now` 就用樣本自己的 tick（`tick × 1000 / 60`），`goAt = 0`。所以 tick 超前檢查（`TICK_LEAD_SECONDS`）在這裡不起作用，改由「相鄰樣本 1–6 tick、從 tick 0 開始、最後一個是完賽、總時間＝最後一個 tick」把時間釘住；跳點檢查的「最長可走距離」也就只看 tick 差（`max(Δtick/60, Δnow) + 0.1 s`，兩者相同）。
 - **gate**：房間會在 gate 60 m 內相信車子自報的 `crossings`／`nextGate` 多一個（live frame 可能在路上掉了，藏住一次穿越）；重播不掉樣本，所以送進 `judgeFrame` 前把非重置樣本的自報換成伺服器目前的數字，只有重置樣本保留自報（重置是立刻存的，可能緊跟在兩個樣本之間的一次穿越後面，例如過了 gate 撞牆按重置）。實測 14 張圖 × 四種電腦車手 × 一半夾 20 次重置，56 趟 0 誤拒；把整段路往旁邊移 25 m（經由一次落在復位點附近的重置）會因為沒穿過 gate 被拒。

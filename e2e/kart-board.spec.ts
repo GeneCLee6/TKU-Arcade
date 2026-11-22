@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.80): the time trial's leaderboard, end to end through the real
+// 2026-11-23 (docs/ARCHITECTURE.md §4.81): the time trial's leaderboard, end to end through the real
 // Worker and D1. A time trial driven by the autopilot (`?autopilot`) finishes; its results offer the
 // upload, the nickname filled in; the run goes up and ranks; the leaderboard shows it; its replay
 // downloads as a .tkureplay file; and its ghost races along in the time trial. Headless Chromium draws

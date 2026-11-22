@@ -453,7 +453,7 @@ export interface SpikeOptions {
    */
   readonly ghost?: Ghost | null
   /**
-   * 2026-11-23 (§4.80, the leaderboard): at the finish of a time trial on its own laps with the
+   * 2026-11-23 (§4.81, the leaderboard): at the finish of a time trial on its own laps with the
    * standard tuning, the run recorded for the board (shared/kart/boardRun.ts). Given only on a
    * track with a board (SpikePage); the recorder is fetched when the loop starts, and a run whose GO
    * comes before it has arrived is not recorded
@@ -596,7 +596,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let bestLap: number | null = keyOfRecords ? loadBestLap(keyOfRecords) : null
   let recorder: GhostRecorder | null = null
   let news: RecordNews | null = null
-  // 2026-11-23 (§4.80): the run as the leaderboard keeps it, on a built-in track's own laps alone;
+  // 2026-11-23 (§4.81): the run as the leaderboard keeps it, on a built-in track's own laps alone;
   // `boardTuning` is the tuning it started with, which must stay the standard one to the finish
   const boardable = !net && !!track && !!options.onBoardRun && ownLaps === undefined
   // Its own small chunk (the tape, replay.ts), so that the race's engine does not carry it
@@ -716,6 +716,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     const frameMs = lastFrame === undefined || paused || wasPaused ? 0 : now - lastFrame
     lastFrame = now
     wasPaused = paused
+    // 2026-11-23 (docs/KART-PERF.md §11): and the picture behind the menu is drawn once, not every frame
+    scene.hold(paused)
 
     const { bindings, rules, tuning, enabled } = options.controls()
     const pad = readGamepad()

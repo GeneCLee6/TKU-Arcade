@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.80): the kart leaderboard's API (worker/kartBoard.ts) on a real
+// 2026-11-23 (docs/ARCHITECTURE.md §4.81): the kart leaderboard's API (worker/kartBoard.ts) on a real
 // SQLite with the deployed migrations. A real run, driven here without a screen, goes on the board;
 // a nickname keeps only its best; the board ranks, finds a name's row past the top, and hands out
 // the replay; and an upload is refused for a stale physics stamp, an old layout, a bad nickname, a

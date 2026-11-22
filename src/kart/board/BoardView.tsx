@@ -1,4 +1,4 @@
-// /kart?board (2026-11-23, docs/ARCHITECTURE.md §4.80): the time trial's site-wide leaderboard, as a
+// /kart?board (2026-11-23, docs/ARCHITECTURE.md §4.81): the time trial's site-wide leaderboard, as a
 // race broadcast's standings. A track at a time (the track of the week first), its top 100, your own
 // rank wherever it is, and on every row its replay to download or its ghost to race. Its own lazy
 // chunk: the kart's menu and a race never load it.

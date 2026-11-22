@@ -1,4 +1,4 @@
-// The leaderboard's side of the browser (2026-11-23, docs/ARCHITECTURE.md §4.80): reading a board,
+// The leaderboard's side of the browser (2026-11-23, docs/ARCHITECTURE.md §4.81): reading a board,
 // uploading a run, fetching a row's replay as a ghost, and the two things it remembers here (the
 // nickname is the site's own, src/lib/nickname.ts; whether new bests go up by themselves). Only the
 // board's lazy chunks import it.

@@ -35,15 +35,12 @@ import { cantOf } from '../../../shared/kart/levels.ts'
 import { roadDirection, trackBounds, type Track } from '../../../shared/kart/track.ts'
 import { kartScene, kartThemes, waterScene, type KartTheme } from '../../styles/kartTokens.ts'
 import { buildCornerDressing, buildCornerSigns } from './cornerArt.ts'
-import { buildCrossings } from './crossingArt.ts'
 import { buildFestival } from './festival.ts'
-import { buildForks } from './forkArt.ts'
-import { buildLedges } from './ledgeArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
-import { buildObstacleArt } from './obstacleArt.ts'
 import { buildWater, type Water, type WaterLevel } from './seaWater.ts'
 import { loadedScenery, type TrackScenery } from './trackScenery.ts'
+import { loadedFeatures, type TrackFeatures } from './trackFeatures.ts'
 import { loadTrackCuesOn, onTrackCuesChange } from '../trackCues.ts'
 import {
   ASPHALT_LENGTH,
@@ -292,18 +289,22 @@ function sunDisc(
 }
 
 /**
- * Builds `track`'s art. Its own quarter (trackScenery.ts) must have been fetched first
- * (`loadTrackScenery`); without it the track is drawn as a plain one, and says so in the console
+ * Builds `track`'s art. Its own quarter (trackScenery.ts) and the parts of what it has
+ * (trackFeatures.ts) must have been fetched first (`loadTrackScenery`, `loadTrackFeatures`); without
+ * them the track is drawn as a plain one, and says so in the console
  */
 export function buildTrackArt(
   track: Track,
   level: ArtLevel,
   scenery: TrackScenery | null = loadedScenery(track),
+  features: TrackFeatures | null = loadedFeatures(track),
 ): TrackArt {
   const group = new Group()
   const textures = trackTextures(level.anisotropy)
   const theme = themeOf(track)
   if (!scenery) console.error(`kart: ${track.id}'s scenery was not loaded before its scene`)
+  if (!features) console.error(`kart: ${track.id}'s parts were not loaded before its scene`)
+  const parts: TrackFeatures = features ?? {}
   const quarter: TrackScenery = scenery ?? {}
   const harbourArt = track.id === 'harbour' ? (quarter.harbour ?? null) : null
   const harbour = harbourArt !== null
@@ -799,7 +800,7 @@ export function buildTrackArt(
   }
 
   // ── A track with branches (2026-11-20): their roads, and barriers open at their mouths ──
-  buildForks({ track, level, group, textures, keep, own, ownTexture, standard, shadowed, place })
+  parts.forks?.buildForks({ track, level, group, textures, keep, own, ownTexture, standard, shadowed, place })
 
   // ── A hill track (2026-11-17): the ground's height field and the jumps' ramps ──
   if (hillAt) {
@@ -810,12 +811,12 @@ export function buildTrackArt(
     for (const ramp of buildJumpRamps(kit)) group.add(ramp)
   }
   // ── High platforms (2026-11-23, ledgeArt.ts): the buildings under them, their faces, their cues ──
-  const ledgeArt = buildLedges(
+  const ledgeArt = parts.ledges?.buildLedges(
     { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place },
     groundAt,
   )
   // ── A road over a road (2026-11-22, crossingArt.ts): the viaduct's deck, the underpass's walls ──
-  buildCrossings({ track, level, group, textures, keep, own, ownTexture, standard, shadowed, place })
+  parts.crossings?.buildCrossings({ track, level, group, textures, keep, own, ownTexture, standard, shadowed, place })
 
   // ── The arrow boards along the outside of every corner (2026-11-17, cornerArt.ts) ──
   buildCornerSigns(
@@ -870,6 +871,7 @@ export function buildTrackArt(
         flatMap: textures.water,
         swell: 0.25,
         overGround: true,
+        near: box,
       },
       level.water ?? 0,
     )
@@ -1037,7 +1039,7 @@ export function buildTrackArt(
     : null
 
   // ── Moving obstacles (2026-11-22, obstacleArt.ts): booms and sliding containers, by the race clock ──
-  const obstacleArt = buildObstacleArt(track, { group, shadows: level.shadows, keep, own, ownTexture })
+  const obstacleArt = parts.obstacles?.buildObstacleArt(track, { group, shadows: level.shadows, keep, own, ownTexture })
   obstacleArt?.clock(0)
 
   for (const instances of group.children) {

@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.80): the leaderboard's judgement of an uploaded run
+// 2026-11-23 (docs/ARCHITECTURE.md §4.81): the leaderboard's judgement of an uploaded run
 // (shared/kart/boardCheck.ts). Real runs, driven without a screen and recorded as /kart records them,
 // pass on every board track; a run changed after the fact (too fast, a jump, a time that is not the
 // samples', another layout, another shape) or a file that is not one is refused, with the reason.
