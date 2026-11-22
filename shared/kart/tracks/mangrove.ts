@@ -78,7 +78,7 @@ export const MANGROVE: TrackJson = {
   id: 'mangrove',
   // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Mangrove Channel', 'zh-TW': '紅樹林水道' },
-  revision: 1,
+  revision: 2,
   theme: 'day',
   laps: 3,
   road: made.road,

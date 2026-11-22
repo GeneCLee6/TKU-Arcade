@@ -134,7 +134,7 @@ export const HARBOUR: TrackJson = {
   // 7: the classic feel (2026-11-17): the physics changed, so the old times are set aside
   // 10: redrawn round four switchback hairpins (2026-11-18)
   // 11: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
-  revision: 12,
+  revision: 13,
   laps: 3,
   road: made.road,
   gates: made.gates,

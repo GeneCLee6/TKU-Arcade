@@ -20,7 +20,15 @@ import {
   type KartTuning,
 } from '../../shared/kart/physics.ts'
 import { PRESETS } from '../../shared/kart/tuning.ts'
-import { collideWalls, KART_RADIUS, wallClearance, type Wall } from '../../shared/kart/walls.ts'
+import {
+  collideWalls,
+  KART_RADIUS,
+  slideShare,
+  WALL_SLIDE,
+  wallClearance,
+  type Wall,
+} from '../../shared/kart/walls.ts'
+import { ARCADE_TUNING } from '../../shared/kart/physics.ts'
 
 const THROTTLE: KartInput = { ...NO_INPUT, throttle: true }
 const DEGREE = Math.PI / 180
@@ -98,7 +106,8 @@ describe('collideWalls', () => {
     let touched = 0
     for (let step = 0; step < 90; step++) {
       scraping = stepRun(scraping, { ...THROTTLE, steer: 0.3 }, course)
-      if (scraping.kart.x > -KART_RADIUS - 1e-6) touched++
+      // Pushed out to the radius, give or take the small bounce of a slide (2026-11-22)
+      if (scraping.impact > 0 && scraping.kart.x > -KART_RADIUS - 0.01) touched++
     }
     let open = run
     for (let step = 0; step < 90; step++) open = stepRun(open, THROTTLE, course)
@@ -306,5 +315,65 @@ describe('frame rate independence with walls', () => {
         expect(run.kart.z).toBeGreaterThan(-150)
       }
     }
+  })
+})
+
+// 2026-11-22 (docs/KART-FEEL.md §20): the wall slide, the classic feel's. A car laid along a wall,
+// its nose a few degrees in, slides along it: little lost, the combo kept. Steeper is a hit as ever
+describe('the wall slide', () => {
+  /** 1.5 s at the wall at `nose` degrees in and `steer`, from top speed: the speed left, and the gap */
+  function along(nose: number, steer: number, tuning: KartTuning = KART_TUNING) {
+    const course: Course = { walls: [WALL], start: { x: -KART_RADIUS, z: 0, heading: 0 } }
+    const angle = nose * DEGREE
+    let run = startRun(course)
+    run = {
+      ...run,
+      kart: { ...run.kart, x: -KART_RADIUS - 0.01, heading: angle, vx: 60 * Math.sin(angle), vz: -60 * Math.cos(angle) },
+    }
+    let worst = 0
+    let open = { ...run, kart: { ...run.kart, x: -50 } }
+    for (let step = 0; step < 90; step++) {
+      run = stepRun(run, { ...THROTTLE, steer }, course, tuning)
+      open = stepRun(open, THROTTLE, { walls: [], start: course.start }, tuning)
+      worst = Math.max(worst, run.hitSpeed)
+    }
+    return { speed: kartSpeed(run.kart), open: kartSpeed(open.kart), worst }
+  }
+
+  it('the share of a hit a contact pays: none grazing, all from the slide angle on', () => {
+    expect(slideShare(0)).toBe(0)
+    expect(slideShare(Math.sin(WALL_SLIDE.slideAngle))).toBeCloseTo(1, 9)
+    expect(slideShare(Math.sin(30 * DEGREE))).toBe(1)
+    expect(slideShare(Math.sin(6 * DEGREE))).toBeGreaterThan(0.2)
+    expect(slideShare(Math.sin(6 * DEGREE))).toBeLessThan(0.3)
+  })
+
+  it('a few degrees in, steering a little into it: a little slower than the open road, combo kept', () => {
+    for (const nose of [0, 3, 6]) {
+      const { speed, open, worst } = along(nose, 0.15)
+      expect(speed).toBeGreaterThan(open * 0.8)
+      expect(speed).toBeLessThan(open - 1)
+      expect(worst).toBeLessThan(KART_TUNING.wallBreakSpeed)
+    }
+  })
+
+  it('the arcade (old) preset grinds as it always did', () => {
+    const classic = along(3, 0.15)
+    const arcade = along(3, 0.15, ARCADE_TUNING)
+    expect(arcade.speed / arcade.open).toBeLessThan(classic.speed / classic.open - 0.1)
+  })
+
+  it('a hit at 20 degrees costs what it did; a slide at 8 degrees less than half of it', () => {
+    const cost = (angle: number) => {
+      const state = towardsWall(KART_RADIUS + 0.05, 60, angle * DEGREE)
+      const result = slide(state, [WALL])
+      return { lost: 1 - kartSpeed(result.state) / 60, hit: result.hitSpeed }
+    }
+    const steep = cost(20)
+    expect(steep.lost).toBeGreaterThan(0.1)
+    expect(steep.hit).toBeCloseTo(60 * Math.sin(20 * DEGREE), 6)
+    const shallow = cost(8)
+    expect(shallow.lost).toBeLessThan(steep.lost / 2)
+    expect(shallow.hit).toBeLessThan(KART_TUNING.wallBreakSpeed)
   })
 })

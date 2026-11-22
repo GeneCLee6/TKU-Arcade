@@ -106,7 +106,7 @@ export const RIVERSIDE: TrackJson = {
   // 7: the classic feel (2026-11-17): the physics changed, so the old times are set aside
   // 10: redrawn as a flowing beginner's circuit with a hill and a jump (2026-11-18)
   // 11: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
-  revision: 13,
+  revision: 14,
   laps: 3,
   road: made.road,
   gates: made.gates,

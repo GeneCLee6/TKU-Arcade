@@ -114,7 +114,7 @@
 
 **目標**（擁有者 2026-11-22 定案，見 §3.1 最後）：對每張圖最快的非旗艦車，頂尖腳本**平均領先 ≤ 1%、單張最多 3.5%**，多數賽道第一；代價是難開；新手開不一定快。（原本的規劃是「差距 1–2%」，2026-11-22 曾要「每張 ≤ 2.5%」，做不到，改成這個。）
 
-**數值**：極速 +2、加速 +2、操控 0、集氣 +2、重量 0（超出預算 +6），極速再 ×1.015（2026-11-22 改過，見 §3.1）；代價 `FLAGSHIP_TRAITS`：`steerResponse` ×2.2、`turnRate` ×1.08、`driftRecoverRate` ×0.8、`wallImpactLoss` ×1.6、`wallScrapeDrag` ×1.5、`wallGaugeKeep` ×0.4。
+**數值**：極速 +2、加速 +2、操控 0、集氣 +2、重量 0（超出預算 +6），極速再 ×1.015（2026-11-22 改過，見 §3.1）；代價 `FLAGSHIP_TRAITS`：`steerResponse` ×2.2、`turnRate` ×1.08、`driftRecoverRate` ×0.8、`wallImpactLoss` ×1.6、`wallScrapeDrag` ×1.5、`wallGaugeKeep` ×0.4；2026-11-22 加 `wallSlideAngle` ×0.5（貼牆滑行只到 6°，`KART-FEEL.md` §20：不這樣漁港領先會變 4.5%）。
 
 **量到的**（同 §2 的量法）：
 

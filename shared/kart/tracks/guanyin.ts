@@ -51,7 +51,7 @@ export const GUANYIN_PIECES: readonly Piece[] = [
 ]
 
 /** Its own revision: the layout's, on top of the physics' (editor/build.ts CUSTOM_REVISION) */
-export const GUANYIN_REVISION = 8
+export const GUANYIN_REVISION = 9
 
 const built = buildSpec({ name: '', theme: 'day', pieces: GUANYIN_PIECES })
 

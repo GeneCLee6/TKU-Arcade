@@ -5,7 +5,7 @@
 // KART_RADIUS that may not come closer to it than that. Segments are the simplest thing a track JSON
 // (e8-t04, J4) can list; a track's walls turn into these.
 import { KART_RADIUS } from './kartRadius.ts'
-import { STEP_SECONDS, type KartState, type KartTuning } from './physics.ts'
+import { MODEL_CLASSIC, STEP_SECONDS, type KartState, type KartTuning } from './physics.ts'
 
 export interface Wall {
   readonly ax: number
@@ -34,6 +34,34 @@ const MAX_CHECKS = 200
 /** Two passes, so that a car pushed out of one wall into another (in a corner) comes out of both */
 const PASSES = 2
 
+/**
+ * The wall slide (2026-11-22, docs/KART-FEEL.md §20; the classic feel only): a car that meets a wall
+ * at a shallow angle slides along it instead of crashing into it. Up to `slideAngle` between the way
+ * it goes and the wall, what the hit takes from the speed along the wall (`wallImpactLoss` times how
+ * head-on it was) and how hard it counts as a crash (`hitSpeed`, which breaks the combo past
+ * `wallBreakSpeed`) fade with the square of the angle's share of `slideAngle`: a car laid along the
+ * wall, its nose a few degrees in, keeps nearly all its speed and its combo. Steeper than that it is
+ * a hit as before. Touching the wall still costs `wallScrapeDrag` a second (times `scrapeShare`
+ * while it only slides) and still spoils a drift's exit bonus (course.ts): hugging a wall is a way
+ * round a corner that can save distance, not a free one. The arcade (old) preset is unchanged
+ */
+export const WALL_SLIDE = {
+  /** The steepest a slide is, radians, unless the tuning says (`wallSlideAngle`) */
+  slideAngle: (12 * Math.PI) / 180,
+  /** The share of `wallScrapeDrag` a step that only slid along the wall pays */
+  scrapeShare: 0.6,
+} as const
+
+/**
+ * How much of a hit's cost a contact `headOn` (the cosine between the velocity and the wall's
+ * normal, so the sine of the angle to the wall) pays: 1 for a hit, less for a slide, 0 grazing
+ */
+export function slideShare(headOn: number, slideAngle: number = WALL_SLIDE.slideAngle): number {
+  if (!(slideAngle > 0)) return 1
+  const share = headOn / Math.sin(slideAngle)
+  return share >= 1 ? 1 : share * share
+}
+
 export interface WallResult {
   readonly state: KartState
   /**
@@ -45,6 +73,11 @@ export interface WallResult {
   readonly hitSpeed: number
   /** Whether the car touched a wall at all in this step */
   readonly touching: boolean
+  /**
+   * The classic feel (2026-11-22): every contact of this step was a slide along the wall (WALL_SLIDE),
+   * none a hit. Left out otherwise
+   */
+  readonly sliding?: boolean
 }
 
 /**
@@ -124,6 +157,10 @@ export function collideWalls(
   let touching = false
   let impact = 0
   let hitSpeed = 0
+  // The wall slide is the classic feel's; the arcade (old) preset takes every contact as a hit
+  const slides = tuning.model === MODEL_CLASSIC
+  const slideAngle = tuning.wallSlideAngle ?? WALL_SLIDE.slideAngle
+  let hardest = 0
 
   for (let check = 1; check <= checks; check++) {
     if (!hit) {
@@ -164,12 +201,14 @@ export function collideWalls(
         if (into >= 0) continue
         const speed = Math.hypot(vx, vz)
         const headOn = -into / speed
+        const share = slides ? slideShare(headOn, slideAngle) : 1
+        hardest = Math.max(hardest, share)
         impact = Math.max(impact, headOn)
-        hitSpeed = Math.max(hitSpeed, -into)
+        hitSpeed = Math.max(hitSpeed, -into * share)
         // Along the wall, minus a share for how head-on it was; out of the wall, a small bounce
         const alongX = vx - into * nx
         const alongZ = vz - into * nz
-        const kept = 1 - tuning.wallImpactLoss * headOn
+        const kept = 1 - tuning.wallImpactLoss * headOn * share
         vx = alongX * kept - into * tuning.wallBounce * nx
         vz = alongZ * kept - into * tuning.wallBounce * nz
       }
@@ -178,11 +217,19 @@ export function collideWalls(
 
   if (!touching) return { state: after, impact: 0, hitSpeed: 0, touching: false }
 
+  const sliding = slides && slideAngle > 0 && hardest < 1
   const speed = Math.hypot(vx, vz)
   if (speed > 0) {
-    const scraped = Math.max(0, speed - tuning.wallScrapeDrag * dt) / speed
+    const drag = tuning.wallScrapeDrag * (sliding ? WALL_SLIDE.scrapeShare : 1)
+    const scraped = Math.max(0, speed - drag * dt) / speed
     vx *= scraped
     vz *= scraped
   }
-  return { state: { ...after, x, z, vx, vz }, impact, hitSpeed, touching }
+  return {
+    state: { ...after, x, z, vx, vz },
+    impact,
+    hitSpeed,
+    touching,
+    ...(sliding ? { sliding } : {}),
+  }
 }

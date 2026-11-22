@@ -124,7 +124,7 @@ export const TAMKANG: TrackJson = {
   // 6: the classic feel (2026-11-17): the physics changed, so the old times are set aside
   // 9: redrawn over the hill east of the avenue, with a jump (2026-11-18)
   // 10: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
-  revision: 12,
+  revision: 13,
   laps: 3,
   road: made.road,
   gates: made.gates,

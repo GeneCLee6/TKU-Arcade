@@ -147,6 +147,15 @@ export interface KartState {
   readonly airHeld?: number
   readonly driftJumps?: number
   /**
+   * The timed landing (2026-11-22, terrain.ts; docs/KART-FEEL.md §20): seconds since the throttle
+   * was last pressed afresh in this flight, the seconds left after a landing in which a fresh press
+   * still times it, and how many timed landings there have been. Only on a track with terrain, never
+   * before a car first takes off
+   */
+  readonly airTap?: number
+  readonly landWindow?: number
+  readonly timedLandings?: number
+  /**
    * The classic feel only (2026-11-17, classic.ts; docs/KART-FEEL.md): the steering as the wheels
    * have it (it follows the stick quickly, not at once), the deepest slip angle of this drift, the
    * drift key as it was at the last step, whether the drift key must be let go before it drifts
@@ -579,6 +588,11 @@ export const KART_TUNING = {
   wallBreakSpeed: 8,
   /** A hit at least wallBreakSpeed hard keeps this share of the gauge */
   wallGaugeKeep: 0.5,
+  /**
+   * The wall slide (2026-11-22, walls.ts's WALL_SLIDE): up to this angle between the way the car
+   * goes and the wall, a contact is a slide along it rather than a hit
+   */
+  wallSlideAngle: 12 * DEG,
 
   /** MODEL_CLASSIC */
   model: MODEL_CLASSIC as number,

@@ -49,6 +49,8 @@ export interface Measure {
   readonly crashes: number
   /** Resets (stuck, or turned round) */
   readonly resets: number
+  /** Timed landings (2026-11-22, shared/kart/terrain.ts) */
+  readonly timedLandings: number
 }
 
 const LAPS_CAP_SECONDS = 400
@@ -107,5 +109,6 @@ export function measure(
     combo,
     crashes,
     resets: trial.run.resets,
+    timedLandings: trial.run.kart.timedLandings ?? 0,
   }
 }

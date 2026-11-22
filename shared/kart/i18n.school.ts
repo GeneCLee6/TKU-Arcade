@@ -7,7 +7,7 @@
 const en = {
   'kart.school.title': 'Driving school',
   'kart.school.intro':
-    'Ten short lessons, one technique each, from the first lap to the techniques of the experts. Every lesson can be tried again or skipped.',
+    'Eleven short lessons, one technique each, from the first lap to the techniques of the experts. Every lesson can be tried again or skipped.',
   'kart.school.back': 'Back to the kart',
   'kart.school.lessons': 'Lessons',
   'kart.school.lessonNumber': 'Lesson {n}',
@@ -42,6 +42,7 @@ const en = {
   'kart.school.lesson.n2o': 'N2O',
   'kart.school.lesson.start': 'Perfect start',
   'kart.school.lesson.jump': 'Drift jump',
+  'kart.school.lesson.landing': 'Timed landing',
   'kart.school.lesson.gap': 'Through the gates',
   'kart.school.lesson.final': 'Final test',
 
@@ -53,6 +54,7 @@ const en = {
   'kart.school.goal.n2o': 'Fill a charge, fire it, and keep filling the gauge while it burns.',
   'kart.school.goal.start': 'Make a perfect start.',
   'kart.school.goal.jump': 'Land a drift jump off the loading ramp, the first jump.',
+  'kart.school.goal.landing': 'Time a landing off the riverside jump.',
   'kart.school.goal.gap': 'Drive through the gates of the three yard walls.',
   'kart.school.goal.final': 'Two laps in under {limit} seconds.',
 
@@ -72,6 +74,8 @@ const en = {
     'Watch the countdown. Press and hold {throttle} during the “1”, or within a quarter of a second after GO. Earlier is only a small boost.',
   'kart.school.how.jump':
     'Start the drift before the ramp: about 0.3 s before the lip, hold {drift} and steer {right}, so the tail is already out, and keep holding through the air. Land, let go, press {throttle}.',
+  'kart.school.how.landing':
+    'Go over the jump straight, the nose in line. In the air let go of {throttle}, and press it again just as the kart touches down: within a tenth of a second before or after is a timed landing, a longer boost than holding {throttle} through the air.',
   'kart.school.how.gap':
     'Up the hill, each yard wall has a gate, and the three gates are in one straight line, hidden behind the first wall. Line up early, do not drift, do not correct: straight through all three.',
   'kart.school.how.final':
@@ -85,6 +89,7 @@ const en = {
   'kart.school.live.keepDrifting': 'Burning: keep drifting, the gauge still fills',
   'kart.school.live.wait': 'Wait for the “1”…',
   'kart.school.live.holdNow': 'Now: hold {throttle}',
+  'kart.school.live.landNow': 'In the air: let go of {throttle}, press it as you land',
 
   'kart.school.note.wall': 'You hit the wall: let go of {throttle} or tap {brake} before the corner.',
   'kart.school.note.wrongWay': 'Wrong way: turn round.',
@@ -118,6 +123,10 @@ const en = {
   'kart.school.note.jumpShallow':
     'The tail was not out yet at the lip: start the drift a little earlier.',
   'kart.school.note.jumpLetGo': 'You let go of {drift} in the air: hold it until you land.',
+  'kart.school.note.landHeld':
+    'You held {throttle} through the landing: let go of it in the air and press it as you land.',
+  'kart.school.note.landEarly': 'You pressed {throttle} too soon: wait until the kart is about to touch down.',
+  'kart.school.note.landLate': 'Too late: press {throttle} the moment the kart lands.',
   'kart.school.note.gapAround': 'You went round the wall: the gates are in one straight line.',
   'kart.school.note.gapWall': 'You hit the wall by the gate: line up earlier, and do not correct.',
   'kart.school.note.timeUp': 'Time is up.',
@@ -127,7 +136,7 @@ export type KartSchoolKey = keyof typeof en
 
 const zhTW: Record<KartSchoolKey, string> = {
   'kart.school.title': '駕訓班',
-  'kart.school.intro': '十堂短課，一堂一招：從跑完第一圈，到高手的技巧。每一課都可以重來或跳過。',
+  'kart.school.intro': '十一堂短課，一堂一招：從跑完第一圈，到高手的技巧。每一課都可以重來或跳過。',
   'kart.school.back': '回卡丁車',
   'kart.school.lessons': '課程',
   'kart.school.lessonNumber': '第 {n} 課',
@@ -162,6 +171,7 @@ const zhTW: Record<KartSchoolKey, string> = {
   'kart.school.lesson.n2o': 'N2O 噴射',
   'kart.school.lesson.start': '完美起跑',
   'kart.school.lesson.jump': '甩尾起跳',
+  'kart.school.lesson.landing': '落地時機噴',
   'kart.school.lesson.gap': '穿縫與捷徑',
   'kart.school.lesson.final': '綜合考驗',
 
@@ -173,6 +183,7 @@ const zhTW: Record<KartSchoolKey, string> = {
   'kart.school.goal.n2o': '集滿一格、噴出去，噴射中繼續集氣。',
   'kart.school.goal.start': '完美起跑一次。',
   'kart.school.goal.jump': '在第一個跳台「裝卸坡」甩尾起跳並落地。',
+  'kart.school.goal.landing': '在河濱的跳台落地時按準時機。',
   'kart.school.goal.gap': '一路穿過三道院牆的門。',
   'kart.school.goal.final': '兩圈在 {limit} 秒內跑完。',
 
@@ -192,6 +203,8 @@ const zhTW: Record<KartSchoolKey, string> = {
     '看著倒數。在「1」那一秒內按住 {throttle}，或 GO 之後 0.25 秒內按下。更早按只有小加速。',
   'kart.school.how.jump':
     '跳台前就開始甩：起跳前約 0.3 秒按住 {drift} 並往 {right} 打，讓車尾先甩出去，空中一直按著。落地後放開、按 {throttle}。',
+  'kart.school.how.landing':
+    '直直飛過跳台、車頭對正。在空中先放開 {throttle}，車子快碰地時再按：落地前後十分之一秒內就是落地時機噴，比一路按著 {throttle} 落地的加速更長。',
   'kart.school.how.gap':
     '上坡的三道院牆各有一個門，三個門排成一直線，藏在第一道牆後面。提早對準，不甩尾、不修方向，一路直直穿過三道門。',
   'kart.school.how.final':
@@ -205,6 +218,7 @@ const zhTW: Record<KartSchoolKey, string> = {
   'kart.school.live.keepDrifting': '噴射中：繼續甩，加速條照樣集',
   'kart.school.live.wait': '等到「1」…',
   'kart.school.live.holdNow': '現在：按住 {throttle}',
+  'kart.school.live.landNow': '在空中：放開 {throttle}，落地那一下再按',
 
   'kart.school.note.wall': '撞牆了：彎前先放開 {throttle}，或點一下 {brake}。',
   'kart.school.note.wrongWay': '逆向了：掉頭。',
@@ -234,6 +248,9 @@ const zhTW: Record<KartSchoolKey, string> = {
   'kart.school.note.jumpShallow': '起跳時車尾還沒甩出去：再早一點開始甩。',
   'kart.school.note.jumpLetGo': '在空中放開了 {drift}：按到落地。',
   'kart.school.note.gapAround': '繞過牆了：三個門排成一直線。',
+  'kart.school.note.landHeld': '落地時一直按著 {throttle}：在空中先放開，落地那一下再按。',
+  'kart.school.note.landEarly': '按 {throttle} 太早：等車子快碰地再按。',
+  'kart.school.note.landLate': '太晚了：車子一落地就按 {throttle}。',
   'kart.school.note.gapWall': '撞到門旁邊的牆：提早對準，別修方向。',
   'kart.school.note.timeUp': '時間到。',
 }

@@ -19,6 +19,11 @@ import { createDriver } from '../src/kart/bots/drivers.ts'
 import { runLesson } from '../src/kart/school/headless.ts'
 import { LESSON_IDS } from '../src/kart/school/lessons.ts'
 
+const trackHasJumps = (id: string): boolean => {
+  const track = raceTrack(id)
+  return (track?.jumps?.length ?? 0) > 0 || (track?.forks ?? []).some((fork) => fork.jumps.length > 0)
+}
+
 const seedsAt = process.argv.indexOf('--seeds')
 const SEEDS = seedsAt > 0 ? Math.max(1, Number(process.argv[seedsAt + 1]) || 1) : 3
 
@@ -117,6 +122,21 @@ for (const [name, tuning] of CHOSEN) {
       const known = expert!.seconds - master.seconds
       console.log(
         `${''.padEnd(12)}master vs expert: ${known.toFixed(1)} s faster (${((known / expert!.seconds) * 100).toFixed(1)}% less time): what knowing the track is worth`,
+      )
+    }
+    // 2026-11-22: the master's timed landings (on a track without a guide the master is the expert
+    // with the timed landing), and what they are worth against holding the
+    // throttle through the air as everyone else does (docs/KART-FEEL.md §20)
+    if (trackHasJumps(id)) {
+      const plain = { ...FEEL_DRIVERS.master, skill: { ...FEEL_DRIVERS.master.skill, landTap: false } }
+      const without = mean(
+        Array.from({ length: SEEDS }, (_, at) => feelRace(id, plain, tuning, (at + 1) * 7).seconds),
+      )
+      const runs = Array.from({ length: SEEDS }, (_, at) => feelRace(id, FEEL_DRIVERS.master, tuning, (at + 1) * 7))
+      const timed = mean(runs.map((run) => run.timedLandings))
+      const top = mean(runs.map((run) => run.seconds))
+      console.log(
+        `${''.padEnd(12)}timed landings: ${timed.toFixed(1)} a race, ${(without - top).toFixed(2)} s (${(((without - top) / without) * 100).toFixed(2)}%) against holding the throttle through the air`,
       )
     }
   }

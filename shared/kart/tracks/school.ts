@@ -8,7 +8,8 @@
 //   rights. The final test.
 //
 // Neither is a race track: they are not in RACE_TRACK_IDS, so no room can be set to them. The other
-// two lessons drive the first stretch of a race track (the wharf's loading ramp, the lanes' yards).
+// lessons drive the first stretch of a race track (the wharf's loading ramp, the lanes' yards, the
+// riverside's jump for the timed landing).
 import { parseTrack, TRACK_FORMAT, type Track, type TrackJson } from '../track.ts'
 import { circuit } from './circuit.ts'
 import { fitted, lay, LAY_SAMPLE, left, line, right } from './lay.ts'
@@ -76,7 +77,7 @@ export const SCHOOL_TEST: TrackJson = laidTrack(
 )
 
 /** Where a lesson drives: one of the school's tracks, or a race track's first stretch */
-export type SchoolTrackId = 'yard' | 'test' | 'wharf' | 'lanes'
+export type SchoolTrackId = 'yard' | 'test' | 'wharf' | 'lanes' | 'riverside'
 
 const parsed = new Map<SchoolTrackId, Track>()
 

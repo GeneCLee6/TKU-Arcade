@@ -84,18 +84,21 @@ function raceDigest(track: Track): string {
  * Taken on main at fb5f7e1: [track digest, race digest]. 2026-11-21: the track digests taken again
  * with the grid in one row and the time trial's own start (shared/kart/startLine.ts); the races,
  * driven from that start, are the very same. 2026-11-22: riverside's, harbour's and tamkang's
- * track digests taken again for their settled names (docs/KART-WORLD.md §0; only `name` changed)
+ * track digests taken again for their settled names (docs/KART-WORLD.md §0; only `name` changed).
+ * Later that day every digest taken again: each revision raised, and the wall slide and the timed
+ * landing in the physics (docs/KART-FEEL.md §20); the lanes' race, which touches no wall at a
+ * slant and lands no jump the new way, is the very same
  */
 const TRACKS: Record<string, readonly [string, string]> = {
-  riverside: ['3ac8b411', '847dafcb'],
-  harbour: ['86bba381', 'bcba2291'],
-  tamkang: ['bf88d630', 'bd30b1b0'],
-  guanyin: ['da874157', '18754f84'],
-  mangrove: ['0e545779', '5384366d'],
-  fort: ['52eb5dfa', '960ef7c3'],
-  danhai: ['13182b1e', '9f25ce59'],
-  datun: ['3ad039d7', 'e2c40dda'],
-  lanes: ['142a2b05', 'e46f40e5'],
+  riverside: ['7d5b57b8', '7cffd72b'],
+  harbour: ['3dc50b6a', 'f7e6b09a'],
+  tamkang: ['b31f94db', '942dad15'],
+  guanyin: ['233004ea', '09cf9011'],
+  mangrove: ['0268a3b6', 'ece42fe7'],
+  fort: ['0d5d475b', 'ad851a43'],
+  danhai: ['ee3baecd', '0adde0a5'],
+  datun: ['c1fb29ca', '30d3c497'],
+  lanes: ['f0104bee', 'e46f40e5'],
   // 2026-11-20: the wharf (a branch now) and the old street (redrawn for its boost cover) changed
   // on purpose, their revisions raised; these are what they were
   // wharf: ['e842a0a2', '59e4d97c'],
@@ -117,11 +120,14 @@ const SPECS: Record<string, TrackSpec> = (() => {
   }
 })()
 
-/** Taken on main at fb5f7e1: each editor track's [id, track digest] (the digests again 2026-11-21: the grid in one row) */
+/**
+ * Taken on main at fb5f7e1: each editor track's [id, track digest] (the digests again 2026-11-21: the
+ * grid in one row; and 2026-11-22: CUSTOM_REVISION 8)
+ */
 const CUSTOM: Record<string, readonly [string, string]> = {
-  starter: ['custom-164wwb3lbtz', 'e073cc2a'],
-  hill: ['custom-ih8shvnxar', '3f84d520'],
-  jump: ['custom-1jip6lh60ry', '1ff4a340'],
+  starter: ['custom-164wwb3lbtz', '011a2e9f'],
+  hill: ['custom-ih8shvnxar', '1391ffbf'],
+  jump: ['custom-1jip6lh60ry', 'bbb4dbbd'],
 }
 
 const customOf = (name: string) => SPECS[name]!

@@ -63,6 +63,17 @@ export const TERRAIN_TUNING = {
   landingAlign: (16 * Math.PI) / 180,
   /** ... and lasts this long, as a release boost does */
   landingBoost: 0.5,
+  /**
+   * The timed landing (2026-11-22, docs/KART-FEEL.md §20): a fresh press of the throttle within this
+   * long before the wheels touch, or after, on a landing that earns the boost above (long enough in
+   * the air, the nose in line) ...
+   */
+  landingTapWindow: 0.1,
+  /**
+   * ... makes that boost this long instead: in place of it, not on top of it (a perfect instant
+   * boost is 1.4 times a good one; this is 1.5 times the plain landing's)
+   */
+  landingTimedBoost: 0.75,
   /** The drift jump: the tail must be out this far at the lip for the drift to be carried, radians */
   driftJumpSlip: (10 * Math.PI) / 180,
   /** ... and the nose then swings this fast in the air at full steer, rad/s */
@@ -289,6 +300,13 @@ const wrapAngle = (angle: number): number => {
   return wrapped === -Math.PI ? Math.PI : wrapped
 }
 
+/** The throttle went down since the last step: not held before, or let go and pressed between */
+const pressedAfresh = (state: KartState, input: KartInput): boolean =>
+  input.throttle && (!state.throttleHeld || (input.throttleTap ?? false))
+
+/** `airTap` never counts past this, seconds: long before any landing window */
+const AIR_TAP_CAP = 9
+
 /** Whether the car is in the air */
 export const airborne = (kart: KartState): boolean => (kart.air ?? 0) > 0
 
@@ -366,6 +384,8 @@ function stepAir(
     traction: Math.min(1, state.traction + dt / Math.max(dt, tuning.driftRecovery)),
     boostHeld: input.boost,
     throttleHeld: input.throttle,
+    // The timed landing: how long since the throttle was last pressed afresh in this flight
+    airTap: pressedAfresh(state, input) ? 0 : Math.min(AIR_TAP_CAP, (state.airTap ?? AIR_TAP_CAP) + dt),
     // The classic feel's start boost runs down in the air too; the arcade feel never has one
     ...(state.launchSeconds === undefined
       ? {}
@@ -411,6 +431,8 @@ export function stepOnTerrain(
     air: 0,
     // The count of drift jumps landed is the terrain's, not the flat car's
     ...(state.driftJumps === undefined ? {} : { driftJumps: state.driftJumps }),
+    // and so are the timed landings
+    ...(state.timedLandings === undefined ? {} : { timedLandings: state.timedLandings }),
   }
 }
 
@@ -438,7 +460,10 @@ export function settleTerrain(
     const speed = Math.hypot(after.vx, after.vz)
     const slip =
       speed > 1 ? Math.abs(wrapAngle(Math.atan2(after.vx, -after.vz) - after.heading)) : 0
-    const clean = air >= numbers.landingMinAir && input.throttle && slip <= numbers.landingAlign
+    const earned = air >= numbers.landingMinAir && slip <= numbers.landingAlign
+    const clean = earned && input.throttle
+    // A press just before the touch: the timed landing at once
+    const timed = earned && (after.airTap ?? AIR_TAP_CAP) <= numbers.landingTapWindow + 1e-9
     const carried = input.drift ? (after.airDrift ?? 0) : 0
     if (carried !== 0 && speed > 1) {
       // The drift jump: down in the drift it left in, as deep as the nose now is and as long as
@@ -476,6 +501,7 @@ export function settleTerrain(
         event: 'landing',
       }
     }
+    const boost = timed ? numbers.landingTimedBoost : clean ? numbers.landingBoost : 0
     return {
       kart: {
         ...after,
@@ -483,7 +509,11 @@ export function settleTerrain(
         vy: 0,
         air: 0,
         ...(after.airDrift === undefined ? {} : { airDrift: 0 as const, airHeld: 0 }),
-        miniSeconds: clean ? Math.max(after.miniSeconds, numbers.landingBoost) : after.miniSeconds,
+        miniSeconds: Math.max(after.miniSeconds, boost),
+        airTap: AIR_TAP_CAP,
+        // Not timed yet: a press in the next `landingTapWindow` still is
+        landWindow: earned && !timed ? numbers.landingTapWindow : 0,
+        ...(timed ? { timedLandings: (after.timedLandings ?? 0) + 1 } : {}),
       },
       event: 'landing',
     }
@@ -512,6 +542,8 @@ export function settleTerrain(
           doubleDrift: false,
           airDrift: way,
           airHeld: after.driftSeconds,
+          airTap: AIR_TAP_CAP,
+          landWindow: 0,
           driftSeconds: 0,
           driftPeak: Math.max(after.driftPeak ?? 0, out),
         },
@@ -532,11 +564,30 @@ export function settleTerrain(
         slideDirection: 0,
         burstReady: false,
         doubleDrift: false,
+        airTap: AIR_TAP_CAP,
+        landWindow: 0,
       },
       event: 'takeoff',
     }
   }
-  return { kart: { ...after, y: groundAt(terrain, after.x, after.z).y }, event: 'none' }
+  const y = groundAt(terrain, after.x, after.z).y
+  const window = before.landWindow ?? 0
+  if (window <= 0) return { kart: { ...after, y }, event: 'none' }
+  // Just down: a fresh press now times the landing, its boost the timed one (in place of the plain
+  // one, which has run this long already)
+  if (pressedAfresh(before, input)) {
+    return {
+      kart: {
+        ...after,
+        y,
+        landWindow: 0,
+        miniSeconds: Math.max(after.miniSeconds, numbers.landingTimedBoost - (numbers.landingTapWindow - window)),
+        timedLandings: (after.timedLandings ?? 0) + 1,
+      },
+      event: 'none',
+    }
+  }
+  return { kart: { ...after, y, landWindow: Math.max(0, window - STEP_SECONDS) }, event: 'none' }
 }
 
 /**
