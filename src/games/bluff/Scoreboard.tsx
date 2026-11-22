@@ -8,7 +8,6 @@ import { useT } from '../../i18n/useT.ts'
 import { displayType, monoType } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { Count, Muted, Name, Tag, Top } from './bluffParts.ts'
-import './messages.ts'
 import { RoleTag } from './RoundReveal.tsx'
 import { byScore, gains, revealedRole, signed } from './screenState.ts'
 

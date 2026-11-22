@@ -6,7 +6,6 @@ import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { glass, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { RoleCard } from './RoleCard.tsx'
 import { roleKey } from './screenState.ts'
 

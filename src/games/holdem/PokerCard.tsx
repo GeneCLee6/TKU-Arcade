@@ -4,7 +4,6 @@ import type { Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, radius } from '../../styles/tokens.ts'
 import { SUIT_PATHS } from '../silent-table/suits.ts'
-import './messages.ts'
 
 export type CardSize = 'tiny' | 'small' | 'medium' | 'large'
 

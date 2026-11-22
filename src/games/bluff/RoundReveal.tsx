@@ -7,7 +7,6 @@ import { useT } from '../../i18n/useT.ts'
 import { displayType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { Body, Name, Tag } from './bluffParts.ts'
-import './messages.ts'
 import { gains, revealedRole, signed } from './screenState.ts'
 
 /** How long apart the reveal's parts come up, when it is seen arriving */

@@ -9,7 +9,6 @@ import { glass, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { Dumpling } from './Dumpling.tsx'
-import './messages.ts'
 import { dumpling } from './palette.ts'
 import { promptOf, roundLines } from './screenState.ts'
 

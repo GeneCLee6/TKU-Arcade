@@ -5,7 +5,6 @@ import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { glass, monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { CardFace } from './PokerCard.tsx'
 import { categoryKey, logLine, type Names } from './screenState.ts'
 

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import styled from 'styled-components'
-import { silentTableScreenMessages } from '../../../shared/games/silent-table/i18n.screen.ts'
 import { ROUNDS } from '../../../shared/games/silent-table/limits.ts'
 import type {
   SilentTableAction,
@@ -11,7 +10,7 @@ import type {
 import { Avatar } from '../../components/Avatar.tsx'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
-import { registerMessages, type Translate } from '../../i18n/t.ts'
+import { type Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { useReducedMotion } from '../../lib/useMediaQuery.ts'
 import { clippedFill, cornerClip, displayType, glass, monoType, SLANT } from '../../styles/esports.ts'
@@ -22,8 +21,6 @@ import { tableNews, type TableNews } from './news.ts'
 import { CardBack, CardFace, CardSlot } from './PlayingCard.tsx'
 import { RevealPanel } from './RevealPanel.tsx'
 import { useRevealPlayback } from './useRevealPlayback.ts'
-
-registerMessages(silentTableScreenMessages)
 
 /** If the room never answers "ready", the button comes back after this */
 const READY_ANSWER_MS = 4000

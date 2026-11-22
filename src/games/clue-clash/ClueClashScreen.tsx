@@ -13,7 +13,6 @@ import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { ClueForm } from './ClueForm.tsx'
 import { ClueList } from './ClueList.tsx'
-import './messages.ts'
 import { answerKey, promptOf, verdictOf } from './screenState.ts'
 
 /** If the room never answers a press, the buttons come back after this */

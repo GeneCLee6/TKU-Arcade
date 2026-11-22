@@ -11,7 +11,6 @@ import type { GameScreenProps } from '../screens.ts'
 import { ClueForm } from './ClueForm.tsx'
 import { ClueLog } from './ClueLog.tsx'
 import { Grid } from './Grid.tsx'
-import './messages.ts'
 import { answerKey, cellLooks, clueCount, giverOf, picksLeft, promptOf } from './screenState.ts'
 import { Setup } from './Setup.tsx'
 

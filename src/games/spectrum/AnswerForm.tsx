@@ -11,7 +11,6 @@ import { Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 
 interface AnswerFormProps {
   /** What the room has from you so far: null until it has an answer */

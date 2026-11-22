@@ -6,7 +6,6 @@ import { Avatar } from '../../components/Avatar.tsx'
 import { Heading, List, Row, Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { sortRack } from './screenState.ts'
 import { TileFace } from './Tile.tsx'
 

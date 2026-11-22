@@ -6,7 +6,6 @@ import { Heading, List, Row } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { glass, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { CardBack, RoleCard } from './RoleCard.tsx'
 
 /**

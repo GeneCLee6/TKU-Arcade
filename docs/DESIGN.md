@@ -130,7 +130,7 @@ Button、IconButton、Card、Dialog、Drawer（手機聊天）、Toast、Tabs、
 
 7. **規則頁**是 markdown 兩份，不是 `t()`；由英文寫起，繁中翻譯，兩份都是「自己的話」，不轉載原作說明書。
 8. **預設語言**：`en`；第一次進站（localStorage 無紀錄）依 `navigator.languages` 偵測，`zh*` 用繁中、其餘英文；之後以使用者切換為準（2026-11-03 拍板）。
-9. **字串放哪裡**（2026-11-15，首屏只帶一種語言，`ARCHITECTURE.md` §5.1）：大廳與全站共用的放 `src/i18n/en.ts`／`zh-TW.ts`；只有房間裡才看得到的（等待室、房主、聊天、結算、房間錯誤）放 `room.en.ts`／`room.zh-TW.ts`；遊戲的名稱與簡介放 `shared/games/lobby.en.ts`／`lobby.zh-TW.ts`（只准這兩個 key 與 `tryAlone`）；遊戲的選項、錯誤、結算放那款的 `i18n.ts`；畫面自己的放 `i18n.screen.ts` 等隨畫面載入。放錯地方 `check-i18n`、`catalog.test.ts` 或 `npm run budget` 會擋。
+9. **字串放哪裡**（2026-11-15，首屏只帶一種語言，`ARCHITECTURE.md` §5.1）：大廳與全站共用的放 `src/i18n/en.ts`／`zh-TW.ts`；只有房間裡才看得到的（等待室、房主、聊天、結算、房間錯誤）放 `room.en.ts`／`room.zh-TW.ts`；遊戲的名稱與簡介放 `shared/games/lobby.en.ts`／`lobby.zh-TW.ts`（只准這兩個 key 與 `tryAlone`）；遊戲的選項、錯誤、結算放那款的 `i18n.ts`；畫面自己的放 `i18n.screen.en.ts`／`i18n.screen.zh-TW.ts`（隨畫面載入、只載目前語言；陞官圖簡化版與卡丁車照舊 `i18n.screen.ts` 兩語）。放錯地方 `check-i18n`、`catalog.test.ts` 或 `npm run budget` 會擋。
 
 ## 6. 無障礙
 

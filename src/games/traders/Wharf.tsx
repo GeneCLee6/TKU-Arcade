@@ -4,7 +4,6 @@ import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { Heading, Help, Section } from './Market.tsx'
-import './messages.ts'
 import { Token } from './pieces.tsx'
 import type { Selection } from './screenState.ts'
 

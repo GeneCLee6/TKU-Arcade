@@ -6,7 +6,6 @@ import { Heading, List, Row, Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { displayType, glass, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { revealedWords } from './screenState.ts'
 
 /** The two words, who had the odd one, and everyone's word: the same for everyone */

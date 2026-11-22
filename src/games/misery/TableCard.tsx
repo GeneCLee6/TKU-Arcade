@@ -7,7 +7,6 @@ import { useReducedMotion } from '../../lib/useMediaQuery.ts'
 import { displayType, glass, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { IndexBadge } from './MiseryCardFace.tsx'
-import './messages.ts'
 import { attemptText, miseryFill } from './screenState.ts'
 
 /** How long the index takes to climb to its value at a reveal */
