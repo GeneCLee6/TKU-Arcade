@@ -973,6 +973,7 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
     'Hillside Lanes',
     // 2026-11-20: the first with real branches
     'Viaduct Works',
+    'Zhuwei Flyover',
   ])
   await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
   await expect(page.getByText('Time trial')).toBeVisible()

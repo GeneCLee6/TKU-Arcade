@@ -81,6 +81,7 @@ test('the race against the computer and the Backstreet Cup offer the two tracks'
     'Wharf Warehouses',
     'Hillside Lanes',
     'Viaduct Works',
+    'Zhuwei Flyover',
   ])
 })
 
