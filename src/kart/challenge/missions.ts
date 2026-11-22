@@ -136,6 +136,15 @@ export const MISSIONS: readonly Mission[] = [
     rules: { noReset: true },
     limit: { medal: 'bronze', slack: 1 },
   }),
+  // 2026-11-22 (#103): through Lock Gate Lane's booms and container without touching one
+  m({
+    id: 'lockgate',
+    chapter: 'technique',
+    track: 'ch-lock',
+    laps: 2,
+    kind: 'finish',
+    rules: { noCrash: true },
+  }),
   // ── Master ──
   m({ id: 'branches', chapter: 'master', track: 'works', laps: 3, kind: 'branches' }),
   m({
@@ -173,6 +182,16 @@ export const MISSIONS: readonly Mission[] = [
     kind: 'finish',
     vehicle: 'hornet',
     limit: { medal: 'gold', slack: 1.1 },
+  }),
+  // 2026-11-22 (#103): Lock Gate Lane at the gold pace: every boom timed, every container read
+  m({
+    id: 'lockrun',
+    chapter: 'master',
+    track: 'ch-lock',
+    laps: 3,
+    kind: 'finish',
+    rules: { noReset: true },
+    limit: { medal: 'gold', slack: 1.04 },
   }),
   // ── Boss ──
   m({

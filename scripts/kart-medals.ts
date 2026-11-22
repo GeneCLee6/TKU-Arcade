@@ -6,6 +6,9 @@
 // driven alone is driven by the master (and the expert and the average driver, for the table): the
 // master's pass (the expert's, where the master never passes) sets its stars. The result is written to src/kart/challenge/medalTable.ts.
 // Run again whenever the physics or a track changes: npm run kart:medals   (-- --dry: print only)
+// 2026-11-22: `-- --only harbour,ch-lock` measures those tracks (and their missions) alone and keeps
+// every other track's and mission's numbers as the table has them, so that a change to one track
+// can be run in a batch of its own
 import { writeFileSync } from 'node:fs'
 import { KART_TUNING } from '../shared/kart/physics.ts'
 import { CHALLENGE_TRACK_IDS } from '../shared/kart/tracks/challenge.ts'
@@ -14,13 +17,19 @@ import { RACE_TRACK_IDS } from '../shared/kart/tracks/list.ts'
 import { createDriver } from '../src/kart/bots/drivers.ts'
 import { missionTrack, runMission } from '../src/kart/challenge/headless.ts'
 import { calibrate, type MedalTimes } from '../src/kart/challenge/medals.ts'
+import { MEDAL_TABLE, MISSION_PACE } from '../src/kart/challenge/medalTable.ts'
 import { isRaceMission, MISSIONS } from '../src/kart/challenge/missions.ts'
 import { DRIVERS, measure, type DriverId } from './kart/drivers.ts'
 
 const SEEDS = [7, 14, 21]
-const TRACKS = [...RACE_TRACK_IDS, ...CHALLENGE_TRACK_IDS]
+const ALL = [...RACE_TRACK_IDS, ...CHALLENGE_TRACK_IDS]
+const onlyAt = process.argv.indexOf('--only')
+const only = onlyAt >= 0 ? new Set((process.argv[onlyAt + 1] ?? '').split(',')) : null
+const TRACKS = only ? ALL.filter((id) => only.has(id)) : ALL
 
+// The tracks not measured keep their numbers, in the table's order
 const table: Record<string, MedalTimes> = {}
+if (only) for (const id of ALL) if (!only.has(id) && MEDAL_TABLE[id]) table[id] = MEDAL_TABLE[id]
 console.log(`${'track'.padEnd(13)}${'average'.padEnd(18)}${'expert'.padEnd(18)}${'master'.padEnd(18)}bronze  silver  gold    platinum`)
 for (const id of TRACKS) {
   const track = missionTrack(id)
@@ -44,6 +53,11 @@ const paces: Record<string, number> = {}
 console.log('\nmission       track        master (passed, seconds)  expert          average')
 for (const mission of MISSIONS) {
   if (isRaceMission(mission)) continue
+  if (only && !only.has(mission.track)) {
+    const kept = MISSION_PACE[mission.id]
+    if (kept !== undefined) paces[mission.id] = kept
+    continue
+  }
   const drive = (who: DriverId) =>
     SEEDS.map((seed) =>
       runMission(mission, (track, tuning) => createDriver(DRIVERS[who], track, tuning, seed), KART_TUNING, table),
@@ -71,7 +85,8 @@ const body = `// Written by \`npm run kart:medals\` (scripts/kart-medals.ts): do
 import type { MedalTimes } from './medals.ts'
 
 export const MEDAL_TABLE: Readonly<Record<string, MedalTimes>> = {
-${Object.entries(table)
+${ALL.filter((id) => table[id])
+  .map((id) => [id, table[id]!] as const)
   .map(
     ([id, t]) =>
       `  ${/^[a-z]+$/.test(id) ? id : `'${id}'`}: { laps: ${t.laps}, bronze: ${t.bronze}, silver: ${t.silver}, gold: ${t.gold}, platinum: ${t.platinum} },`,

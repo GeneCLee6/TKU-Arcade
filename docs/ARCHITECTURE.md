@@ -1496,6 +1496,30 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **`check-budget.mjs`**：一個畫面「首屏之後才載」的東西，改算它自己（和它靜態 import 的、不含入口與房間頁）的全部動態 import。以前只看畫面 chunk 本身的動態 import，所以 `fullData.ts` 載的 `fullSquare.ts` 被當成一款「遊戲」多印一行；現在它和 `FullBoard`、`fullWords` 都列在完整版的「after the first paint」（32.4 kB，不限）。
 - **lint**：`tests/worker/room-robustness.test.ts` 的兩個 `no-unsafe-optional-chaining`（`game?.view as …` 再取 `.you`）改成 `game!.view`；`npm run lint` 0 警告。
 
+### 4.65 路線圖外：會動的障礙物（升降閘門、滑動貨櫃）、閘門巷（2026-11-22，`feat/kart-track-content`）
+
+擁有者 2026-11-22「全照建議，繼續」：`NEXT.md` §5 的賽道內容（#103）。手感、數字與試玩清單在 `KART-FEEL.md` §20、裁定在 `KART-NETCODE.md` §21；這裡記程式怎麼做的。
+
+**格式與狀態**（`shared/kart/obstacles.ts`，新；純函式，瀏覽器、Worker、壓測共用）
+
+- `TrackJson.obstacles?`：`boom`（升降欄杆：主路路點 `at`（可帶小數）、關住 `from`–`to`（中心線右邊幾公尺）、`period`／`shift`／`closed`／`warn`，單位都是 1/60 秒的步）與 `slider`（滑動貨櫃：沿路 `length`、橫向 `size` 的盒子，中心在 `a` 與 `b` 之間來回；`move` 步滑過去、`warn` 步預告）。`parseObstacles`（`parseTrack` 在主路之後叫）一次列出全部問題：欄杆在路緣內（最多超出 1.5 m）、至少 3 m 長；週期 1–60 秒、關至少 0.5 秒、預告至少 0.5 秒、開至少 0.5 秒；貨櫃 2–20 × 2–16 m，**離路緣永遠 ≥ `SLIDER_KERB_GAP` 3 m**（被推過去的車夾在貨櫃與路緣之間還放得下，不會卡死）、偶數週期、滑動與預告各 ≥ 0.5 秒。最多 16 個。沒有 `obstacles` 的賽道解析出來一個欄位都沒多（`branchGolden` 擋）。
+- **狀態是比賽時鐘的純函式**：`boomState(json, tick)`／`sliderState(json, tick)` 只看 `tick`（GO 起算的步數，`net.ts` 的 frame 本來就帶），所以每個瀏覽器、伺服器的裁定、重播、幽靈車算出同一個狀態，**不需要多送任何東西**。欄杆在 `closed` 那段是牆；`shut`（0–1）是畫面上手臂放下的程度：預告的最後 18 步放下、打開後 30 步抬起，**牆只在關著的時候存在**。貨櫃在兩端停 `period/2 − move` 步、中間用 smoothstep 滑。
+- `obstaclesOf(track)` 把每個放到路上（中心、方向、半寬、欄杆的線），每份 JSON 算一次（WeakMap）；`courseOf` 放進 `Course.obstacles`。
+
+**物理**（`course.ts`、`timeTrial.ts`）：`stepRun` 多第六個參數 `tick`。給了、而且賽道有障礙物時，固定的牆撞完之後再對 `obstacleWalls(obstacles, tick)`（關著的欄杆一條線、貨櫃四面、`top` 2.6 m）做一次 `collideWalls`，撞擊力道與接觸取兩次的大者。`stepTrial` 比賽中傳 `trial.steps`；倒數、終點後、沒有時鐘的跑法（編輯器試跑、測試場）不傳，所以**沒有障礙物的賽道與沒有時鐘的呼叫一步都沒變**（`flatGolden` 擋；漁港的那兩條改用拿掉障礙物的同一張圖）。貨櫃往車移動時，`collideWalls` 把車從它所在的那一面推出去，速度不給；貨櫃每步最多移動約 0.13 m，遠小於車的半徑，不會穿過。
+
+**伺服器裁定**（`race.ts` 的 `judgeFrame`）：一般的移動（非重置、非重新同步）多一關 `throughObstacle(obstacles, last, last.tick, frame, frame.tick, airborne)`：(1) 欄杆在兩個 tick **都關著、而且兩者之間一直關著**（關的那段是週期裡連續的一段，沒有繞過週期），移動線段穿過欄杆的線 → `refused('obstacle')`；剛好在這段之間放下或抬起的，給客戶端好處。(2) frame 的位置在貨櫃（那個 tick 的位置）裡面超過 `SLIDER_JUDGE_INSET` 0.6 m（碰撞推擠可能讓車陷一點）→ 同樣拒收；在空中（`FLAG_AIRBORNE`）的不算。拒收的效果和其他拒收一樣：伺服器停在上一個位置，不數門，連續拒收 `RESYNC_AFTER_MS` 後重新同步。**協定、frame 格式、`PROTOCOL_VERSION` 都沒動**。
+
+**電腦車與駕駛**（`src/kart/bots/obstacleSense.ts`，新；`brain.ts` 沒動）：`withObstacles(brain, track, tuning)` 包在 `createTrackBrain` 的輸出外（沒有障礙物的賽道原樣回傳），所以電腦車、`kart:feel` 的駕駛腳本、`?autopilot`（`race/autopilot.ts` 的 `createAutopilot`，房間與壓測機器人都用它）都會。每一步找前方最近、還沒過的一組障礙物（同一個位置的兩支半邊欄杆算一組；只看朝著路方向的車；看 70 m 或 2.2 秒），用現在的速度（至少 9 m/s）估到達的步數，`freeAcross` 算到達前後（早 12 步、晚到「通過自己長度＋14 步」）**任何一步**有東西擋住的範圍，加上車半徑＋1 m，剩下的就是可以走的。(1) 預計的橫向位置在可以走的範圍裡：遠的照原本的手開，14 m 內自己把車夾在那一段裡、不甩尾；10 m 內「出發」（`committed`）：之後只看接下來 20 步，油門不放。(2) 不在：轉向最近的可以走的一段（換車道、繞過貨櫃），太斜就收油、太陡且快就煞。(3) 都擋住（全路面的閘門）：照剩下的距離煞車，停在 3.5 m 前等，等的時候不按重置。在貨櫃旁邊沒有更好的路線就直直往前開。**保險**：被自己的手停住超過 4 秒就把這一組交還給原本的腦（它會重置），避免任何誤判卡死。
+
+**畫面與聲音**（`src/kart/art/obstacleArt.ts`，新；`obstacleCues.ts`，新）：同一種零件一個 `InstancedMesh`（柱、燈箱、紅白條紋手臂、紅燈、綠燈、停止線、軌道、黃色台車、貨櫃、琥珀色旋轉燈），一條賽道的障礙物總共約 10 個 draw call。手臂從路緣外的柱子伸出（全路面的從兩邊各伸一支、中間相接），照 `shut` 轉（`Euler` 順序 `YZX`）；兩顆紅燈在預告與關閉時輪流閃（每 14 步換一次），開著時亮綠燈；停止線在欄杆前 2.2 m。貨櫃每 2.6 m 一個、顏色輪流，預告與滑動時頂上琥珀燈閃。顏色在 `kartTokens.ts` 的 `obstacleScene`。`TrackArt.clock(tick)`／`KartScene.clock(tick)`：`spikeLoop.ts` 每幀用比賽時鐘（`trial.steps` 加上內插的小數；倒數時 0；終點後照幀繼續走）、觀戰用房間的 GO（減 0.1 秒內插延遲）、重播用播放頭的 tick（`WatchFrame.tick`）。聲音：`obstacleCues`（純函式）在車前方 110 m 內的欄杆開始預告時、與預告／關閉期間每 24 步響一次平交道鈴（兩聲叮），貨櫃預告開始時響兩聲低音喇叭（`itemSounds.ts` 的 `bell`、`horn`，WebAudio 合成）。
+
+**賽道**：**漁人碼頭 `harbour@13`**：碼頭直線上兩台滑動貨櫃（路點 44、53，12 × 6.1 m，一台停左邊時另一台停右邊，要蛇行；6 秒一輪），山腳下往西的直線上一組平交道（路點 346.5，左右兩半各一支欄杆，左邊放下 2.5 秒、再換右邊，**永遠有一半開著**，8 秒一輪；右半邊過去正好接那條加速帶）。**閘門巷 `ch-lock`**（挑戰專用，`tracks/challenge.ts`，約 0.8 km、26 m 寬）：第一條直線一道**全路面**的閘門（每 5 秒關 2 秒、預告 1 秒：要等或抓時機）、背直線一台滑動貨櫃、回程一組平交道。挑戰模式加兩關：技術章「看準閘門」（閘門巷 2 圈、不能撞牆）、高手章「閘門衝刺」（3 圈、不能重設、金牌 × 1.04）。
+
+**測試**：`tests/kart/obstacles.test.ts`（新）：狀態是時鐘的純函式且每週期重複、預告與手臂動畫的時間、只在關閉時有牆；格式檢查（九種錯誤一次列出）、貨櫃離路緣、障礙物離復位點與起跑格 > 8 m；關著的欄杆擋住車、開著或沒有時鐘時穿過、沒有障礙物的賽道給不給時鐘一步都一樣、貨櫃推車不穿；裁定：一直關著的穿越拒收、開著或剛好在變的時候採信、在貨櫃裡拒收（空中不算）、**普通與專家電腦車在閘門巷與漁港跑完的每一個 frame 都被伺服器採信**；四級電腦車各三個種子跑完閘門巷三圈不逆走、零穿越、復位 ≤ 1；專家在第一圈的閘門前停下等、抬起後才過；困難電腦車在漁港零碰撞；`freeAcross`；`createAutopilot` 跑完閘門巷零復位；手臂的配置；鈴與喇叭的時機。`bots.test.ts` 的四級三圈（含漁港）照舊；`challenge.test.ts` 26 關（各章 6／7／7／6）、閘門巷有獎牌。
+
+**限制（照實寫）**：(1) 道具（投擲物、雲、陷阱）不認得障礙物，會穿過欄杆與貨櫃。(2) 編輯器做不出障礙物（`TrackSpec` 沒有這一項）。(3) 欄杆是一條沒有高度的線：飛在空中也飛不過（貨櫃有 2.6 m 的 `top`）。(4) 電腦車的判斷用「現在的速度」估到達時間，加減速很大時偶爾會擦到（最差的是新手腳本）；困難以上在測試的種子都沒碰到。(5) 觀戰畫面的障礙物照房間時鐘、別人的車是內插過的，網路很差時兩者可能差一點點。(6) 小地圖沒有畫障礙物。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

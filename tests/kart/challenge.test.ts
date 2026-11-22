@@ -91,10 +91,11 @@ beforeEach(() => {
 })
 
 describe('the missions', () => {
-  it('are 24, six to a chapter, each with a name, on a track that exists', () => {
-    expect(MISSIONS).toHaveLength(24)
+  // 2026-11-22 (#103): two more on Lock Gate Lane, one in technique, one in master
+  it('are 26, six or seven to a chapter, each with a name, on a track that exists', () => {
+    expect(MISSIONS).toHaveLength(26)
     expect(new Set(MISSIONS.map((one) => one.id)).size).toBe(MISSIONS.length)
-    for (const chapter of CHAPTER_IDS) expect(missionsOf(chapter)).toHaveLength(6)
+    expect(CHAPTER_IDS.map((chapter) => missionsOf(chapter).length)).toEqual([6, 7, 7, 6])
     for (const one of MISSIONS) {
       expect(missionTrack(one.track).id).toBe(one.track)
       const key = `kart.challenge.mission.${one.id}` as keyof (typeof KART_CHALLENGE_MESSAGES)['en']
@@ -108,7 +109,7 @@ describe('the missions', () => {
     }
   })
 
-  it('use both challenge tracks, which no room can be set to', () => {
+  it('use every challenge track, which no room can be set to', () => {
     for (const id of CHALLENGE_TRACK_IDS) {
       expect(RACE_TRACK_IDS as readonly string[]).not.toContain(id)
       expect(MISSIONS.some((one) => one.track === id)).toBe(true)

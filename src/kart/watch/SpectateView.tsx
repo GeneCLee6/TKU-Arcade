@@ -52,6 +52,8 @@ function kartOfByte(byte: number) {
 }
 
 /** How often the places are worked out again */
+/** The karts are drawn about this far behind the room's clock, seconds (interpolation) */
+const WATCH_LAG = 0.1
 const POLL_MS = 250
 
 export interface SpectateViewProps {
@@ -198,7 +200,11 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
                 })),
             }
           }
-          return { karts, follow: followRef.current, overhead: overheadRef.current, props, hits }
+          // 2026-11-22: the race clock for the moving obstacles, from the room's GO (the karts
+          // are drawn a moment behind, as they are interpolated)
+          const goAt = latest.current.goAt
+          const tick = goAt === null ? 0 : Math.max(0, ((clock.now() - goAt) / 1000 - WATCH_LAG) * 60)
+          return { karts, follow: followRef.current, overhead: overheadRef.current, props, hits, tick }
         },
         drawn(scene, frame) {
           const shown = frame.karts.filter((kart) => kart.id !== frame.follow)

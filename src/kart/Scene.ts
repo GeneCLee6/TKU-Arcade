@@ -179,6 +179,11 @@ export interface KartScene {
   shot(shot: CameraShot | null): void
   /** Puts the camera straight behind the car at once, as after a reset */
   snapCamera(heading: number, y?: number): void
+  /**
+   * The race clock (2026-11-22): steps since GO, a fraction between two. The moving obstacles
+   * (shared/kart/obstacles.ts) are drawn where the physics has them at that step
+   */
+  clock(tick: number): void
   /** Where the best run's ghost is now (e8-t11), or null to hide it */
   ghost(pose: Pose | null): void
   /** The other racers' karts this frame (e9-t03); one missing from the list is taken away */
@@ -592,6 +597,9 @@ export function createKartScene(
       burstsSeen = Number.MAX_SAFE_INTEGER
       if (y !== undefined) cameraY = y
       effects.lift()
+    },
+    clock(tick) {
+      art?.clock(tick)
     },
     ghost(pose) {
       if (!pose) {

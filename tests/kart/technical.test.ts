@@ -32,7 +32,7 @@ const PLAN: Record<
     jumps: 1,
     hilly: true,
   },
-  harbour: { key: 'harbour@12', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
+  harbour: { key: 'harbour@13', straight: 0.34, was: 0.54, longest: 290, jumps: 0, hilly: false },
   tamkang: { key: 'tamkang@12', straight: 0.34, was: 0.36, longest: 390, jumps: 1, hilly: true },
   oldstreet: { key: 'oldstreet@9', straight: 0.4, was: 0.6, longest: 340, jumps: 0, hilly: false },
   guanyin: { key: 'guanyin@8', straight: 0.43, was: 0.56, longest: 200, jumps: 2, hilly: true },

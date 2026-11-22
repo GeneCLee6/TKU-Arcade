@@ -214,7 +214,8 @@ export function stepTrial(
       start = 'late'
     }
   }
-  const run = stepRun(before, input, course, tuning, rules)
+  // The race clock (2026-11-22): the moving obstacles (obstacles.ts) are where they are at this step
+  const run = stepRun(before, input, course, tuning, rules, trial.steps)
   const steps = trial.steps + 1
   let { laps, lapStartedAt } = trial
   // A finish line crossing ends the lap before it; the first only starts lap 1, timed from GO

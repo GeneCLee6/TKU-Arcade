@@ -88,7 +88,6 @@ function raceDigest(track: Track): string {
  */
 const TRACKS: Record<string, readonly [string, string]> = {
   riverside: ['3ac8b411', '847dafcb'],
-  harbour: ['86bba381', 'bcba2291'],
   tamkang: ['bf88d630', 'bd30b1b0'],
   guanyin: ['da874157', '18754f84'],
   mangrove: ['0e545779', '5384366d'],
@@ -100,6 +99,8 @@ const TRACKS: Record<string, readonly [string, string]> = {
   // on purpose, their revisions raised; these are what they were
   // wharf: ['e842a0a2', '59e4d97c'],
   // oldstreet: ['3dbf1196', '83885996'],
+  // 2026-11-22: the harbour has moving obstacles (shared/kart/obstacles.ts), its revision raised
+  // harbour: ['86bba381', 'bcba2291'],
 }
 
 /** Three editor tracks: the starter, and the starter with a hill and with a jump on its long straight */

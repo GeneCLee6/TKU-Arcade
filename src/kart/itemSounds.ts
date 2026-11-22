@@ -114,6 +114,15 @@ export const CUE_SOUNDS = {
   fogged: [noise('lowpass', 1400, 250, 0.6, 0.4, 0.6)],
   // A short buzz, cut off
   jammed: [tone('square', 140, 120, 0.25, 0.08), noise('highpass', 3500, 3000, 0.2, 0.2, 3)],
+  // 2026-11-22 (obstacleCues.ts): a level crossing's bell, two dings a little apart, ringing on
+  bell: [
+    tone('triangle', 1480, 1470, 0.16, 0.12),
+    tone('sine', 2960, 2950, 0.12, 0.04),
+    tone('triangle', 1245, 1240, 0.18, 0.12, 0.2),
+    tone('sine', 2490, 2480, 0.14, 0.04, 0.2),
+  ],
+  // ... and a container trolley's horn: two low blasts
+  horn: [tone('sawtooth', 220, 218, 0.28, 0.06), tone('sawtooth', 220, 218, 0.34, 0.06, 0.4)],
 } satisfies Record<Exclude<ItemCue['kind'], 'use'>, readonly Voice[]>
 
 export const voicesOf = (cue: ItemCue): readonly Voice[] =>
