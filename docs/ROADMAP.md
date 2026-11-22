@@ -203,6 +203,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #143 | 2026-11-22 | `feat/kart-track-content` | 會動的障礙物（升降閘門、滑動貨櫃，比賽時鐘的純函式、伺服器當牆裁定、電腦車會等或換車道）；漁人碼頭 `harbour@13`；挑戰賽道閘門巷與兩關 |
 | #144 | 2026-11-22 | `feat/kart-track-format-v2` | 賽道格式：立體交叉（看上一步高度判定所在路段）、傾斜彎、車撞車看高度、重播／幽靈車的「在空中」；編輯器高架／地下道／傾斜彎、岔路的跳台牆縫；第六張技術展示賽道竹圍高架（暫名） |
 | #145 | 2026-11-22 | `feat/kart-wall-slide-landing` | 貼牆滑行、落地時機噴、駕訓第 11 課；摩托車引擎聲、聲音依畫質分級；車身細節貼圖（低畫質不載） |
+| #148 | 2026-11-22 | `feat/fullscreen-play` | 全螢幕遊玩：共用 `src/lib/fullscreen.ts`（整頁 Fullscreen API、iPhone 退回專注模式並提示加到主畫面、Keyboard Lock 保留 Esc）、房間標題與卡丁車選單的按鈕、比賽自動全螢幕設定與手機鎖橫、PWA `display_override` |
 
 ## Phase O · M4 社群
 
