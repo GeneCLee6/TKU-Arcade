@@ -42,7 +42,7 @@ describe('the sides in the waiting room', () => {
     const rows = screen.getAllByRole('listitem')
     // Bob chose red; the others fill the smaller side in seat order: Ann blue, Cat red, Dan blue
     expect(rows.map((row) => row.dataset.team)).toEqual(['blue', 'red', 'red', 'blue'])
-    expect(screen.getByTestId('kart-team-sizes')).toHaveTextContent('Red 2 v Blue 2')
+    expect(screen.getByTestId('kart-team-sizes')).toHaveTextContent('Sunset 2 v Estuary 2')
     // Someone who is not the host moves only themselves
     expect(screen.getAllByRole('button')).toHaveLength(2)
     expect(screen.queryByTestId('kart-team-balance')).toBeNull()
@@ -51,13 +51,13 @@ describe('the sides in the waiting room', () => {
   it('sends a member their own choice, and the host anyone else by id', () => {
     const onSetTeam = vi.fn()
     const { unmount } = render(<RoomTeams members={members} you="bob" onSetTeam={onSetTeam} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Put bob on Blue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Put bob on Estuary' }))
     expect(onSetTeam).toHaveBeenLastCalledWith(1, undefined)
     unmount()
     render(<RoomTeams members={members} you="ann" onSetTeam={onSetTeam} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Put cat on Red' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Put cat on Sunset' }))
     expect(onSetTeam).toHaveBeenLastCalledWith(0, 'cat')
-    fireEvent.click(screen.getByRole('button', { name: 'Put ann on Red' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Put ann on Sunset' }))
     expect(onSetTeam).toHaveBeenLastCalledWith(0, undefined)
     // The host takes every choice back: only Bob has made one
     onSetTeam.mockClear()
@@ -79,20 +79,20 @@ describe('the team HUD', () => {
 
   it('says so while a blue boost burns, in either language', () => {
     const { unmount } = render(<TeamPanel t={en} gauge={0} burning />)
-    expect(screen.getByTestId('kart-team-burning')).toHaveTextContent('Blue boost')
+    expect(screen.getByTestId('kart-team-burning')).toHaveTextContent('High Tide')
     unmount()
     render(<TeamPanel t={zh} gauge={0} burning />)
-    expect(screen.getByTestId('kart-team-burning')).toHaveTextContent('藍色噴射')
-    expect(screen.getByRole('meter', { name: '團隊加速條' })).toBeInTheDocument()
+    expect(screen.getByTestId('kart-team-burning')).toHaveTextContent('漲潮')
+    expect(screen.getByRole('meter', { name: '同舟條' })).toBeInTheDocument()
   })
 
   it('shows someone watching both sides\u2019 gauges', () => {
     render(<TeamGauges t={en} gauge={[40, 96]} />)
-    expect(screen.getByRole('meter', { name: 'Red team gauge' })).toHaveAttribute(
+    expect(screen.getByRole('meter', { name: 'Sunset team gauge' })).toHaveAttribute(
       'aria-valuenow',
       '40',
     )
-    expect(screen.getByRole('meter', { name: 'Blue team gauge' })).toHaveAttribute(
+    expect(screen.getByRole('meter', { name: 'Estuary team gauge' })).toHaveAttribute(
       'aria-valuenow',
       '96',
     )
@@ -100,7 +100,7 @@ describe('the team HUD', () => {
 
   it('shows both sides and their score', () => {
     render(<TeamScore t={en} totals={[14, 10]} mine={1} />)
-    const score = screen.getByRole('img', { name: 'Team score: Red 14, Blue 10' })
+    const score = screen.getByRole('img', { name: 'Team score: Sunset 14, Estuary 10' })
     expect(within(score).getByText('14')).toBeInTheDocument()
     expect(within(score).getByText('10')).toBeInTheDocument()
   })
@@ -144,7 +144,7 @@ describe('the standings of a team race', () => {
     expect(rows[0]).toHaveTextContent('10 pts')
     expect(rows[1]).toHaveTextContent('8 pts')
     expect(rows[2]).not.toHaveTextContent('pts')
-    expect(within(rows[0]!).getByRole('img', { name: 'Blue' })).toBeInTheDocument()
+    expect(within(rows[0]!).getByRole('img', { name: 'Estuary' })).toBeInTheDocument()
   })
 
   it('shows no side in a race of everyone for themselves', () => {

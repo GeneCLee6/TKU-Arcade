@@ -275,7 +275,7 @@ const cleared = gatesClearOf(road, made.gates, made.respawns, branches)
 export const WHARF: TrackJson = {
   format: TRACK_FORMAT,
   id: 'wharf',
-  // A working name (2026-11-19): the owner may rename it (docs/KART-WORLD.md §6)
+  // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Wharf Warehouses', 'zh-TW': '碼頭倉庫' },
   // 2: the shed's lane is a branch (2026-11-20)
   revision: 3,

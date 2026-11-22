@@ -882,10 +882,10 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
   await page.goto('/kart')
   await expect(page.locator('canvas')).toBeVisible()
   await expect(page.getByTestId('kart-body').locator('option')).toHaveText([
-    'Tide Runner',
-    'Comet',
+    'Ferry',
+    'Agei',
     'Stingray',
-    'Fiddler',
+    'Fiddler Crab',
     'Egret',
     'Flying Fish',
     // 2026-11-19: eight more karts and three bikes
@@ -910,7 +910,7 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
   // e10-t05: the garage picks a driver too, and shows the kart's stats
   await page.getByTestId('kart-garage-open').click()
   await expect(page.getByTestId('kart-stats')).toBeVisible()
-  await page.getByRole('radio', { name: 'Diamond' }).click()
+  await page.getByRole('radio', { name: 'Dee' }).click()
   await page.getByRole('button', { name: 'Close the garage' }).click()
   await page.getByTestId('kart-body').selectOption('ray')
   await page.getByTestId('kart-course').selectOption('tamkang')
@@ -921,7 +921,7 @@ test('the Tamkang campus opens from the picker and races in the kart picked', as
   await page.reload()
   await expect(page.getByTestId('kart-body')).toHaveValue('ray')
   await page.getByTestId('kart-garage-open').click()
-  await expect(page.getByRole('radio', { name: 'Diamond' })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByRole('radio', { name: 'Dee' })).toHaveAttribute('aria-checked', 'true')
   expect(errors).toEqual([])
 })
 
@@ -958,9 +958,9 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
   await expect(page.getByTestId('kart-course')).toHaveValue('riverside')
   await expect(page.getByTestId('kart-course').locator('option')).toHaveText([
     'Test oval',
-    'Riverside (graybox)',
-    'Harbour Hairpins',
-    'Tamkang Campus',
+    'Golden Riverbank',
+    "Fisherman's Wharf",
+    'Five Tigers Hill',
     'Lantern Old Street',
     'Guanyin Hill Road',
     // 2026-11-18: the four technical tracks
@@ -1158,8 +1158,8 @@ test('a kart picked in the garage races once the garage closes', async ({ page }
   await expect(page.locator('canvas')).toBeVisible()
   await expect(page.getByTestId('kart-countdown')).toHaveCount(0, { timeout: 15_000 })
   await page.getByTestId('kart-garage-open').click()
-  await page.getByRole('radio', { name: 'Comet' }).click()
-  await expect(page.getByRole('radio', { name: 'Comet' })).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('radio', { name: 'Agei' }).click()
+  await expect(page.getByRole('radio', { name: 'Agei' })).toHaveAttribute('aria-checked', 'true')
   // Still the race under way: no countdown behind the panel
   await page.waitForTimeout(1500)
   await expect(page.getByTestId('kart-countdown')).toHaveCount(0)

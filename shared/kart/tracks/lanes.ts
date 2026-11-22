@@ -204,7 +204,7 @@ const lanePads = padsAlong(
 export const LANES: TrackJson = {
   format: TRACK_FORMAT,
   id: 'lanes',
-  // A working name (2026-11-19): the owner may rename it (docs/KART-WORLD.md §6)
+  // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Hillside Lanes', 'zh-TW': '山城坡巷' },
   revision: 1,
   theme: 'sunset',

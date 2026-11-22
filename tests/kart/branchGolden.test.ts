@@ -20,7 +20,7 @@ import { courseOf, type Track } from '../../shared/kart/track.ts'
 import { trackGuide } from '../../shared/kart/tracks/guides.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
-import { BOT_SKILLS } from '../../src/kart/bots/skill.ts'
+import { GOLDEN_HARD } from './goldenHard.ts'
 
 /** FNV-1a over a string, and over the bytes of numbers */
 function hasher() {
@@ -58,7 +58,7 @@ function raceDigest(track: Track): string {
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
   const brain = createBotBrain(
-    BOT_SKILLS.hard,
+    GOLDEN_HARD,
     track.road,
     KART_TUNING,
     5,
@@ -83,12 +83,13 @@ function raceDigest(track: Track): string {
 /**
  * Taken on main at fb5f7e1: [track digest, race digest]. 2026-11-21: the track digests taken again
  * with the grid in one row and the time trial's own start (shared/kart/startLine.ts); the races,
- * driven from that start, are the very same
+ * driven from that start, are the very same. 2026-11-22: riverside's, harbour's and tamkang's
+ * track digests taken again for their settled names (docs/KART-WORLD.md §0; only `name` changed)
  */
 const TRACKS: Record<string, readonly [string, string]> = {
-  riverside: ['09e66287', '847dafcb'],
-  harbour: ['3288e337', 'bcba2291'],
-  tamkang: ['f97d6557', 'bd30b1b0'],
+  riverside: ['3ac8b411', '847dafcb'],
+  harbour: ['86bba381', 'bcba2291'],
+  tamkang: ['bf88d630', 'bd30b1b0'],
   guanyin: ['da874157', '18754f84'],
   mangrove: ['0e545779', '5384366d'],
   fort: ['52eb5dfa', '960ef7c3'],

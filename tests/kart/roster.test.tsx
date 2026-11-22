@@ -40,9 +40,9 @@ describe('the garage (e10-t05)', () => {
     expect(stats.querySelector('[data-stat="speed"]')).toHaveAttribute('data-value', '5')
     expect(stats.querySelector('[data-stat="handling"]')).toHaveAttribute('data-value', '1')
     expect(screen.getAllByRole('img', { name: '5 of 5' }).length).toBeGreaterThan(0)
-    fireEvent.click(screen.getByRole('radio', { name: /Fiddler/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /Fiddler Crab/ }))
     expect(onKart).toHaveBeenCalledWith('crab')
-    fireEvent.click(screen.getByRole('radio', { name: 'Heart' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Hartie' }))
     expect(onDriver).toHaveBeenCalledWith('heart')
   })
 
@@ -130,7 +130,7 @@ describe('the garage (e10-t05)', () => {
     const { rerender } = render(<RoomGarage members={members} you="a" onSetLook={onSetLook} />)
     expect(onSetLook).toHaveBeenLastCalledWith('ray.diamond')
     const picks = screen.getByTestId('kart-picks')
-    expect(within(picks).getByText('Fiddler with Heart')).toBeInTheDocument()
+    expect(within(picks).getByText('Fiddler Crab with Hartie')).toBeInTheDocument()
     expect(within(picks).getByText('Not picked yet')).toBeInTheDocument()
     // A spectator is not racing
     expect(within(picks).queryByText('Cy')).toBeNull()

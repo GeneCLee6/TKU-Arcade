@@ -65,9 +65,9 @@ export interface BotSkill {
   /** Waits for a good moment to use an item (a target in range, a straight); else uses it as it comes */
   readonly itemSense: boolean
   // 2026-11-18, the gauge by the quality of the drift (docs/KART-FEEL.md §5): the hands of the
-  // scripted drivers `npm run kart:feel` measures with (scripts/kart/drivers.ts). The three
-  // difficulties leave them all out, and drive as they always did; the expert (2026-11-20,
-  // expert.ts) has them, as the master driver does
+  // scripted drivers `npm run kart:feel` measures with (scripts/kart/drivers.ts). The easy and
+  // normal difficulties leave them all out; the expert (2026-11-20, expert.ts) has them, as the
+  // master driver does; the hard one (2026-11-22) holds its drifts through (holdSeconds, cornerTurn)
   /** The foot stays down, as a player's does: no easing off at the kart's own top speed */
   readonly flatOut?: boolean
   /**
@@ -122,22 +122,32 @@ export const BOT_SKILLS: Readonly<Record<Difficulty, BotSkill>> = {
     itemDelayMs: [700, 2_500],
     itemSense: true,
   },
+  // 2026-11-22 (owner: "all as proposed"; docs/KART-FEEL.md §13.4): the hard one learnt the
+  // expert's timing, not its routes. Every drift into a corner worth one (0.8 rad) is seen through
+  // until it has earned its instant boost, let go with the perfect press, so the combo keeps going;
+  // and the start boost every time. It still keeps to the line everyone sees: no guide, no drift
+  // jumps, no slots, no branches (those stay the expert's), its line a little looser than the
+  // expert's and a little nearer the middle (apex 0.2, was 0.3), so that it hits the walls no more
+  // than it did
   hard: {
     lineNoise: 0.1,
-    apex: 0.3,
+    apex: 0.2,
     shortcuts: true,
     reactionSteps: 2,
     topSpeedShare: 1,
-    driftAt: 0.9,
+    driftAt: 0.95,
+    cornerTurn: 0.8,
+    holdSeconds: 0.45,
     releaseBoosts: 1,
     doubles: true,
     taps: true,
-    startBoost: 0.9,
+    startBoost: 1,
     stackBoosts: true,
     itemDelayMs: [300, 1_200],
     itemSense: true,
   },
-  // 2026-11-20: the fourth level, with every technique the hard one was never taught (expert.ts)
+  // 2026-11-20: the fourth level (expert.ts): what the hard one does, at full throttle, and the
+  // track known by heart
   expert: EXPERT_SKILL,
 }
 

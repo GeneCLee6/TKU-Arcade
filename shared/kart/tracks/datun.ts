@@ -87,7 +87,7 @@ const made = circuit({
 export const DATUN: TrackJson = {
   format: TRACK_FORMAT,
   id: 'datun',
-  // A working name (2026-11-18): the owner may rename it (docs/KART-WORLD.md §6)
+  // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Datun Ridgeline', 'zh-TW': '大屯稜線' },
   // 2026-11-19: the drift jump (terrain.ts) changed what a jump is
   revision: 2,

@@ -94,7 +94,7 @@ const made = circuit({
 export const RIVERSIDE: TrackJson = {
   format: TRACK_FORMAT,
   id: 'riverside',
-  name: { en: 'Riverside (graybox)', 'zh-TW': '河畔（灰盒）' },
+  name: { en: 'Golden Riverbank', 'zh-TW': '金色水岸' },
   // 2026-11-14: widened (owner: "make them wide"), then redrawn wider still with hairpins (owner:
   // eight karts side by side, more sharp corners); old records are set aside
   // 2026-11-14 again (owner: much faster karts): straights 4 m wider, boost pads; old records

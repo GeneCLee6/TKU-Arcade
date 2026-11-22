@@ -13,7 +13,7 @@ import { startTrial, stepTrial, type Trial, type TrialCourse } from '../../share
 import { courseOf } from '../../shared/kart/track.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { createBotBrain } from '../../src/kart/bots/brain.ts'
-import { BOT_SKILLS } from '../../src/kart/bots/skill.ts'
+import { GOLDEN_HARD } from './goldenHard.ts'
 
 // The flat tracks do not change (2026-11-17, slopes and jumps; docs/ARCHITECTURE.md §4.26). The
 // hashes below were taken on main at 7f53e13, BEFORE the terrain came in: the same inputs on the four
@@ -64,12 +64,12 @@ function hasher() {
   }
 }
 
-/** The hard bot, three laps (or 200 s), every step hashed */
+/** The hard bot (as it was until 2026-11-22, goldenHard.ts), three laps (or 200 s), every step hashed */
 function trackHash(id: string, seed: number, tuning: KartTuning): { hash: string; steps: number } {
   const track = raceTrack(id)!
   const plain = courseOf(track)
   const course: TrialCourse = { ...plain, checkpoints: plain.checkpoints!, road: track.road }
-  const brain = createBotBrain(BOT_SKILLS.hard, track.road, tuning, seed)
+  const brain = createBotBrain(GOLDEN_HARD, track.road, tuning, seed)
   const hash = hasher()
   let trial: Trial = startTrial(course)
   let steps = 0

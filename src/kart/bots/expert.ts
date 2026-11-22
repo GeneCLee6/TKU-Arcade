@@ -1,11 +1,10 @@
 // The fourth computer level, the expert (owner 2026-11-20; docs/ARCHITECTURE.md §4.40): the hands of
 // the scripted master (src/kart/bots/drivers.ts, `npm run kart:feel`) as an opponent. Everything the
-// hard bot does, and every technique the hard bot was never taught (the owner has yet to decide
-// whether it should be): the perfect instant boost and the combo it keeps going (#105), charges fired
-// as soon as the road allows and a drift held through every corner worth one, and on a track with a
-// guide (shared/kart/tracks/guide.ts, #109) its technical line through the slots and over the
-// fences, with the drift jumps and the lift at the crest that line asks for. The three levels before
-// it are left exactly as they were.
+// hard bot does (since 2026-11-22 that includes the perfect instant boost and the combo it keeps
+// going, #105), and what the owner decided stays the expert's: charges fired as soon as the road
+// allows, the foot flat down, a tighter line, and on a track with a guide (shared/kart/tracks/guide.ts,
+// #109) its technical line through the slots, over the fences and down the branches, with the drift
+// jumps and the lift at the crest that line asks for.
 //
 // Never a cheat: the same physics, the same kart numbers, its own kart's top speed at most; the
 // rubber band eases it off ahead of the people as it does every bot (brain.ts honours the banded

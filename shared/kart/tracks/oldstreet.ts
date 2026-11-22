@@ -1,5 +1,5 @@
-// N2 (e10-t04a): the item track. A working name (KART-WORLD.md, e10-t01, will settle the world's
-// names): an original night market on an old riverside street, lanterns strung over the road. The
+// N2 (e10-t04a): the item track. Named Lantern Old Street (settled in KART-WORLD.md,
+// 2026-11-22): an original night market on an old riverside street, lanterns strung over the road. The
 // PRD asks for a track made for the item race (E10: wide roads, many boxes, a shortcut), so it plays
 // differently from the three technical tracks:
 //

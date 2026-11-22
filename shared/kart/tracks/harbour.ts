@@ -1,5 +1,5 @@
-// N1 (e10-t02): the second track, single-player first. A working name (KART-WORLD.md, e10-t01,
-// will settle the world's names): an original fishing harbour at sunset, for the technical track the
+// N1 (e10-t02): the second track, single-player first. Named Fisherman's Wharf (settled in
+// KART-WORLD.md, 2026-11-22): an original fishing harbour at sunset, for the technical track the
 // PRD asks for (E10: tight hairpins one after another, a place to practise chained boosts). It plays
 // differently from Riverside: a long seafront straight, one fast sweeper, then a short, tight, 90
 // degree flick into two switchback hairpins up the hillside, a chicane, and a long fast arc home
@@ -122,7 +122,7 @@ const made = circuit({
 export const HARBOUR: TrackJson = {
   format: TRACK_FORMAT,
   id: 'harbour',
-  name: { en: 'Harbour Hairpins', 'zh-TW': '漁港髮夾彎' },
+  name: { en: "Fisherman's Wharf", 'zh-TW': '漁人碼頭' },
   // 2026-11-14: widened (owner: "make them wide"), then drawn bigger and wider still with sharper
   // corners (owner: eight karts side by side); old records are set aside
   // 2026-11-14 again (owner: much faster karts): straights 4 m wider, boost pads; old records
