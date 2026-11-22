@@ -39,6 +39,7 @@ import { buildForks } from './forkArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
 import { trackGuide } from '../../../shared/kart/tracks/guides.ts'
 import { loadedScenery, type TrackScenery } from './trackScenery.ts'
+import { loadTrackCuesOn, onTrackCuesChange } from '../trackCues.ts'
 import {
   ASPHALT_LENGTH,
   BARRIER_LENGTH,
@@ -946,6 +947,9 @@ export function buildTrackArt(
         roadHeight: (index) => roadHeights?.[index] ?? 0,
       }))
     : null
+  // 2026-11-22: the controls panel's switch hides the marks, also in a race already running
+  skillCues?.setVisible(loadTrackCuesOn())
+  const stopCues = skillCues ? onTrackCuesChange((on) => skillCues.setVisible(on)) : null
 
   // ── The four technical tracks: each one's own landmark (2026-11-18) ──
   const localScenery =
@@ -979,6 +983,7 @@ export function buildTrackArt(
       skillCues?.update(seconds)
     },
     dispose() {
+      stopCues?.()
       for (const geometry of geometries) geometry.dispose()
       for (const material of materials) material.dispose()
       for (const texture of extraTextures) texture.dispose()

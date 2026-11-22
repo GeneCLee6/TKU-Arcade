@@ -189,6 +189,12 @@ export interface KartScene {
   hits(frame: HitFrame, frameSeconds: number): void
   /** Where each of these points (x, height, z) is on screen, as of the last frame drawn */
   project(points: readonly (readonly [number, number, number])[]): ScreenPoint[]
+  /**
+   * Where the name tag of each of these other karts goes on screen: `above` metres over the kart as
+   * last drawn, its height on a hill and in the air included (2026-11-22: a tag at a fixed height
+   * sat off its kart wherever the road is not at 0 m). Null for one not drawn or off screen
+   */
+  tagPoints(ids: readonly number[], above: number): ScreenPoint[]
   /** `{width}x{height}` of the drawing buffer */
   drawingBuffer(): string
   /**
@@ -363,6 +369,13 @@ export function createKartScene(
   let looking: { orbit?: number; back?: number; up?: number } | null = null
   let directed: CameraShot | null = null
   const projected = new Vector3()
+  /** Where a point is on screen as of the last frame drawn, in CSS pixels of the container */
+  const onScreen = (x: number, y: number, z: number): ScreenPoint => {
+    projected.set(x, y, z).project(camera)
+    if (projected.z > 1 || Math.abs(projected.x) > 1.1 || Math.abs(projected.y) > 1.1) return null
+    const { clientWidth: width, clientHeight: height } = container
+    return { x: ((projected.x + 1) / 2) * width, y: ((1 - projected.y) / 2) * height }
+  }
   /** Stunned by a hit (hitFx.ts): the driver sways for as long as the kart spins */
   const dazedBy = (spin: SpinPose | undefined) => (spin && (spin.yaw !== 0 || spin.lift !== 0) ? 1 : 0)
   let time = 0
@@ -664,16 +677,12 @@ export function createKartScene(
       hitArt ??= createHitArt(scene, roadHeight)
       hitArt.update(frame.bursts, frameSeconds)
     },
-    project(points) {
-      const { clientWidth: width, clientHeight: height } = container
-      return points.map(([x, y, z]) => {
-        projected.set(x, y, z).project(camera)
-        if (projected.z > 1 || Math.abs(projected.x) > 1.1 || Math.abs(projected.y) > 1.1) {
-          return null
-        }
-        return { x: ((projected.x + 1) / 2) * width, y: ((1 - projected.y) / 2) * height }
-      })
-    },
+    project: (points) => points.map(([x, y, z]) => onScreen(x, y, z)),
+    tagPoints: (ids, above) =>
+      ids.map((id) => {
+        const at = otherKarts.get(id)?.group.position
+        return at ? onScreen(at.x, at.y + above, at.z) : null
+      }),
     drawingBuffer: () => `${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`,
     drawn: () => renderer.info.render,
     stats: () => ({

@@ -11,6 +11,7 @@ import { broadcastSolid, ticker } from '../ui/broadcast.ts'
 import { controlLabels, useInputDevice } from './controls.ts'
 import { KeyText } from './KeyText.tsx'
 import { loadCoachOn, saveCoachOn } from './store.ts'
+import { loadTrackCuesOn, saveTrackCuesOn } from '../trackCues.ts'
 import type { CoachHandle } from './useCoach.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
@@ -64,6 +65,28 @@ export function CoachSwitch({ t }: { t: KartT }) {
       />
       {t('kart.school.coach')}
       <SwitchNote id={noteId}>{t('kart.school.coachNote')}</SwitchNote>
+    </label>
+  )
+}
+
+/** 2026-11-22: the switch for the cyan and amber marks on the tracks to learn by heart */
+export function TrackCuesSwitch({ t }: { t: KartT }) {
+  const [on, setOn] = useState(loadTrackCuesOn)
+  const noteId = useId()
+  return (
+    <label>
+      <input
+        type="checkbox"
+        checked={on}
+        aria-describedby={noteId}
+        onChange={(event) => {
+          saveTrackCuesOn(event.target.checked)
+          setOn(event.target.checked)
+        }}
+        data-testid="kart-track-cues-switch"
+      />
+      {t('kart.school.trackCues')}
+      <SwitchNote id={noteId}>{t('kart.school.trackCuesNote')}</SwitchNote>
     </label>
   )
 }

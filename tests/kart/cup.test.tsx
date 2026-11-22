@@ -33,6 +33,10 @@ import {
 } from '../../src/kart/cup/store.ts'
 import { trophyShape } from '../../src/kart/cup/trophyShape.ts'
 
+// The menu song is fetched after the screen is up; a test file can end first, and the late import
+// then fails the run (EnvironmentTeardownError, seen in CI 2026-11-22). No song is tested here.
+vi.mock('../../src/kart/audio/useMenuMusic.ts', () => ({ useMenuMusic: () => {} }))
+
 // The Grand Prix (owner 2026-11-17; docs/ARCHITECTURE.md §4.24)
 
 registerMessages(KART_MESSAGES)

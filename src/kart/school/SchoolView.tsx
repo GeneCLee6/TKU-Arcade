@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import styled, { css, keyframes } from 'styled-components'
 import { applyKart } from '../../../shared/kart/karts.ts'
 import { KART_MESSAGES, type KartMessageKey } from '../../../shared/kart/i18n.ts'
+import { KART_SCHOOL_MESSAGES } from '../../../shared/kart/i18n.school.ts'
 import {
   DEFAULT_RULES,
   KART_TUNING,
@@ -73,6 +74,8 @@ import {
 import { schoolTrack } from '../../../shared/kart/tracks/school.ts'
 
 registerMessages(KART_MESSAGES)
+// This screen's own strings, in its own chunk: the menu and a race never load them (2026-11-22)
+registerMessages(KART_SCHOOL_MESSAGES)
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 

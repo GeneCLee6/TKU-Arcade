@@ -286,7 +286,10 @@ export default function ReplayView({
         },
         drawn(scene, frame) {
           const others = frame.karts.filter((kart) => kart.id !== frame.follow)
-          const points = scene.project(others.map((kart) => [kart.x, TAG_HEIGHT, kart.z] as const))
+          const points = scene.tagPoints(
+            others.map((kart) => kart.id),
+            TAG_HEIGHT,
+          )
           placeTags(
             tagLayer.current,
             others.map((kart, i) => ({ seat: kart.id, at: points[i] ?? null })),

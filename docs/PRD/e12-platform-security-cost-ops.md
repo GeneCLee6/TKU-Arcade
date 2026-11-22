@@ -30,7 +30,7 @@ depends_on: []
 - **CI**：lint、typecheck、test、build、JS 預算、i18n 檢查、資產登記檢查；PR 預覽（每個 PR 一個 Worker `wrangler deploy --name`，見 `DEPLOY.md`）；`main` 合併自動部署。
 - **JS 預算**：大廳與桌遊首屏 gzip ≤ 150 kB；卡丁車 chunk 另計（≤ 600 kB gzip，three.js 含）；`scripts/check-budget.mjs`。
 - **遙測**：Workers observability；錯誤回報端點（沿用橋館 `e10-t06` 做法）；每日房間數、每款遊戲場次、卡丁車 fps 分佈（匿名）。
-- **濫用防護**：建房速率（每 IP 每分鐘 5 間）、聊天速率、暱稱過濾（控制字元、過長）、WebSocket 連線上限每房 16、未登入不能用 AI 生成與管理頁。
+- **濫用防護**：建房速率（每位址每分鐘 10 間）、聊天速率、暱稱過濾（控制字元、過長）、WebSocket 連線上限（每房 72 條、64 人，每房每位址 24 條）、未登入不能用 AI 生成與管理頁。（**擁有者 2026-11-22 決定**：原寫「每 IP 每分鐘 5 間」「每房 16」；建房改成 10 間，因為校園 Wi-Fi 一個位址後面有很多桌；連線上限維持 B4 的實作，旁觀很多時不會被擋。）
 - **D1**：遷移檔與流程（`wrangler d1 migrations`）；每日備份到 R2（cron，沿用牌桌）。
 - **R2 資產管線**：`scripts/assets/upload.ts`（內容雜湊檔名、Cache-Control 一年）；`docs/ASSETS.md` 登記每個資產（路徑、來源、授權、作者、備註）；`scripts/check-assets.mjs`：`public/` 與 R2 清單中的每個檔案都要有登記列，否則 CI 失敗。
 - **IP 檢查清單**（`docs/IP-CHECKLIST.md`）：每款遊戲上線前逐項：名稱不與原作相同或近似、無原作美術／文字／音樂、題庫自寫、規則頁為自己的話、資產全部登記、公開文字沒有用原作名稱當自己的名稱；由擁有者簽名日期。
@@ -49,7 +49,7 @@ depends_on: []
 - [ ] AC-12.2 — CI：lint／typecheck／test／build／預算／i18n／資產檢查全在 PR 跑。
 - [ ] AC-12.3 — 遙測：錯誤回報與每日指標可見。
 - [ ] AC-12.4 — 成本：儀表板與 80% 警示。（P1 #107 程式與測試完成；等擁有者設好 `CF_ANALYTICS_TOKEN`、`CF_ACCOUNT_ID`、在 `/stats` 看到數字再勾，DEPLOY.md §13）
-- [x] AC-12.5 — 濫用防護：速率、過濾、連線上限，有測試。（P1 #107 的安全複查 `e12-t13`；`e12-t06` 補上跨 instance 的建房速率、WebSocket 升級速率與每位址連線上限、暱稱過濾、管理頁暴力嘗試鎖定；`tests/worker/abuse.test.ts`，結論在 `docs/SECURITY.md` §6、§7、§9。每房連線上限沿用 B4 的 72 條（64 人＋8），不是本頁寫的 16，見 NEXT §2）
+- [x] AC-12.5 — 濫用防護：速率、過濾、連線上限，有測試。（P1 #107 的安全複查 `e12-t13`；`e12-t06` 補上跨 instance 的建房速率、WebSocket 升級速率與每位址連線上限、暱稱過濾、管理頁暴力嘗試鎖定；`tests/worker/abuse.test.ts`，結論在 `docs/SECURITY.md` §6、§7、§9。每房連線上限沿用 B4 的 72 條（64 人＋8），擁有者 2026-11-22 決定維持，PRD 原寫的 16 已改）
 - [x] AC-12.6 — 資產授權清單：`ASSETS.md`、上傳腳本、CI 擋未登記。
 - [x] AC-12.7 — 功能旗標：每款遊戲可關；關閉行為有測試。（P1 #107：D1 `game_flags`、`/stats` 的開關；`flags.test.ts` 每款遊戲各測一次，`room-host.test.ts` 測既有房間；本機 workerd 用真的 `RoomDO` 實測，預覽站沒有 `STATS_KEY` 只驗了 404，`docs/SECURITY.md` §8）
 - [ ] AC-12.8 — IP 檢查清單：文件存在；每款遊戲上線前有簽名紀錄。
@@ -69,7 +69,7 @@ depends_on: []
 
 ### M1
 
-- [x] `e12-t06` 濫用防護：建房與聊天速率、暱稱過濾、連線上限、管理頁權限 · AC-12.5 · M · ← e1-t01, e1-t12 · 路線圖外提前（2026-11-20，不需要帳號）：Durable Object `LimiterDO`（16 片、只在記憶體；Cloudflare 的 Rate Limiting binding 試過，在這個帳號上一律放行），以位址雜湊為 key：建房每分鐘 5 間、WebSocket 升級每分鐘 120 次、錯的擁有者金鑰每分鐘 5 次後鎖一分鐘；每房每位址最多 24 條連線（關閉碼 4429）；暱稱濾掉零寬與隱形字元、擋冒充（房主、管理員、系統、admin…）與基本髒話（清單 `shared/nickname-words.ts`），伺服器在 `join` 再檢查一次；聊天的速率與長度 B4 就有
+- [x] `e12-t06` 濫用防護：建房與聊天速率、暱稱過濾、連線上限、管理頁權限 · AC-12.5 · M · ← e1-t01, e1-t12 · 路線圖外提前（2026-11-20，不需要帳號）：Durable Object `LimiterDO`（16 片、只在記憶體；Cloudflare 的 Rate Limiting binding 試過，在這個帳號上一律放行），以位址雜湊為 key：建房每分鐘 10 間（原 5 間，擁有者 2026-11-22 改）、WebSocket 升級每分鐘 120 次、錯的擁有者金鑰每分鐘 5 次後鎖一分鐘；每房每位址最多 24 條連線（關閉碼 4429）；暱稱濾掉零寬與隱形字元、擋冒充（房主、管理員、系統、admin…）與基本髒話（清單 `shared/nickname-words.ts`），伺服器在 `join` 再檢查一次；聊天的速率與長度 B4 就有
 - [x] `e12-t07` 每日指標（房間數、場次）與簡單儀表頁（擁有者） · AC-12.3 · S · ← e12-t04 · I4（#48）：D1 `daily_metrics`，`/stats` 要 `STATS_KEY` secret（DEPLOY.md §12）；AC-12.3 等擁有者設好 secret、看到數字再勾
 
 ### M2

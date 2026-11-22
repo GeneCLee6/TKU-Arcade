@@ -16,6 +16,25 @@ interface SpikeReading {
 const spike = (page: Page): Promise<SpikeReading | null> =>
   page.evaluate(() => (window as unknown as { __kartSpike?: SpikeReading }).__kartSpike ?? null)
 
+/**
+ * 2026-11-22 (#129): each name tag shown and its kart's wheels as drawn, in page pixels: the tag's
+ * bottom centre and how far above the wheels it is. On a hill a tag at a fixed height sat metres
+ * under (or over) its kart, off towards the distance
+ */
+const tagGaps = (page: Page) =>
+  page.evaluate(() => {
+    const race = (window as unknown as { __kartRace?: { wheels: { seat: number; x: number; y: number }[] } })
+      .__kartRace
+    const stage = document.querySelector('[data-testid="kart-race"] > [role="img"]')?.getBoundingClientRect()
+    if (!race || !stage) return []
+    return race.wheels.flatMap((wheel) => {
+      const tag = document.querySelector<HTMLElement>(`[data-tag="${wheel.seat}"]`)
+      if (!tag || tag.style.display === 'none') return []
+      const box = tag.getBoundingClientRect()
+      return [{ across: box.x + box.width / 2 - (stage.x + wheel.x), above: stage.y + wheel.y - box.bottom }]
+    })
+  })
+
 test('Guanyin Hill Road: one lap against the computer, over both jumps', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
@@ -40,10 +59,25 @@ test('Guanyin Hill Road: one lap against the computer, over both jumps', async (
   await setup.getByTestId('kart-bots-start').click()
 
   await expect(page.getByTestId('kart-race')).toBeVisible({ timeout: 30_000 })
-  // Both jumps on the lap: off the ground and back on it, twice
+  // Both jumps on the lap: off the ground and back on it, twice; meanwhile, the computer kart's
+  // name tag stays right over it, up the hill and down
+  const gaps: { across: number; above: number }[] = []
   await expect
-    .poll(async () => (await spike(page))?.landings ?? 0, { timeout: 150_000 })
+    .poll(
+      async () => {
+        gaps.push(...(await tagGaps(page)))
+        return (await spike(page))?.landings ?? 0
+      },
+      { timeout: 150_000 },
+    )
     .toBeGreaterThanOrEqual(2)
+  expect(gaps.length).toBeGreaterThan(0)
+  for (const gap of gaps) {
+    // Over the wheels, never under them; sideways only as much as a pitched camera leans an upright
+    // line off the middle of the screen (about a tenth of its height)
+    expect(Math.abs(gap.across)).toBeLessThan(3 + 0.2 * Math.abs(gap.above))
+    expect(gap.above).toBeGreaterThan(-1)
+  }
   expect((await spike(page))?.takeoffs).toBeGreaterThanOrEqual(2)
   const results = page.getByTestId('kart-bots-results')
   await expect(results).toBeVisible({ timeout: 180_000 })

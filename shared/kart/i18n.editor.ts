@@ -1,13 +1,9 @@
-// e10-t07: the track editor's strings (/kart/editor), and the few /kart shows for a shared track.
-// Merged into KART_MESSAGES (i18n.ts), so the same check covers them. `en` is the source.
+// e10-t07: the track editor's strings (/kart/editor). Registered by EditorPage's lazy chunk, not merged
+// into KART_MESSAGES (2026-11-22; the few /kart shows for a shared track are in i18n.menu.ts).
+// `npm run check-i18n` checks them. `en` is the source.
 const en = {
   'kart.editor.title': 'Track editor',
   'kart.editor.back': 'Back to the kart',
-  'kart.editor.open': 'Track editor',
-  'kart.editor.editCopy': 'Edit a copy of this track',
-  'kart.editor.badLink':
-    'This track link does not work: it may have been cut short or changed. Here is a built-in track instead.',
-  'kart.editor.untitled': 'Untitled track',
   'kart.editor.name': 'Name',
   'kart.editor.theme': 'Scenery',
   'kart.editor.theme.day': 'Riverside afternoon',
@@ -137,10 +133,6 @@ export type KartEditorKey = keyof typeof en
 const zhTW: Record<KartEditorKey, string> = {
   'kart.editor.title': '賽道編輯器',
   'kart.editor.back': '回卡丁車',
-  'kart.editor.open': '賽道編輯器',
-  'kart.editor.editCopy': '複製這條賽道來改',
-  'kart.editor.badLink': '這個賽道連結打不開：可能被截斷或改過。先用內建的賽道。',
-  'kart.editor.untitled': '未命名賽道',
   'kart.editor.name': '名稱',
   'kart.editor.theme': '場景',
   'kart.editor.theme.day': '河畔午後',

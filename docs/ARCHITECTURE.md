@@ -1065,7 +1065,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **限制**
 
-1. 困難級要不要學新技巧，仍待擁有者（NEXT §1）。專家十一張加總撞牆比困難少，但砲台、河畔、大屯比困難多（`KART-FEEL.md` §13.2）；沒有卡死或逆走。
+1. 困難級要不要學新技巧，仍待擁有者（NEXT §2.1）。專家十一張加總撞牆比困難少，但砲台、河畔、大屯比困難多（`KART-FEEL.md` §13.2）；沒有卡死或逆走。
 2. 專家在沒有導引的賽道（含自訂賽道）不會走技術捷徑，因為不知道捷徑在哪。
 3. 幽靈車一頁搬一次；搬家期間（第一次讀，通常 < 1 秒）HUD 已有紀錄，幽靈晚一點出現。
 
@@ -1164,6 +1164,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - 跳台：跳台兩端路緣外各一根黑柱琥珀燈；跳台前 10、7、4 個路點各一個琥珀箭頭，放在導引的技術線上、往導引說的甩尾方向越來越斜（`cue.way`；沒有導引但跳台就是分支起點的——廠區的裝卸平台——用分支往哪邊離開）。
 - 矮欄：頂上每 5 m 一盞琥珀燈。
 - 燈慢慢呼吸（亮度 55–100%，青與琥珀錯開半拍）；其他都不動。路面箭頭是 `polygonOffset` 的透明平面，`depthWrite` 關。導引的路點數和賽道不同（編輯器的副本）就不用導引，只標跳台與縫。
+- **可以關**（擁有者 2026-11-22）：`/kart` 操作設定的「賽道技術提示」開關（預設開，`src/kart/trackCues.ts`，localStorage `tku-arcade.kart.trackCues`，讀寫都走不會丟例外的 `lib/storage.ts`）。關掉時 `SkillCues.setVisible(false)` 把全部標記（路面箭頭、燈、燈條、燈柱）藏起來，比賽中切換也立刻生效（`trackArt.ts` 訂閱，`dispose` 時退訂）；牆、縫、跳台本身不變。測試 `tests/kart/trackCues.test.tsx`。
 
 **效能**（Playwright、`--use-angle=d3d11` 真 GPU、1280 × 720、中畫質、自動駕駛 10 秒）：每幀 draw call 碼頭倉庫 203 → 215、山城坡巷 213 → 228、高架廠區 249 → 242；幀數在量測雜訊內（70 → 79、70 → 73、67.5 → 64）。卡丁車 chunk 391 → 403.0 kB gzip（上限 600）。貨櫃、燈、箭頭、盆栽、燈籠用 instancing，其他用 `Batch` 合併；低畫質照 `level.density` 少放倉庫、房子、貨櫃堆。
 
@@ -1390,7 +1391,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 擁有者 2026-11-21「繼續開發」。以前一定要湊人；現在桌遊有電腦玩家（§4.49）、卡丁車有對戰電腦與駕訓班，所以大廳首頁多一塊「跟電腦玩」：一個人、一下就開局。
 
-- **協定**：`POST /api/rooms` 多一個選用的 `bots: { count, level }`（`shared/protocol.ts` 的 `CreateRoomRequest`／`QuickBots`）。`shared/games/quickBots.ts` 的 `parseQuickBots(module, raw)` 檢查：遊戲要有 `bot`（房間在 DO 裡下的那種；卡丁車的電腦車是房主瀏覽器跑的，不收）與 `bots`；`level` 在 `bots.levels`；`count` 是正整數，加上那一個人在 `[minPlayers, maxPlayers]` 之間、不超過名字數。不合就 **400 `bad_bots`**（不默默丟掉）。帶 `bots` 的房間一律私人（`public` 被忽略）。**速率限制不變**：一鍵開局就是一個 POST，照樣算進每位址每分鐘 5 間（`tests/worker/abuse.test.ts`）。
+- **協定**：`POST /api/rooms` 多一個選用的 `bots: { count, level }`（`shared/protocol.ts` 的 `CreateRoomRequest`／`QuickBots`）。`shared/games/quickBots.ts` 的 `parseQuickBots(module, raw)` 檢查：遊戲要有 `bot`（房間在 DO 裡下的那種；卡丁車的電腦車是房主瀏覽器跑的，不收）與 `bots`；`level` 在 `bots.levels`；`count` 是正整數，加上那一個人在 `[minPlayers, maxPlayers]` 之間、不超過名字數。不合就 **400 `bad_bots`**（不默默丟掉）。帶 `bots` 的房間一律私人（`public` 被忽略）。**速率限制不變**：一鍵開局就是一個 POST，照樣算進每位址每分鐘的建房上限（2026-11-22 起 10 間；`tests/worker/abuse.test.ts`）。
 - **RoomDO**：`RoomHost.create(..., bots)` 建房時就把電腦放進座位 1..count（名字照 `bots.names` 的順序，`newBot` 與等待室的「加電腦玩家」共用），`RoomRecord.startOnJoin = true`。第一個加入的人照舊成為房主、坐 0 號，`join` 在 `welcome` 之後**以房主身分**走 `beginFromSeats`（同一套檢查：人數、遊戲暫停）；旗標用完即刪、跟著存檔，所以只會開一次，之後進來的人是旁觀。遊戲被擁有者暫停時留在等待室、房主收到 `game_disabled`，恢復後自己按開始。`RoomDO.webSocketMessage` 在 `startsOnJoin()` 時把 `join` 也當成會開局的訊息，先讀暫停清單（§e12-t11）。
 - **大廳**（`src/components/QuickPlay.tsx`，自己的 lazy chunk，首屏之後才載）：英雄區下面、遊戲卡片上面。列出 `LOBBY_GAMES` 裡 `meta.computer` 的桌遊（新遊戲加了 `computer: true` 就自動出現），每格「你和 N 位電腦玩家」＋「立刻開玩」；N＝`quickBotCount(meta)`＝`max(1, minPlayers − 1)`。難度是區塊上方的分段切換（簡單／普通，預設普通）。卡丁車兩格直接導到 `/kart?bots`（`KartPlay` 讀一次就從網址拿掉，`SpikePage` 以 `openBots` 開在對戰電腦設定）與 `/kart?school`。沒有暱稱時先跳暱稱框，再建房（和「建立房間」同一條路）。格子裡的遊戲名**不是標題**（`<p>`），因為測試與巡檢用 h3 找遊戲卡片。
 - **遊戲卡片**多一個「可以跟電腦玩」標籤：`meta.computer` 或有 `tryAlone`（卡丁車）的卡片。
@@ -1462,6 +1463,20 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 **進度**（`store.ts`，localStorage `tku-arcade.kart.challenge`，經 `lib/storage.ts` 不丟例外，JSON 解析 try/catch，壞資料當沒有）：`medals`（每張賽道最佳獎牌）、`best`（獎牌趟最佳秒數）、`stars`（每關最佳星等）。
 
 **驗證**：`tests/kart/challenge.test.ts`（任務資料：24 關、每章 6 關、每關有名字、對電腦只在比賽賽道；兩張挑戰賽道過 `parseTrack`、不在 `RACE_TRACK_IDS`；判定的每種條件、規則與時限；淘汰順序、名次、追逐；獎牌校準公式、每張賽道銅 > 銀 > 金 > 白金、時限與星等；目標幽靈車縮放；進度存取、壞資料、章節解鎖）、`tests/kart/challenge.medals.test.ts`（河畔、紅樹林、碼頭倉庫：頂尖拿金、專家至少銀、一般至少銅、新手沒有；頂尖過得了七個技術任務且至少兩星；新手過不了甩尾起跳、穿縫、岔路、十連段）、`e2e/kart-challenge.spec.ts`（選單入口、章節鎖、獎牌牆與隱藏白金；`?autopilot` 完成「完美五發」、星等存進 localStorage）。截圖：`scripts/kart-challenge-shots.mjs`（真 GPU）。
+
+### 4.61 路線圖外：房間卡丁車首屏瘦身、單機畫面的字串各自 lazy（2026-11-22，`feat/kart-fixes-budget`）
+
+擁有者 2026-11-22「全照建議」。數字在 `KART-PERF.md` §9。**更正 §4.60 的「首屏」一段**：挑戰的字串併進 `KART_MESSAGES` 不影響房間首屏（`KART_MESSAGES` 跟 `RaceView` 在首屏之後），#131 的 +0.7 kB 是打包器重切共用 chunk。
+
+- **字串**：`KART_MESSAGES`（`shared/kart/i18n.ts`）只放選單與比賽要的；駕訓班 `KART_SCHOOL_MESSAGES`、挑戰 `KART_CHALLENGE_MESSAGES`、編輯器 `KART_EDITOR_MESSAGES` 由 `SchoolView`／`ChallengeView`／`EditorPage` 自己 `registerMessages`（和 `promotion/i18n.sheets.ts` 同一招）。三個畫面以外用到的幾句（`kart.school.open`／`loading`／`invite*`／`coach*`／`tip*`、`kart.challenge.open`／`loading`、`kart.editor.open`／`editCopy`／`badLink`／`untitled`）在 `i18n.menu.ts`。型別 `KartMessageKey` 仍包含全部（只有型別，不進 chunk）；`KART_MESSAGES` 的型別是其中的 `KartBaseKey`。**新增單機畫面的字串**：自己一個 `shared/kart/i18n.<名>.ts`，由畫面登記，列進 `scripts/check-i18n.mjs` 的 `KART_PARTS`（沒列又沒併進 `i18n.ts` 會被擋）；別的畫面也要說的那幾句放 `i18n.menu.ts`。
+- **錄影器**（`src/games/kart/useRaceRecorder.ts`）：首屏只有一個殼 `deferredRecorder`，`import('../../kart/watch/raceTape.ts')`（frame 解碼＋`createReplayRecorder`）在掛上時開始；之前的 `heard`／`sent`／`view` 呼叫排隊，到了依序重放。`recorder.hasFrames()` 在 chunk 到之前是 false（結果面板的「看重播」不出現），`recorder.ready` 給測試等。
+- **觀戰名次表**：`KartScreen` 的 `Standings` 改 `lazy`（`RaceView`、`BotRaceView` 仍靜態 import，它們本來就在首屏之後）。
+
+### 4.62 路線圖外：名牌貼著車（坡上也是）、三個 e2e 的修正（2026-11-22，`feat/kart-fixes-e2e`，#135）
+
+- **名牌偏在遠方**（#129 預覽截圖）：原因是名牌錨點用固定高度——`netRace.ts`、`SpectateView`、`ReplayView` 都投影 `[x, TAG_HEIGHT 2.4 m, z]`，但車子畫在路面高度上（#94 起坡道賽道，`liftOf` 的 `y`）。12 張比賽賽道裡 8 張有起伏（河濱最高 8.6 m、淡江 10.9、觀音山 17.0、砲台 17.8、大屯 25.0、山城 12.5、廠區 5.0、碼頭 2.0），車在 10 m 高的路上，名牌就投影在車底下 7.6 m 的地方，看起來落在車後方遠處；平地賽道（漁港、老街、紅樹林、淡海）沒事，所以是「有時」。LOD（#124）與非同步車款替換（#128）都沒有問題：遠處簡化車與替換後的車用的是同一個 `group`。修法：`KartScene.tagPoints(ids, above)` 直接取那台車最後畫出來的 `group.position`（含坡道高度、空中、被打中的彈起）再加 `above`；三個地方都改用它。`window.__kartRace.wheels` 給 e2e 每台車輪子的畫面座標；`e2e/kart-hills.spec.ts` 在觀音山整圈比對每個名牌的底邊中點：一定在車輪上方、橫向偏差不超過「3 px＋高度差的 20%」（相機俯角讓垂直線離畫面中心時會斜）。改回舊算法時這支會失敗。
+- **`vite preview` 下 3 個「draws a real scene」**（`kart-night` 一個、`kart-spike` 兩個）：測試在頁面裡 `fetch('data:image/png…')` 讀截圖，被正式站 CSP `connect-src 'self'` 擋下（dev server 沒有 CSP 才過）。改成 `atob` 解成 `Uint8Array` 包成 `Blob` 再 `createImageBitmap`，不經過網路；CSP 不動。
+- **觸控 844×390 整批跑時逾時**（#131）：是等待條件不穩，不是測試本身慢。`openTrial` 先等 `canvas` 出現（預設 5 秒），但 #128 之後畫布要等載入畫面把引擎 chunk 載完才有；閒置機器約 2 秒，整批跑或機器忙時會超過 5 秒。用 CDP `Emulation.setCPUThrottlingRate` 6 倍重現：舊版在等 canvas 失敗。改成等比賽真的在畫（`__kartSpike.frames > 5`，載入另給 45 秒，且加在測試時限上，測試本身仍是 30 秒）；axe 只掃觸控按鈕與設定面板（掃整頁時軟體 WebGL 每幀在畫，忙的機器上 axe 吃掉大半時限）。6 倍節流下新版通過。
 
 ## 5. i18n
 

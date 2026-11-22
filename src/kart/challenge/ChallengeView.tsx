@@ -17,6 +17,7 @@ import { kartMessages } from '../../../shared/games/kart/i18n.ts'
 import type { KartAction } from '../../../shared/games/kart/types.ts'
 import type { Ghost } from '../../../shared/kart/ghost.ts'
 import { KART_MESSAGES, type KartMessageKey } from '../../../shared/kart/i18n.ts'
+import { KART_CHALLENGE_MESSAGES } from '../../../shared/kart/i18n.challenge.ts'
 import { applyKart } from '../../../shared/kart/karts.ts'
 import {
   DEFAULT_RULES,
@@ -107,6 +108,8 @@ import {
 } from './store.ts'
 
 registerMessages(KART_MESSAGES)
+// This screen's own strings, in its own chunk: the menu and a race never load them (2026-11-22)
+registerMessages(KART_CHALLENGE_MESSAGES)
 // The tracks' names as a room shows them (`games.kart.track.<id>`, goals.ts)
 registerMessages(kartMessages)
 
