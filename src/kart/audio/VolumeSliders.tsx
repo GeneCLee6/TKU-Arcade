@@ -1,5 +1,6 @@
-// 2026-11-20 (§4.46): the music's and the effects' volumes, two sliders for the kart's settings
-// panels (the controls panel, the touch panel). Kept in this browser (volumes.ts); heard at once.
+// 2026-11-20 (§4.46): the music's and the effects' volumes (2026-11-22: and the ambience's), sliders
+// for the kart's settings panels (the controls panel, the touch panel, the settings). Kept in this
+// browser (volumes.ts); heard at once.
 import { useState, useSyncExternalStore } from 'react'
 import styled from 'styled-components'
 import type { KartMessageKey } from '../../../shared/kart/i18n.ts'
@@ -45,6 +46,20 @@ export function VolumeSliders({ t }: { readonly t: KartT }) {
           data-testid="kart-volume-effects"
         />
         <Value aria-hidden="true">{t('kart.sound.percent', { value: Math.round(volumes.effects * 100) })}</Value>
+      </Row>
+      <Row>
+        <span>{t('kart.sound.ambience')}</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={volumes.ambience}
+          onChange={(event) => change({ ambience: Number(event.target.value) })}
+          aria-label={t('kart.sound.ambience')}
+          data-testid="kart-volume-ambience"
+        />
+        <Value aria-hidden="true">{t('kart.sound.percent', { value: Math.round(volumes.ambience * 100) })}</Value>
       </Row>
       <Note>{t(unsaved ? 'kart.sound.notSaved' : 'kart.sound.note')}</Note>
     </Group>

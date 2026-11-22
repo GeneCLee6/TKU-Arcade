@@ -644,3 +644,18 @@ export const kartLobby = {
   hillsNight: '#231E47',
   trackGlow: '#FFFFFF',
 } as const
+
+/**
+ * 2026-11-22 (docs/ARCHITECTURE.md §4.72): the podium after a race (src/kart/ceremony/): the three
+ * steps (winner, second, third), the stage, the lights that sweep it and the trophy. Also the name
+ * plates' medal colours over it (2D, read from here as the 3D's are)
+ */
+export const kartPodium = {
+  steps: ['#E8B931', '#C9D1DC', '#C77B3A'],
+  stepSide: '#1B2238',
+  floor: '#10152A',
+  sky: '#070A16',
+  lights: ['#FF3B6B', '#2EC4F1', '#FFD23F'],
+  spot: '#FFF4D6',
+  trophy: '#F2C94C',
+} as const

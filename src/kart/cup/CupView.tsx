@@ -34,9 +34,12 @@ import { useMenuMusic } from '../audio/useMenuMusic.ts'
 import { isKartId } from '../../../shared/kart/karts.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
 import { prefetchKart, RACE_ENGINE } from '../load/kartLoad.ts'
+import { podiumSeats } from '../ceremony/podium.ts'
 
 // 2026-11-20 (§4.47): the player's own driver on the podium, celebrating (three.js, fetched then)
 const KartPreview = lazy(() => import('../roster/KartPreview.tsx'))
+// 2026-11-22 (§4.72): the cup's top three on the podium, as after every race, before the card
+const PodiumCeremony = lazy(() => import('../ceremony/PodiumCeremony.tsx'))
 
 export interface CupViewProps {
   readonly run: CupRun
@@ -51,6 +54,7 @@ export default function CupView({ run: first, onMenu }: CupViewProps) {
   const [run, setRunState] = useState(first)
   const [newBest, setNewBest] = useState(false)
   const [abandoning, setAbandoning] = useState(false)
+  const [ceremonyDone, setCeremonyDone] = useState(false)
   const setRun = (next: CupRun) => {
     saveCupRun(next)
     setRunState(next)
@@ -111,6 +115,33 @@ export default function CupView({ run: first, onMenu }: CupViewProps) {
     const done = () => {
       clearCupRun()
       onMenu()
+    }
+    if (!ceremonyDone) {
+      return (
+        <Suspense fallback={null}>
+          <PodiumCeremony
+            title={t('kart.flow.podium.cupTitle', { cup: cupName })}
+            entries={podiumSeats(table.map((line, index) => ({ seat: line.seat, rank: index + 1 }))).map(
+              ({ seat, place }) => {
+                const entry = run.entries[seat]
+                const mine = seat === you || !entry
+                return {
+                  seat,
+                  place,
+                  name: nameOf(seat),
+                  kart: mine ? loadBody() : entry.kart,
+                  driver: mine ? loadDriver() : entry.driver,
+                  line: t('kart.flow.podium.points', {
+                    points: table.find((one) => one.seat === seat)?.points ?? 0,
+                  }),
+                  you: seat === you,
+                }
+              },
+            )}
+            onDone={() => setCeremonyDone(true)}
+          />
+        </Suspense>
+      )
     }
     return (
       <Screen data-testid="kart-cup-podium">

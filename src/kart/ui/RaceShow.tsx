@@ -193,3 +193,184 @@ export const PlaceArrow = styled.span<{ $up: boolean }>`
     animation: none;
   }
 `
+
+// ── 2026-11-22 (docs/ARCHITECTURE.md §4.72): each driver presented, and the close's countdown ──────
+
+/**
+ * During the opening, the driver in front of the camera: a lower third with their place on the grid,
+ * name, kart and driver, and their team's colour (a team race) or the accent. Keyed by the driver, so
+ * that each one slides in afresh
+ */
+export function DriverCard({
+  grid,
+  name,
+  ride,
+  stripe,
+  you,
+  skip,
+}: {
+  readonly grid: string
+  readonly name: string
+  readonly ride: string | null
+  /** The team's colour, or the accent */
+  readonly stripe: string
+  readonly you: string | null
+  readonly skip: string
+}) {
+  return (
+    <Lower role="status" data-testid="kart-driver-card" style={{ borderLeftColor: stripe }}>
+      <LowerGrid style={{ background: stripe }}>{grid}</LowerGrid>
+      <LowerBody>
+        <LowerName>
+          {name}
+          {you && <LowerYou>{you}</LowerYou>}
+        </LowerName>
+        {ride && <LowerRide>{ride}</LowerRide>}
+      </LowerBody>
+      <LowerSkip>{skip}</LowerSkip>
+    </Lower>
+  )
+}
+
+/**
+ * The seconds left after the first finish, for a racer still out on the track: a big number under a
+ * label, red for the last three; or, once over, time up
+ */
+export function CloseCountdown({
+  label,
+  seconds,
+  timeUp,
+}: {
+  readonly label: string
+  readonly seconds: number
+  readonly timeUp: string
+}) {
+  const over = seconds <= 0
+  return (
+    <Close role="timer" data-testid="kart-close-countdown" data-seconds={Math.max(0, seconds)}>
+      <CloseLabel>{label}</CloseLabel>
+      <CloseNumber key={seconds} $last={seconds <= 3}>
+        {over ? timeUp : seconds}
+      </CloseNumber>
+    </Close>
+  )
+}
+
+const slideIn = keyframes`
+  from { opacity: 0; transform: translateX(-40px) skewX(-10deg); }
+  to { opacity: 1; transform: none; }
+`
+
+const Lower = styled.section`
+  ${broadcast}
+  position: absolute;
+  left: max(${space.lg}px, 6vw);
+  bottom: 22%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: stretch;
+  gap: 0 ${space.md}px;
+  min-width: min(380px, calc(100% - ${2 * space.lg}px));
+  max-width: calc(100% - ${2 * space.lg}px);
+  padding: 0 ${space.lg}px 0 0;
+  border-left: 6px solid ${color.accent};
+  pointer-events: none;
+  animation: ${slideIn} 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`
+
+const LowerGrid = styled.span`
+  ${displayType}
+  display: grid;
+  place-items: center;
+  min-width: 3.4em;
+  padding: ${space.sm}px;
+  color: ${color.bg};
+  font-size: ${fontSize.lg}px;
+  text-transform: uppercase;
+`
+
+const LowerBody = styled.div`
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  padding: ${space.sm}px 0;
+`
+
+const LowerName = styled.strong`
+  ${displayType}
+  display: flex;
+  align-items: baseline;
+  gap: ${space.sm}px;
+  overflow: hidden;
+  color: ${color.text};
+  font-size: ${fontSize.xxl}px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const LowerYou = styled.span`
+  ${ticker(color.accent, 6)}
+  padding: 0 ${space.sm}px;
+  color: ${color.onAccent};
+  font-size: ${fontSize.sm}px;
+`
+
+const LowerRide = styled.span`
+  ${monoType}
+  overflow: hidden;
+  color: ${color.muted};
+  font-size: ${fontSize.sm}px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const LowerSkip = styled.span`
+  ${monoType}
+  grid-column: 1 / -1;
+  padding: 2px ${space.sm}px;
+  color: ${color.muted};
+  font-size: 12px;
+  animation: ${blink} 0.8s ease-in-out infinite alternate;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`
+
+const Close = styled.div`
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  translate: -50% 0;
+  pointer-events: none;
+`
+
+const CloseLabel = styled.p`
+  ${ticker(color.danger, 8)}
+  margin: 0;
+  padding: 2px ${space.lg}px;
+  color: ${color.onAccent};
+  font-size: ${fontSize.sm}px;
+  font-weight: 700;
+  text-transform: uppercase;
+`
+
+const CloseNumber = styled.p<{ $last: boolean }>`
+  ${displayType}
+  margin: 0;
+  color: ${({ $last }) => ($last ? color.danger : color.text)};
+  font-size: clamp(56px, min(14vh, 16vw), 120px);
+  line-height: 1;
+  text-shadow: ${splitShadow};
+  white-space: nowrap;
+  isolation: isolate;
+  ${slam(320)}
+`

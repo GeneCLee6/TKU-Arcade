@@ -39,7 +39,7 @@ test('a replay on a phone held upright: the item slot in the middle, the map on 
   await setup.getByTestId('kart-bots-laps').selectOption('1')
   await setup.getByTestId('kart-bots-start').click()
   await expect(page.getByTestId('kart-race')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByTestId('kart-intro')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId('kart-driver-card')).toBeVisible({ timeout: 30_000 })
   await page.keyboard.press('KeyM')
   const results = page.getByTestId('kart-bots-results')
   await expect(results).toBeVisible({ timeout: 200_000 })

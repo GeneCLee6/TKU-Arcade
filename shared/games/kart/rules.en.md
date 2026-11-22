@@ -6,8 +6,8 @@ A 3D kart race in the browser for 1 to 8 karts: friends in one room, computer ka
 
 1. The host picks the **track**, the **laps** (1 to 9), the **mode** and the **sides**, and can add computer karts to free seats.
 2. Everyone picks a kart and a driver in the waiting room. The six karts differ a little in top speed, pull, steering and weight.
-3. When everyone's track has loaded, the room counts down: get ready, 3, 2, 1, GO. Pressing forward in the last half second gives a start boost.
-4. The first kart to finish its laps wins. Once it is home the others have 30 seconds; a kart still out then did not finish, and is placed by the laps it completed.
+3. When everyone's track has loaded, the camera meets each driver in turn, then the room counts down: 3, 2, 1, GO. Pressing forward in the last half second gives a start boost.
+4. The first kart to finish its laps wins. Once it is home the others have 10 seconds, counted down on screen; a kart still out then did not finish, and is placed by how far round it had come. The top three then go up on the podium.
 
 ## Driving
 
@@ -15,7 +15,7 @@ A 3D kart race in the browser for 1 to 8 karts: friends in one room, computer ka
 - **Instant boost**: a real drift, with the tail out for a moment, earns a short burst; a tap and let go does not. Let the drift go and press forward again, while the kart is still sliding or just after it straightens. A drifting kart slides and loses a little speed, so drifting down a straight for it does not pay.
 - **Reset**: puts the kart back on the road at the last checkpoint.
 
-The controls panel on the Kart page lists the keys, the gamepad buttons and the touch buttons, and lets you change them.
+The controls panel on the Kart page lists the keys, the gamepad buttons and the touch buttons, and lets you change them. During a race, Esc (Start on a gamepad, or the pause button at the top left) opens the menu: the volumes, the picture, the effects and the opening. Racing alone, the race pauses; in a room it goes on.
 
 **Driving school**: the Kart page's menu has eleven short lessons, one technique each, from the first lap to the drift jump: the drift, the instant boost, perfect timing, the combo, N2O, the perfect start, the drift jump, the timed landing, the gates and a final test. Each shows your own keys, says what went wrong when a try fails, and can be tried again or skipped; a pass earns one to three stars. During a race, a short tip comes once for a technique you have not used yet (it can be turned off in the controls panel).
 

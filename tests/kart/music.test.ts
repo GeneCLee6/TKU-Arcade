@@ -210,13 +210,13 @@ describe('the volumes', () => {
 
   it('start at the defaults and keep what was set', () => {
     expect(loadVolumes()).toEqual(DEFAULT_VOLUMES)
-    expect(saveVolumes({ music: 0.25, effects: 0.8 })).toBe(true)
+    expect(saveVolumes({ music: 0.25, effects: 0.8, ambience: 0.5 })).toBe(true)
     forgetVolumesForTest()
-    expect(loadVolumes()).toEqual({ music: 0.25, effects: 0.8 })
+    expect(loadVolumes()).toEqual({ music: 0.25, effects: 0.8, ambience: 0.5 })
   })
 
   it('throws nothing away but what is odd, and clamps', () => {
-    expect(parseVolumes('{"music":2,"effects":"loud"}')).toEqual({ music: 1, effects: DEFAULT_VOLUMES.effects })
+    expect(parseVolumes('{"music":2,"effects":"loud"}')).toEqual({ music: 1, effects: DEFAULT_VOLUMES.effects, ambience: DEFAULT_VOLUMES.ambience })
     expect(parseVolumes('not json')).toEqual(DEFAULT_VOLUMES)
     expect(parseVolumes('null')).toEqual(DEFAULT_VOLUMES)
     expect(parseVolumes(null)).toEqual(DEFAULT_VOLUMES)
@@ -228,8 +228,8 @@ describe('the volumes', () => {
       throw new Error('full')
     }
     try {
-      expect(saveVolumes({ music: 0.1, effects: 0.2 })).toBe(false)
-      expect(loadVolumes()).toEqual({ music: 0.1, effects: 0.2 })
+      expect(saveVolumes({ music: 0.1, effects: 0.2, ambience: 0.3 })).toBe(false)
+      expect(loadVolumes()).toEqual({ music: 0.1, effects: 0.2, ambience: 0.3 })
     } finally {
       Storage.prototype.setItem = original
     }
