@@ -31,7 +31,7 @@ for (const name of DRIVER_IDS) {
       trial = stepTrial(trial, drive(trial), course, KART_TUNING)
       const { kart } = trial.run
       if (trial.run.hitSpeed >= KART_TUNING.wallBreakSpeed) {
-        hits.push(nearestRoadPoint(track.road, kart.x, kart.z))
+        hits.push(nearestRoadPoint(track.road, kart.x, kart.z, kart.y))
       }
       if ((kart.driftJumps ?? 0) > (before.driftJumps ?? 0)) jumps++
     }

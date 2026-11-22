@@ -70,7 +70,7 @@ export function createTrackBrain(
   let resets = 0
   return withObstacles((trial, sense) => {
     const { kart } = trial.run
-    const index = nearestRoadPoint(track.road, kart.x, kart.z)
+    const index = nearestRoadPoint(track.road, kart.x, kart.z, kart.y)
     const coming = approach(track, index)
     const on = forkAt(track.road, paths, kart.x, kart.z)
     if (trial.run.resets > resets) {

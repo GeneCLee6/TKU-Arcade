@@ -1,6 +1,13 @@
 // e10-t07: the editor's piece library. Each button adds one piece or a few (an S-bend is two), all of
 // them ordinary pieces that can be changed afterwards; the road keeps the width it had.
-import { jump, slope, straight, turn, type Piece } from '../../../shared/kart/editor/spec.ts'
+import {
+  jump,
+  overpass,
+  slope,
+  straight,
+  turn,
+  type Piece,
+} from '../../../shared/kart/editor/spec.ts'
 import type { KartEditorKey } from '../../../shared/kart/i18n.editor.ts'
 
 export interface Preset {
@@ -67,4 +74,18 @@ export const PRESETS: readonly Preset[] = [
   { id: 'uphill', label: 'kart.editor.preset.uphill', make: (w) => [slope(100, 8, w)] },
   { id: 'downhill', label: 'kart.editor.preset.downhill', make: (w) => [slope(100, -8, w)] },
   { id: 'jump', label: 'kart.editor.preset.jump', make: (w) => [jump(80, 2.5, w)] },
+  // 2026-11-22 (shared/kart/levels.ts): a road over a road, and bends that lean into themselves.
+  // A viaduct wants an underpass (or a flat road) to cross it at its middle
+  { id: 'overpass', label: 'kart.editor.preset.overpass', make: (w) => [overpass(220, 4.5, w)] },
+  { id: 'underpass', label: 'kart.editor.preset.underpass', make: (w) => [overpass(220, -4.5, w)] },
+  {
+    id: 'bankedLeft',
+    label: 'kart.editor.preset.bankedLeft',
+    make: (w) => [turn(-90, 70, w, { bank: 10 })],
+  },
+  {
+    id: 'bankedRight',
+    label: 'kart.editor.preset.bankedRight',
+    make: (w) => [turn(90, 70, w, { bank: 10 })],
+  },
 ]

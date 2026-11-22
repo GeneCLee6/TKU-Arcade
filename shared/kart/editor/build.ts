@@ -5,9 +5,11 @@
 // room is given (custom.ts). Pure.
 import type { Spot } from '../course.ts'
 import { roadClearance } from '../scenery.ts'
-import { gatesClearOf, type BranchJson } from '../branches.ts'
+import { branchMouth, branchPath, gatesClearOf, type BranchJson } from '../branches.ts'
+import { findCrossings, inZone, LEVEL_CLEARANCE, ZONE_PAD, type Crossing } from '../levels.ts'
 import {
   gatesAlong,
+  gatesClearOfCrossings,
   headingOf,
   padsAlong,
   parseTrack,
@@ -16,10 +18,12 @@ import {
   type RoadPoint,
   type TrackJson,
 } from '../track.ts'
+import { fence } from '../tracks/guide.ts'
+import type { Wall } from '../walls.ts'
 import { lineGrid, LINE_BACK, LINE_PLACES, LINE_SOLO_ACROSS } from '../startLine.ts'
 import { KART_RADIUS } from '../walls.ts'
 import { specHash } from './codec.ts'
-import { layout, wrapAngle, type Laid } from './layout.ts'
+import { layout, pieceLength, wrapAngle, type Laid } from './layout.ts'
 import { BYPASS_EASE, LIMITS, type Bypass, type Piece, type TrackSpec } from './spec.ts'
 
 /** The loop is closed when the last piece ends this near the start, facing this near its way */
@@ -53,6 +57,11 @@ export type ProblemCode =
   | 'high'
   | 'steep'
   | 'bypass'
+  // 2026-11-22 (levels.ts): where the road runs over itself it must be high enough over, cross
+  // squarely enough and keep pads, boxes, jumps, the start and bypasses away; a banked bend must be
+  // long enough to lean in and out
+  | 'crossing'
+  | 'bank'
 
 export interface Problem {
   readonly code: ProblemCode
@@ -129,8 +138,17 @@ function middles(laid: Laid): number[] {
   })
 }
 
-/** Pairs of pieces whose road runs into each other; at most `max` of them */
-function crossings(laid: Laid, at: number[], total: number, max: number): [number, number][] {
+/**
+ * Pairs of pieces whose road runs into each other; at most `max` of them. Where it runs over itself
+ * at a crossing (2026-11-22, levels.ts), high enough apart, it does not
+ */
+function crossings(
+  laid: Laid,
+  at: number[],
+  total: number,
+  max: number,
+  levels: readonly Crossing[] = [],
+): [number, number][] {
   const { road, pieceOf } = laid
   const found = new Map<string, [number, number]>()
   for (let i = 0; i < road.length && found.size < max; i++) {
@@ -145,6 +163,13 @@ function crossings(laid: Laid, at: number[], total: number, max: number): [numbe
       const dx = a.x - b.x
       const dz = a.z - b.z
       if (dx * dx + dz * dz > reach * reach) continue
+      if (
+        levels.length > 0 &&
+        inZone(levels, a.x, a.z, ZONE_PAD) &&
+        inZone(levels, b.x, b.z, ZONE_PAD) &&
+        Math.abs((a.y ?? 0) - (b.y ?? 0)) >= LEVEL_CLEARANCE
+      )
+        continue
       const pair: [number, number] = [pieceOf[i]!, pieceOf[j]!]
       found.set(pair.join(','), pair)
       if (found.size >= max) break
@@ -198,11 +223,61 @@ export function bypassRoad(
 /** Raised whenever the physics changes enough that old times on custom tracks mean nothing */
 export const CUSTOM_REVISION = 7
 
+/** A bypass's slot (2026-11-22): this wide, in the middle of the wall across it */
+const BYPASS_SLOT = 9
+/** A bypass's wall leaves this many road points of its mouth open */
+const BYPASS_MOUTH = 3
+/** How high a bypass's walls stand over the road, and its jump's lip */
+const BYPASS_WALL = 9
+const BYPASS_JUMP = 2.5
+
+/**
+ * What stands on a bypass (2026-11-22, #113): its road with a jump raised in its middle, or the
+ * walls of its mouth or its slot. `path` is the bypass's whole centre line (branches.ts)
+ */
+function bypassFeature(
+  road: readonly RoadPoint[],
+  bypass: Bypass,
+  laidBy: { from: number; to: number; road: RoadPoint[] },
+): { road: RoadPoint[]; jumps?: number[]; walls: Wall[] } {
+  const middle = Math.floor(laidBy.road.length / 2)
+  if (bypass.feature === 'jump') {
+    // The two points up to the lip raised into a ramp, as circuit.ts's jumps
+    const raised = laidBy.road.map((point, index) => {
+      const lift = index === middle ? BYPASS_JUMP : index === middle - 1 ? BYPASS_JUMP / 2 : 0
+      return { ...point, y: Math.round(((point.y ?? 0) + lift) * 100) / 100 }
+    })
+    return { road: raised, jumps: [middle], walls: [] }
+  }
+  const path = branchPath(road, { from: laidBy.from, to: laidBy.to, road: laidBy.road })
+  if (bypass.feature === 'slot') {
+    const at = middle + 1
+    const edge = bypass.width / 2 + 1
+    return {
+      road: laidBy.road,
+      walls: [
+        ...fence(path, [[at, -edge], [at, -BYPASS_SLOT / 2]], BYPASS_WALL),
+        ...fence(path, [[at, BYPASS_SLOT / 2], [at, edge]], BYPASS_WALL),
+      ],
+    }
+  }
+  if (bypass.feature === 'wall') {
+    // Along the main road's kerb on the bypass's side, but for the first few points of its mouth
+    const [first, last] = branchMouth(road, path, laidBy.from, bypass.side)
+    const kerb: [number, number][] = []
+    for (let index = first + BYPASS_MOUTH; index <= last + 1; index++) {
+      kerb.push([index, bypass.side * (road[index % road.length]!.width / 2 - 0.4)])
+    }
+    return { road: laidBy.road, walls: kerb.length > 1 ? fence(road, kerb, BYPASS_WALL) : [] }
+  }
+  return { road: laidBy.road, walls: [] }
+}
+
 /** The track the spec makes, under its own id (`custom-<hash>`), and everything wrong with it */
 export function buildSpec(spec: TrackSpec): Built {
   const pieces: readonly Piece[] = spec.pieces
   const laid = layout(pieces)
-  const { road, joints } = laid
+  const { road, joints, pieceOf } = laid
   const problems: Problem[] = []
   const last = pieces.length - 1
 
@@ -273,9 +348,26 @@ export function buildSpec(spec: TrackSpec): Built {
     problems.push({ code: 'long', pieces: [], params: { max: LIMITS.maxTrack } })
   }
 
+  // Banked bends (2026-11-22): long enough to lean in and out no faster than the format allows
+  pieces.forEach((piece, index) => {
+    if (piece.kind !== 'turn' || !piece.bank) return
+    if (pieceLength(piece) < piece.bank * 4.5) {
+      problems.push({ code: 'bank', pieces: [index], params: { length: Math.ceil(piece.bank * 4.5) } })
+    }
+  })
+
+  // Where the road runs over itself (2026-11-22, levels.ts): high enough over, squarely enough
+  const levelProblems: string[] = []
+  const levels = road.length > 3 && !open ? findCrossings(road, levelProblems) : []
+  const pieceAt = (problem: string) => {
+    const found = [...problem.matchAll(/road\[(\d+)\]/g)].map((match) => pieceOf[Number(match[1])]!)
+    return [...new Set(found.filter((one) => one !== undefined))]
+  }
+  for (const problem of levelProblems) problems.push({ code: 'crossing', pieces: pieceAt(problem) })
+
   // Never running into itself (the checks the hand-made tracks' tests make, oldstreet.test.ts)
   if (road.length > 3 && total <= LIMITS.maxTrack) {
-    for (const pair of crossings(laid, at, total, 6)) {
+    for (const pair of crossings(laid, at, total, 6, levels)) {
       problems.push({ code: 'crosses', pieces: pair[0] === pair[1] ? [pair[0]] : pair })
     }
   }
@@ -295,6 +387,7 @@ export function buildSpec(spec: TrackSpec): Built {
   const bypasses = spec.bypasses ?? []
   const branches: BranchJson[] = []
   const branchOf: Bypass[] = []
+  const bypassWalls: Wall[] = []
   if (bypasses.length > LIMITS.maxBypasses) {
     problems.push({ code: 'bypass', pieces: [] })
   }
@@ -304,13 +397,24 @@ export function buildSpec(spec: TrackSpec): Built {
       problems.push({ code: 'bypass', pieces: [bypass.from, bypass.to] })
       continue
     }
-    branches.push({ from: laidBy.from, to: laidBy.to, road: laidBy.road })
+    // What stands on it (2026-11-22): a jump, the walls of its mouth or its slot
+    const dressed = bypass.feature ? bypassFeature(road, bypass, laidBy) : null
+    branches.push({
+      from: laidBy.from,
+      to: laidBy.to,
+      road: dressed ? dressed.road : laidBy.road,
+      ...(dressed?.jumps ? { jumps: dressed.jumps } : {}),
+    })
+    if (dressed) bypassWalls.push(...dressed.walls)
     branchOf.push(bypass)
   }
   const along =
     road.length > 0 ? gatesAlong(road, GATE_EVERY) : { gates: [], respawns: [] }
-  const { gates, respawns } =
+  const forked =
     branches.length > 0 ? gatesClearOf(road, along.gates, along.respawns, branches) : along
+  // ... and off any crossing (2026-11-22): a road that never crosses itself keeps them as they were
+  const { gates, respawns } =
+    levels.length > 0 ? gatesClearOfCrossings(road, forked.gates, forked.respawns) : forked
   const padSpots: [number, number][] = []
   const boxes: { x: number; z: number }[] = []
   pieces.forEach((piece, index) => {
@@ -353,12 +457,22 @@ export function buildSpec(spec: TrackSpec): Built {
     respawns,
     grid,
     ...(road.length > 3 ? { solo: soloOf(road, at, total) } : {}),
-    walls: [],
+    walls: bypassWalls,
     boostPads: road.length > 0 ? padsAlong(road, padSpots) : [],
     itemBoxes: boxes.slice(0, MAX_BOXES),
     decor: [],
     ...(laid.jumps.length > 0 ? { jumps: laid.jumps } : {}),
     ...(branches.length > 0 ? { branches } : {}),
+  }
+  // A crossing's zone (2026-11-22): whatever parseTrack finds there names the crossing's pieces
+  if (levels.length > 0 && problems.length === 0) {
+    const parsed = parseTrack(track)
+    if ('problems' in parsed && parsed.problems.some((problem) => /crossing/.test(problem))) {
+      const named = new Set(
+        levels.flatMap((crossing) => [pieceOf[crossing.upper]!, pieceOf[crossing.lower]!]),
+      )
+      problems.push({ code: 'crossing', pieces: [...named] })
+    }
   }
   // A bypass is checked as any branch is (branches.ts): clear of the road, never across it or
   // itself or another, its gates clear; the pieces it runs beside are named

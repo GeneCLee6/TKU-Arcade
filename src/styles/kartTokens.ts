@@ -46,6 +46,9 @@ export const kartScene = {
   hill: '#4E7D55',
   hillFar: '#7FA3A8',
   metal: '#9AA3AD',
+  // 2026-11-22 (crossingArt.ts): a viaduct's deck and the underpass's walls beneath it
+  concrete: '#B9B5AC',
+  concreteDark: '#6E6A63',
   tyre: '#222326',
   seat: '#E4572E',
   lamp: '#FFF4C2',

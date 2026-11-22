@@ -9,20 +9,25 @@ import { isShot, type KartShot } from './shots.ts'
 
 /** First byte of a packed replay; the version follows */
 export const REPLAY_MAGIC = 0x52
-export const REPLAY_VERSION = 1
+export const REPLAY_VERSION = 2
+/**
+ * Version 1 (until 2026-11-22) did not keep when a kart was in the air: it is still read, and its
+ * replay has no `airborne`. A replay that knows is packed as version 2, one that does not as 1
+ */
+const REPLAY_VERSION_AIRLESS = 1
 
 /**
  * A replay as one array of bytes: magic, version, the JSON of everything but the karts (u32 length
  * first), then each kart: u8 seat, u32 length, its samples
  */
 export function encodeReplay(replay: Replay): Uint8Array {
-  const { karts, ...rest } = replay
+  const { karts, airborne, ...rest } = replay
   const meta = new TextEncoder().encode(JSON.stringify(rest))
   const size = 2 + 4 + meta.length + karts.reduce((sum, kart) => sum + 5 + kart.bytes.length, 0)
   const bytes = new Uint8Array(size)
   const view = new DataView(bytes.buffer)
   bytes[0] = REPLAY_MAGIC
-  bytes[1] = REPLAY_VERSION
+  bytes[1] = airborne ? REPLAY_VERSION : REPLAY_VERSION_AIRLESS
   view.setUint32(2, meta.length, true)
   bytes.set(meta, 6)
   let at = 6 + meta.length
@@ -177,7 +182,8 @@ export function checkReplayMeta(value: unknown): Omit<Replay, 'karts'> | null {
 
 /** The replay in these bytes, or null for anything else (checked: see checkReplayMeta) */
 export function decodeReplay(bytes: Uint8Array): Replay | null {
-  if (bytes.byteLength < 6 || bytes[0] !== REPLAY_MAGIC || bytes[1] !== REPLAY_VERSION) return null
+  if (bytes.byteLength < 6 || bytes[0] !== REPLAY_MAGIC) return null
+  if (bytes[1] !== REPLAY_VERSION && bytes[1] !== REPLAY_VERSION_AIRLESS) return null
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const metaLength = view.getUint32(2, true)
   if (metaLength > REPLAY_LIMITS.meta || 6 + metaLength > bytes.byteLength) return null
@@ -201,6 +207,6 @@ export function decodeReplay(bytes: Uint8Array): Replay | null {
   }
   // Nothing left over that is not a kart
   if (at !== bytes.byteLength) return null
-  return { ...meta, karts }
+  return { ...meta, karts, ...(bytes[1] === REPLAY_VERSION ? { airborne: true as const } : {}) }
 }
 

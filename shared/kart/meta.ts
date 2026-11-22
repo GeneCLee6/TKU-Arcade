@@ -31,6 +31,8 @@ export const TRACK_META: Readonly<Record<string, TrackMeta>> = {
   wharf: { podium: ['comet', 'hermit', 'crab'], character: ['descent'] },
   lanes: { podium: ['dolphin', 'marlin', 'tide'], character: ['fast', 'descent'] },
   works: { podium: ['dolphin', 'pelican', 'ray'], character: ['technical'] },
+  // 2026-11-22: the technical showcase (`npm run kart:meta -- --tracks zhuwei`): wide bends, long arms
+  zhuwei: { podium: ['heron', 'dolphin', 'marlin'], character: ['fast'] },
 }
 
 /** A track's recommendations, or null for one without (a custom track, the test oval) */

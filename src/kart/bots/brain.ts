@@ -845,7 +845,7 @@ export function createBotBrain(
     wrong = trial.wrongWay ? wrong + 1 : 0
     // Back to the technical line only where the two lines run together
     if (fallback > 0) {
-      const here = nearestRoadPoint(road, kart.x, kart.z)
+      const here = nearestRoadPoint(road, kart.x, kart.z, kart.y)
       const apart = Math.abs(guide!.tech[here]! - guide!.safe[here]!) > LINES_APART
       fallback = Math.max(apart ? 1 : 0, fallback - speed / 60)
     }
@@ -858,7 +858,7 @@ export function createBotBrain(
       return { ...NO_INPUT, reset: true }
     }
 
-    const nearest = nearestRoadPoint(road, kart.x, kart.z)
+    const nearest = nearestRoadPoint(road, kart.x, kart.z, kart.y)
     // In the air: hold the throttle for the landing boost, the nose kept in line with the flight
     if ((kart.air ?? 0) > 0) {
       move = NONE

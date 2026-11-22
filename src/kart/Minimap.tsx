@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
 import styled from 'styled-components'
 import type { Fork } from '../../shared/kart/branches.ts'
+import { findCrossings } from '../../shared/kart/levels.ts'
 import { trackBounds, type Gate, type RoadPoint } from '../../shared/kart/track.ts'
 import type { Wall } from '../../shared/kart/walls.ts'
 import type { KartMessageKey } from '../../shared/kart/i18n.ts'
@@ -63,6 +64,24 @@ export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
     [road],
   )
   const width = road.reduce((sum, point) => sum + point.width, 0) / Math.max(1, road.length)
+  // 2026-11-22 (shared/kart/levels.ts): where the road runs over itself, the stretch on top drawn
+  // again over the one beneath, edged, so that the map shows which goes over
+  const overpasses = useMemo(() => {
+    const crossings = findCrossings(road, [])
+    const count = road.length
+    return crossings.map((crossing) => {
+      const near = (index: number) => {
+        const point = road[((index % count) + count) % count]!
+        return Math.hypot(point.x - crossing.x, point.z - crossing.z) < crossing.reach + 12
+      }
+      let first = crossing.upper
+      while (near(first - 1) && crossing.upper - first < count) first--
+      let last = crossing.upper + 1
+      while (near(last + 1) && last - crossing.upper < count) last++
+      const points = Array.from({ length: last - first + 1 }, (_, k) => road[(((first + k) % count) + count) % count]!)
+      return `M${points.map((point) => `${point.x.toFixed(1)} ${point.z.toFixed(1)}`).join('L')}`
+    })
+  }, [road])
 
   useImperativeHandle(
     ref,
@@ -138,6 +157,19 @@ export const Minimap = forwardRef<MinimapHandle, MinimapProps>(function Minimap(
           strokeWidth={1.5}
           strokeDasharray="6 6"
         />
+        {overpasses.map((d, index) => (
+          <g key={index} data-testid="kart-minimap-overpass">
+            <path d={d} fill="none" stroke={kartScene.nose} strokeWidth={width + 6} />
+            <path d={d} fill="none" stroke={kartScene.road} strokeWidth={width} />
+            <path
+              d={d}
+              fill="none"
+              stroke={kartScene.roadLine}
+              strokeWidth={1.5}
+              strokeDasharray="6 6"
+            />
+          </g>
+        ))}
         {walls.map((wall, index) => (
           <line
             key={index}

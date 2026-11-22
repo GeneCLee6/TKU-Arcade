@@ -31,6 +31,7 @@ import {
   type KartTuning,
 } from './physics.ts'
 import { placeOnTrack } from './branches.ts'
+import { hasLevels, levelPenalty } from './levels.ts'
 import { roadDirection, type RoadPoint } from './track.ts'
 
 /** 3, 2, 1, then GO */
@@ -110,12 +111,22 @@ function launch(kart: Trial['run']['kart'], seconds: number): Trial['run']['kart
 /** Seconds, from steps */
 export const seconds = (steps: number): number => steps * STEP_SECONDS
 
-/** The road point nearest (x, z): which part of the track the car is on */
-export function nearestRoadPoint(road: readonly RoadPoint[], x: number, z: number): number {
+/**
+ * The road point nearest (x, z): which part of the track the car is on. On a road that runs over
+ * itself (2026-11-22, levels.ts), `y`, the car's height, keeps it to the road it is on
+ */
+export function nearestRoadPoint(
+  road: readonly RoadPoint[],
+  x: number,
+  z: number,
+  y?: number,
+): number {
   let best = 0
   let bestDistance = Infinity
+  const levels = y !== undefined && hasLevels(road)
   road.forEach((point, index) => {
-    const distance = (point.x - x) ** 2 + (point.z - z) ** 2
+    const distance =
+      (point.x - x) ** 2 + (point.z - z) ** 2 + (levels ? levelPenalty(point.y ?? 0, y) : 0)
     if (distance < bestDistance) {
       bestDistance = distance
       best = index
@@ -133,13 +144,15 @@ export function goingBackwards(
   vz: number,
   /** On a track with branches (2026-11-20): each branch's centre line; the road the car is on counts */
   branches?: readonly (readonly RoadPoint[])[],
+  /** The car's height: at a crossing (2026-11-22), the road it is on */
+  y?: number,
 ): boolean {
   const speed = Math.hypot(vx, vz)
   if (speed < WRONG_WAY_SPEED) return false
   const { dx, dz } =
     branches && branches.length > 0
-      ? placeOnTrack(road, branches, x, z)
-      : roadDirection(road, nearestRoadPoint(road, x, z))
+      ? placeOnTrack(road, branches, x, z, y)
+      : roadDirection(road, nearestRoadPoint(road, x, z, y))
   return (vx * dx + vz * dz) / speed < WRONG_WAY_DOT
 }
 
@@ -230,6 +243,7 @@ export function stepTrial(
     run.kart.vx,
     run.kart.vz,
     course.branches,
+    run.kart.y,
   )
   const wrongSeconds = backwards ? trial.wrongSeconds + STEP_SECONDS : 0
   const finished = laps.length >= course.checkpoints.laps

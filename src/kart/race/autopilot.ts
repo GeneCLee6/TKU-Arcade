@@ -15,7 +15,7 @@ const wrap = (angle: number) => angle - 2 * Math.PI * Math.round(angle / (2 * Ma
 export function autopilot(trial: Trial, road: readonly RoadPoint[]): KartInput {
   if (trial.phase !== 'racing') return NO_INPUT
   const { kart } = trial.run
-  const nearest = nearestRoadPoint(road, kart.x, kart.z)
+  const nearest = nearestRoadPoint(road, kart.x, kart.z, kart.y)
   const target = road[(nearest + 4) % road.length]!
   const turn = wrap(Math.atan2(target.x - kart.x, -(target.z - kart.z)) - kart.heading)
   const speed = Math.hypot(kart.vx, kart.vz)

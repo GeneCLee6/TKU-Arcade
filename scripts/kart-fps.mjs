@@ -29,7 +29,7 @@ const seconds = Number(option('seconds', '10'))
 const warmup = Number(option('warmup', '0'))
 const TRACKS = [
   'riverside', 'harbour', 'tamkang', 'oldstreet', 'guanyin', 'mangrove',
-  'fort', 'danhai', 'datun', 'wharf', 'lanes', 'works',
+  'fort', 'danhai', 'datun', 'wharf', 'lanes', 'works', 'zhuwei',
 ]
 const SCREENS = {
   desktop: { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, label: '1280x720@1' },

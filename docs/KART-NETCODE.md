@@ -411,3 +411,13 @@ JSON patch 少約 **73–76%**（本機 1.52 → 0.36、預覽站 1.46 → 0.40 
 - **電腦車**（多人房的、房主代跑的）用同一套物理與 `obstacleSense.ts` 的手，送出的 frame 一樣被裁定。壓測機器人（`scripts/kart/loadtest-bot.ts`）改用 `createAutopilot(track, tuning)`：會等閘門、換車道。
 - **限制**：觀戰畫面的障礙物照房間時鐘，別人的車是內插過的（約 0.1 秒），所以網路很差時，看別人過平交道可能差一點點；比賽結果不受影響（裁定只看 frame 的 tick）。
 - **壓測**：PR 預覽站 `npm run kart:loadtest -- --bots 6 --track harbour --laps 3`，數字見 PR。
+
+## 22. 立體交叉、車撞車看高度、重播的「在空中」（2026-11-22，`feat/kart-track-format-v2`）
+
+賽道可以跨過自己（8 字的高架與地下道，`ARCHITECTURE.md` §4.66）。**協定沒有變**：frame 格式、`PROTOCOL_VERSION`、op 都一樣；frame 沒有高度，也不需要。
+
+- **伺服器裁定不改**：`judgeFrame`／`passGates` 只看 x、z。`parseTrack` 保證交叉「區」裡沒有閘門、復位點、起跑格、跳台唇、加速帶、道具箱、分支（`levels.ts`），區外兩條路不重疊，所以平面上越過的閘門一定是那一層自己的；速度、跳點、復位、追門的檢查都照舊。編輯器的賽道在伺服器（`custom.ts` → `buildSpec` → `parseTrack`）走同一套檢查，太低（< 6 m）、太斜（< 30°）、區內有東西的交叉都被拒。
+- **別人的車在哪一層**：瀏覽器每台別人的車記住上一次畫的高度（`createHeightKeeper`），下一個 frame 在交叉區裡取「不高於它 2 m 的最高路面」，所以從高架上來的車留在高架、地下道的留在地下道（frame 一秒 20 個，一步最多移動幾公尺，不會跳層）。`FLAG_AIRBORNE` 照舊決定畫在飛行弧線上還是路面上。
+- **車撞車看高度**：`bumpKart` 對每台別人的車用上面那個高度，自己用物理的 `y`，差超過 `KART_BODY_HEIGHT`（1.5 m）就不推；房主代跑的電腦車之間用各自物理的 `y`。平面賽道沒有高度，照舊。
+- **重播**：樣本的「過終點線次數」位元組第 7 位＝在空中；打包版本 2（`Replay.airborne`）。版本 1 的舊檔照播（那一位本來就是 0，飛行照舊用猜的）；舊版程式拿到版本 2 的檔會顯示「版本太新」。分享連結與檔案（`replayFile.ts`）不用改。
+- **壓測**：PR 預覽站 `npm run kart:loadtest -- --bots 6 --track zhuwei --laps 3`；壓測機器人沿主路中心線開，上下層各過三次。數字見 PR。
