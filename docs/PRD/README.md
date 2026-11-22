@@ -7,7 +7,8 @@
 01-legal-ip-analysis.md    版權與智慧財產：哪些能做、哪些不能（法律風險，獨立一份）
 e1 … e21、e23          epic：背景、目標、非目標、需求、設計方向、AC、task、風險、未決問題
 ../ROADMAP.md              批次順序（一批 = 一個 PR = 一個 AI session）
-../NEXT.md                 現在的位置與每批的工作方式
+../NEXT.md                 現在的位置、待擁有者決定、每批的工作方式、AI 可接著做的事
+../history/                重整前的 NEXT 全文與 ROADMAP 路線圖外條目（只用搜尋）
 ../ARCHITECTURE.md         技術架構（Worker、DO、GameModule、卡丁車同步）
 ../DESIGN.md               設計規格與 i18n 規則
 ```
