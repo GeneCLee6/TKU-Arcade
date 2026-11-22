@@ -197,6 +197,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #137 | 2026-11-22 | `feat/i18n-hygiene` | `check-i18n` 讀語法樹找裸字串（JSX 子節點、條件式、各種寫法的屬性、toast／alert／fillText） |
 | #138 | 2026-11-22 | `feat/rooms-robustness` | 房間收尾：選項 patch、斷線讓座與「離開房間」、踢人認帳號與位址＋同名、24 小時自清、公開／私人切換、德州撲克真人出局即結束 |
 | #139 | 2026-11-22 | `feat/i18n-screen-split` | 15 款桌遊畫面字串每語一個 lazy 檔，只載目前語言 |
+| #140 | 2026-11-22 | `feat/kart-polish-2` | 黑鳶目標定案；觸控噴射鍵噴射中、直拿道具欄置中；電腦車看牆（困難重撞 −43%）、團隊賽留存量等變藍；鍵帽字母、多支手把 |
 
 ## Phase O · M4 社群
 

@@ -11,8 +11,24 @@ import { median } from '../../scripts/kart/meta.ts'
 
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((seed) => seed * 7)
 
-const raced = (track: string, who: keyof typeof FEEL_DRIVERS, kart: KartId) =>
-  median(SEEDS.map((seed) => feelRace(track, FEEL_DRIVERS[who], applyKart(KART_TUNING, kart), seed).seconds))
+const races = new Map<string, number>()
+const raced = (track: string, who: keyof typeof FEEL_DRIVERS, kart: KartId): number => {
+  const key = `${track}/${who}/${kart}`
+  const known = races.get(key)
+  if (known !== undefined) return known
+  const time = median(
+    SEEDS.map((seed) => feelRace(track, FEEL_DRIVERS[who], applyKart(KART_TUNING, kart), seed).seconds),
+  )
+  races.set(key, time)
+  return time
+}
+
+/**
+ * The flagship's target (owner 2026-11-22, docs/KART-META.md §3.1): against each track's quickest
+ * other vehicle, the master's lead is at most this on any one track (and at most 1% on average over
+ * the twelve: `npm run kart:meta`, too long for a test)
+ */
+const MOST_LEAD = 0.035
 
 describe('the season flagship', () => {
   it('is faster on a straight than any other vehicle, and the room allows for it', () => {
@@ -32,6 +48,16 @@ describe('the season flagship', () => {
     // heron is the harbour's quickest of the rest (shared/kart/meta.ts)
     expect(raced('harbour', 'master', 'kite')).toBeLessThan(raced('harbour', 'master', 'heron'))
   }, 120_000)
+
+  it('... but by no more than 3.5%, there (its biggest lead) and on the old street (the next)', () => {
+    // The two tracks of its biggest leads (3.45% and 3.37%, docs/KART-META.md §3.1); heron is the
+    // quickest of the rest on both (shared/kart/meta.ts)
+    for (const track of ['harbour', 'oldstreet']) {
+      const other = raced(track, 'master', 'heron')
+      const lead = (other - raced(track, 'master', 'kite')) / other
+      expect(lead, track).toBeLessThanOrEqual(MOST_LEAD)
+    }
+  }, 240_000)
 
   it('a novice is not: on the hillside lanes the entry bike is quicker in a novice’s hands', () => {
     expect(raced('lanes', 'novice', 'swift')).toBeLessThan(raced('lanes', 'novice', 'kite'))

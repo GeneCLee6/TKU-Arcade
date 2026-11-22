@@ -22,7 +22,7 @@ import type { KartRules } from '../../shared/kart/physics.ts'
 import { Button } from '../components/Button.tsx'
 import type { MessageParams } from '../i18n/t.ts'
 import { color, fontSize, radius, space } from '../styles/tokens.ts'
-import { keyLabel, padLabel, readGamepad } from './devices.ts'
+import { keyLabel, padLabel, readGamepad, useKeyLayout } from './devices.ts'
 import { VolumeSliders } from './audio/VolumeSliders.tsx'
 import { CoachSwitch, TrackCuesSwitch } from './school/CoachTip.tsx'
 
@@ -57,6 +57,8 @@ export const ControlsPanel = memo(function ControlsPanel({
   const title = useRef<HTMLHeadingElement>(null)
   const [capture, setCapture] = useState<Capture>()
   const [status, setStatus] = useState('')
+  // What is printed on the keys, where the browser says (an AZERTY keyboard's A where QWERTY has Q)
+  useKeyLayout()
 
   useEffect(() => title.current?.focus(), [])
 

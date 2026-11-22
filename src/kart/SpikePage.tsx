@@ -25,6 +25,7 @@ import {
   saveBindings,
   saveRules,
   saveTuning,
+  useKeyLayout,
 } from './devices.ts'
 import { BoostVeil, CalloutText, Hud } from './Hud.tsx'
 import { supportsWebGL2 } from './webgl.ts'
@@ -190,6 +191,8 @@ export function SpikePage({
   const touchSource = touch.source
   // On a small screen the controls fold into a menu, and the long how-to-drive text starts folded
   const [menuOpen, setMenuOpen] = useState(false)
+  // The hints' key names follow the keyboard's layout once the browser has said it
+  useKeyLayout()
   const menuButton = useRef<HTMLButtonElement>(null)
   const topRow = useRef<HTMLDivElement>(null)
   const menuId = useId()
@@ -648,7 +651,7 @@ export function SpikePage({
           <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} walls={track.walls} />
         </MapCorner>
       )}
-      <TouchControls t={t} touch={touch} />
+      <TouchControls t={t} touch={touch} hud={hud} maxStored={tuning.maxStoredBoosts} />
       {track && trial && (
         <RaceCenter
           t={t}

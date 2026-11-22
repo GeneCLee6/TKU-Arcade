@@ -33,6 +33,7 @@ import {
 } from '../../../shared/kart/physics.ts'
 import { bumpKart, gridSpot, lapsDone, raceProgress } from '../../../shared/kart/race.ts'
 import { shotLive, shotPosition } from '../../../shared/kart/shots.ts'
+import { TEAM_GAUGE } from '../../../shared/kart/team.ts'
 import { createTeamRider, type TeamRider } from '../../../shared/kart/teamRider.ts'
 import {
   COUNTDOWN_SECONDS,
@@ -422,7 +423,14 @@ export function createBotRace(options: BotRaceOptions): BotRace {
     const mine = progressOf(bot.seat)
     const theirs = peopleProgress()
     const lead = mine === null || theirs === null ? 0 : (mine - theirs) / gateCount
-    const input = bot.brain(trial, { speedShare: bandedShare(bot.skill.topSpeedShare, lead) })
+    // A team race: how full its team's gauge is, for the charge it keeps to turn blue (brain.ts)
+    const side = state.teams ? state.racers.find((one) => one.seat === bot.seat)?.team : undefined
+    const input = bot.brain(trial, {
+      speedShare: bandedShare(bot.skill.topSpeedShare, lead),
+      ...(state.teams && side !== undefined
+        ? { teamGauge: state.teams.gauge[side] / TEAM_GAUGE.full }
+        : {}),
+    })
     const before = trial.run
     trial = stepTrial(trial, input, bot.course, tunings.get(bot.seat), DEFAULT_RULES)
     if (trial.phase !== 'countdown') {

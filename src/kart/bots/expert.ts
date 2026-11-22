@@ -37,4 +37,8 @@ export const EXPERT_SKILL: BotSkill = {
   boostAt: 0.6,
   itemDelayMs: [250, 900],
   itemSense: true,
+  // 2026-11-22 (#100, #102; docs/KART-FEEL.md §13.5): watches the wall out of its drifts (its
+  // technical line on a guide's track is driven as it is), and keeps a charge for blue
+  wallCare: 0.25,
+  teamSave: 0.6,
 }

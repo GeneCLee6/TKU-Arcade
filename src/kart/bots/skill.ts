@@ -92,6 +92,21 @@ export interface BotSkill {
    * corner big enough to hold a drift through. Left out: wherever the grip is not enough
    */
   readonly cornerTurn?: number
+  /**
+   * Watches the wall (2026-11-22, #100; the classic feel, docs/KART-FEEL.md §13.5): in a drift, the
+   * line the kart is on is watched this many seconds ahead, and where it meets the road's edge the
+   * drift is let go (once it has earned its instant boost) or braked in (until then); out of a
+   * drift, where the line the hands mean to drive meets the edge they steer one that does not, and
+   * where none does they lift, keep the charge and the instant boost's press, and brake. Left out:
+   * they drive into it
+   */
+  readonly wallCare?: number
+  /**
+   * A team race (2026-11-22, #102): with the team's gauge at least this full (a share of it) and no
+   * blue charge held, the last red charge is kept, to turn blue when the gauge fills. Left out: every
+   * charge is fired as it comes
+   */
+  readonly teamSave?: number
 }
 
 export const BOT_SKILLS: Readonly<Record<Difficulty, BotSkill>> = {
@@ -115,6 +130,7 @@ export const BOT_SKILLS: Readonly<Record<Difficulty, BotSkill>> = {
     topSpeedShare: 0.95,
     driftAt: 1,
     releaseBoosts: 0.5,
+    teamSave: 0.7,
     doubles: false,
     taps: false,
     startBoost: 0.5,
@@ -145,6 +161,9 @@ export const BOT_SKILLS: Readonly<Record<Difficulty, BotSkill>> = {
     stackBoosts: true,
     itemDelayMs: [300, 1_200],
     itemSense: true,
+    // 2026-11-22 (#100, #102; docs/KART-FEEL.md §13.5): watches the wall, and keeps a charge for blue
+    wallCare: 0.3,
+    teamSave: 0.6,
   },
   // 2026-11-20: the fourth level (expert.ts): what the hard one does, at full throttle, and the
   // track known by heart

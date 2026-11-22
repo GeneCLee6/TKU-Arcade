@@ -494,7 +494,7 @@ function LessonScreen({
           )}
         </Prompts>
       )}
-      <TouchControls t={t} touch={touch} />
+      <TouchControls t={t} touch={touch} hud={hud} maxStored={setup.controls.tuning.maxStoredBoosts} />
       <Bottom $touch={touch.shown}>
         <Hud t={t} hud={hud} maxStored={setup.controls.tuning.maxStoredBoosts} dense={touch.shown} />
       </Bottom>

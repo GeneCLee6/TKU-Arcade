@@ -66,16 +66,26 @@ export interface ItemSlotProps {
   item: ItemId | null
   /** The key that uses it, as the player sees it; left out when watching (nothing to press) */
   keyName?: string
+  /**
+   * On a phone held upright, in the middle too, under the clock (2026-11-22, #100: the race moves its
+   * map to the left under it, MAP_UNDER_ITEM_SLOT); otherwise beside the map, in what it leaves free
+   */
+  centred?: boolean
 }
 
 /**
  * What this kart holds, at the top centre of the screen: an empty slot, or the item with its name
  * and key. The page it is on must be the positioned box it sits in (the race, the watch page)
  */
-export const ItemSlot = memo(function ItemSlot({ t, item, keyName }: ItemSlotProps) {
+export const ItemSlot = memo(function ItemSlot({
+  t,
+  item,
+  keyName,
+  centred = false,
+}: ItemSlotProps) {
   const full = item !== null
   return (
-    <Dock>
+    <Dock $centred={centred}>
       {/* Keyed by the item: each one arriving plays the drop again */}
       <Slot key={item ?? 'empty'} data-testid="kart-item" data-item={item ?? ''} $full={full}>
         <Frame $full={full}>{item && <ItemIcon item={item} />}</Frame>
@@ -122,10 +132,17 @@ const flash = keyframes`
 `
 
 /** Where the slot starts on a phone held upright: under the place and whatever is said beside it */
-export const ITEM_SLOT_PORTRAIT_TOP = 92
+const ITEM_SLOT_PORTRAIT_TOP = 92
+/**
+ * A phone held upright, the slot in the middle (`centred`, 2026-11-22): under the clock at the top
+ * right, at its tallest (four rows from the second lap on); and where the map, moved to the left
+ * under it, starts (the slot there is 48 px of frame and its padding, about 60 px)
+ */
+export const ITEM_SLOT_UPRIGHT_TOP = 136
+export const MAP_UNDER_ITEM_SLOT = ITEM_SLOT_UPRIGHT_TOP + 60 + space.sm
 
 /** Top centre of the race, clear of the place (top left) and the map (top right) */
-const Dock = styled.div`
+const Dock = styled.div<{ $centred: boolean }>`
   position: absolute;
   top: ${space.sm}px;
   left: 50%;
@@ -138,8 +155,8 @@ const Dock = styled.div`
    * of what the map (132 px, top right) leaves free
    */
   @media (max-width: 560px) and (orientation: portrait) {
-    top: ${ITEM_SLOT_PORTRAIT_TOP}px;
-    left: calc((100% - 140px) / 2);
+    top: ${({ $centred }) => ($centred ? ITEM_SLOT_UPRIGHT_TOP : ITEM_SLOT_PORTRAIT_TOP)}px;
+    left: ${({ $centred }) => ($centred ? '50%' : 'calc((100% - 140px) / 2)')};
   }
 `
 
