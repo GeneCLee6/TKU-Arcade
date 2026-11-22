@@ -201,7 +201,10 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
         },
         drawn(scene, frame) {
           const shown = frame.karts.filter((kart) => kart.id !== frame.follow)
-          const points = scene.project(shown.map((kart) => [kart.x, TAG_HEIGHT, kart.z] as const))
+          const points = scene.tagPoints(
+            shown.map((kart) => kart.id),
+            TAG_HEIGHT,
+          )
           placeTags(
             tagLayer.current,
             shown.map((kart, i) => ({ seat: kart.id, at: points[i] ?? null })),

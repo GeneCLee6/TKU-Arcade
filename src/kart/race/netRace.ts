@@ -188,6 +188,11 @@ export interface RaceDebug {
   /** #86: hits on this kart foreseen here, and of those the ones the room confirmed */
   foreseen: number
   confirmed: number
+  /**
+   * 2026-11-22: where each other kart's wheels are on screen as drawn, CSS pixels (the e2e checks
+   * that its name tag sits right over it, hills included)
+   */
+  wheels: { seat: number; x: number; y: number }[]
 }
 
 declare global {
@@ -227,6 +232,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     teamFires: 0,
     foreseen: 0,
     confirmed: 0,
+    wheels: [],
   }
   window.__kartRace = debug
   // The item race (e9-t05, e9-t06a)
@@ -690,7 +696,14 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     },
     drawn(scene) {
       if (!tagListener) return
-      const points = scene.project(poses.map((pose) => [pose.x, TAG_HEIGHT, pose.z] as const))
+      // Over each kart as the scene drew it (its height on a hill), not over its x and z at 0 m
+      const seats = poses.map((pose) => pose.seat)
+      const points = scene.tagPoints(seats, TAG_HEIGHT)
+      const wheels = scene.tagPoints(seats, 0)
+      debug.wheels = seats.flatMap((one, index) => {
+        const at = wheels[index]
+        return at ? [{ seat: one, x: at.x, y: at.y }] : []
+      })
       tagListener(
         poses.map((pose, index) => ({
           seat: pose.seat,

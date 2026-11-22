@@ -1472,6 +1472,12 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **錄影器**（`src/games/kart/useRaceRecorder.ts`）：首屏只有一個殼 `deferredRecorder`，`import('../../kart/watch/raceTape.ts')`（frame 解碼＋`createReplayRecorder`）在掛上時開始；之前的 `heard`／`sent`／`view` 呼叫排隊，到了依序重放。`recorder.hasFrames()` 在 chunk 到之前是 false（結果面板的「看重播」不出現），`recorder.ready` 給測試等。
 - **觀戰名次表**：`KartScreen` 的 `Standings` 改 `lazy`（`RaceView`、`BotRaceView` 仍靜態 import，它們本來就在首屏之後）。
 
+### 4.62 路線圖外：名牌貼著車（坡上也是）、三個 e2e 的修正（2026-11-22，`feat/kart-fixes-e2e`）
+
+- **名牌偏在遠方**（#129 預覽截圖）：原因是名牌錨點用固定高度——`netRace.ts`、`SpectateView`、`ReplayView` 都投影 `[x, TAG_HEIGHT 2.4 m, z]`，但車子畫在路面高度上（#94 起坡道賽道，`liftOf` 的 `y`）。12 張比賽賽道裡 8 張有起伏（河濱最高 8.6 m、淡江 10.9、觀音山 17.0、砲台 17.8、大屯 25.0、山城 12.5、廠區 5.0、碼頭 2.0），車在 10 m 高的路上，名牌就投影在車底下 7.6 m 的地方，看起來落在車後方遠處；平地賽道（漁港、老街、紅樹林、淡海）沒事，所以是「有時」。LOD（#124）與非同步車款替換（#128）都沒有問題：遠處簡化車與替換後的車用的是同一個 `group`。修法：`KartScene.tagPoints(ids, above)` 直接取那台車最後畫出來的 `group.position`（含坡道高度、空中、被打中的彈起）再加 `above`；三個地方都改用它。`window.__kartRace.wheels` 給 e2e 每台車輪子的畫面座標；`e2e/kart-hills.spec.ts` 在觀音山整圈比對每個名牌的底邊中點：一定在車輪上方、橫向偏差不超過「3 px＋高度差的 20%」（相機俯角讓垂直線離畫面中心時會斜）。改回舊算法時這支會失敗。
+- **`vite preview` 下 3 個「draws a real scene」**（`kart-night` 一個、`kart-spike` 兩個）：測試在頁面裡 `fetch('data:image/png…')` 讀截圖，被正式站 CSP `connect-src 'self'` 擋下（dev server 沒有 CSP 才過）。改成 `atob` 解成 `Uint8Array` 包成 `Blob` 再 `createImageBitmap`，不經過網路；CSP 不動。
+- **觸控 844×390 整批跑時逾時**（#131）：是等待條件不穩，不是測試本身慢。`openTrial` 先等 `canvas` 出現（預設 5 秒），但 #128 之後畫布要等載入畫面把引擎 chunk 載完才有；閒置機器約 2 秒，整批跑或機器忙時會超過 5 秒。用 CDP `Emulation.setCPUThrottlingRate` 6 倍重現：舊版在等 canvas 失敗。改成等比賽真的在畫（`__kartSpike.frames > 5`，載入另給 45 秒，且加在測試時限上，測試本身仍是 30 秒）；axe 只掃觸控按鈕與設定面板（掃整頁時軟體 WebGL 每幀在畫，忙的機器上 axe 吃掉大半時限）。6 倍節流下新版通過。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
