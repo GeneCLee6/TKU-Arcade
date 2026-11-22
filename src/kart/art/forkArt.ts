@@ -14,6 +14,7 @@ import { pathDirection } from '../../../shared/kart/branches.ts'
 import { courseOf, type RoadPoint } from '../../../shared/kart/track.ts'
 import { groundAt } from '../../../shared/kart/terrain.ts'
 import type { Wall } from '../../../shared/kart/walls.ts'
+import { KERB_FOOT } from '../../../shared/kart/levels.ts'
 import { ASPHALT_LENGTH, BARRIER_LENGTH, KERB_LENGTH } from './textures.ts'
 import type { ArtKit } from './trackArt.ts'
 
@@ -85,7 +86,8 @@ function segmentBarriers(walls: readonly Wall[], heightAt: (x: number, z: number
     ]
     const start = positions.length / 3
     for (const end of ends) {
-      const base = heightAt(end.x, end.z)
+      // A kerb at a crossing (2026-11-22, levels.ts) stands on its own road, not the one beneath
+      const base = wall.base !== undefined ? wall.base + KERB_FOOT : heightAt(end.x, end.z)
       const bx = end.x + nx * BARRIER_THICKNESS
       const bz = end.z + nz * BARRIER_THICKNESS
       positions.push(

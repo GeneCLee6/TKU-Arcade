@@ -117,7 +117,7 @@ describe('the cups', () => {
     // 2026-11-18: the four technical tracks, the expert's last
     expect(cupOf('flood').tracks).toEqual(['mangrove', 'danhai', 'fort', 'datun'])
     // 2026-11-19: the tracks with a way round for those who know them
-    expect(cupOf('backstreet').tracks).toEqual(['danhai', 'wharf', 'lanes', 'works'])
+    expect(cupOf('backstreet').tracks).toEqual(['danhai', 'wharf', 'lanes', 'works', 'zhuwei'])
     expect(pickableCups(true)).toHaveLength(CUPS.length)
     expect(cupOf('sprint').tracks).toHaveLength(1)
   })

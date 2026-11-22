@@ -40,7 +40,7 @@ for (const name of ['novice', 'average', 'expert'] as const) {
     const before = trial.run.kart
     trial = stepTrial(trial, brain(trial, { speedShare: skill.topSpeedShare }), course, KART_TUNING)
     const { kart } = trial.run
-    const at = nearestRoadPoint(track.road, kart.x, kart.z)
+    const at = nearestRoadPoint(track.road, kart.x, kart.z, kart.y)
     if (kart.miniSeconds > before.miniSeconds) dashes.push(at)
     const v0 = Math.hypot(before.vx, before.vz)
     if (v0 > 20 && Math.hypot(kart.vx, kart.vz) < v0 * 0.8) hits.push(at)

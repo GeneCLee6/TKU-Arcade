@@ -15,6 +15,7 @@ export const MEDAL_TABLE: Readonly<Record<string, MedalTimes>> = {
   wharf: { laps: 3, bronze: 114.2, silver: 92.3, gold: 81.4, platinum: 77.5 },
   lanes: { laps: 3, bronze: 106.6, silver: 83, gold: 75.7, platinum: 73.7 },
   works: { laps: 3, bronze: 109.8, silver: 94.6, gold: 82.3, platinum: 80.5 },
+  zhuwei: { laps: 3, bronze: 103.2, silver: 97.3, gold: 93.5, platinum: 91.2 },
   'ch-needle': { laps: 3, bronze: 64.3, silver: 60.6, gold: 48.2, platinum: 45.5 },
   'ch-hop': { laps: 3, bronze: 61, silver: 57.1, gold: 54.9, platinum: 53.5 },
   'ch-lock': { laps: 3, bronze: 51.4, silver: 47.3, gold: 45.4, platinum: 40.7 },

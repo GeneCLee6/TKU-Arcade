@@ -28,7 +28,8 @@ export const CUPS: readonly Cup[] = [
   // 2026-11-19: the tracks with a way round only those who know them take: the night circuit's
   // lane, then the two to learn by heart (docs/KART-FEEL.md §11)
   // 2026-11-20: and the works, whose shortcuts are roads of their own (docs/KART-FEEL.md §14)
-  { id: 'backstreet', tracks: ['danhai', 'wharf', 'lanes', 'works'] },
+  // 2026-11-22: and the technical showcase, over and under itself (shared/kart/levels.ts)
+  { id: 'backstreet', tracks: ['danhai', 'wharf', 'lanes', 'works', 'zhuwei'] },
   { id: 'sprint', tracks: ['riverside'], hidden: true },
 ]
 

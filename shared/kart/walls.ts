@@ -17,7 +17,16 @@ export interface Wall {
    * flies over it. Left out: nothing flies over it
    */
   readonly top?: number
+  /**
+   * The height of its foot, metres (2026-11-22, levels.ts): a wall standing only as high as its own
+   * road at a crossing. A car whose roof is under it passes beneath, and one at or over its `top`
+   * passes above, on the ground or in the air. Left out: it reaches down to the ground everywhere
+   */
+  readonly base?: number
 }
+
+/** A kart's height from the road to its roof, metres: a wall with a `base` over that passes over it */
+export const KART_BODY_HEIGHT = 1.5
 
 export { KART_RADIUS }
 
@@ -114,6 +123,9 @@ export function collideWalls(
 
   // A car in the air is over every wall whose top it has cleared
   const height = (after.air ?? 0) > 0 ? (after.y ?? 0) : -Infinity
+  // At a crossing (2026-11-22): a wall with a foot stands only round its own road, whether the car
+  // is on the ground or in the air
+  const level = after.y ?? 0
 
   const boxes = wallBoxes(walls)
   let x = before.x
@@ -139,6 +151,11 @@ export function collideWalls(
       for (let index = 0; index < walls.length; index++) {
         const wall = walls[index]!
         if (wall.top !== undefined && height >= wall.top) continue
+        if (
+          wall.base !== undefined &&
+          (level + KART_BODY_HEIGHT <= wall.base || level >= (wall.top ?? Infinity))
+        )
+          continue
         const reach = radius + BOX_SLACK
         if (
           x < boxes[index * 4]! - reach ||

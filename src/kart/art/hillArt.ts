@@ -12,7 +12,7 @@ import {
   PlaneGeometry,
 } from 'three'
 import { pathDirection } from '../../../shared/kart/branches.ts'
-import { groundAt, terrainOf, type Terrain } from '../../../shared/kart/terrain.ts'
+import { groundAt, lowestRoadNear, terrainOf, type Terrain } from '../../../shared/kart/terrain.ts'
 import { roadDirection, trackBounds, type Track } from '../../../shared/kart/track.ts'
 import { kartScene } from '../../styles/kartTokens.ts'
 import type { ArtKit } from './trackArt.ts'
@@ -50,8 +50,18 @@ function groundTerrain(terrain: Terrain): Terrain {
     points[(lip.index - 1 + count) % count]!.y = foot
     points[lip.index]!.y = foot
   }
-  return forks ? { points, lips: [], forks, halves: terrain.halves ?? [] } : { points, lips: [] }
+  // A crossing's and a bank's (2026-11-22) are kept: the ground goes by them too
+  const more = {
+    ...(terrain.crossings ? { crossings: terrain.crossings, halves: terrain.halves ?? [] } : {}),
+    ...(terrain.banked ? { banked: terrain.banked } : {}),
+  }
+  return forks
+    ? { points, lips: [], forks, halves: terrain.halves ?? [], ...more }
+    : { points, lips: [], ...more }
 }
+
+/** At a crossing the ground lies at the underpass for this far either side of it, metres */
+const UNDER_REACH = 16
 
 /**
  * How high the ground is at (x, z) on a track with terrain; null for a flat track (whose ground is
@@ -66,6 +76,10 @@ export function hillGround(
   if (!terrain) return null
   const ground = groundTerrain(terrain)
   return (x, z) => {
+    // At a crossing (2026-11-22): the ground at the underpass beside it, the viaduct over it on its
+    // deck (crossingArt.ts), not on a bank of earth across the underpass
+    const under = lowestRoadNear(ground, x, z, UNDER_REACH)
+    if (under !== null) return under - SINK
     const near = groundAt(ground, x, z)
     const t = Math.max(0, Math.min(1, (near.distance - reach.near) / reach.fade))
     const fade = 1 - t * t * (3 - 2 * t)

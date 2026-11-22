@@ -5,6 +5,7 @@
 // TextEncoder, btoa and atob.
 import { CODE_PATTERN, MAX_CODE_CHARS } from './codeShape.ts'
 import {
+  BYPASS_FEATURES,
   LIMITS,
   PAD_PLACES,
   TRACK_THEMES,
@@ -27,6 +28,9 @@ type PieceTuple =
   | readonly ['t', number, number, number, number, number]
   | readonly ['u', number, number, number, number, number]
   | readonly ['j', number, number, number]
+  // 2026-11-22: a banked bend ('b', a turn and its lean) and a straight over or under ('o')
+  | readonly ['b', number, number, number, number, number, number]
+  | readonly ['o', number, number, number, number, number]
 
 const padIndex = (pad: PadPlace) => PAD_PLACES.indexOf(pad)
 
@@ -37,7 +41,19 @@ function pieceTuple(piece: Piece): PieceTuple {
     case 'straight':
       return ['s', tenth(piece.length), tenth(piece.width), pad, boxes]
     case 'turn':
-      return ['t', tenth(piece.angle), tenth(piece.radius), tenth(piece.width), pad, boxes]
+      return piece.bank
+        ? [
+            'b',
+            tenth(piece.angle),
+            tenth(piece.radius),
+            tenth(piece.width),
+            pad,
+            boxes,
+            tenth(piece.bank),
+          ]
+        : ['t', tenth(piece.angle), tenth(piece.radius), tenth(piece.width), pad, boxes]
+    case 'overpass':
+      return ['o', tenth(piece.length), tenth(piece.rise), tenth(piece.width), pad, boxes]
     case 'slope':
       return ['u', tenth(piece.length), tenth(piece.rise), tenth(piece.width), pad, boxes]
     case 'jump':
@@ -75,15 +91,22 @@ export function cleanName(name: string): string {
   return Array.from(plain).slice(0, LIMITS.maxName).join('').trim()
 }
 
-type BypassTuple = readonly [number, number, number, number, number]
+type BypassTuple =
+  | readonly [number, number, number, number, number]
+  | readonly [number, number, number, number, number, number]
 
-const bypassTuple = (bypass: Bypass): BypassTuple => [
-  bypass.from,
-  bypass.to,
-  bypass.side,
-  tenth(bypass.offset),
-  tenth(bypass.width),
-]
+// 2026-11-22: what stands on it, a sixth number (1 a jump, 2 a wall, 3 a slot) only when it has one
+const bypassTuple = (bypass: Bypass): BypassTuple =>
+  bypass.feature
+    ? [
+        bypass.from,
+        bypass.to,
+        bypass.side,
+        tenth(bypass.offset),
+        tenth(bypass.width),
+        BYPASS_FEATURES.indexOf(bypass.feature) + 1,
+      ]
+    : [bypass.from, bypass.to, bypass.side, tenth(bypass.offset), tenth(bypass.width)]
 
 /**
  * The pieces alone, as the code has them: what a track's records are kept by (`specHash`). With
@@ -144,6 +167,25 @@ function readPiece(value: unknown): Piece | null {
     if (length === null || rise === null || rise === 0 || width === null || !more) return null
     return { kind: 'slope', length, rise, width, ...more }
   }
+  if (value[0] === 'b' && value.length === 7) {
+    const angle = numberIn(value[1], -LIMITS.maxAngle, LIMITS.maxAngle)
+    const radius = numberIn(value[2], LIMITS.minRadius, LIMITS.maxRadius)
+    const width = numberIn(value[3], LIMITS.minWidth, LIMITS.maxWidth)
+    const more = extra(value[4], value[5])
+    const bank = numberIn(value[6], 0.1, LIMITS.maxBank)
+    if (angle === null || angle === 0 || radius === null || width === null || !more || bank === null)
+      return null
+    return { kind: 'turn', angle, radius, width, ...more, bank }
+  }
+  if (value[0] === 'o' && value.length === 6) {
+    const length = numberIn(value[1], LIMITS.minOverpass, LIMITS.maxOverpass)
+    const rise = numberIn(value[2], -LIMITS.maxOverpassRise, LIMITS.maxOverpassRise)
+    const width = numberIn(value[3], LIMITS.minWidth, LIMITS.maxWidth)
+    const more = extra(value[4], value[5])
+    if (length === null || rise === null || Math.abs(rise) < LIMITS.minOverpassRise) return null
+    if (width === null || !more) return null
+    return { kind: 'overpass', length, rise, width, ...more }
+  }
   if (value[0] === 'j' && value.length === 4) {
     const length = numberIn(value[1], LIMITS.minJump, LIMITS.maxJump)
     const height = numberIn(value[2], LIMITS.minJumpHeight, LIMITS.maxJumpHeight)
@@ -201,8 +243,11 @@ export function decodeSpec(code: string): TrackSpec | null {
 }
 
 function readBypass(value: unknown, pieces: number): Bypass | null {
-  if (!Array.isArray(value) || value.length !== 5) return null
-  const [from, to, side, offset, width] = value as unknown[]
+  if (!Array.isArray(value) || (value.length !== 5 && value.length !== 6)) return null
+  const [from, to, side, offset, width, kind] = value as unknown[]
+  const feature =
+    value.length === 6 && Number.isInteger(kind) ? BYPASS_FEATURES[(kind as number) - 1] : undefined
+  if (value.length === 6 && !feature) return null
   if (!Number.isInteger(from) || !Number.isInteger(to)) return null
   if ((from as number) < 0 || (to as number) < (from as number) || (to as number) >= pieces - 1) {
     return null
@@ -211,7 +256,14 @@ function readBypass(value: unknown, pieces: number): Bypass | null {
   const off = numberIn(offset, LIMITS.minBypassOffset, LIMITS.maxBypassOffset)
   const wide = numberIn(width, LIMITS.minBypassWidth, LIMITS.maxBypassWidth)
   if (off === null || wide === null) return null
-  return { from: from as number, to: to as number, side, offset: off, width: wide }
+  return {
+    from: from as number,
+    to: to as number,
+    side,
+    offset: off,
+    width: wide,
+    ...(feature ? { feature } : {}),
+  }
 }
 
 /**

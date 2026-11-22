@@ -9,7 +9,7 @@ import { applyKart, KART_IDS, type KartId } from './karts.ts'
 import { ARCADE_TUNING, KART_TUNING, type KartState } from './physics.ts'
 import { TEAM_BOOST } from './teamBoost.ts'
 import { courseOf, type Track } from './track.ts'
-import { KART_RADIUS } from './walls.ts'
+import { KART_BODY_HEIGHT, KART_RADIUS } from './walls.ts'
 import type { KartFrame } from './net.ts'
 import type { Warp } from './items.ts'
 
@@ -349,6 +349,11 @@ export function bumpKart(
     readonly mass?: number
     /** The other's circle, metres (karts.ts's `kartRadius`): a kart's when not given */
     readonly radius?: number
+    /**
+     * Its height (2026-11-22): on a track with terrain, a kart more than a body's height above or
+     * below this one (on the viaduct over it, in the air) passes by. Left out: no height to go by
+     */
+    readonly y?: number
   }[],
   mass = 1,
   /** This kart's own circle */
@@ -357,6 +362,12 @@ export function bumpKart(
   let { x, z, vx, vz } = kart
   let hit = 0
   for (const other of others) {
+    if (
+      kart.y !== undefined &&
+      other.y !== undefined &&
+      Math.abs(kart.y - other.y) > KART_BODY_HEIGHT
+    )
+      continue
     const reach = radius + (other.radius ?? KART_RADIUS)
     const dx = x - other.x
     const dz = z - other.z

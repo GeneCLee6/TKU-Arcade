@@ -8,6 +8,7 @@ import { buildSpec, type Problem } from '../../../shared/kart/editor/build.ts'
 import { closeLoop } from '../../../shared/kart/editor/close.ts'
 import { decodeSpec, encodeSpec } from '../../../shared/kart/editor/codec.ts'
 import {
+  BYPASS_FEATURES,
   LIMITS,
   PAD_PLACES,
   starterSpec,
@@ -61,6 +62,19 @@ function pieceText(t: T, piece: Piece): string {
   }
   if (piece.kind === 'jump') {
     return t('kart.editor.piece.jump', { length: piece.length, height: piece.height })
+  }
+  if (piece.kind === 'overpass') {
+    return t(piece.rise > 0 ? 'kart.editor.piece.overpass' : 'kart.editor.piece.underpass', {
+      length: piece.length,
+      rise: Math.abs(piece.rise),
+    })
+  }
+  if (piece.bank) {
+    return t(piece.angle < 0 ? 'kart.editor.piece.bankedLeft' : 'kart.editor.piece.bankedRight', {
+      angle: Math.abs(piece.angle),
+      radius: piece.radius,
+      bank: piece.bank,
+    })
   }
   return t(piece.angle < 0 ? 'kart.editor.piece.left' : 'kart.editor.piece.right', {
     angle: Math.abs(piece.angle),
@@ -474,6 +488,32 @@ export default function EditorPage() {
                       testId="kart-editor-rise"
                     />
                   </>
+                ) : piece.kind === 'overpass' ? (
+                  <>
+                    <NumberField
+                      label={t('kart.editor.length')}
+                      value={piece.length}
+                      min={LIMITS.minOverpass}
+                      max={LIMITS.maxOverpass}
+                      onValue={(length) => editPiece(at, { length })}
+                      testId="kart-editor-length"
+                    />
+                    <NumberField
+                      label={t('kart.editor.overpassRise')}
+                      value={piece.rise}
+                      min={-LIMITS.maxOverpassRise}
+                      max={LIMITS.maxOverpassRise}
+                      onValue={(rise) =>
+                        editPiece(at, {
+                          rise:
+                            Math.abs(rise) < LIMITS.minOverpassRise
+                              ? Math.sign(rise || piece.rise) * LIMITS.minOverpassRise
+                              : rise,
+                        })
+                      }
+                      testId="kart-editor-overpass-rise"
+                    />
+                  </>
                 ) : piece.kind === 'jump' ? (
                   <>
                     <NumberField
@@ -526,6 +566,22 @@ export default function EditorPage() {
                       max={LIMITS.maxRadius}
                       onValue={(radius) => editPiece(at, { radius })}
                       testId="kart-editor-radius"
+                    />
+                    <NumberField
+                      label={t('kart.editor.bank')}
+                      value={piece.bank ?? 0}
+                      min={0}
+                      max={LIMITS.maxBank}
+                      onValue={(bank) =>
+                        setPieces(
+                          spec.pieces.map((one, i) => {
+                            if (i !== at || one.kind !== 'turn') return one
+                            const { bank: _old, ...level } = one
+                            return bank > 0 ? { ...level, bank } : level
+                          }),
+                        )
+                      }
+                      testId="kart-editor-bank"
                     />
                   </>
                 )}
@@ -634,6 +690,31 @@ export default function EditorPage() {
                       onValue={(width) => editBypass({ width })}
                       testId="kart-editor-bypass-width"
                     />
+                    <Inline>
+                      <span>{t('kart.editor.bypass.feature')}</span>
+                      <select
+                        value={spec.bypasses![bypassAt]!.feature ?? 'none'}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          const feature = BYPASS_FEATURES.find((one) => one === value)
+                          setBypasses(
+                            (spec.bypasses ?? []).map((bypass, index) => {
+                              if (index !== bypassAt) return bypass
+                              const { feature: _old, ...plain } = bypass
+                              return feature ? { ...plain, feature } : plain
+                            }),
+                          )
+                        }}
+                        data-testid="kart-editor-bypass-feature"
+                      >
+                        <option value="none">{t('kart.editor.bypass.feature.none')}</option>
+                        {BYPASS_FEATURES.map((feature) => (
+                          <option key={feature} value={feature}>
+                            {t(`kart.editor.bypass.feature.${feature}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </Inline>
                     <Button
                       $size="sm"
                       $variant="danger"

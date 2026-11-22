@@ -41,7 +41,8 @@ import { gridSpot, raceProgress } from '../../../shared/kart/race.ts'
 import { foeShots } from '../../../shared/kart/team.ts'
 import { createTeamRider } from '../../../shared/kart/teamRider.ts'
 import type { Trial } from '../../../shared/kart/timeTrial.ts'
-import type { Track } from '../../../shared/kart/track.ts'
+import { createHeightKeeper } from '../../../shared/kart/terrain.ts'
+import { courseOf, type Track } from '../../../shared/kart/track.ts'
 import type { KartRacer, KartView } from '../../../shared/games/kart/types.ts'
 import { CLOCK_ANSWER_BYTES, CLOCK_FRAME, CLOCK_PING_BYTES } from '../../../shared/protocol.ts'
 import type { RoomRealtime } from '../../lib/useRoom.ts'
@@ -204,6 +205,11 @@ declare global {
 export function createRaceNet(options: RaceNetOptions): RaceNet {
   const { realtime, track, seat } = options
   const remotes = createRemotes()
+  // How high each of the others is (2026-11-22, terrain.ts): kept kart by kart so that at a crossing
+  // each stays on its own road; drawn there, and bumps go by it
+  const terrain = courseOf(track).terrain ?? null
+  const heightOf = createHeightKeeper(terrain)
+  const heights = new Map<number, number>()
   const samples: ClockSample[] = []
   let offset: number | null = null
   let lastRtt: number | null = null
@@ -585,7 +591,13 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
         .filter((pose) => !pose.stale)
         .map((pose) => {
           const { kart } = loadoutOfByte(pose.frame.body)
-          return { ...pose, mass: kartMass(kart), radius: kartRadius(kart) }
+          const y = heights.get(pose.seat)
+          return {
+            ...pose,
+            mass: kartMass(kart),
+            radius: kartRadius(kart),
+            ...(y !== undefined ? { y } : {}),
+          }
         }),
     gridSpots: () => options.view().racers.map((_, slot) => gridSpot(track, slot)),
     place: () => orderOf(options.view().racers).indexOf(seat) + 1,
@@ -614,10 +626,21 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
         })
         const forward = pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading)
         const side = pose.vx * Math.cos(pose.heading) + pose.vz * Math.sin(pose.heading)
+        const y = terrain
+          ? heightOf(
+              pose.seat,
+              pose.x,
+              pose.z,
+              Math.abs(forward),
+              pose.frame.airborne === true,
+            )
+          : undefined
+        if (y !== undefined) heights.set(pose.seat, y)
         return {
           id: pose.seat,
           x: pose.x,
           z: pose.z,
+          ...(y !== undefined ? { y } : {}),
           heading: pose.heading,
           // A track with jumps (2026-11-17): in the air only when its frame says so
           airborne: pose.frame.airborne === true,

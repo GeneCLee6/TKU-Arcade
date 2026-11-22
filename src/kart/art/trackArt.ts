@@ -31,9 +31,11 @@ import {
   type Texture,
 } from 'three'
 import { roadClearance, roadDistances, scatter } from '../../../shared/kart/scenery.ts'
+import { cantOf } from '../../../shared/kart/levels.ts'
 import { roadDirection, trackBounds, type Track } from '../../../shared/kart/track.ts'
 import { kartScene, kartThemes, type KartTheme } from '../../styles/kartTokens.ts'
 import { buildCornerDressing, buildCornerSigns } from './cornerArt.ts'
+import { buildCrossings } from './crossingArt.ts'
 import { buildFestival } from './festival.ts'
 import { buildForks } from './forkArt.ts'
 import { buildHillGround, buildJumpRamps, hillGround } from './hillArt.ts'
@@ -138,8 +140,11 @@ function edges(track: Pick<Track, 'road'>, inset = 0) {
 function strip(
   inner: { x: number; z: number }[],
   outer: { x: number; z: number }[],
-  /** The height: one for the whole loop, or (a track with terrain, 2026-11-17) one per point */
-  y: number | readonly number[],
+  /**
+   * The height: one for the whole loop, or (a track with terrain, 2026-11-17) one per point, or (a
+   * banked road, 2026-11-22) one per point for each of the two lines
+   */
+  y: number | readonly number[] | { readonly inner: readonly number[]; readonly outer: readonly number[] },
   along: number[],
   length: number,
   every: number,
@@ -152,8 +157,9 @@ function strip(
   for (let index = 0; index <= count; index++) {
     const at = index % count
     const v = (index === count ? length : along[at]!) / every
-    const height = typeof y === 'number' ? y : y[at]!
-    positions.push(inner[at]!.x, height, inner[at]!.z, outer[at]!.x, height, outer[at]!.z)
+    const height = typeof y === 'number' ? y : 'inner' in y ? y.inner[at]! : y[at]!
+    const outerHeight = typeof y === 'object' && 'outer' in y ? y.outer[at]! : height
+    positions.push(inner[at]!.x, height, inner[at]!.z, outer[at]!.x, outerHeight, outer[at]!.z)
     uvs.push(0, v, 1, v)
     if (index < count) {
       const a = index * 2
@@ -321,6 +327,14 @@ export function buildTrackArt(
   /** The road's height at each point: none on a flat track */
   const roadHeights = hillAt ? track.road.map((point) => point.y ?? 0) : null
   const lifted = (lift: number) => (roadHeights ? roadHeights.map((height) => height + lift) : lift)
+  // A banked road (2026-11-22, shared/kart/levels.ts): each line across it at its own height, the
+  // left kerb higher where the road leans to the right
+  const banked = track.road.some((point) => point.bank !== undefined)
+  const sideHeights = (side: 'left' | 'right', inset: number, lift: number) =>
+    track.road.map((point) => {
+      const across = (side === 'left' ? -1 : 1) * (point.width / 2 - inset)
+      return (point.y ?? 0) + lift - across * cantOf(point)
+    })
   const standard = (color: string, map?: Texture) =>
     own(
       new MeshStandardMaterial({
@@ -396,7 +410,9 @@ export function buildTrackArt(
     strip(
       sides.map((side) => side.left),
       sides.map((side) => side.right),
-      lifted(LIFT.road),
+      banked
+        ? { inner: sideHeights('left', 0, LIFT.road), outer: sideHeights('right', 0, LIFT.road) }
+        : lifted(LIFT.road),
       along,
       length,
       ASPHALT_LENGTH,
@@ -416,7 +432,12 @@ export function buildTrackArt(
         strip(
           sides.map((edge) => edge[side]),
           kerbInner.map((edge) => edge[side]),
-          lifted(LIFT.kerb),
+          banked
+            ? {
+                inner: sideHeights(side, 0, LIFT.kerb),
+                outer: sideHeights(side, KERB_WIDTH, LIFT.kerb),
+              }
+            : lifted(LIFT.kerb),
           along,
           length,
           KERB_LENGTH,
@@ -435,7 +456,7 @@ export function buildTrackArt(
           sides.map((edge) => edge[`${side}Out`]),
           along,
           length,
-          roadHeights ?? undefined,
+          banked ? sideHeights(side, 0, 0) : (roadHeights ?? undefined),
         ),
       ),
       own(new MeshLambertMaterial({ map: textures.barrier, side: DoubleSide })),
@@ -776,6 +797,8 @@ export function buildTrackArt(
     group.add(buildHillGround(kit, hillAt))
     for (const ramp of buildJumpRamps(kit)) group.add(ramp)
   }
+  // ── A road over a road (2026-11-22, crossingArt.ts): the viaduct's deck, the underpass's walls ──
+  buildCrossings({ track, level, group, textures, keep, own, ownTexture, standard, shadowed, place })
 
   // ── The arrow boards along the outside of every corner (2026-11-17, cornerArt.ts) ──
   buildCornerSigns(

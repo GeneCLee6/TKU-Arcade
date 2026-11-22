@@ -43,6 +43,7 @@ import {
   type Trial,
   type TrialCourse,
 } from '../../../shared/kart/timeTrial.ts'
+import { createHeightKeeper } from '../../../shared/kart/terrain.ts'
 import { courseOf, roadDirection, type Track } from '../../../shared/kart/track.ts'
 import { pointAhead, type BotBrain } from './brain.ts'
 import { createTrackBrain } from './routes.ts'
@@ -165,6 +166,9 @@ function flips(seed: number): () => number {
 export function createBotRace(options: BotRaceOptions): BotRace {
   const { room, track, laps, players } = options
   const plain: Course = courseOf(track)
+  // How high each person's kart is, from its frames (2026-11-22): bumps go by it
+  const terrain = plain.terrain ?? null
+  const heightOf = createHeightKeeper(terrain)
   const boxes = itemBoxes(track)
   const gateCount = track.gates.length
   const bots: Bot[] = options.bots.map(({ seat, entry, difficulty }) => {
@@ -265,6 +269,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
         vz: kart.vz,
         mass: bot.mass,
         radius: bot.radius,
+        ...(kart.y !== undefined ? { y: kart.y } : {}),
       })
     }
     for (const [person, frame] of people) {
@@ -277,6 +282,18 @@ export function createBotRace(options: BotRaceOptions): BotRace {
         vz: frame.vz,
         mass: kartMass(pick),
         radius: kartRadius(pick),
+        // Its height (2026-11-22): over or under a bot at a crossing, in the air, it passes by
+        ...(terrain
+          ? {
+              y: heightOf(
+                person,
+                frame.x,
+                frame.z,
+                Math.hypot(frame.vx, frame.vz),
+                frame.airborne ?? false,
+              ),
+            }
+          : {}),
       })
     }
     return others
@@ -372,7 +389,7 @@ export function createBotRace(options: BotRaceOptions): BotRace {
       .filter((one) => one !== null)
       .map((one) => Math.hypot(one.x - kart.x, one.z - kart.z))
     // The road a little way on: does it run straight?
-    const nearest = nearestRoadPoint(track.road, kart.x, kart.z)
+    const nearest = nearestRoadPoint(track.road, kart.x, kart.z, kart.y)
     const later = pointAhead(track.road, nearest, STRAIGHT_METRES)
     const here = roadDirection(track.road, nearest)
     const there = roadDirection(track.road, later.index)
