@@ -41,20 +41,25 @@ const PLAN: Record<
   // 2026-11-18, the four new ones (moreTracks.test.ts has what is their own): at most 30% straight
   mangrove: { key: 'mangrove@2', straight: 0.3, was: 0.3, longest: 280, jumps: 0, hilly: false },
   fort: { key: 'fort@3', straight: 0.3, was: 0.3, longest: 200, jumps: 1, hilly: true },
-  danhai: { key: 'danhai@2', straight: 0.3, was: 0.3, longest: 220, jumps: 0, hilly: false },
+  // 2026-11-23: the night market's roofs, a high platform (shared/kart/ledges.ts)
+  danhai: { key: 'danhai@3', straight: 0.36, was: 0.36, longest: 320, jumps: 1, hilly: true },
   datun: { key: 'datun@3', straight: 0.3, was: 0.3, longest: 200, jumps: 2, hilly: true },
   // 2026-11-19, the two to learn by heart (skillTracks.test.ts has what is their own): a shortcut
   // is a straight line, so they are straighter than the technical four
   // 2026-11-20: the wharf's shed lane is a branch (branches.ts), its records afresh; then (revision
   // 3) the road round the shed reaches further out and the lane is half as long as it
   // 2026-11-22: every one raised again for the wall slide and the timed landing (KART-FEEL §22)
-  wharf: { key: 'wharf@4', straight: 0.36, was: 0.36, longest: 230, jumps: 2, hilly: true },
+  // 2026-11-23: the container stacks' roof (revision 5)
+  wharf: { key: 'wharf@5', straight: 0.4, was: 0.4, longest: 230, jumps: 3, hilly: true },
   lanes: { key: 'lanes@2', straight: 0.4, was: 0.4, longest: 220, jumps: 3, hilly: true },
   // 2026-11-20, the first with branches (branches.test.ts and skillTracks.test.ts have its own)
-  works: { key: 'works@2', straight: 0.4, was: 0.4, longest: 220, jumps: 1, hilly: true },
+  // 2026-11-23: the long shed's roof (revision 3)
+  works: { key: 'works@3', straight: 0.42, was: 0.42, longest: 250, jumps: 2, hilly: true },
   // 2026-11-22, the technical showcase (levels.test.ts has its own): a figure of eight whose two
   // arms run straight over and under each other, so a little straighter than the rest
   zhuwei: { key: 'zhuwei@2', straight: 0.44, was: 0.44, longest: 270, jumps: 1, hilly: true },
+  // 2026-11-23, the high-platform track: three ramps, each with a straight to come down on
+  breakwater: { key: 'breakwater', straight: 0.5, was: 0.5, longest: 370, jumps: 3, hilly: true },
 }
 
 const load = (id: RaceTrackId): Track => raceTrack(id)!

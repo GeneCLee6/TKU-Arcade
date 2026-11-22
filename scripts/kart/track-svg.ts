@@ -2,6 +2,7 @@
 // and prints its shape and whatever is wrong with it (the checks of tests/kart/technical.test.ts).
 // Run: node --experimental-strip-types scripts/kart/track-svg.ts <id> <out.svg> ["minX,minZ,maxX,maxZ;..."]
 import { writeFileSync } from 'node:fs'
+import { trackLedges } from '../../shared/kart/ledges.ts'
 import { kerbs, parseTrack } from '../../shared/kart/track.ts'
 import { acrossRoad } from '../../shared/kart/tracks/guide.ts'
 import { trackGuide } from '../../shared/kart/tracks/guides.ts'
@@ -43,6 +44,21 @@ road.forEach((p, i) => {
     : `rgb(255,${shade},${Math.round(shade / 2)})`
   svg += `<line x1="${p.x}" y1="${p.z}" x2="${q.x}" y2="${q.z}" stroke="${colour}" stroke-width="${p.width}" stroke-linecap="round" opacity="0.75"/>`
 })
+// Branches (2026-11-23): green; a platform's stretch past its face darker, its face a thick bar
+for (const fork of track.forks ?? []) {
+  fork.path.forEach((p, i) => {
+    const q = fork.path[i + 1]
+    if (!q) return
+    const high = fork.rise !== undefined && i >= fork.rise
+    svg += `<line x1="${p.x}" y1="${p.z}" x2="${q.x}" y2="${q.z}" stroke="${high ? '#2a7' : '#9d9'}" stroke-width="${p.width}" stroke-linecap="round" opacity="0.7"/>`
+  })
+}
+for (const ledge of trackLedges(track)) {
+  const f = ledge.face
+  svg += `<line x1="${f.ax}" y1="${f.az}" x2="${f.bx}" y2="${f.bz}" stroke="#fb0" stroke-width="4"/>`
+  svg += `<line x1="${ledge.lip.x}" y1="${ledge.lip.z}" x2="${ledge.faceX}" y2="${ledge.faceZ}" stroke="#fb0" stroke-width="1.5" stroke-dasharray="4 3"/>`
+  svg += `<text x="${ledge.faceX}" y="${ledge.faceZ - 8}" font-size="14" fill="#a60">${ledge.need.toFixed(1)} m/s</text>`
+}
 svg += `<polyline points="${poly(k.slice(0, half))} ${k[0]!.ax},${k[0]!.az}" fill="none" stroke="#333" stroke-width="1.2"/>`
 svg += `<polyline points="${poly(k.slice(half))} ${k[half]!.ax},${k[half]!.az}" fill="none" stroke="#333" stroke-width="1.2"/>`
 for (const wall of track.walls)

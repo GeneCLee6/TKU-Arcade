@@ -13,6 +13,7 @@ import {
   type KartState,
   type KartTuning,
 } from '../../shared/kart/physics.ts'
+import { onPlatform, trackLedges } from '../../shared/kart/ledges.ts'
 import { seconds, startTrial, stepTrial, type TrialCourse } from '../../shared/kart/timeTrial.ts'
 import { courseOf, type Track } from '../../shared/kart/track.ts'
 import { createDriver, type Driver } from '../../src/kart/bots/drivers.ts'
@@ -51,6 +52,8 @@ export interface Measure {
   readonly resets: number
   /** Timed landings (2026-11-22, shared/kart/terrain.ts) */
   readonly timedLandings: number
+  /** High platforms flown onto (2026-11-23, shared/kart/ledges.ts) */
+  readonly platforms: number
 }
 
 const LAPS_CAP_SECONDS = 400
@@ -74,6 +77,9 @@ export function measure(
   const grades = [0, 0, 0, 0]
   let combo = 0
   let crashes = 0
+  const ledges = trackLedges(track)
+  let platforms = 0
+  let up = -1
   for (let step = 0; trial.phase !== 'finished' && step < LAPS_CAP_SECONDS * 60; step++) {
     const before: KartState = trial.run.kart
     const wasRacing = trial.phase === 'racing'
@@ -93,6 +99,11 @@ export function measure(
     }
     combo = Math.max(combo, kart.chain)
     if (trial.run.hitSpeed >= tuning.wallBreakSpeed) crashes++
+    if (ledges.length > 0) {
+      const on = onPlatform(track, ledges, kart)
+      if (on >= 0 && on !== up) platforms++
+      up = on
+    }
   }
   const laps = trial.laps.map(seconds)
   return {
@@ -110,5 +121,6 @@ export function measure(
     crashes,
     resets: trial.run.resets,
     timedLandings: trial.run.kart.timedLandings ?? 0,
+    platforms,
   }
 }

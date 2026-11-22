@@ -32,6 +32,12 @@ export interface BotSkill {
    */
   readonly tricks?: boolean
   /**
+   * High platforms (2026-11-23, shared/kart/ledges.ts): hands that know the shortcuts fly onto them
+   * when fast enough (routes.ts). `false` keeps them to the main road there, whatever else they
+   * know: what `npm run kart:feel` weighs the platforms by
+   */
+  readonly platforms?: boolean
+  /**
    * The timed landing (2026-11-22, shared/kart/terrain.ts): off the throttle in the air and on it
    * again the moment the kart is down, for the timed landing's longer boost. Script drivers only
    */

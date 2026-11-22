@@ -20,6 +20,8 @@ export const UNLOCK_PASSES = 4
  *   reached before the laps are over;
  * - slots: through every slot of the track's guide, in turn, every lap;
  * - branches: down every branch of the track (shared/kart/branches.ts) on every lap;
+ * - platforms (2026-11-23): up onto every high platform of the track (shared/kart/ledges.ts) on
+ *   every lap;
  * - cover: at least `target` per cent of the race in a boost;
  * - place: against the computer, finish in the first `target`;
  * - elimination: against the computer, the last to finish each lap is out; win the last lap;
@@ -32,6 +34,7 @@ export type MissionKind =
   | 'driftJumps'
   | 'slots'
   | 'branches'
+  | 'platforms'
   | 'cover'
   | 'place'
   | 'elimination'
@@ -127,6 +130,8 @@ export const MISSIONS: readonly Mission[] = [
     bots: { count: 5, difficulty: 'hard' },
   }),
   m({ id: 'cover', chapter: 'technique', track: 'fort', laps: 2, kind: 'cover', target: 60 }),
+  // 2026-11-23 (shared/kart/ledges.ts): up onto all three of the Breakwater Roofs, both laps
+  m({ id: 'roofs', chapter: 'technique', track: 'breakwater', laps: 2, kind: 'platforms' }),
   m({
     id: 'needle',
     chapter: 'technique',
@@ -174,6 +179,17 @@ export const MISSIONS: readonly Mission[] = [
     bots: { count: 3, difficulty: 'hard' },
   }),
   m({ id: 'spotless', chapter: 'master', track: 'guanyin', laps: 2, kind: 'finish', rules: { noCrash: true } }),
+  // 2026-11-23: the long shed's roof every lap, and the container stacks' with no N2O to help: the
+  // speed off the ramp from the line and the drift out of the bend before it alone
+  m({ id: 'shedroof', chapter: 'master', track: 'works', laps: 3, kind: 'platforms' }),
+  m({
+    id: 'stackdry',
+    chapter: 'master',
+    track: 'wharf',
+    laps: 2,
+    kind: 'platforms',
+    rules: { noN2O: true },
+  }),
   m({
     id: 'bikeneedle',
     chapter: 'master',

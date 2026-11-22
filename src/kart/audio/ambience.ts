@@ -48,6 +48,8 @@ export const TRACK_AMBIENCE: Record<RaceTrackId, AmbienceRecipe> = {
   works: { layers: { machines: 1, wind: 0.2 }, crowd: 0.8 },
   // 2026-11-22: the river under the line, the trains and the traffic over it
   zhuwei: { layers: { surf: 0.3, traffic: 0.7, wind: 0.3 }, crowd: 0.8 },
+  // 2026-11-23: the harbour mouth, the breakwater's surf and the gulls over the market
+  breakwater: { layers: { surf: 1, gulls: 0.8, wind: 0.4 }, crowd: 0.8 },
 }
 
 const THEME_AMBIENCE: Record<TrackThemeName, AmbienceRecipe> = {

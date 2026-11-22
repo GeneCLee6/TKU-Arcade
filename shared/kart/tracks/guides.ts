@@ -5,7 +5,9 @@
 // 2026-11-20: a track with branches (shared/kart/branches.ts) has a second guide, for its route
 // down every branch (`routeRoad`), by the route's own road points: src/kart/bots/routes.ts drives
 // that route with it.
+import { BREAKWATER_GUIDE, BREAKWATER_ROUTE_GUIDE } from './breakwater.ts'
 import { NEEDLE_GUIDE } from './challenge.ts'
+import { DANHAI_GUIDE, DANHAI_ROUTE_GUIDE } from './danhai.ts'
 import type { TrackGuide } from './guide.ts'
 import { HARBOUR_GUIDE } from './harbour.ts'
 import { LANES_GUIDE } from './lanes.ts'
@@ -23,6 +25,9 @@ const GUIDES: Readonly<Record<string, TrackGuide>> = {
   oldstreet: OLDSTREET_GUIDE,
   works: WORKS_GUIDE,
   zhuwei: ZHUWEI_GUIDE,
+  // 2026-11-23: the high-platform track (breakwater.ts), and the night market's roofs (danhai.ts)
+  breakwater: BREAKWATER_GUIDE,
+  danhai: DANHAI_GUIDE,
   // 2026-11-21: the challenge mode's Needle Lane (challenge.ts): both lines through its slots
   'ch-needle': NEEDLE_GUIDE,
 }
@@ -33,6 +38,8 @@ const ROUTE_GUIDES: Readonly<Record<string, TrackGuide>> = {
   wharf: WHARF_ROUTE_GUIDE,
   works: WORKS_ROUTE_GUIDE,
   zhuwei: ZHUWEI_ROUTE_GUIDE,
+  breakwater: BREAKWATER_ROUTE_GUIDE,
+  danhai: DANHAI_ROUTE_GUIDE,
 }
 
 export const trackGuide = (id: string): TrackGuide | undefined =>

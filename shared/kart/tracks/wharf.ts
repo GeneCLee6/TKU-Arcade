@@ -24,6 +24,7 @@ import { padsAlong, TRACK_FORMAT, type RoadPoint, type TrackJson } from '../trac
 import { circuit } from './circuit.ts'
 import { fence, guideFor, island, type GuideBuilder, type TrackGuide } from './guide.ts'
 import { fitted, lay, LAY_SAMPLE, layBranch, left, line, right } from './lay.ts'
+import { blockDetour, straightPlatform } from './platform.ts'
 
 /** The container rows: the road is this wide there, and each corner this tight */
 const ROWS_WIDTH = 62
@@ -47,6 +48,29 @@ const SHED_REACH = 30
  */
 const LANE_MOUTH = 20
 const LANE_RADIUS = 32
+/**
+ * The container stacks (2026-11-23, revision 5; shared/kart/ledges.ts): up the home quay a ramp, a
+ * straight to come down on, the road then swinging left round the stacks and back; their roof runs
+ * on from the ramp off to the right, a high platform. The run-up to the lip and the straight after
+ * it; the detour's corners, how far out and along it goes, the straight after it; the ramp's
+ * height, the roof's, its width, where its face is and how far right of the road's line it runs
+ */
+const STACK_RUN = 30
+const STACK_LAND = 50
+const STACK_RADIUS = 36
+const STACK_OUT = 34
+const STACK_ALONG = 20
+const STACK_AFTER = 22
+const STACK_LIP = 2.5
+const STACK_TOP = 2.8
+const STACK_WIDTH = 12
+const STACK_FACE = 32
+const STACK_SIDE = 21
+/** The roof eases round over 30 m past its face to run this far right of the road's line ... */
+const STACK_BEND = 8
+const STACK_LINE = STACK_SIDE + (STACK_SIDE / STACK_FACE) * (STACK_BEND / 2)
+/** The road's width up the ramp and beside the stacks' face */
+const STACK_ROAD = 28
 /** A fence that can be flown over stands this high, metres */
 export const FENCE_HEIGHT = 1.5
 /** A wall nothing flies over (a shed, a row of containers) is drawn and stands this high */
@@ -83,12 +107,13 @@ const laid = lay(
     line(42, SWEEP_WIDTH, { mark: 'quayIn' }),
     right(180, SWEEP_RADIUS, SWEEP_WIDTH, { mark: 'quayOut', mid: 'quayMid' }),
     line(60, 34),
-    // Home: the long quay, a left and a right onto the straight
+    // Home: the long quay, a ramp, round the container stacks (the stacks' roof straight on), and
+    // a left and a right onto the straight
     line(50, 34, { mid: 'pad2' }),
-    left(25, 90, 32),
-    right(50, 90, 32),
-    left(25, 90, 32),
-    line(50, 34),
+    line(STACK_RUN, STACK_ROAD, { mark: 'stackLip' }),
+    line(STACK_LAND, STACK_ROAD),
+    ...blockDetour(-1, STACK_RADIUS, STACK_OUT, STACK_ALONG, 30, 'stack', { shift: STACK_LINE }),
+    line(STACK_AFTER, 34),
     left(90, 40, 32),
     fitted(34, { mid: 'boxes2' }),
     right(90, 40, 36),
@@ -104,6 +129,7 @@ const made = circuit({
   jumps: [
     [...laid.marks.ramp1!, 2],
     [...laid.marks.ramp2!, 2],
+    [...laid.marks.stackLip!, STACK_LIP],
   ],
   pads: [
     [...laid.marks.pad1!, 8],
@@ -150,8 +176,26 @@ const laneLaid = layBranch(
   ],
   LANE,
 )
-const branches: BranchJson[] = [{ from: laneFrom, to: laneTo, road: laneLaid.road }]
+// The stacks' roof (2026-11-23): from the ramp's lip, off to the right, to where the road is back
+const stackFrom = at('stackLip')
+const stackTo = at('stackBack') + 4
+const stack = straightPlatform(road, stackFrom, stackTo, {
+  width: STACK_WIDTH,
+  mouth: STACK_ROAD - 4,
+  end: 10,
+  bend: STACK_BEND,
+  face: STACK_FACE,
+  side: STACK_SIDE,
+  // ... where the road comes back after the stacks: the roof ends in a drop onto it
+  merge: 0,
+  top: STACK_TOP,
+  downAt: 72,
+  down: 0,
+  gaps: [{ at: 40, length: 10, depth: 1.6 }],
+})
+const branches: BranchJson[] = [{ from: laneFrom, to: laneTo, road: laneLaid.road }, stack]
 const lanePath: RoadPoint[] = branchPath(road, branches[0]!)
+const stackPath: RoadPoint[] = branchPath(road, stack)
 /** The slot into the lane: a road point into where it runs clear of the road, off its middle */
 const laneSlot =
   lanePath.findIndex((point) => roadDepth(road, true, point.x, point.z) < -point.width / 2) + 1
@@ -247,15 +291,29 @@ const mainLines = guideFor(road)
 drawLines(mainLines, (index) => index)
 export const WHARF_GUIDE: TrackGuide = mainLines.build()
 
-// The route down the shed's lane: lined up on the road's left for the slot, through it, round
+// The route down the shed's lane: lined up on the road's left for the slot, through it, round;
+// and over the stacks' roof (2026-11-23)
 const route = routeRoad(
-  { road, jumps: made.jumps, forks: [{ from: laneFrom, to: laneTo, path: lanePath, jumps: [] }] },
-  [0],
+  {
+    road,
+    jumps: made.jumps,
+    forks: [
+      { from: laneFrom, to: laneTo, path: lanePath, jumps: [] },
+      { from: stackFrom, to: stackTo, path: stackPath, jumps: (stack.jumps ?? []).map((lip) => lip + 1) },
+    ],
+  },
+  [0, 1],
 )
 const onLane = (index: number) => route.main[laneFrom]! + index
 const routeLines = guideFor(route.road)
 drawLines(routeLines, (index) => route.main[index]!)
 routeLines.tech.chord([route.main[laneFrom]! - 10, 4], [onLane(laneSlot), LANE_SLOT_AT], 1.5)
+// The stacks' roof: up the ramp on its left, across it to the right, slanting off the lip for the
+// face, and on down the roof's middle
+const stackLip = route.main[stackFrom]!
+routeLines.tech
+  .hold(stackLip - 14, stackLip - 5, -9, 2)
+  .chord([stackLip - 5, -9], [stackLip + 4, 0], 1.5)
 
 export const WHARF_ROUTE_GUIDE: TrackGuide = routeLines.build()
 
@@ -277,8 +335,8 @@ export const WHARF: TrackJson = {
   id: 'wharf',
   // Its name, settled by the owner on 2026-11-22 (docs/KART-WORLD.md §6)
   name: { en: 'Wharf Warehouses', 'zh-TW': '碼頭倉庫' },
-  // 2: the shed's lane is a branch (2026-11-20)
-  revision: 4,
+  // 2: the shed's lane is a branch (2026-11-20); 5: the container stacks' roof (2026-11-23)
+  revision: 5,
   theme: 'day',
   laps: 3,
   road,
