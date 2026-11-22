@@ -22,6 +22,7 @@ import {
   SphereGeometry,
 } from 'three'
 import { createRng } from '../../../shared/games/rng.ts'
+import { roadDepth } from '../../../shared/kart/branches.ts'
 import { roadClearance } from '../../../shared/kart/scenery.ts'
 import { roadDirection, type RoadPoint } from '../../../shared/kart/track.ts'
 import {
@@ -331,8 +332,15 @@ export function buildOldStreet(kit: ArtKit): { update(seconds: number): void } {
     (stall, index, all) =>
       all.findIndex((other) => Math.hypot(other.x - stall.x, other.z - stall.z) < 4.5) === index,
   )
-  const onIsland = (stall: Beside) => roadClearance(road, stall.x, stall.z) < 0
-  const fits = kept.filter((stall) => onIsland(stall) || roadClearance(road, stall.x, stall.z) > 1)
+  // 2026-11-22: not on the lantern alley (a branch, branches.ts) either, which roadClearance counts
+  // as road too: a stall over it would be "on the island"
+  const branchPaths = (track.forks ?? []).map((fork) => fork.path)
+  const onBranch = (stall: Beside) =>
+    branchPaths.some((path) => roadDepth(path, false, stall.x, stall.z) > -4)
+  const onIsland = (stall: Beside) => !onBranch(stall) && roadClearance(road, stall.x, stall.z) < 0
+  const fits = kept.filter(
+    (stall) => !onBranch(stall) && (onIsland(stall) || roadClearance(road, stall.x, stall.z) > 1),
+  )
   const counters = new InstancedMesh(
     keep(new BoxGeometry(4.2, 1.1, 1.6)),
     lambert(oldStreetScene.counter),

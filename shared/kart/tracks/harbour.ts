@@ -23,6 +23,7 @@
 import type { ObstacleJson } from '../obstacles.ts'
 import { TRACK_FORMAT, type TrackJson } from '../track.ts'
 import { circuit, type CircuitPoint } from './circuit.ts'
+import { guideFor, type TrackGuide } from './guide.ts'
 
 /** The scenery (harbourArt.ts) is placed in drawn units, this many metres each */
 export const HARBOUR_SCALE = 1.6
@@ -108,9 +109,19 @@ const CONTROL: readonly CircuitPoint[] = [
   [-270, -180, 34],
 ]
 
+/**
+ * 2026-11-22 (#103, revision 14): the step before hairpin 2. Up the second hillside leg a ramp to a
+ * lip 1.6 m high, a few metres before the road turns hard left: taken square at speed, the car comes
+ * down in the hairpin's outside wall, so the plain way is to lift before the crest; the fast way is
+ * the drift jump (terrain.ts), begun on the right of the road, landing already turned in
+ */
+export const HARBOUR_STEP: readonly [number, number] = [216, 72]
+const STEP_HEIGHT = 1.6
+
 const made = circuit({
   control: CONTROL,
   line: [-110, -180],
+  jumps: [[...HARBOUR_STEP, STEP_HEIGHT]],
   // Off the middle: taking one is a choice of line
   pads: [
     [-40, -180, -8],
@@ -119,6 +130,21 @@ const made = circuit({
     [-180, 205, 8],
   ],
 })
+
+const stepLip = made.jumps[0]!
+const lines = guideFor(made.road)
+// The drift jump into hairpin 2: begun on the right of the road, a left drift, landing turning in
+lines.tech.hold(stepLip - 10, stepLip, 6, 3)
+lines.cue({
+  lip: stepLip,
+  way: -1,
+  land: [stepLip + 6, -2],
+  into: 0.2,
+  nose: (40 * Math.PI) / 180,
+  most: 62,
+})
+/** The harbour's guide (2026-11-22): both lines down the middle but for the step's drift jump */
+export const HARBOUR_GUIDE: TrackGuide = lines.build()
 
 /**
  * 2026-11-22 (#103, obstacles.ts): the quay's two container trolleys, sliding across the road out
@@ -150,7 +176,8 @@ export const HARBOUR: TrackJson = {
   // 11: the same layout under new physics (2026-11-18: any real drift earns the instant boost)
   // 13: the quay's sliding containers and the level crossing's booms (2026-11-22, obstacles.ts)
   // 14: the wall slide and the timed landing (2026-11-22, docs/KART-FEEL.md §22)
-  revision: 14,
+  // 15: the step before hairpin 2 (2026-11-22, #146)
+  revision: 15,
   laps: 3,
   road: made.road,
   gates: made.gates,
@@ -161,5 +188,6 @@ export const HARBOUR: TrackJson = {
   boostPads: made.boostPads,
   itemBoxes: [],
   decor: [],
+  jumps: made.jumps,
   obstacles: HARBOUR_OBSTACLES,
 }

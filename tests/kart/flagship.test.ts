@@ -4,6 +4,7 @@ import { KART_TUNING } from '../../shared/kart/physics.ts'
 import { speedCapFor } from '../../shared/kart/race.ts'
 import { FEEL_DRIVERS, feelRace } from '../../scripts/kart/feel.ts'
 import { median } from '../../scripts/kart/meta.ts'
+import { TRACK_META } from '../../shared/kart/meta.ts'
 
 // The first season's flagship, driven (2026-11-21, docs/KART-META.md §3): in exact hands the
 // quickest there is, and in a novice's not. The whole table (every vehicle, every track, nine races
@@ -45,15 +46,16 @@ describe('the season flagship', () => {
   })
 
   it('the master is quicker in it than in the quickest other vehicle on the harbour', () => {
-    // heron is the harbour's quickest of the rest (shared/kart/meta.ts)
-    expect(raced('harbour', 'master', 'kite')).toBeLessThan(raced('harbour', 'master', 'heron'))
+    // The harbour's quickest of the rest (shared/kart/meta.ts)
+    const best = TRACK_META.harbour!.podium[0]
+    expect(raced('harbour', 'master', 'kite')).toBeLessThan(raced('harbour', 'master', best))
   }, 120_000)
 
   it('... but by no more than 3.5%, there (its biggest lead) and on the old street (the next)', () => {
-    // The two tracks of its biggest leads (3.45% and 3.37%, docs/KART-META.md §3.1); heron is the
-    // quickest of the rest on both (shared/kart/meta.ts)
+    // The two tracks of its biggest leads (3.45% and 3.37%, docs/KART-META.md §3.1), against the
+    // quickest of the rest on each (shared/kart/meta.ts; 2026-11-22 no longer the heron on either)
     for (const track of ['harbour', 'oldstreet']) {
-      const other = raced(track, 'master', 'heron')
+      const other = raced(track, 'master', TRACK_META[track]!.podium[0])
       const lead = (other - raced(track, 'master', 'kite')) / other
       expect(lead, track).toBeLessThanOrEqual(MOST_LEAD)
     }

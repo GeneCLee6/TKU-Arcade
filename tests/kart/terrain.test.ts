@@ -82,8 +82,9 @@ describe('the ground', () => {
   })
 
   it('a flat track has no terrain, and its course and road are as they were', () => {
-    // 2026-11-18: Riverside and the campus were redrawn with a hill and a jump each
-    for (const id of ['harbour', 'oldstreet'] as const) {
+    // 2026-11-18: Riverside and the campus were redrawn with a hill and a jump each; 2026-11-22 the
+    // harbour and the old street got a step each (#103): the flat ones are the mangrove and Danhai
+    for (const id of ['mangrove', 'danhai'] as const) {
       const track = raceTrack(id)!
       expect(terrainOf(track)).toBeNull()
       expect('terrain' in courseOf(track)).toBe(false)
