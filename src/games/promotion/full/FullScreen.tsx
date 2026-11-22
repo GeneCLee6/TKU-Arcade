@@ -430,7 +430,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
               <Tools>
                 {zoomButtons}
                 {ledgerButton}
-                <Button $variant="secondary" $size="sm" onClick={() => void immersive.enter()}>
+                <Button $variant="secondary" $size="sm" data-immersive-enter="" onClick={() => void immersive.enter()}>
                   {t('games.promotion.full.ui.fullscreen')}
                 </Button>
                 <SoundButton />
@@ -513,7 +513,7 @@ export default function FullScreen({ room, game }: GameScreenProps) {
             <Tools>
               {zoomButtons}
               {ledgerButton}
-              <Button $variant="secondary" $size="sm" onClick={immersive.exit}>
+              <Button $variant="secondary" $size="sm" data-immersive-exit="" onClick={immersive.exit}>
                 {t('games.promotion.full.ui.exitFullscreen')}
               </Button>
             </Tools>

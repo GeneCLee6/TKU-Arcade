@@ -127,6 +127,66 @@ test('without the Fullscreen API (an iPhone) the button gives focus mode, which 
   await host.context().close()
 })
 
+/** What takes the keyboard outside the frame and the toasts: nothing while the board covers the page */
+async function reachableOutside(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')]
+      .filter((element) => !element.closest('[data-immersion], [data-inert-keep], [inert]'))
+      .filter((element) => !element.hasAttribute('disabled') && element.tabIndex >= 0)
+      .filter((element) => element.getClientRects().length > 0)
+      .map((element) => element.outerHTML.slice(0, 60)),
+  )
+}
+
+// #112 of docs/NEXT.md §5: in focus mode the rest of the page is inert, as behind a modal; the frame
+// (the square's drawer inside it) keeps working, and Esc closes the drawer before focus mode
+test('focus mode makes the page behind inert, keeps the focus in the board, and gives it back', async ({
+  browser,
+}) => {
+  const host = await newPerson(browser, { viewport: { width: 844, height: 390 } })
+  await host.context().addInitScript(() => {
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { value: undefined })
+  })
+  const guest = await newPerson(browser)
+  await startGame(host, guest)
+  const frame = host.locator('[data-immersion]')
+  expect(await reachableOutside(host)).not.toEqual([])
+
+  await host.getByRole('button', { name: 'Full screen' }).click()
+  await expect(frame).toHaveAttribute('data-immersion', 'focus')
+  await expect(host.getByRole('button', { name: 'Exit full screen' })).toBeFocused()
+  expect(await reachableOutside(host)).toEqual([])
+  // Round and round with Tab: never out of the frame
+  for (let step = 0; step < 30; step++) {
+    await host.keyboard.press('Tab')
+    const inside = await host.evaluate(() => {
+      const active = document.activeElement
+      return active === null || active === document.body || active.closest('[data-immersion], [data-inert-keep]') !== null
+    })
+    expect(inside, `Tab ${step + 1}`).toBe(true)
+  }
+
+  // The square's drawer opens inside the frame and works; its Esc is its own
+  const stop = host.locator('[data-cell][tabindex="0"]')
+  await stop.focus()
+  await host.keyboard.press('Enter')
+  const sheet = host.getByRole('dialog')
+  await expect(sheet).toBeVisible()
+  await expect(sheet.getByRole('button').first()).toBeEnabled()
+  await host.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await expect(frame).toHaveAttribute('data-immersion', 'focus')
+  await expect(stop).toBeFocused()
+
+  await host.keyboard.press('Escape')
+  await expect(frame).toHaveAttribute('data-immersion', 'off')
+  await expect(host.locator('[inert]')).toHaveCount(0)
+  await expect(host.getByRole('button', { name: 'Full screen' })).toBeFocused()
+  expect(await reachableOutside(host)).not.toEqual([])
+  await guest.context().close()
+  await host.context().close()
+})
+
 test('the keyboard still walks the fitted board by what is on the screen', async ({ browser }) => {
   const host = await newPerson(browser, { viewport: { width: 1440, height: 900 } })
   const guest = await newPerson(browser)

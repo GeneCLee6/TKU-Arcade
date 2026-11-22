@@ -286,7 +286,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
               </SeatStrip>
               <Tools>
                 {zoomButtons}
-                <Button $variant="secondary" $size="sm" onClick={() => void immersive.enter()}>
+                <Button $variant="secondary" $size="sm" data-immersive-enter="" onClick={() => void immersive.enter()}>
                   {t('games.promotion.ui.fullscreen')}
                 </Button>
                 <SoundButton />
@@ -320,7 +320,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
             {turn}
             <Tools>
               {zoomButtons}
-              <Button $variant="secondary" $size="sm" onClick={immersive.exit}>
+              <Button $variant="secondary" $size="sm" data-immersive-exit="" onClick={immersive.exit}>
                 {t('games.promotion.ui.exitFullscreen')}
               </Button>
             </Tools>
