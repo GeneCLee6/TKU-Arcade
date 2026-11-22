@@ -4,7 +4,7 @@
 // hit they already sway (kartModel.ts, #99). Which gesture when, and the pose it makes, pure so that
 // a test can read them; kartModel.ts eases between them and puts them on the driver.
 
-// 2026-11-22 (§4.72): and on the podium after a race, the winner lifts the trophy high (the podium's
+// 2026-11-22 (§4.73): and on the podium after a race, the winner lifts the trophy high (the podium's
 // stage puts the cup in the hands)
 export type DriverGesture = 'idle' | 'wave' | 'pump' | 'cheer' | 'podium' | 'trophy'
 

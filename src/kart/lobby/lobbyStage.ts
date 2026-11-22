@@ -10,7 +10,14 @@
 // 2026-11-22 (owner: "the drivers fill the screen"): the cards are as big as the screen lets them be
 // (KartLobby.tsx), so the picture follows their size (measured, in steps, capped), the camera stands
 // back just enough for a kart to fit the card's width, and a phone draws at one pixel a pixel.
+//
+// 2026-11-23 (#151): the drivers stand in front of their karts (kartModel.ts's `standing`; in the
+// race they sit). A phone took turns drawing three cards a frame, about five frames a second each,
+// which looked stuck rather than alive: now it draws each card once, again only when it changes (a
+// new pick, Ready and its cheer, the cheer over, a new size), and the card's own CSS sways the
+// picture gently (KartLobby.tsx), which the compositor does at the screen's own rate for nothing.
 import {
+  Box3,
   CircleGeometry,
   Color,
   DirectionalLight,
@@ -25,7 +32,7 @@ import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
 import { kartParts, kartThemes } from '../../styles/kartTokens.ts'
 import { loadBodies } from '../art/bodyLoad.ts'
 import { buildKartEnvironment } from '../art/kartParts.ts'
-import { buildKartModel, type KartModel } from '../art/kartModel.ts'
+import { buildKartModel, solidBox, type KartModel } from '../art/kartModel.ts'
 import { BODY_DETAIL } from '../art/bodyDetail.ts'
 import { loadQuality } from '../quality.ts'
 import { bodyReady } from '../art/vehicleBodies.ts'
@@ -48,7 +55,7 @@ export interface LobbyStage {
 export interface LobbyStageOptions {
   /** prefers-reduced-motion: each picture drawn once, standing still */
   readonly still: boolean
-  /** A phone: fewer pictures a frame */
+  /** A phone: each picture drawn once and again only when it changes (the card's CSS moves it) */
   readonly slow: boolean
 }
 
@@ -60,11 +67,12 @@ const STEP = 20
 const MAX_PIXEL_RATIO = { fast: 1.5, slow: 1 }
 /** A frame at most this often, ms */
 const FRAME_MS = 33
-/** Pictures drawn a frame: every place, or three on a phone */
-const PER_FRAME = { fast: 8, slow: 3 }
+/** Pictures drawn a frame: every place; on a phone, only those that changed, one a frame */
+const PER_FRAME = { fast: 8, slow: 1 }
 /** The camera's vertical field of view (degrees), and how much of a kart's width a card must show */
 const FOV = 34
-const HALF_WIDTH = 1.05
+/** Room round the kart and driver in the picture, a share of their size */
+const MARGIN = 1.16
 /** Seen from the front, a little to one side, and swaying either side of it (radians, a second) */
 const FRONT = Math.PI
 const SWAY = 0.5
@@ -83,6 +91,10 @@ interface Place {
   fresh: boolean
   /** performance.now() when it turned ready, or null */
   readySince: number | null
+  /** The gesture it was last drawn with (a phone draws again when it changes) */
+  drawn: DriverGesture | null
+  /** The kart and its standing driver: the middle across and along, half the width, the top */
+  framing: { x: number; z: number; half: number; top: number } | null
 }
 
 /** The stage, or null where there is no WebGL (the cards stay as they are, words only) */
@@ -119,15 +131,26 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
   floor.rotation.x = -Math.PI / 2
   scene.add(floor)
   const camera = new PerspectiveCamera(FOV, size.width / size.height, 0.1, 50)
-  /** Far enough back for a kart's width to fit the card, wide or tall */
-  let distance = 3.7
+  const halfTan = Math.tan(((FOV / 2) * Math.PI) / 180)
   const frameCamera = () => {
     camera.aspect = size.width / size.height
     camera.updateProjectionMatrix()
-    const halfTan = Math.tan(((FOV / 2) * Math.PI) / 180)
-    distance = Math.min(5.8, Math.max(3.1, HALF_WIDTH / (halfTan * camera.aspect)))
   }
   frameCamera()
+  /**
+   * Far enough back for the kart and its driver beside it to fit the card: their width across it,
+   * the driver's height up it (2026-11-23: standing, so worked out from each model's own size)
+   */
+  const distanceFor = (framing: NonNullable<Place['framing']>) =>
+    Math.min(
+      7,
+      Math.max(
+        3,
+        (framing.half * MARGIN) / (halfTan * camera.aspect) + 0.9,
+        ((framing.top / 2) * MARGIN) / halfTan + 0.9,
+      ),
+    )
+  const box = new Box3()
 
   const places: Place[] = Array.from({ length: 8 }, () => ({
     look: null,
@@ -138,6 +161,8 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
     visible: true,
     fresh: false,
     readySince: null,
+    drawn: null,
+    framing: null,
   }))
   const observer =
     typeof IntersectionObserver === 'undefined'
@@ -181,6 +206,12 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
           resize()
         })
 
+  /** Drawn once, and again only on a change: a phone, or less motion asked for */
+  const stills = still || slow
+  /** The gesture `place` shows at `now`: arms up for a while after Ready, otherwise at ease */
+  const gestureOf = (place: Place, now: number): DriverGesture =>
+    place.readySince !== null && now - place.readySince < CHEER_FOR * 1000 ? 'cheer' : 'idle'
+
   let disposed = false
   let handle = 0
   let lastFrame = 0
@@ -211,10 +242,22 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
       )
       return
     }
-    place.model = buildKartModel(false, false, look.kart, look.driver, {
-      environment,
-      detail: BODY_DETAIL[loadQuality()],
-    })
+    place.model = buildKartModel(
+      false,
+      false,
+      look.kart,
+      look.driver,
+      { environment, detail: BODY_DETAIL[loadQuality()] },
+      { standing: true },
+    )
+    solidBox(place.model.group, box)
+    place.framing = {
+      x: (box.min.x + box.max.x) / 2,
+      z: (box.min.z + box.max.z) / 2,
+      // Seen from the front, swaying a little: its width, and some of its length
+      half: Math.max((box.max.x - box.min.x) / 2, (box.max.z - box.min.z) / 4),
+      top: box.max.y,
+    }
     place.model.group.visible = false
     scene.add(place.model.group)
     place.built = key
@@ -224,16 +267,26 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
     const place = places[index]!
     const model = place.model
     const context = place.context
-    if (!model || !context || !place.canvas) return
-    const cheering = place.readySince !== null && now - place.readySince < CHEER_FOR * 1000
-    const gesture: DriverGesture = cheering ? 'cheer' : 'idle'
+    const framing = place.framing
+    if (!model || !context || !place.canvas || !framing) return
+    const gesture = gestureOf(place, now)
+    place.drawn = gesture
     model.group.visible = true
-    model.update({ speed: 0, steer: 0, drift: 0, boosting: false, gesture }, still ? 1 : seconds)
-    const yaw = FRONT + (still ? 0.35 : Math.sin(now / 1000 * SWAY_SPEED + index * 1.3) * SWAY)
-    // A tall card: a little higher, looking down on the driver
+    // Drawn once (a phone, less motion): the pose taken in full at once
+    model.update({ speed: 0, steer: 0, drift: 0, boosting: false, gesture }, stills ? 1 : seconds)
+    const yaw =
+      FRONT +
+      (stills ? (index % 2 === 0 ? 0.35 : -0.35) : Math.sin(now / 1000 * SWAY_SPEED + index * 1.3) * SWAY)
+    // Round the middle of the kart and its driver; a tall card a little higher, looking down
     const tall = Math.max(0, 1 / camera.aspect - 1)
-    camera.position.set(Math.sin(yaw) * distance, 1.15 + tall * 0.6, Math.cos(yaw) * distance)
-    camera.lookAt(0, 0.6 + tall * 0.12, 0)
+    const distance = distanceFor(framing)
+    const middle = framing.top * 0.52
+    camera.position.set(
+      framing.x + Math.sin(yaw) * distance,
+      middle + 0.35 + tall * 0.5,
+      framing.z + Math.cos(yaw) * distance,
+    )
+    camera.lookAt(framing.x, middle + tall * 0.08, framing.z)
     renderer.render(scene, camera)
     model.group.visible = false
     const target = place.canvas
@@ -253,15 +306,20 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
     lastFrame = now
     const seconds = Math.min(0.2, (now - lastAt) / 1000)
     lastAt = now
+    // Drawn once, a card is drawn again when its gesture changes (Ready's cheer, and its end)
+    if (stills) {
+      for (const place of places) {
+        if (place.fresh && place.model && place.drawn !== gestureOf(place, now)) place.fresh = false
+      }
+    }
     const due = places
       .map((place, index) => ({ place, index }))
-      .filter(({ place }) => place.model && place.context && place.visible && (!still || !place.fresh))
+      .filter(({ place }) => place.model && place.context && place.visible && (!stills || !place.fresh))
     if (due.length === 0) return
     const count = Math.min(due.length, slow ? PER_FRAME.slow : PER_FRAME.fast)
     for (let n = 0; n < count; n++) {
       const { index } = due[(turn + n) % due.length]!
-      // A phone's places are drawn less often: each moves on by the time since it was last drawn
-      drawPlace(index, now, slow ? seconds * (due.length / count) : seconds)
+      drawPlace(index, now, seconds)
     }
     turn = (turn + count) % Math.max(1, due.length)
   }

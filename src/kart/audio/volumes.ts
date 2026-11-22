@@ -1,5 +1,5 @@
 // 2026-11-20 (docs/ARCHITECTURE.md §4.46): the kart's volumes, music and sound effects (2026-11-22,
-// §4.72: and the ambience), each 0 to 1, kept in this browser (lib/storage.ts never throws: blocked
+// §4.73: and the ambience), each 0 to 1, kept in this browser (lib/storage.ts never throws: blocked
 // storage keeps them for the page). The site's own sound switch (lib/sound.ts) still silences them
 // all; these only set how loud each is.
 import { readStored, writeStored } from '../../lib/storage.ts'

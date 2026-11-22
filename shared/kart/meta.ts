@@ -22,7 +22,7 @@ export const TRACK_META: Readonly<Record<string, TrackMeta>> = {
   riverside: { podium: ['shrimp', 'heron', 'squid'], character: ['fast', 'descent'] },
   harbour: { podium: ['marlin', 'swift', 'hornet'], character: ['fast'] },
   tamkang: { podium: ['heron', 'shrimp', 'marlin'], character: ['fast'] },
-  oldstreet: { podium: ['dolphin', 'marlin', 'eel'], character: ['fast'] },
+  oldstreet: { podium: ['dolphin', 'marlin', 'otter'], character: ['fast'] },
   guanyin: { podium: ['petrel', 'heron', 'swift'], character: ['fast', 'climb'] },
   mangrove: { podium: ['heron', 'skipper', 'marlin'], character: ['technical', 'flat'] },
   fort: { podium: ['hornet', 'comet', 'pelican'], character: ['technical', 'climb'] },

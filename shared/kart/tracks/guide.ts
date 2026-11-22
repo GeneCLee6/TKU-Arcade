@@ -48,6 +48,12 @@ export interface TrackGuide {
    * metres right of the middle. The hands aim at each in turn until they are through it
    */
   readonly slots: readonly { readonly index: number; readonly across: number }[]
+  /**
+   * 2026-11-23 (#150): only the cues. The hands keep the line they find on the road by themselves
+   * (round the walls, minding the edges) and take only the drift jumps from the guide: a track whose
+   * road needs no line of its own but has a lip to drift over (the old street's step)
+   */
+  readonly cuesOnly?: true
 }
 
 interface Place {

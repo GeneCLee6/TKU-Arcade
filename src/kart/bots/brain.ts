@@ -260,7 +260,8 @@ export function createBotBrain(
 
   // The guide's line for these hands: the shortcuts by skill, otherwise the safe one
   const tricks = (skill.tricks ?? false) && guide !== undefined
-  const line = guide
+  // A guide of cues alone (2026-11-23) leaves the line to the road, as without one
+  const line = guide && !guide.cuesOnly
     ? tricks
       ? { offsets: guide.tech, room: guide.techRoom }
       : { offsets: guide.safe, room: guide.safeRoom }
@@ -975,7 +976,7 @@ export function createBotBrain(
         : kart.drifting
           ? { ...NO_EDGE, own: onRoadFor(kart.x, kart.z, speed, travel, nearest, travelRate, care) }
           : // A technical line (the guide's slots and branches) is driven as it is
-            tricks
+            tricks && !guide!.cuesOnly
             ? NO_EDGE
             : edgeAhead(kart.x, kart.z, speed, travel, nearest, gripTurn, gripSteerNow, CARE_WARY)
       return classicHands(

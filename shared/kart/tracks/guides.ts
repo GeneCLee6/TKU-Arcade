@@ -11,7 +11,7 @@ import { DANHAI_GUIDE, DANHAI_ROUTE_GUIDE } from './danhai.ts'
 import type { TrackGuide } from './guide.ts'
 import { HARBOUR_GUIDE } from './harbour.ts'
 import { LANES_GUIDE } from './lanes.ts'
-import { OLDSTREET_ROUTE_GUIDE } from './oldstreet.ts'
+import { OLDSTREET_GUIDE, OLDSTREET_ROUTE_GUIDE } from './oldstreet.ts'
 import { WHARF_GUIDE, WHARF_ROUTE_GUIDE } from './wharf.ts'
 import { WORKS_GUIDE, WORKS_ROUTE_GUIDE } from './works.ts'
 import { ZHUWEI_GUIDE, ZHUWEI_ROUTE_GUIDE } from './zhuwei.ts'
@@ -21,6 +21,8 @@ const GUIDES: Readonly<Record<string, TrackGuide>> = {
   harbour: HARBOUR_GUIDE,
   wharf: WHARF_GUIDE,
   lanes: LANES_GUIDE,
+  // 2026-11-23 (#150): the drift jump over the old street home's step (oldstreet.ts)
+  oldstreet: OLDSTREET_GUIDE,
   works: WORKS_GUIDE,
   zhuwei: ZHUWEI_GUIDE,
   // 2026-11-23: the high-platform track (breakwater.ts), and the night market's roofs (danhai.ts)

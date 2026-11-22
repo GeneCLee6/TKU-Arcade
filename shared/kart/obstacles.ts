@@ -453,3 +453,115 @@ export function obstaclesOf(track: {
   }
   return out
 }
+
+// ── Items against obstacles (2026-11-23, #150) ──────────────────────────────────────────────────
+// A hailstone flew straight through a boom that was down and a container in its way, and a puddle
+// could be dropped inside a container's path. The room (shared/games/kart/rules.ts) now asks these
+// when an item leaves, by the same clock functions as the karts' walls, so every browser draws the
+// same flight from the shot's numbers alone.
+
+/** The race clock's step at server time `at` (ms) in a race that went at `goAt` */
+export const tickAtMs = (goAt: number, at: number): number =>
+  ((at - goAt) * OBSTACLE_STEPS_PER_SECOND) / 1000
+
+/** Where segment p0-p1 first crosses a wall, as a share of the way (0 to 1); null for none */
+function segmentHitShare(
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  walls: readonly Wall[],
+): number | null {
+  const dx = x1 - x0
+  const dz = z1 - z0
+  let nearest: number | null = null
+  for (const wall of walls) {
+    const ex = wall.bx - wall.ax
+    const ez = wall.bz - wall.az
+    const denominator = dx * ez - dz * ex
+    if (Math.abs(denominator) < 1e-9) continue
+    const wx = wall.ax - x0
+    const wz = wall.az - z0
+    const along = (wx * ez - wz * ex) / denominator
+    const share = (wx * dz - wz * dx) / denominator
+    if (along >= 0 && along <= 1 && share >= 0 && share <= 1 && (nearest === null || along < nearest)) {
+      nearest = along
+    }
+  }
+  return nearest
+}
+
+/**
+ * How many seconds a point leaving (x, z) at `tick` and moving at (vx, vz) m/s flies before it meets
+ * an obstacle in the way at that moment (a boom down, a container wherever it has slid to), looked
+ * at step by step for at most `seconds`; null when it meets none. Empty obstacles: null at once
+ */
+export function obstacleStop(
+  obstacles: readonly Obstacle[],
+  x: number,
+  z: number,
+  vx: number,
+  vz: number,
+  tick: number,
+  seconds: number,
+): number | null {
+  if (obstacles.length === 0 || seconds <= 0) return null
+  const speed = Math.hypot(vx, vz)
+  // Only the obstacles near enough to the flight to matter
+  const reach = speed * seconds
+  const near = obstacles.filter((obstacle) => {
+    const size = obstacle.json.kind === 'slider' ? obstacle.json.length + obstacle.half * 2 : obstacle.half * 2 + 3
+    return Math.hypot(obstacle.x - x, obstacle.z - z) <= reach + size
+  })
+  if (near.length === 0) return null
+  const step = 1 / OBSTACLE_STEPS_PER_SECOND
+  const steps = Math.ceil(seconds / step)
+  for (let k = 0; k < steps; k++) {
+    const t0 = k * step
+    const t1 = Math.min(seconds, t0 + step)
+    const walls = obstacleWalls(near, tick + (t1 * OBSTACLE_STEPS_PER_SECOND))
+    if (walls.length === 0) continue
+    const share = segmentHitShare(x + vx * t0, z + vz * t0, x + vx * t1, z + vz * t1, walls)
+    if (share !== null) return t0 + (t1 - t0) * share
+  }
+  return null
+}
+
+/**
+ * A spot for something lying on the road (a puddle, a fake box) `radius` metres wide, out of every
+ * obstacle: out of the whole stretch a container slides over, and off a boom's line (it comes down
+ * on whatever is there). Moved along the road, the shorter way out; unchanged when already clear
+ */
+export function clearOfObstacles(
+  obstacles: readonly Obstacle[],
+  x: number,
+  z: number,
+  radius: number,
+): { x: number; z: number } {
+  let px = x
+  let pz = z
+  for (const obstacle of obstacles) {
+    const { json } = obstacle
+    const rx = px - obstacle.x
+    const rz = pz - obstacle.z
+    const along = rx * obstacle.dx + rz * obstacle.dz
+    const right = rx * -obstacle.dz + rz * obstacle.dx
+    let alongHalf: number
+    let low: number
+    let high: number
+    if (json.kind === 'slider') {
+      alongHalf = json.length / 2 + radius
+      low = Math.min(json.a, json.b) - json.size / 2 - radius
+      high = Math.max(json.a, json.b) + json.size / 2 + radius
+    } else {
+      alongHalf = radius
+      low = json.from - radius
+      high = json.to + radius
+    }
+    if (Math.abs(along) >= alongHalf || right <= low || right >= high) continue
+    const out = (along < 0 ? -1 : 1) * (alongHalf + 0.05) - along
+    px = Math.round((px + obstacle.dx * out) * 1000) / 1000
+    pz = Math.round((pz + obstacle.dz * out) * 1000) / 1000
+  }
+  return { x: px, z: pz }
+}
