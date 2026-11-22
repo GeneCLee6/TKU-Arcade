@@ -6,7 +6,6 @@ import { FieldError, FieldLabel, TextInput } from '../../components/Field.tsx'
 import { Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 
 interface ClueFormProps {
   /** How many clues you write: two with three players */

@@ -10,7 +10,6 @@ import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { AllLines } from './AllLines.tsx'
 import { LineView } from './LineView.tsx'
-import './messages.ts'
 import { answerKey, lineOf, promptOf } from './screenState.ts'
 import { RevealCard, TableCard } from './TableCard.tsx'
 

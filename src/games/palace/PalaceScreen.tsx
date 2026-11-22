@@ -12,7 +12,6 @@ import { ActionLog } from './ActionLog.tsx'
 import { ActionPicker } from './ActionPicker.tsx'
 import { Court } from './Court.tsx'
 import { Hand } from './Hand.tsx'
-import './messages.ts'
 import { RoleGuide } from './RoleGuide.tsx'
 import { actKey, answerKey, CLAIMS, isBluff, promptOf, roleKey } from './screenState.ts'
 

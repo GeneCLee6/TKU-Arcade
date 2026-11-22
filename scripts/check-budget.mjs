@@ -80,6 +80,13 @@ if (!manifest[languageFile(SITE_LANGUAGE, 'en')]) console.log('skip languages: n
 const SCREEN_LANGUAGE_PARTS = {
   'src/games/promotion/full/FullScreen.tsx': ['shared/games/promotion/i18n.full'],
 }
+// And every game screen whose own words come one language at a time (src/games/screenStrings.ts,
+// 2026-11-22): src/games/<id>/<Name>Screen.tsx waits for shared/games/<id>/i18n.screen.<language>.ts
+for (const key of Object.keys(manifest)) {
+  const id = /^src\/games\/([^/]+)\/\w+Screen\.tsx$/.exec(key)?.[1]
+  const part = `shared/games/${id}/i18n.screen`
+  if (id && manifest[`${part}.en.ts`] && !SCREEN_LANGUAGE_PARTS[key]) SCREEN_LANGUAGE_PARTS[key] = [part]
+}
 // The room's own words (src/i18n/roomStrings.ts): every room waits for them, the lobby never loads them
 const ROOM_LANGUAGE = 'src/i18n/room'
 const listedParts = new Set([ROOM_LANGUAGE, ...Object.values(SCREEN_LANGUAGE_PARTS).flat()])

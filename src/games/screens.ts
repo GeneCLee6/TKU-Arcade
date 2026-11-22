@@ -4,6 +4,7 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import type { GameProjection } from '../../shared/games/types.ts'
 import type { RoomParts } from '../components/GameLayout.tsx'
 import { loadFullStrings } from './promotion/full/fullStrings.ts'
+import { loadScreenStrings } from './screenStrings.ts'
 
 export interface GameScreenProps {
   /** The room around the game: a screen puts its board inside `GameLayout` and hands this on */
@@ -13,23 +14,33 @@ export interface GameScreenProps {
 
 type GameScreen = LazyExoticComponent<ComponentType<GameScreenProps>>
 
+type ScreenModule = Promise<{ default: ComponentType<GameScreenProps> }>
+
+// A screen and its words in the page's language, fetched side by side (screenStrings.ts): the screen
+// shows with them, never before. Promotion's simple board and the kart register their own
+const withStrings = (gameId: string, load: () => ScreenModule): GameScreen =>
+  lazy(() => {
+    const strings = loadScreenStrings(gameId)
+    return load().then((module) => strings.then(() => module))
+  })
+
 const SCREENS: Partial<Record<string, GameScreen>> = {
   promotion: lazy(() => import('./promotion/PromotionScreen.tsx')),
-  'silent-table': lazy(() => import('./silent-table/SilentTableScreen.tsx')),
-  spectrum: lazy(() => import('./spectrum/SpectrumScreen.tsx')),
-  bluff: lazy(() => import('./bluff/BluffScreen.tsx')),
-  'odd-word': lazy(() => import('./odd-word/OddWordScreen.tsx')),
-  lantern: lazy(() => import('./lantern/LanternScreen.tsx')),
-  tiles: lazy(() => import('./tiles/TilesScreen.tsx')),
-  'word-bridge': lazy(() => import('./word-bridge/WordBridgeScreen.tsx')),
-  'clue-clash': lazy(() => import('./clue-clash/ClueClashScreen.tsx')),
-  kite: lazy(() => import('./kite/KiteScreen.tsx')),
-  traders: lazy(() => import('./traders/TradersScreen.tsx')),
-  'secret-scroll': lazy(() => import('./secret-scroll/SecretScrollScreen.tsx')),
-  wasabi: lazy(() => import('./wasabi/WasabiScreen.tsx')),
-  palace: lazy(() => import('./palace/PalaceScreen.tsx')),
-  holdem: lazy(() => import('./holdem/HoldemScreen.tsx')),
-  misery: lazy(() => import('./misery/MiseryScreen.tsx')),
+  'silent-table': withStrings('silent-table', () => import('./silent-table/SilentTableScreen.tsx')),
+  spectrum: withStrings('spectrum', () => import('./spectrum/SpectrumScreen.tsx')),
+  bluff: withStrings('bluff', () => import('./bluff/BluffScreen.tsx')),
+  'odd-word': withStrings('odd-word', () => import('./odd-word/OddWordScreen.tsx')),
+  lantern: withStrings('lantern', () => import('./lantern/LanternScreen.tsx')),
+  tiles: withStrings('tiles', () => import('./tiles/TilesScreen.tsx')),
+  'word-bridge': withStrings('word-bridge', () => import('./word-bridge/WordBridgeScreen.tsx')),
+  'clue-clash': withStrings('clue-clash', () => import('./clue-clash/ClueClashScreen.tsx')),
+  kite: withStrings('kite', () => import('./kite/KiteScreen.tsx')),
+  traders: withStrings('traders', () => import('./traders/TradersScreen.tsx')),
+  'secret-scroll': withStrings('secret-scroll', () => import('./secret-scroll/SecretScrollScreen.tsx')),
+  wasabi: withStrings('wasabi', () => import('./wasabi/WasabiScreen.tsx')),
+  palace: withStrings('palace', () => import('./palace/PalaceScreen.tsx')),
+  holdem: withStrings('holdem', () => import('./holdem/HoldemScreen.tsx')),
+  misery: withStrings('misery', () => import('./misery/MiseryScreen.tsx')),
   kart: lazy(() => import('./kart/KartScreen.tsx')),
 }
 

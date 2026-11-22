@@ -4,7 +4,6 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 
 interface ClueListProps {
   clues: readonly CcClueView[]

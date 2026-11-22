@@ -6,7 +6,6 @@ import { Heading, List, Row, Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
-import './messages.ts'
 
 interface AnswerProgressProps {
   answerers: readonly SpectrumAnswererView[]

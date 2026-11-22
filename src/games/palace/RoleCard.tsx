@@ -4,7 +4,6 @@ import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { useT } from '../../i18n/useT.ts'
 import { displayType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { glyphKey, roleKey } from './screenState.ts'
 
 export type CardSize = 'lg' | 'sm'

@@ -2,7 +2,6 @@ import styled, { css } from 'styled-components'
 import type { WbCard, WbDuoCard } from '../../../shared/games/word-bridge/types.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import type { CellLook } from './screenState.ts'
 
 type Face = WbCard | WbDuoCard | 'found'

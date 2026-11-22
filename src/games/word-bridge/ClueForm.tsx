@@ -6,7 +6,6 @@ import { FieldError, FieldLabel, SelectInput, TextInput } from '../../components
 import { Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { space, fontSize } from '../../styles/tokens.ts'
-import './messages.ts'
 
 interface ClueFormProps {
   /** The words still face down: a clue may not hold one */

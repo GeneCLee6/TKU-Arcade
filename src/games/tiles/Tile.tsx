@@ -5,7 +5,6 @@ import type { Suit, TileId } from '../../../shared/games/tiles/types.ts'
 import type { Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, radius } from '../../styles/tokens.ts'
-import './messages.ts'
 
 /** Drawn rather than typed: phones turn the text suit signs into emoji */
 const SUIT_PATHS: Record<Suit, string> = {

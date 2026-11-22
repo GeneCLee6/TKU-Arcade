@@ -10,7 +10,6 @@ import { useT } from '../../i18n/useT.ts'
 import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
-import './messages.ts'
 import { RoundScore } from './RoundScore.tsx'
 import {
   canPick,

@@ -6,7 +6,6 @@ import { useLanguage, useT } from '../../i18n/useT.ts'
 import { displayType, glass, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { Body, Tag } from './bluffParts.ts'
-import './messages.ts'
 import { roleOf } from './screenState.ts'
 
 /**

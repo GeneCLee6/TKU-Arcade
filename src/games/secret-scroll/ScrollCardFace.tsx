@@ -16,7 +16,6 @@ const scrollCard = {
   back: promotionBoard.lacquer,
   backTrim: promotionBoard.gold,
 }
-import './messages.ts'
 
 // Each character's emblem, drawn here in a 24-unit box: our own simple line marks, no artwork
 const stroke = {

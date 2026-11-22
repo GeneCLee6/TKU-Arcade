@@ -4,7 +4,6 @@ import type { Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { displayType, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { LANE_GAP, lanes, lineOrder, position, type NumberLineMark } from './numberLine.ts'
 
 const TICKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

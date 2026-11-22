@@ -5,7 +5,6 @@ import { Avatar } from '../../components/Avatar.tsx'
 import { useT } from '../../i18n/useT.ts'
 import { clippedFill, cornerClip, displayType, slantClip } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import type { GuessPicks } from './screenState.ts'
 
 interface AnswerCardsProps {

@@ -3,7 +3,6 @@ import type { SpectrumTopic } from '../../../shared/games/spectrum/types.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
 import { glass, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 
 /**
  * This round's card of four topics (owner, 2026-11-13). The guesser picks the one to ask, a button

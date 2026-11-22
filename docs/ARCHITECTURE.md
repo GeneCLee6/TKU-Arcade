@@ -1494,10 +1494,11 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 | 房間（等待室、房主、聊天、結算、房間錯誤、倒數） | `src/i18n/room.en.ts`、`room.zh-TW.ts` | 和房間的 chunk 一起（`src/App.tsx` 的 `roomChunk`，`roomStrings.ts`），只載目前語言 |
 | 一款遊戲的選項與房間要的字串（選項標籤、錯誤、結算） | `shared/games/<id>/info.ts`、`i18n.ts`（仍是兩語一檔，很小） | 進那款遊戲的房間時（`src/i18n/gameDetails.ts` 用 `import.meta.glob` 每款各一個 chunk；`RoomPage` 一拿到房間摘要就開始載，第一次顯示房間前等它；房主換遊戲時選單一變就開始載） |
 | 陞官圖完整版的畫面字串（最大的一張表） | `shared/games/promotion/i18n.full.en.ts`、`i18n.full.zh-TW.ts` | 和完整版畫面一起（`screens.ts` 的 lazy、`full/fullStrings.ts`），只載目前語言；字型要的中文字在畫面之後才載（`fullFont.ts`） |
-| 其他遊戲畫面的字串、卡丁車 | `i18n.screen.ts` 等，`registerMessages` | 照舊隨畫面 chunk，兩語 |
+| 其他 15 款桌遊畫面的字串（2026-11-22） | `shared/games/<id>/i18n.screen.en.ts`、`i18n.screen.zh-TW.ts`（`i18n.screen.ts` 只是兩語合起來給 check-i18n、`npm run play` 與測試） | 和畫面一起（`screens.ts` 的 `withStrings`、`src/games/screenStrings.ts` 用 `import.meta.glob` 每款每語一個 chunk），只載目前語言；`tests/games/screenStrings.test.ts` 擋網站再 import 兩語那份 |
+| 陞官圖簡化版畫面、卡丁車 | `i18n.screen.ts` 等，`registerMessages` | 照舊隨畫面 chunk，兩語（簡化版很小、字型要全部中文字；卡丁車另有 `KART_PARTS`） |
 
 - **不閃英文**：`index.html` 有一段 inline script，用和 `t.ts` 一樣的規則（localStorage，否則 `navigator.languages`）決定語言，對那份字串 chunk 發 `modulepreload`，所以它和入口一起下載、不是入口跑完才開始；檔名由 `vite.config.ts` 的 `languageChunks` 在 build 時填進去（找不到就 build 失敗）。`src/main.tsx` 等那份到了才 render。載入失敗就改用英文，再失敗也照樣 render（看到的是 key）。
-- **切換語言**：`setLanguage` 先記住選擇（localStorage），等那個語言的網站字串與已註冊的語言分片（`registerLanguageParts`：房間、陞官圖完整版）都到了才換；載過一次之後是立即的。連點兩下以最後一次為準。
+- **切換語言**：`setLanguage` 先記住選擇（localStorage），等那個語言的網站字串與已註冊的語言分片（`registerLanguageParts`：房間、陞官圖完整版、15 款桌遊畫面）都到了才換；載過一次之後是立即的。連點兩下以最後一次為準。
 - **API**：`loadLanguage`、`loadStartLanguage`、`registerLanguageParts(name, { en, 'zh-TW' })`（回傳目前語言那份的 promise，lazy 畫面在 factory 裡和畫面 chunk 一起等）、`registerMessages`（兩語一起，照舊）、`hasMessage`（網路來的 key 是否已有字串，`useRoom` 的錯誤碼用）、`preloadLanguage`（測試用，`tests/setup.ts` 一開始就把兩語、房間、完整版與每款遊戲的 details 都載好）。
 - **check-i18n**：多比對 `room.*.ts` 與 `lobby.*.ts` 兩語一致；`lobby.en.ts` 只准 `games.<id>.name`／`.summary`／`.tryAlone`；全部遊戲的字串仍從 `shared/games/index.ts` 的 `GAME_MESSAGES`（含大廳那兩張表）比對。
 - **擋回頭路**：`tests/games/catalog.test.ts` 從 `src/main.tsx` 沿靜態 import 走一遍，入口不得碰到任何字串表、`catalog.ts`、任何遊戲的 `info.ts`／`i18n.ts`；`src/` 任何地方都不得靜態 import `catalog.ts`。`check-budget` 的主站另有較低的上限（下面）。

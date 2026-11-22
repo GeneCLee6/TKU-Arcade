@@ -7,15 +7,16 @@ import { resetAccountForTests } from '../src/lib/account.ts'
 // up front, so that a test renders any page or screen at once and in either language. Only with a
 // DOM: the Worker's and the scripts' tests run in node
 if (typeof document !== 'undefined') {
-  const [{ GAME_CARDS }, { loadFullStrings }, { loadGameDetails }, { loadRoomStrings }, { preloadLanguage }] =
+  const [{ GAME_CARDS }, { loadFullStrings }, { loadScreenStrings }, { loadGameDetails }, { loadRoomStrings }, { preloadLanguage }] =
     await Promise.all([
       import('../shared/games/lobby.ts'),
       import('../src/games/promotion/full/fullStrings.ts'),
+      import('../src/games/screenStrings.ts'),
       import('../src/i18n/gameDetails.ts'),
       import('../src/i18n/roomStrings.ts'),
       import('../src/i18n/t.ts'),
     ])
-  await Promise.all([loadRoomStrings(), loadFullStrings()])
+  await Promise.all([loadRoomStrings(), loadFullStrings(), ...GAME_CARDS.map((game) => loadScreenStrings(game.id))])
   await Promise.all([
     preloadLanguage('en'),
     preloadLanguage('zh-TW'),

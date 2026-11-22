@@ -5,7 +5,6 @@ import { Button } from '../../components/Button.tsx'
 import { Heading, List, Row, Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 
 interface SetupProps {
   view: WbView

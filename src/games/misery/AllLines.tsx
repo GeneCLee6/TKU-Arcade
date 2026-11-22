@@ -7,7 +7,6 @@ import { glass, monoType } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { LineView } from './LineView.tsx'
 import { IndexBadge } from './MiseryCardFace.tsx'
-import './messages.ts'
 import { lineOf } from './screenState.ts'
 
 /**

@@ -3,7 +3,6 @@ import type { MiseryCard } from '../../../shared/games/misery/types.ts'
 import { useT } from '../../i18n/useT.ts'
 import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import './messages.ts'
 import { miseryFill } from './screenState.ts'
 
 /** The index on its meter colour; `null` is the hidden one, a pulsing question mark */
