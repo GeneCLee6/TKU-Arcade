@@ -1568,6 +1568,17 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 
 **限制（照實寫）**：(1) 老街沒有主路導引，所以頂尖腳本與專家在老街的台階是收油跳過，不會甩尾起跳；人可以。(2) 燈籠巷的牆是素色高牆（沒有個別的店屋場景）。(3) 台階讓困難電腦車每圈慢約 2 秒（坡頂收油）。
 
+### 4.69 路線圖外：全螢幕遊玩（網頁與 PWA）（2026-11-22，#148，`feat/fullscreen-play`）
+
+- **共用 API**（`src/lib/fullscreen.ts`）：全站只有一個全螢幕，對象是整頁（`document.documentElement`），不是某個元素：等待室變比賽、比賽變結果都不用重新進入，`<dialog>`（top layer）與 toast 照常。`enterFullscreen()`（要在點擊或按鍵裡呼叫；`requestFullscreen({ navigationUI: 'hide' })`，舊 Safari 用 `webkit` 前綴）、`exitFullscreen()`（暫停選單的「離開全螢幕」就呼叫它）、`toggleFullscreen()`、`fullscreenMode()`（`'off' | 'fullscreen' | 'focus'`）、`subscribeFullscreen`、React 的 `useFullscreenMode()`。
+- **專注模式**：沒有 Fullscreen API 或被拒（iPhone Safari、沒權限的 iframe）時退回，和 #141 陞官圖同一個做法：`<html data-focus-mode>`，TopBar 藏起來（`TopBar.tsx`）；第一次會 toast 說明，iPhone 上提示「加到主畫面」才能沒有瀏覽器列。陞官圖自己的圖版全螢幕（`useImmersive.ts`）不動。
+- **Esc**：真全螢幕時 Esc 是瀏覽器的（頁面攔不到），離開後頁面靠 `fullscreenchange`（含 `webkitfullscreenchange`）跟上；Chrome／Edge 桌機進入後用 Keyboard Lock 保留 Esc（`navigator.keyboard.lock(['Escape'])`），所以比賽的 Esc 先開暫停選單、長按 Esc 才離開全螢幕。專注模式沒有瀏覽器幫忙，Esc 由這裡處理，但有 `<dialog open>` 或畫面自己用掉這個 Esc（`event.preventDefault()`）時不動作——**要自己用 Esc 的畫面（暫停選單）請 `preventDefault()`**。
+- **自動全螢幕**（設定，預設關，`localStorage` `tku-arcade.fullscreen.auto`）：`autoFullscreen()`／`setAutoFullscreen()`／`useAutoFullscreen()`；瀏覽器只准從使用者動作進全螢幕，所以 `armAutoFullscreen()` 掛一次性的 `keydown`／`pointerdown`（捕獲階段，Esc 除外），比賽的第一個鍵或第一下觸控就進去；只用真全螢幕，不會無預警進專注模式。
+- **手機轉橫**：`lockLandscape()`／`unlockOrientation()`（`screen.orientation.lock('landscape')`，Chrome Android 只在全螢幕或已安裝的 app 有效，其他瀏覽器拒絕就維持現有的轉橫提示）。`src/kart/race/useRaceFullscreen.ts` 在比賽中：掛自動全螢幕、觸控裝置嘗試鎖橫（一進來先試一次給已安裝的 app，進全螢幕時再試）、離開比賽解鎖。
+- **按鈕**（`src/components/FullscreenButton.tsx`，自己的 lazy chunk，字串 `shared/games/i18n.fullscreen.ts` 由它登記、`screenMessages.ts` 列給 check-i18n）：每個房間標題列（桌遊等待室與遊戲中、卡丁車觀戰與結果）、卡丁車單機選單（`SpikePage.tsx`，`landscape`：進全螢幕順便鎖橫）；卡丁車等待室的在下一個 PR（§4.70）。比賽中由暫停選單（`feat/kart-race-flow`）提供。
+- **PWA**（`public/manifest.webmanifest`）：`display` 維持 `standalone`，加 `display_override: ["fullscreen", "standalone"]`，Android 從主畫面開啟就是全螢幕（iOS 不認 `display_override`，維持 standalone）；`orientation` 維持 `any`（桌遊與大廳要能直拿，卡丁車比賽時才鎖橫）。`isStandalone()` 也認 `display-mode: fullscreen`（但排除 Fullscreen API 造成的）。service worker 不受影響。
+- **測試**：`tests/lib/fullscreen.test.ts`（整頁全螢幕與離開、瀏覽器自己的 Esc、專注模式與 Esc、被 `preventDefault` 或對話框攔下時不離開、自動全螢幕只在設定開時且只一次、鎖橫）、`e2e/fullscreen.spec.ts`（房間標題的按鈕進出真全螢幕；拿掉 API 時進專注模式、TopBar 消失、Esc 離開）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

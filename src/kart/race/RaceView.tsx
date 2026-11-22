@@ -31,6 +31,7 @@ import { RACE_ENGINE } from '../load/kartLoad.ts'
 import { KartLoading } from '../load/KartLoading.tsx'
 import { useKartLoad } from '../load/useKartLoad.ts'
 import { createAutopilot } from './autopilot.ts'
+import { useRaceFullscreen } from './useRaceFullscreen.ts'
 import { ITEM_SLOT_UPRIGHT_TOP, ItemNote, ItemSlot, MAP_UNDER_ITEM_SLOT } from './ItemHud.tsx'
 import { effectsOf, FORESEEN_LATE_MS } from '../hitFx.ts'
 import { FogVeil, StunHud } from './HitHud.tsx'
@@ -234,6 +235,8 @@ export default function RaceView({
   const [failure, setFailure] = useState(() => !supportsWebGL2())
   // The item key's name follows the keyboard's layout once the browser has said it
   useKeyLayout()
+  // 2026-11-22: full screen by itself if asked for, a phone on its side where it may be locked
+  useRaceFullscreen()
   const [hud, setHud] = useState<SpikeHud>(EMPTY_HUD)
   const [trial, setTrial] = useState<SpikeTrial>()
   const [callout, setCallout] = useState<{ callout: Callout; id: number }>()
