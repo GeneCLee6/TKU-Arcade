@@ -2,13 +2,15 @@
 // they stay out of the first load of the lobby and the board games. Same rules as any catalog:
 // en is the source, zh-TW has the same keys, and `npm run check-i18n` compares them.
 import { KART_BOTS_MESSAGES, type KartBotsKey } from './i18n.bots.ts'
-import { KART_EDITOR_MESSAGES, type KartEditorKey } from './i18n.editor.ts'
+import type { KartEditorKey } from './i18n.editor.ts'
 import { KART_CUP_MESSAGES, type KartCupKey } from './i18n.cup.ts'
 import { KART_ROSTER_MESSAGES, type KartRosterKey } from './i18n.roster.ts'
 import { KART_TOUCH_MESSAGES, type KartTouchKey } from './i18n.touch.ts'
 import { KART_LOAD_MESSAGES, type KartLoadKey } from './i18n.load.ts'
-import { KART_SCHOOL_MESSAGES, type KartSchoolKey } from './i18n.school.ts'
-import { KART_CHALLENGE_MESSAGES, type KartChallengeKey } from './i18n.challenge.ts'
+import { KART_MENU_MESSAGES, type KartMenuKey } from './i18n.menu.ts'
+// Types only: these screens register their own strings (scripts/check-i18n.mjs KART_PARTS)
+import type { KartSchoolKey } from './i18n.school.ts'
+import type { KartChallengeKey } from './i18n.challenge.ts'
 
 const en = {
   'kart.spike.title': 'Kart physics test',
@@ -348,16 +350,14 @@ const en = {
   'kart.pad.axis': 'Axis {index} {sign}',
 } as const
 
-export type KartMessageKey =
-  | keyof typeof en
-  | KartRosterKey
-  | KartBotsKey
-  | KartEditorKey
-  | KartCupKey
-  | KartTouchKey
-  | KartSchoolKey
-  | KartLoadKey
-  | KartChallengeKey
+/** What KART_MESSAGES holds: everything a race and the menu say */
+type KartBaseKey = keyof typeof en | KartRosterKey | KartBotsKey | KartCupKey | KartTouchKey | KartLoadKey | KartMenuKey
+
+/**
+ * Every kart string's key. The driving school's, the challenges' and the editor's are registered by
+ * their own lazy chunks (2026-11-22, docs/KART-PERF.md): only those screens may use them
+ */
+export type KartMessageKey = KartBaseKey | KartEditorKey | KartSchoolKey | KartChallengeKey
 
 const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.title': '卡丁車物理測試',
@@ -687,27 +687,23 @@ const zhTW: Record<keyof typeof en, string> = {
 }
 
 // e10-t05: the garage's strings live in their own file (i18n.roster.ts) and join the rest here
-export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartMessageKey, string>> = {
+export const KART_MESSAGES: Record<'en' | 'zh-TW', Record<KartBaseKey, string>> = {
   en: {
     ...en,
     ...KART_ROSTER_MESSAGES.en,
     ...KART_BOTS_MESSAGES.en,
-    ...KART_EDITOR_MESSAGES.en,
     ...KART_CUP_MESSAGES.en,
     ...KART_TOUCH_MESSAGES.en,
-    ...KART_SCHOOL_MESSAGES.en,
     ...KART_LOAD_MESSAGES.en,
-    ...KART_CHALLENGE_MESSAGES.en,
+    ...KART_MENU_MESSAGES.en,
   },
   'zh-TW': {
     ...zhTW,
     ...KART_ROSTER_MESSAGES['zh-TW'],
     ...KART_BOTS_MESSAGES['zh-TW'],
-    ...KART_EDITOR_MESSAGES['zh-TW'],
     ...KART_CUP_MESSAGES['zh-TW'],
     ...KART_TOUCH_MESSAGES['zh-TW'],
-    ...KART_SCHOOL_MESSAGES['zh-TW'],
     ...KART_LOAD_MESSAGES['zh-TW'],
-    ...KART_CHALLENGE_MESSAGES['zh-TW'],
+    ...KART_MENU_MESSAGES['zh-TW'],
   },
 }

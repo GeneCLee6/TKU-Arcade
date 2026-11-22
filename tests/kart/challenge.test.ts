@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { KART_MESSAGES } from '../../shared/kart/i18n.ts'
+import { KART_CHALLENGE_MESSAGES } from '../../shared/kart/i18n.challenge.ts'
 import { INITIAL_KART, KART_TUNING, type KartInput, type KartState } from '../../shared/kart/physics.ts'
 import { CHALLENGE_TRACK_IDS, challengeTrack } from '../../shared/kart/tracks/challenge.ts'
 import { RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
@@ -97,9 +97,9 @@ describe('the missions', () => {
     for (const chapter of CHAPTER_IDS) expect(missionsOf(chapter)).toHaveLength(6)
     for (const one of MISSIONS) {
       expect(missionTrack(one.track).id).toBe(one.track)
-      const key = `kart.challenge.mission.${one.id}` as keyof (typeof KART_MESSAGES)['en']
-      expect(KART_MESSAGES.en[key]).toBeTruthy()
-      expect(KART_MESSAGES['zh-TW'][key]).toBeTruthy()
+      const key = `kart.challenge.mission.${one.id}` as keyof (typeof KART_CHALLENGE_MESSAGES)['en']
+      expect(KART_CHALLENGE_MESSAGES.en[key]).toBeTruthy()
+      expect(KART_CHALLENGE_MESSAGES['zh-TW'][key]).toBeTruthy()
       // A race against the computer only on a race track (the room judges it); laps within a room's
       if (isRaceMission(one)) {
         expect(RACE_TRACK_IDS as readonly string[]).toContain(one.track)
