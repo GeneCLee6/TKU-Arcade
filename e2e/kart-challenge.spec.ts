@@ -25,7 +25,7 @@ test('/kart’s menu opens the challenges: chapters, and the medal wall', async 
   const home = page.getByTestId('kart-challenge')
   await expect(home).toBeVisible()
   await expect(page).toHaveURL(/challenge/)
-  await expect(home.getByRole('listitem')).toHaveCount(26)
+  await expect(home.getByRole('listitem')).toHaveCount(29)
   await expect(page.getByTestId('kart-challenge-chapter-basics')).toHaveAttribute('data-open', 'true')
   await expect(page.getByTestId('kart-challenge-chapter-technique')).not.toHaveAttribute('data-open')
   await expect(page.getByTestId('kart-challenge-start-combo10')).toBeDisabled()
