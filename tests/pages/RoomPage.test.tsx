@@ -548,17 +548,41 @@ describe('losing the connection', () => {
     expect(banner()).toBeNull()
   })
 
-  it('keeps showing the room under a polite banner', async () => {
+  it('keeps showing the room under a polite banner, after its first second', async () => {
     await droppedRoom()
+    // Most drops are back within a second: no flash of a banner for those
+    expect(banner()).toBeNull()
+    act(() => vi.advanceTimersByTime(1_000))
     expect(banner()!.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite')
     expect(screen.getByText('Al')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('tells that a button did nothing while reconnecting', async () => {
+  // 2026-11-22: a tap waits for the new socket; only one that waited too long is given up
+  it('sends a tap made while reconnecting once back, or says it was not sent', async () => {
     await droppedRoom()
     fireEvent.click(screen.getByRole('button', { name: en['room.waiting.ready'] }))
-    expect(screen.getByText(en['room.reconnecting.notSent'])).toBeInTheDocument()
+    expect(screen.queryByText(en['room.reconnecting.notSent'])).toBeNull()
+    act(() => vi.advanceTimersByTime(0))
+    socketOpens()
+    serverSays(welcome({}))
+    expect(FakeWebSocket.last.sent.at(-1)).toBe(JSON.stringify({ t: 'ready', ready: true }))
+  })
+
+  it('offers to try at once after a few seconds, and says when it is back', async () => {
+    await droppedRoom()
+    act(() => vi.advanceTimersByTime(0))
+    serverCloses(1006)
+    act(() => vi.advanceTimersByTime(6_000))
+    const before = FakeWebSocket.instances.length
+    fireEvent.click(screen.getByRole('button', { name: en['room.reconnecting.now'] }))
+    expect(FakeWebSocket.instances.length).toBeGreaterThanOrEqual(before)
+    socketOpens()
+    serverSays(welcome({}))
+    expect(banner()).toBeNull()
+    expect(screen.getByText(en['room.reconnected'])).toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(3_000))
+    expect(screen.queryByText(en['room.reconnected'])).toBeNull()
   })
 
   it('comes back as the same member, and the banner goes', async () => {
@@ -666,9 +690,9 @@ describe('closes', () => {
     expect(backLink()).toBeInTheDocument()
   })
 
-  it.each([1006, CloseCode.stale, CloseCode.badMessage])(
-    'anything else before welcome (%i): connection lost, retry opens one new socket',
-    async (code) => {
+  it('a protocol error before welcome: connection lost, retry opens one new socket', async () => {
+    const code = CloseCode.badMessage
+    {
       await closedBeforeWelcome(code)
       expect(screen.getByRole('alert')).toHaveTextContent("Couldn't connect to the room.")
       expect(FakeWebSocket.instances).toHaveLength(1)
@@ -679,6 +703,28 @@ describe('closes', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Joining…')
       socketOpens()
       expect(FakeWebSocket.last.joins).toHaveLength(1)
+    }
+  })
+
+  // 2026-11-22: one failed upgrade no longer ends it; tried again for FIRST_CONNECT_GIVE_UP_MS
+  it.each([1006, CloseCode.stale])(
+    'anything else before welcome (%i): tried again behind "Joining…", then connection lost',
+    async (code) => {
+      localStorage.setItem(NICKNAME_KEY, 'Al')
+      stubSummary()
+      renderRoom()
+      await summaryLoaded()
+      vi.useFakeTimers()
+      socketOpens()
+      serverCloses(code)
+      expect(screen.queryByRole('alert')).toBeNull()
+      expect(screen.getByRole('status')).toHaveTextContent('Joining…')
+      for (let i = 0; i < 80 && !retryButton(); i++) {
+        if (!FakeWebSocket.last.gone) serverCloses(code)
+        act(() => vi.advanceTimersByTime(500))
+      }
+      expect(screen.getByRole('alert')).toHaveTextContent("Couldn't connect to the room.")
+      vi.useRealTimers()
     },
   )
 

@@ -62,6 +62,8 @@ export type RoomHandle = {
   react(reaction: number): void
   /** A real-time game's channel (e2-t11): frames and clock pings, outside React */
   realtime: RoomRealtime
+  /** 2026-11-22: while reconnecting, try now instead of waiting (the banner's button) */
+  reconnectNow(): void
 }
 
 /**
@@ -73,6 +75,12 @@ export type RoomRealtime = {
   send(data: Uint8Array): boolean
   /** Returns the way to stop listening */
   listen(listener: (data: Uint8Array) => void): () => void
+  /**
+   * 2026-11-22: called when the socket is back after a drop, or the page after being hidden: a
+   * clock synced against the room's starts over (the device may have slept, and this browser's
+   * `performance.now()` with it). Returns the way to stop
+   */
+  onResume?(listener: () => void): () => void
 }
 
 /** More than this many on screen and the oldest go first */
@@ -99,11 +107,16 @@ export function useRoom(roomId: string, name: string): RoomHandle {
   const you = useRef<string | null>(null)
   // One channel for the life of the page: the race loop holds on to it across reconnects
   const listeners = useRef(new Set<(data: Uint8Array) => void>())
+  const resumers = useRef(new Set<() => void>())
   const [realtime] = useState<RoomRealtime>(() => ({
     send: (data) => connection.current?.sendQuiet(data) ?? false,
     listen: (listener) => {
       listeners.current.add(listener)
       return () => listeners.current.delete(listener)
+    },
+    onResume: (listener) => {
+      resumers.current.add(listener)
+      return () => resumers.current.delete(listener)
     },
   }))
 
@@ -130,6 +143,11 @@ export function useRoom(roomId: string, name: string): RoomHandle {
           current.phase === 'joined' ? { ...current, reconnecting: true } : current,
         ),
       onUnanswered: () => toast(t('room.reconnecting.lostTap'), { tone: 'warning' }),
+      // Waited for the new socket too long: the room has likely moved on
+      onUnsent: () => toast(t('room.reconnecting.notSent'), { tone: 'warning' }),
+      onResumed: () => {
+        for (const listener of resumers.current) listener()
+      },
       onError: (error) => {
         // Not let in: ask for the password, and stop knocking until it is typed (`retry`)
         if (error.code === 'password_required' || error.code === 'wrong_password') {
@@ -180,6 +198,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     [toast],
   )
 
+  const reconnectNow = useCallback(() => connection.current?.reconnectNow(), [])
   const retry = useCallback(() => {
     setSession({ phase: 'joining' })
     setTimers([])
@@ -213,7 +232,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     [send],
   )
   // Quiet: the page is on its way to the lobby, and a dropped socket goes the old way (17.)
-  const leave = useCallback(() => void connection.current?.send({ t: 'leave' }), [])
+  const leave = useCallback(() => void connection.current?.send({ t: 'leave' }, false), [])
   const react = useCallback((reaction: number) => send({ t: 'react', reaction }), [send])
   const setPassword = useCallback(
     (password: string | null) => send({ t: 'set_password', password }),
@@ -221,7 +240,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
   )
   // e10-t05: quiet when offline: the choice is sent again when the waiting room comes back
   const setLook = useCallback(
-    (look: string | null) => void connection.current?.send({ t: 'set_look', look }),
+    (look: string | null) => void connection.current?.send({ t: 'set_look', look }, false),
     [],
   )
   // 2026-11-18: a side in a game with teams; `member` is the host's choice for someone else
@@ -237,14 +256,14 @@ export function useRoom(roomId: string, name: string): RoomHandle {
   )
   const actFor = useCallback(
     (seat: number, action: JsonValue) =>
-      connection.current?.send({ t: 'action', action, botSeat: seat }) ?? false,
+      connection.current?.send({ t: 'action', action, botSeat: seat }, false) ?? false,
     [],
   )
   const sendChat = useCallback((raw: string): Promise<ChatSendResult> => {
     // The room closes the socket over a message that does not parse
     const text = normalizeChatText(raw)
     // Not sent while reconnecting: the composer keeps the text and says so
-    if (text === null || !connection.current?.send({ t: 'chat', text })) {
+    if (text === null || !connection.current?.send({ t: 'chat', text }, false)) {
       return Promise.resolve('failed')
     }
     return chatSends.current.add(text)
@@ -278,5 +297,6 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     react,
     sendChat,
     realtime,
+    reconnectNow,
   }
 }

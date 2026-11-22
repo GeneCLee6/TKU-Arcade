@@ -8,7 +8,6 @@ import {
   isSeatToken,
   parseServerMessage,
   roomSocketPath,
-  STALE_AFTER_MS,
   type ChatMessage,
   type ClientMessage,
   type ErrorMessage,
@@ -44,6 +43,16 @@ export type RoomHandlers = {
   /** The socket dropped and it is trying again; the next `onView` means it is back */
   onReconnecting: () => void
   /**
+   * Back after a drop (welcomed again), or the page is back from the background (2026-11-22): a
+   * clock synced against the room's may be off by however long the device slept, and is redone
+   */
+  onResumed?: () => void
+  /**
+   * Taps made while reconnecting wait for the new socket (2026-11-22); these were still waiting
+   * after QUEUE_TTL_MS and were never sent: the person should make them again
+   */
+  onUnsent?: (count: number) => void
+  /**
    * The socket was found dead while something sent on it had no answer yet: that tap most likely
    * never arrived, and the person should make it again once back
    */
@@ -61,8 +70,12 @@ export type RoomHandlers = {
 }
 
 export type RoomConnection = {
-  /** False when it could not go out: before `welcome`, while reconnecting, or after the end */
-  send: (message: ClientMessage) => boolean
+  /**
+   * False when it could not go out: before `welcome`, or after the end. While reconnecting it waits
+   * (up to QUEUE_TTL_MS, MAX_QUEUED of them) and goes out on the new socket once welcomed; with
+   * `wait` false it does not, for what has its own way of trying again (chat, the race loop)
+   */
+  send: (message: ClientMessage, wait?: boolean) => boolean
   /**
    * Out without waiting for an answer, as a real-time game's frames and clock pings go: twenty a
    * second must not each count as a tap the socket owes a reply to. False when it could not go out
@@ -70,6 +83,8 @@ export type RoomConnection = {
   sendQuiet: (data: Uint8Array) => boolean
   /** After it, nothing from this socket counts any more */
   leave: () => void
+  /** While reconnecting: try now rather than at the end of the wait (the banner's button) */
+  reconnectNow: () => void
 }
 
 /** How long to wait after each failed attempt; the last one repeats */
@@ -82,8 +97,28 @@ const RECONNECT_JITTER = 0.25
 export const RECONNECT_ATTEMPT_TIMEOUT_MS = 10_000
 /** Attempts have failed for this long since the socket dropped: leave it to the person */
 export const RECONNECT_GIVE_UP_MS = 5 * 60_000
-/** Sent without hearing anything back, by which time the server has given up on this socket too */
-const MAX_UNANSWERED_PINGS = STALE_AFTER_MS / HEARTBEAT_INTERVAL_MS
+/**
+ * A first connection that fails is tried again until this long has passed (2026-11-22): before, a
+ * single failed upgrade (a deploy, a phone between networks) ended in "Couldn't connect"
+ */
+export const FIRST_CONNECT_GIVE_UP_MS = 20_000
+/**
+ * After a 4429 (too many sockets from this address this minute, e.g. a whole campus behind one
+ * address coming back after a deploy) the next attempt waits at least this long: the window is a
+ * minute, and trying sooner only uses it up again. Before 2026-11-22 a 4429 ended the connection
+ */
+export const RATE_LIMITED_DELAY_MS = 20_000
+/** Taps made while reconnecting wait this long for the new socket, then are given up (onUnsent) */
+export const QUEUE_TTL_MS = 10_000
+/** At most this many taps wait; past it, send says no */
+export const MAX_QUEUED = 16
+/**
+ * Pings sent without hearing anything back: the socket is dead. Three, 45 s: no longer tied to the
+ * server's STALE_AFTER_MS, which since 2026-11-22 allows for a background tab's slowed timers
+ */
+const MAX_UNANSWERED_PINGS = 3
+/** Hidden at least this long, a page coming back has its clocks redone (onResumed) */
+const RESUME_AFTER_HIDDEN_MS = 1_000
 /**
  * A socket can look open and be dead: a phone that slept, went to another app or changed networks
  * reports no close for a long time, and everything sent on it is lost. The server answers every
@@ -138,15 +173,17 @@ function finalEnd(code: number): RoomEnd | null {
       return 'notFound'
     case CloseCode.roomFull:
       return 'full'
-    case CloseCode.tooManyConnections:
-      return 'tooManyConnections'
     default:
       return null
   }
 }
 
 /** shared/protocol.ts CloseCode: after any close but the 44xx ones, except `stale` */
-const canReconnectAfter = (code: number) => code === CloseCode.stale || code < 4400 || code >= 4500
+const canReconnectAfter = (code: number) =>
+  code === CloseCode.stale ||
+  code === CloseCode.tooManyConnections ||
+  code < 4400 ||
+  code >= 4500
 
 type RoomSocket = Pick<RoomConnection, 'send' | 'sendQuiet' | 'leave'> & {
   /** Checks that the socket still answers; replaced if it does not */
@@ -168,9 +205,17 @@ type RoomSocketHandlers = Omit<RoomHandlers, 'onEnd' | 'onReconnecting'> & {
  * only from the `open` of a socket that is still current, which is what keeps StrictMode's double
  * effect (and a retry) to one member. `rev` and the view start again from its own `welcome`.
  */
-function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandlers): RoomSocket {
+function openRoomSocket(
+  roomId: string,
+  name: string,
+  handlers: RoomSocketHandlers,
+  resume = false,
+): RoomSocket {
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const socket = new WebSocket(`${scheme}//${window.location.host}${roomSocketPath(roomId)}`)
+  // `resume`: an attempt to come back after a drop, which the site's socket limit allows for
+  // (worker/rooms.ts, docs/SECURITY.md §6): a whole room coming back at once is not a flood
+  const path = roomSocketPath(roomId) + (resume ? '&resume=1' : '')
+  const socket = new WebSocket(`${scheme}//${window.location.host}${path}`)
   // A real-time game's frames (e2-t11) come as bytes
   socket.binaryType = 'arraybuffer'
   let current = true
@@ -362,18 +407,30 @@ function openRoomSocket(roomId: string, name: string, handlers: RoomSocketHandle
  * This person's connection to a room, one socket at a time. A socket that had been welcomed and
  * drops is replaced by itself, the seat token bringing back the same member, until an attempt is
  * welcomed, a close says trying is pointless, or RECONNECT_GIVE_UP_MS has gone by. A first
- * connection that fails is reported at once. Reports at most one end.
+ * connection that fails is tried again for FIRST_CONNECT_GIVE_UP_MS (2026-11-22) and then reported.
+ * Reports at most one end.
  */
 export function connectRoom(roomId: string, name: string, handlers: RoomHandlers): RoomConnection {
   let socket: RoomSocket | null = null
-  /** When the socket dropped; null unless reconnecting */
+  /** When the welcomed socket dropped; null unless reconnecting */
   let lostAt: number | null = null
+  /** When the first connection failed; null unless trying it again */
+  let joiningSince: number | null = null
   let failures = 0
+  /** The last close was a 4429: the next attempt waits RATE_LIMITED_DELAY_MS */
+  let rateLimited = false
   /** While reconnecting: the wait for the next attempt or, with a socket, its deadline */
   let timer: ReturnType<typeof setTimeout> | undefined
+  /** Taps made while reconnecting, for the next socket */
+  let queue: { message: ClientMessage; at: number }[] = []
+  let ended = false
+  /** When the page was last hidden; null while it is shown */
+  let hiddenAt: number | null = document.visibilityState === 'hidden' ? Date.now() : null
+
+  const retrying = () => lostAt !== null || joiningSince !== null
 
   const open = () => {
-    socket = openRoomSocket(roomId, name, { ...handlers, onWelcome, onClosed })
+    socket = openRoomSocket(roomId, name, { ...handlers, onWelcome, onClosed }, lostAt !== null)
   }
 
   const attempt = () => {
@@ -388,16 +445,20 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
   // Judged here rather than by a timer of its own: a phone asleep for an hour has not been failing
   // for an hour, so it gets its attempt on waking up
   const attemptFailed = () => {
-    if (lostAt !== null && Date.now() - lostAt >= RECONNECT_GIVE_UP_MS) {
-      finish('disconnected')
+    const since = lostAt ?? joiningSince
+    const limit = lostAt !== null ? RECONNECT_GIVE_UP_MS : FIRST_CONNECT_GIVE_UP_MS
+    if (since !== null && Date.now() - since >= limit) {
+      finish(rateLimited ? 'tooManyConnections' : lostAt !== null ? 'disconnected' : 'connectionLost')
       return
     }
-    timer = setTimeout(attempt, reconnectDelay(failures++))
+    const delay = reconnectDelay(failures++)
+    timer = setTimeout(attempt, rateLimited ? Math.max(delay, RATE_LIMITED_DELAY_MS) : delay)
   }
 
-  // A wait still running is pointless now, and an attempt under way will do
+  // A wait still running is pointless now, and an attempt under way will do. Not after a 4429: the
+  // site asked for a pause, and coming back sooner only uses up its minute again
   const wake = () => {
-    if (socket || document.visibilityState === 'hidden') return
+    if (socket || rateLimited || document.visibilityState === 'hidden') return
     clearTimeout(timer)
     failures = 0
     attempt()
@@ -408,19 +469,41 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
     window.removeEventListener('online', wake)
     document.removeEventListener('visibilitychange', wake)
     lostAt = null
+    joiningSince = null
+    rateLimited = false
   }
 
   const finish = (end: RoomEnd) => {
+    ended = true
+    queue = []
     stopReconnecting()
     unwatch()
     handlers.onEnd(end)
   }
 
+  // What was tapped while reconnecting, on the socket just welcomed; what waited too long is not
+  // sent (the room may have moved on), and the person is told
+  const flush = () => {
+    const now = Date.now()
+    const waiting = queue
+    queue = []
+    let dropped = 0
+    for (const { message, at } of waiting) {
+      if (now - at <= QUEUE_TTL_MS && socket?.send(message)) continue
+      dropped++
+    }
+    if (dropped > 0) handlers.onUnsent?.(dropped)
+  }
+
   const onWelcome = () => {
-    if (lostAt === null) return
+    const wasLost = lostAt !== null
+    if (!retrying()) return
     stopReconnecting()
+    if (!wasLost) return
     // The server only says so when some are running, and these are from before the drop
     handlers.onTimers([])
+    flush()
+    handlers.onResumed?.()
   }
 
   const onClosed = (code: number, welcomed: boolean, unanswered: boolean) => {
@@ -429,43 +512,72 @@ export function connectRoom(roomId: string, name: string, handlers: RoomHandlers
     if (welcomed && unanswered && finalEnd(code) === null) handlers.onUnanswered?.()
     const final = finalEnd(code)
     if (final) return finish(final)
-    if (!welcomed && lostAt === null) return finish('connectionLost')
-    if (!canReconnectAfter(code)) return finish('disconnected')
-    if (lostAt !== null) return attemptFailed()
+    if (!canReconnectAfter(code)) {
+      return finish(!welcomed && lostAt === null ? 'connectionLost' : 'disconnected')
+    }
+    rateLimited = code === CloseCode.tooManyConnections
+    if (retrying()) return attemptFailed()
 
-    lostAt = Date.now()
     failures = 0
     window.addEventListener('online', wake)
     document.addEventListener('visibilitychange', wake)
+    if (!welcomed) {
+      // A first connection that failed: tried again for a while, behind the page's "joining"
+      joiningSince = Date.now()
+      return attemptFailed()
+    }
+    lostAt = Date.now()
     handlers.onReconnecting()
     attemptFailed()
   }
 
   // Back on the page, the network or the window: a socket that looks open may have died meanwhile.
-  // Checked at once rather than at the next heartbeat, up to 45 s later
+  // Checked at once rather than at the next heartbeat, up to 45 s later. `resume`: Chrome unfreezing
+  // a background tab (Page Lifecycle)
   const check = () => {
-    if (document.visibilityState === 'hidden') return
+    if (document.visibilityState === 'hidden') {
+      hiddenAt ??= Date.now()
+      return
+    }
+    const wasHidden = hiddenAt !== null && Date.now() - hiddenAt >= RESUME_AFTER_HIDDEN_MS
+    hiddenAt = null
     if (socket) socket.probe()
-    else if (lostAt !== null) wake()
+    else if (retrying()) wake()
+    // The device may have slept: whatever was synced against the room's clock is redone
+    if (wasHidden && !retrying()) handlers.onResumed?.()
   }
   const watched = ['online', 'focus', 'pageshow'] as const
   for (const event of watched) window.addEventListener(event, check)
   document.addEventListener('visibilitychange', check)
+  document.addEventListener('resume', check)
   function unwatch() {
     for (const event of watched) window.removeEventListener(event, check)
     document.removeEventListener('visibilitychange', check)
+    document.removeEventListener('resume', check)
   }
 
   open()
 
   return {
-    send: (message) => socket?.send(message) ?? false,
+    send: (message, wait = true) => {
+      if (socket?.send(message)) return true
+      if (!wait || ended || lostAt === null || queue.length >= MAX_QUEUED) return false
+      queue.push({ message, at: Date.now() })
+      return true
+    },
     sendQuiet: (data) => socket?.sendQuiet(data) ?? false,
     leave: () => {
+      ended = true
+      queue = []
       stopReconnecting()
       unwatch()
       socket?.leave()
       socket = null
+    },
+    reconnectNow: () => {
+      if (ended || !retrying()) return
+      rateLimited = false
+      wake()
     },
   }
 }

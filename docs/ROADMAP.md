@@ -207,6 +207,7 @@ worktree 開分支、只讀需要的段落、lint+typecheck+test+build 只看最
 | #146 | 2026-11-22 | `feat/kart-track-routes` | 燈籠老街的燈籠巷（第二條捷徑，穿縫）、漁人碼頭與老街各一個接彎的台階；`oldstreet@11`、`harbour@15` |
 | #147 | 2026-11-22 | `feat/table-bots-many` | 「跟電腦玩」自選電腦數量（1 到滿座，德州撲克預設 5）與各自難度；等待室「空位全部坐滿」 |
 | #148 | 2026-11-22 | `feat/fullscreen-play` | 全螢幕遊玩：共用 `src/lib/fullscreen.ts`（整頁 Fullscreen API、iPhone 退回專注模式並提示加到主畫面、Keyboard Lock 保留 Esc）、房間標題與卡丁車選單的按鈕、比賽自動全螢幕設定與手機鎖橫、PWA `display_override` |
+| #149 | 2026-11-22 | `feat/net-stability-bots` | 連線穩定度：心跳寬限 45 → 90 s（背景分頁不再每一兩分鐘被踢，預覽站每人每小時 58 → 0 次）、第一次連線失敗自動重試、4429 改成暫停並給重連另 240 次額度、重連期間的操作排隊、提示晚 1 s 出現並可立刻重試、卡丁車重連後重新對時；`npm run net:soak`、`docs/NETWORK.md` |
 
 ## Phase O · M4 社群
 
