@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { BluffView } from '../../../shared/games/bluff/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
-import { Heading, List, Row, Section } from '../../components/roomParts.ts'
+import { Heading, List } from '../../components/roomParts.ts'
 import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { useT } from '../../i18n/useT.ts'
 import { displayType, monoType } from '../../styles/esports.ts'
@@ -10,6 +10,7 @@ import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { Count, Muted, Name, Tag, Top } from './bluffParts.ts'
 import { RoleTag } from './RoundReveal.tsx'
 import { byScore, gains, revealedRole, signed } from './screenState.ts'
+import { PlateRow, placeOf, RankPlate, TableSection as Section } from '../../components/table/tableKit.ts'
 
 /** Everyone's total, highest first; once revealed, each one's role and what this round changed */
 export function Scoreboard({ view, nameOf }: { view: BluffView; nameOf(seat: SeatId): string }) {
@@ -23,11 +24,16 @@ export function Scoreboard({ view, nameOf }: { view: BluffView; nameOf(seat: Sea
         <Count>{t('games.bluff.ui.round', { round: view.round, rounds: view.totalRounds })}</Count>
       </Top>
       <List as="ol">
-        {byScore(view).map((player) => {
+        {byScore(view).map((player, _index, all) => {
+          const place = placeOf(all.map((one) => one.score), player.score)
           const name = nameOf(player.seat)
           const gain = gained.get(player.seat)
           return (
-            <Row key={player.seat} $mark={seatColor(player.seat)}>
+            <PlateRow key={player.seat} $mark={seatColor(player.seat)}>
+              {/* The list is in order already: the plate only shows it, ties sharing a place */}
+              <RankPlate $lead={place === 1} aria-hidden="true">
+                {place}
+              </RankPlate>
               <Avatar name={name} tint={seatColor(player.seat)} />
               <Name>
                 {name}
@@ -47,7 +53,7 @@ export function Scoreboard({ view, nameOf }: { view: BluffView; nameOf(seat: Sea
                 <VisuallyHidden>{t('games.bluff.ui.pointsLabel', { score: player.score })}</VisuallyHidden>
                 {gain !== undefined && <Gain $up={gain > 0}>{signed(gain)}</Gain>}
               </Score>
-            </Row>
+            </PlateRow>
           )
         })}
       </List>

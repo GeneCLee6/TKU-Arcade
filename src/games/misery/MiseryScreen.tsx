@@ -4,14 +4,16 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import type { MiseryAction, MiseryView } from '../../../shared/games/misery/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType, SLANT } from '../../styles/esports.ts'
+import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { AllLines } from './AllLines.tsx'
 import { LineView } from './LineView.tsx'
 import { answerKey, lineOf, promptOf } from './screenState.ts'
 import { RevealCard, TableCard } from './TableCard.tsx'
+import { PhaseBar, tablePanel, Ticker } from '../../components/table/tableKit.ts'
 
 /** If the room never answers a press, the buttons come back after this */
 const ANSWER_WAIT_MS = 4000
@@ -88,6 +90,11 @@ export default function MiseryScreen({ room, game }: GameScreenProps) {
           </Facts>
         </Header>
         {view.phase === 'guess' && <TableCard view={view} nameOf={nameOf} />}
+        {/* The broadcast's caption (DESIGN §3.9): the card's index as it is turned */}
+        <TableCaption
+          id={view.phase !== 'guess' && view.last !== null ? `turn-${view.last.turnNo}` : null}
+          text={view.last === null ? '' : t('games.misery.ui.index', { index: view.last.card.index })}
+        />
         {view.phase !== 'guess' && view.last !== null && (
           <RevealCard reveal={view.last} you={view.you} nameOf={nameOf} />
         )}
@@ -118,7 +125,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -126,10 +133,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Round = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The round as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Round = styled(Ticker)``
 
 const Facts = styled.div`
   display: flex;
@@ -152,7 +157,7 @@ const Fact = styled.span`
 `
 
 const Mine = styled.section<{ $live: boolean }>`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.lg}px;

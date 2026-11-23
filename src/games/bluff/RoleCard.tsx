@@ -3,10 +3,11 @@ import styled from 'styled-components'
 import type { BluffView } from '../../../shared/games/bluff/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { useLanguage, useT } from '../../i18n/useT.ts'
-import { displayType, glass, SLANT } from '../../styles/esports.ts'
+import { displayType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { Body, Tag } from './bluffParts.ts'
 import { roleOf } from './screenState.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 /**
  * The term, big, with its three categories (one of them true, 2026-11-14), and what only you hold
@@ -92,7 +93,7 @@ export function RoleCard({ view }: { view: BluffView }) {
 }
 
 const Card = styled.section<{ $role: string }>`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.lg}px;

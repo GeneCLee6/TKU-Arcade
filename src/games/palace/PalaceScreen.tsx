@@ -4,8 +4,9 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import type { PalaceAct, PalaceAction, PalaceRole, PalaceView } from '../../../shared/games/palace/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType } from '../../styles/esports.ts'
+import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { ActionLog } from './ActionLog.tsx'
@@ -13,7 +14,8 @@ import { ActionPicker } from './ActionPicker.tsx'
 import { Court } from './Court.tsx'
 import { Hand } from './Hand.tsx'
 import { RoleGuide } from './RoleGuide.tsx'
-import { actKey, answerKey, CLAIMS, isBluff, promptOf, roleKey } from './screenState.ts'
+import { actKey, answerKey, CLAIMS, isBluff, logLine, promptOf, roleKey } from './screenState.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 /** If the room never answers a press, the buttons come back after this */
 const ANSWER_WAIT_MS = 4000
@@ -57,6 +59,9 @@ export default function PalaceScreen({ room, game }: GameScreenProps) {
   const canPass = legal.some((action) => action.type === 'pass')
   const canChallenge = legal.some((action) => action.type === 'challenge')
   const blocks = legal.flatMap((action) => (action.type === 'block' ? [action.role] : []))
+  // The broadcast's caption (DESIGN §3.9): a challenge and how it went, someone out. The log's own line
+  const last = view.log.at(-1)
+  const big = last !== undefined && CAPTIONED.has(last.k) ? logLine(last, names) : null
 
   return (
     <GameLayout
@@ -93,6 +98,11 @@ export default function PalaceScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage>
+        <TableCaption
+          id={big === null ? null : `log-${view.log.length}`}
+          text={big === null ? '' : t(big.key, big.params)}
+          tone={last?.k === 'proved' ? 'accent' : 'magenta'}
+        />
         {view.current !== null && !game.over && <Now view={view} nameOf={nameOf} />}
         {choosing && <ActionPicker key={view.step} view={view} legal={legal} disabled={asked} nameOf={nameOf} onAct={send} />}
         <Hand view={view} disabled={asked} onAct={send} />
@@ -131,6 +141,9 @@ function Now({ view, nameOf }: { view: PalaceView; nameOf(seat: SeatId): string 
   )
 }
 
+/** The log's lines that make a caption */
+const CAPTIONED = new Set(['challenge', 'proved', 'caught', 'out'])
+
 const Stage = styled.div`
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -138,7 +151,7 @@ const Stage = styled.div`
 `
 
 const NowPanel = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: 2px;
   padding: ${space.md}px ${space.lg}px;

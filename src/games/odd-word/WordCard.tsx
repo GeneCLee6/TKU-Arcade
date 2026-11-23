@@ -3,8 +3,8 @@ import styled from 'styled-components'
 import type { OddWordView } from '../../../shared/games/odd-word/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { useLanguage, useT } from '../../i18n/useT.ts'
-import { glass } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 /**
  * Your word, as big as a phone allows: the only secret this game has, cut by the server into your
@@ -55,7 +55,7 @@ export function WordCard({ view }: { view: OddWordView }) {
 }
 
 const Card = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.lg}px;

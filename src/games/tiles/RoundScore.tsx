@@ -3,11 +3,12 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import { rackValue } from '../../../shared/games/tiles/tiles.ts'
 import type { TilesRoundResult, TilesView } from '../../../shared/games/tiles/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
-import { Heading, List, Row, Section } from '../../components/roomParts.ts'
+import { Heading, List, Row } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { sortRack } from './screenState.ts'
 import { TileFace } from './Tile.tsx'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 /** A finished round: who won it, every rack laid open, and the score it moved */
 export function RoundScore({

@@ -13,6 +13,7 @@ import { ClueLog } from './ClueLog.tsx'
 import { Grid } from './Grid.tsx'
 import { answerKey, cellLooks, clueCount, giverOf, picksLeft, promptOf } from './screenState.ts'
 import { Setup } from './Setup.tsx'
+import { PhaseBar, Ticker } from '../../components/table/tableKit.ts'
 
 /** If the room never answers a press, the buttons come back after this */
 const ANSWER_WAIT_MS = 4000
@@ -210,7 +211,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -218,10 +219,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Title = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The card, level or mode as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Title = styled(Ticker)``
 
 const Facts = styled.div`
   display: flex;

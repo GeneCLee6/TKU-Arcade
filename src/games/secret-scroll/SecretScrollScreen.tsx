@@ -10,12 +10,14 @@ import type {
 } from '../../../shared/games/secret-scroll/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType, SLANT } from '../../styles/esports.ts'
+import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { ScrollCardBack, ScrollCardFace } from './ScrollCardFace.tsx'
 import { chosenPlay, eventLines, guessesOf, playableCards, promptOf, targetsOf } from './screenState.ts'
+import { PhaseBar, tablePanel, Ticker } from '../../components/table/tableKit.ts'
 
 /** If the room never answers a press, the button comes back after this */
 const ANSWER_WAIT_MS = 4000
@@ -98,6 +100,18 @@ export default function SecretScrollScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage data-testid="scroll-stage">
+        {/* The broadcast's caption when a round is won (DESIGN §3.9): the round panel's own title */}
+        <TableCaption
+          id={view.lastRound !== null && view.phase !== 'turn' ? `round-${view.lastRound.round}` : null}
+          text={
+            view.lastRound === null
+              ? ''
+              : t('games.secret-scroll.ui.roundWon', {
+                  round: view.lastRound.round,
+                  names: list(view.lastRound.winners.map(nameOf)),
+                })
+          }
+        />
         <Header>
           <Round>{t('games.secret-scroll.ui.round', { round: view.round })}</Round>
           <Facts>
@@ -311,7 +325,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -319,10 +333,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Round = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The round as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Round = styled(Ticker)``
 
 const Facts = styled.div`
   display: flex;
@@ -364,7 +376,7 @@ const Tiles = styled.div`
 `
 
 const Tile = styled.section<{ $out: boolean; $turn: boolean }>`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.xs}px;
   padding: ${space.sm}px;
@@ -449,12 +461,12 @@ const panel = `
 `
 
 const HandPanel = styled.section`
-  ${glass}
+  ${tablePanel}
   ${panel}
 `
 
 const RoundPanel = styled.section`
-  ${glass}
+  ${tablePanel}
   ${panel}
 
   & > p {
@@ -463,7 +475,7 @@ const RoundPanel = styled.section`
 `
 
 const LogPanel = styled.section`
-  ${glass}
+  ${tablePanel}
   ${panel}
 `
 
@@ -549,7 +561,7 @@ const LogLine = styled.li<{ $mine: boolean; $sub: boolean }>`
 `
 
 const Reference = styled.details`
-  ${glass}
+  ${tablePanel}
   padding: ${space.sm}px ${space.md}px;
 
   & > summary {

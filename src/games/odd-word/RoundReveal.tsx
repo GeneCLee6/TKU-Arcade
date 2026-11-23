@@ -2,11 +2,12 @@ import styled from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { OddWordView } from '../../../shared/games/odd-word/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
-import { Heading, List, Row, Section } from '../../components/roomParts.ts'
+import { Heading, List, Row } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
-import { displayType, glass, SLANT } from '../../styles/esports.ts'
+import { displayType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { revealedWords } from './screenState.ts'
+import { TableSection as Section, tablePanel } from '../../components/table/tableKit.ts'
 
 /** The two words, who had the odd one, and everyone's word: the same for everyone */
 export function RoundReveal({ view, nameOf }: { view: OddWordView; nameOf(seat: SeatId): string }) {
@@ -62,7 +63,7 @@ export function RoundReveal({ view, nameOf }: { view: OddWordView; nameOf(seat: 
 }
 
 const Card = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.md}px;
   padding: ${space.lg}px;

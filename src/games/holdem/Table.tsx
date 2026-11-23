@@ -153,7 +153,7 @@ function SeatBox({
             )}
         {badge !== null && <Badge>{badge}</Badge>}
       </Holes>
-      {status !== null && !player.out && <Status>{status}</Status>}
+      {status !== null && !player.out && <Status data-status="">{status}</Status>}
     </Box>
   )
 }
@@ -253,8 +253,9 @@ const Box = styled.div<{ $turn: boolean; $you: boolean; $faded: boolean }>`
   border-top: 3px solid var(--seat);
   ${(p) => (p.$turn ? turnGlow : '')}
   /* Folded or out: the seat's words fade, never cards it shows (2026-11-23: a shown 10 of diamonds in a
-     faded seat was 1.9:1 against the dimmed card, axe serious in the phone sweep) */
-  & > :not([data-holes]) {
+     faded seat was 1.9:1 against the dimmed card, axe serious in the phone sweep), nor the word that
+     says why (a faded muted "Folded" was 3.75:1) */
+  & > :not([data-holes], [data-status]) {
     opacity: ${(p) => (p.$faded ? 0.6 : 1)};
   }
   font-size: 12px;

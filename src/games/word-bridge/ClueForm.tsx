@@ -3,9 +3,9 @@ import styled from 'styled-components'
 import { clueProblem, MAX_CLUE_COUNT, MAX_CLUE_LENGTH, tidyClue } from '../../../shared/games/word-bridge/clue.ts'
 import { Button } from '../../components/Button.tsx'
 import { FieldError, FieldLabel, SelectInput, TextInput } from '../../components/Field.tsx'
-import { Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { space, fontSize } from '../../styles/tokens.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 interface ClueFormProps {
   /** The words still face down: a clue may not hold one */

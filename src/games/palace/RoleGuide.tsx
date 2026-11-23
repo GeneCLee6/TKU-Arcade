@@ -4,10 +4,10 @@ import type { PalaceRole } from '../../../shared/games/palace/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
-import { glass } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { RoleCard } from './RoleCard.tsx'
 import { roleKey } from './screenState.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 const ROLES: readonly PalaceRole[] = ['treasurer', 'guard', 'eunuch', 'strategist', 'dowager']
 
@@ -47,7 +47,7 @@ export function RoleGuide() {
 }
 
 const Panel = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.lg}px;

@@ -1,8 +1,9 @@
 import styled from 'styled-components'
 import type { SpectrumTopic } from '../../../shared/games/spectrum/types.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
-import { glass, monoType, SLANT } from '../../styles/esports.ts'
+import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 /**
  * This round's card of four topics (owner, 2026-11-13). The guesser picks the one to ask, a button
@@ -70,7 +71,7 @@ export function TopicChoice({
 }
 
 const Card = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.md}px;
   padding: ${space.md}px;

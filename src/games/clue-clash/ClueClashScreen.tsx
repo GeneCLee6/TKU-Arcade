@@ -6,14 +6,16 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { FieldError, FieldLabel, TextInput } from '../../components/Field.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
-import { Heading, Section } from '../../components/roomParts.ts'
+import { TableCaption } from '../../components/LateParts.tsx'
+import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
-import { displayType, monoType, SLANT } from '../../styles/esports.ts'
+import { displayType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { ClueForm } from './ClueForm.tsx'
 import { ClueList } from './ClueList.tsx'
 import { answerKey, promptOf, verdictOf } from './screenState.ts'
+import { PhaseBar, TableSection as Section, Ticker } from '../../components/table/tableKit.ts'
 
 /** If the room never answers a press, the buttons come back after this */
 const ANSWER_WAIT_MS = 4000
@@ -169,6 +171,12 @@ export default function ClueClashScreen({ room, game }: GameScreenProps) {
           <GuessForm key={view.cardsUsed} disabled={asked} onGuess={(text) => send({ type: 'guess', text })} onPass={() => send({ type: 'pass' })} />
         )}
 
+        {/* The broadcast's caption (DESIGN §3.9): the verdict, the reveal's own heading */}
+        <TableCaption
+          id={view.phase === 'reveal' ? `reveal-${view.cardsUsed}` : null}
+          text={t(`games.clue-clash.ui.verdict.${verdict ?? 'pass'}`)}
+          tone={verdict === 'wrong' ? 'magenta' : 'accent'}
+        />
         {(view.phase === 'reveal' || (view.phase === 'over' && view.guess !== null)) && (
           <Section aria-labelledby="cc-reveal" data-testid="cc-reveal">
             <Heading id="cc-reveal">{t(`games.clue-clash.ui.verdict.${verdict ?? 'pass'}`)}</Heading>
@@ -271,7 +279,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -279,10 +287,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Mono = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The card, level or mode as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Mono = styled(Ticker)``
 
 const Facts = styled.div`
   display: flex;

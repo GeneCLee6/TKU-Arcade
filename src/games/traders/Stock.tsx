@@ -1,7 +1,8 @@
-import styled from 'styled-components'
+import styled, { css } from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { TradersPlayerView } from '../../../shared/games/traders/types.ts'
 import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { tradersPieces as piece } from '../../styles/tradersTokens.ts'
@@ -177,9 +178,16 @@ const Panel = styled.section<{ $returning: boolean }>`
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.md}px;
-  background: ${color.sunken};
-  border-radius: 6px;
-  box-shadow: inset 0 3px 0 ${(p) => (p.$returning ? color.warning : color.accent)};
+  ${tablePanel}
+  ${(p) =>
+    p.$returning &&
+    css`
+      &::before {
+        box-shadow:
+          inset 0 0 0 1px ${color.line},
+          inset 0 3px 0 ${color.warning};
+      }
+    `}
 `
 
 const Head = styled.div`

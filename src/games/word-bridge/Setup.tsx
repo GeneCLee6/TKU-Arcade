@@ -2,9 +2,10 @@ import styled from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { WbAction, WbTeam, WbView } from '../../../shared/games/word-bridge/types.ts'
 import { Button } from '../../components/Button.tsx'
-import { Heading, List, Row, Section } from '../../components/roomParts.ts'
+import { Heading, List, Row } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 interface SetupProps {
   view: WbView
