@@ -473,6 +473,8 @@ export default function ReplayView({
       laps: reel.replay.laps,
       reducedMotion: prefersReducedMotion(),
       passings: kit.replayPassings(track, reel),
+      // 2026-11-23: a replay knows what is coming; the director cuts to it a moment before
+      foreseen: kit.foreseePasses(track, reel),
     })
     const playing = clips.current
     if (playing) run.current.favour(playing.list[playing.index]?.seat ?? null)

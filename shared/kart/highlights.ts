@@ -6,7 +6,7 @@
 //
 // Pure: the replay's own data (shared/kart/replay.ts) and the track, nothing else; tested in
 // tests/kart/highlights.test.ts.
-import type { Passings } from './broadcast.ts'
+import { CONFIRM_SECONDS, type ForeseenPass, type Passings } from './broadcast.ts'
 import { gatesPassed } from './race.ts'
 import type { Track } from './track.ts'
 import { msToTicks, sampleAt, TICKS_PER_SECOND, type ReplayReel } from './replay.ts'
@@ -84,6 +84,55 @@ export function replayPassings(track: Pick<Track, 'gates'>, reel: ReplayReel): P
     passings.set(seat, times)
   }
   return passings
+}
+
+/** The places are read this often to foresee the passes, ticks (a watch page's frame at 30 a second) */
+const FORESEE_STEP = 2
+/** The same two swapping back within this long is not a pass (the director's rule) */
+const FORESEE_ECHO_SECONDS = 4
+
+/**
+ * Every overtake of the replay as the broadcast's director confirms one (a swap of neighbouring
+ * places that holds CONFIRM_SECONDS, not the same two straight back, neither home), at the moment of
+ * the swap: the future a director watching the replay knows (2026-11-23, broadcast.ts `foreseen`)
+ */
+export function foreseePasses(track: Pick<Track, 'gates'>, reel: ReplayReel): ForeseenPass[] {
+  const found: ForeseenPass[] = []
+  if (reel.samples.size === 0) return found
+  const finishTick = (seat: number) => {
+    const ms = reel.replay.racers.find((racer) => racer.seat === seat)?.finishMs
+    return ms === null || ms === undefined ? Infinity : msToTicks(ms)
+  }
+  let previous: number[] | null = null
+  let pending: ForeseenPass[] = []
+  for (let tick = Math.max(reel.start, 0); tick <= reel.end; tick += FORESEE_STEP) {
+    const time = tick / TICKS_PER_SECOND
+    const order = replayOrderAt(track, reel, tick)
+    if (previous && time >= SETTLE_SECONDS) {
+      for (let i = 0; i + 1 < order.length; i++) {
+        const seat = order[i]!
+        const behind = order[i + 1]!
+        if (finishTick(seat) <= tick || finishTick(behind) <= tick) continue
+        const was = previous.indexOf(seat)
+        const wasBehind = previous.indexOf(behind)
+        if (was < 0 || wasBehind < 0 || was < wasBehind) continue
+        const undone = pending.findIndex((one) => one.seat === behind && one.other === seat)
+        const echo = found.some(
+          (one) => one.seat === behind && one.other === seat && time - one.at < FORESEE_ECHO_SECONDS,
+        )
+        if (undone >= 0) pending.splice(undone, 1)
+        else if (!echo) pending.push({ seat, other: behind, at: time })
+      }
+    }
+    pending = pending.filter((one) => {
+      if (time - one.at < CONFIRM_SECONDS) return true
+      const place = order.indexOf(one.seat)
+      if (place >= 0 && place < order.indexOf(one.other) && finishTick(one.seat) > tick) found.push(one)
+      return false
+    })
+    previous = order
+  }
+  return found
 }
 
 /** Every moment worth showing, unscored by overlap: the candidates */

@@ -125,6 +125,8 @@ export type BoardRefusal =
   | 'reset'
   | 'far'
   | 'obstacle'
+  /** Through a wall between two samples (2026-11-23, boardWalls.ts) */
+  | 'wall'
   | 'tick'
   | 'old'
   /** Laps that the gates did not count, or times that do not match the samples */
