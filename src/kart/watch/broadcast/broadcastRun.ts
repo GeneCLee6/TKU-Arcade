@@ -11,9 +11,12 @@ import {
   startDirector,
   type BroadcastHit,
   type BroadcastKart,
+  type BroadcastShot,
+  type ForeseenPass,
   type Caption,
   type CutReason,
   type DirectorState,
+  type Foresight,
   type Passings,
   type ShotKind,
 } from '../../../../shared/kart/broadcast.ts'
@@ -59,6 +62,8 @@ export interface RunInput {
   readonly karts: readonly RunKart[]
   readonly racers: readonly RunRacer[]
   readonly hits: readonly BroadcastHit[]
+  /** 2026-11-23: the items in flight, for the hits foreseen (live; a replay knows its hits) */
+  readonly shots?: readonly BroadcastShot[]
 }
 
 export interface StandingRow {
@@ -82,6 +87,8 @@ export interface BroadcastReadout {
   readonly shot: ShotKind
   readonly reason: CutReason
   readonly cuts: number
+  /** 2026-11-23: how the director's predictions have done */
+  readonly foresight?: Foresight
   readonly rows: readonly StandingRow[]
   /** The kart on screen: its speed, km/h */
   readonly speed: number
@@ -120,6 +127,11 @@ export interface RunOptions {
   readonly reducedMotion: boolean
   /** A replay's times at each gate, worked out whole beforehand; live, they are noted as it goes */
   readonly passings?: Passings
+  /**
+   * 2026-11-23, a replay: its overtakes to come (highlights.ts foreseePasses), and its `hits` hold
+   * those to come: the director cuts to them a moment before instead of guessing
+   */
+  readonly foreseen?: readonly ForeseenPass[]
   /** For tests: the cameras, else the track's own */
   readonly cameras?: readonly TracksideCamera[]
 }
@@ -171,11 +183,23 @@ export function createBroadcastRun(options: RunOptions): BroadcastRun {
         notePassings(noted, input.time, karts)
       }
       const before = state
-      const result = directorStep(state, { time: input.time, karts, laps, gates: track.gates.length, hits: input.hits }, {
-        cameras,
-        reducedMotion: options.reducedMotion,
-        favour: favoured,
-      })
+      const result = directorStep(
+        state,
+        {
+          time: input.time,
+          karts,
+          laps,
+          gates: track.gates.length,
+          hits: input.hits,
+          ...(input.shots ? { shots: input.shots } : {}),
+        },
+        {
+          cameras,
+          reducedMotion: options.reducedMotion,
+          favour: favoured,
+          ...(options.foreseen ? { foreseen: options.foreseen } : {}),
+        },
+      )
       state = result.state
       // Captions one at a time: the one up stays CAPTION_MIN at least, the most important waiting
       // goes next, and one kept waiting too long is dropped
@@ -221,6 +245,7 @@ export function createBroadcastRun(options: RunOptions): BroadcastRun {
     },
     readout: () => ({
       seat: state.seat,
+      foresight: state.foresight,
       shot: state.shot,
       reason: state.reason,
       cuts: state.cuts,
