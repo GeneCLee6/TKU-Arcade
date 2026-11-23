@@ -1021,6 +1021,21 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
     'Zhuwei Flyover',
     // 2026-11-23: the high-platform track
     'Breakwater Roofs',
+    // 2026-11-23 (#131): every track the other way round
+    'Golden Riverbank (Reverse)',
+    "Fisherman's Wharf (Reverse)",
+    'Five Tigers Hill (Reverse)',
+    'Lantern Old Street (Reverse)',
+    'Guanyin Hill Road (Reverse)',
+    'Mangrove Channel (Reverse)',
+    'Hobe Fort Hill (Reverse)',
+    'Danhai Night Circuit (Reverse)',
+    'Datun Ridgeline (Reverse)',
+    'Wharf Warehouses (Reverse)',
+    'Hillside Lanes (Reverse)',
+    'Viaduct Works (Reverse)',
+    'Zhuwei Flyover (Reverse)',
+    'Breakwater Roofs (Reverse)',
   ])
   await expect(page.getByRole('button', { name: 'Tuning' })).toHaveCount(0)
   await expect(page.getByText('Time trial')).toBeVisible()

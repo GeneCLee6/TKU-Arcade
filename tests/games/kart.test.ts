@@ -15,7 +15,7 @@ import {
 import type { KartAction, KartState } from '../../shared/games/kart/types.ts'
 import { isGameError, type Actor, type RealtimeMemory } from '../../shared/games/types.ts'
 import type { KartFrame } from '../../shared/kart/net.ts'
-import { RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
+import { ALL_RACE_TRACK_IDS, RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { bytes, driveFrames } from '../kart/raceDriver.ts'
 import { playRandom } from './harness.ts'
@@ -47,8 +47,9 @@ describe('the race room in the lobby (e9-t07)', () => {
     const track = kart.options.track
     if (track.kind !== 'select') throw new Error('the track is chosen from a list')
     // e10-t08: and a track made in the editor
-    expect(track.choices.map((choice) => choice.value)).toEqual([...RACE_TRACK_IDS, 'custom'])
-    for (const id of RACE_TRACK_IDS) {
+    // 2026-11-23 (#131): and every reversed track
+    expect(track.choices.map((choice) => choice.value)).toEqual([...ALL_RACE_TRACK_IDS, 'custom'])
+    for (const id of ALL_RACE_TRACK_IDS) {
       expect(GAME_MESSAGES.en[`games.kart.track.${id}`]).toBeTruthy()
       expect(GAME_MESSAGES['zh-TW'][`games.kart.track.${id}`]).toBeTruthy()
     }

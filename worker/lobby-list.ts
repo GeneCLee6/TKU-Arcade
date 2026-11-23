@@ -2,37 +2,14 @@
 // room list and quick join; docs/ARCHITECTURE.md §4.83). The LobbyDO keeps every listed room, open,
 // full, locked or playing (worker/lobby-board.ts); the home page is still shown only the open ones,
 // a game's own list all of its rooms, the open ones first.
-import { LOBBY_LIST_LIMIT, type RoomListing } from '../shared/protocol.ts'
+import { humansOf, isOpenRoom } from '../shared/lobby-feed.ts'
+import type { RoomListing } from '../shared/protocol.ts'
 import { LOBBY_NAME } from './lobby-board.ts'
 import { FixedWindowLimit } from './rate-limit.ts'
 
-/** Some may walk in: waiting, a free seat, no password */
-export const isOpenRoom = (room: RoomListing): boolean =>
-  (room.status ?? 'waiting') === 'waiting' && room.locked !== true && room.seated < room.maxSeats
-
-/** People, not computer players, seated */
-export const humansOf = (room: RoomListing): number => room.seated - (room.bots ?? 0)
-
-/** 0: open; 1: waiting, but full or locked; 2: playing (to watch) */
-const standing = (room: RoomListing): number =>
-  isOpenRoom(room) ? 0 : (room.status ?? 'waiting') === 'waiting' ? 1 : 2
-
-/**
- * What a list is shown of `rooms` (newest first, as the lobby keeps them). No `gameId`: the home
- * page's, the open rooms of every game, newest first, as before 2026-11-23. A `gameId`: every room
- * of that game, open first, then waiting but full or locked, then playing; among each, more people
- * first, then newer. LOBBY_LIST_LIMIT of them either way
- */
-export function lobbyRooms(rooms: readonly RoomListing[], gameId: string | null): RoomListing[] {
-  if (gameId === null) return rooms.filter(isOpenRoom).slice(0, LOBBY_LIST_LIMIT)
-  return rooms
-    .filter((room) => room.gameId === gameId)
-    .sort(
-      (a, b) =>
-        standing(a) - standing(b) || humansOf(b) - humansOf(a) || b.createdAt - a.createdAt,
-    )
-    .slice(0, LOBBY_LIST_LIMIT)
-}
+// What a list shows moved to shared/lobby-feed.ts (2026-11-23), so that the pushed list a page puts
+// together reads exactly as the polled one
+export { humansOf, isOpenRoom, lobbyRooms } from '../shared/lobby-feed.ts'
 
 /**
  * The rooms of `gameId` quick join tries, best first: open ones, the most people first (a race
@@ -54,6 +31,16 @@ export const LOBBY_READS_PER_INSTANCE = 20_000
 
 export const lobbyReadLimit = new FixedWindowLimit(LOBBY_READS_PER_ADDRESS, LOBBY_READS_PER_INSTANCE)
 
+/**
+ * 2026-11-23: pushed lists (/ws/lobby) one address may open a minute, per Worker instance. A page
+ * opens one and keeps it, opening again only after a drop or coming back to the tab
+ */
+export const LOBBY_WATCHES_PER_ADDRESS = 30
+/** Pushed lists one Worker instance opens a minute, whoever asks */
+export const LOBBY_WATCHES_PER_INSTANCE = 3_000
+
+export const lobbyWatchLimit = new FixedWindowLimit(LOBBY_WATCHES_PER_ADDRESS, LOBBY_WATCHES_PER_INSTANCE)
+
 /** The LOBBY binding, as far as reading the list needs it */
 export interface LobbyLister {
   idFromName(name: string): DurableObjectId
@@ -70,4 +57,33 @@ export async function readLobby(lobby: LobbyLister, now: number = Date.now()): P
   const rooms = await lobby.get(lobby.idFromName(LOBBY_NAME)).list()
   cached.set(lobby, { at: now, rooms })
   return rooms
+}
+
+// ── Quick join's new rooms (2026-11-23, #163) ─────────────────────────────────────────────────────
+// Two people asking for a quick join at the same moment, with no open room listed, each used to open
+// a room of their own. Now the lobby (one object, one call at a time) holds the first one's new room
+// for its game a few seconds: whoever asks in that time is sent to it, once the room is there.
+
+/** How long a new quick-join room is held for the next ones asking for its game, ms */
+export const QUICK_HOLD_MS = 15_000
+
+/** The quick-join rooms being opened, one a game: pure, kept by the LobbyDO (worker/lobby.ts) */
+export class QuickHolds {
+  private readonly held = new Map<string, { id: string; at: number }>()
+
+  /**
+   * Null when `id` is the room to open for `gameId` (it is held from now on); otherwise the room
+   * another quick join opened for it in the last QUICK_HOLD_MS, to be sent to instead
+   */
+  claim(gameId: string, id: string, now: number): string | null {
+    const held = this.held.get(gameId)
+    if (held && held.id !== id && now >= held.at && now - held.at < QUICK_HOLD_MS) return held.id
+    this.held.set(gameId, { id, at: now })
+    return null
+  }
+
+  /** `id` was not opened after all, or turned out full or gone: the next one asking opens one */
+  release(gameId: string, id: string): void {
+    if (this.held.get(gameId)?.id === id) this.held.delete(gameId)
+  }
 }

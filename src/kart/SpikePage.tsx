@@ -49,7 +49,7 @@ import { TouchControls } from './touch/TouchControls.tsx'
 import { useTouchControls } from './touch/useTouchControls.ts'
 import { touchBottom, touchCorner, touchSpace } from './touch/touchLayout.ts'
 import { broadcastSolid } from './ui/broadcast.ts'
-import { PauseLayer } from './ui/PauseLayer.tsx'
+import { PauseButton, PauseLayer } from './ui/PauseLayer.tsx'
 import { CoachTip } from './school/CoachTip.tsx'
 import { useCoach } from './school/useCoach.ts'
 import { answerInvite, shouldInvite } from './school/store.ts'
@@ -266,7 +266,7 @@ export function SpikePage({
         body,
         driver,
         ghostPick,
-        onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
+        onPose: (x, z, heading, nextGate, tick) => minimap.current?.place(x, z, heading, nextGate, tick),
         onTrial: (next) => {
           // A run's upload card goes with its results: a new countdown leaves it behind
           if (next.phase === 'countdown') setBoardRun(null)
@@ -657,6 +657,7 @@ export function SpikePage({
               {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
             </Button>
           )}
+          {play && <PauseButton t={t} />}
           <Suspense>
             <FullscreenButton landscape />
           </Suspense>
@@ -739,7 +740,15 @@ export function SpikePage({
               }}
             />
           )}
-          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} walls={track.walls} />
+          <Minimap
+            ref={minimap}
+            t={t}
+            road={track.road}
+            gates={track.gates}
+            forks={track.forks}
+            walls={track.walls}
+            obstacles={track.obstacles}
+          />
         </MapCorner>
       )}
       <TouchControls t={t} touch={touch} hud={hud} maxStored={tuning.maxStoredBoosts} />

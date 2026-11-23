@@ -7,7 +7,9 @@ import type { RoomListing } from '../../shared/protocol.ts'
 import { setLanguage } from '../../src/i18n/t.ts'
 import { RouterContext, type RouterValue } from '../../src/lib/useRouter.ts'
 import OnlineView from '../../src/kart/online/OnlineView.tsx'
+import { readRoomPassword } from '../../src/lib/roomPassword.ts'
 import { ALL_ROOMS, filterRooms, roomState } from '../../src/kart/online/roomList.ts'
+import { FakeWebSocket } from '../lib/fakeWebSocket.ts'
 
 vi.mock('../../src/kart/audio/useMenuMusic.ts', () => ({ useMenuMusic: () => {} }))
 
@@ -42,8 +44,15 @@ describe('roomList', () => {
 
 type Call = { url: string; body: unknown }
 
-function setup(rooms: RoomListing[] = ROOMS, answers: Record<string, () => Response> = {}) {
+function setup(
+  rooms: RoomListing[] = ROOMS,
+  answers: Record<string, () => Response> = {},
+  { push = false }: { push?: boolean } = {},
+) {
   const calls: Call[] = []
+  // Polled unless a test plays the pushed list's server (src/lib/lobbyFeed.ts)
+  if (push) FakeWebSocket.install()
+  else vi.stubGlobal('WebSocket', undefined)
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -67,6 +76,28 @@ beforeEach(() => setLanguage('en'))
 afterEach(() => vi.unstubAllGlobals())
 
 describe('OnlineView', () => {
+  // 2026-11-23: pushed by the LobbyDO, each change shown as it comes, without asking again
+  it('shows the pushed list live, with each change as it comes', async () => {
+    const { calls } = setup([], {}, { push: true })
+    const socket = FakeWebSocket.last
+    expect(socket.url).toContain('/ws/lobby?game=kart')
+    act(() => {
+      socket.open()
+      socket.receive(JSON.stringify({ t: 'rooms', rooms: [ROOMS[0]] }))
+    })
+    expect((await screen.findAllByTestId('kart-online-room')).map((row) => row.dataset.room)).toEqual([
+      'aaaaaaaaaa',
+    ])
+    expect(screen.getByTestId('kart-online-updated').textContent).toBe('Live: changes show as they happen')
+    act(() => socket.receive(JSON.stringify({ t: 'room', room: ROOMS[3] })))
+    expect(screen.getAllByTestId('kart-online-room').map((row) => row.dataset.state)).toEqual(['open', 'racing'])
+    act(() => socket.receive(JSON.stringify({ t: 'gone', id: 'aaaaaaaaaa' })))
+    expect(screen.getAllByTestId('kart-online-room')).toHaveLength(1)
+    // Asked once at the start (before the feed's first list), never again on a timer
+    const asked = calls.filter((call) => call.url.startsWith('/api/lobby')).length
+    expect(asked).toBeLessThanOrEqual(1)
+  })
+
   it('lists the rooms with their state, track, mode, people and password, and joins or watches', async () => {
     const { calls, navigate } = setup()
     const rows = await screen.findAllByTestId('kart-online-room')
@@ -128,6 +159,45 @@ describe('OnlineView', () => {
     expect(sent.body).toMatchObject({ gameId: 'kart', name: '社辦 車隊', options: { mode: 'items', teams: 'solo' } })
     expect(sent.body).not.toHaveProperty('public')
     expect(navigate).toHaveBeenCalledWith('/r/ffffffffff')
+  })
+
+  // 2026-11-23 (#163): a password from the start, by the room's own rules; its maker walks in with it
+  it('sets a password on the new room, kept for its maker, and refuses one of only spaces', async () => {
+    const { calls, navigate } = setup([], {
+      '/api/rooms': () => Response.json({ id: 'gggggggggg', code: '4321' }, { status: 201 }),
+    })
+    fireEvent.click(screen.getByTestId('kart-online-create-open'))
+    const password = screen.getByTestId('kart-online-create-password')
+    fireEvent.change(password, { target: { value: '   ' } })
+    expect(screen.getByTestId('kart-online-password-issue')).toBeTruthy()
+    expect(screen.getByTestId('kart-online-create-go')).toBeDisabled()
+    fireEvent.change(password, { target: { value: '  tku88 ' } })
+    expect(screen.queryByTestId('kart-online-password-issue')).toBeNull()
+    // Public and with a password: said to be unlisted (the room's rule, unchanged)
+    fireEvent.click(screen.getByTestId('kart-online-create-public'))
+    expect(screen.getByTestId('kart-online-password-note').textContent).toContain('not listed')
+    fireEvent.click(screen.getByTestId('kart-online-create-private'))
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('kart-online-create-go'))
+    })
+    const sent = calls.at(-1)!
+    expect(sent.url).toBe('/api/rooms')
+    expect(sent.body).toMatchObject({ gameId: 'kart', password: 'tku88' })
+    expect(sent.body).not.toHaveProperty('public')
+    expect(readRoomPassword('gggggggggg')).toBe('tku88')
+    expect(navigate).toHaveBeenCalledWith('/r/gggggggggg')
+  })
+
+  it('sends no password when none is typed', async () => {
+    const { calls } = setup([], {
+      '/api/rooms': () => Response.json({ id: 'hhhhhhhhhh', code: null }, { status: 201 }),
+    })
+    fireEvent.click(screen.getByTestId('kart-online-create-open'))
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('kart-online-create-go'))
+    })
+    expect(calls.at(-1)!.body).not.toHaveProperty('password')
+    expect(readRoomPassword('hhhhhhhhhh')).toBeNull()
   })
 
   it('says when the site owner paused the kart', async () => {

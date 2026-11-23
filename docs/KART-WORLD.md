@@ -415,6 +415,29 @@
 
 全部原創、程式產生；沒有對照任何遊戲的地圖或建築（`IP-CHECKLIST.md` 2026-11-23）。
 
+### 6.6 反向賽道（2026-11-23，`feat/kart-reverse-tracks`）
+
+14 張比賽賽道都有反向版，id 是原 id 加 `-rev`，名稱是原名加「（反向）」／「 (Reverse)」，不另取名字（同一塊地反著跑）。畫面、配樂、環境音都照原賽道。大獎賽多一個 **反向盃**（`reverse`）／**Reverse Cup**：金色水岸、紅樹林水道、滬尾砲台坡、竹圍高架四張的反向（河岸、溼地、山丘、高架各一，難度由淺到深）。
+
+| 反向賽道 | 跳台 | 岔路 | 其他 | 可玩 |
+| --- | --- | --- | --- | --- |
+| 金色水岸（反向）`riverside-rev` | 1 座原地轉 | — | — | 是 |
+| 漁人碼頭（反向）`harbour-rev` | 台階跳台原地轉 | — | 4 個障礙物同時鐘、左右對調 | 是 |
+| 五虎崗（反向）`tamkang-rev` | 1 座原地轉 | — | — | 是 |
+| 燈籠老街（反向）`oldstreet-rev` | 台階跳台原地轉 | 燈籠巷反向開放 | 攤位島照舊 | 是 |
+| 觀音山坡道（反向）`guanyin-rev` | 2 座原地轉（落差 3 m，新坡降到最陡 0.4） | — | — | 是 |
+| 紅樹林水道（反向）`mangrove-rev` | — | — | — | 是 |
+| 滬尾砲台坡（反向）`fort-rev` | 1 座原地轉 | — | — | 是 |
+| 淡海夜城（反向）`danhai-rev` | 1 座原地轉 | 夜市屋頂高台**關閉** | — | 是 |
+| 大屯稜線（反向）`datun-rev` | 2 座原地轉 | — | — | 是 |
+| 碼頭倉庫（反向）`wharf-rev` | 3 座原地轉 | 倉庫後的小路反向開放（原本入口的牆縫變出口）；貨櫃頂高台**關閉** | 矮欄、牆縫照舊（沒有導引） | 是 |
+| 山城坡巷（反向）`lanes-rev` | 3 座原地轉 | — | 院牆、牆縫照舊（沒有導引） | 是 |
+| 高架廠區（反向）`works-rev` | 2 座原地轉 | 窄巷、盲彎切入反向開放；裝卸平台與長廠房屋頂**關閉** | 平台上一條加速帶拿掉 | 是 |
+| 竹圍高架（反向）`zhuwei-rev` | 1 座原地轉 | 抽水站旁的直切岔路反向開放 | 立體交叉、傾斜彎（取反）照舊 | 是 |
+| 防波堤屋頂（反向）`breakwater-rev` | 3 座原地轉 | 三座高台**關閉** | 屋頂上兩條加速帶拿掉 | 是（變成一張沒有捷徑的快圖） |
+
+全部原創；反向賽道沒有參考任何遊戲的反向／鏡像賽道設計。
+
 ## 7. 改名的地方（給實作的人；2026-11-22 照這裡改完）
 
 - **字串**：車名 `shared/kart/i18n.roster.ts` 的 `kart.body.<id>`；車手 `kart.driver.<id>`；一句話介紹 `kart.blurb.<id>`、`kart.driverBlurb.<id>`；賽道 `shared/kart/i18n.ts` 的 `kart.course.<id>` 與 `shared/games/kart/i18n.ts` 的 `games.kart.track.<id>`（多人房的選項）；道具 `shared/games/kart/i18n.screen.ts` 的 `games.kart.item.<id>`；團隊賽 `shared/games/kart/i18n.team.ts`；電腦車名 `kart.bots.name.<id>` 與 `games.kart.bot.name.<id>`；各賽道檔的 `name`；規則頁 `shared/games/kart/rules.{en,zh-TW}.md`。en 是來源，zh-TW 同步，`npm run check-i18n` 會擋。

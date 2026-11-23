@@ -10,6 +10,7 @@
 // - `lead`: a degree of the scale from the key's root, `0`-`9` then `a`-`f` for 10-15, a bar a string
 import type { RaceTrackId } from '../../../shared/kart/tracks/list.ts'
 import type { TrackThemeName } from '../../../shared/kart/track.ts'
+import { forwardId } from '../../../shared/kart/tracks/reverseId.ts'
 
 export type SongId = 'breeze' | 'sunset' | 'neon' | 'folk' | 'steel' | 'ridge' | 'lounge'
 export type PercKind = 'wood' | 'tom' | 'metal' | 'clap'
@@ -128,6 +129,6 @@ const THEME_SONGS: Record<TrackThemeName, SongId> = {
 
 export function songFor(track: { readonly id: string; readonly theme?: TrackThemeName } | null): SongId {
   if (!track) return 'lounge'
-  const own = (TRACK_SONGS as Record<string, SongId | undefined>)[track.id]
+  const own = (TRACK_SONGS as Record<string, SongId | undefined>)[forwardId(track.id)]
   return own ?? THEME_SONGS[track.theme ?? 'day']
 }

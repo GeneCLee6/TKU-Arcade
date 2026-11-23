@@ -64,6 +64,12 @@ import {
   type StoredGame,
 } from './room-turn.ts'
 import { UNKNOWN_ADDRESS } from './address.ts'
+import {
+  hashRoomPassword,
+  sameLegacyPassword,
+  verifyRoomPassword,
+  type PasswordHash,
+} from './room-password.ts'
 
 export type RoomRecord = {
   id: string
@@ -84,9 +90,13 @@ export type RoomRecord = {
   /** 2026-11-23: what the host called it (shared/nickname.ts acceptableRoomName); absent: none */
   name?: string
   /**
-   * What someone new must bring to join (e1-t16); absent for an open room. Kept as typed (trimmed):
-   * it is a door code for friends, never a person's own password. Members see it in the view, to
-   * pass it on; a summary only says the room is locked, and a listing never has such a room
+   * What someone new must bring to join (e1-t16), as a salted hash (2026-11-23, worker/room-password.ts);
+   * absent for an open room. No view, summary, listing or log ever has it: they only say `locked`
+   */
+  passwordHash?: PasswordHash
+  /**
+   * The same in a room from before 2026-11-23, as typed (trimmed). RoomDO hashes it when the room
+   * next loads and deletes this (`migratePassword`); until then it is still compared, in constant time
    */
   password?: string
   /**
@@ -176,7 +186,19 @@ export type StoredRoom = {
   chat: ChatMessage[]
   /** By member id; absent in a room from before 2026-11-23 */
   acks?: Record<string, SeqAck>
+  /** Wrong room passwords by hashed address (`PasswordFail`); absent: none */
+  passwordFails?: Record<string, PasswordFail>
 }
+
+/** Wrong passwords from one address to one room, counted from `since` (PASSWORD_FAIL_WINDOW_MS) */
+export type PasswordFail = { count: number; since: number }
+
+/**
+ * What RoomDO worked out before a message, with `passwordWork`: the hashing is asynchronous and the
+ * room is not. `passwordOk`: whether a `join`'s password is the room's. `passwordHash`: the hash of a
+ * `set_password`'s
+ */
+export type PasswordPrep = { passwordOk?: boolean; passwordHash?: PasswordHash }
 
 export type RoomHostDeps = {
   sockets: {
@@ -209,6 +231,8 @@ export type RoomHostDeps = {
     saveAck?(member: string, ack: SeqAck | null): void
     /** Forgets the whole room */
     clearAll(): void
+    /** The wrong-password counts (`PasswordFail`), all together; null: none left. Absent: memory only */
+    savePasswordFails?(fails: Record<string, PasswordFail> | null): void
   }
   games(id: string): AnyGameModule | null
   now(): number
@@ -253,6 +277,16 @@ function hashKey(key: string): number {
 
 /** Wrong passwords one socket may send before it is closed (e1-t16) */
 export const PASSWORD_TRIES = 5
+
+/**
+ * 2026-11-23: wrong passwords one address may send one room in PASSWORD_FAIL_WINDOW_MS, over any
+ * number of sockets; past it every join from there is closed until the window is over. Stored, so
+ * that neither a new socket nor the room hibernating starts the count again
+ */
+export const PASSWORD_FAILS = 10
+export const PASSWORD_FAIL_WINDOW_MS = 15 * 60_000
+/** Addresses whose counts a room keeps; past this the oldest is forgotten */
+const MAX_PASSWORD_FAIL_ADDRESSES = 200
 
 /** `RoomRecord.activeAt` is written again only once it is this far behind */
 export const ACTIVITY_SAVE_MS = 10 * 60_000
@@ -307,6 +341,8 @@ export class RoomHost {
    * not counted again. Lost on hibernation, which only gives up the already retired ones once more
    */
   private botsAbandoned: number | null = null
+  /** Wrong room passwords by hashed address (PASSWORD_FAILS), as stored */
+  private readonly passwordFails = new Map<string, PasswordFail>()
 
   constructor(deps: RoomHostDeps) {
     this.deps = deps
@@ -359,6 +395,10 @@ export class RoomHost {
           : { ...member, conn: null, offlineAt: member.offlineAt ?? this.deps.now() },
       )
     }
+    this.passwordFails.clear()
+    for (const [address, fail] of Object.entries(stored.passwordFails ?? {})) {
+      this.passwordFails.set(address, fail)
+    }
     this.acks.clear()
     for (const [member, ack] of Object.entries(stored.acks ?? {})) {
       // A member removed since only leaves its key behind: forgotten now
@@ -378,7 +418,7 @@ export class RoomHost {
     rawOptions: unknown,
     isPublic = false,
     code: string | null = null,
-    password: string | null = null,
+    password: PasswordHash | null = null,
     bots: QuickBots | null = null,
     name: string | null = null,
     seatBots: SeatBots | null = null,
@@ -408,7 +448,7 @@ export class RoomHost {
       public: isPublic && password === null,
       code,
       ...(name !== null ? { name } : {}),
-      ...(password !== null ? { password } : {}),
+      ...(password !== null ? { passwordHash: password } : {}),
       ...(seated.length > 0 ? { startOnJoin: true as const } : {}),
       emptySince: this.deps.now(),
       idleSince: null,
@@ -461,8 +501,80 @@ export class RoomHost {
       members: members.length,
       seated: members.filter((member) => member.seat !== null).length,
       maxSeats: this.room.maxSeats,
-      ...(this.room.password !== undefined ? { locked: true } : {}),
+      ...(this.isLocked() ? { locked: true } : {}),
     }
+  }
+
+  /** Whether someone new must bring a password (e1-t16) */
+  private isLocked(): boolean {
+    return this.room?.passwordHash !== undefined || this.room?.password !== undefined
+  }
+
+  /** A room from before 2026-11-23 with its password as typed: RoomDO hashes it (`migratePassword`) */
+  legacyPassword(): string | null {
+    return this.room?.password ?? null
+  }
+
+  /** `legacyPassword`'s hash in its place: the text is deleted from storage with this write */
+  migratePassword(hash: PasswordHash): void {
+    const room = this.room
+    if (!room || room.password === undefined) return
+    delete room.password
+    room.passwordHash = hash
+    this.deps.storage.saveRoom(room)
+  }
+
+  /**
+   * What must be worked out, asynchronously, before `message(conn, raw)` (2026-11-23): checking a
+   * newcomer's password against the hash, or hashing the host's new one. Null when nothing (the
+   * fast path for every other message): a member coming back with their token is never checked, and
+   * nor is an address already over PASSWORD_FAILS, so neither costs a derivation
+   */
+  passwordWork(conn: string, raw: string): Promise<PasswordPrep> | null {
+    const connection = this.conns.get(conn)
+    const room = this.room
+    if (!connection || !room) return null
+    const message = parseClientMessage(raw)
+    if (message?.t === 'join') {
+      if (connection.member !== null || message.password === undefined || !this.isLocked()) return null
+      if (message.token !== null && this.findByToken(message.token)) return null
+      if (this.passwordLockedOut(connection.address ?? UNKNOWN_ADDRESS)) return null
+      const check = room.passwordHash
+        ? verifyRoomPassword(message.password, room.passwordHash)
+        : sameLegacyPassword(message.password, room.password ?? '')
+      return check.then((passwordOk) => ({ passwordOk }))
+    }
+    if (message?.t === 'set_password' && message.password !== null) {
+      if (connection.member === null || connection.member !== room.hostId) return null
+      return hashRoomPassword(message.password).then((passwordHash) => ({ passwordHash }))
+    }
+    return null
+  }
+
+  /** Whether `address` sent this room PASSWORD_FAILS wrong passwords in the current window */
+  private passwordLockedOut(address: string): boolean {
+    const fail = this.passwordFails.get(address)
+    if (!fail) return false
+    if (this.deps.now() - fail.since >= PASSWORD_FAIL_WINDOW_MS) return false
+    return fail.count >= PASSWORD_FAILS
+  }
+
+  /** One more wrong password from `address`; stale counts are forgotten on the way */
+  private notePasswordFail(address: string): void {
+    const now = this.deps.now()
+    for (const [key, fail] of this.passwordFails) {
+      if (now - fail.since >= PASSWORD_FAIL_WINDOW_MS) this.passwordFails.delete(key)
+    }
+    const fail = this.passwordFails.get(address)
+    if (fail) {
+      fail.count++
+    } else {
+      if (this.passwordFails.size >= MAX_PASSWORD_FAIL_ADDRESSES) {
+        this.passwordFails.delete(this.passwordFails.keys().next().value as string)
+      }
+      this.passwordFails.set(address, { count: 1, since: now })
+    }
+    this.deps.storage.savePasswordFails?.(Object.fromEntries(this.passwordFails))
   }
 
   /**
@@ -487,7 +599,7 @@ export class RoomHost {
       maxSeats: room.maxSeats,
       createdAt: room.createdAt,
       ...(room.status === 'playing' ? { status: 'playing' as const } : {}),
-      ...(room.password !== undefined ? { locked: true as const } : {}),
+      ...(this.isLocked() ? { locked: true as const } : {}),
       ...(room.name !== undefined ? { name: room.name } : {}),
       ...(bots > 0 ? { bots } : {}),
       ...(options ? { options } : {}),
@@ -531,12 +643,12 @@ export class RoomHost {
   // ── Sockets ────────────────────────────────────────────────────────────────────────────────
 
   /** A text frame from a socket. Never throws for anything a client can send */
-  message(conn: string, raw: string): void {
-    this.handleMessage(conn, raw)
+  message(conn: string, raw: string, prep: PasswordPrep = {}): void {
+    this.handleMessage(conn, raw, prep)
     this.settleCleanup()
   }
 
-  private handleMessage(conn: string, raw: string): void {
+  private handleMessage(conn: string, raw: string, prep: PasswordPrep): void {
     const connection = this.conns.get(conn)
     if (!connection || !this.room) return
     connection.lastSeen = this.deps.now()
@@ -560,6 +672,7 @@ export class RoomHost {
           message.token,
           message.password ?? null,
           message.session ?? null,
+          prep.passwordOk === true,
         )
       }
       return
@@ -571,7 +684,7 @@ export class RoomHost {
     }
     const seq = message.seq
     if (seq === undefined) {
-      this.dispatch(conn, member, message)
+      this.dispatch(conn, member, message, prep)
       return
     }
     // shared/protocol.ts 20.: a message sent again after its socket died, already handled
@@ -580,7 +693,7 @@ export class RoomHost {
       this.deps.sockets.send(conn, { t: 'ack', seq: handled.seq })
       return
     }
-    this.dispatch(conn, member, message)
+    this.dispatch(conn, member, message, prep)
     // Gone with it (the room dissolved, the member kicked): nothing to remember, nobody to tell
     if (!this.room || !this.members.has(member.id)) return
     const ack = { session: handled?.session ?? '', seq }
@@ -590,7 +703,12 @@ export class RoomHost {
     this.deps.sockets.send(conn, { t: 'ack', seq })
   }
 
-  private dispatch(conn: string, member: MemberRecord, message: ClientMessage): void {
+  private dispatch(
+    conn: string,
+    member: MemberRecord,
+    message: ClientMessage,
+    prep: PasswordPrep = {},
+  ): void {
     switch (message.t) {
       case 'join':
         return
@@ -646,7 +764,7 @@ export class RoomHost {
         this.leave(conn, member)
         return
       case 'set_password':
-        this.setPassword(conn, member, message.password)
+        this.setPassword(conn, member, message.password, prep.passwordHash ?? null)
         return
       case 'set_look':
         this.setLook(member, message.look)
@@ -980,6 +1098,7 @@ export class RoomHost {
     token: string | null,
     password: string | null = null,
     session: string | null = null,
+    passwordOk = false,
   ): void {
     // Who the session says this is (e1-t13): the name `join` sent is only a guest's
     const account = connection.account
@@ -1024,20 +1143,29 @@ export class RoomHost {
       }
       return
     }
-    // Someone new to a room with a password (e1-t16); a member coming back has their token instead
-    const required = this.requireRoom().password
-    if (required !== undefined && password !== required) {
+    // Someone new to a room with a password (e1-t16); a member coming back has their token instead.
+    // `passwordOk` is RoomDO's verdict (`passwordWork`): the room never holds the password itself
+    if (this.isLocked()) {
+      const address = connection.address ?? UNKNOWN_ADDRESS
+      if (this.passwordLockedOut(address)) {
+        this.refuse(conn, 'rate_limited')
+        this.drop(conn, CloseCode.badMessage, 'too many wrong passwords')
+        return
+      }
       if (password === null) {
         this.refuse(conn, 'password_required')
         return
       }
-      connection.wrongPasswords = (connection.wrongPasswords ?? 0) + 1
-      if (connection.wrongPasswords >= PASSWORD_TRIES) {
-        this.drop(conn, CloseCode.badMessage, 'too many wrong passwords')
+      if (!passwordOk) {
+        connection.wrongPasswords = (connection.wrongPasswords ?? 0) + 1
+        this.notePasswordFail(address)
+        if (connection.wrongPasswords >= PASSWORD_TRIES || this.passwordLockedOut(address)) {
+          this.drop(conn, CloseCode.badMessage, 'too many wrong passwords')
+          return
+        }
+        this.refuse(conn, 'wrong_password')
         return
       }
-      this.refuse(conn, 'wrong_password')
-      return
     }
     if (this.members.size >= MAX_MEMBERS) {
       this.drop(conn, CloseCode.roomFull, 'room full')
@@ -1638,12 +1766,20 @@ export class RoomHost {
   }
 
   /** e1-t16: in any status, since it only decides who new may come in */
-  private setPassword(conn: string, member: MemberRecord, password: string | null): void {
+  private setPassword(
+    conn: string,
+    member: MemberRecord,
+    password: string | null,
+    hash: PasswordHash | null,
+  ): void {
     const room = this.requireRoom()
     if (member.id !== room.hostId) return this.refuse(conn, 'forbidden')
+    // Hashed by RoomDO beforehand (`passwordWork`); without it the text is never kept instead
+    if (password !== null && hash === null) return this.refuse(conn, 'unavailable')
     this.change(() => {
-      if (password === null) delete room.password
-      else room.password = password
+      delete room.password
+      if (hash === null) delete room.passwordHash
+      else room.passwordHash = hash
       this.deps.storage.saveRoom(room)
     })
   }
@@ -1954,7 +2090,7 @@ export class RoomHost {
       minPlayers: room.minPlayers,
       maxSeats: room.maxSeats,
       ...(room.code ? { code: room.code } : {}),
-      ...(room.password !== undefined ? { password: room.password } : {}),
+      ...(this.isLocked() ? { locked: true as const } : {}),
       ...(room.public ? { public: true as const } : {}),
       ...(room.name !== undefined ? { name: room.name } : {}),
     }

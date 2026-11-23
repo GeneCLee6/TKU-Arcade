@@ -430,7 +430,7 @@ export interface SpikeOptions {
   /** e10-t05b: who sits in it, looks only */
   readonly driver?: DriverId
   /** Every frame, where the car is: the minimap moves its marker with it, outside React */
-  readonly onPose?: (x: number, z: number, heading: number, nextGate: number) => void
+  readonly onPose?: (x: number, z: number, heading: number, nextGate: number, tick?: number) => void
   /** 2026-11-17: which ghost races along: the track's overall best (the default), this kart's, none */
   readonly ghostPick?: GhostPick
   /** On a track: the time trial's state, when it changes */
@@ -1142,7 +1142,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
           }
         : {}),
     }
-    options.onPose?.(current.x, current.z, current.heading, run.nextGate)
+    // 2026-11-23: and the race clock, for the obstacles on the map
+    options.onPose?.(current.x, current.z, current.heading, run.nextGate, obstacles.length > 0 ? obstacleTick : undefined)
     if (trial && track) {
       const view: SpikeTrial = {
         phase: trial.phase,

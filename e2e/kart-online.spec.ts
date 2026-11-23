@@ -65,3 +65,28 @@ test('one quick joins from the kart page, the other finds that room in the list 
   await expect(bob.locator('[data-testid="kart-lobby-place"]', { hasText: 'Ann' }).first()).toBeAttached()
   expect(errors).toEqual([])
 })
+
+// 2026-11-23 (docs/NETWORK.md §6): the list is pushed by the LobbyDO. Bob watches the list first; the
+// room Ann opens shows up there within 2 s of her being in it, without Refresh and well inside the
+// old 10 s poll
+test('a new public room shows up in an open list within 2 seconds, pushed', async ({ browser }) => {
+  const ann = await newPerson(browser, { viewport: { width: 1100, height: 720 } })
+  const bob = await newPerson(browser, { viewport: { width: 1100, height: 720 } })
+  await prepare(ann, 'Ann')
+  await prepare(bob, 'Bob')
+  await bob.goto('/kart?online')
+  await expect(bob.getByTestId('kart-online-updated')).toHaveAttribute('data-live', 'true', { timeout: 30_000 })
+
+  await ann.goto('/kart?online')
+  await ann.getByTestId('kart-online-quick-bots').selectOption('1')
+  await ann.getByTestId('kart-online-quick').click()
+  await ann.waitForURL(/\/r\/[A-Za-z0-9]{10}/)
+  const id = new URL(ann.url()).pathname.split('/')[2]!
+  await expect(ann.getByRole('heading', { name: 'Starting line-up' })).toBeVisible({ timeout: 60_000 })
+  const shownBy = Date.now()
+  const row = bob.locator(`[data-testid="kart-online-room"][data-room="${id}"]`)
+  await expect(row).toBeVisible({ timeout: 10_000 })
+  // From Ann's waiting room drawing to Bob's row: the room's report and the push, no poll
+  expect(Date.now() - shownBy).toBeLessThan(2_000)
+  await expect(bob.getByTestId('kart-online-updated')).toHaveAttribute('data-live', 'true')
+})

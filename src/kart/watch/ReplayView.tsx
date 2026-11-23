@@ -27,7 +27,7 @@ import {
 import { shotsAt } from '../../../shared/kart/replayShots.ts'
 import { runningScore } from '../../../shared/kart/team.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
-import type { Track } from '../../../shared/kart/track.ts'
+import { courseOf, type Track } from '../../../shared/kart/track.ts'
 import {
   cycleSeat,
   SEEK_SECONDS,
@@ -288,6 +288,8 @@ export default function ReplayView({
   useEffect(() => {
     if (!stage.current || !track || failure || !engine) return
     let stop: (() => void) | undefined
+    // 2026-11-23: the shots' heights, on a track with terrain
+    const terrain = courseOf(track).terrain ?? null
     // 2026-11-17: the recorded hits spin their karts; a burst only when playing through its moment
     const fxEvents = reel.replay.events.map((event) => ({
       ...event,
@@ -411,6 +413,7 @@ export default function ReplayView({
                     reel.replay.shots,
                     tick,
                     (seat) => karts.find((kart) => kart.id === seat) ?? null,
+                    terrain,
                   ),
                 }
               : null
@@ -439,7 +442,7 @@ export default function ReplayView({
           const samples = frame.follow === null ? undefined : reel.samples.get(frame.follow)
           if (followed && samples) {
             const gate = sampleAt(samples, head.current.tick)?.nextGate ?? 0
-            minimap.current?.place(followed.x, followed.z, followed.heading, gate)
+            minimap.current?.place(followed.x, followed.z, followed.heading, gate, frame.tick)
           }
           // 2026-11-23: the broadcast's map shows every kart (the dots, when it is on)
           minimap.current?.others?.(
@@ -640,6 +643,7 @@ export default function ReplayView({
             road={track.road}
             gates={track.gates}
             forks={track.forks}
+            obstacles={track.obstacles}
             dots={directing ? seats.map((seat) => ({ seat, fill: color.text })) : undefined}
           />
         </MapCorner>

@@ -52,6 +52,11 @@ test('the first two lessons, driven by the master’s hands, are passed and thei
   await lesson.locator('details summary').click()
   await expect(lesson.getByTestId('kart-school-key').first()).toHaveText('Up arrow')
   await expect(page.getByTestId('kart-school-count')).toContainText('0 / 1')
+  // 2026-11-23 (#152): the lesson's own row has a pause button, opening the same menu as Esc
+  await page.getByTestId('kart-pause-button').click()
+  await expect(page.getByTestId('kart-pause')).toHaveAttribute('data-paused', 'true')
+  await page.getByTestId('kart-pause-resume').click()
+  await expect(page.getByTestId('kart-pause')).toHaveCount(0)
 
   const result = page.getByTestId('kart-school-result')
   await expect(result).toBeVisible({ timeout: 150_000 })

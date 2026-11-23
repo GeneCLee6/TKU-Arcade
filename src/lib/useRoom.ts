@@ -14,7 +14,7 @@ export type RoomSession =
   /** `reconnecting`: the connection dropped; `view` is the last one seen, nothing can be sent */
   | { phase: 'joined'; you: string; view: RoomView; reconnecting: boolean }
   /** The room has a password (e1-t16) and this browser has none, or the wrong one */
-  | { phase: 'password'; wrong: boolean }
+  | { phase: 'password'; wrong: boolean; held?: boolean }
   | { phase: 'ended'; end: RoomEnd }
 
 export type RoomHandle = {
@@ -153,6 +153,13 @@ export function useRoom(roomId: string, name: string): RoomHandle {
         if (error.code === 'password_required' || error.code === 'wrong_password') {
           opened.leave()
           setSession({ phase: 'password', wrong: error.code === 'wrong_password' })
+          return
+        }
+        // 2026-11-23: too many wrong passwords from this network (the room's PASSWORD_FAILS), before
+        // ever getting in: the form says to wait instead of letting it knock again
+        if (error.code === 'rate_limited' && you.current === null) {
+          opened.leave()
+          setSession({ phase: 'password', wrong: false, held: true })
           return
         }
         // A refused message is the composer's to explain, with its text back in the box

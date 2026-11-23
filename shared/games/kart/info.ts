@@ -2,7 +2,7 @@
 // The room loads this file when it opens a race room (src/i18n/gameDetails.ts); the lobby card's
 // players and minutes are in shared/games/lobby.ts. `rules.ts` spreads this into the module.
 import { CODE_PATTERN, MAX_CODE_CHARS } from '../../kart/editor/codeShape.ts'
-import { RACE_TRACK_IDS } from '../../kart/tracks/list.ts'
+import { ALL_RACE_TRACK_IDS, RACE_TRACK_IDS } from '../../kart/tracks/list.ts'
 import type { GameInfo } from '../types.ts'
 import type { KartOptions } from './types.ts'
 
@@ -17,7 +17,8 @@ export const kartInfo: GameInfo<KartOptions> = {
       kind: 'select',
       labelKey: 'games.kart.option.track',
       choices: [
-        ...RACE_TRACK_IDS.map((id) => ({ value: id, labelKey: `games.kart.track.${id}` })),
+        // 2026-11-23 (#131): the reversed tracks after the originals
+        ...ALL_RACE_TRACK_IDS.map((id) => ({ value: id, labelKey: `games.kart.track.${id}` })),
         // e10-t08: a track made in the editor, given in `custom`
         { value: CUSTOM_TRACK, labelKey: 'games.kart.track.custom' },
       ],

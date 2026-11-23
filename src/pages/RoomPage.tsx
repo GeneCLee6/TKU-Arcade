@@ -179,6 +179,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         <Suspense fallback={<p role="status">{t('common.loading')}</p>}>
           <PasswordForm
             wrong={session.wrong}
+            held={session.held === true}
             onSubmit={(password) => {
               keepRoomPassword(id, password)
               retry()

@@ -3,15 +3,15 @@
 // cups' names are working titles of our own (`kart.cup.name.<id>`, KART-WORLD.md §6.1), like every
 // name in the kart's world until the owner settles them; the ids stay (the browser keeps the best
 // result of each cup by id). Pure.
-import type { RaceTrackId } from '../../../shared/kart/tracks/list.ts'
+import type { AnyRaceTrackId } from '../../../shared/kart/tracks/list.ts'
 
-export const CUP_IDS = ['ebb', 'hill', 'rivermouth', 'flood', 'backstreet', 'sprint'] as const
+export const CUP_IDS = ['ebb', 'hill', 'rivermouth', 'flood', 'backstreet', 'reverse', 'sprint'] as const
 export type CupId = (typeof CUP_IDS)[number]
 
 export interface Cup {
   readonly id: CupId
   /** In racing order */
-  readonly tracks: readonly RaceTrackId[]
+  readonly tracks: readonly AnyRaceTrackId[]
   /** Only for the tests (`?autopilot`): one short race, to reach the podium quickly */
   readonly hidden?: boolean
 }
@@ -31,6 +31,9 @@ export const CUPS: readonly Cup[] = [
   // 2026-11-22: and the technical showcase, over and under itself (shared/kart/levels.ts)
   // 2026-11-23: and the high-platform track, three roofs beside the road (shared/kart/ledges.ts)
   { id: 'backstreet', tracks: ['danhai', 'wharf', 'lanes', 'works', 'zhuwei', 'breakwater'] },
+  // 2026-11-23 (#131): the other way round (shared/kart/tracks/reverse.ts): the river bank, the
+  // mangroves, the fort's hill and the flyover, each driven backwards
+  { id: 'reverse', tracks: ['riverside-rev', 'mangrove-rev', 'fort-rev', 'zhuwei-rev'] },
   { id: 'sprint', tracks: ['riverside'], hidden: true },
 ]
 

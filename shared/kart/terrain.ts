@@ -863,12 +863,26 @@ export function createHeightKeeper(
   const last = new Map<number | string, number>()
   return (id, x, z, speed, airborne) => {
     if (!terrain) return 0
-    const near = last.get(id)
-    const y =
-      airborne === false
-        ? groundAt(terrain, x, z, near).y
-        : heightGuess(terrain, x, z, speed, TERRAIN_TUNING, near)
+    const y = heightSeen(terrain, x, z, speed, airborne, last.get(id))
     last.set(id, y)
     return y
   }
+}
+
+/**
+ * How high a kart seen only on the plan is, given how high it was a moment ago (`near`): on the
+ * road when `airborne` is false, heightGuess's guess otherwise. createHeightKeeper's step, and the
+ * room's for the items (2026-11-23, shared/games/kart/rules.ts)
+ */
+export function heightSeen(
+  terrain: Terrain,
+  x: number,
+  z: number,
+  speed: number,
+  airborne: boolean | undefined,
+  near: number | undefined,
+): number {
+  return airborne === false
+    ? groundAt(terrain, x, z, near).y
+    : heightGuess(terrain, x, z, speed, TERRAIN_TUNING, near)
 }

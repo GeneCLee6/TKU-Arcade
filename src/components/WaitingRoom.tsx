@@ -6,6 +6,7 @@ import type { RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import type { LobbyChat } from '../kart/lobby/KartLobby.tsx'
 import { memberName } from '../lib/memberName.ts'
+import { forgetRoomPassword, keepRoomPassword, readRoomPassword } from '../lib/roomPassword.ts'
 import { clippedFill, cornerClip, displayType, monoType, slantClip } from '../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
@@ -101,14 +102,24 @@ export function WaitingRoom({
     <Invite roomId={roomId} code={view.room.code ?? null} name={view.room.name ?? null}>
       <Visibility
         isPublic={view.room.public === true}
-        locked={view.room.password !== undefined}
+        locked={view.room.locked === true}
         onSet={isHost ? onSetPublic : undefined}
       />
-      {(isHost || view.room.password !== undefined) && (
+      {(isHost || view.room.locked === true) && (
         <Suspense>
           <RoomPasswordSetting
-            password={view.room.password ?? null}
-            onSet={isHost ? onSetPassword : undefined}
+            locked={view.room.locked === true}
+            known={view.room.locked === true ? readRoomPassword(roomId) : null}
+            onSet={
+              isHost && onSetPassword
+                ? (password) => {
+                    // Kept for this browser: the room itself only has the hash to show
+                    if (password === null) forgetRoomPassword(roomId)
+                    else keepRoomPassword(roomId, password)
+                    onSetPassword(password)
+                  }
+                : undefined
+            }
           />
         </Suspense>
       )}

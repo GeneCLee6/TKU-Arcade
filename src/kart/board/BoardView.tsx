@@ -14,7 +14,7 @@ import {
 } from '../../../shared/kart/board.ts'
 import { KART_BOARD_MESSAGES } from '../../../shared/kart/i18n.board.ts'
 import { KART_MESSAGES, type KartMessageKey } from '../../../shared/kart/i18n.ts'
-import type { RaceTrackId } from '../../../shared/kart/tracks/list.ts'
+import type { AnyRaceTrackId } from '../../../shared/kart/tracks/list.ts'
 import { Button } from '../../components/Button.tsx'
 import { registerMessages, type MessageParams } from '../../i18n/t.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
@@ -37,7 +37,7 @@ type Load =
   | { readonly kind: 'ready'; readonly board: BoardResponse }
 
 /** The track the address asks for (`?board=<id>`), else the week's */
-function boardTrackAsked(now = Date.now()): RaceTrackId {
+function boardTrackAsked(now = Date.now()): AnyRaceTrackId {
   const asked = new URLSearchParams(window.location.search).get('board')
   return isBoardTrack(asked) ? asked : weeklyTrack(now)
 }
@@ -51,14 +51,14 @@ export default function BoardView({
   /** Races a row's ghost in the time trial on its track */
   onChase: (chase: BoardChase) => void
   /** Drives the track in the time trial */
-  onDrive: (track: RaceTrackId) => void
+  onDrive: (track: AnyRaceTrackId) => void
 }) {
   const t: T = useT()
   const language = useLanguage()
   useMenuMusic()
   const pickId = useId()
-  const [track, setTrack] = useState<RaceTrackId>(() => boardTrackAsked())
-  const [weekly] = useState<RaceTrackId>(() => weeklyTrack(Date.now()))
+  const [track, setTrack] = useState<AnyRaceTrackId>(() => boardTrackAsked())
+  const [weekly] = useState<AnyRaceTrackId>(() => weeklyTrack(Date.now()))
   const [attempt, setAttempt] = useState(0)
   // What came back, for which ask: anything else is still loading
   const [answer, setAnswer] = useState<{ key: string; load: Load } | null>(null)
@@ -78,7 +78,7 @@ export default function BoardView({
   }, [track, nick, key])
   const load: Load = answer?.key === key ? answer.load : { kind: 'loading' }
 
-  const pick = useCallback((next: RaceTrackId) => {
+  const pick = useCallback((next: AnyRaceTrackId) => {
     const url = new URL(window.location.href)
     url.searchParams.set('board', next)
     window.history.replaceState(null, '', url)
@@ -119,7 +119,7 @@ export default function BoardView({
           <select
             id={pickId}
             value={track}
-            onChange={(event) => pick(event.target.value as RaceTrackId)}
+            onChange={(event) => pick(event.target.value as AnyRaceTrackId)}
             data-testid="kart-board-track"
           >
             {BOARD_TRACKS.map((one) => (

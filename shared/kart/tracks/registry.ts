@@ -12,7 +12,8 @@ import { HARBOUR } from './harbour.ts'
 import { LANES } from './lanes.ts'
 import { MANGROVE } from './mangrove.ts'
 import { OLDSTREET } from './oldstreet.ts'
-import type { RaceTrackId } from './list.ts'
+import { REVERSE_TRACK_IDS, type RaceTrackId } from './list.ts'
+import { forwardId, reverseTrack } from './reverse.ts'
 import { RIVERSIDE } from './riverside.ts'
 import { TAMKANG } from './tamkang.ts'
 import { WHARF } from './wharf.ts'
@@ -48,10 +49,14 @@ export function raceTrack(id: string): Track | null {
     const custom = customTrack(id.slice(CUSTOM_PREFIX.length))
     return custom.ok ? custom.track : null
   }
-  if (!Object.hasOwn(RACE_TRACKS, id)) return null
+  const reversed = (REVERSE_TRACK_IDS as readonly string[]).includes(id)
+  if (!reversed && !Object.hasOwn(RACE_TRACKS, id)) return null
   const known = parsed.get(id)
   if (known) return known
-  const result = parseTrack(RACE_TRACKS[id as RaceTrackId])
+  // 2026-11-23 (#131): a reversed track is worked out from its original's (reverse.ts)
+  const result = parseTrack(
+    reversed ? reverseTrack(RACE_TRACKS[forwardId(id) as RaceTrackId]).track : RACE_TRACKS[id as RaceTrackId],
+  )
   if ('problems' in result) throw new Error(`${id}: ${result.problems.join('; ')}`)
   parsed.set(id, result.track)
   return result.track

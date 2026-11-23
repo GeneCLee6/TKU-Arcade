@@ -1,3 +1,4 @@
+import { REVERSE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
 import { describe, expect, it } from 'vitest'
 import {
   BUDGET_STATS,
@@ -103,7 +104,8 @@ describe('the tracks’ traits', () => {
 
 describe('the garage’s picks (shared/kart/meta.ts)', () => {
   it('has three different vehicles, none the flagship, for every track kart:feel drives', () => {
-    expect(Object.keys(TRACK_META).sort()).toEqual([...FEEL_TRACKS].sort())
+    // 2026-11-23 (#131): and every reversed track
+    expect(Object.keys(TRACK_META).sort()).toEqual([...FEEL_TRACKS, ...REVERSE_TRACK_IDS].sort())
     for (const [track, meta] of Object.entries(TRACK_META)) {
       expect(new Set(meta.podium).size, track).toBe(3)
       for (const kart of meta.podium) {

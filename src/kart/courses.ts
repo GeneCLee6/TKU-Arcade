@@ -16,6 +16,8 @@ import { WHARF } from '../../shared/kart/tracks/wharf.ts'
 import { WORKS } from '../../shared/kart/tracks/works.ts'
 import { ZHUWEI } from '../../shared/kart/tracks/zhuwei.ts'
 import { BREAKWATER } from '../../shared/kart/tracks/breakwater.ts'
+import { REVERSE_TRACK_IDS, type ReverseTrackId } from '../../shared/kart/tracks/list.ts'
+import { forwardId, reverseTrack } from '../../shared/kart/tracks/reverse.ts'
 
 /**
  * What /kart/spike drives on: the walled yard of J3, J4's test oval, J5's first track, N1's second or
@@ -44,6 +46,8 @@ export type SpikeCourse =
   | 'zhuwei'
   // 2026-11-23: the high-platform track (shared/kart/ledges.ts)
   | 'breakwater'
+  // 2026-11-23 (#131): every track driven the other way round (shared/kart/tracks/reverse.ts)
+  | ReverseTrackId
 
 export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'arena',
@@ -62,6 +66,7 @@ export const SPIKE_COURSES: readonly SpikeCourse[] = [
   'works',
   'zhuwei',
   'breakwater',
+  ...REVERSE_TRACK_IDS,
 ]
 
 const TRACKS = {
@@ -85,7 +90,11 @@ const TRACKS = {
 /** A course's track, checked like any track file; null for the yard, which is not a track */
 export function spikeTrack(course: SpikeCourse): Track | null {
   if (course === 'arena') return null
-  const parsed = parseTrack(TRACKS[course])
+  const parsed = parseTrack(
+    (REVERSE_TRACK_IDS as readonly string[]).includes(course)
+      ? reverseTrack(TRACKS[forwardId(course) as keyof typeof TRACKS]).track
+      : TRACKS[course as keyof typeof TRACKS],
+  )
   if ('problems' in parsed) throw new Error(`${course}: ${parsed.problems.join('; ')}`)
   return parsed.track
 }
