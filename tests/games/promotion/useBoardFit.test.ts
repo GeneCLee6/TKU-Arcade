@@ -16,6 +16,10 @@ describe('stageHeight', () => {
     expect(stageHeight(375, 164, 89)).toBe(375 - 89 - BELOW)
   })
 
+  it('keeps the least on a taller screen, where the top bar stays stuck and the result shows above', () => {
+    expect(stageHeight(667, 400, 133)).toBe(MIN_STAGE)
+  })
+
   it('never gives the board less than its minimum', () => {
     expect(stageHeight(390, 300, 140)).toBe(MIN_STAGE)
   })
