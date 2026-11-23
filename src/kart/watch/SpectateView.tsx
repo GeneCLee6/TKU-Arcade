@@ -7,7 +7,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KartView } from '../../../shared/games/kart/types.ts'
 import { itemBoxes } from '../../../shared/kart/items.ts'
 import { readRelayed, type KartFrame } from '../../../shared/kart/net.ts'
-import { shotLive, shotPosition } from '../../../shared/kart/shots.ts'
+import { shotHeight, shotLive, shotPosition } from '../../../shared/kart/shots.ts'
+import { courseOf } from '../../../shared/kart/track.ts'
 import { runningScore } from '../../../shared/kart/team.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import { cycleSeat, watchOrder, type WatchCommand } from '../../../shared/kart/watch.ts'
@@ -142,6 +143,8 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       remotes.add(relayed.seat, relayed.frame, performance.now() / 1000)
     })
     const boxes = itemBoxes(track)
+    // 2026-11-23: the shots' heights, on a track with terrain
+    const terrain = courseOf(track).terrain ?? null
     // 2026-11-17: the hits from here on spin their karts (hitFx.ts)
     const hitFeed = createHitFeed(null, latest.current.used)
     // #86: and the items sound around the kart followed
@@ -251,17 +254,21 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
               // e9-t06b: the shots on the road; a cloud flies at its target as this browser sees it
               shots: (room.shots ?? [])
                 .filter((shot) => shotLive(shot, now))
-                .map((shot) => ({
-                  n: shot.n,
-                  item: shot.item,
-                  ...shotPosition(
-                    shot,
-                    now,
-                    shot.target === null
-                      ? null
-                      : (karts.find((kart) => kart.id === shot.target) ?? null),
-                  ),
-                })),
+                .map((shot) => {
+                  const y = shotHeight(shot, now, terrain)
+                  return {
+                    n: shot.n,
+                    item: shot.item,
+                    ...shotPosition(
+                      shot,
+                      now,
+                      shot.target === null
+                        ? null
+                        : (karts.find((kart) => kart.id === shot.target) ?? null),
+                    ),
+                    ...(y !== null ? { y } : {}),
+                  }
+                }),
             }
           }
           // 2026-11-22: the race clock for the moving obstacles, from the room's GO (the karts

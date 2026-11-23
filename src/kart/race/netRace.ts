@@ -34,6 +34,7 @@ import {
   isStunItem,
   SHOT_TUNING,
   shotLive,
+  shotHeight,
   shotPosition,
   type Fix,
   type StunItem,
@@ -471,7 +472,13 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     // #86: a shot this kart has just driven into, told at once rather than a round trip later
     const server = roughNow()
     if (offset !== null && view.phase === 'racing') {
-      const to: Fix = { x: next.kart.x, z: next.kart.z, at: server }
+      // 2026-11-23: with its height on a track with terrain, as the room judges it
+      const to: Fix = {
+        x: next.kart.x,
+        z: next.kart.z,
+        at: server,
+        ...(terrain && next.kart.y !== undefined ? { y: next.kart.y } : {}),
+      }
       const from =
         lastFix &&
         next.resets === lastResets &&
@@ -492,6 +499,7 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
         // A mirror up (2026-11-20) sends it back: nothing to foresee either
         Math.max(me?.shieldUntil ?? 0, me?.mirrorUntil ?? 0),
         foreseenShots,
+        terrain,
       )
       if (shot) {
         const ms = SHOT_TUNING.stunMs[shot.item]
@@ -753,7 +761,13 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
                 : shot.target === seat
                   ? pose
                   : (poses.find((one) => one.seat === shot.target && !one.stale) ?? null)
-            return { n: shot.n, item: shot.item, ...shotPosition(shot, at, target) }
+            const y = shotHeight(shot, at, terrain)
+            return {
+              n: shot.n,
+              item: shot.item,
+              ...shotPosition(shot, at, target),
+              ...(y !== null ? { y } : {}),
+            }
           }),
       }
     },

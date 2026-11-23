@@ -18,6 +18,7 @@
 //   in), never through it. It is warned of for `warn` steps before each slide.
 //
 // Pure: the browser, the Worker and the load test run it.
+import { LEVEL_CLEARANCE } from './levels.ts'
 import { roadDirection, type RoadPoint } from './track.ts'
 import type { Wall } from './walls.ts'
 
@@ -504,6 +505,8 @@ export function obstacleStop(
   vz: number,
   tick: number,
   seconds: number,
+  /** 2026-11-23: how high the point is, s after it left: only the obstacles at that height stop it */
+  heightAt?: (seconds: number) => number,
 ): number | null {
   if (obstacles.length === 0 || seconds <= 0) return null
   const speed = Math.hypot(vx, vz)
@@ -519,12 +522,31 @@ export function obstacleStop(
   for (let k = 0; k < steps; k++) {
     const t0 = k * step
     const t1 = Math.min(seconds, t0 + step)
-    const walls = obstacleWalls(near, tick + (t1 * OBSTACLE_STEPS_PER_SECOND))
+    let walls = obstacleWalls(near, tick + (t1 * OBSTACLE_STEPS_PER_SECOND))
     if (walls.length === 0) continue
+    if (heightAt) {
+      const height = heightAt(t1)
+      walls = obstacleWalls(
+        near.filter((obstacle) => obstacleAtHeight(obstacle, height)),
+        tick + t1 * OBSTACLE_STEPS_PER_SECOND,
+      )
+      if (walls.length === 0) continue
+    }
     const share = segmentHitShare(x + vx * t0, z + vz * t0, x + vx * t1, z + vz * t1, walls)
     if (share !== null) return t0 + (t1 - t0) * share
   }
   return null
+}
+
+/**
+ * Whether something `y` high (a shot, 2026-11-23) meets `obstacle` where it stands: a boom on its
+ * own road (nothing flies over one), a container from under its road to its top. One on the road
+ * over or under it at a crossing (LEVEL_CLEARANCE apart) is not in its way
+ */
+export function obstacleAtHeight(obstacle: Obstacle, y: number): boolean {
+  const above = y - obstacle.y
+  if (above <= -LEVEL_CLEARANCE / 2) return false
+  return obstacle.json.kind === 'boom' ? above < LEVEL_CLEARANCE / 2 : above < SLIDER_HEIGHT
 }
 
 /**
@@ -557,10 +579,13 @@ export function clearOfObstacles(
   x: number,
   z: number,
   radius: number,
+  /** 2026-11-23: its height: an obstacle on another road (over it, under it) leaves it be */
+  y?: number,
 ): { x: number; z: number } {
   let px = x
   let pz = z
   for (const obstacle of obstacles) {
+    if (y !== undefined && Math.abs(y - obstacle.y) >= LEVEL_CLEARANCE / 2) continue
     const { json } = obstacle
     const rx = px - obstacle.x
     const rz = pz - obstacle.z

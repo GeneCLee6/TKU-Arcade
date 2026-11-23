@@ -34,6 +34,11 @@ export interface ShotLook {
   readonly item: ShotItem
   readonly x: number
   readonly z: number
+  /**
+   * The road it is on (2026-11-23, shared/kart/shots.ts `shotHeight`): at a crossing, the one it
+   * was put on, not the one over it. Left out (a cloud, a flat track), the road under (x, z)
+   */
+  readonly y?: number
 }
 
 export interface ItemArt {
@@ -235,8 +240,9 @@ export function createItemArt(
           group = makeShot(shot.item)
           shotGroups.set(shot.n, group)
         }
+        const base = shot.y ?? ground(shot.x, shot.z)
         if (shot.item === 'hail') {
-          group.position.set(shot.x, HAIL_HEIGHT + ground(shot.x, shot.z), shot.z)
+          group.position.set(shot.x, HAIL_HEIGHT + base, shot.z)
           group.rotation.set(time * 9, time * 7, 0)
         } else if (shot.item === 'cloud') {
           group.position.set(
@@ -246,19 +252,19 @@ export function createItemArt(
           )
           group.rotation.y = time * 0.6
         } else if (shot.item === 'fog') {
-          group.position.set(shot.x, ground(shot.x, shot.z), shot.z)
+          group.position.set(shot.x, base, shot.z)
           group.rotation.y = time * 0.25 + shot.n
           group.scale.y = 1 + Math.sin(time * 1.3 + shot.n) * 0.08
         } else if (shot.item === 'decoy') {
           // Like a box, but slower and a little lower
           group.position.set(
             shot.x,
-            BOX_HEIGHT - 0.15 + Math.sin(time * 1.1 + shot.n) * 0.1 + ground(shot.x, shot.z),
+            BOX_HEIGHT - 0.15 + Math.sin(time * 1.1 + shot.n) * 0.1 + base,
             shot.z,
           )
           group.rotation.y = time * 0.9 + shot.n
         } else {
-          group.position.set(shot.x, 0.04 + ground(shot.x, shot.z), shot.z)
+          group.position.set(shot.x, 0.04 + base, shot.z)
         }
       }
       for (const [n, group] of shotGroups) {
