@@ -123,13 +123,28 @@ export const INTRO_TO = COUNT_MS / 1000
 export const INTRO_FROM = countdownMs() / 1000
 
 /**
- * The group shot: each outermost kart at most this far off where the camera looks across (radians;
- * a phone held upright sees about 21 degrees either side, Scene.ts's 80-degree view at 9:19.5)
+ * The group shot: each outermost kart at most this far off where the camera looks across, without a
+ * screen to fit (radians; a phone held upright sees about 21 degrees either side, Scene.ts's 80-degree
+ * view at 9:19.5)
  */
 export const GROUP_HALF_ANGLE = (17 * Math.PI) / 180
-/** ... never nearer the middle of the grid than this, metres, and this high for each metre away */
+/** ... with one: this share of what the screen sees either side (the rest is margin) */
+export const GROUP_FILL = 0.78
+/** ... never nearer the middle of the grid than this, metres, and this high for each metre away (at least GROUP_LOW) */
 export const GROUP_NEAREST = 9
-export const GROUP_RISE = 0.42
+export const GROUP_RISE = 0.3
+export const GROUP_LOW = 2.6
+
+/**
+ * How far either side of where it looks the group shot may put a kart on a screen `aspect` wide (width
+ * over height): Scene.ts's vertical view is 60 degrees, 80 held upright
+ */
+export function groupHalfAngle(aspect: number | undefined): number {
+  if (!aspect || !Number.isFinite(aspect) || aspect <= 0) return GROUP_HALF_ANGLE
+  const vertical = ((aspect < 1 ? 80 : 60) * Math.PI) / 180
+  const across = Math.atan(Math.tan(vertical / 2) * aspect)
+  return Math.max(GROUP_HALF_ANGLE, Math.min((40 * Math.PI) / 180, across * GROUP_FILL))
+}
 /** The push in: from this much further away to the shot's own distance */
 export const GROUP_PUSH = 1.22
 /** ... and a drift across, metres either side of dead ahead over the shot */
@@ -153,6 +168,7 @@ export function groupShot(
   share: number,
   y = 0,
   reducedMotion = false,
+  halfAngle = GROUP_HALF_ANGLE,
 ): CameraShot | null {
   const pole = spots[0]
   if (!pole) return null
@@ -171,14 +187,14 @@ export function groupShot(
     0,
     ...spots.map((spot) => (spot.x - middle.x) * forward.x + (spot.z - middle.z) * forward.z),
   )
-  const distance = Math.max(GROUP_NEAREST, ahead + across / Math.tan(GROUP_HALF_ANGLE))
+  const distance = Math.max(GROUP_NEAREST, ahead + across / Math.tan(halfAngle))
   const along = reducedMotion ? 0.5 : smooth(share, 0, 1)
   const away = distance * lerp(GROUP_PUSH, 1, along)
   const drift = GROUP_DRIFT * lerp(1, -1, along)
   return {
     eye: {
       x: middle.x + forward.x * away + side.x * drift,
-      y: y + away * GROUP_RISE,
+      y: y + Math.max(GROUP_LOW, away * GROUP_RISE),
       z: middle.z + forward.z * away + side.z * drift,
     },
     target: { x: middle.x, y: y + 0.6, z: middle.z },
@@ -196,12 +212,14 @@ export function openingShot(
   look: OpeningLook,
   reducedMotion = false,
   y = 0,
+  /** The screen's width over its height: the shot comes as close as it can and still fit every kart */
+  aspect?: number,
 ): CameraShot | null {
   if (!look.group) return null
   // Before GO is set (the others still loading) the shot waits at its start
   const stage = left === null ? { kind: 'group' as const, share: 0 } : openingStage(left)
   if (!stage || stage.kind === 'count') return null
-  return groupShot(spots, stage.share, y, reducedMotion)
+  return groupShot(spots, stage.share, y, reducedMotion, groupHalfAngle(aspect))
 }
 
 /** The finish: the swing round to the front takes this long, seconds */

@@ -132,16 +132,22 @@ describe('the opening: one group shot, then 3, 2, 1', () => {
       for (const count of [2, 5, 8]) {
         const spots = Array.from({ length: count }, (_, slot) => gridSpot(course, slot))
         for (let left = countdownMs() / 1000; left > COUNT_MS / 1000; left -= 0.1) {
-          const shot = openingShot(spots, left, look)!
-          expect(shot).not.toBeNull()
-          for (const spot of spots) {
-            // The kart's middle, and its driver's head a little above it
-            for (const height of [0.3, 1.2]) {
-              for (const screen of screens) {
+          // Fitted to each screen (as close as it can come), and without one (fits them all)
+          const fitted = screens.map((screen) => ({ screen, shot: openingShot(spots, left, look, false, 0, screen.aspect)! }))
+          const plain = openingShot(spots, left, look)!
+          const shots = [...fitted, ...screens.map((screen) => ({ screen, shot: plain }))]
+          for (const { screen, shot } of shots) {
+            expect(shot).not.toBeNull()
+            for (const spot of spots) {
+              // The kart's middle, and its driver's head a little above it
+              for (const height of [0.3, 1.2]) {
                 expect(onScreen(shot, { x: spot.x, y: height, z: spot.z }, screen.fov, screen.aspect)).toBe(true)
               }
             }
           }
+          // A wide screen comes closer than a phone held upright
+          const away = (shot: { eye: { x: number; z: number } }) => Math.hypot(shot.eye.x - spots[0]!.x, shot.eye.z - spots[0]!.z)
+          if (count === 8) expect(away(fitted[0]!.shot)).toBeLessThan(away(fitted[2]!.shot))
         }
       }
     }

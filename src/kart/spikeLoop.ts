@@ -1038,7 +1038,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     } else if (net?.gridSpots && trial?.phase === 'countdown') {
       const spots = net.gridSpots()
       shot =
-        (skipped ? null : openingShot(spots, left, opening, reduced, current.y ?? 0)) ??
+        (skipped
+          ? null
+          : openingShot(spots, left, opening, reduced, current.y ?? 0, window.innerWidth / Math.max(1, window.innerHeight))) ??
         countdownShot(spots, left, reduced, current.y ?? 0)
     }
     if (shot || directed) scene.shot(shot)

@@ -159,12 +159,23 @@ const Banner = styled.p`
   isolation: isolate;
   ${slam(420)}
   ${streak(color.warning)}
+
+  /* 2026-11-23: under the lap's time when both show (crossing the line into the final lap) */
+  [data-testid='kart-lap-split'] ~ & {
+    top: max(30%, calc(max(19%, 104px) + 80px));
+
+    @media (max-width: 560px) and (orientation: portrait) {
+      top: 292px;
+    }
+  }
 `
 
+// Under the item slot (top middle, about 96 px), over the final lap's banner (30%), which the
+// banner leaves room for when both show at once (the line into the final lap)
 const Split = styled.section`
   ${broadcast}
   position: absolute;
-  top: max(${space.xl}px, 9%);
+  top: max(19%, 104px);
   left: 50%;
   display: flex;
   flex-wrap: wrap;
@@ -176,6 +187,11 @@ const Split = styled.section`
   translate: -50% 0;
   pointer-events: none;
   ${slam(320)}
+
+  /* A phone held upright: under the item slot there (ItemHud.tsx's MAP_UNDER_ITEM_SLOT) */
+  @media (max-width: 560px) and (orientation: portrait) {
+    top: 212px;
+  }
 `
 
 const SplitLap = styled.span`
