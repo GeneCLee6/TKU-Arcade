@@ -7,7 +7,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KartView } from '../../../shared/games/kart/types.ts'
 import { itemBoxes } from '../../../shared/kart/items.ts'
 import { readRelayed, type KartFrame } from '../../../shared/kart/net.ts'
-import { shotLive, shotPosition } from '../../../shared/kart/shots.ts'
+import { shotHeight, shotLive, shotPosition } from '../../../shared/kart/shots.ts'
+import { courseOf } from '../../../shared/kart/track.ts'
 import { runningScore } from '../../../shared/kart/team.ts'
 import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 import { cycleSeat, watchOrder, type WatchCommand } from '../../../shared/kart/watch.ts'
@@ -43,11 +44,18 @@ import {
   WatchStage,
 } from './WatchParts.tsx'
 import { placeTags, TAG_HEIGHT, useWatchKeys } from './watchDom.ts'
+import { useCloseCountdown } from '../ui/useCloseCountdown.ts'
+import { CloseCountdown } from '../ui/RaceShow.tsx'
+import { KART_FLOW_MESSAGES } from '../../../shared/kart/i18n.flow.ts'
+import { registerMessages } from '../../i18n/t.ts'
 import { Button } from '../../components/Button.tsx'
 import { color } from '../../styles/tokens.ts'
 import { TeamGauges, TeamScore } from '../race/TeamHud.tsx'
 import type { BroadcastReadout, BroadcastRun } from './broadcast/broadcastRun.ts'
 import { prefersReducedMotion, useBroadcastKit } from './broadcastSwitch.ts'
+
+// The countdown's words (2026-11-23), without the rest of the kart's
+registerMessages(KART_FLOW_MESSAGES)
 
 /** The kart and driver a frame's body byte names (e10-t05) */
 function kartOfByte(byte: number) {
@@ -98,6 +106,8 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
   const followRef = useRef(follow)
   const overheadRef = useRef(overhead)
   const frames = useRef(new Map<number, KartFrame>())
+  /** The room's clock while the race is drawn (the countdown after the first finish reads it) */
+  const roomClock = useRef<{ now(): number } | null>(null)
   useLayoutEffect(() => {
     latest.current = view
     followRef.current = follow
@@ -135,6 +145,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
     if (!stage.current || !track || failure || !engine) return
     const remotes = createRemotes()
     const clock = createServerClock(realtime)
+    roomClock.current = clock
     const stopListening = realtime.listen((data) => {
       const relayed = readRelayed(data)
       if (!relayed) return
@@ -142,6 +153,8 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       remotes.add(relayed.seat, relayed.frame, performance.now() / 1000)
     })
     const boxes = itemBoxes(track)
+    // 2026-11-23: the shots' heights, on a track with terrain
+    const terrain = courseOf(track).terrain ?? null
     // 2026-11-17: the hits from here on spin their karts (hitFx.ts)
     const hitFeed = createHitFeed(null, latest.current.used)
     // #86: and the items sound around the kart followed
@@ -251,17 +264,21 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
               // e9-t06b: the shots on the road; a cloud flies at its target as this browser sees it
               shots: (room.shots ?? [])
                 .filter((shot) => shotLive(shot, now))
-                .map((shot) => ({
-                  n: shot.n,
-                  item: shot.item,
-                  ...shotPosition(
-                    shot,
-                    now,
-                    shot.target === null
-                      ? null
-                      : (karts.find((kart) => kart.id === shot.target) ?? null),
-                  ),
-                })),
+                .map((shot) => {
+                  const y = shotHeight(shot, now, terrain)
+                  return {
+                    n: shot.n,
+                    item: shot.item,
+                    ...shotPosition(
+                      shot,
+                      now,
+                      shot.target === null
+                        ? null
+                        : (karts.find((kart) => kart.id === shot.target) ?? null),
+                    ),
+                    ...(y !== null ? { y } : {}),
+                  }
+                }),
             }
           }
           // 2026-11-22: the race clock for the moving obstacles, from the room's GO (the karts
@@ -290,7 +307,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
           const followed = frame.karts.find((kart) => kart.id === frame.follow)
           if (followed) {
             const gate = frames.current.get(followed.id)?.nextGate ?? 0
-            minimap.current?.place(followed.x, followed.z, followed.heading, gate)
+            minimap.current?.place(followed.x, followed.z, followed.heading, gate, frame.tick)
           }
           // 2026-11-23: the broadcast's map shows every kart (the dots, when it is on)
           minimap.current?.others?.(
@@ -309,6 +326,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       stop?.()
       stopListening()
       clock.stop()
+      roomClock.current = null
       stopUnlock()
       player.dispose()
     }
@@ -329,6 +347,10 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       setReadout(null)
     }
   }, [kit, broadcastOn, track])
+
+  // 2026-11-23 (#152): after the first finish, the seconds left to everyone still out, with a tock
+  // for each, as the racers see them (shared/kart/opening.ts; the room closes the race then)
+  const closeLeft = useCloseCountdown(view, () => roomClock.current?.now() ?? null)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -383,6 +405,13 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       />
       {clean && <CleanHint data-keep="">{t('games.kart.broadcast.cleanHint')}</CleanHint>}
       {directing && <Overlay t={t} readout={readout} nameOf={nameOf} laps={view.laps} live />}
+      {closeLeft !== null && (
+        <CloseCountdown
+          label={t('kart.flow.close.label')}
+          seconds={closeLeft}
+          timeUp={t('kart.flow.close.timeUp')}
+        />
+      )}
       {!engine && (
         <KartLoading
           t={t}
@@ -428,6 +457,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
             road={track.road}
             gates={track.gates}
             forks={track.forks}
+            obstacles={track.obstacles}
             dots={directing ? view.racers.map((one) => one.seat).map((seat) => ({ seat, fill: color.text })) : undefined}
           />
         </MapCorner>

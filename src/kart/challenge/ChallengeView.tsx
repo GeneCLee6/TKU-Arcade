@@ -50,7 +50,7 @@ import { KartLoading } from '../load/KartLoading.tsx'
 import { useKartLoad } from '../load/useKartLoad.ts'
 import { loadQuality } from '../quality.ts'
 import RaceView from '../race/RaceView.tsx'
-import { PauseLayer } from '../ui/PauseLayer.tsx'
+import { PauseButton, PauseLayer } from '../ui/PauseLayer.tsx'
 import { raceEpochNow } from '../race/raceClock.ts'
 import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
 import type { SpikeHud, SpikeStep, SpikeTrial } from '../spikeLoop.ts'
@@ -594,6 +594,7 @@ function MissionRun({ mission, onResult, onAgain, onNext, onList }: RunProps) {
         <Count data-testid="kart-challenge-count">{counter}</Count>
       </GoalPanel>
       <Actions>
+        {!shown.done && !shown.failed && <PauseButton t={t} />}
         <Button type="button" $size="sm" $variant="secondary" onClick={onAgain} data-testid="kart-challenge-restart">
           {t('kart.challenge.restart')}
         </Button>
@@ -1085,6 +1086,7 @@ function MedalScreen({
         </Targets>
       </Panel>
       <Actions>
+        {!result && <PauseButton t={t} />}
         <Button type="button" $size="sm" $variant="secondary" onClick={onAgain}>
           {t('kart.challenge.restart')}
         </Button>

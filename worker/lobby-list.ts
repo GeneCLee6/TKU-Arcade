@@ -71,3 +71,32 @@ export async function readLobby(lobby: LobbyLister, now: number = Date.now()): P
   cached.set(lobby, { at: now, rooms })
   return rooms
 }
+
+// ── Quick join's new rooms (2026-11-23, #163) ─────────────────────────────────────────────────────
+// Two people asking for a quick join at the same moment, with no open room listed, each used to open
+// a room of their own. Now the lobby (one object, one call at a time) holds the first one's new room
+// for its game a few seconds: whoever asks in that time is sent to it, once the room is there.
+
+/** How long a new quick-join room is held for the next ones asking for its game, ms */
+export const QUICK_HOLD_MS = 15_000
+
+/** The quick-join rooms being opened, one a game: pure, kept by the LobbyDO (worker/lobby.ts) */
+export class QuickHolds {
+  private readonly held = new Map<string, { id: string; at: number }>()
+
+  /**
+   * Null when `id` is the room to open for `gameId` (it is held from now on); otherwise the room
+   * another quick join opened for it in the last QUICK_HOLD_MS, to be sent to instead
+   */
+  claim(gameId: string, id: string, now: number): string | null {
+    const held = this.held.get(gameId)
+    if (held && held.id !== id && now >= held.at && now - held.at < QUICK_HOLD_MS) return held.id
+    this.held.set(gameId, { id, at: now })
+    return null
+  }
+
+  /** `id` was not opened after all, or turned out full or gone: the next one asking opens one */
+  release(gameId: string, id: string): void {
+    if (this.held.get(gameId)?.id === id) this.held.delete(gameId)
+  }
+}

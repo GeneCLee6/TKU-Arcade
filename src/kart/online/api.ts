@@ -68,7 +68,7 @@ export async function quickJoin(
 
 /** A new race room with these options: its id */
 export async function createKartRoom(
-  ask: { options: OptionValues; public: boolean; name?: string },
+  ask: { options: OptionValues; public: boolean; name?: string; password?: string },
   signal?: AbortSignal,
 ): Promise<string | RoomFailure> {
   const request: CreateRoomRequest = {
@@ -76,6 +76,8 @@ export async function createKartRoom(
     options: ask.options,
     ...(ask.public ? { public: true } : {}),
     ...(ask.name ? { name: ask.name } : {}),
+    // 2026-11-23 (#163): set from the start (the room's own rules: shared/protocol.ts normalizePassword)
+    ...(ask.password ? { password: ask.password } : {}),
   }
   try {
     const response = await fetch('/api/rooms', {
