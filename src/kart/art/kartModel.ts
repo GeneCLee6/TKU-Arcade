@@ -69,6 +69,14 @@ import { buildDriver, STANDING_HIP, type DriverDetail } from './driverModel.ts'
 import { blendPose, gesturePose, REST, type DriverGesture, type GesturePose } from '../driverGestures.ts'
 import { driveJoints, elbowBend, reachArm } from '../driverRig.ts'
 import {
+  poseLeg,
+  seatedLegs,
+  standingLegs,
+  STILL_LEGS,
+  type HandShape,
+  type LegDrive,
+} from '../driverLimbs.ts'
+import {
   landingKick,
   SPRING_REST,
   springTarget,
@@ -592,6 +600,7 @@ export function buildKartModel(
   }
   const kit: BodyKit = {
     paint,
+    ...(paintAll ? { allPaint: paintAll } : {}),
     put,
     colour,
     morph: (object, to) => morphs.push(morphOf(object, to, morphEase)),
@@ -662,7 +671,7 @@ export function buildKartModel(
   const crouch = standing ? 0 : (bike?.crouch ?? 0)
   // Standing, they stand on the ground beside the cockpit, off to the left of it as seen from in
   // front, turned a little towards the kart
-  const driver = buildDriver(kit, driverId, bike !== undefined && !standing, standing, driverDetail)
+  const driver = buildDriver(kit, driverId, driverDetail)
   if (standing) {
     const box = solidBox(chassis)
     driver.group.position.set(box.max.x + STAND_ACROSS, STANDING_HIP, seat.z + STAND_AHEAD)
@@ -674,8 +683,11 @@ export function buildKartModel(
   }
 
   // 2026-11-23 (§4.86, driverRig.ts): the skeleton. The joints from the drive and the gesture, the
-  // hands on the wheel (two bones from each shoulder to its grip), or raised off it by the gesture
-  const { torso, head, arms, elbows } = driver
+  // hands on the wheel (two bones from each shoulder to its grip), or raised off it by the gesture.
+  // 2026-11-23 (§4.91, driverLimbs.ts): and the legs, seated on the pedals (pressed with the throttle
+  // and the brake, swung out of a turn, pressed up by a landing) or standing (the weight from foot to
+  // foot, a step, a jump); and the fingers: round the grip on the wheel, the gesture's shape off it
+  const { pelvis, torso, head, arms, elbows, hips, knees, ankles } = driver
   const ikTurn = new Quaternion()
   const gestureTurn = new Quaternion()
   const turnBy = new Euler(0, 0, 0, 'ZXY')
@@ -685,18 +697,31 @@ export function buildKartModel(
   // On their feet the arms hang a little out from the sides, the elbows just bent
   const hanging = [-1, 1].map((side) => new Quaternion().setFromEuler(new Euler(0.06, 0, side * 0.1)))
   const seatedY = torso.position.y
+  const shapes: [HandShape, HandShape] = ['grip', 'grip']
+  const stillLegs: LegDrive = { ...STILL_LEGS, bike: bike !== undefined }
   const poseDriver = (
     joints: ReturnType<typeof driveJoints>,
     g: GesturePose,
+    legDrive: LegDrive = stillLegs,
   ): void => {
     // On their feet (the race room) nothing of the drive moves them: only the gesture
     const drive = standing ? 0 : 1
+    // The legs first: they say where the pelvis is, and the torso rides on it
+    const legs = standing ? standingLegs(g) : seatedLegs(legDrive, g)
+    pelvis.position.set(...legs.pelvis)
+    pelvis.rotation.z = legs.pelvisRoll
+    for (const index of [0, 1] as const) {
+      const { knee } = poseLeg(legs, index, hips[index]!.quaternion, ankles[index]!.quaternion)
+      knees[index]!.rotation.x = knee
+    }
     torso.rotation.set(
       joints.torsoBack * drive + g.torsoBack,
       joints.torsoTwist * drive + g.twist,
-      joints.torsoLean * drive,
+      // Standing, the shoulders tip against the hips' roll (the weight on one foot)
+      joints.torsoLean * drive - legs.pelvisRoll * 0.75,
     )
-    torso.position.y = seatedY + g.bounce
+    // Standing, the bounce is the pelvis's (legs.pelvis); seated, the torso rises off the seat
+    torso.position.y = seatedY + (standing ? 0 : g.bounce)
     head.rotation.set(
       joints.headUp * drive + g.headUp,
       joints.headTurn * drive + g.headTurn,
@@ -706,8 +731,9 @@ export function buildKartModel(
     else wheel.rotation.z = -joints.wheel
     wheel.updateMatrix()
     bar.updateMatrix()
+    pelvis.updateMatrix()
     torso.updateMatrix()
-    toTorso.copy(torso.matrix).invert()
+    toTorso.multiplyMatrices(pelvis.matrix, torso.matrix).invert()
     for (const [index, arm] of arms.entries()) {
       const left = index === 0
       const side = left ? -1 : 1
@@ -727,8 +753,12 @@ export function buildKartModel(
       gestureTurn.setFromEuler(turnBy)
       arm.quaternion.multiplyQuaternions(gestureTurn, ikTurn)
       elbows[index]!.rotation.x = elbowBend(reach, up, left ? g.leftBend : g.rightBend)
+      // The fingers: round the grip while the hand is on the wheel; off it, what the gesture shows
+      const off = standing || Math.abs(up) > 0.6
+      const asked = left ? g.leftHand : g.rightHand
+      shapes[index] = !off ? 'grip' : !left && g.vSign >= 0.5 ? 'vee' : (asked ?? (standing ? 'relax' : 'fist'))
     }
-    if (driver.vee) driver.vee.visible = g.vSign >= 0.5
+    driver.setHands(shapes[0], shapes[1])
   }
   const STILL_JOINTS = driveJoints({
     steer: 0,
@@ -1023,6 +1053,14 @@ export function buildKartModel(
             crouch,
           }),
           gestured,
+          {
+            steer: steered,
+            pedal: throttled,
+            brake: braking,
+            // Pressed into the seat by a landing (the spring below its rest)
+            squash: Math.min(1, Math.max(0, -spring.height / 0.1)),
+            bike: bike !== undefined,
+          },
         )
       }
       if (!far) {
@@ -1065,6 +1103,7 @@ export function buildKartModel(
       }
     },
     dispose() {
+      driver.skeleton?.dispose()
       for (const geometry of geometries) geometry.dispose()
       for (const material of materials) material.dispose()
       for (const texture of textures) texture.dispose()

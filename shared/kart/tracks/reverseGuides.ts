@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/NEXT.md §5, docs/ARCHITECTURE.md §4.91): the guides of the reversed tracks
+// 2026-11-23 (docs/NEXT.md §5, docs/ARCHITECTURE.md §4.92): the guides of the reversed tracks
 // (reverse.ts). A reversed track stands on the same ground as its original, its road the same points
 // the other way round: the original's lines (guide.ts) are carried over point by point, each place
 // on a line kept where it is (so metres right of the middle become metres left), and with them the

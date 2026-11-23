@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.91, docs/KART-FEEL.md §28): the reversed tracks' guides
+// 2026-11-23 (docs/ARCHITECTURE.md §4.92, docs/KART-FEEL.md §28): the reversed tracks' guides
 // (shared/kart/tracks/reverseGuides.ts). Their geometry (no line through a wall, every slot in its
 // gap, every drift jump off a lip of the reversed road), the carrying over itself, and the measure the
 // owner asked for: on the reversed tracks to learn by heart the driver who knows them (the master)

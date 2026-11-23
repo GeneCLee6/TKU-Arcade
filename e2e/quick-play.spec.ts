@@ -15,7 +15,7 @@ test('one tap from the lobby to a hand of hold’em against five computers, on a
   await expect(quick.getByRole('heading', { name: 'Play the computer' })).toBeVisible()
   // 2026-11-23: folded on a phone, so that the games' New room stays on the first screen
   await expect(quick.getByRole('button', { name: 'Easy' })).toBeHidden()
-  await quick.getByRole('button', { name: '9 ways' }).click()
+  await quick.locator('[data-quick-toggle]').click()
   await expect(quick.getByRole('button', { name: 'Hide' })).toHaveAttribute('aria-expanded', 'true')
   // The level, Normal unless picked; Easy here
   await quick.getByRole('button', { name: 'Easy' }).click()

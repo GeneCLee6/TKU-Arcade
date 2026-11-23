@@ -149,12 +149,24 @@ export function HomePage() {
           </Intro>
           <HeroArt />
         </Hero>
+        {/* 2026-11-23 (QA sweep): "Play the computer" is three dozen buttons since every game with
+            computer players is in it; from the keyboard, a way past them to the games (WCAG 2.4.1).
+            Out of sight until it has the focus */}
+        <SkipLink
+          href="#lobby-games"
+          onClick={(event) => {
+            event.preventDefault()
+            document.getElementById('lobby-games')?.focus()
+          }}
+        >
+          {t('lobby.skipToGames')}
+        </SkipLink>
         <Suspense>
           <QuickPlay disabled={creating} paused={paused} onPlay={handleNewRoom} />
         </Suspense>
         {/* The games first: on a phone a list of rooms must not push "New room" off the screen */}
-        <section>
-          <SectionTitle>{t('lobby.games')}</SectionTitle>
+        <GamesSection id="lobby-games" tabIndex={-1} aria-labelledby="lobby-games-title">
+          <SectionTitle id="lobby-games-title">{t('lobby.games')}</SectionTitle>
           <PublicChoice>
             <PublicCheck
               type="checkbox"
@@ -179,7 +191,7 @@ export function HomePage() {
               </li>
             ))}
           </Grid>
-        </section>
+        </GamesSection>
         <Suspense>
           <PublicRooms />
         </Suspense>
@@ -330,6 +342,32 @@ const SignInRow = styled.div`
 `
 
 // A broadcast heading (2026-11-23): a slanted bar in the hue, the title, a hairline to the edge
+const SkipLink = styled.a`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+
+  &:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    justify-self: start;
+    color: ${color.accent};
+  }
+`
+
+/** The skip link's target: focused by script only, no ring of its own around the whole list */
+const GamesSection = styled.section`
+  &&:focus,
+  &&:focus-visible {
+    outline: none;
+  }
+`
+
 const SectionTitle = styled.h2`
   display: flex;
   align-items: center;

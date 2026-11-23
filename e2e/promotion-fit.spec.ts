@@ -87,6 +87,10 @@ test('full screen covers the screen with the board and the roll, and Esc or the 
   await startGame(host, guest)
   const frame = host.locator('[data-immersion]')
 
+  // 2026-11-23 (QA sweep): one "Full screen" in a game of Promotion, the board's: the room heading's
+  // (#148) steps aside while it is played
+  await expect(host.getByRole('button', { name: 'Full screen' })).toHaveCount(1)
+  await expect(host.getByTestId('fullscreen-button')).toHaveCount(0)
   await host.getByRole('button', { name: 'Full screen' }).click()
   // Headless Chromium may grant real fullscreen or refuse it; either way the board covers the screen
   await expect(frame).toHaveAttribute('data-immersion', /^(fullscreen|focus)$/)

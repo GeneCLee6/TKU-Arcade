@@ -18,6 +18,7 @@ export const zhTW: Messages = {
   'language.zhTW': '繁中',
   'lobby.changeNickname': '修改',
   'lobby.games': '遊戲',
+  'lobby.skipToGames': '跳到遊戲列表',
   'lobby.profile': '我的檔案',
   'lobby.playingAs': '你的暱稱：{name}',
   'lobby.join.invalid': '這不是房號或房間連結，檢查後再試一次。',

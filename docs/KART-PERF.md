@@ -427,3 +427,20 @@ heap snapshot 的差（第 1 場到第 4 場）：+2 875 個 native 物件（約
 - 骨架每幀的成本是近處每台車：幾個 4×4 矩陣、兩次兩骨 IK、一個 `driveJoints`；遠處（LOD）與低畫質不算。
 - 從選單進比賽 371.1 → 374.8 kB（上限 480，`npm run budget`）：骨架、動作與車身動態約 3.7 kB，沒有拆 lazy（比賽一定要用）。
 - 量法：`node scripts/kart-fps.mjs --base http://localhost:9800 --qualities low,medium,high --warmup 5 --seconds 8`。
+
+## 14. 車手蒙皮、腿與手指、等待室即時 3D 的成本（2026-11-23，`feat/kart-driver-skin`）
+
+`ARCHITECTURE.md` §4.91。前＝`main`（`b14a133`，合併 #170 後再量一次 `fccf81a`）的正式建置，後＝這個分支，同一台機器（Intel UHD 770 內顯，ANGLE D3D11）、一次只開一個 `vite preview` 輪流量；1280×720@1、河濱、7 台電腦車、道具賽，熱身 5 秒後數 8 秒。**量的時候同一台機器上還有其他工作（別的分支在跑 e2e 與模擬），fps 與 JS ms 飄得很大**（同一個 `main` 兩次：低 177／140 fps、中 89／79），draw calls 與三角形才可靠。
+
+| 畫質 | draw calls 前 → 後 | 三角形 前 → 後 | fps 前 → 後（各兩次，噪音大） |
+| --- | --- | --- | --- |
+| 低 | 177–194 → 191–195 | 133–135k → 135k | 140–177 → 123–171 |
+| 中 | 260–274 → 239–254 | 213–217k → 242–253k | 79–89 → 67–77 |
+| 高 | 289–302 → 277–295 | 235–236k → 268–283k | 67–79 → 55–72 |
+
+- **draw calls 少了**（中、高）：四肢從每個關節每種材質一個 draw 變成全部合成一個蒙皮 mesh。**三角形多了約 3 萬**：每隻手 7 種手勢都在 mesh 裡（沒顯示的縮成一點，仍算三角形，手指已減到 4 邊、中間節不封口），加上平滑的袖子與腿。低畫質不變（剛體、合併、不動）。
+- **JS**：在 Node 量 8 台車手每幀的 `update`（腿 IK、手勢）＋矩陣＋骨架，中、高約 0.1＋0.12＋0.02 ms；瀏覽器上量到的 JS ms 增加大部分在噪音裡，剩下是 three.js 每台車每幀上傳一張骨頭貼圖（`skeleton.update`）。
+- **建車**：蒙皮先數頂點、直接寫進 typed array；遠處（LOD）的合併版本用 `bakeSkinned` 把目前姿勢烤成靜態，沒顯示的手勢不放進去。
+- **頒獎台**（高）：draw calls 120–135 → 108–110；**等待室**（8 位、高）：桌機每秒 draw calls 8.1–9.2k → 8.1k（照舊每張 30 fps）；手機橫拿（844×390@3）原本只在有變化時畫（0 calls/s），現在即時：約 2.4–2.5k calls/s、JS 約 8–10% 的時間。e2e 在 CPU 降速 4 倍下量頁面本身每秒約 48 幀（`e2e/kart-driver-skin.spec.ts`）。
+- **從選單進比賽** 380.2 → 385.5 kB（上限 480，`npm run budget`）：three.js 的 `SkinnedMesh`／`Skeleton`／`Bone` 與腿、手勢、蒙皮的程式；比賽一定要用（中、高畫質每台車都有），所以沒有拆 lazy，也沒有用預算外的 chunk 繞過去。等待室的步調（`lobbyPacing.ts`）在等待室自己的 lazy chunk。
+- 量法：`node scripts/kart-fps.mjs --base http://localhost:<port> --qualities low,medium,high --warmup 5 --seconds 8`、`--scene podium`、`--scene lobby --screens desktop,phone`。
