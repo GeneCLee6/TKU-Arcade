@@ -5,6 +5,7 @@
 // repo is on 5.
 import { describe, expect, it, vi } from 'vitest'
 import { CHAT_HISTORY, CHAT_RATE, type ChatMessage } from '../../shared/chat.ts'
+import { EMOTE_COUNT, PROFILE_MIN_MS, REACTION_RATE } from '../../shared/social.ts'
 import { replayMatch, type ReplayStep } from '../../shared/games/match.ts'
 import { createRng } from '../../shared/games/rng.ts'
 import { holdem } from '../../shared/games/holdem/rules.ts'
@@ -2712,6 +2713,98 @@ describe('reactions', () => {
     expect(reactions(o)).toHaveLength(2)
     x.send({ t: 'react', reaction: REACTION_COUNT })
     expect(x.closed).not.toBeNull()
+  })
+})
+
+// 2026-11-23 (shared/social.ts): emotes and phrases ride on the reactions; player cards on the member
+describe('emotes, phrases and player cards', () => {
+  const reactions = (client: Client) =>
+    client.received.filter((message) => message.t === 'reaction')
+  const card = {
+    title: 'kart-first-finish',
+    unlocked: 3,
+    total: 90,
+    games: 12,
+    boardWins: 4,
+    kartWins: 2,
+    kart: 'heron',
+    driver: 'club',
+    lap: { track: 'riverside', ms: 61_234 },
+  }
+
+  it('passes on a phrase as a number, and no more than REACTION_RATE in its window', () => {
+    const { world, x, o } = started()
+    x.send({ t: 'react', reaction: EMOTE_COUNT + 1 })
+    expect(reactions(o).at(-1)).toEqual({ t: 'reaction', member: x.you, reaction: EMOTE_COUNT + 1 })
+    for (let sent = 1; sent < REACTION_RATE.count + 3; sent++) {
+      world.clock += REACTION_MIN_MS
+      x.send({ t: 'react', reaction: 0 })
+    }
+    expect(reactions(o)).toHaveLength(REACTION_RATE.count)
+    world.clock += REACTION_RATE.windowMs
+    x.send({ t: 'react', reaction: 3 })
+    expect(reactions(o)).toHaveLength(REACTION_RATE.count + 1)
+    // Each member has their own window
+    o.send({ t: 'react', reaction: 2 })
+    expect(reactions(x).at(-1)).toEqual({ t: 'reaction', member: o.you, reaction: 2 })
+    expect(x.errors).toEqual([])
+  })
+
+  it('refuses a reaction past the list, or not a whole number', () => {
+    for (const reaction of [REACTION_COUNT, -1, 1.5, '1']) {
+      const { x } = started()
+      x.send({ t: 'react', reaction })
+      expect(x.closed).not.toBeNull()
+    }
+  })
+
+  it('shows a card to everyone, keeps it through a restart and takes it away with null', () => {
+    const world = room()
+    const ann = world.join('Ann')
+    const bob = world.join('Bob')
+    const before = bob.fresh().game
+    ann.send({ t: 'profile_summary', profile: card })
+    expect(bob.fresh().members[ann.you]?.profile).toEqual(card)
+    expect(bob.fresh().game).toEqual(before)
+    world.restart()
+    const back = world.join('Ann', ann.token)
+    const again = world.join('Bob', bob.token)
+    expect(again.fresh().members[back.you]?.profile).toEqual(card)
+    back.send({ t: 'profile_summary', profile: null })
+    expect(again.fresh().members[back.you]).not.toHaveProperty('profile')
+    expect(back.errors).toEqual([])
+  })
+
+  it('takes a changed card at most every PROFILE_MIN_MS, but hides it at once', () => {
+    const world = room()
+    const ann = world.join('Ann')
+    ann.send({ t: 'profile_summary', profile: card })
+    ann.send({ t: 'profile_summary', profile: { ...card, games: 13 } })
+    expect(ann.fresh().members[ann.you]?.profile?.games).toBe(12)
+    world.clock += PROFILE_MIN_MS
+    ann.send({ t: 'profile_summary', profile: { ...card, games: 13 } })
+    expect(ann.fresh().members[ann.you]?.profile?.games).toBe(13)
+    ann.send({ t: 'profile_summary', profile: null })
+    expect(ann.fresh().members[ann.you]).not.toHaveProperty('profile')
+  })
+
+  it('closes the socket over a card that is not one', () => {
+    const bad = [
+      { ...card, unlocked: 91 },
+      { ...card, games: -1 },
+      { ...card, note: 'hello' },
+      { ...card, title: 'Not An Id' },
+      { ...card, lap: { track: 'riverside', ms: 10 } },
+      { ...card, lap: { track: 'riverside', ms: 61_000, extra: 1 } },
+      { ...card, kart: 'x'.repeat(49) },
+      'card',
+    ]
+    for (const profile of bad) {
+      const world = room()
+      const ann = world.join('Ann')
+      ann.send({ t: 'profile_summary', profile })
+      expect(ann.closed).not.toBeNull()
+    }
   })
 })
 

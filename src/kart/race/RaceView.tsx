@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { SOCIAL_SEAT } from '../../components/social/bus.ts'
 import styled, { css, keyframes } from 'styled-components'
 import type { KartAction, KartItemEvent, KartView } from '../../../shared/games/kart/types.ts'
 import { actionKeys } from '../../../shared/kart/input.ts'
@@ -609,6 +610,7 @@ export default function RaceView({
           <Tag
             key={racer.seat}
             data-tag={racer.seat}
+            {...{ [SOCIAL_SEAT]: racer.seat }}
             $team={teamOf(racer.seat)}
             style={{ display: 'none' }}
           >

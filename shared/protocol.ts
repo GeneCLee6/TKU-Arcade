@@ -112,11 +112,18 @@
 //    `ack`, and none is applied twice. Without `session` and `seq` (a page from before) nothing
 //    changes; a server from before ignores both and sends no `ack`, and the page then does not
 //    send anything again.
+// 21. Social (2026-11-23, shared/social.ts). `react` carries an emote or a canned phrase by its
+//    number (REACTION_COUNT of them, never text), passed on to everyone as `reaction`; the room drops
+//    one within REACTION_MIN_MS of the last and any past REACTION_RATE. `profile_summary` is a few
+//    numbers from the sender's own achievements (parseProfileSummary), kept as RoomMember.profile;
+//    null takes it away (a hidden card). Neither is part of a game, nor changes one. A page from
+//    before draws only the reactions it knows and ignores `profile`.
 //
 // A browser of another version is refused at the upgrade with CloseCode.versionMismatch and told to
 // reload. View types are `type` aliases, not interfaces, so they stay assignable to JsonValue.
 import { normalizeChatText, type ChatMessage } from './chat.ts'
 import { acceptableName } from './nickname.ts'
+import { parseProfileSummary, SOCIAL_REACTION_COUNT, type ProfileSummary } from './social.ts'
 import type { GameError, GameProjection, OptionValues, SeatId } from './games/types.ts'
 import type { JsonValue, PatchOp } from './patch.ts'
 
@@ -274,6 +281,8 @@ export type RoomMember = {
    * (`bots.names`), which the browser shows through the game's strings; `name` is only a fallback
    */
   bot?: { level: string; name: string }
+  /** What this member shows of their profile (21. above); absent until sent, or when hidden */
+  profile?: ProfileSummary
 }
 
 /** A seat the game is waiting for, whose player is absent or gone, and what the host can do */
@@ -512,13 +521,19 @@ export type LeaveMessage = { t: 'leave' }
 /** The host lists the room on the home page, or takes it off (19. above) */
 export type SetPublicMessage = { t: 'set_public'; public: boolean }
 
-/** How many reactions there are (e7-t11); the browser draws them, the room only passes on a number */
-export const REACTION_COUNT = 6
+/**
+ * How many reactions there are (e7-t11; 2026-11-23, 21. above: twelve emotes, then eight phrases);
+ * the browser draws them, the room only passes on a number
+ */
+export const REACTION_COUNT = SOCIAL_REACTION_COUNT
 /** One member's reactions are passed on at most this often; faster ones are dropped quietly */
 export const REACTION_MIN_MS = 500
 
 /** A quick reaction for everyone in the room to see float up (e7-t11). Never stored, never locked */
 export type ReactMessage = { t: 'react'; reaction: number }
+
+/** Show the room one's card (21. above), or with null hide it. Any status */
+export type ProfileSummaryMessage = { t: 'profile_summary'; profile: ProfileSummary | null }
 
 /**
  * The host sets the room's password, or takes it away with null (e1-t16). Someone new needs it to
@@ -564,6 +579,7 @@ type ClientBody =
   | SetLookMessage
   | SetTeamMessage
   | ReactMessage
+  | ProfileSummaryMessage
   | AddBotMessage
   | LeaveMessage
   | SetPublicMessage
@@ -937,6 +953,11 @@ function parseClientBody(value: Record<string, unknown>): ClientBody | null {
         (value.reaction as number) < REACTION_COUNT
         ? { t: 'react', reaction: value.reaction as number }
         : null
+    case 'profile_summary': {
+      if (value.profile === null) return { t: 'profile_summary', profile: null }
+      const profile = parseProfileSummary(value.profile)
+      return profile ? { t: 'profile_summary', profile } : null
+    }
     case 'set_look':
       return value.look === null ||
         (typeof value.look === 'string' && LOOK_PATTERN.test(value.look))

@@ -4,6 +4,7 @@ import { normalizeChatText, type ChatMessage } from '../../shared/chat.ts'
 import type { OptionValues } from '../../shared/games/types.ts'
 import type { JsonValue } from '../../shared/patch.ts'
 import type { ClientMessage, CoverMessage, ErrorMessage, RoomView } from '../../shared/protocol.ts'
+import type { ProfileSummary } from '../../shared/social.ts'
 import { useToast } from '../components/useToast.ts'
 import { hasMessage, t, type TextKey } from '../i18n/t.ts'
 import { ChatSends, mergeChat, type ChatSendResult } from './chatState.ts'
@@ -60,6 +61,8 @@ export type RoomHandle = {
   /** e7-t11: the reactions floating now, oldest first */
   reactions: readonly FloatingReaction[]
   react(reaction: number): void
+  /** 2026-11-23 (shared/social.ts): this person's card for the room, or null to hide it; quiet */
+  sendProfile(profile: ProfileSummary | null): void
   /** A real-time game's channel (e2-t11): frames and clock pings, outside React */
   realtime: RoomRealtime
   /** 2026-11-22: while reconnecting, try now instead of waiting (the banner's button) */
@@ -241,6 +244,12 @@ export function useRoom(roomId: string, name: string): RoomHandle {
   // Quiet: the page is on its way to the lobby, and a dropped socket goes the old way (17.)
   const leave = useCallback(() => void connection.current?.send({ t: 'leave' }, false), [])
   const react = useCallback((reaction: number) => send({ t: 'react', reaction }), [send])
+  // Quiet: the card is sent again whenever the room has none (src/components/social/)
+  const sendProfile = useCallback(
+    (profile: ProfileSummary | null) =>
+      void connection.current?.send({ t: 'profile_summary', profile }, false),
+    [],
+  )
   const setPassword = useCallback(
     (password: string | null) => send({ t: 'set_password', password }),
     [send],
@@ -302,6 +311,7 @@ export function useRoom(roomId: string, name: string): RoomHandle {
     actFor,
     reactions,
     react,
+    sendProfile,
     sendChat,
     realtime,
     reconnectNow,

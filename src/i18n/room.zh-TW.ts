@@ -77,6 +77,7 @@ export const roomZhTW: Record<RoomMessageKey, string> = {
   'room.joining': '加入中…',
   'room.kicked': '房主已將你移出這個房間，幾分鐘內無法再加入。',
   'room.loadFailed': '連不上房間，請檢查網路連線。',
+  'room.card.open': '查看 {name} 的玩家名片',
   'room.memberCount': '房間人數：{count}',
   'room.status.waiting': '等待中',
   'room.status.playing': '對戰中',

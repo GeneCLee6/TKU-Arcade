@@ -273,6 +273,7 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
                 {players.map((player) => (
                   <SeatChip
                     key={player.seat}
+                    data-social-seat={player.seat}
                     type="button"
                     $turn={player.seat === activeSeat}
                     aria-pressed={selected === player.cell}

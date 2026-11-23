@@ -83,6 +83,7 @@ export const roomEn = {
   'room.joining': 'Joining…',
   'room.kicked': "The host removed you from this room. You can't rejoin for a few minutes.",
   'room.loadFailed': "Couldn't reach the room. Check your connection.",
+  'room.card.open': "Open {name}'s player card",
   'room.memberCount': 'In the room: {count}',
   'room.status.waiting': 'Lobby',
   'room.status.playing': 'Live',

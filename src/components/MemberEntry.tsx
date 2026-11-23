@@ -6,6 +6,7 @@ import { botKey, memberName } from '../lib/memberName.ts'
 import { Button } from './Button.tsx'
 import { color, fontSize, radius, space, type ColorName } from '../styles/tokens.ts'
 import { ConfirmButton } from './ConfirmButton.tsx'
+import { NameButton } from './social/NameButton.tsx'
 
 export interface MemberEntryProps {
   member: RoomMember
@@ -63,7 +64,10 @@ export function MemberEntry({
   }
   return (
     <>
-      <Name>{name}</Name>
+      {/* 2026-11-23: opens their card, and their emotes float by it (src/components/social/) */}
+      <Name>
+        <NameButton member={id} name={name} />
+      </Name>
       <Badges>
         {member.host && <Badge $tone="accent">{t('room.waiting.badge.host')}</Badge>}
         {isYou && <Badge $tone="text">{t('room.waiting.badge.you')}</Badge>}

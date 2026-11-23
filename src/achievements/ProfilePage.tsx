@@ -16,7 +16,9 @@ import { clippedFill, cornerClip, displayType, glass, monoType } from '../styles
 import { color, fontSize, space } from '../styles/tokens.ts'
 import { BadgeEmblem } from './Badge.tsx'
 import { RACE_TRACK_IDS } from './kartLists.ts'
+import { setCardShared, setTitleChoice, useCardShared, useTitleChoice } from './cardPrefs.ts'
 import { favourite, lapTime } from './profileStats.ts'
+import { pickTitle } from './summary.ts'
 import { record, subscribeAchievements } from './engine.ts'
 import { BOARD_GAMES, CATEGORIES, evaluate, progressOf, RULES, type Category, type Rule } from './rules.ts'
 import type { Stats } from './stats.ts'
@@ -75,6 +77,7 @@ export function ProfilePage() {
             <Fill style={{ width: `${percent}%` }} />
           </Bar>
           <Note>{t('ach.profile.local')}</Note>
+          <CardSettings done={done} saved={saved} t={t} />
         </Card>
 
         <section aria-labelledby="profile-stats">
@@ -155,6 +158,45 @@ function AchievementTile({
         </TileState>
       </TileText>
     </Tile>
+  )
+}
+
+/**
+ * 2026-11-23 (docs/ARCHITECTURE.md §4.97): what rooms see of this card (summary.ts): whether they
+ * see it at all, and which unlocked achievement it shows as a title
+ */
+function CardSettings({ done, saved, t }: { done: readonly Rule[]; saved: Saved; t: Translate }) {
+  const shared = useCardShared()
+  const choice = useTitleChoice()
+  const shown = pickTitle(done, saved, choice)
+  const value = choice === 'auto' || choice === 'none' || done.some((rule) => rule.id === choice) ? choice : 'auto'
+  return (
+    <Settings>
+      {shown && (
+        <ShownTitle data-testid="profile-title">{t(`ach.rule.${shown}.name` as TextKey)}</ShownTitle>
+      )}
+      <SettingRow>
+        <span>{t('ach.profile.cardTitle')}</span>
+        <select value={value} onChange={(event) => setTitleChoice(event.target.value)}>
+          <option value="auto">{t('ach.profile.cardTitleAuto')}</option>
+          <option value="none">{t('ach.profile.cardTitleNone')}</option>
+          {done.map((rule) => (
+            <option key={rule.id} value={rule.id}>
+              {t(`ach.rule.${rule.id}.name` as TextKey)}
+            </option>
+          ))}
+        </select>
+      </SettingRow>
+      <ShareRow>
+        <input
+          type="checkbox"
+          checked={shared}
+          onChange={(event) => setCardShared(event.target.checked)}
+        />
+        <span>{t('ach.profile.cardShare')}</span>
+      </ShareRow>
+      <Note>{t('ach.profile.cardShareHint')}</Note>
+    </Settings>
   )
 }
 
@@ -277,6 +319,50 @@ const Main = styled.main`
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+`
+
+const Settings = styled.div`
+  display: grid;
+  gap: ${space.sm}px;
+  padding-top: ${space.md}px;
+  border-top: 1px solid ${color.line};
+`
+
+const ShownTitle = styled.p`
+  margin: 0;
+  color: ${color.accent};
+  font-weight: 800;
+`
+
+const SettingRow = styled.label`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${space.sm}px;
+
+  select {
+    min-height: 40px;
+    max-width: 100%;
+    padding: 0 ${space.sm}px;
+    color: ${color.text};
+    background: ${color.sunken};
+    border: 1px solid ${color.border};
+    font: inherit;
+  }
+`
+
+const ShareRow = styled.label`
+  display: flex;
+  align-items: center;
+  gap: ${space.sm}px;
+  min-height: 44px;
+  cursor: pointer;
+
+  input {
+    width: 18px;
+    height: 18px;
+    accent-color: ${color.accent};
   }
 `
 

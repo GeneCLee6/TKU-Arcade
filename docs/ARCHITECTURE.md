@@ -2007,6 +2007,20 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **全螢幕的第一下 Esc**（`src/lib/fullscreen.ts`、`PauseLayer.tsx`）：Chromium 進全螢幕後 `navigator.keyboard.lock(['Escape'])`（#151 起就有；這次加單元測試與 e2e 確認比賽中真的鎖了、Esc 開暫停選單、仍在全螢幕）。Firefox／Safari 沒有 Keyboard Lock，Esc 由瀏覽器拿去離開全螢幕、頁面收不到按鍵：`fullscreen.ts` 記住「是不是頁面自己要離開」（`exitFullscreen` 設 `leaving`），全螢幕結束而不是頁面要的，就發 `onBrowserExit`；`PauseLayer` 在 `enabled` 時聽它，打開選單（單機暫停、多人房只開選單），和 Chromium 第一下 Esc 一樣。滑掉、F11 也算（比賽中離開全螢幕本來就該停一下）。頁面自己的「離開全螢幕」不觸發。
 - **卡丁車 e2e 的測試時鐘**（`src/kart/testClock.ts`、`e2e/kartClock.ts`）：測試在頁面載入前設 `window.__kartTest = { manual: true }`，`spikeLoop` 就不照牆上時鐘步進，只在測試呼叫 `__kartTest.step(n, until)` 時跑 `n` 步（一幀最多 120 步），`until` 第一次成立的那一步就停（比賽停在那一步，等測試按下一個鍵）。步進本身完全是原本的程式（`stepTrial`／`stepRun`、輸入、HUD），只換「什麼時候跑」：沒有設定的人（正式版、其他測試）走 `advanceClock` 原路，`flatGolden`／`branchGolden` 不變。`stepUntil` 的條件函式用 DevTools 協定送過去（`evaluateHandle`），不用 `new Function`（建置版 CSP 擋）。改用的：`kart-spike` 加速條放開視窗、搖桿、河濱（另加載入寬限）、`kart-night` 夜間車燈（先等比賽畫出來再等 canvas，兩次載入各有寬限）；`kart-lobby` 8 車手＋4 次 axe 不是物理問題，逾時 120 → 240 s。
 
+### 4.97 路線圖外：房間的社交——快捷表情、短語、玩家名片（2026-11-23，`feat/room-social`，#PRNUM）
+
+擁有者：「把它們想像是在做一個線上遊戲就知道怎麼做了」「總之要電競化專業化」。不需要帳號，所有房間（等待室、遊戲中、結算；卡丁車等待室、比賽中、觀戰）都有。
+
+- **在 e7-t11 的表情上擴充，不另做一套**：`react`／`reaction` 照舊只帶一個數字。`shared/social.ts`：0–11 是表情（前 6 個就是原本的 6 個，新增 6 個），12–19 是 8 句快捷短語（文字在兩語的字串檔，房間只轉數字，所以**不收任何自由文字**）。`REACTION_COUNT` 從 6 變 20；舊頁面的 `parseServerMessage` 收到 ≥ 6 的數字就忽略，所以向後相容、不必升 `PROTOCOL_VERSION`。
+- **速率**：伺服器除了原本的「兩次間隔 `REACTION_MIN_MS`（500 ms）」，再加**每人每 10 秒 6 個**（`REACTION_RATE`，用聊天的 `ChatRateLimit` 另開一個實例，和聊天的 10 秒 10 則互不相干），超過的安靜丟掉。瀏覽器自己也照同樣的數字擋（`reactionGate.ts`），被擋時面板顯示「慢一點」而不是石沉大海。非清單內的數字（超出範圍、小數、字串）照協定慣例是 protocol error，關 socket。
+- **玩家名片**（`profile_summary`，協定 21.）：瀏覽器從自己的成就存檔（`src/achievements/store.ts`）算出**摘要數字**（`src/achievements/summary.ts`）：稱號（一個成就的 rule id）、成就數／總數、局數、桌遊勝場、賽車冠軍數、最常開的車款 id、目前的車手 id、最快的一圈（賽道 id＋毫秒）。從不送完整存檔。`parseProfileSummary` 兩邊共用：只收這些欄位、整數與範圍（成就 ≤ 999、計數 ≤ 100 萬、圈速 3 s–1 h）、id 只能是 `[a-z][a-z0-9-]{0,47}`、JSON ≤ 400 字；不合就是 protocol error。房間把它存在成員上（`MemberRecord.profile` → `RoomMember.profile`，跟 `look` 一樣隨成員存檔、重啟還在、離開就沒了），**不進遊戲 state、不影響規則**；同一人 2 s 內只收一次變更（`PROFILE_MIN_MS`），隱藏（`profile: null`）隨時立刻生效。電腦成員不收。
+- **何時送**：`SocialLayer` 掛上後，房間裡自己的成員沒有名片或和現在算出來的不同就送（新加入、換了稱號、對局結束後 1.5 s 等成就引擎記完再算一次）；在「我的檔案」或自己的名片關掉「在房間公開我的名片」就送 `null`。房間存著，所以重連不用再送。
+- **前端**（`src/components/social/`）：`SocialLayer.tsx` 是 `RoomPage` 的 lazy chunk（原本 `Reactions.tsx` 搬進來擴充），包含左下角的表情鈕＋面板（`EmoteDock`／`EmotePicker`，比賽中移到左緣中間、避開觸控鍵）、冒泡（`Bubbles`）、名片浮層（`PlayerCard.tsx`，再一個 lazy chunk，點開才載成就名稱與車款、賽道字串）。首屏只多兩個極小的模組：`bus.ts`（開名片的事件）與 `NameButton.tsx`（`MemberEntry` 與卡丁車等待室的名字改成按鈕）。
+- **冒泡的位置**：元素帶 `data-social-member="<成員 id>"`（名字按鈕）或 `data-social-seat="<座位>"`（卡丁車比賽與觀戰的名牌，那裡只知道座位；陞官圖兩版的座位籤、真假朗讀與光譜的記分板、朝堂暗鬥、宮燈點點、滬尾商行的座位列）就是錨點，名字優先。冒泡層 `position: fixed`、z-index 36（比賽 20、頒獎台 30 之上，暫停選單 40 之下），有冒泡時每幀量錨點位置（名牌每幀在動），放在錨點上方（太靠上就放下方）；找不到可見的錨點（自己的車沒有名牌、名字在收起的抽屜裡）就疊在表情鈕旁邊、附上名字。同一人新的取代舊的。螢幕閱讀器的 live region（`aria-live="polite"`）沿用。卡丁車比賽中冒泡較小、半透明；表情面板裡「比賽中顯示表情」可以關（`tku-arcade.social.raceEmotes`，關掉也不出聲）。
+- **聲音**（`social/sound.ts`）：WebAudio 合成，表情一聲短促的上滑、短語兩個短音、名片開／關一個上滑／下滑；照全站聲音開關（`isSoundOn`）。
+- **和 `feat/app-shell-no-scroll` 的協調**：那支還沒合併。這裡先用最小的固定角落浮層；`EmotePicker`（只有按鈕＋面板、不定位）與 `Bubbles` 都有 export，按鈕面板系統合併後把 `EmotePicker` 放進它的面板、`SocialLayer` 的 `EmoteDock` 拿掉即可；名片本來就是浮層（`Dialog`）。
+- 測試：`tests/shared/social.test.ts`（摘要的欄位、型別、範圍、大小；協定解析）、`tests/worker/room-host.test.ts`「emotes, phrases and player cards」（轉送、速率視窗、清單外關 socket、名片存檔與重啟、隱藏、2 s 限制、非法名片）、`tests/achievements/summary.test.ts`、`tests/components/social/SocialLayer.test.tsx`、`e2e/social.spec.ts`（兩個瀏覽器互送表情與短語、看對方名片、隱藏後對方看到「不公開」）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
