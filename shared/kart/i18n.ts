@@ -13,6 +13,7 @@ import { KART_FLOW_MESSAGES, type KartFlowKey } from './i18n.flow.ts'
 import type { KartSchoolKey } from './i18n.school.ts'
 import type { KartChallengeKey } from './i18n.challenge.ts'
 import type { KartBoardKey } from './i18n.board.ts'
+import type { KartOnlineKey } from './i18n.online.ts'
 
 const en = {
   'kart.spike.title': 'Kart physics test',
@@ -369,6 +370,7 @@ export type KartMessageKey =
   | KartSchoolKey
   | KartChallengeKey
   | KartBoardKey
+  | KartOnlineKey
 
 const zhTW: Record<keyof typeof en, string> = {
   'kart.spike.title': '卡丁車物理測試',

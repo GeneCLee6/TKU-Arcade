@@ -98,7 +98,7 @@ export function WaitingRoom({
 
   // Sharing the room: its number, link and QR code, whether it is listed, its password
   const invite = (
-    <Invite roomId={roomId} code={view.room.code ?? null}>
+    <Invite roomId={roomId} code={view.room.code ?? null} name={view.room.name ?? null}>
       <Visibility
         isPublic={view.room.public === true}
         locked={view.room.password !== undefined}
@@ -268,10 +268,13 @@ export function WaitingRoom({
 function Invite({
   roomId,
   code,
+  name = null,
   children,
 }: {
   roomId: string
   code: string | null
+  /** 2026-11-23: what the host called the room, when it has a name */
+  name?: string | null
   children?: ReactNode
 }) {
   const t = useT()
@@ -291,6 +294,7 @@ function Invite({
   return (
     <Section>
       <Heading>{t('room.waiting.invite')}</Heading>
+      {name !== null && <RoomName data-testid="room-name">{name}</RoomName>}
       <Code>
         <CodeLabel>{t(code !== null ? 'room.waiting.roomCode' : 'room.waiting.roomId')}</CodeLabel>
         {/* An id, not a word: no translating it, by a browser or the zh-TW walkthrough */}
@@ -546,6 +550,12 @@ const StartBar = styled.div`
 `
 
 // The room's id, big and mono, as people read it out to each other
+const RoomName = styled.p`
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+`
+
 const Code = styled.p`
   display: grid;
   margin: 0;

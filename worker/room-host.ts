@@ -27,6 +27,7 @@ import {
   PROXY_FRAME,
   PROXY_HEADER_BYTES,
   RECONNECT_GRACE_MS,
+  BOT_HOST_GRACE_MS,
   ROOM_CLEANUP_MS,
   ROOM_IDLE_MAX_MS,
   SEAT_RELEASE_MS,
@@ -40,6 +41,7 @@ import {
   type ErrorCode,
   type QuickBots,
   type RoomListing,
+  type SeatBots,
   type RoomMember,
   type RoomStatus,
   type RoomSummary,
@@ -79,6 +81,8 @@ export type RoomRecord = {
   public: boolean
   /** Its short number (shared/room-code.ts); null when none was free, or the room is older */
   code?: string | null
+  /** 2026-11-23: what the host called it (shared/nickname.ts acceptableRoomName); absent: none */
+  name?: string
   /**
    * What someone new must bring to join (e1-t16); absent for an open room. Kept as typed (trimmed):
    * it is a door code for friends, never a person's own password. Members see it in the view, to
@@ -286,6 +290,11 @@ export class RoomHost {
   private botTurn: { key: string; at: number } | null = null
   /** By member id: what has been handled from their page (shared/protocol.ts 20.), as stored */
   private readonly acks = new Map<string, SeqAck>()
+  /**
+   * 2026-11-23: the game (its seed) whose computer karts have been given up, so that the grace is
+   * not counted again. Lost on hibernation, which only gives up the already retired ones once more
+   */
+  private botsAbandoned: number | null = null
 
   constructor(deps: RoomHostDeps) {
     this.deps = deps
@@ -359,6 +368,8 @@ export class RoomHost {
     code: string | null = null,
     password: string | null = null,
     bots: QuickBots | null = null,
+    name: string | null = null,
+    seatBots: SeatBots | null = null,
   ): boolean {
     const module = this.deps.games(gameId)
     if (this.room || !module) return false
@@ -366,6 +377,11 @@ export class RoomHost {
     // names and seats for, whatever it was asked
     const names = module.bot ? (module.bots?.names ?? []) : []
     const seated = bots === null ? [] : names.slice(0, Math.min(bots.count, module.meta.maxPlayers - 1))
+    // 2026-11-23: computer players a host's browser runs (the kart), seated to wait with the room
+    const hostRun =
+      seatBots !== null && !module.bot && module.bots?.levels.includes(seatBots.level)
+        ? module.bots.names.slice(0, Math.max(0, Math.min(seatBots.count, module.meta.maxPlayers - 1)))
+        : []
     this.room = {
       id,
       gameId,
@@ -379,6 +395,7 @@ export class RoomHost {
       // A room with a password is a private one: never listed for anyone to walk into
       public: isPublic && password === null,
       code,
+      ...(name !== null ? { name } : {}),
       ...(password !== null ? { password } : {}),
       ...(seated.length > 0 ? { startOnJoin: true as const } : {}),
       emptySince: this.deps.now(),
@@ -390,6 +407,13 @@ export class RoomHost {
     if (bots !== null && seated.length > 0) {
       seated.forEach((name, index) => {
         const bot = this.newBot(index + 1, quickBotLevel(bots, index), name, null)
+        this.members.set(bot.id, bot)
+      })
+      this.saveMembers()
+    }
+    if (seatBots !== null && hostRun.length > 0) {
+      hostRun.forEach((botName, index) => {
+        const bot = this.newBot(index + 1, seatBots.level, botName, null)
         this.members.set(bot.id, bot)
       })
       this.saveMembers()
@@ -429,24 +453,32 @@ export class RoomHost {
     }
   }
 
-  /** What the home page shows of this room; null while it should not be listed (e1-t09) */
+  /**
+   * What the lists show of this room; null while it should not be listed (e1-t09). 2026-11-23 (the
+   * kart's room list): a public room stays listed while full, locked (a password set since) or
+   * playing, saying so; GET /api/lobby without `game` still answers only the open ones
+   */
   listing(): RoomListing | null {
     const room = this.room
-    // A room with a password (e1-t16) is not for anyone to walk into
-    if (!room?.public || room.status !== 'waiting' || room.password !== undefined) return null
+    if (!room?.public || room.status === 'ended') return null
     const host = room.hostId === null ? undefined : this.members.get(room.hostId)
     const members = [...this.members.values()]
-    const seated = members.filter((member) => member.seat !== null).length
-    if (!host || seated >= room.maxSeats || !members.some((member) => member.conn !== null)) {
-      return null
-    }
+    if (!host || !members.some((member) => member.conn !== null)) return null
+    const seated = members.filter((member) => member.seat !== null)
+    const bots = seated.filter((member) => member.bot).length
+    const options = listedOptions(this.deps.games(room.gameId), room.options)
     return {
       id: room.id,
       gameId: room.gameId,
       host: host.name,
-      seated,
+      seated: seated.length,
       maxSeats: room.maxSeats,
       createdAt: room.createdAt,
+      ...(room.status === 'playing' ? { status: 'playing' as const } : {}),
+      ...(room.password !== undefined ? { locked: true as const } : {}),
+      ...(room.name !== undefined ? { name: room.name } : {}),
+      ...(bots > 0 ? { bots } : {}),
+      ...(options ? { options } : {}),
     }
   }
 
@@ -701,11 +733,9 @@ export class RoomHost {
     if (room?.status !== 'playing' || !game) return
     const realtime = this.deps.games(game.gameId)?.realtime
     if (!realtime?.abandon) return
-    const seats = [...this.members.values()]
-      .filter((member) => member.bot && member.seat !== null)
-      .map((member) => member.seat as number)
-      .filter((seat) => game.seats.some((one) => one.id === seat))
+    const seats = this.botSeatsIn(game)
     if (seats.length === 0) return
+    this.botsAbandoned = game.seed
     const now = this.deps.now()
     let actions: JsonValue[]
     try {
@@ -715,6 +745,32 @@ export class RoomHost {
       return
     }
     for (const action of actions) this.systemAction(action, now)
+  }
+
+  /** The computer members' seats that are in `game` */
+  private botSeatsIn(game: StoredGame): number[] {
+    return [...this.members.values()]
+      .filter((member) => member.bot && member.seat !== null)
+      .map((member) => member.seat as number)
+      .filter((seat) => game.seats.some((one) => one.id === seat))
+  }
+
+  /**
+   * 2026-11-23 (docs/KART-NETCODE.md §25): when the computer karts are given up for a host whose
+   * socket closed during the race, BOT_HOST_GRACE_MS after it did; null when nothing is pending (the
+   * host is online, there is no race or no computer kart in it, or they were given up already). A
+   * host back on the same page within it carries on running them
+   */
+  private botGraceAt(): number | null {
+    const room = this.room
+    const game = this.game
+    if (room?.status !== 'playing' || !game || room.hostId === null) return null
+    if (this.botsAbandoned === game.seed) return null
+    const host = this.members.get(room.hostId)
+    if (!host || host.conn !== null || host.offlineAt === null) return null
+    if (!this.deps.games(game.gameId)?.realtime?.abandon) return null
+    if (this.botSeatsIn(game).length === 0) return null
+    return host.offlineAt + BOT_HOST_GRACE_MS
   }
 
   /** The real-time module's scratch space for this game, new for each game */
@@ -810,6 +866,9 @@ export class RoomHost {
     }
     this.fireTimers(now)
     this.playBot(now)
+    // 2026-11-23: a host gone longer than the grace no longer runs the computer karts
+    const graceAt = this.botGraceAt()
+    if (graceAt !== null && now >= graceAt) this.abandonBots()
     this.markAbsent(now)
     this.releaseSeats(now)
     this.replaceAbsentHost()
@@ -831,7 +890,7 @@ export class RoomHost {
   nextAlarm(): number | null {
     const timerAt = this.game && this.room?.status === 'playing' ? nextTimerAt(this.game) : null
     const botAt = this.botTurn?.at ?? null
-    const times = [this.sweepAt, timerAt, botAt, this.cleanupAt()].filter(
+    const times = [this.sweepAt, timerAt, botAt, this.botGraceAt(), this.cleanupAt()].filter(
       (at): at is number => at !== null && Number.isFinite(at),
     )
     return times.length > 0 ? Math.min(...times) : null
@@ -924,6 +983,9 @@ export class RoomHost {
     }
     if (known) {
       const replaced = known.conn !== null
+      // 2026-11-23: the same page coming back (its `session`, 20.) still runs the computer karts
+      const samePage = session !== null && this.acks.get(known.id)?.session === session
+      const graceRunning = this.botGraceAt() !== null
       if (known.conn !== null) {
         // A second tab, or a reload that beat the old socket's close
         this.conns.delete(known.conn)
@@ -943,8 +1005,11 @@ export class RoomHost {
         this.saveMembers()
       })
       this.welcome(conn, known, session)
-      // A reload that beat the old socket's close: the old page ran the computer karts, not this one
-      if (replaced && known.id === this.room?.hostId) this.abandonBots()
+      // Another page (a reload, a second tab): the old one ran the computer karts, not this one, and
+      // a page never picks them up halfway (shared/protocol.ts 14.). The same page carries on
+      if (known.id === this.room?.hostId && !samePage && (replaced || graceRunning)) {
+        this.abandonBots()
+      }
       return
     }
     // Someone new to a room with a password (e1-t16); a member coming back has their token instead
@@ -1822,6 +1887,7 @@ export class RoomHost {
       ...(room.code ? { code: room.code } : {}),
       ...(room.password !== undefined ? { password: room.password } : {}),
       ...(room.public ? { public: true as const } : {}),
+      ...(room.name !== undefined ? { name: room.name } : {}),
     }
     const members: Record<string, RoomMember> = {}
     for (const member of this.members.values()) {
@@ -1919,8 +1985,9 @@ export class RoomHost {
       if (room && room.status === 'waiting' && this.waitsOnReady(room)) member.ready = false
       this.saveMembers()
     })
-    // The host's browser ran the computer karts: nobody does now (shared/protocol.ts 14.)
-    if (member.id === this.room?.hostId) this.abandonBots()
+    // The host's browser ran the computer karts (shared/protocol.ts 14.): 2026-11-23, they are given
+    // up only if it is not back within BOT_HOST_GRACE_MS (`botGraceAt`, the alarm), so that a short
+    // drop and its reconnect do not end their race
   }
 
   private saveMembers(): void {
@@ -1967,4 +2034,22 @@ export class RoomHost {
     if (!this.room) throw new Error('The room was not created')
     return this.room
   }
+}
+
+/**
+ * A room's options as a list may show them (2026-11-23): the choices and the numbers, never typed
+ * text (a custom track's code, a word); null when there are none
+ */
+export function listedOptions(
+  module: AnyGameModule | null | undefined,
+  options: OptionValues,
+): Record<string, string | number> | null {
+  if (!module) return null
+  const shown: Record<string, string | number> = {}
+  for (const [key, spec] of Object.entries(module.options)) {
+    const value = options[key]
+    if (spec.kind === 'select' && typeof value === 'string') shown[key] = value
+    else if (spec.kind === 'int' && typeof value === 'number') shown[key] = value
+  }
+  return Object.keys(shown).length > 0 ? shown : null
 }

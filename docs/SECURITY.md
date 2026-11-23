@@ -106,7 +106,9 @@ frame-ancestors 'none'
 | 聊天 | 每人每 10 秒 10 則、每則 500 字 | `shared/chat.ts`、`RoomHost` |
 | 表情 | 每人間隔 `REACTION_MIN_MS` | `RoomHost` |
 | 房間密碼 | 錯 `PASSWORD_TRIES` 次關掉 socket | `RoomHost` |
-| `GET /api/lobby`、`GET /api/rooms/<id>`、`GET /api/codes/<code>`、`GET /api/flags` | **沒有** | — |
+| `GET /api/lobby`（大廳與卡丁車房間列表，2026-11-23） | **每 instance 每位址每分鐘 240 次**、instance 合計 2 萬次（記憶體，不走 `LimiterDO`：列表每 10 秒輪詢，每次多一個 DO 請求不划算；本機不限）；每個 instance 把 LobbyDO 的回答沿用 2 秒；`?game=` 不是遊戲 400 | `worker/app.ts`、`worker/lobby-list.ts` |
+| `POST /api/rooms/quick`（卡丁車快速加入，2026-11-23） | 找房吃上一列的 240 次；真的開新房時再吃 `POST /api/rooms` 的全部額度（每位址每分鐘 10 間）；房名照暱稱規則（§9），不合 400 `bad_name` | `worker/rooms.ts` |
+| `GET /api/rooms/<id>`、`GET /api/codes/<code>`、`GET /api/flags` | **沒有** | — |
 | `/api/telemetry` | 只收區間計數，見 `worker/telemetry.ts` | — |
 
 說明：
@@ -118,7 +120,8 @@ frame-ancestors 'none'
 - **踢人黑名單**（2026-11-22，`shared/protocol.ts` 18.）：被踢的人 10 分鐘內，同一個 seat token、同一個社團帳號、或「同一個位址雜湊**而且**同一個名字」都進不來（4411）。不只看位址是刻意的：同一個校園 Wi-Fi 或宿舍共用一個位址，只看位址會把整桌朋友都擋掉。代價：換名字或換網路就能回來；朋友圈可以接受，再不行就設房間密碼或解散另開。
 - **共用位址**：同一個校園 Wi-Fi 或手機網路的人共用位址。10 間／分鐘、120 次升級／分鐘（重連另 240 次：一次部署會讓所有 socket 同時斷，一整桌在同一個校園位址一起回來不該被當成洪水；`resume` 是誰都能帶的參數，所以這是「額外的額度」不是繞過，腳本最多 360 次）、每房 24 條是照「幾桌朋友在同一個 Wi-Fi」抓的（建房原本 5 間，2026-11-22 擁有者為校園 Wi-Fi 調成 10）；「再來一局」與換遊戲都不算建房。
 - **聊天以外的文字**：遊戲內的文字輸入都由規則在伺服器限長度、也只在該輪能送（撞詞與搭橋的提示 12 字、撞詞猜答 20 字、光譜的答案 30 字：`shared/games/*/clue.ts`、`answer.ts`），所以不另外限速率；每則訊息還有 `MAX_CLIENT_MESSAGE_CHARS`。沒有題目投稿、卡丁車名牌；卡丁車編輯器的分享碼只在瀏覽器解析。
-- GET 端點沒有限制：它們只讀、回應很小，Cloudflare 的 DDoS 防護在前面；成本儀表板會先看到異常（每日 Workers 請求 80% 警示）。
+- 其他 GET 端點沒有限制：它們只讀、回應很小，Cloudflare 的 DDoS 防護在前面；成本儀表板會先看到異常（每日 Workers 請求 80% 警示）。`GET /api/lobby` 2026-11-23 起有記憶體限制，因為卡丁車的房間列表會一直輪詢、而且每次都可能叫醒 LobbyDO。
+- **公開房列表露出什麼**（2026-11-23）：房主暱稱、房名、遊戲、人數、電腦車數、狀態（等待中／比賽中）、有沒有密碼、`select`／`int` 選項（賽道、模式、圈數）；**不露出**密碼本身、成員名單、房號以外的任何識別、自訂賽道代碼這類打字欄位。只有房主設成公開的房間才列；有密碼的公開房列成「鎖著」，大廳首頁的列表照舊不列。
 
 ## 7. 擁有者端點
 
@@ -153,6 +156,7 @@ PR 預覽站（`tku-arcade-pr-107`）：
 - **髒話**：英文整個單字（shit、bitch…，`shiitake` 不擋）或任何位置都不會是正常字的（fuck、nigger…，含 `f.u.c.k`）；中文的明顯罵人詞組（幹你娘、操你媽、雞掰…）。**單字「幹」不擋**（幹部、能幹）。清單刻意短：它進每個人的首屏，而且擋到正常名字比漏掉創意拼法更糟；真的有人亂取名，房主可以踢。
 - 表單邊打邊提示（`nickname.reserved`／`nickname.blocked`／長度）；伺服器在 `join` 用同一套檢查（`acceptableName`），不過就當協定錯誤關閉（4422），因為正常的頁面送不出這種名字。localStorage 裡存的舊暱稱不合規時會重新問。登入帳號的名字來自牌桌、不經這個檢查。
 - 測試：`tests/worker/abuse.test.ts`（擋與不擋的例子都列了）、`tests/components/NicknameForm.test.tsx`。
+- **房名**（2026-11-23，`shared/roomName.ts`）：卡丁車建房與快速加入可以取房名，公開房的房名會給陌生人看，所以用同一套：`normalizeText` 清理（最多 24 字）＋`nameProblem` 同一份清單；伺服器在 `POST /api/rooms`、`/api/rooms/quick` 檢查，不合回 400 `bad_name`（不默默丟掉）；表單邊打邊提示。測試 `tests/worker/lobby-list.test.ts`、`tests/kart/onlineView.test.tsx`。
 
 
 ## 10. 實測（#110）

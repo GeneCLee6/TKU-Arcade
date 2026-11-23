@@ -13,6 +13,7 @@ import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { applyPatch, type JsonValue } from '../../shared/patch.ts'
 import {
   PROTOCOL_VERSION,
+  BOT_HOST_GRACE_MS,
   RECONNECT_GRACE_MS,
   SWEEP_INTERVAL_MS,
   parseClientMessage,
@@ -343,14 +344,83 @@ describe('the host moves the computer karts (2026-11-17)', () => {
   })
 })
 
-describe('when the host goes (2026-11-17)', () => {
-  it('drops the computer karts out at once, and the race goes on', () => {
+/** The host's page comes back on a new socket, with its token and the page's `session` */
+function comeBack(world: World, ann: Client, session: string | null, conn = 'conn-back'): Client {
+  const back = new Client(world, conn)
+  world.clients.set(back.conn, back)
+  world.sockets.push({ conn, openedAt: world.clock })
+  world.host.opened(back.conn, world.clock)
+  back.send({ t: 'join', name: 'Ann', token: ann.token, ...(session !== null ? { session } : {}) })
+  return back
+}
+
+const PAGE = 'page-one-abcdef'
+
+describe('when the host goes (2026-11-17; a grace since 2026-11-23)', () => {
+  it('drops the computer karts out once the host has been gone BOT_HOST_GRACE_MS, and the race goes on', () => {
     const { world, ann, bob } = kartRoom()
     ann.send({ t: 'add_bot', level: 'easy' })
     toGo(world, ann, bob, [2])
     world.disconnect(ann)
+    // Not at once: the alarm is set for the end of the grace
+    expect(bob.race.racers.map((racer) => racer.out)).toEqual([false, false, false])
+    expect(world.host.nextAlarm()).toBeLessThanOrEqual(world.clock + BOT_HOST_GRACE_MS)
+    world.clock += BOT_HOST_GRACE_MS - 1
+    world.host.sweep()
+    expect(bob.race.racers.map((racer) => racer.out)).toEqual([false, false, false])
+    world.clock += 1
+    world.host.sweep()
     expect(bob.race.racers.map((racer) => racer.out)).toEqual([false, false, true])
     expect(bob.race.phase).toBe('racing')
+  })
+
+  it('keeps them in the race when the same page is back within 5 s, and it goes on moving them', () => {
+    const world = new World()
+    expect(world.host.create('abcdefghij', 'kart', { track: 'riverside', laps: 1 }, false)).toBe(true)
+    const ann = new Client(world, 'conn-ann')
+    world.clients.set(ann.conn, ann)
+    world.sockets.push({ conn: ann.conn, openedAt: world.clock })
+    world.host.opened(ann.conn, world.clock)
+    ann.send({ t: 'join', name: 'Ann', token: null, session: PAGE })
+    const bob = world.join('Bob')
+    bob.send({ t: 'ready', ready: true })
+    ann.send({ t: 'add_bot', level: 'easy' })
+    toGo(world, ann, bob, [2])
+    world.disconnect(ann)
+    world.clock += 4_000
+    world.host.sweep()
+    const back = comeBack(world, ann, PAGE)
+    expect(back.view?.members[ann.you]?.host).toBe(true)
+    // Past the grace: nothing is pending any more
+    world.clock += BOT_HOST_GRACE_MS + 1
+    world.host.sweep()
+    expect(bob.race.racers.map((racer) => racer.out)).toEqual([false, false, false])
+    // And the host's page still moves the computer seat
+    const before = bob.frames.length
+    back.binary(proxyFrame(2, bytes(driveFrames(raceTrack('riverside')!, 2).next().value as KartFrame)))
+    expect(bob.frames.length).toBe(before + 1)
+  })
+
+  it('drops them at once when the host comes back on another page (a reload)', () => {
+    const { world, ann, bob } = kartRoom()
+    ann.send({ t: 'add_bot', level: 'easy' })
+    toGo(world, ann, bob, [2])
+    world.disconnect(ann)
+    world.clock += 2_000
+    comeBack(world, ann, 'page-two-abcdef')
+    expect(bob.race.racers.map((racer) => racer.out)).toEqual([false, false, true])
+  })
+
+  it('survives hibernation during the grace', () => {
+    const { world, ann, bob } = kartRoom()
+    ann.send({ t: 'add_bot', level: 'easy' })
+    toGo(world, ann, bob, [2])
+    world.disconnect(ann)
+    world.hibernate()
+    world.clock += BOT_HOST_GRACE_MS
+    world.host.sweep()
+    const watcher = world.join('Cy')
+    expect(watcher.race.racers.map((racer) => racer.out)).toEqual([false, false, true])
   })
 
   it('does not hold up the start for them', () => {
@@ -360,6 +430,8 @@ describe('when the host goes (2026-11-17)', () => {
     bob.send({ t: 'action', action: { t: 'loaded' } })
     ann.send({ t: 'action', action: { t: 'loaded' } })
     world.disconnect(ann)
+    world.clock += BOT_HOST_GRACE_MS
+    world.host.sweep()
     expect(bob.race.racers.map((racer) => racer.out)).toEqual([false, false, true])
     expect(bob.race.phase).toBe('countdown')
   })
@@ -377,6 +449,8 @@ describe('when the host goes (2026-11-17)', () => {
     ann.send({ t: 'action', action: { t: 'loaded' }, botSeat: 1 })
     expect(bob.race.phase).toBe('countdown')
     world.disconnect(ann)
+    world.clock += BOT_HOST_GRACE_MS
+    world.host.sweep()
     // Ann still holds her seat and may come back; the computer kart is out
     expect(bob.race.racers.map((racer) => racer.out)).toEqual([false, true])
     expect(bob.view?.room.status).toBe('playing')
@@ -455,5 +529,28 @@ describe('the race room waits for everyone to be ready (2026-11-21)', () => {
     xia.send({ t: 'start' })
     expect(xia.errors).toEqual([])
     expect(xia.view?.room.status).toBe('playing')
+  })
+})
+
+// 2026-11-23 (the kart's room list, worker/lobby-list.ts): what a public race room lists
+describe('the public listing of a race room (2026-11-23)', () => {
+  it("carries the room's name, its computer players and its choices, never typed text", () => {
+    const world = new World()
+    expect(
+      world.host.create('abcdefghij', 'kart', { track: 'harbour', custom: 'abc' }, true, null, null, null, '河口快車', {
+        count: 2,
+        level: 'hard',
+      }),
+    ).toBe(true)
+    const ann = world.join('Ann')
+    const listing = world.host.listing()
+    expect(listing).toMatchObject({ name: '河口快車', seated: 3, bots: 2, maxSeats: 8 })
+    expect(listing?.options).toMatchObject({ track: 'harbour', mode: 'items', teams: 'solo', laps: 3 })
+    expect(listing?.options).not.toHaveProperty('custom')
+    expect(ann.view?.room.name).toBe('河口快車')
+    // The host takes seat 0, the computer karts 1 and 2, waiting for the host to start
+    const seats = Object.values(ann.view?.members ?? {}).map((member) => [member.seat, member.bot?.level ?? null])
+    expect(seats.sort()).toEqual([[0, null], [1, 'hard'], [2, 'hard']])
+    expect(ann.view?.room.status).toBe('waiting')
   })
 })
