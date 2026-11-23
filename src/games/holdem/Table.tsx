@@ -246,7 +246,8 @@ const Box = styled.div<{ $turn: boolean; $you: boolean; $faded: boolean }>`
   padding: 3px 4px;
   /* A nameplate: the seat's colour along the top, the game's hue round whoever is to act */
   border-radius: 2px;
-  background: linear-gradient(180deg, ${mix('var(--seat)', 18, color.surface)}, ${color.surface} 60%);
+  /* Plain surface under the words: a folded seat's faded text keeps its contrast */
+  background: ${color.surface};
   color: ${color.text};
   border: 2px solid ${(p) => (p.$you ? color.brand : color.line)};
   border-top: 3px solid var(--seat);
