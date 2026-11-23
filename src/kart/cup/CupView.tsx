@@ -131,7 +131,11 @@ export default function CupView({ run: first, onMenu }: CupViewProps) {
                   name: nameOf(seat),
                   kart: mine ? loadBody() : entry.kart,
                   driver: mine ? loadDriver() : entry.driver,
-                  ...(mine ? { outfit: loadOutfit(loadDriver()) } : {}),
+                  ...(mine
+                    ? { outfit: loadOutfit(loadDriver()) }
+                    : entry.outfit
+                      ? { outfit: entry.outfit }
+                      : {}),
                   line: t('kart.flow.podium.points', {
                     points: table.find((one) => one.seat === seat)?.points ?? 0,
                   }),

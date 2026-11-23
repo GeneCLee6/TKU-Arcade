@@ -5,6 +5,7 @@ import { loadoutOfByte } from '../../../shared/kart/karts.ts'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { ITEM_TUNING } from '../../../shared/kart/items.ts'
+import type { OutfitId } from '../../../shared/kart/outfits.ts'
 import {
   advancePlayhead,
   heldAt,
@@ -103,6 +104,11 @@ export interface ReplayViewProps {
   notice?: string | null
   /** 2026-11-23: open on the race's highlights, played with the broadcast (the results' button) */
   highlights?: boolean
+  /**
+   * 2026-11-23: what each racer's driver wore (the room's `look`, the computer's draw, a file's
+   * header): a frame's body byte has no room for it. Left out, or nothing for a seat: the race suit
+   */
+  outfitOf?: (seat: number) => OutfitId | undefined
 }
 
 /** The highlights being played: which of them */
@@ -112,13 +118,18 @@ interface Clips {
 }
 
 /** Every kart at `tick` */
-function kartsAt(reel: ReplayReel, tick: number): WatchedKart[] {
+function kartsAt(
+  reel: ReplayReel,
+  tick: number,
+  outfitOf?: (seat: number) => OutfitId | undefined,
+): WatchedKart[] {
   const karts: WatchedKart[] = []
   // A team race: whose blue boost burns at this moment (their flames are blue)
   const burning = teamBurnsAt(reel.replay.teams, tick)
   for (const [seat, samples] of reel.samples) {
     const one = sampleAt(samples, tick)
     if (!one) continue
+    const outfit = outfitOf?.(seat)
     karts.push({
       id: seat,
       x: one.x,
@@ -131,6 +142,7 @@ function kartsAt(reel: ReplayReel, tick: number): WatchedKart[] {
       skidding: one.skidding,
       // e10-t05: the frame's body byte names the kart and its driver
       ...kartOfByte(one.body),
+      ...(outfit ? { outfit } : {}),
       look: {
         speed: one.vx * Math.sin(one.heading) - one.vz * Math.cos(one.heading),
         steer: one.steer,
@@ -168,6 +180,7 @@ export default function ReplayView({
   revision,
   notice,
   highlights = false,
+  outfitOf,
 }: ReplayViewProps) {
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
@@ -189,6 +202,11 @@ export default function ReplayView({
     speed: 1,
   }))
   const head = useRef<Playhead>(shown)
+  // What each driver wears, as the caller says now (a new function every render is no new replay)
+  const outfitRef = useRef(outfitOf)
+  useLayoutEffect(() => {
+    outfitRef.current = outfitOf
+  })
   const seats = useMemo(() => [...reel.samples.keys()], [reel])
   const [follow, setFollow] = useState<number | null>(() =>
     you !== null && reel.samples.has(you) ? you : (seats[0] ?? null),
@@ -334,7 +352,7 @@ export default function ReplayView({
           }
           const tick = head.current.tick
           lastTick = tick
-          const karts = kartsAt(reel, tick)
+          const karts = kartsAt(reel, tick, outfitRef.current)
           const nowMs = (tick * 1000) / TICKS_PER_SECOND
           const playedThrough = !sought && lastMs !== null && nowMs > lastMs && nowMs - lastMs < 500
           const where = (seat: number) => karts.find((kart) => kart.id === seat)
@@ -731,7 +749,14 @@ export default function ReplayView({
           >
             {t('games.kart.highlights.watch')}
           </Button>
-          <ReplayShare replay={replay} nameOf={nameOf} you={you} revision={revision} size="sm" />
+          <ReplayShare
+            replay={replay}
+            nameOf={nameOf}
+            you={you}
+            revision={revision}
+            size="sm"
+            {...(outfitOf ? { outfitOf } : {})}
+          />
         </Row>
       </WatchControls>
     </WatchPage>

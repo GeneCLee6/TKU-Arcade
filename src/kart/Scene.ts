@@ -71,7 +71,8 @@ import {
   startRig,
   type Chased,
 } from './camera.ts'
-import type { CameraShot, Point3 } from './director.ts'
+import type { CameraShot, Point3, SightBlocked } from './director.ts'
+import { createSightTest } from './art/sightLine.ts'
 import { cappedPost, loadSettings } from './settings.ts'
 import { forwardId } from '../../shared/kart/tracks/reverseId.ts'
 
@@ -217,6 +218,11 @@ export interface KartScene {
    * sat off its kart wherever the road is not at 0 m). Null for one not drawn or off screen
    */
   tagPoints(ids: readonly number[], above: number): ScreenPoint[]
+  /**
+   * 2026-11-23 (director.ts's `pickGroupAngle`): whether the track's art stands between two points
+   * (always false on the test yard, which has none)
+   */
+  sightBlocked: SightBlocked
   /** `{width}x{height}` of the drawing buffer */
   drawingBuffer(): string
   /**
@@ -330,6 +336,8 @@ export function createKartScene(
   )
   // A track brings its own ground and sky; the test yard keeps the plain plane and grid
   let art: TrackArt | null = null
+  // 2026-11-23: made the first time the group shot asks
+  let sight: SightBlocked | null = null
   if (track) {
     art = buildTrackArt(track, {
       density: settings.density,
@@ -792,6 +800,7 @@ export function createKartScene(
         const at = otherKarts.get(id)?.group.position
         return at ? onScreen(at.x, at.y + above, at.z) : null
       }),
+    sightBlocked: (from, to) => (sight ??= art ? createSightTest(art.group) : () => false)(from, to),
     drawingBuffer: () => `${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`,
     drawn: () => renderer.info.render,
     stats: () => ({

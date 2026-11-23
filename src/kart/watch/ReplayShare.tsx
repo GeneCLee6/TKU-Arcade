@@ -3,6 +3,7 @@
 // when the file is small enough a link carries it whole in its hash, which never reaches a server.
 // Its own small chunk where the room's first screen offers it (KartScreen.tsx).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { OutfitId } from '../../../shared/kart/outfits.ts'
 import type { Replay } from '../../../shared/kart/replay.ts'
 import { replayLink, writeReplayFile, type ReplayFileInfo } from '../../../shared/kart/replayFile.ts'
 import { Button } from '../../components/Button.tsx'
@@ -22,21 +23,32 @@ export interface ReplayShareProps {
    */
   readonly revision?: number
   readonly size?: 'sm' | 'md'
+  /** 2026-11-23: what each racer's driver wore, kept in the file's header */
+  readonly outfitOf?: (seat: number) => OutfitId | undefined
 }
 
-export default function ReplayShare({ replay, nameOf, you, revision, size = 'md' }: ReplayShareProps) {
+export default function ReplayShare({
+  replay,
+  nameOf,
+  you,
+  revision,
+  size = 'md',
+  outfitOf,
+}: ReplayShareProps) {
   const t = useT()
   // The file, made once: a link is offered only when it is small enough for one
   const [file, setFile] = useState<{ bytes: Uint8Array; info: ReplayFileInfo } | null>(null)
   const [copied, setCopied] = useState(false)
   // The names as they are when the file is made (a new function every render is no new replay)
   const names = useRef(nameOf)
+  const outfits = useRef(outfitOf)
   useLayoutEffect(() => {
     names.current = nameOf
+    outfits.current = outfitOf
   })
   useEffect(() => {
     let live = true
-    const info = fileInfo(replay, names.current, you, revision)
+    const info = fileInfo(replay, names.current, you, revision, outfits.current)
     writeReplayFile(replay, info)
       .then((bytes) => live && setFile({ bytes, info }))
       .catch(() => undefined)

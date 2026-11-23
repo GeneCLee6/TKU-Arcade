@@ -1,4 +1,5 @@
 // 2026-11-20 (docs/KART-NETCODE.md §11.4): what ReplayShare.tsx needs to make and save a replay's file
+import { DEFAULT_OUTFIT, type OutfitId } from '../../../shared/kart/outfits.ts'
 import type { Replay } from '../../../shared/kart/replay.ts'
 import {
   REPLAY_FILE_EXTENSION,
@@ -13,6 +14,8 @@ export function fileInfo(
   nameOf: (seat: number) => string,
   you: number | null,
   revision?: number,
+  /** 2026-11-23: what each racer's driver wore, where known (the race suit left out of the file) */
+  outfitOf?: (seat: number) => OutfitId | undefined,
 ): ReplayFileInfo {
   let current = 1
   try {
@@ -25,7 +28,21 @@ export function fileInfo(
     names: replay.racers.map((racer) => ({ seat: racer.seat, name: nameOf(racer.seat) })),
     you,
     savedAt: Date.now(),
+    ...outfitsOf(replay, outfitOf),
   }
+}
+
+/** The file's `outfits`: each racer's that is not the race suit; none at all when nobody's is known */
+export function outfitsOf(
+  replay: Replay,
+  outfitOf?: (seat: number) => OutfitId | undefined,
+): { outfits?: { seat: number; outfit: OutfitId }[] } {
+  if (!outfitOf) return {}
+  const outfits = replay.racers.flatMap((racer) => {
+    const outfit = outfitOf(racer.seat)
+    return outfit && outfit !== DEFAULT_OUTFIT ? [{ seat: racer.seat, outfit }] : []
+  })
+  return outfits.length > 0 ? { outfits } : {}
 }
 
 /** `tku-kart-riverside-20261120-2130.tkureplay` */

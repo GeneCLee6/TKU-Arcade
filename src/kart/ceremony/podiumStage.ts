@@ -20,6 +20,7 @@ import {
   Scene,
   SpotLight,
   Vector2,
+  Vector3,
   WebGLRenderer,
   type BufferGeometry,
   type Material,
@@ -41,6 +42,21 @@ import {
 
 export interface PodiumStage {
   dispose(): void
+}
+
+/**
+ * 2026-11-23 (docs/ARCHITECTURE.md §4.97): where the winner's kart and driver are on the screen now,
+ * CSS pixels from the page's top left, for the test that checks the name plate stays off them in the
+ * close-up (e2e/kart-podium.spec.ts)
+ */
+export interface PodiumDebug {
+  winnerBox(): { left: number; top: number; right: number; bottom: number } | null
+}
+
+declare global {
+  interface Window {
+    __kartPodium?: PodiumDebug
+  }
 }
 
 const MAX_PIXEL_RATIO = 1.5
@@ -239,9 +255,45 @@ export function createPodiumStage(
   }
   frame = requestAnimationFrame(draw)
 
+  window.__kartPodium = {
+    winnerBox() {
+      const winner = models.find((one) => one.place === 1)
+      if (!winner) return null
+      // Every vertex of what is solid and shown (not the glows or the flames; the cup put down and
+      // the props at rest are hidden or at no size), posed as drawn, on the screen
+      const rect = canvas.getBoundingClientRect()
+      let left = Infinity
+      let top = Infinity
+      let right = -Infinity
+      let bottom = -Infinity
+      const point = new Vector3()
+      winner.model.group.updateMatrixWorld(true)
+      winner.model.group.traverseVisible((object) => {
+        if (!(object instanceof Mesh)) return
+        const material = object.material as Material | Material[]
+        if ((Array.isArray(material) ? material : [material]).some((one) => one.transparent || one.blending !== 1))
+          return
+        const position = object.geometry.getAttribute('position')
+        if (!position) return
+        for (let i = 0; i < position.count; i += 1) {
+          object.getVertexPosition(i, point).applyMatrix4(object.matrixWorld).project(camera)
+          if (point.z > 1) continue
+          const x = rect.left + ((point.x + 1) / 2) * rect.width
+          const y = rect.top + ((1 - point.y) / 2) * rect.height
+          left = Math.min(left, x)
+          right = Math.max(right, x)
+          top = Math.min(top, y)
+          bottom = Math.max(bottom, y)
+        }
+      })
+      return left === Infinity ? null : { left, top, right, bottom }
+    },
+  }
+
   return {
     dispose() {
       disposed = true
+      delete window.__kartPodium
       releaseSharedTextures(renderer, scene)
       cancelAnimationFrame(frame)
       observer?.disconnect()
