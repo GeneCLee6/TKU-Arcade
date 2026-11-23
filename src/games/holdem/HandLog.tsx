@@ -3,7 +3,8 @@ import type { HoldemView } from '../../../shared/games/holdem/types.ts'
 import type { SeatId } from '../../../shared/games/types.ts'
 import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType } from '../../styles/esports.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
+import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { CardFace } from './PokerCard.tsx'
 import { categoryKey, logLine, type Names } from './screenState.ts'
@@ -54,7 +55,7 @@ export function HandLog({ view, names }: { view: HoldemView; names: Names }) {
 }
 
 const Panel = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.lg}px;

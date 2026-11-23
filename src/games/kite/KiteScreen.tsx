@@ -11,8 +11,10 @@ import type {
 import type { SeatId } from '../../../shared/games/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
+import { digits, hueSurface, PhaseBar, slantMark, tablePanel, Ticker, turnGlow } from '../../components/table/tableKit.ts'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType, SLANT } from '../../styles/esports.ts'
+import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { EmptySlot, KiteCard } from './KiteCard.tsx'
@@ -79,6 +81,9 @@ export default function KiteScreen({ room, game }: GameScreenProps) {
   const mine = ownHand(view)
   const hinted = new Set(lastHinted(view))
   const canThrow = legal.some((action) => action.type === 'discard')
+  // The broadcast's caption (DESIGN §3.9): a line snapping
+  const lastEntry = view.log.at(-1)
+  const snapped = lastEntry !== undefined && lastEntry.kind === 'play' && !lastEntry.ok
 
   const prompt = (() => {
     if (game.over) return t('games.kite.ui.prompt.over')
@@ -132,6 +137,11 @@ export default function KiteScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage>
+        <TableCaption
+          id={snapped ? `snap-${lastEntry.turn}` : null}
+          text={t('games.kite.ui.burns', { count: view.burns, max: MAX_BURNS })}
+          tone="magenta"
+        />
         <Facts view={view} />
         {game.chatLocked && <Notice role="note">{t('games.kite.ui.chatLocked')}</Notice>}
         <Strings view={view} />
@@ -142,7 +152,13 @@ export default function KiteScreen({ room, game }: GameScreenProps) {
             const picked = choice?.kind === 'player' && choice.seat === hand.seat
             const name = nameOf(hand.seat)
             return (
-              <HandRow key={hand.seat} $picked={picked} data-testid={`hand-${hand.seat}`}>
+              <HandRow
+                key={hand.seat}
+                $picked={picked}
+                $turn={hand.seat === view.current && !game.over}
+                data-testid={`hand-${hand.seat}`}
+                style={{ ['--seat' as string]: seatColor(hand.seat) }}
+              >
                 <HandHead>
                   <SeatDot style={{ background: seatColor(hand.seat) }} aria-hidden="true" />
                   {canHint ? (
@@ -176,7 +192,13 @@ export default function KiteScreen({ room, game }: GameScreenProps) {
           })}
 
           {mine && (
-            <HandRow $picked={false} $own data-testid="own-hand">
+            <HandRow
+              $picked={false}
+              $own
+              $turn={mine.seat === view.current && !game.over}
+              data-testid="own-hand"
+              style={{ ['--seat' as string]: seatColor(mine.seat) }}
+            >
               <HandHead>
                 <SeatDot style={{ background: seatColor(mine.seat) }} aria-hidden="true" />
                 <Name>{t('games.kite.ui.yourHand')}</Name>
@@ -274,7 +296,7 @@ function Facts({ view }: { view: KiteView }) {
 function Strings({ view }: { view: KiteView }) {
   const t = useT()
   return (
-    <Section aria-labelledby="kite-strings">
+    <Sky aria-labelledby="kite-strings">
       <SectionTitle id="kite-strings">{t('games.kite.ui.strings')}</SectionTitle>
       <StringRow data-testid="strings">
         <Wire aria-hidden="true" />
@@ -292,7 +314,7 @@ function Strings({ view }: { view: KiteView }) {
           )
         })}
       </StringRow>
-    </Section>
+    </Sky>
   )
 }
 
@@ -435,11 +457,8 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const FactRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: ${space.xs}px;
-`
+// The score line as a broadcast's phase bar
+const FactRow = styled(PhaseBar)``
 
 const Fact = styled.span<{ $strong?: boolean; $danger?: boolean }>`
   display: inline-flex;
@@ -449,8 +468,8 @@ const Fact = styled.span<{ $strong?: boolean; $danger?: boolean }>`
   color: ${({ $strong }) => ($strong ? color.onAccent : color.text)};
   background: ${({ $strong }) => ($strong ? color.accent : color.raised)};
   box-shadow: ${({ $danger }) => ($danger ? `inset 3px 0 0 ${color.danger}` : 'none')};
+  ${digits}
   font-size: ${fontSize.sm}px;
-  font-weight: 700;
   transform: skewX(${SLANT});
 
   & > * {
@@ -480,7 +499,7 @@ const Notice = styled.p`
 `
 
 const Section = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.sm}px ${space.md}px;
@@ -488,10 +507,22 @@ const Section = styled.section`
 `
 
 const SectionTitle = styled.h2`
+  ${slantMark}
   margin: 0;
   color: ${color.muted};
   font-size: ${fontSize.sm}px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+`
+
+// The sky the kites fly in: the game's own table top
+const Sky = styled.section`
+  ${hueSurface}
+  display: grid;
+  gap: ${space.sm}px;
+  padding: ${space.sm}px ${space.md}px;
+  min-width: 0;
 `
 
 const StringRow = styled.ul`
@@ -531,8 +562,12 @@ const Hands = styled.div`
   gap: ${space.sm}px;
 `
 
-const HandRow = styled.section<{ $picked: boolean; $own?: boolean }>`
-  ${glass}
+// A player's nameplate and their kites: the seat's colour down the left, the game's hue round whoever
+// is to move (DESIGN §3.9)
+const HandRow = styled.section<{ $picked: boolean; $own?: boolean; $turn?: boolean }>`
+  ${tablePanel}
+  border-left: 4px solid var(--seat);
+  ${({ $turn }) => $turn && turnGlow}
   display: grid;
   gap: ${space.xs}px;
   padding: ${space.sm}px ${space.md}px;
@@ -592,14 +627,7 @@ const NameButton = styled.button`
   }
 `
 
-const TurnMark = styled.span`
-  ${monoType}
-  padding: 0 ${space.sm}px;
-  color: ${color.onAccent};
-  background: ${color.accent};
-  font-size: 12px;
-  font-weight: 700;
-`
+const TurnMark = styled(Ticker)``
 
 const CardRow = styled.ul`
   display: flex;

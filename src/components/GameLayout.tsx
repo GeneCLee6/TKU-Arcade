@@ -13,8 +13,13 @@ import { color, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 import type { ChatPanelProps } from './ChatPanel.tsx'
 import { Countdown } from './Countdown.tsx'
-import { LateChatPanel as ChatPanel, LateDrawer as Drawer, LateTabs as Tabs } from './LateParts.tsx'
-import { CoverSection, RoomInPlay, type RoomInPlayProps } from './RoomInPlay.tsx'
+import {
+  LateChatPanel as ChatPanel,
+  LateCoverSection as CoverSection,
+  LateDrawer as Drawer,
+  LateTabs as Tabs,
+} from './LateParts.tsx'
+import { RoomInPlay, type RoomInPlayProps } from './RoomInPlay.tsx'
 import { seatedMembers } from './roomParts.ts'
 
 export type RoomChat = Pick<ChatPanelProps, 'messages' | 'locked' | 'onSend' | 'draftStore'>
