@@ -70,6 +70,8 @@ describe('POST /api/rooms', () => {
       expect.any(String),
       null,
       null,
+      null,
+      null,
     )
   })
 
@@ -92,6 +94,8 @@ describe('POST /api/rooms', () => {
         expect.any(String),
         null,
         null,
+        null,
+        null,
       )
     }
   })
@@ -101,7 +105,7 @@ describe('POST /api/rooms', () => {
     const res = await handleRequest(post(JSON.stringify({ gameId: 'tictactoe' })), env)
     const { id, code } = (await res.json()) as { id: string; code: string }
     expect(isRoomCode(code)).toBe(true)
-    expect(room.create).toHaveBeenCalledWith(id, 'tictactoe', undefined, false, code, null, null)
+    expect(room.create).toHaveBeenCalledWith(id, 'tictactoe', undefined, false, code, null, null, null, null)
     expect(lobby.codes.get(code)).toBe(id)
   })
 
@@ -116,6 +120,8 @@ describe('POST /api/rooms', () => {
       'tictactoe',
       undefined,
       false,
+      null,
+      null,
       null,
       null,
       null,
@@ -143,6 +149,8 @@ describe('POST /api/rooms', () => {
       'tictactoe',
       undefined,
       false,
+      null,
+      null,
       null,
       null,
       null,
@@ -289,6 +297,8 @@ describe('a room password at creation', () => {
       expect.any(String),
       'tamsui',
       null,
+      null,
+      null,
     )
   })
 
@@ -333,6 +343,8 @@ describe('computer players at creation', () => {
       expect.any(String),
       null,
       { count: 2, level: 'easy' },
+      null,
+      null,
     )
   })
 

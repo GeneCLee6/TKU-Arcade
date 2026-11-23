@@ -493,9 +493,9 @@ describe('rooms nobody uses, and public or not (shared/protocol.ts 19.)', () => 
     ann.send({ t: 'set_public', public: true })
     expect(bob.view!.room.public).toBe(true)
     expect(world.host.listing()).toMatchObject({ id: ROOM_ID, host: 'Ann' })
-    // Still never listed with a password
+    // With a password: listed as locked (2026-11-23), which the home page's list leaves out
     ann.send({ t: 'set_password', password: 'kite' })
-    expect(world.host.listing()).toBeNull()
+    expect(world.host.listing()).toMatchObject({ locked: true })
     ann.send({ t: 'set_password', password: null })
     ann.send({ t: 'set_public', public: false })
     expect(bob.view!.room).not.toHaveProperty('public')

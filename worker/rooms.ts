@@ -1,11 +1,16 @@
 import { getGame } from '../shared/games/index.ts'
-import { parseQuickBots } from '../shared/games/quickBots.ts'
+import { parseQuickBots, parseSeatBots } from '../shared/games/quickBots.ts'
 import type { OptionValues } from '../shared/games/types.ts'
+import { weeklyTrack } from '../shared/kart/board.ts'
+import { acceptableRoomName } from '../shared/roomName.ts'
 import {
   CloseCode,
   normalizePassword,
   type CreateRoomResponse,
+  type QuickBots,
+  type QuickJoinResponse,
   type RoomCodeResponse,
+  type SeatBots,
 } from '../shared/protocol.ts'
 import { isRoomCode, newRoomCode } from '../shared/room-code.ts'
 import { isRoomId, newRoomId } from '../shared/room-id.ts'
@@ -14,6 +19,7 @@ import type { Env } from './app.ts'
 import { ACCOUNT_HEADER, encodeAccountHeader, sessionAccount } from './auth.ts'
 import { isGameEnabled } from './flags.ts'
 import { LOBBY_NAME } from './lobby-board.ts'
+import { lobbyReadLimit, quickRooms, readLobby, type LobbyLister } from './lobby-list.ts'
 import { FixedWindowLimit, takeShared } from './rate-limit.ts'
 
 /** Tries this many fresh ids before giving up (a collision at ~59 bits is not expected at all) */
@@ -35,6 +41,9 @@ const CREATES_PER_ADDRESS = 30
 const CREATES_PER_INSTANCE = 600
 
 const createLimit = new FixedWindowLimit(CREATES_PER_ADDRESS, CREATES_PER_INSTANCE)
+
+/** Open rooms quick join asks about (their summary) before it opens a new one */
+const QUICK_TRIES = 3
 
 const ROOM_PATH = /^\/api\/rooms\/([^/]+)$/
 const REPLAY_PATH = /^\/api\/rooms\/([^/]+)\/replay$/
@@ -91,24 +100,42 @@ export async function handleRoomCode(request: Request, env: Env, url: URL): Prom
   return Response.json(body, { headers: noStore })
 }
 
-/** POST /api/rooms creates a room and answers its id; GET /api/rooms/<id> answers its summary */
+/** One take of the address's allowance of new rooms (in memory, then shared); false when spent */
+async function takeCreate(
+  request: Request,
+  env: Env,
+  limit: FixedWindowLimit,
+  now: number,
+): Promise<boolean> {
+  const address = clientAddress(request)
+  const key = await addressKey(address)
+  // Local development (npm run dev, the browser tests) opens many rooms from one machine
+  const shared = address === null || !isLoopback(address)
+  return limit.take(key, now) && (!shared || (await takeShared(env.LIMITER, 'create', key)))
+}
+
+/**
+ * POST /api/rooms creates a room and answers its id; POST /api/rooms/quick (2026-11-23) finds an open
+ * public room or opens one; GET /api/rooms/<id> answers its summary
+ */
 export async function handleRooms(
   request: Request,
   env: Env,
   url: URL,
   limit: FixedWindowLimit = createLimit,
   now: number = Date.now(),
+  reads: FixedWindowLimit = lobbyReadLimit,
 ): Promise<Response> {
   if (url.pathname === '/api/rooms') {
     if (request.method !== 'POST') return fail('method_not_allowed', 405, { allow: 'POST' })
-    const address = clientAddress(request)
-    const key = await addressKey(address)
-    // Local development (npm run dev, the browser tests) opens many rooms from one machine
-    const shared = address === null || !isLoopback(address)
-    if (!limit.take(key, now) || (shared && !(await takeShared(env.LIMITER, 'create', key)))) {
+    if (!(await takeCreate(request, env, limit, now))) {
       return fail('rate_limited', 429, { 'retry-after': '60' })
     }
     return createRoom(request, env)
+  }
+  if (url.pathname === '/api/rooms/quick') {
+    if (request.method !== 'POST') return fail('method_not_allowed', 405, { allow: 'POST' })
+    return quickJoin(request, env, limit, now, reads)
   }
   const replay = REPLAY_PATH.exec(url.pathname)
   if (replay && isRoomId(replay[1])) {
@@ -125,40 +152,79 @@ export async function handleRooms(
   return summary ? Response.json(summary, { headers: noStore }) : fail('not_found', 404)
 }
 
-async function createRoom(request: Request, env: Env): Promise<Response> {
+/** The JSON body (at most MAX_CREATE_BODY_CHARS), as an object; null when it is not JSON */
+async function readBody(request: Request): Promise<Record<string, unknown> | null> {
   const text = await request.text()
-  if (text.length > MAX_CREATE_BODY_CHARS) return fail('bad_request', 400)
-  let body: unknown
+  if (text.length > MAX_CREATE_BODY_CHARS) return null
   try {
-    body = JSON.parse(text)
+    const body: unknown = JSON.parse(text)
+    // Anything but an object asks for no game at all: `unknown_game`, as before
+    return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {}
   } catch {
-    return fail('bad_request', 400)
+    return null
   }
-  const {
-    gameId,
-    options,
-    public: isPublic,
-    password,
-    bots: rawBots,
-  } = (typeof body === 'object' && body !== null ? body : {}) as {
-    gameId?: unknown
-    options?: unknown
-    public?: unknown
-    password?: unknown
-    bots?: unknown
-  }
+}
+
+/** A new room as asked, checked: what `openRoom` needs */
+type RoomAsk = {
+  gameId: string
+  options: OptionValues | undefined
+  isPublic: boolean
+  password: string | null
+  bots: QuickBots | null
+  name: string | null
+  seatBots: SeatBots | null
+}
+
+type GameModuleOf = NonNullable<ReturnType<typeof getGame>>
+
+/** `body`'s room name and seated computer players, or the error to refuse it with */
+function parseExtras(
+  module: GameModuleOf,
+  body: Record<string, unknown>,
+): { name: string | null; seatBots: SeatBots | null } | { error: string } {
+  // 2026-11-23: a room's name is shown to strangers: the nickname rules, refused when it breaks them
+  const named = body.name !== undefined && body.name !== ''
+  const name = named ? acceptableRoomName(body.name) : null
+  if (named && name === null) return { error: 'bad_name' }
+  const seatBots = body.seatBots === undefined ? null : parseSeatBots(module, body.seatBots)
+  if (body.seatBots !== undefined && seatBots === null) return { error: 'bad_bots' }
+  return { name, seatBots }
+}
+
+async function createRoom(request: Request, env: Env): Promise<Response> {
+  const body = await readBody(request)
+  if (body === null) return fail('bad_request', 400)
+  const { gameId, options, public: isPublic, password, bots: rawBots } = body
   const module = typeof gameId === 'string' ? getGame(gameId) : null
   if (typeof gameId !== 'string' || !module) return fail('unknown_game', 400)
   // The lobby's "Play the computer" (2026-11-21): computer players seated from the start, and the
   // game under way once its person joins. Refused, not dropped, when they do not fit the game
   const bots = rawBots === undefined ? null : parseQuickBots(module, rawBots)
   if (rawBots !== undefined && bots === null) return fail('bad_bots', 400)
+  const extras = parseExtras(module, body)
+  if ('error' in extras) return fail(extras.error, 400)
   // Paused by the owner (e12-t11, worker/flags.ts)
   if (!(await isGameEnabled(env.DB, gameId))) return fail('game_disabled', 403)
   // A password that is there but no good (too long, only spaces) is refused, not dropped silently
   if (password !== undefined && password !== '' && normalizePassword(password) === null) {
     return fail('bad_password', 400)
   }
+  const opened = await openRoom(env, {
+    gameId,
+    options: plainOptions(options),
+    // A room with computer players is one person's game: never listed for strangers
+    isPublic: isPublic === true && bots === null,
+    password: normalizePassword(password),
+    bots,
+    ...extras,
+  })
+  if (!opened) return fail('unavailable', 503)
+  return Response.json(opened, { status: 201, headers: noStore })
+}
+
+/** Opens the room asked for; null when no fresh id would take (not expected) */
+async function openRoom(env: Env, ask: RoomAsk): Promise<CreateRoomResponse | null> {
   for (let attempt = 0; attempt < CREATE_ATTEMPTS; attempt++) {
     const id = newRoomId()
     // The number first, so that the room can show it from the start. Should the id be taken (not
@@ -167,20 +233,79 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
     // The room checks `options` against the game's schema: this only keeps them plain for the RPC
     const created = await roomStub(env, id).create(
       id,
-      gameId,
-      plainOptions(options),
-      // A room with computer players is one person's game: never listed for strangers
-      isPublic === true && bots === null,
+      ask.gameId,
+      ask.options,
+      ask.isPublic,
       code,
-      normalizePassword(password),
-      bots,
+      ask.password,
+      ask.bots,
+      ask.name,
+      ask.seatBots,
     )
-    if (created) {
-      const created: CreateRoomResponse = { id, code }
-      return Response.json(created, { status: 201, headers: noStore })
+    if (created) return { id, code }
+  }
+  return null
+}
+
+/**
+ * What a quick join opens when there is no room to join (2026-11-23): the kart's track of the week
+ * (shared/kart/board.ts, the leaderboard's rotation) with items; another game's defaults
+ */
+export function quickOptions(gameId: string, now: number): OptionValues | undefined {
+  return gameId === 'kart' ? { track: weeklyTrack(now), mode: 'items' } : undefined
+}
+
+/**
+ * POST /api/rooms/quick (2026-11-23, docs/ARCHITECTURE.md §4.83): the best open public room of the
+ * game (worker/lobby-list.ts quickRooms), checked with the room itself since the list may be a few
+ * seconds old; else a new public room, which is a new room like any (the same limits)
+ */
+async function quickJoin(
+  request: Request,
+  env: Env,
+  limit: FixedWindowLimit,
+  now: number,
+  reads: FixedWindowLimit,
+): Promise<Response> {
+  const body = await readBody(request)
+  if (body === null) return fail('bad_request', 400)
+  const { gameId } = body
+  const module = typeof gameId === 'string' ? getGame(gameId) : null
+  if (typeof gameId !== 'string' || !module) return fail('unknown_game', 400)
+  const extras = parseExtras(module, body)
+  if ('error' in extras) return fail(extras.error, 400)
+  if (!(await isGameEnabled(env.DB, gameId))) return fail('game_disabled', 403)
+  const address = clientAddress(request)
+  if ((address === null || !isLoopback(address)) && !reads.take(await addressKey(address), now)) {
+    return fail('rate_limited', 429, { 'retry-after': '60' })
+  }
+  const rooms = await readLobby(env.LOBBY as unknown as LobbyLister, now)
+  for (const room of quickRooms(rooms, gameId).slice(0, QUICK_TRIES)) {
+    const summary = await roomStub(env, room.id).summary()
+    if (
+      summary?.status === 'waiting' &&
+      summary.locked !== true &&
+      summary.gameId === gameId &&
+      summary.seated < summary.maxSeats
+    ) {
+      const found: QuickJoinResponse = { id: room.id, created: false }
+      return Response.json(found, { headers: noStore })
     }
   }
-  return fail('unavailable', 503)
+  if (!(await takeCreate(request, env, limit, now))) {
+    return fail('rate_limited', 429, { 'retry-after': '60' })
+  }
+  const opened = await openRoom(env, {
+    gameId,
+    options: quickOptions(gameId, now),
+    isPublic: true,
+    password: null,
+    bots: null,
+    ...extras,
+  })
+  if (!opened) return fail('unavailable', 503)
+  const created: QuickJoinResponse = { ...opened, created: true }
+  return Response.json(created, { status: 201, headers: noStore })
 }
 
 function plainOptions(options: unknown): OptionValues | undefined {

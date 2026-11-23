@@ -2,7 +2,7 @@
 // computer players already seated and starts its game as soon as its one person joins. Which games
 // can, how many computer players they may get (2026-11-22: the person picks, one up to a full
 // table), at which levels (all the same, or one each), and the check POST /api/rooms makes of `bots`.
-import type { QuickBots } from '../protocol.ts'
+import type { QuickBots, SeatBots } from '../protocol.ts'
 import type { GameMeta } from './types.ts'
 
 /** What of a game decides whether a room can open with computer players, and how many */
@@ -80,4 +80,20 @@ export function parseQuickBots(game: BotGame, raw: unknown): QuickBots | null {
 /** The level of the computer player in the `index`th seat it was given (0 first) */
 export function quickBotLevel(bots: QuickBots, index: number): string {
   return bots.levels?.[index] ?? bots.level
+}
+
+/**
+ * 2026-11-23: `raw` as CreateRoomRequest.seatBots, or null when it is no good: only a game whose host's
+ * browser runs its computer players (`bots` without `bot`: the kart), one of its levels, and from one
+ * up to every seat but the host's, no more than its names
+ */
+export function parseSeatBots(game: BotGame, raw: unknown): SeatBots | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const { count, level } = raw as { count?: unknown; level?: unknown }
+  const bots = game.bots
+  if (game.bot || !bots) return null
+  if (typeof level !== 'string' || !bots.levels.includes(level)) return null
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 1) return null
+  if (count > game.meta.maxPlayers - 1 || count > bots.names.length) return null
+  return { count, level }
 }

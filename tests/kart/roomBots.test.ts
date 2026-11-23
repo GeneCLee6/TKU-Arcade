@@ -9,6 +9,7 @@ import type { AnyGameModule, GameProjection } from '../../shared/games/types.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { applyPatch, type JsonValue } from '../../shared/patch.ts'
 import {
+  BOT_HOST_GRACE_MS,
   PROTOCOL_VERSION,
   proxyFrame,
   type RoomView,
@@ -175,8 +176,10 @@ describe('computer karts in a race room (2026-11-17)', () => {
     race.advance(w.clock)
     expect(w.race().phase).toBe('racing')
     expect(sent).toBeGreaterThan(0)
-    // Ann hands the host over to nobody: she goes, and her bot is out
+    // Ann goes and does not come back within the grace (2026-11-23): her bot is out
     w.host.closed('ann')
+    w.clock += BOT_HOST_GRACE_MS
+    w.host.sweep()
     expect(w.race('cy').racers.find((racer) => racer.seat === seat)?.out).toBe(true)
     const before = sent
     w.clock += 1_000
