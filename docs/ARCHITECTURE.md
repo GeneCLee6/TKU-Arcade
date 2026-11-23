@@ -1656,7 +1656,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - 存 `localStorage` 的 `tku-arcade.kart.settings`（`lib/storage.ts`，讀寫失敗不丟例外，存不了就提示只活到關頁）；預設：特效高、晃動開、亮相開、繞場開。壞掉的值逐欄回預設（`parseSettings`）。
 - 特效等級：粒子量（煙、火花、噴射火焰、N2O 的尾焰）乘 35%／70%／100%（`effects.ts` 的發射率），後處理的上限 off／bloom／full，和畫質取較低的（`cappedPost`）。晃動關掉時 `Scene.ts` 的鏡頭震動與被打中的晃動乘 0。畫質、特效、晃動在建場景時讀，所以「下一場起生效」；音量、開場、提示立刻生效。
 
-**起跑前車手亮相**（`shared/kart/opening.ts`、`director.ts` 的 `openingShot`／`presentShot`、`RaceShow.tsx` 的 `DriverCard`）
+**起跑前車手亮相**（`shared/kart/opening.ts`、`director.ts` 的 `openingShot`／`presentShot`、`RaceShow.tsx` 的 `DriverCard`）（**2026-11-23 起由 §4.93 的團體鏡頭取代**，`presentShot`、`DriverCard`、繞場的 `introShot` 都拿掉，開場固定 4.8 s）
 
 - 開場長度跟著人數：每位車手 0.7 s（8 人 5.6 s）＋ 1 s 滑到起跑格全景＋ 3、2、1 ＝ `countdownMs(n)`：8 人 9.6 s、4 人 6.8 s、2 人 5.4 s（原本固定 6.5 s）。房間在 `realtime.clock` 用它定 `goAt`、`timers` 的 `go` 也用它（同一個 `racers.length`），所有人同步；每個瀏覽器從「離 GO 幾秒」與人數算出現在輪到誰（`openingStage`），所以同一房間每個人同一刻看到同一位車手。
 - 鏡頭：每位車手的車前 3.6 m、高 1.15 m，看著車手的臉，這 0.7 s 內從左前 0.42 rad 慢慢掃到右前 −0.18 rad 並推近 0.5 m；最後一位之後 1 s 平滑接上起跑格全景，「3」出現時已就位。照起跑格順序（竿位先）。減少動態時每位是靜止鏡頭、直接切全景。
@@ -1929,6 +1929,37 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **電腦車的連續反向彎**（`brain.ts`，`BotSkill.esses`：只有 `BOT_SKILLS.hard` 與 `EXPERT_SKILL`，腳本駕駛明確關掉）：`classicHands` 多收行進方向對路的角度 `across`；甩尾被帶往外側時舵不鬆、路反轉且已賺到瞬間加速就放開（車頭已朝下一彎外側時不等 `holdSeconds`）、放開與等噴那幾步路還往甩尾方向彎（`ESSES_BEND` 0.2）就不反打。只在沒有導引的路上生效（安全線上會讓竹圍的困難快過專家，技術線上高架廠區的專家會撞到復位）。困難重撞 −40%、專家 −37%，加總都變快（`KART-FEEL.md` §13.6）。測試 `tests/kart/botBends.test.ts`。
 - **工具**：`node --experimental-strip-types scripts/kart/reverse-guide-check.ts [ids]` 印每份導引（原向與反向）的提示、縫與兩條線穿牆的地方。
 - **測試**：`tests/kart/reverseGuides.test.ts`（有反向導引的五份；每份長度對、有技術內容、兩條線不穿牆、每道縫離牆 1.4 m 以上且在技術線上、提示在反向的跳台上、落地點在前方 20 點內；帶過來的線是原向的鏡像、縫在原位反過來；漁人碼頭等不給；頂尖 vs 熟練：碼頭倉庫反向三種子平均快 ≥ 8%、山城坡巷反向 ≥ 5%、都不復位，高架廠區、竹圍高架反向頂尖比熟練快），`tests/kart/reverse.test.ts`（反向 revision 跟 `REVERSE_REVISION`；哪幾張有導引；只有碼頭倉庫與山城坡巷各拿掉一道欄）、`tests/kart/botBends.test.ts`。
+
+### 4.93 路線圖外：開場改團體鏡頭、一進場就有聲音、每圈過線顯示圈時、等待室房主大格（2026-11-23，`feat/kart-start-audio-laps`）
+
+擁有者 2026-11-23：「開頭畫面不要每個人都介紹，直接一個鏡頭把所有人照到就好，然後現在有個 bug，開頭剛進去沒聲音，開始跑才有聲音，不對的，然後每跑一圈過線的時候要顯示時間…然後房主應該要單獨一個比較大，其他人比較小格。」
+
+**開場：一個團體鏡頭**（`shared/kart/opening.ts`、`director.ts` 的 `groupShot`／`openingShot`）
+
+- #152 的車手逐一亮相（§4.73，`presentShot`、`DriverCard`）與 #116 的繞場（`introShot`）都拿掉。開場＝**團體鏡頭 1.8 s（`GROUP_MS`）＋ 3、2、1（3 s）＝固定 4.8 s**，不再跟人數變（原本 2 人 5.4 s、8 人 9.6 s）。`countdownMs()` 不看人數，房間的 `goAt` 與 `go` 計時器照舊用它，協定不變（`KART-NETCODE.md` §23 補記）；`openingStage(left)` 只剩 `group`（帶 0–1 的進度）與 `count`。每個畫面從「離 GO 幾秒」算進度，同房同一刻同一個畫面（§4.74 的對時收斂照舊：等收斂才送 `loaded`）。
+- 鏡頭：站在起跑線**前方**、稍低，朝後看整排車（看得到每位車手的臉與 #173 的待機／準備動作，起跑拱門在畫面上緣）。距離＝最靠前那台的前方距離＋「離中線最遠那台的橫向距離 ÷ tan(半視角)」（至少 9 m），半視角＝這個螢幕左右看得到的角度 × 0.78（`groupHalfAngle(寬高比)`：Scene.ts 垂直 60°、直拿 80°；最少 17°、最多 40°：16:9 約 36°、直拿手機 17°），所以寬螢幕盡量靠近、直拿退遠，都拍得到全部車手；高度＝max(2.6 m, 距離 × 0.3)。1.8 s 內從 1.22 倍距離推近到 1 倍，並從一側平移 1.6 m 到另一側。GO 還沒定（有人還在載入）時停在起點。「3」出現時切到 #116 的車後起跑格全景，之後照舊在「2」滑到自己車後。減少動態：靜止鏡頭。
+- 跳過照舊（任何鍵或點畫面）：換成車後全景。上方照舊 `IntroCard`（賽道名、圈數、跳過提示）。
+- 設定：「開場動畫」由「車手亮相」「繞場鏡頭」兩個勾選改成一個選單 **團體鏡頭／關閉**（`RaceSettings.opening: 'group' | 'off'`，預設團體鏡頭；舊的 `driverIntro`／`flyby` 欄位讀到就忽略）。關閉＝從頭就是車後全景。
+
+**一進場就有聲音**（`src/kart/audio/unlock.ts`）
+
+- **原因**：卡丁車整個只有一個 AudioContext（`audio/bus.ts`，§4.46），瀏覽器規定要使用者手勢才能開始出聲，所以它只在**比賽畫面自己的按鍵／點擊**（`spikeLoop.ts`）或結果畫面（`useMenuMusic.ts`）才建立。玩家從等待室按「準備」「開始遊戲」、從 `/kart` 選單按「開始比賽」那一下，所在的頁面都沒有在聽，所以進到比賽畫面時根本沒有 AudioContext：前奏音樂、環境音、3、2、1 的嗶聲全部等到第一個按鍵——通常就是 GO 時按的油門。引擎聲還多一層：就算 context 已經在，`kartAudio` 也只在自己的 `unlock()`（按鍵）才接上。
+- **修法**：(1) `useKartAudioUnlock()`：等待室（`KartLobby`）、`/kart` 的選單（`KartPlay`）、比賽畫面（`RaceView`）掛上，**每一次** pointerdown／keydown／touchend（capture）都 `unlockKartAudio()`，所以按「準備」「開始」「開始比賽」那一下就建好並啟動 context（iOS 也要在手勢裡 resume）。(2) 比賽一建好就 `startKartAudio()`：已經有 context、或這頁被點過（`navigator.userActivation.hasBeenActive`，Chrome／Firefox 之後可以自己開始）就建立／喚醒，然後接上引擎。(3) `kartAudio.update` 每幀看到 context 已存在就自己接上引擎，不再等自己的按鍵。(4) 還是不能出聲時（直接開比賽網址、什麼都還沒點），比賽畫面正上方出現「點一下開聲音」按鈕（`SoundTap`，載入畫面上也看得到；計時賽只在倒數時），任何點擊或按鍵都會開，聲音開始就消失。網站的總音效開關關掉時不出現。
+- 音樂本來就照「比賽階段」排：倒數＝`intro` 前奏層（`sequencer.ts`），所以 context 一開就是前奏，GO 切正式段落；暫停時壓低（`duckKartBus`）照舊。
+- 量測用：`__kartSpike.sound` = `{ state, steps, beeps }`（context 狀態、音樂已排程的步數、播過的倒數嗶聲）。
+
+**每圈過線的圈時**（`src/kart/ui/lapSplit.ts`、`RaceShow.tsx` 的 `LapSplitCard`、`RaceOverlay.tsx` 的 `LapSplitShow`）
+
+- 每次過起終點線，畫面中上方（道具欄下方，頂端 max(19%, 104 px)；直拿手機 212 px）broadcast 面板 2.6 s；進最後一圈時「最後一圈」大字讓到它下面：「第 N 圈」斜條、圈時（`formatTime`，0:31.420）、是這場到目前最快的一圈就加洋紅色「最快圈」（第一圈不標）、和最佳的差距（`+0.42`／`−1.03`，快綠慢紅）。差距對的是這張圖的**最快圈紀錄**（本機，計時賽才有），沒有紀錄就對這場前面最快的一圈；比的紀錄是開跑前的那個（完賽那一刻紀錄被更新也不會跟自己比）。中途重新加入的不補播已經跑完的圈。
+- 計時賽（`SpikePage`）用本機的圈時；對戰電腦、大獎賽、挑戰、多人房（`RaceView`）一律用**房間的** `lapMs`（伺服器 `lap` 動作的時間；單機是瀏覽器裡的本機房間，同一份規則）。
+
+**等待室：房主大格、其他人小格**（`KartLobby.tsx`、`lobby/lobbyLayout.ts`）
+
+- 橫向：房主的位子一張**大卡**佔左邊整個高度（13 欄格線的第 1 欄 6fr；手機橫拿與超寬 4fr），其他 7 個位子在右邊兩列：第一列 4 張（各佔 12 欄的 3 欄）、第二列 3 張（各 4 欄），兩列都填滿（`spanOf`）。順序：房主的座位先，其他照座位號（`placeOrder`；房主沒入座就是 1 號位大）。大卡的名字、皇冠放大；3D 圖本來就照卡片大小畫，大卡的上限從 380×420 放寬到 520×640 CSS px（`lobbyStage.ts` 的 `MAX`）。
+- 手機橫拿（844×390）：小卡太窄，名字和準備狀態改成上下兩行、系列／等級標籤收起（隊色仍在名牌上緣、電腦車仍有 CPU 標記）。直拿：列表上方的大圖改成**房主**（加皇冠；房主還沒選車就照舊是自己或第一位），列表照舊。
+- 準備狀態、隊色、電腦標記、房主的管理鈕都照舊；一頁不捲動的檢查（`e2e/kart-lobby.spec.ts`，1280×720、844×390、390×844）照舊通過。
+
+**測試**：`tests/kart/raceFlow.test.ts`（開場固定且 4–5 s、團體鏡頭到「3」才換、**三張賽道 × 2／5／8 台 × 開場每 0.1 s，每台車的車身與車手頭都在 16:9、844×390、直拿 390×844 的視錐內（照各自寬高比調過距離的、與不給寬高比的都算）**、寬螢幕比直拿近、在車前朝後、推近、每幀移動 < 0.5 m、GO 未定停在起點、關掉沒有自己的鏡頭、減少動態靜止；設定預設團體鏡頭、舊欄位忽略）、`tests/kart/raceShow.test.ts`、`tests/kart/lapSplit.test.ts`（第一圈不標最快、比上一圈快標最快且負差、比紀錄、`−` 號、只顯示 2.6 s、完賽改紀錄仍比舊紀錄、重新加入不補播）、`tests/kart/lobbyLayout.test.ts`（房主先、兩列都填滿 12 欄、7 位是 4＋3）；e2e `kart-bots`（從選單點進來、還沒按任何鍵：開場卡、context `running`、音樂已排程、倒數嗶聲有響、沒有「點一下開聲音」；一圈的圈時卡）、`kart-race`（兩人＋電腦：按準備／開始的人進場就 `running`、倒數中音樂已排程、嗶聲；完賽的人看到「Lap 1 0:xx.xxx」）、`kart-intro-sync`（改成量兩個畫面的 2、1 出現時刻，差 < 200 ms）、`kart-lobby`、`kart-bots`、`kart-watch-portrait`、`phones`（亮相卡改開場卡）。
 
 ## 5. i18n
 
