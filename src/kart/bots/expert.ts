@@ -41,4 +41,6 @@ export const EXPERT_SKILL: BotSkill = {
   // technical line on a guide's track is driven as it is), and keeps a charge for blue
   wallCare: 0.25,
   teamSave: 0.6,
+  // 2026-11-23 (docs/KART-FEEL.md §13.5): and drives the S-bends out of a drift (skill.ts)
+  esses: true,
 }

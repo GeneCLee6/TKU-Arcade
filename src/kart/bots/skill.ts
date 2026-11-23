@@ -113,6 +113,17 @@ export interface BotSkill {
    */
   readonly wallCare?: number
   /**
+   * The S-bends (2026-11-23, docs/KART-FEEL.md §13.5): the hard hits that were left came out of a
+   * drift, the kart carried to the outside and the instant boost fired into the bend after. With
+   * this habit, in a drift that carries the kart across the road towards its outside the stick is
+   * never eased out of it; a drift that has earned its instant boost is let go as soon as the road
+   * turns the other way; and out of a drift while the road still bends its way, no counter-steer
+   * (it swings the nose to the outside): the hands steer the way the kart is to go. The computer
+   * karts' own (hard, expert): the scripted drivers (drivers.ts) leave it out, so that the medals
+   * they weigh stay as they are. Left out: none of it
+   */
+  readonly esses?: boolean
+  /**
    * A team race (2026-11-22, #102): with the team's gauge at least this full (a share of it) and no
    * blue charge held, the last red charge is kept, to turn blue when the gauge fills. Left out: every
    * charge is fired as it comes
@@ -175,6 +186,8 @@ export const BOT_SKILLS: Readonly<Record<Difficulty, BotSkill>> = {
     // 2026-11-22 (#100, #102; docs/KART-FEEL.md §13.5): watches the wall, and keeps a charge for blue
     wallCare: 0.3,
     teamSave: 0.6,
+    // 2026-11-23 (docs/KART-FEEL.md §13.5): and drives the S-bends out of a drift
+    esses: true,
   },
   // 2026-11-20: the fourth level (expert.ts): what the hard one does, at full throttle, and the
   // track known by heart

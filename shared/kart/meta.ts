@@ -38,7 +38,8 @@ export const TRACK_META: Readonly<Record<string, TrackMeta>> = {
   // 2026-11-23: three high platforms; the fastest kart (the egret, speed +2) on top
   breakwater: { podium: ['heron', 'ray', 'dolphin'], character: ['fast'] },
   // 2026-11-23 (#131, `npm run kart:meta -- --tracks <id>-rev,...`, two batches): the reversed
-  // tracks (shared/kart/tracks/reverse.ts); their character is the original's, a climb now a descent
+  // tracks (shared/kart/tracks/reverse.ts; wharf, lanes, works and zhuwei again with their guides,
+  // reverseGuides.ts, 2026-11-23); their character is the original's, a climb now a descent
   // and a descent a climb
   'riverside-rev': { podium: ['marlin', 'whale', 'skipper'], character: ['fast', 'climb'] },
   'harbour-rev': { podium: ['hornet', 'heron', 'otter'], character: ['fast'] },
@@ -49,9 +50,9 @@ export const TRACK_META: Readonly<Record<string, TrackMeta>> = {
   'fort-rev': { podium: ['heron', 'dolphin', 'shrimp'], character: ['technical', 'descent'] },
   'danhai-rev': { podium: ['ray', 'comet', 'pelican'], character: ['technical'] },
   'datun-rev': { podium: ['hornet', 'ray', 'hermit'], character: ['technical'] },
-  'wharf-rev': { podium: ['comet', 'crab', 'hermit'], character: ['climb'] },
-  'lanes-rev': { podium: ['shrimp', 'heron', 'squid'], character: ['fast', 'climb'] },
-  'works-rev': { podium: ['pelican', 'hermit', 'comet'], character: ['technical'] },
+  'wharf-rev': { podium: ['eel', 'dolphin', 'hermit'], character: ['climb'] },
+  'lanes-rev': { podium: ['dolphin', 'ray', 'pelican'], character: ['fast', 'climb'] },
+  'works-rev': { podium: ['comet', 'crab', 'hermit'], character: ['technical'] },
   'zhuwei-rev': { podium: ['heron', 'shrimp', 'squid'], character: ['fast'] },
   'breakwater-rev': { podium: ['hermit', 'comet', 'crab'], character: ['fast'] },
 }
