@@ -72,6 +72,7 @@ import {
 } from './camera.ts'
 import type { CameraShot, Point3 } from './director.ts'
 import { cappedPost, loadSettings } from './settings.ts'
+import { forwardId } from '../../shared/kart/tracks/reverseId.ts'
 
 const GROUND_SIZE = 400
 const GRID_CELL = 5
@@ -370,8 +371,8 @@ export function createKartScene(
       ? night.buildStreetLights(
           track,
           nightKit,
-          track.id !== 'oldstreet',
-          track.id === 'oldstreet' ? kartNight.lanternPool : kartNight.lampPool,
+          forwardId(track.id) !== 'oldstreet',
+          forwardId(track.id) === 'oldstreet' ? kartNight.lanternPool : kartNight.lampPool,
         )
       : null
   if (streetLights) scene.add(streetLights.group)

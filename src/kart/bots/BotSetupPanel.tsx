@@ -6,7 +6,7 @@ import styled from 'styled-components'
 import { MAX_LAPS } from '../../../shared/games/kart/info.ts'
 import type { KartMessageKey } from '../../../shared/kart/i18n.ts'
 import { trackMeta } from '../../../shared/kart/meta.ts'
-import { RACE_TRACK_IDS, type RaceTrackId } from '../../../shared/kart/tracks/list.ts'
+import { ALL_RACE_TRACK_IDS, type AnyRaceTrackId } from '../../../shared/kart/tracks/list.ts'
 import { Button } from '../../components/Button.tsx'
 import type { MessageParams } from '../../i18n/t.ts'
 import { color, fontSize, radius, space } from '../../styles/tokens.ts'
@@ -78,13 +78,13 @@ export function BotSetupPanel({ t, onStart, onClose, custom, onGrandPrix }: BotS
               change(
                 event.target.value === 'custom' && custom
                   ? { track: 'custom', custom: custom.code }
-                  : { track: event.target.value as RaceTrackId, custom: undefined },
+                  : { track: event.target.value as AnyRaceTrackId, custom: undefined },
               )
             }
             data-testid="kart-bots-track"
           >
             {custom && <option value="custom">{custom.name}</option>}
-            {RACE_TRACK_IDS.map((id) => (
+            {ALL_RACE_TRACK_IDS.map((id) => (
               <option key={id} value={id}>
                 {t(`kart.course.${id}`)}
               </option>

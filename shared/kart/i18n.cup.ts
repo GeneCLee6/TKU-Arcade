@@ -21,6 +21,8 @@ const en = {
   'kart.cup.name.rivermouth': 'Rivermouth Cup',
   'kart.cup.name.flood': 'Flood Tide Cup',
   'kart.cup.name.backstreet': 'Backstreet Cup',
+  // 2026-11-23 (#131): four tracks the other way round
+  'kart.cup.name.reverse': 'Reverse Cup',
   'kart.cup.name.sprint': 'Test Sprint',
   'kart.cup.tracksOf': 'Tracks of the {cup}',
   'kart.cup.best': 'Your best: place {place}, {points} points',
@@ -78,6 +80,7 @@ const zhTW: Record<KartCupKey, string> = {
   'kart.cup.name.rivermouth': '河口盃',
   'kart.cup.name.flood': '漲潮盃',
   'kart.cup.name.backstreet': '巷弄盃',
+  'kart.cup.name.reverse': '反向盃',
   'kart.cup.name.sprint': '測試短盃',
   'kart.cup.tracksOf': '{cup}的賽道',
   'kart.cup.best': '你的最佳：第 {place} 名，{points} 分',

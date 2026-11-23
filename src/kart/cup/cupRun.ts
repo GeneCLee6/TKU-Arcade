@@ -11,7 +11,7 @@
 import type { KartMode, KartTeams } from '../../../shared/games/kart/types.ts'
 import { MAX_LAPS } from '../../../shared/games/kart/info.ts'
 import { DRIVER_IDS, KART_IDS } from '../../../shared/kart/karts.ts'
-import type { RaceTrackId } from '../../../shared/kart/tracks/list.ts'
+import type { AnyRaceTrackId } from '../../../shared/kart/tracks/list.ts'
 import { BOT_NAMES, drawBots, MAX_BOTS, type BotEntry } from '../bots/roster.ts'
 import { isDifficulty, type Difficulty } from '../bots/skill.ts'
 import { cupOf, isCupId, type CupId } from './cups.ts'
@@ -53,7 +53,7 @@ export const playerSeat = (run: CupRun): number => run.entries.length
 export const seatCount = (run: CupRun): number => run.entries.length + 1
 
 /** The race to run next (or being run), null once the cup is over */
-export function currentTrack(run: CupRun): RaceTrackId | null {
+export function currentTrack(run: CupRun): AnyRaceTrackId | null {
   if (run.phase === 'podium') return null
   return cupOf(run.setup.cup).tracks[run.results.length] ?? null
 }

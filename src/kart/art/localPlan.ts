@@ -13,6 +13,7 @@
 import { createRng } from '../../../shared/games/rng.ts'
 import { roadClearance, scatter } from '../../../shared/kart/scenery.ts'
 import { roadDirection, trackBounds, type RoadPoint, type Track } from '../../../shared/kart/track.ts'
+import { forwardId } from '../../../shared/kart/tracks/reverseId.ts'
 
 export const LOCAL_TRACK_IDS = ['mangrove', 'fort', 'danhai', 'datun'] as const
 export type LocalTrackId = (typeof LOCAL_TRACK_IDS)[number]
@@ -131,7 +132,9 @@ export function localPlan(
   track: Pick<Track, 'id' | 'road'> & Partial<Pick<Track, 'jumps'>>,
   density: number,
 ): LocalPlan | null {
-  if (!isLocalTrack(track.id)) return null
+  // A reversed track (2026-11-23) is dressed as its original
+  const id = forwardId(track.id)
+  if (!isLocalTrack(id)) return null
   const { road } = track
   const box = trackBounds(track)
   const reach = (margin: number) => ({
@@ -144,7 +147,7 @@ export function localPlan(
   const heightNear = (x: number, z: number) => road[indexNear(road, x, z)]!.y ?? 0
   const rng = createRng(1811)
 
-  if (track.id === 'mangrove') {
+  if (id === 'mangrove') {
     const pools = scatter(road, {
       seed: 31,
       count: count(46),
@@ -202,7 +205,7 @@ export function localPlan(
     }
     return {
       ...EMPTY,
-      id: track.id,
+      id,
       pools,
       clumps: clumps.filter((clump) => roadClearance(road, clump.x, clump.z) > 3),
       birds,
@@ -213,7 +216,7 @@ export function localPlan(
     }
   }
 
-  if (track.id === 'fort') {
+  if (id === 'fort') {
     // On the hilltop, straight ahead of the jump: the crest straight looks at it all the way up,
     // and the road turns away under its walls. Failing that, wherever the hilltop has the room
     const top = Math.max(...road.map((point) => point.y ?? 0))
@@ -250,7 +253,7 @@ export function localPlan(
     })
     return {
       ...EMPTY,
-      id: track.id,
+      id,
       fort,
       planks,
       fits: (x, z) =>
@@ -259,7 +262,7 @@ export function localPlan(
     }
   }
 
-  if (track.id === 'danhai') {
+  if (id === 'danhai') {
     const towers = scatter(road, {
       seed: 47,
       count: count(120),
@@ -296,7 +299,7 @@ export function localPlan(
     }
     return {
       ...EMPTY,
-      id: track.id,
+      id,
       towers,
       ring,
       fits: (x, z) =>
@@ -349,7 +352,7 @@ export function localPlan(
   }).map((spot) => ({ x: spot.x, z: spot.z, size: 1.2 + spot.a, turn: spot.b * 6 }))
   return {
     ...EMPTY,
-    id: track.id,
+    id,
     grass,
     rocks,
     dome,

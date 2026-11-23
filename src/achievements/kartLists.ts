@@ -44,7 +44,7 @@ export const RACE_TRACK_IDS = [
   'breakwater',
 ] as const
 
-export const CUP_IDS = ['ebb', 'hill', 'rivermouth', 'flood', 'backstreet', 'sprint'] as const
+export const CUP_IDS = ['ebb', 'hill', 'rivermouth', 'flood', 'backstreet', 'reverse', 'sprint'] as const
 
 export const LESSON_IDS = [
   'drive',

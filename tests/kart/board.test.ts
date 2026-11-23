@@ -3,7 +3,7 @@
 // pass on every board track; a run changed after the fact (too fast, a jump, a time that is not the
 // samples', another layout, another shape) or a file that is not one is refused, with the reason.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { BOARD_TRACKS, boardTime, weeklyTrack } from '../../shared/kart/board.ts'
+import { BOARD_TRACKS, boardTime, WEEKLY_TRACKS, weeklyTrack } from '../../shared/kart/board.ts'
 import { checkBoardRun } from '../../shared/kart/boardCheck.ts'
 import { ghostFromReplay, replayLoadout } from '../../shared/kart/boardRun.ts'
 import { physicsStamp } from '../../shared/kart/boardStamp.ts'
@@ -12,7 +12,7 @@ import { speedCapFor } from '../../shared/kart/race.ts'
 import { decodeTape, type Replay } from '../../shared/kart/replay.ts'
 import { readReplayFile, type ReplayFile } from '../../shared/kart/replayFile.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
-import { RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
+import { ALL_RACE_TRACK_IDS, RACE_TRACK_IDS } from '../../shared/kart/tracks/list.ts'
 import type { Track } from '../../shared/kart/track.ts'
 import { boardFile, driveBoardRun, retape } from './boardDrive.ts'
 
@@ -174,7 +174,9 @@ describe('a run changed after the fact, or not a run', () => {
 
 describe('the board’s small parts', () => {
   it('has a board for every race track, and only those', () => {
-    expect([...BOARD_TRACKS]).toEqual([...RACE_TRACK_IDS])
+    // 2026-11-23 (#131): each reversed track a board of its own; the week turns through the originals
+    expect([...BOARD_TRACKS]).toEqual([...ALL_RACE_TRACK_IDS])
+    expect([...WEEKLY_TRACKS]).toEqual([...RACE_TRACK_IDS])
   })
 
   it('turns the week’s track every Monday in Taipei, through every track', () => {
@@ -182,8 +184,8 @@ describe('the board’s small parts', () => {
     const week = 7 * 86_400_000
     expect(weeklyTrack(monday - 1)).not.toBe(weeklyTrack(monday))
     expect(weeklyTrack(monday)).toBe(weeklyTrack(monday + week - 1))
-    const seen = new Set(BOARD_TRACKS.map((_, n) => weeklyTrack(monday + n * week)))
-    expect(seen.size).toBe(BOARD_TRACKS.length)
+    const seen = new Set(WEEKLY_TRACKS.map((_, n) => weeklyTrack(monday + n * week)))
+    expect(seen.size).toBe(WEEKLY_TRACKS.length)
   })
 
   it('writes times as a clock and stamps the physics', () => {
