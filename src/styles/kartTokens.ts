@@ -238,27 +238,31 @@ export const harbourScene = {
  * kartDrivers, below: any driver sits in any kart
  */
 export const kartBodies = {
+  // 2026-11-23 (§4.86; owner: "more striking"): not all satin black any more, so that 21 karts tell
+  // apart at a glance: six stay dark (tide, eel, squid, swift, cormorant, the flagship), five are
+  // pale (pearl, silver, white, cream) and ten are painted in a colour of their own, the neon picked
+  // to stand out on it
   tide: { main: '#11181C', second: '#2A3740', accent: '#12D8F2', glow: '#4DEBFF' },
-  comet: { main: '#1B1512', second: '#3D302A', accent: '#FF5A1F', glow: '#FF8A3D' },
-  ray: { main: '#15121F', second: '#2F2A45', accent: '#8F4DFF', glow: '#B58CFF' },
-  crab: { main: '#111A14', second: '#2A3B30', accent: '#35E85C', glow: '#7CFF8E' },
-  heron: { main: '#1A1A14', second: '#3A3A2E', accent: '#FFD60A', glow: '#FFE75C' },
-  flyfish: { main: '#1C1218', second: '#3F2A36', accent: '#FF2E88', glow: '#FF7AB8' },
+  comet: { main: '#E9E5DE', second: '#2A2420', accent: '#FF5A1F', glow: '#FF8A3D' },
+  ray: { main: '#2B1E52', second: '#14101F', accent: '#B98CFF', glow: '#B58CFF' },
+  crab: { main: '#3C4A2C', second: '#151B12', accent: '#35E85C', glow: '#7CFF8E' },
+  heron: { main: '#C9CDD2', second: '#17171B', accent: '#FFD60A', glow: '#FFE75C' },
+  flyfish: { main: '#6E1340', second: '#1C1218', accent: '#FF2E88', glow: '#FF7AB8' },
   // 2026-11-19: eight more karts and three bikes, each with a neon of its own
-  dolphin: { main: '#10161F', second: '#273447', accent: '#2F7BFF', glow: '#6FA4FF' },
-  skipper: { main: '#171A10', second: '#353B26', accent: '#B6F21A', glow: '#D4FF66' },
-  shrimp: { main: '#1D1113', second: '#42282C', accent: '#FF3B3B', glow: '#FF7D74' },
-  marlin: { main: '#101A1D', second: '#263D42', accent: '#16E0C0', glow: '#6BF5DE' },
+  dolphin: { main: '#EEF2F7', second: '#1B2638', accent: '#2F7BFF', glow: '#6FA4FF' },
+  skipper: { main: '#4C5C14', second: '#171A10', accent: '#D4FF3A', glow: '#D4FF66' },
+  shrimp: { main: '#B3161E', second: '#1D1113', accent: '#FFB3A8', glow: '#FF7D74' },
+  marlin: { main: '#0E5A57', second: '#0B1A1C', accent: '#16E0C0', glow: '#6BF5DE' },
   eel: { main: '#141420', second: '#2E2E48', accent: '#5B5BFF', glow: '#9494FF' },
   squid: { main: '#1B1220', second: '#3D2A47', accent: '#D94DFF', glow: '#EB96FF' },
-  hermit: { main: '#1D1810', second: '#423827', accent: '#FF9F1A', glow: '#FFC266' },
-  whale: { main: '#12181B', second: '#2B383E', accent: '#C8E6F5', glow: '#E6F6FF' },
+  hermit: { main: '#8C6B3E', second: '#1D1810', accent: '#FF9F1A', glow: '#FFC266' },
+  whale: { main: '#F4F6F8', second: '#2B383E', accent: '#4FC3F7', glow: '#BDEBFF' },
   swift: { main: '#12161C', second: '#2A3340', accent: '#3DC8FF', glow: '#8ADEFF' },
-  hornet: { main: '#1B180E', second: '#3D3722', accent: '#FFB800', glow: '#FFD45C' },
-  petrel: { main: '#1C1016', second: '#402633', accent: '#FF4D9D', glow: '#FF94C4' },
+  hornet: { main: '#F2B705', second: '#121212', accent: '#121212', glow: '#FFD45C' },
+  petrel: { main: '#4A0F2C', second: '#1C1016', accent: '#FF4D9D', glow: '#FF94C4' },
   // 2026-11-20: the item series
-  pelican: { main: '#191712', second: '#3B372B', accent: '#F2E6C2', glow: '#FFF4D6' },
-  otter: { main: '#17120F', second: '#3A2C24', accent: '#E07A3F', glow: '#F5A474' },
+  pelican: { main: '#EDE3C8', second: '#3B372B', accent: '#F08C2E', glow: '#FFF4D6' },
+  otter: { main: '#7A3B1F', second: '#17120F', accent: '#FFB27A', glow: '#F5A474' },
   cormorant: { main: '#0E1312', second: '#24302D', accent: '#2BD9A0', glow: '#7AF0C8' },
   // 2026-11-21: the first season's flagship, platinum on black with a violet glow
   kite: { main: '#0D0C12', second: '#3A3848', accent: '#E9E4FF', glow: '#A98BFF' },

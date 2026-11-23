@@ -30,6 +30,7 @@ import { headlightLevel } from './art/headlights.ts'
 import { loadedFeatures } from './art/trackFeatures.ts'
 import { QUALITY, type Quality } from './quality.ts'
 import { BODY_DETAIL } from './art/bodyDetail.ts'
+import { DRIVER_DETAIL } from './art/driverModel.ts'
 import { releaseSharedTextures } from './art/sharedTextures.ts'
 import { nextResolution, SHED_SECONDS, startResolution } from './resolution.ts'
 import { createKartEffects, type KartEffects } from './art/effects.ts'
@@ -343,7 +344,13 @@ export function createKartScene(
     ? null
     : buildKartEnvironment(renderer, theme.skyTop, theme.skyHorizon)
   // 2026-11-22 (#99): the bodies' fine detail by the quality (art/bodyDetail.ts): none on low
-  const finish: KartFinish = { environment, glow: post?.glow ?? 1, detail: BODY_DETAIL[quality] }
+  // 2026-11-23 (§4.86): and the drivers' (art/driverModel.ts): plain and still on low
+  const finish: KartFinish = {
+    environment,
+    glow: post?.glow ?? 1,
+    detail: BODY_DETAIL[quality],
+    driver: DRIVER_DETAIL[quality],
+  }
   // The hover kart and its driver (e8-t07, 2026-11-14), with its sparks, trails and boost flames
   const kart = buildKartModel(shadows, false, body, driver, finish, { shadowProxy: true })
   const car = kart.group

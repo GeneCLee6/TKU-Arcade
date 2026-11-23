@@ -37,6 +37,10 @@ import {
   MeshStandardMaterial,
   Object3D,
   PlaneGeometry,
+  Euler,
+  Matrix4,
+  Quaternion,
+  Raycaster,
   Vector3,
   type BufferGeometry,
   type Material,
@@ -61,8 +65,18 @@ import {
   type BoostReading,
 } from '../boostFx.ts'
 import { bodyDetailTexture, wearDecal, type BodyDetailLevel } from './bodyDetail.ts'
-import { buildDriver, STANDING_HIP } from './driverModel.ts'
+import { buildDriver, STANDING_HIP, type DriverDetail } from './driverModel.ts'
 import { blendPose, gesturePose, REST, type DriverGesture, type GesturePose } from '../driverGestures.ts'
+import { driveJoints, elbowBend, reachArm } from '../driverRig.ts'
+import {
+  landingKick,
+  SPRING_REST,
+  springTarget,
+  stepSpring,
+  throttleOf,
+  thrusterGlow,
+  vaneAngle,
+} from '../kartMotion.ts'
 import { buildKartBody } from './vehicleBodies.ts'
 import {
   bell,
@@ -120,6 +134,13 @@ export interface KartLook {
    * grid, wave, punch the air, cheer. Left out, they drive
    */
   readonly gesture?: DriverGesture
+  /**
+   * 2026-11-23 (§4.86, kartMotion.ts): the throttle as pressed, 0 to 1 (this browser's own kart):
+   * the thrusters' halo follows it. Left out, it is read from how the kart gathers speed
+   */
+  readonly throttle?: number
+  /** 2026-11-23: stunned this much at least, 0 to 1, whatever the scene says (a screenshot's pose) */
+  readonly dazed?: number
 }
 
 export interface KartModel {
@@ -185,6 +206,8 @@ const HOVER = 0.27
 const BIKE_LEAN = 0.52
 /** How much lower it rides with its shape open */
 const MORPH_DROP = 0.07
+/** 2026-11-23 (§4.86): the yoke's grips this far either side of its middle, where the hands go */
+const GRIP = 0.13
 
 /** What the scene lends a kart's paint (Scene.ts): the environment to reflect, and how bright to glow */
 export interface KartFinish {
@@ -200,6 +223,12 @@ export interface KartFinish {
    * decals on medium, the scratches, the grain and the fine twill too on high; none when left out
    */
   readonly detail?: BodyDetailLevel
+  /**
+   * 2026-11-23 (§4.86, driverModel.ts): how much of the driver is drawn and moved by the quality:
+   * low merges a plain driver standing still (hands on the wheel) and leaves out the thrusters'
+   * halo; only high has the nose's vanes. Left out, the full driver (and the vanes)
+   */
+  readonly driver?: DriverDetail
 }
 
 /** 2026-11-20 (docs/KART-PERF.md): what a model keeps besides its full self */
@@ -393,6 +422,9 @@ export function buildKartModel(
   const environment = finish.environment ?? null
   const bright = finish.glow ?? 1
   const detailLevel: BodyDetailLevel = ghost ? 'off' : (finish.detail ?? 'off')
+  // 2026-11-23 (§4.86): the driver's detail; on low the driver stands still, merged
+  const driverDetail: DriverDetail = finish.driver ?? 'high'
+  const lowDriver = driverDetail === 'low'
   const geometries: BufferGeometry[] = []
   const materials: Material[] = []
   const textures: Texture[] = []
@@ -477,6 +509,23 @@ export function buildKartModel(
   const tailLamp = lit(kartParts.tailLamp)
   const tailColour = new Color(kartParts.tailLamp)
   const strip = lit(colours.glow, 0.8)
+  // The soft round glow: the pool under the kart and (2026-11-23) the halo behind each thruster
+  const glowMap = ghost ? null : glowTexture()
+  if (glowMap) textures.push(glowMap)
+  const halo =
+    glowMap && !lowDriver
+      ? own(
+          new MeshBasicMaterial({
+            map: glowMap,
+            color: colours.glow,
+            transparent: true,
+            opacity: 0.2,
+            blending: AdditiveBlending,
+            depthWrite: false,
+            toneMapped: false,
+          }),
+        )
+      : null
   // Satin black, a paler satin panel, and the one neon colour
   const paint = {
     main: colour(colours.main, 0.46, 0.55),
@@ -550,6 +599,8 @@ export function buildKartModel(
       put(parent, bell(radius, 0.44), paint.metal, x, y, z)
       put(parent, hoop(radius * 0.96, 0.02), paint.glow, x, y, z)
       put(parent, new CircleGeometry(radius * 0.7, 16), mouth, x, y, z - 0.1)
+      // A halo behind the mouth, as strong as the throttle (2026-11-23, kartMotion.ts)
+      if (halo) put(parent, new PlaneGeometry(radius * 3.6, radius * 3.6), halo, x, y, z + 0.02).castShadow = false
       // A collar round the bell: it slides back and widens while a full boost runs
       const collar = hinge(parent, x, y, z - 0.16)
       put(collar, bell(radius * 1.12, 0.2, 0.86), paint.carbon)
@@ -580,10 +631,12 @@ export function buildKartModel(
   const { seat, rearContacts, bike } = buildKartBody(body, kit, chassis)
 
   // A yoke in front of the driver, on a column: two grips and a lit read-out between them. On a
-  // bike (2026-11-19), low bars over the tank instead: a clip-on each side of a small read-out
+  // bike (2026-11-19), low bars over the tank instead: a clip-on each side of a small read-out.
+  // 2026-11-23 (§4.86): the yoke turns about its column (`wheel`) and the driver's hands go with it
   const bar = bike
     ? hinge(chassis, 0, bike.bar.y, bike.bar.z)
     : hinge(chassis, 0, seat.y + 0.4, seat.z - 0.46)
+  const wheel = bike ? bar : hinge(bar)
   if (bike) {
     put(bar, new BoxGeometry(0.09, 0.03, 0.05), paint.carbon, 0, -0.01, -0.03)
     put(bar, new BoxGeometry(0.06, 0.012, 0.03), paint.glow, 0, 0.01, -0.03)
@@ -593,10 +646,14 @@ export function buildKartModel(
     }
   } else {
     put(bar, new CylinderGeometry(0.02, 0.026, 0.3, 6), paint.metal, 0, -0.1, -0.1).rotation.x = -0.8
-    put(bar, new BoxGeometry(0.2, 0.07, 0.03), paint.carbon)
-    put(bar, new BoxGeometry(0.11, 0.035, 0.012), paint.glow, 0, 0.005, 0.02)
+    // The yoke: a carbon body, a lit read-out, a mark at the top (it shows the wheel turn), paddles
+    // behind and a grip each side
+    put(wheel, new BoxGeometry(0.22, 0.075, 0.03), paint.carbon)
+    put(wheel, new BoxGeometry(0.11, 0.035, 0.012), paint.glow, 0, 0.005, 0.02)
+    put(wheel, new BoxGeometry(0.022, 0.014, 0.034), paint.accent, 0, 0.042, 0)
     for (const side of [-1, 1]) {
-      put(bar, new BoxGeometry(0.035, 0.12, 0.04), paint.dark, side * 0.115, 0, 0)
+      put(wheel, new BoxGeometry(0.04, 0.13, 0.045), paint.dark, side * GRIP, 0, 0)
+      put(wheel, new BoxGeometry(0.05, 0.035, 0.008), paint.metal, side * 0.075, 0.03, -0.024)
     }
   }
 
@@ -605,7 +662,7 @@ export function buildKartModel(
   const crouch = standing ? 0 : (bike?.crouch ?? 0)
   // Standing, they stand on the ground beside the cockpit, off to the left of it as seen from in
   // front, turned a little towards the kart
-  const driver = buildDriver(kit, driverId, bike !== undefined && !standing, standing)
+  const driver = buildDriver(kit, driverId, bike !== undefined && !standing, standing, driverDetail)
   if (standing) {
     const box = solidBox(chassis)
     driver.group.position.set(box.max.x + STAND_ACROSS, STANDING_HIP, seat.z + STAND_AHEAD)
@@ -614,6 +671,127 @@ export function buildKartModel(
   } else {
     driver.group.position.set(0, seat.y, seat.z)
     chassis.add(driver.group)
+  }
+
+  // 2026-11-23 (§4.86, driverRig.ts): the skeleton. The joints from the drive and the gesture, the
+  // hands on the wheel (two bones from each shoulder to its grip), or raised off it by the gesture
+  const { torso, head, arms, elbows } = driver
+  const ikTurn = new Quaternion()
+  const gestureTurn = new Quaternion()
+  const turnBy = new Euler(0, 0, 0, 'ZXY')
+  const toTorso = new Matrix4()
+  const grip = new Vector3()
+  const pole = new Vector3()
+  // On their feet the arms hang a little out from the sides, the elbows just bent
+  const hanging = [-1, 1].map((side) => new Quaternion().setFromEuler(new Euler(0.06, 0, side * 0.1)))
+  const seatedY = torso.position.y
+  const poseDriver = (
+    joints: ReturnType<typeof driveJoints>,
+    g: GesturePose,
+  ): void => {
+    // On their feet (the race room) nothing of the drive moves them: only the gesture
+    const drive = standing ? 0 : 1
+    torso.rotation.set(
+      joints.torsoBack * drive + g.torsoBack,
+      joints.torsoTwist * drive + g.twist,
+      joints.torsoLean * drive,
+    )
+    torso.position.y = seatedY + g.bounce
+    head.rotation.set(
+      joints.headUp * drive + g.headUp,
+      joints.headTurn * drive + g.headTurn,
+      joints.headRoll * drive + g.headTilt,
+    )
+    if (bike) bar.rotation.y = -joints.wheel * 0.4
+    else wheel.rotation.z = -joints.wheel
+    wheel.updateMatrix()
+    bar.updateMatrix()
+    torso.updateMatrix()
+    toTorso.copy(torso.matrix).invert()
+    for (const [index, arm] of arms.entries()) {
+      const left = index === 0
+      const side = left ? -1 : 1
+      let reach = 0.2
+      if (standing) ikTurn.copy(hanging[index]!)
+      else {
+        // The grip, from the wheel to the chassis, to the seat (not turned), to the torso, to the shoulder
+        if (bike) grip.set(side * 0.15, -0.01, 0.015)
+        else grip.set(side * GRIP, 0, 0.01).applyMatrix4(wheel.matrix)
+        grip.applyMatrix4(bar.matrix).sub(driver.group.position).applyMatrix4(toTorso).sub(arm.position)
+        // The elbows out to the sides and a little down and back
+        pole.set(side, -0.55, 0.35)
+        reach = reachArm(grip, pole, ikTurn)
+      }
+      const up = (left ? g.leftUp : g.rightUp) + joints.loose[index]! * drive
+      turnBy.set(up, 0, left ? g.leftOut : -g.rightOut)
+      gestureTurn.setFromEuler(turnBy)
+      arm.quaternion.multiplyQuaternions(gestureTurn, ikTurn)
+      elbows[index]!.rotation.x = elbowBend(reach, up, left ? g.leftBend : g.rightBend)
+    }
+    if (driver.vee) driver.vee.visible = g.vSign >= 0.5
+  }
+  const STILL_JOINTS = driveJoints({
+    steer: 0,
+    drift: 0,
+    heat: 0,
+    surge: 0,
+    dazed: 0,
+    sway: 0,
+    bike: bike !== undefined,
+    crouch,
+  })
+  poseDriver(STILL_JOINTS, REST)
+  // Low (a race on the low quality): the driver as it sits now, merged and never moved again
+  const rigged = !lowDriver || standing
+  if (!rigged) {
+    driver.group.updateMatrixWorld(true)
+    const pieces: Mesh[] = []
+    driver.group.traverseVisible((object) => {
+      if (object instanceof Mesh) pieces.push(object)
+    })
+    const merged = mergeTree(driver.group, pieces, keep)
+    driver.group.clear()
+    for (const mesh of merged) {
+      mesh.castShadow = shadows
+      driver.group.add(mesh)
+    }
+  }
+
+  // 2026-11-23 (§4.86, kartMotion.ts): a vane standing on each side of the nose, turning with the
+  // steering; found by looking straight down onto the body ahead of the cockpit. On the high quality
+  // only (two draws a kart), and not on a bike (its bars turn) or a ghost
+  const vanes: Group[] = []
+  if (!bike && !ghost && driverDetail === 'high') {
+    const bounds = solidBox(chassis)
+    const surfaces: Mesh[] = []
+    chassis.traverseVisible((object) => {
+      if (!(object instanceof Mesh)) return
+      const material = object.material as Material
+      if (material.transparent || material.blending === AdditiveBlending) return
+      if (driver.group.getObjectById(object.id)) return
+      surfaces.push(object)
+    })
+    const caster = new Raycaster()
+    const down = new Vector3(0, -1, 0)
+    const from = new Vector3()
+    const halfWidth = Math.min(-bounds.min.x, bounds.max.x)
+    for (const ahead of [0.6, 0.48, 0.36]) {
+      const found = [-1, 1].map((side) => {
+        from.set(side * halfWidth * 0.62, bounds.max.y + 0.5, bounds.min.z * ahead)
+        caster.set(from, down)
+        const hit = caster.intersectObjects(surfaces, false)[0]
+        return hit ? chassis.worldToLocal(hit.point.clone()) : null
+      })
+      if (found.some((spot) => spot === null)) continue
+      for (const spot of found) {
+        const vane = hinge(chassis, spot!.x, spot!.y - 0.005, spot!.z)
+        put(vane, new BoxGeometry(0.05, 0.012, 0.12), paint.carbon, 0, 0.006, 0.03)
+        put(vane, new BoxGeometry(0.014, 0.085, 0.2), paint.accent, 0, 0.05, 0.04)
+        put(vane, new BoxGeometry(0.018, 0.01, 0.18), paint.glow, 0, 0.095, 0.04)
+        vanes.push(vane)
+      }
+      break
+    }
   }
 
   // Where the thruster mouths are with the shape closed, in the kart's own frame
@@ -670,9 +848,8 @@ export function buildKartModel(
   // The glow on the road beneath, and the pool of the head lamps ahead: not on a ghost
   let under: Mesh | null = null
   let underMaterial: MeshBasicMaterial | null = null
-  if (!ghost) {
-    const texture = glowTexture()
-    textures.push(texture)
+  if (glowMap) {
+    const texture = glowMap
     const pool = (color: string, opacity: number) =>
       own(
         new MeshBasicMaterial({
@@ -710,14 +887,19 @@ export function buildKartModel(
   let gestureSeconds = 0
   let gestured: GesturePose = REST
   const gestureSeed = Math.random()
-  for (const arm of driver.arms) arm.rotation.order = 'ZXY'
-  const seatedY = driver.torso.position.y
+  // 2026-11-23 (§4.86, kartMotion.ts): the spring under the body, the landings seen and how long it
+  // has flown; the steering, the slide and the throttle as the driver and the thrusters follow them
+  let spring = SPRING_REST
+  let landingsSeen = 0
+  let airTime = 0
+  let steered = 0
+  let slid = 0
+  let throttled = 0
   /** The nose thrown up by a boost that fired, radians, dying away; and the boosts seen so far */
   let rear = 0
   let firedSeen = 0
   let lastSpeed = 0
   let bob = 0
-  let lean = 0
   let thrown = 0
   let braking = 0
   let sway = 0
@@ -744,7 +926,8 @@ export function buildKartModel(
       for (const mesh of parts) mesh.visible = !far
       if (!far) for (const look of farLooks) look.visible = false
     },
-    update(look, seconds, dazed = 0) {
+    update(look, seconds, hit = 0) {
+      const dazed = Math.max(hit, look.dazed ?? 0)
       reading = readBoost(reading, look, seconds)
       const speedShare = Math.min(1, Math.abs(look.speed) / 30)
       // Banking into a drift, a little into a fast turn: - about z leans the top towards +x, into a right turn
@@ -790,62 +973,61 @@ export function buildKartModel(
       // A bike leans about the line it rides on, not about its own middle: its pads stay over the
       // road and the rider's head goes in towards the corner
       chassis.position.x = bike ? -Math.sin(roll) * HOVER : 0
+      // The spring: squatting as it pulls away, up a little in the air, pressed down by a landing
+      const landed = (look.landings ?? 0) > landingsSeen
+      landingsSeen = look.landings ?? 0
+      if (look.airborne) airTime += seconds
+      spring = stepSpring(
+        spring,
+        springTarget(accel, look.airborne ?? false, reading.heat),
+        seconds,
+        landed ? landingKick(airTime) : 0,
+      )
+      if (landed || !look.airborne) airTime = 0
       chassis.position.y =
+        spring.height +
         HOVER -
         (bike ? (1 - Math.cos(roll)) * HOVER : 0) -
         MORPH_DROP * open +
         Math.sin(bob) * (0.045 - speedShare * 0.02) +
         Math.sin(bob * 7.3) * 0.006 * speedShare
 
-      // The driver: into the turn, thrown back by a boost and by pulling away, forward under
-      // braking; the head looks where they steer; stunned, they sway and the head lolls
+      // The driver (§4.86, driverRig.ts): into the turn, thrown back by a boost and by pulling away,
+      // forward under braking, the shoulders and the head to the inside of a drift, the wheel turned
+      // and the hands with it; stunned, they sway, the head lolls and the hands come loose
       const heat = reading.heat
-      // On a bike the rider goes over with it, and hangs off a little further into the turn
-      lean = ease(
-        lean,
-        bike ? -look.steer * 0.1 - look.drift * 0.16 : -look.steer * 0.16 - look.drift * 0.12,
-        8,
-        seconds,
-      )
-      thrown = ease(
-        thrown,
-        Math.max(-0.16, Math.min(0.12, accel * 0.006)) + heat * 0.24 + rear * 0.8,
-        10,
-        seconds,
-      )
+      steered = ease(steered, look.steer, 8, seconds)
+      slid = ease(slid, look.drift, 8, seconds)
+      thrown = ease(thrown, Math.max(-0.16, Math.min(0.12, accel * 0.006)) + rear * 0.8, 10, seconds)
       sway += seconds * (dazed > 0 ? 9 : 0)
       if (look.gesture !== gesture) {
         gesture = look.gesture
         gestureSeconds = 0
       }
       gestureSeconds += seconds
-      gestured = blendPose(
-        gestured,
-        gesture ? gesturePose(gesture, gestureSeconds, gestureSeed) : REST,
-        1 - Math.exp(-14 * seconds),
-      )
-      const g = gestured
-      const { torso, head, arms } = driver
-      // On their feet (the race room) nothing of the drive moves them: only the gesture
-      const drive = standing ? 0 : 1
-      torso.rotation.z = (lean + Math.sin(sway) * 0.3 * dazed) * drive
-      torso.rotation.x =
-        (crouch + thrown * (bike ? 0.6 : 1) + Math.cos(sway * 0.7) * 0.12 * dazed) * drive + g.torsoBack
-      torso.position.y = seatedY + g.bounce
-      head.rotation.y = (-look.steer * 0.3 - look.drift * 0.15) * drive + g.headTurn
-      head.rotation.z = Math.sin(sway * 1.3 + 1) * 0.35 * dazed * drive
-      head.rotation.x =
-        (-crouch * 0.9 - thrown * 0.5 + Math.cos(sway * 1.1) * 0.2 * dazed) * drive + g.headUp
-      bar.rotation.y = -look.steer * 0.45
-      // The arms stay on the bar: they reach as the torso goes back, and follow the bar round;
-      // a gesture lifts them off it (raised about the shoulder, then out to the side)
-      for (const [index, arm] of arms.entries()) {
-        const left = index === 0
-        arm.rotation.set(
-          (-thrown * (bike ? 0.5 : 0.9) - 0.3 * dazed) * drive + (left ? g.leftUp : g.rightUp),
-          -look.steer * 0.3 * drive,
-          left ? g.leftOut : -g.rightOut,
+      if (rigged && !far) {
+        gestured = blendPose(
+          gestured,
+          gesture ? gesturePose(gesture, gestureSeconds, gestureSeed, driverId) : REST,
+          1 - Math.exp(-14 * seconds),
         )
+        poseDriver(
+          driveJoints({
+            steer: steered,
+            drift: slid,
+            heat,
+            surge: thrown,
+            dazed,
+            sway,
+            bike: bike !== undefined,
+            crouch,
+          }),
+          gestured,
+        )
+      }
+      if (!far) {
+        const turn = -vaneAngle(steered, slid, speedShare)
+        for (const vane of vanes) vane.rotation.y = turn
       }
 
       // The lit parts: the thruster mouths by the speed, white-hot in the boost's own colour; the
@@ -853,7 +1035,14 @@ export function buildKartModel(
       if (!ghost) {
         flameColour.set(BOOST_FX[reading.last].flame)
         tint.copy(glowColour).lerp(flameColour, heat)
-        mouth.color.copy(tint).multiplyScalar((0.55 + speedShare * 0.45 + heat * 1.4) * bright)
+        // The thrusters by the throttle too (kartMotion.ts): the mouths, and the halo behind them
+        throttled = ease(throttled, throttleOf(look.throttle, accel, speedShare), 12, seconds)
+        const burn = thrusterGlow(throttled, speedShare, heat)
+        mouth.color.copy(tint).multiplyScalar(burn.mouth * bright)
+        if (halo) {
+          halo.opacity = burn.halo * 0.75
+          halo.color.copy(tint)
+        }
         // The lit lines: dim standing still, brighter with the speed, blazing in a boost
         strip.color
           .copy(glowColour)

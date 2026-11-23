@@ -203,6 +203,51 @@ for (const [name, viewport] of [
   })
 }
 
+// 2026-11-23 (docs/ARCHITECTURE.md §4.86): the drivers' skeleton and the kart's motion, on the GPU this
+// runs on. Each driver steers, drifts, is stunned and wins (their own win), through the spike's debug
+// `pose` and `gesture`; every picture is attached to the report, and the win differs from the drive
+test.describe("the drivers' skeleton", () => {
+  test.use({ viewport: { width: 960, height: 540 }, locale: 'en-US' })
+  for (const driver of ['spade', 'heart', 'diamond', 'club'] as const) {
+    test(`${driver} steers, drifts, is stunned and wins, with a clean console`, async ({ page }, info) => {
+      const errors = watchConsole(page)
+      await page.addInitScript(
+        ([who, body]) => {
+          localStorage.setItem('tku-arcade.kart.driver', who)
+          localStorage.setItem('tku-arcade.kart.body', body)
+        },
+        [driver, driver === 'club' ? 'comet' : 'tide'],
+      )
+      await openSpike(page)
+      const shots: Record<string, string> = {}
+      for (const [name, pose, gesture] of [
+        ['drive', { steer: 0, drift: 0, throttle: 1 }, null],
+        ['steer', { steer: 1, drift: 0, throttle: 1 }, null],
+        ['drift', { steer: 1, drift: 1, throttle: 1 }, null],
+        ['daze', { steer: 0, drift: 0, dazed: 1 }, null],
+        ['cheer', { steer: 0, drift: 0 }, 'cheer'],
+      ] as const) {
+        await page.evaluate(
+          ([wanted, act]) => {
+            const spike = (window as unknown as { __kartSpike: Record<string, unknown> }).__kartSpike
+            spike.pose = wanted
+            spike.gesture = act
+            spike.view = { orbit: 2.4, back: 2.1, up: 1.3 }
+          },
+          [pose, gesture] as const,
+        )
+        await page.waitForTimeout(name === 'cheer' ? 1200 : 700)
+        const png = await page.locator('canvas').screenshot()
+        shots[name] = png.toString('base64')
+        await info.attach(`${driver}-${name}`, { body: png, contentType: 'image/png' })
+      }
+      expect(shots.cheer).not.toBe(shots.drive)
+      expect(shots.steer).not.toBe(shots.drive)
+      expect(errors).toEqual([])
+    })
+  }
+})
+
 test.describe('on a phone', () => {
   test.use({
     viewport: { width: 375, height: 667 },
