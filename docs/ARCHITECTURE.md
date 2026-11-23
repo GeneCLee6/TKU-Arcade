@@ -1823,6 +1823,17 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **已知限制**：列表是輪詢（每人每 10 秒一次 Worker 請求），不是推送；房間要有人進去才會出現在列表（快速加入開的房，房主一進來就列）；兩個人同時快速加入又都沒房時會各開一間（各自出現在對方的列表上）；有密碼的公開房只能在等待室事後設，建房表單不收密碼；房名沒有在比賽畫面顯示。
 
 
+### 4.85 路線圖外：桌遊牌桌的電競化（共用元件）（2026-11-23，`feat/boardgame-table-esports`）
+
+擁有者 2026-11-22：「電競化專業化」。#155 做了牌桌外面，這批做牌桌本身（`DESIGN.md` §3.9）。**不改規則、互動流程與資訊**，只換樣式；所以各遊戲的 `data-testid`、ARIA、文字都沒變。
+
+- **`src/components/table/tableKit.ts`**（靜態、約 1.1 kB gzip，用到它的遊戲首屏才帶）：`tablePanel`、`tableSurface(base)`／`hueSurface`、`turnGlow`、`nameplate`、`digits`、`mix`（`color-mix` 的唯一寫法）、`Ticker`、`RankPlate`、`PhaseBar`、`slantMark`。只有樣式，不管遊戲邏輯。
+- **事件字幕**：`TableCaption`（`src/components/LateParts.tsx`）只是 `captionChunk`（`src/lib/lateParts.ts`）的殼；`EventCaption.tsx` 首屏之後才載。介面是 `{ id, text, tone }`：`id` 變成新的值就丟一則字幕，`null` 或掛上時的那個值不丟（重連、晚進來的人不會看到舊事件）。字由 `::after { content: attr(data-text) }` 畫、整塊 `aria-hidden`：字幕只重複畫面上已有的字，DOM 裡不多一份（`getByText` 不會撞兩個）。哪個時刻算事件由各遊戲從 `view` 推（德州撲克的 `allIn`／`handEnd`、放風箏 `log` 最後一筆 `play` 且 `!ok`、陞官圖 `getCell(from).rank !== getCell(to).rank` 且動畫放完、默契牌局 `reveal` 放完）。
+- **房間側欄**（`RoomInPlay.tsx`，每款都帶）：成員列成名牌（`--seat` 由列的 `style` 給）；輪到的那列遊戲色框＋外光、斜的「輪到」牌；頭像外的倒數環 `TurnRing.tsx` 走 `turnRingChunk`（首屏之後），環的寬度用負 margin 抵掉，載入前後版面不動。環的進度是 CSS 動畫：`animation-duration` ＝ 倒數總長、`animation-delay` ＝ 已過的時間取負，換 deadline 就換一個元件重算。
+- **為了首屏**：`CoverSection`（遊戲卡在某個座位時的處理）搬到自己的檔案、走 `coverChunk`（只有遊戲卡住才用得到），抵掉側欄新樣式的成本。陞官圖兩個首屏只帶字幕的殼與側欄樣式，不 import `tableKit`。
+- **首屏**（`npm run budget`，對照 `5eb85e7`）：見各 PR（第一個 PR：陞官圖 139.7 → 139.9、完整版 139.9 → 140.0；德州撲克 132.5 → 134.8、放風箏 130.7 → 132.7、默契牌局 131.6 → 133.7；沒套用的遊戲 +0.1）。
+- **測試**：`tests/setup.ts` 先載 `captionChunk`、`coverChunk`、`turnRingChunk`；既有的畫面測試、`test:sweep`（每款從等待室玩到再來一局，含 axe）照跑。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

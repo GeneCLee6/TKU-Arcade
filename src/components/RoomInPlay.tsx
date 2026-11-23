@@ -1,15 +1,18 @@
 import type { ReactNode } from 'react'
 import styled from 'styled-components'
-import type { CoverableSeat, CoverMessage, RoomMember, RoomView } from '../../shared/protocol.ts'
+import type { CoverMessage, RoomMember, RoomView } from '../../shared/protocol.ts'
 import { useT } from '../i18n/useT.ts'
 import type { RoomTimer } from '../lib/roomConnection.ts'
 import { memberName } from '../lib/memberName.ts'
 import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
+import { turnRingChunk } from '../lib/lateParts.ts'
+import { clippedFill, displayType, slantClip } from '../styles/esports.ts'
 import { Avatar } from './Avatar.tsx'
 import { Button } from './Button.tsx'
 import { ConfirmButton } from './ConfirmButton.tsx'
 import { Countdown } from './Countdown.tsx'
 import { FreeSeatRow } from './FreeSeatRow.tsx'
+import { LateCoverSection } from './LateParts.tsx'
 import { DissolveButton, HostEndedActions } from './HostControls.tsx'
 import { MemberEntry } from './MemberEntry.tsx'
 import {
@@ -81,6 +84,15 @@ export function RoomInPlay({
     (seat) => !seated.some((member) => member.seat === seat),
   )
 
+  // The ring round whoever is to move loads after the first paint (src/lib/lateParts.ts)
+  const TurnRing = turnRingChunk.use()
+  const avatar = (member: RoomMember) => (
+    <Avatar
+      name={memberName(member, view.room.gameId)}
+      tint={seatTint && member.seat !== null ? seatColor(member.seat) : undefined}
+    />
+  )
+
   return (
     <Layout>
       {!(hidePlaying && status === 'playing') && !(resultElsewhere && status === 'ended') && (
@@ -93,7 +105,7 @@ export function RoomInPlay({
       {!urgentElsewhere && timers.map((timer) => <Countdown key={timer.id} timer={timer} />)}
 
       {!urgentElsewhere && status === 'playing' && view.coverable.length > 0 && (
-        <CoverSection
+        <LateCoverSection
           seated={seated}
           coverable={view.coverable}
           isHost={isHost}
@@ -108,11 +120,16 @@ export function RoomInPlay({
             const hasTurn = member.seat !== null && member.seat === turnSeat
             const detail = seatDetail?.(member)
             return (
-              <MemberRow key={member.id} $turn={hasTurn}>
-                <Avatar
-                  name={memberName(member, view.room.gameId)}
-                  tint={seatTint && member.seat !== null ? seatColor(member.seat) : undefined}
-                />
+              <MemberRow
+                key={member.id}
+                $turn={hasTurn}
+                style={member.seat === null ? undefined : { ['--seat' as string]: seatColor(member.seat) }}
+              >
+                {hasTurn && TurnRing ? (
+                  <TurnRing timer={timers[0]}>{avatar(member)}</TurnRing>
+                ) : (
+                  avatar(member)
+                )}
                 {member.seat !== null && (
                   <SeatNumber>{t('room.waiting.seat', { seat: member.seat + 1 })}</SeatNumber>
                 )}
@@ -182,64 +199,6 @@ export function RoomInPlay({
   )
 }
 
-interface CoverSectionProps {
-  seated: RoomMember[]
-  coverable: CoverableSeat[]
-  isHost: boolean
-  onCover: RoomInPlayProps['onCover']
-}
-
-/** The seats a game is stuck on: the host keeps it moving, everyone else hears why it stopped */
-export function CoverSection({ seated, coverable, isHost, onCover }: CoverSectionProps) {
-  const t = useT()
-  if (!isHost) return <Muted>{t('room.cover.waitForHost')}</Muted>
-  return (
-    <Section>
-      <Heading>{t('room.cover.heading')}</Heading>
-      <List>
-        {coverable.map(({ seat, skip, proxy }) => {
-          // Nobody holds a seat whose player was kicked
-          const name = seated.find((member) => member.seat === seat)?.name
-          const number = seat + 1
-          return (
-            <CoverRow key={seat}>
-              <span>
-                {name === undefined
-                  ? t('room.cover.seatEmpty', { seat: number })
-                  : t('room.cover.seatHeld', { seat: number, name })}
-              </span>
-              {skip || proxy ? (
-                <Actions>
-                  {skip && (
-                    <Button
-                      $variant="secondary"
-                      aria-label={t('room.cover.skipNamed', { seat: number })}
-                      onClick={() => onCover(seat, 'skip')}
-                    >
-                      {t('room.cover.skip')}
-                    </Button>
-                  )}
-                  {proxy && (
-                    <Button
-                      $variant="secondary"
-                      aria-label={t('room.cover.proxyNamed', { seat: number })}
-                      onClick={() => onCover(seat, 'proxy')}
-                    >
-                      {t('room.cover.proxy')}
-                    </Button>
-                  )}
-                </Actions>
-              ) : (
-                <Muted>{t('room.cover.cannotContinue')}</Muted>
-              )}
-            </CoverRow>
-          )
-        })}
-      </List>
-    </Section>
-  )
-}
-
 function StatusLine({ playing, isHost }: { playing: boolean; isHost: boolean }) {
   const t = useT()
   if (playing) return <p role="status">{t('room.inProgress')}</p>
@@ -251,19 +210,25 @@ const Layout = styled.div`
   gap: ${space.xl}px;
 `
 
-const CoverRow = styled(Row)`
-  overflow-wrap: anywhere;
-`
-
-// The outline and the word say whose move it is, so neither rests on a colour
+// A nameplate (docs/DESIGN.md §3.9): the seat's colour down the left edge. The outline and the word
+// say whose move it is, so neither rests on a colour
 const MemberRow = styled(Row)<{ $turn: boolean }>`
-  outline: ${(p) => (p.$turn ? `2px solid ${color.text}` : 'none')};
-  outline-offset: -1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--seat, transparent) 22%, ${color.sunken}), ${color.sunken} 65%);
+  box-shadow: inset 4px 0 0 var(--seat, ${color.line})
+    ${(p) => (p.$turn ? `, 0 0 ${space.lg}px color-mix(in srgb, ${color.accent} 40%, transparent)` : '')};
+  outline: ${(p) => (p.$turn ? `2px solid ${color.accent}` : 'none')};
+  outline-offset: -2px;
 `
 
+// A slanted tag in the game's hue, as on a broadcast (docs/DESIGN.md §3.9)
 const TurnMark = styled.span`
-  font-size: ${fontSize.sm}px;
-  font-weight: 600;
+  ${clippedFill(slantClip(6), color.accent)}
+  margin-left: auto;
+  padding: 0 ${space.md}px;
+  color: ${color.onAccent};
+  ${displayType}
+  font-size: 12px;
+  text-transform: uppercase;
 `
 
 const SeatDetail = styled.span`

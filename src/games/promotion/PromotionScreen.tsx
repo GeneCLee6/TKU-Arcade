@@ -7,6 +7,7 @@ import type { RoomMember } from '../../../shared/protocol.ts'
 import { Avatar } from '../../components/Avatar.tsx'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
 import type { Translate } from '../../i18n/t.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
 import { initialOf } from '../../lib/avatar.ts'
@@ -255,6 +256,12 @@ export default function PromotionScreen({ room, game }: GameScreenProps) {
       dock={immersed ? undefined : turn}
     >
       <Frame ref={frame} $immersed={immersed} data-immersion={immersive.mode}>
+        {/* The broadcast's caption once the piece lands on another rank (DESIGN §3.9): magenta down */}
+        <TableCaption
+          id={!playing && last && getCell(last.from).rank !== getCell(last.to).rank ? `move-${playback.count}` : null}
+          text={last ? `${nameOf(last.seat)} → ${shortCellText(t, last.to)}` : ''}
+          tone={last?.face === 'zang' ? 'magenta' : 'accent'}
+        />
         <Stage
           ref={stageRef}
           data-fit-screen=""
@@ -458,9 +465,10 @@ const SeatChip = styled.button<{ $turn: boolean }>`
   background: ${color.surface};
   color: ${color.text};
   border: 1px solid ${color.border};
-  outline: ${(p) => (p.$turn ? `2px solid ${color.text}` : 'none')};
+  outline: ${(p) => (p.$turn ? `2px solid ${color.accent}` : 'none')};
   outline-offset: -1px;
-  border-radius: 18px;
+  box-shadow: ${(p) => (p.$turn ? `0 0 ${space.md}px ${color.accent}` : 'none')};
+  border-radius: 2px;
   font-family: inherit;
   font-size: ${fontSize.sm}px;
   font-weight: ${(p) => (p.$turn ? 600 : 400)};

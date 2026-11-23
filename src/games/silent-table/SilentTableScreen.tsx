@@ -10,10 +10,12 @@ import type {
 import { Avatar } from '../../components/Avatar.tsx'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
+import { mix, tablePanel } from '../../components/table/tableKit.ts'
 import { type Translate } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { useReducedMotion } from '../../lib/useMediaQuery.ts'
-import { clippedFill, cornerClip, displayType, glass, monoType, SLANT } from '../../styles/esports.ts'
+import { clippedFill, cornerClip, displayType, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { ChipMark, ChipRail } from './ChipRail.tsx'
@@ -129,6 +131,12 @@ export default function SilentTableScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage>
+        {/* The broadcast's caption once the cards are all turned (DESIGN §3.9) */}
+        <TableCaption
+          id={reveal && !playing ? `level-${state.level}-${reveal.passed}` : null}
+          text={reveal ? t(reveal.passed ? 'games.silent-table.ui.passed' : 'games.silent-table.ui.failed') : ''}
+          tone={reveal?.passed === false ? 'magenta' : 'accent'}
+        />
         <Progress state={state} />
         {game.chatLocked && (
           <Locked>
@@ -379,7 +387,14 @@ const feltClip = `polygon(${FELT_CUT}px 0, calc(100% - ${FELT_CUT}px) 0, 100% ${
 // The skin's felt is --felt, drawn on ::before (esports.ts) so that no focus ring on it is clipped.
 // The ring around whatever has the focus has to show on the felt too
 const Felt = styled.div`
-  ${clippedFill(feltClip, 'var(--felt)')}
+  /* Under a broadcast's lights (DESIGN §3.9): a spot from above, a fine weave, darker edges */
+  ${clippedFill(
+    feltClip,
+    `radial-gradient(ellipse at 50% 0%, ${mix(color.onFelt, 14)}, transparent 60%),
+    radial-gradient(ellipse at 50% 45%, transparent 50%, ${mix(color.chipInk, 30)}),
+    repeating-linear-gradient(45deg, ${mix(color.onFelt, 3)} 0 1px, transparent 1px 6px),
+    var(--felt)`,
+  )}
   --color-accent: ${color.onFelt};
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -388,7 +403,9 @@ const Felt = styled.div`
   color: ${color.onFelt};
 
   &::before {
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, ${color.gameSilentTable} 55%, transparent);
+    box-shadow:
+      inset 0 0 0 2px color-mix(in srgb, ${color.gameSilentTable} 55%, transparent),
+      inset 0 0 40px ${mix(color.chipInk, 35)};
   }
 
   & > * {
@@ -416,7 +433,7 @@ const Stats = styled.div`
 `
 
 const Stat = styled.div`
-  ${glass}
+  ${tablePanel}
   display: grid;
   align-content: start;
   gap: ${space.xs}px;
@@ -532,7 +549,7 @@ const SeatList = styled.ul`
 // A glass row with the seat's colour down its left edge. Ready is told by the word as well as by the
 // outline
 const SeatItem = styled.li<{ $ready: boolean; $mark: string }>`
-  ${clippedFill(cornerClip(12), color.panel)}
+  ${(p) => clippedFill(cornerClip(12), `linear-gradient(90deg, ${mix(p.$mark, 20, color.panel)}, ${color.panel} 60%)`)}
   display: flex;
   align-items: center;
   gap: ${space.sm}px;
