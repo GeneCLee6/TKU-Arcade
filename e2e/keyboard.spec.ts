@@ -12,6 +12,17 @@ async function tabTo(page: Page, target: ReturnType<Page['locator']>, limit = 40
   throw new Error(`Not reached in ${limit} presses of Tab`)
 }
 
+/**
+ * 2026-11-23 (QA sweep): past "Play the computer" (three dozen buttons since every game with computer
+ * players is in it) by the lobby's skip link, as a keyboard user would: it comes within the first
+ * dozen stops, and the games (past the "list publicly" box) come next
+ */
+async function skipToGames(page: Page) {
+  await tabTo(page, page.getByRole('link', { name: 'Skip to the games' }), 12)
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#lobby-games')).toBeFocused()
+}
+
 test('every stop on the way through the lobby shows that it has the focus', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('button', { name: 'New room' }).first()).toBeVisible()
@@ -31,7 +42,8 @@ test('a room can be made and a nickname given with the keyboard alone', async ({
   await page.goto('/')
   const newRoom = page.getByRole('button', { name: 'New room' }).first()
   await expect(newRoom).toBeVisible()
-  await tabTo(page, newRoom)
+  await skipToGames(page)
+  await tabTo(page, newRoom, 3)
   await page.keyboard.press('Enter')
   await expect(page.getByRole('textbox', { name: 'Nickname' })).toBeFocused()
   await page.keyboard.type('Ann')
@@ -44,7 +56,8 @@ test('Esc closes the nickname dialog and gives the focus back', async ({ page })
   await page.goto('/')
   const newRoom = page.getByRole('button', { name: 'New room' }).first()
   await expect(newRoom).toBeVisible()
-  await tabTo(page, newRoom)
+  await skipToGames(page)
+  await tabTo(page, newRoom, 3)
   await page.keyboard.press('Enter')
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.keyboard.press('Escape')
@@ -120,7 +133,8 @@ test('the rules can be reached from a game card, and the way back too', async ({
   await page.goto('/')
   const link = page.getByRole('link', { name: 'How to play Promotion' })
   await expect(link).toBeVisible()
-  await tabTo(page, link)
+  await skipToGames(page)
+  await tabTo(page, link, 2)
   await page.keyboard.press('Enter')
   await page.waitForURL(/\/games\/promotion\/rules/)
   const back = page.getByRole('link', { name: 'Back to the lobby' })

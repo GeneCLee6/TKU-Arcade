@@ -716,7 +716,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     const workFrom = performance.now()
     if (firstFrameAt === null) {
       firstFrameAt = now
-      loadMs = now - loadStarted
+      // (2026-11-23, QA sweep: a first frame in the very frame the loop started is stamped with that
+      // frame's start, a moment before: a negative load time, which /api/telemetry refuses with a 400)
+      loadMs = Math.max(0, now - loadStarted)
     } else if (now - firstFrameAt >= TELEMETRY_AFTER_MS && !reported) {
       report(((debug.frames + 1) * 1000) / (now - firstFrameAt), loadMs, options.quality ?? 'high')
     }

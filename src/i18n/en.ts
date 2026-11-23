@@ -20,6 +20,7 @@ export const en = {
   'language.zhTW': '繁中',
   'lobby.changeNickname': 'Change',
   'lobby.games': 'Games',
+  'lobby.skipToGames': 'Skip to the games',
   'lobby.profile': 'My profile',
   'lobby.playingAs': 'Playing as {name}',
   'lobby.join.invalid': "That's not a room number or link. Check it and try again.",
