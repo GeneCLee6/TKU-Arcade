@@ -15,7 +15,7 @@ import { teamScore } from '../shared/games/kart/rules.ts'
 import type { KartView } from '../shared/games/kart/types.ts'
 import { MAX_RACERS } from '../shared/kart/race.ts'
 import { TEAM_NAMES } from '../shared/kart/team.ts'
-import { RACE_TRACK_IDS } from '../shared/kart/tracks/list.ts'
+import { ALL_RACE_TRACK_IDS } from '../shared/kart/tracks/list.ts'
 import type { CreateRoomResponse } from '../shared/protocol.ts'
 import { Bot, newLedger } from './kart/loadtest-bot.ts'
 import {
@@ -62,7 +62,7 @@ const track = values.track
 const mode = values.mode
 if (!Number.isInteger(bots) || bots < 1 || bots > MAX_RACERS) usage(`--bots must be 1 to ${MAX_RACERS}`)
 if (!Number.isInteger(laps) || laps < 1 || laps > 9) usage('--laps must be 1 to 9')
-if (!(RACE_TRACK_IDS as readonly string[]).includes(track)) usage(`--track must be one of ${RACE_TRACK_IDS.join(', ')}`)
+if (!(ALL_RACE_TRACK_IDS as readonly string[]).includes(track)) usage(`--track must be one of ${ALL_RACE_TRACK_IDS.join(', ')}`)
 if (mode !== 'items' && mode !== 'race') usage('--mode must be items or race')
 const picks = values.karts === undefined ? KART_IDS : values.karts.split(',').filter(isKartId)
 if (picks.length === 0) usage(`--karts must name vehicles: ${KART_IDS.join(', ')}`)

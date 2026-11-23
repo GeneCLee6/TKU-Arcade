@@ -27,7 +27,7 @@ import {
 } from '../../../shared/kart/physics.ts'
 import { formatTime, type Trial } from '../../../shared/kart/timeTrial.ts'
 import type { Track } from '../../../shared/kart/track.ts'
-import { RACE_TRACK_IDS } from '../../../shared/kart/tracks/list.ts'
+import { ALL_RACE_TRACK_IDS } from '../../../shared/kart/tracks/list.ts'
 import type { JsonValue } from '../../../shared/patch.ts'
 import { Button } from '../../components/Button.tsx'
 import { registerMessages } from '../../i18n/t.ts'
@@ -120,8 +120,8 @@ const EMPTY_HUD: SpikeHud = { speed: 0, gauge: 0, storedBoosts: 0, boosting: fal
 const CALLOUT_MS = 900
 /** How often the bots are run up to the clock, ms (as BotRaceView.tsx) */
 const RUN_EVERY_MS = 16
-/** The tracks of the medal wall: every built-in race track */
-const MEDAL_TRACKS = RACE_TRACK_IDS
+/** The tracks of the medal wall: every built-in race track, and (2026-11-23, #131) each reversed */
+const MEDAL_TRACKS = ALL_RACE_TRACK_IDS
 
 /** What the address asks for: ?challenge=<mission> or ?challenge=medal-<track> */
 type Screen =

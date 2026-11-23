@@ -6,15 +6,15 @@
 //
 // Pure and small: the menu imports it for the week's track; the physics stamp (boardStamp.ts) and the
 // checks (boardCheck.ts) are their own files.
-import type { RaceTrackId } from './tracks/list.ts'
+import type { AnyRaceTrackId, RaceTrackId } from './tracks/list.ts'
 import type { DriverId, KartId } from './karts.ts'
 
 /**
- * The tracks with a board: every race track (list.ts's RACE_TRACK_IDS, which a test holds this to),
- * in the menu's order. Written out rather than imported, so that the kart's screens do not split
- * list.ts out of the lobby's chunk, which would grow the site's first screen
+ * The tracks of the week's rotation: every original race track (list.ts's RACE_TRACK_IDS, which a
+ * test holds this to), in the menu's order. Written out rather than imported, so that the kart's
+ * screens do not split list.ts out of the lobby's chunk, which would grow the site's first screen
  */
-export const BOARD_TRACKS: readonly RaceTrackId[] = [
+export const WEEKLY_TRACKS: readonly RaceTrackId[] = [
   'riverside',
   'harbour',
   'tamkang',
@@ -31,7 +31,17 @@ export const BOARD_TRACKS: readonly RaceTrackId[] = [
   'breakwater',
 ]
 
-export const isBoardTrack = (value: unknown): value is RaceTrackId =>
+/**
+ * The tracks with a board: the originals, then (2026-11-23, #131) the reversed tracks, each a board
+ * of its own (list.ts's ALL_RACE_TRACK_IDS, which a test holds this to). The week's rotation stays
+ * on the originals, so that adding the reversed tracks did not move it
+ */
+export const BOARD_TRACKS: readonly AnyRaceTrackId[] = [
+  ...WEEKLY_TRACKS,
+  ...WEEKLY_TRACKS.map((id) => `${id}-rev` as const),
+]
+
+export const isBoardTrack = (value: unknown): value is AnyRaceTrackId =>
   typeof value === 'string' && (BOARD_TRACKS as readonly string[]).includes(value)
 
 /** Rows a board shows to everyone */
@@ -56,8 +66,8 @@ export const boardWeek = (now: number): number => Math.floor((now - FIRST_MONDAY
 /** The featured track of the week `now` falls in: the board tracks in turn */
 export function weeklyTrack(now: number): RaceTrackId {
   const week = boardWeek(now)
-  const count = BOARD_TRACKS.length
-  return BOARD_TRACKS[((week % count) + count) % count]!
+  const count = WEEKLY_TRACKS.length
+  return WEEKLY_TRACKS[((week % count) + count) % count]!
 }
 
 // ── What goes over the wire ──────────────────────────────────────────────────────────────────
@@ -83,7 +93,7 @@ export interface BoardEntry {
 
 /** GET `${BOARD_API}?track=<id>[&nick=<name>]` */
 export interface BoardResponse {
-  readonly track: RaceTrackId
+  readonly track: AnyRaceTrackId
   readonly revision: number
   /** The top BOARD_TOP, fastest first */
   readonly entries: readonly BoardEntry[]

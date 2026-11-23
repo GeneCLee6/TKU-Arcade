@@ -106,6 +106,42 @@ export function circuitRoad(control: readonly CircuitPoint[], sample: number): R
   return points
 }
 
+/**
+ * The grid and the time trial's start for a road that begins at its start and finish line (road
+ * point 0): one row LINE_BACK behind the line, and the old pole's place (TrackJson.solo). The
+ * reversed tracks (reverse.ts) seat theirs with it too
+ */
+export function gridBehindLine(road: readonly RoadPoint[]): { grid: Spot[]; solo: Spot } {
+  const count = road.length
+  let back = LINE_BACK
+  let index = 0
+  for (;;) {
+    const a = road[(index - 1 + count) % count]!
+    const b = road[(index + count) % count]!
+    const span = Math.hypot(b.x - a.x, b.z - a.z)
+    if (span >= back) {
+      const dx = (b.x - a.x) / span
+      const dz = (b.z - a.z) / span
+      const t = back / span
+      // Worked out as it was when it was the pole, to the centimetre
+      const side = LINE_SOLO_ACROSS
+      return {
+        solo: {
+          x: round(b.x - dx * span * t - dz * side),
+          z: round(b.z - dz * span * t + dx * side),
+          heading: Math.round(headingOf({ dx, dz }) * 1e6) / 1e6,
+        },
+        grid: lineGrid(
+          { x: b.x - dx * span * t, z: b.z - dz * span * t, heading: headingOf({ dx, dz }) },
+          Math.min(a.width, b.width),
+        ),
+      }
+    }
+    back -= span
+    index--
+  }
+}
+
 export function circuit(plan: CircuitPlan): Circuit {
   const drawn = circuitRoad(plan.control, plan.sample ?? 6)
   const near = (road: readonly RoadPoint[], x: number, z: number) => {
@@ -144,36 +180,7 @@ export function circuit(plan: CircuitPlan): Circuit {
   }
 
   // One row across the road, LINE_BACK behind the line (2026-11-21, startLine.ts): the pole first
-  let grid: Spot[] = []
-  let solo: Spot = { x: 0, z: 0, heading: 0 }
-  {
-    let back = LINE_BACK
-    let index = 0
-    for (;;) {
-      const a = road[(index - 1 + count) % count]!
-      const b = road[(index + count) % count]!
-      const span = Math.hypot(b.x - a.x, b.z - a.z)
-      if (span >= back) {
-        const dx = (b.x - a.x) / span
-        const dz = (b.z - a.z) / span
-        const t = back / span
-        // Worked out as it was when it was the pole, to the centimetre
-        const side = LINE_SOLO_ACROSS
-        solo = {
-          x: round(b.x - dx * span * t - dz * side),
-          z: round(b.z - dz * span * t + dx * side),
-          heading: Math.round(headingOf({ dx, dz }) * 1e6) / 1e6,
-        }
-        grid = lineGrid(
-          { x: b.x - dx * span * t, z: b.z - dz * span * t, heading: headingOf({ dx, dz }) },
-          Math.min(a.width, b.width),
-        )
-        break
-      }
-      back -= span
-      index--
-    }
-  }
+  const { grid, solo } = gridBehindLine(road)
 
   // The island: along both its edges, closed by a pointed nose one road point beyond each end,
   // in the middle of it, so that a kart meeting it head-on glances off into a lane

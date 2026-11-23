@@ -8,6 +8,7 @@
 // No three.js here at runtime: this module is light, and may be imported by a page that has not
 // fetched the engine yet (the loading screen, the waiting room's prefetch).
 import type { Track } from '../../../shared/kart/track.ts'
+import { forwardId } from '../../../shared/kart/tracks/reverseId.ts'
 
 type HarbourArt = typeof import('./harbourArt.ts')
 type TamkangArt = typeof import('./tamkangArt.ts')
@@ -88,7 +89,7 @@ const loaded = new Map<string, TrackScenery>()
 const loading = new Map<string, Promise<TrackScenery>>()
 
 /** Whether `track` has a quarter to fetch at all */
-export const hasOwnScenery = (track: Pick<Track, 'id'>): boolean => track.id in LOADERS
+export const hasOwnScenery = (track: Pick<Track, 'id'>): boolean => forwardId(track.id) in LOADERS
 
 /**
  * Fetches `track`'s own scenery, once; a failed fetch (the network) is forgotten, so that asking
@@ -97,27 +98,30 @@ export const hasOwnScenery = (track: Pick<Track, 'id'>): boolean => track.id in 
 export function loadTrackScenery(track: Pick<Track, 'id'>): Promise<TrackScenery> {
   const done = loadedScenery(track)
   if (done) return Promise.resolve(done)
-  const load = LOADERS[track.id]
-  let pending = loading.get(track.id)
+  // A reversed track (2026-11-23) stands in its original's quarter
+  const id = forwardId(track.id)
+  const load = LOADERS[id]
+  let pending = loading.get(id)
   if (!pending && load) {
     pending = load().then(
       (scenery) => {
-        loaded.set(track.id, scenery)
-        loading.delete(track.id)
+        loaded.set(id, scenery)
+        loading.delete(id)
         return scenery
       },
       (error: unknown) => {
-        loading.delete(track.id)
+        loading.delete(id)
         throw error
       },
     )
-    loading.set(track.id, pending)
+    loading.set(id, pending)
   }
   return pending ?? Promise.resolve(NONE)
 }
 
 /** `track`'s scenery if it is here: at once for a track with none of its own; null while it is not */
 export function loadedScenery(track: Pick<Track, 'id'>): TrackScenery | null {
-  if (!(track.id in LOADERS)) return NONE
-  return loaded.get(track.id) ?? null
+  const id = forwardId(track.id)
+  if (!(id in LOADERS)) return NONE
+  return loaded.get(id) ?? null
 }

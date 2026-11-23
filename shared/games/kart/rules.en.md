@@ -36,6 +36,10 @@ Some tracks (**Wharf Warehouses**, **Hillside Lanes**, **Viaduct Works**, **Brea
 
 **Expert** computer karts take these shortcuts; the Easy, Normal and Hard ones keep to the long way round. Hard and Expert ones fire perfect instant boosts and keep the combo going. On the Kart page, `?autopilot=master` shows a driver who takes every shortcut; `?autopilot=expert` drives the same track well without knowing it.
 
+## Reverse tracks
+
+Every track can also be raced the other way round: pick one marked **(Reverse)** on any track menu (time trial, computer karts, Grand Prix, a race room). Same ground and scenery, the start line where it was, the grid on its far side. Each jump is turned round where it stands, its ramp now on the side you come from. The shortcuts you fly into from a ramp (the high platforms and the Viaduct Works' loading deck) are closed the other way round; the other branches are open, entered from where they used to end. A reversed track keeps its own records, ghosts, leaderboard and medals. The **Reverse Cup** in the Grand Prix runs four of them.
+
 ## Modes
 
 - **Item race**: item boxes on the road. Drive through one to draw an item, by your place: the further back, the stronger. Use it with the item key. You hold one item at a time.

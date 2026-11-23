@@ -50,6 +50,8 @@ import {
   trackTextures,
   type TrackTextures,
 } from './textures.ts'
+import { forwardId } from '../../../shared/kart/tracks/reverseId.ts'
+import { raceTrack } from '../../../shared/kart/tracks/registry.ts'
 
 /** How much the art does: set by the quality option (quality.ts) */
 export interface ArtLevel {
@@ -306,13 +308,18 @@ export function buildTrackArt(
   if (!features) console.error(`kart: ${track.id}'s parts were not loaded before its scene`)
   const parts: TrackFeatures = features ?? {}
   const quarter: TrackScenery = scenery ?? {}
-  const harbourArt = track.id === 'harbour' ? (quarter.harbour ?? null) : null
+  // A reversed track (2026-11-23) stands on its original's ground, dressed the same: the quarters
+  // laid out along the road (a town, a campus, a market street) are laid along the original's,
+  // whose road runs the way they were placed by (`groundTrack`)
+  const look = forwardId(track.id)
+  const groundTrack: Track = look !== track.id ? (raceTrack(look) ?? track) : track
+  const harbourArt = look === 'harbour' ? (quarter.harbour ?? null) : null
   const harbour = harbourArt !== null
   // The campus on its hilltop (2026-11-14): its own ground, falling away beyond the campus
-  const tamkangArt = track.id === 'tamkang' ? (quarter.tamkang ?? null) : null
+  const tamkangArt = look === 'tamkang' ? (quarter.tamkang ?? null) : null
   const tamkang = tamkangArt !== null
   // N2's item track: a night market by the river (oldStreetArt.ts)
-  const oldStreetArt = track.id === 'oldstreet' ? (quarter.oldStreet ?? null) : null
+  const oldStreetArt = look === 'oldstreet' ? (quarter.oldStreet ?? null) : null
   const oldStreet = oldStreetArt !== null
   const geometries: BufferGeometry[] = []
   const materials: Material[] = []
@@ -357,14 +364,14 @@ export function buildTrackArt(
   }
 
   // 2026-11-18: the four technical tracks' own scenery (localArt.ts); null for any other track
-  const local = quarter.local ? quarter.local.plan.localPlan(track, level.density) : null
+  const local = quarter.local ? quarter.local.plan.localPlan(groundTrack, level.density) : null
   // 2026-11-22: Guanyin Hill Road's own (guanyinArt.ts); its river keeps the far hills out of it
   const guanyinPlan =
-    track.id === 'guanyin' && quarter.guanyin ? quarter.guanyin.guanyinPlan(track) : null
+    look === 'guanyin' && quarter.guanyin ? quarter.guanyin.guanyinPlan(groundTrack) : null
   // 2026-11-20: the three tracks to learn by heart, dressed (skillWalls.ts, wharfArt.ts, lanesArt.ts,
   // worksArt.ts) and their technical places shown (skillCues.ts)
   const skillArt = quarter.skill ?? null
-  const skillStyle = skillArt ? skillArt.walls.skillStyleOf(track.id) : null
+  const skillStyle = skillArt ? skillArt.walls.skillStyleOf(look) : null
   // 2026-11-22: the harbour's and the old street's step and alley are shown too (cues only)
   const skillRuns = skillArt ? skillArt.walls.wallRuns(track.walls, groundAt) : []
   const skillSlots = skillArt ? skillArt.walls.findSlots(skillRuns) : []
@@ -482,7 +489,7 @@ export function buildTrackArt(
     ? standard(kartScene.fence)
     : null
   const shedMaterial = fenceMaterial
-    ? track.id === 'wharf'
+    ? look === 'wharf'
       ? standard(kartScene.container)
       : standard(kartScene.yardWall, textures.brick)
     : null
@@ -547,7 +554,7 @@ export function buildTrackArt(
   }
 
   // ── Scenery ──
-  const river = track.id === 'riverside' ? { minX: box.minX - 120, maxX: box.minX - 42 } : null
+  const river = look === 'riverside' ? { minX: box.minX - 120, maxX: box.minX - 42 } : null
   const inRiver = (x: number) => river !== null && x > river.minX - 6 && x < river.maxX + 6
   const reach = {
     minX: box.minX - 160,
@@ -943,7 +950,7 @@ export function buildTrackArt(
   // ── The harbour: its sea, quay, breakwaters, lighthouse, boats and hillside town ──
   const harbourScenery = harbour
     ? harbourArt.buildHarbour({
-        track,
+        track: groundTrack,
         level,
         group,
         textures,
@@ -959,7 +966,7 @@ export function buildTrackArt(
   // ── The campus: its hillside, landmarks, town, river and mountain ──
   const tamkangScenery = tamkang
     ? tamkangArt.buildTamkang({
-        track,
+        track: groundTrack,
         level,
         group,
         textures,
@@ -975,7 +982,7 @@ export function buildTrackArt(
   // ── The old street: its river, stalls, lanterns, shophouses and temple ──
   const oldStreetScenery = oldStreet
     ? oldStreetArt.buildOldStreet({
-        track,
+        track: groundTrack,
         level,
         group,
         textures,
@@ -990,7 +997,7 @@ export function buildTrackArt(
 
   // ── The Viaduct Works (2026-11-20): sheds, chimneys, the elevated line, the deck's piers ──
   const skillKit = { track, level, group, textures, keep, own, ownTexture, standard, shadowed, place }
-  const worksScenery = track.id === 'works' && quarter.works ? quarter.works.buildWorks(skillKit, groundAt) : null
+  const worksScenery = look === 'works' && quarter.works ? quarter.works.buildWorks(skillKit, groundAt) : null
   // ── The tracks to learn by heart (2026-11-20): their walls, their own quarters, their cues ──
   const wharfScenery = wharfLayout && quarter.wharf ? quarter.wharf.buildWharf(skillKit, wharfLayout) : null
   if (lanesLayout && quarter.lanes) {

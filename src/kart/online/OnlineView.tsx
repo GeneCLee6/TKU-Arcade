@@ -9,7 +9,7 @@ import { BOT_LEVELS, type BotLevel } from '../../../shared/games/kart/bots.ts'
 import { weeklyTrack } from '../../../shared/kart/board.ts'
 import { KART_ONLINE_MESSAGES } from '../../../shared/kart/i18n.online.ts'
 import { KART_MESSAGES, type KartMessageKey } from '../../../shared/kart/i18n.ts'
-import { RACE_TRACK_IDS, type RaceTrackId } from '../../../shared/kart/tracks/list.ts'
+import { ALL_RACE_TRACK_IDS, type AnyRaceTrackId } from '../../../shared/kart/tracks/list.ts'
 import type { RoomListing } from '../../../shared/protocol.ts'
 import { MAX_ROOM_NAME_CHARS, normalizeRoomName, roomNameIssue } from '../../../shared/roomName.ts'
 import { Button } from '../../components/Button.tsx'
@@ -102,7 +102,7 @@ export default function OnlineView({ onExit }: { onExit: () => void }) {
   const navigate = useNavigate()
   const list = useKartRooms()
   const age = useAge(list.at)
-  const [weekly] = useState<RaceTrackId>(() => weeklyTrack(Date.now()))
+  const [weekly] = useState<AnyRaceTrackId>(() => weeklyTrack(Date.now()))
   const nick = readNickname()
   const ids = { bots: useId(), level: useId(), show: useId(), mode: useId(), locked: useId() }
 
@@ -305,8 +305,8 @@ function RoomRow({ t, room, onGo }: { t: T; room: RoomListing; onGo: () => void 
   const title = room.name ?? t('kart.online.room.unnamed', { host: room.host })
   const track = typeof room.options?.track === 'string' ? room.options.track : null
   const trackName =
-    track && (RACE_TRACK_IDS as readonly string[]).includes(track)
-      ? t(`kart.course.${track as RaceTrackId}`)
+    track && (ALL_RACE_TRACK_IDS as readonly string[]).includes(track)
+      ? t(`kart.course.${track as AnyRaceTrackId}`)
       : t('kart.online.room.custom')
   const mode = room.options?.mode === 'race' ? 'race' : 'items'
   const teams = room.options?.teams === 'teams' ? 'teams' : 'solo'
@@ -369,14 +369,14 @@ function CreateForm({
 }: {
   t: T
   nick: string | null
-  weekly: RaceTrackId
+  weekly: AnyRaceTrackId
   busy: boolean
   onCancel: () => void
   onCreate: (ask: { options: Record<string, string | number>; public: boolean; name?: string }) => void
 }) {
   const ids = { name: useId(), track: useId(), mode: useId(), teams: useId(), issue: useId() }
   const [name, setName] = useState('')
-  const [track, setTrack] = useState<RaceTrackId>(weekly)
+  const [track, setTrack] = useState<AnyRaceTrackId>(weekly)
   const [mode, setMode] = useState('items')
   const [teams, setTeams] = useState('solo')
   // From "Invite friends": private unless asked (2026-11-23); quick join's rooms are the public ones
@@ -420,8 +420,8 @@ function CreateForm({
       <Fields>
         <Field>
           <label htmlFor={ids.track}>{t('kart.online.create.track')}</label>
-          <select id={ids.track} value={track} onChange={(event) => setTrack(event.target.value as RaceTrackId)}>
-            {RACE_TRACK_IDS.map((one) => (
+          <select id={ids.track} value={track} onChange={(event) => setTrack(event.target.value as AnyRaceTrackId)}>
+            {ALL_RACE_TRACK_IDS.map((one) => (
               <option key={one} value={one}>
                 {t(`kart.course.${one}`)}
                 {one === weekly ? ` · ${t('kart.online.create.weekly')}` : ''}

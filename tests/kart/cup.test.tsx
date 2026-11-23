@@ -119,7 +119,10 @@ describe('the cups', () => {
       'rivermouth',
       'flood',
       'backstreet',
+      'reverse',
     ])
+    // 2026-11-23 (#131): four tracks the other way round
+    expect(cupOf('reverse').tracks).toEqual(['riverside-rev', 'mangrove-rev', 'fort-rev', 'zhuwei-rev'])
     // 2026-11-18: the four technical tracks, the expert's last
     expect(cupOf('flood').tracks).toEqual(['mangrove', 'danhai', 'fort', 'datun'])
     // 2026-11-19: the tracks with a way round for those who know them
@@ -307,7 +310,7 @@ describe('the cup’s screens', () => {
       within(screen.getByTestId('kart-cup-cup'))
         .getAllByRole('option')
         .map((option) => option.getAttribute('value')),
-    ).toEqual(['ebb', 'hill', 'rivermouth', 'flood', 'backstreet'])
+    ).toEqual(['ebb', 'hill', 'rivermouth', 'flood', 'backstreet', 'reverse'])
     fireEvent.change(screen.getByTestId('kart-cup-cup'), { target: { value: 'rivermouth' } })
     fireEvent.change(screen.getByTestId('kart-cup-count'), { target: { value: '7' } })
     fireEvent.click(screen.getByTestId('kart-cup-start'))

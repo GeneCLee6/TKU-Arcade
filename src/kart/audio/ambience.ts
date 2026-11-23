@@ -5,6 +5,7 @@
 // (no recordings).
 import type { RaceTrackId } from '../../../shared/kart/tracks/list.ts'
 import type { TrackThemeName } from '../../../shared/kart/track.ts'
+import { forwardId } from '../../../shared/kart/tracks/reverseId.ts'
 
 /**
  * - `surf`: waves breaking, a swell every few seconds
@@ -60,7 +61,7 @@ const THEME_AMBIENCE: Record<TrackThemeName, AmbienceRecipe> = {
 }
 
 export function ambienceFor(track: { readonly id: string; readonly theme?: TrackThemeName }): AmbienceRecipe {
-  const own = (TRACK_AMBIENCE as Record<string, AmbienceRecipe | undefined>)[track.id]
+  const own = (TRACK_AMBIENCE as Record<string, AmbienceRecipe | undefined>)[forwardId(track.id)]
   return own ?? THEME_AMBIENCE[track.theme ?? 'day']
 }
 
