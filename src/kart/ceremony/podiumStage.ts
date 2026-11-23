@@ -30,8 +30,8 @@ import { releaseSharedTextures } from '../art/sharedTextures.ts'
 import { buildKartEnvironment } from '../art/kartParts.ts'
 import { buildKartModel, type KartModel } from '../art/kartModel.ts'
 import {
-  PODIUM_GESTURE,
   podiumCamera,
+  podiumGesture,
   revealed,
   STEP_HEIGHT,
   STEP_X,
@@ -171,7 +171,9 @@ export function createPodiumStage(
     () => {
       if (disposed) return
       for (const entry of entries) {
-        const model = buildKartModel(false, false, entry.kart, entry.driver, { environment })
+        const model = buildKartModel(false, false, entry.kart, entry.driver, { environment }, {
+          ...(entry.outfit ? { outfit: entry.outfit } : {}),
+        })
         model.group.position.set(STEP_X[entry.place], STEP_HEIGHT[entry.place], 0)
         // Facing the camera (a kart faces -z)
         model.group.rotation.y = Math.PI + (STEP_X[entry.place] === 0 ? 0 : -Math.sign(STEP_X[entry.place]) * 0.25)
@@ -227,12 +229,11 @@ export function createPodiumStage(
     }
     for (const { model, place } of models) {
       const up = revealed(place, seconds, still)
-      model.update(
-        { speed: 0, steer: 0, drift: 0, boosting: false, gesture: up ? PODIUM_GESTURE[place] : 'idle' },
-        step,
-      )
+      const gesture = up ? podiumGesture(place, seconds) : 'idle'
+      model.update({ speed: 0, steer: 0, drift: 0, boosting: false, gesture }, step)
+      // The cup while it is held up; then (§3.3) put down for the winner's own win
       const cup = model.group.getObjectByName('trophy')
-      if (cup) cup.visible = up
+      if (cup) cup.visible = gesture === 'trophy'
     }
     renderer.render(scene, camera)
   }

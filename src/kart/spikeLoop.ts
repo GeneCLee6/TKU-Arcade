@@ -1,4 +1,6 @@
 import { TEST_ARENA } from '../../shared/kart/arena.ts'
+import type { OutfitId } from '../../shared/kart/outfits.ts'
+import { loadOutfit } from './bodies.ts'
 import type { KartTelemetry } from '../../shared/protocol.ts'
 import {
   finishRecording,
@@ -54,6 +56,7 @@ import {
   type TrialPhase,
 } from '../../shared/kart/timeTrial.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
+import { testClock } from './testClock.ts'
 import { obstaclesOf } from '../../shared/kart/obstacles.ts'
 import { obstacleCues } from './obstacleCues.ts'
 import { startRun, stepRun, type Run, type Spot } from '../../shared/kart/course.ts'
@@ -428,6 +431,8 @@ export interface SpikeOptions {
   readonly body?: KartBody
   /** e10-t05b: who sits in it, looks only */
   readonly driver?: DriverId
+  /** 2026-11-23 (shared/kart/outfits.ts): what the driver wears; left out, what this browser keeps */
+  readonly outfit?: OutfitId
   /** Every frame, where the car is: the minimap moves its marker with it, outside React */
   readonly onPose?: (x: number, z: number, heading: number, nextGate: number, tick?: number) => void
   /** 2026-11-17: which ghost races along: the track's overall best (the default), this kart's, none */
@@ -626,6 +631,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     options.quality,
     options.body,
     options.driver,
+    // 2026-11-23 (shared/kart/outfits.ts): what the driver wears, as picked in the garage
+    options.outfit ?? loadOutfit(options.driver ?? DEFAULT_DRIVER),
   )
   // 2026-11-22: a bike's own engine, and as much sound as the quality has (audio/tiers.ts)
   const audio = createKartAudio({ quality: options.quality, kind: kartKind(kartId) })
@@ -713,6 +720,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
 
   let firstFrameAt: number | null = null
   let loadMs = 0
+  // 2026-11-23 (QA follow-up): a browser test's clock in place of the wall's (testClock.ts); null
+  // whenever no test asked for it
+  const manual = testClock()
   const frame = (now: number) => {
     handle = requestAnimationFrame(frame)
     const workFrom = performance.now()
@@ -748,10 +758,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       itemTapped = false
       throttleTapped = false
     }
-    const clock = advanceClock(accumulator, frameMs / 1000)
+    const clock = manual
+      ? { steps: paused ? 0 : manual.take(), accumulator: 0, alpha: 1 }
+      : advanceClock(accumulator, frameMs / 1000)
     accumulator = clock.accumulator
     let callout: Callout | undefined
-    for (let step = 0; step < clock.steps; step++) {
+    let ran = 0
+    while (ran < clock.steps) {
       const pilot = net?.autopilot ?? options.autopilot
       const driven = pilot && trial ? pilot(trial) : null
       const keyed = enabled
@@ -929,9 +942,11 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       }
       feats?.(step)
       options.onStep?.(step)
+      ran++
+      if (manual?.stepped(run.kart, input)) break
     }
     const current = run.kart
-    debug.tick += clock.steps
+    debug.tick += ran
     debug.frames++
     debug.state = current
     debug.gamepad = pad?.id

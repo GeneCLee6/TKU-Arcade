@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import styled from 'styled-components'
 import type { FullPending, PromotionAction } from '../../../../shared/games/promotion/types.ts'
 import { Button } from '../../../components/Button.tsx'
@@ -9,6 +9,12 @@ import type { RoomTimer } from '../../../lib/roomConnection.ts'
 import { promotionBoard } from '../../../styles/promotionTokens.ts'
 import { color, fontSize, radius, space } from '../../../styles/tokens.ts'
 import { anyCell, shortCellName } from './fullText.ts'
+import type { FullLayout } from './fullLayout.ts'
+import type { SquareLayout } from './fullSquare.ts'
+
+/** The least room inside the square board's outer ring for the card to go there */
+const PROMPT_MIN_W = 300
+const PROMPT_MIN_H = 150
 
 /** Where an offered post leads, in a few words: the copyists, the banner school, the summons */
 const routeOf = (cell: string) => {
@@ -32,8 +38,9 @@ export function DecisionPrompt({
   timer,
   waiting,
   onAnswer,
-  top = false,
-  area = null,
+  layout,
+  box,
+  scale,
 }: {
   pending: FullPending
   /** This viewer is the one deciding */
@@ -46,11 +53,29 @@ export function DecisionPrompt({
   /** An answer was sent and the room has not replied yet */
   waiting: boolean
   onAnswer(action: PromotionAction): void
-  /** Over the top of the board rather than its foot: the cell it is about is in the lower half */
-  top?: boolean
-  /** In the middle of this box instead (CSS pixels in the board's box): inside the square board's outer ring */
-  area?: { x: number; y: number; width: number; height: number } | null
+  /**
+   * Where the board is drawn, to place the card (2026-11-23: worked out here rather than by the screen,
+   * out of the first screen): the board's layout, the box it is drawn in (null when zoomed in) and its
+   * scale. Over the top of the board rather than its foot when the cell it is about is in the lower
+   * half; on the square board, inside the outer ring (where every cell that asks is) if it has room
+   */
+  layout: FullLayout | null
+  box: { width: number; height: number } | null
+  scale: number
 }) {
+  const pendingBox = layout?.byId.get(pending.cell)
+  const top = !!layout && !!pendingBox && pendingBox.y + pendingBox.height / 2 > layout.height / 2
+  const area = useMemo(() => {
+    if (!layout || !box || !('square' in layout)) return null
+    const { inner } = (layout as SquareLayout).square
+    const room = {
+      x: (box.width - layout.width * scale) / 2 + inner.x * scale,
+      y: (box.height - layout.height * scale) / 2 + inner.y * scale,
+      width: inner.width * scale,
+      height: inner.height * scale,
+    }
+    return room.width >= PROMPT_MIN_W && room.height >= PROMPT_MIN_H ? room : null
+  }, [layout, box, scale])
   const t = useT()
   const language = useLanguage()
   const titleId = useId()

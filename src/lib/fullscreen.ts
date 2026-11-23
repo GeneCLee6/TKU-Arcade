@@ -12,7 +12,10 @@
 // Esc: in real full screen the browser takes Esc and leaves full screen itself; the page hears of it
 // (`fullscreenchange`) and every reader of this state follows. Where the browser lets a page keep Esc
 // while full screen (Chrome and Edge on a computer, Keyboard Lock), it is kept, so that the race's
-// Esc opens its pause menu first and holding Esc still leaves. Focus mode has no browser to leave it:
+// Esc opens its pause menu first and holding Esc still leaves. Firefox and Safari have no Keyboard
+// Lock and do not tell the page which key it was: full screen left by the browser rather than by the
+// page (`onBrowserExit`, 2026-11-23) is taken for that Esc, and the race opens its menu then, so that
+// the first Esc does the same everywhere. Focus mode has no browser to leave it:
 // Esc leaves it here, unless a dialog is open or a screen took that Esc itself (preventDefault).
 //
 // Tiny and without React's heavier parts: every room's first screen carries it (docs/ARCHITECTURE.md).
@@ -85,6 +88,11 @@ function keepEscape(on: boolean): void {
   }
 }
 
+/** The browser's full screen, as last heard; and whether the page itself is the one leaving it */
+let shownLast = false
+let leaving = false
+const BROWSER_EXIT = 'tku-arcade-fullscreen-browser-exit'
+
 let listening = false
 function listen(): void {
   if (listening || typeof document === 'undefined') return
@@ -92,7 +100,12 @@ function listen(): void {
   const onChange = () => {
     const on = fullscreenElement() !== null
     // Out of the browser's full screen (its own Esc, a swipe, the F11 key): no lock left behind
-    if (!on) keepEscape(false)
+    if (!on) {
+      keepEscape(false)
+      if (shownLast && !leaving) window.dispatchEvent(new Event(BROWSER_EXIT))
+      leaving = false
+    }
+    shownLast = on
     changed()
   }
   document.addEventListener('fullscreenchange', onChange)
@@ -112,6 +125,7 @@ function listen(): void {
 export async function enterFullscreen(): Promise<FullscreenMode> {
   listen()
   if (fullscreenElement() !== null) return 'fullscreen'
+  leaving = false
   const root = document.documentElement as HTMLElement & PrefixedElement
   try {
     if (!canFullscreen()) throw new Error('no fullscreen')
@@ -131,6 +145,7 @@ export function exitFullscreen(): void {
   setFocus(false)
   keepEscape(false)
   if (fullscreenElement() === null) return
+  leaving = true
   try {
     const document_ = prefixed()
     const leaving = document.exitFullscreen ? document.exitFullscreen() : document_.webkitExitFullscreen?.()
@@ -146,6 +161,17 @@ export async function toggleFullscreen(): Promise<FullscreenMode> {
     return 'off'
   }
   return enterFullscreen()
+}
+
+/**
+ * Calls `listener` when the browser's full screen ends without the page asking: its Esc where the
+ * page cannot keep that key (Firefox, Safari), a swipe, F11. The race opens its menu then (PauseLayer).
+ * Returns the undo
+ */
+export function onBrowserExit(listener: () => void): () => void {
+  listen()
+  window.addEventListener(BROWSER_EXIT, listener)
+  return () => window.removeEventListener(BROWSER_EXIT, listener)
 }
 
 export function subscribeFullscreen(listener: () => void): () => void {

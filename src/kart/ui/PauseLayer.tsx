@@ -17,7 +17,7 @@ import { color, fontSize, space } from '../../styles/tokens.ts'
 import { duckKartBus } from '../audio/bus.ts'
 import { loadBindings, loadRules, saveBindings, saveRules } from '../devices.ts'
 import { pauseRace, resumeRace } from '../race/raceClock.ts'
-import { exitFullscreen, useFullscreenMode } from '../../lib/fullscreen.ts'
+import { exitFullscreen, onBrowserExit, useFullscreenMode } from '../../lib/fullscreen.ts'
 import { broadcastSolid, ticker } from './broadcast.ts'
 import type { Bindings } from '../../../shared/kart/input.ts'
 import type { KartRules } from '../../../shared/kart/physics.ts'
@@ -180,10 +180,15 @@ export function PauseLayer({
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener(OPEN_EVENT, onOpen)
+    // 2026-11-23 (QA follow-up): full screen left by the browser, not from this page: in Firefox and
+    // Safari that is the first Esc, which the page never hears of (no Keyboard Lock). The menu opens as
+    // that Esc would have opened it in Chrome, which keeps the key for the page (src/lib/fullscreen.ts)
+    const offExit = onBrowserExit(onOpen)
     frame = requestAnimationFrame(poll)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener(OPEN_EVENT, onOpen)
+      offExit()
       cancelAnimationFrame(frame)
     }
   }, [enabled, toggle, show])

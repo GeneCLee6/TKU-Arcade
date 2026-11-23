@@ -79,6 +79,13 @@ export interface GesturePose {
   readonly leftLift: number
   readonly rightLift: number
   readonly stance: number
+  /**
+   * 2026-11-23 (docs/KART-WORLD.md §3.3, the wins of their own): how much of the driver's prop shows,
+   * 0 to 1 (driverLooks.ts's DriverProp: Dee's calculator, Clover's dumbbell); and how far a thrown
+   * kiss's hearts have flown, 0 (none) to 1 (gone: `heartFlight`)
+   */
+  readonly prop: number
+  readonly burst: number
   /** What each hand shows off the wheel (driverLimbs.ts); left out, a fist seated, at ease standing */
   readonly leftHand?: HandShape
   readonly rightHand?: HandShape
@@ -105,6 +112,8 @@ export const REST: GesturePose = {
   leftLift: 0,
   rightLift: 0,
   stance: 0,
+  prop: 0,
+  burst: 0,
 }
 
 /**
@@ -192,96 +201,145 @@ function idleOf(style: GestureStyle | undefined, t: number, phase: number): Gest
   }
 }
 
+/** A key of a showpiece: from this many seconds in, this pose (the rest at rest) */
+type Key = readonly [number, Partial<GesturePose>]
+
+const smoothShare = (share: number) => {
+  const s = Math.max(0, Math.min(1, share))
+  return s * s * (3 - 2 * s)
+}
+
+/**
+ * The pose `t` seconds into a run of keys: eased from each key to the next, held at the last; each
+ * hand's shape changes halfway between two keys
+ */
+export function keyed(t: number, keys: readonly Key[]): GesturePose {
+  let index = 0
+  while (index < keys.length - 1 && t >= keys[index + 1]![0]) index++
+  const [at, pose] = keys[index]!
+  const from: GesturePose = { ...REST, ...pose }
+  const next = keys[index + 1]
+  if (!next || t <= at) return from
+  const to: GesturePose = { ...REST, ...next[1] }
+  const share = smoothShare((t - at) / (next[0] - at))
+  const { leftHand: _left, rightHand: _right, ...numbers } = blendPose(from, to, share)
+  const hands = share < 0.5 ? from : to
+  return {
+    ...numbers,
+    ...(hands.leftHand ? { leftHand: hands.leftHand } : {}),
+    ...(hands.rightHand ? { rightHand: hands.rightHand } : {}),
+  }
+}
+
+/**
+ * 2026-11-23 (docs/KART-WORLD.md §3.3; owner: "a victory animation of each one's own"): how long each
+ * driver's win takes to play through, s; then it holds its last pose, alive. Across the line, on the
+ * podium and on Ready in the race room
+ */
+export const SHOWPIECE_SECONDS = 3.2
+
+// Spade draws a sword that is not there: the right hand to the left hip, a sweep out and up, and the
+// finger pointed straight at the sky, the left fist on the hip, the weight forward
+const SPADE_WIN: readonly Key[] = [
+  [0, {}],
+  [0.35, { rightUp: 0.55, rightOut: -0.75, rightBend: 1.3, leftUp: 0.25, leftOut: 0.35, leftBend: 1.2, twist: 0.28, headTurn: 0.35, headUp: -0.15, hipDrop: 0.04, rightHand: 'fist', leftHand: 'open' }],
+  [0.6, { rightUp: 0.6, rightOut: -0.8, rightBend: 1.35, leftUp: 0.25, leftOut: 0.35, leftBend: 1.2, twist: 0.34, headTurn: 0.4, headUp: -0.18, hipDrop: 0.05, rightHand: 'fist', leftHand: 'open' }],
+  [0.9, { rightUp: 1.7, rightOut: 1.05, rightBend: 0.15, leftUp: 0.3, leftOut: 0.5, leftBend: 1.5, twist: -0.18, headTurn: -0.25, headUp: 0.1, leftStep: 0.08, rightHand: 'fist', leftHand: 'fist' }],
+  [1.25, { rightUp: 2.95, rightOut: 0.08, leftUp: 0.35, leftOut: 0.6, leftBend: 1.65, headUp: 0.38, headTurn: 0.05, torsoBack: 0.12, leftStep: 0.16, hipShift: -0.03, rightHand: 'point', leftHand: 'fist' }],
+]
+
+// Hartie blows a kiss: a hand to the visor's chin, thrown out to the crowd (the hearts fly from it),
+// then both hands in a heart over the helmet, swaying, hopping
+const HEART_RAISED: Partial<GesturePose> = { leftUp: 2.55, rightUp: 2.55, leftOut: 0.95, rightOut: 0.95, leftBend: 1.25, rightBend: 1.25, headUp: 0.2, torsoBack: 0.1, leftHand: 'open', rightHand: 'open' }
+const HEART_WIN: readonly Key[] = [
+  [0, {}],
+  [0.4, { rightUp: 1.75, rightOut: -0.2, rightBend: 2.1, headTilt: 0.18, headUp: 0.05, twist: 0.06, rightHand: 'open', leftHand: 'relax' }],
+  [0.62, { rightUp: 1.8, rightOut: -0.2, rightBend: 2.15, headTilt: 0.24, headUp: 0.08, twist: 0.08, rightHand: 'open', leftHand: 'relax' }],
+  [0.85, { rightUp: 2.1, rightOut: 1.0, rightBend: 0.15, twist: -0.12, torsoBack: 0.1, headUp: 0.2, headTilt: -0.1, rightStep: 0.1, leftUp: 0.4, leftOut: 0.3, leftBend: 0.6, rightHand: 'open', leftHand: 'open' }],
+  [1.5, { rightUp: 2.15, rightOut: 1.05, rightBend: 0.1, twist: -0.12, torsoBack: 0.1, headUp: 0.22, headTilt: -0.12, rightStep: 0.1, leftUp: 0.45, leftOut: 0.3, leftBend: 0.6, rightHand: 'open', leftHand: 'open' }],
+  [1.95, HEART_RAISED],
+]
+/** When Hartie's kiss is thrown, and how long its hearts fly, s */
+export const KISS_AT = 0.78
+export const KISS_FLIGHT = 1.7
+
+// Dee pushes the visor up its bridge with one finger, brings a calculator up and taps it (the line was
+// right), then holds it up and shows a V
+const DEE_SUM: Partial<GesturePose> = { leftUp: 1.2, leftOut: 0.15, leftBend: 1.35, prop: 1, rightUp: 1.15, rightOut: 0.3, rightBend: 1.4, headUp: -0.22, headTurn: -0.1, leftHand: 'grip', rightHand: 'point' }
+const DIAMOND_WIN: readonly Key[] = [
+  [0, {}],
+  [0.35, { rightUp: 2.0, rightOut: -0.35, rightBend: 2.25, headUp: 0.02, rightHand: 'point', leftHand: 'relax' }],
+  [0.6, { rightUp: 2.15, rightOut: -0.35, rightBend: 2.1, headUp: 0.16, rightHand: 'point', leftHand: 'relax' }],
+  [1.0, DEE_SUM],
+  [1.9, DEE_SUM],
+  [2.3, { leftUp: 1.45, leftOut: 0.15, leftBend: 1.25, prop: 1, rightUp: 2.25, rightOut: 0.35, rightBend: 0.55, vSign: 1, headUp: 0.12, headTilt: -0.18, headTurn: -0.2, hipShift: -0.035, rightLift: 0.12, rightStep: -0.12, leftHand: 'grip', rightHand: 'vee' }],
+]
+
+// Clover curls a dumbbell twice, presses it overhead, puts it away and flexes both arms, roaring
+const CLOVER_CURL: Partial<GesturePose> = { rightUp: 0.35, rightOut: 0.1, rightBend: 0.2, prop: 1, stance: 0.1, hipDrop: 0.03, leftUp: 0.6, leftOut: 0.4, leftBend: 1.6, headUp: 0.05, rightHand: 'grip', leftHand: 'fist' }
+const CLOVER_PRESS: Partial<GesturePose> = { rightUp: 2.9, rightOut: 0.05, prop: 1, leftUp: 1.55, leftOut: 1.35, leftBend: 1.6, stance: 0.12, hipDrop: 0.02, headUp: 0.25, torsoBack: 0.08, rightHand: 'grip', leftHand: 'fist' }
+const CLOVER_WIN: readonly Key[] = [
+  [0, {}],
+  [0.3, CLOVER_CURL],
+  [1.2, CLOVER_CURL],
+  [1.5, CLOVER_PRESS],
+  [1.9, CLOVER_PRESS],
+  [2.25, { leftUp: 1.55, rightUp: 1.55, leftOut: 1.35, rightOut: 1.35, leftBend: 1.5, rightBend: 1.5, headUp: 0.28, torsoBack: 0.12, stance: 0.12, hipDrop: 0.05, leftHand: 'fist', rightHand: 'fist' }],
+]
+/** Clover's curls: from, to, how many, s */
+const CURLS = [0.3, 1.2, 2] as const
+
+/**
+ * Each driver's win, `t` seconds in (2026-11-23: their showpiece, `SHOWPIECE_SECONDS` long, then held
+ * and alive); left out, both arms up and shaking
+ */
 function cheerOf(style: GestureStyle | undefined, t: number, phase: number): GesturePose {
   switch (style) {
     case 'spade': {
-      // One fist straight up, held, punching; the other arm points down the road; a nod
-      const rise = riseOf(t, 0.25)
-      const punch = Math.max(0, Math.sin(t * 3.2)) * 0.12
+      const pose = keyed(t, SPADE_WIN)
+      // Held: a breath, the finger pushing at the sky
+      const held = smoothShare((t - 1.25) / 0.3)
       return {
-        ...REST,
-        rightUp: (2.75 + punch) * rise,
-        rightOut: 0.15 * rise,
-        leftUp: 1.45 * rise,
-        leftOut: -0.25 * rise,
-        leftBend: -0.25 * rise,
-        headUp: (0.18 + Math.max(0, Math.sin(t * 2.4)) * 0.12) * rise,
-        headTurn: 0.12 * rise,
-        torsoBack: 0.08 * rise,
-        twist: 0.1 * rise,
-        // A step forward onto the left foot, the weight on it
-        leftStep: 0.16 * rise,
-        hipShift: -0.03 * rise,
-        rightHand: 'fist',
-        leftHand: 'point',
+        ...pose,
+        headUp: pose.headUp + Math.sin(t * 2.2) * 0.03 * held,
+        rightUp: pose.rightUp + Math.max(0, Math.sin(t * 3.2)) * 0.06 * held,
       }
     }
     case 'heart': {
-      // Both arms up, the elbows out, the hands meeting over the helmet: a heart; swaying side to side
-      const rise = riseOf(t, 0.4)
+      const pose = keyed(t, HEART_WIN)
+      // The heart over the helmet sways and hops
+      const held = smoothShare((t - 1.95) / 0.3)
       const sway = Math.sin(t * 2.6 + phase)
       return {
-        ...REST,
-        leftUp: 2.55 * rise,
-        rightUp: 2.55 * rise,
-        leftOut: 0.95 * rise,
-        rightOut: 0.95 * rise,
-        leftBend: 1.25 * rise,
-        rightBend: 1.25 * rise,
-        headTilt: sway * 0.2 * rise,
-        headUp: 0.2 * rise,
-        torsoBack: 0.1 * rise,
-        twist: sway * 0.05 * rise,
-        // Jumping: up off the ground in time with the sway, the feet tucked under
-        bounce: Math.abs(sway) * 0.1 * rise,
-        leftLift: Math.abs(sway) * 0.05 * rise,
-        rightLift: Math.abs(sway) * 0.05 * rise,
-        leftHand: 'open',
-        rightHand: 'open',
+        ...pose,
+        burst: t < KISS_AT ? 0 : Math.min(1, (t - KISS_AT) / KISS_FLIGHT),
+        headTilt: pose.headTilt + sway * 0.2 * held,
+        twist: pose.twist + sway * 0.05 * held,
+        bounce: Math.abs(sway) * 0.1 * held,
+        leftLift: Math.abs(sway) * 0.05 * held,
+        rightLift: Math.abs(sway) * 0.05 * held,
       }
     }
     case 'diamond': {
-      // The right hand up in a V, a little forward, the head tipped to it; the left on the wheel
-      const rise = riseOf(t, 0.3)
-      const wag = Math.sin(t * 5 + phase) * 0.08
-      return {
-        ...REST,
-        rightUp: 2.25 * rise,
-        rightOut: (0.35 + wag) * rise,
-        rightBend: 0.55 * rise,
-        headTilt: -0.18 * rise,
-        headTurn: -0.2 * rise,
-        headUp: 0.12 * rise,
-        torsoBack: 0.06 * rise,
-        vSign: rise,
-        // The weight on the left foot, the right heel kicked up behind
-        hipShift: -0.035 * rise,
-        rightLift: (0.12 + wag * 0.3) * rise,
-        rightStep: -0.12 * rise,
-        rightHand: 'vee',
-        leftHand: 'relax',
-      }
+      const pose = keyed(t, DIAMOND_WIN)
+      // Tapping the sum in, then the V wagging
+      const tapping = t > 1 && t < 1.9 ? Math.max(0, Math.sin(t * 15)) * 0.35 : 0
+      const wag = smoothShare((t - 2.3) / 0.3) * Math.sin(t * 5 + phase) * 0.08
+      return { ...pose, rightBend: pose.rightBend + tapping, rightOut: pose.rightOut + wag }
     }
     case 'club': {
-      // Both arms out and flexed, forearms up, a bounce in the seat and a roar (the chin up)
-      const rise = riseOf(t, 0.35)
-      const pump = Math.abs(Math.sin(t * 4 + phase))
+      const pose = keyed(t, CLOVER_WIN)
+      const [from, to, count] = CURLS
+      const curl = t > from && t < to ? (1 - Math.cos(((t - from) / (to - from)) * count * Math.PI * 2)) / 2 : 0
+      const pump = smoothShare((t - 2.25) / 0.3) * Math.abs(Math.sin(t * 4 + phase))
       return {
-        ...REST,
-        leftUp: 1.55 * rise,
-        rightUp: 1.55 * rise,
-        leftOut: 1.35 * rise,
-        rightOut: 1.35 * rise,
-        leftBend: (1.5 + pump * 0.2) * rise,
-        rightBend: (1.5 + pump * 0.2) * rise,
-        headUp: (0.28 + pump * 0.08) * rise,
-        torsoBack: 0.12 * rise,
-        bounce: pump * 0.05 * rise,
-        // A wide, strong stance, sinking into it with each flex
-        stance: 0.12 * rise,
-        hipDrop: (0.05 + pump * 0.04) * rise,
-        leftHand: 'fist',
-        rightHand: 'fist',
+        ...pose,
+        rightUp: pose.rightUp + curl * 0.35,
+        rightBend: pose.rightBend + curl * 2 + pump * 0.2,
+        leftBend: pose.leftBend + pump * 0.2,
+        bounce: pose.bounce + pump * 0.05,
+        hipDrop: pose.hipDrop + pump * 0.04,
+        headUp: pose.headUp + pump * 0.08,
       }
     }
     default: {
@@ -537,6 +595,8 @@ export function blendPose(from: GesturePose, to: GesturePose, share: number): Ge
     leftLift: mix(from.leftLift, to.leftLift),
     rightLift: mix(from.rightLift, to.rightLift),
     stance: mix(from.stance, to.stance),
+    prop: mix(from.prop, to.prop),
+    burst: mix(from.burst, to.burst),
     // The fingers do not ease: the shape asked for, as soon as it is asked (the arm eases up to show it)
     ...handsOf(share > 0 ? to : from),
   }
@@ -547,5 +607,32 @@ function handsOf(pose: GesturePose): Pick<GesturePose, 'leftHand' | 'rightHand'>
   return {
     ...(pose.leftHand ? { leftHand: pose.leftHand } : {}),
     ...(pose.rightHand ? { rightHand: pose.rightHand } : {}),
+  }
+}
+
+/** How many hearts Hartie's kiss throws */
+export const HEART_COUNT = 6
+
+/**
+ * 2026-11-23 (§3.3): where heart `index` of a thrown kiss is, `burst` (0 to 1) into its flight, in the
+ * torso's frame (the driver faces -z): from in front of the visor, out and up in a fan, swelling and
+ * then shrinking away; null before it is thrown and once it is gone
+ */
+export function heartFlight(
+  burst: number,
+  index: number,
+): { x: number; y: number; z: number; scale: number; spin: number } | null {
+  if (burst <= 0 || burst >= 1) return null
+  // Each a little later than the one before, so that they leave one after another
+  const own = (burst - index * 0.06) / (1 - (HEART_COUNT - 1) * 0.06)
+  if (own <= 0 || own >= 1) return null
+  const fan = (index / (HEART_COUNT - 1) - 0.5) * 1.6
+  const ease = 1 - (1 - own) * (1 - own)
+  return {
+    x: Math.sin(fan) * 0.55 * ease,
+    y: 0.72 + ease * 0.4 + Math.sin(own * Math.PI * 3 + index) * 0.03,
+    z: -0.25 - Math.cos(fan) * 0.65 * ease,
+    scale: Math.min(1, own / 0.15) * Math.min(1, (1 - own) / 0.3),
+    spin: Math.sin(own * Math.PI * 2 + index) * 0.4,
   }
 }

@@ -30,7 +30,7 @@ import { useMenuMusic } from '../audio/useMenuMusic.ts'
 import { useRaceRecorder } from '../../games/kart/useRaceRecorder.ts'
 import type { Replay } from '../../../shared/kart/replay.ts'
 import ReplayShare from '../watch/ReplayShare.tsx'
-import { loadBody, loadDriver } from '../bodies.ts'
+import { loadBody, loadDriver, loadOutfit } from '../bodies.ts'
 import { formatTime } from '../../../shared/kart/timeTrial.ts'
 import { podiumSeats, type PodiumEntry } from '../ceremony/podium.ts'
 import { trackAchievement } from '../../achievements/track.ts'
@@ -378,6 +378,8 @@ function podiumEntries(
       name: nameOf(seat),
       kart: you || !entry ? loadBody() : entry.kart,
       driver: you || !entry ? loadDriver() : entry.driver,
+      // 2026-11-23 (shared/kart/outfits.ts): what you wear; the computer's drivers in the race suit
+      ...(you || !entry ? { outfit: loadOutfit(loadDriver()) } : {}),
       line: formatTime((finishOf(seat) ?? 0) / 1000),
       you,
     }

@@ -25,6 +25,7 @@
 // foot), cheer on Ready and then wait ready (`ready`: bouncing on the balls of the feet, a thumb up).
 // Every picture is drawn into its own corner of the one canvas at its own size (the big picture is
 // bigger than a card's), so nothing is resized between them.
+import type { OutfitId } from '../../../shared/kart/outfits.ts'
 import {
   Box3,
   CircleGeometry,
@@ -46,12 +47,14 @@ import { BODY_DETAIL } from '../art/bodyDetail.ts'
 import { releaseSharedTextures } from '../art/sharedTextures.ts'
 import { loadQuality } from '../quality.ts'
 import { bodyReady } from '../art/vehicleBodies.ts'
-import type { DriverGesture } from '../driverGestures.ts'
+import { SHOWPIECE_SECONDS, type DriverGesture } from '../driverGestures.ts'
 import { FRAME_MS, isDue, nextPacing, START_PACING, type Pacing } from './lobbyPacing.ts'
 
 export interface LobbyLook {
   readonly kart: KartId
   readonly driver: DriverId
+  /** 2026-11-23 (shared/kart/outfits.ts): what they wear; the race suit left out */
+  readonly outfit?: OutfitId
   readonly ready: boolean
 }
 
@@ -94,7 +97,8 @@ const FRONT = Math.PI
 const SWAY = 0.5
 const SWAY_SPEED = 0.55
 /** Arms up this long after pressing Ready, s */
-const CHEER_FOR = 2.2
+// 2026-11-23 (docs/KART-WORLD.md §3.3): long enough for each driver's own win to play through
+const CHEER_FOR = SHOWPIECE_SECONDS
 
 interface Place {
   look: LobbyLook | null
@@ -242,7 +246,7 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
 
   const build = (place: Place) => {
     const look = place.look
-    const key = look ? `${look.kart}.${look.driver}` : null
+    const key = look ? `${look.kart}.${look.driver}.${look.outfit ?? ''}` : null
     if (key === place.built) return
     if (place.model) {
       scene.remove(place.model.group)
@@ -270,7 +274,7 @@ export function createLobbyStage({ still, slow }: LobbyStageOptions): LobbyStage
       look.kart,
       look.driver,
       { environment, detail: BODY_DETAIL[loadQuality()] },
-      { standing: true },
+      { standing: true, ...(look.outfit ? { outfit: look.outfit } : {}) },
     )
     solidBox(place.model.group, box)
     place.framing = {

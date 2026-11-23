@@ -21,6 +21,7 @@
 - **卡丁車的甩尾與噴射特效、聲音、彎道箭頭板（2026-11-17）也是程式產生的**：胎痕、煙、火花、噴射的火與地上的光環（`src/kart/art/effects.ts`，一張 canvas 柔光貼圖加 three.js 幾何）、速度線（`speedLines.ts`）、彎道箭頭板（`cornerArt.ts`，canvas 畫的黃底黑箭頭）；引擎、風聲、輪胎尖叫、噴射聲（`src/kart/kartAudio.ts`）全部用 WebAudio 的振盪器與噪音合成。沒有任何音檔、貼圖或模型，不用登記、不放 R2。
 - **卡丁車的配樂、環境音、夜間燈光與車手動作（2026-11-20，`feat/kart-audio-atmos`）也全部是程式產生的**：七首配樂（`src/kart/audio/songs.ts` 是一小張音級與節奏表，`musicPlayer.ts` 用 WebAudio 的振盪器與一段程式產生的白噪音即時合成）、環境音（海浪、海鷗、鳥、夜市、城市、機械、風、蟲鳴、觀眾，`ambiencePlayer.ts`，同樣合成）、車頭燈與路燈的光斑（`src/kart/art/nightLights.ts`，canvas 畫的漸層貼圖、three.js 的光源與方塊）、車手動作（`driverGestures.ts`，只是骨架的旋轉）。**沒有任何音檔、取樣、貼圖或模型**，不用登記、不放 R2；旋律與節奏是為這個遊戲寫的，沒有參考任何遊戲或現成歌曲（`IP-CHECKLIST.md` 卡丁車 2026-11-20 補記）。
 - **車身細節與摩托車引擎聲（2026-11-22，`feat/kart-wall-slide-landing`）也全部是程式產生的**：`src/kart/art/bodyDetail.ts` 在 canvas 上畫的高度圖（面板縫線、每塊面板的兩顆螺絲、高畫質的刮痕與細顆粒，當 bump map 用）、塗裝貼紙的磨損（把邊緣挖掉幾塊）、高畫質的 2/2 斜紋碳纖（`kartParts.ts` 的 64 px canvas）；摩托車的引擎聲是 `src/kart/kartAudio.ts` 的振盪器與濾波器即時合成（方波與鋸齒、點火脈衝、渦輪的高音）。沒有引入任何外部貼圖、模型或音檔，不用登記、不放 R2；音色是自己調的，沒有取樣或模仿任何真實車廠或遊戲的引擎聲。
+- **車手的樣貌、服裝、勝利道具與背景（2026-11-23，`feat/kart-characters`）也全部是程式產生的**：四種安全帽、圍巾、馬尾、耳機、毛巾（`src/kart/art/driverHelmets.ts`）、十二套服裝（`driverOutfits.ts`，顏色在 `kartTokens.ts` 的 `kartOutfits`）、計算機、啞鈴、愛心（`driverProps.ts`；愛心是既有的紅心徽章外形）都是 three.js 的基本幾何（hull、圓柱、環、方塊、擠出平面），背景文字是自己寫的。沒有引入任何外部模型、貼圖、字型或圖檔，不用登記、不放 R2；沒有參考任何遊戲的角色造型、服裝或勝利動作。
 - **測試的基準圖不是資產**：`e2e-visual/__screenshots__/*.png`（I4，`e7-t10`）是網站自己畫面的截圖，由 CI 的 Playwright 容器產生，只給視覺回歸比對用，不出現在網站上，不登記、不放 R2（13 張，共約 3.6 MB；畫面改了才換）。大廳卡片的小圖（`src/components/GameArt.tsx`）是程式畫的 SVG，同上不用登記。
 
 ## 字型

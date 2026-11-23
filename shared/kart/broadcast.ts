@@ -11,6 +11,16 @@
 // and keeps the gaps between the karts, as a timing screen does: each kart's time at each gate, the
 // gap to the kart ahead the difference at the last gate both have passed.
 //
+// 2026-11-23 (NEXT §5, "the director only scores, it does not see what is coming: it cuts to an
+// overtake 0.8 s after the swap"): it also looks ahead (`foresee`). Two karts in neighbouring places,
+// the one behind closing (faster, or on the inside of the bend they are in, which is the shorter
+// way round), a pass expected within PREDICT_HORIZON: a prediction, and the side shot of the chaser
+// before the pass rather than after it. A prediction that does not come true in PREDICT_GRACE is let
+// go gently: the chaser keeps a fading say for RETRACT_SECONDS, so that the camera eases back to
+// the race instead of jumping away. A shot (an item in flight) closing on a kart within
+// HIT_HORIZON: that kart, before the hit. Watching a replay, the future is known: the overtakes to
+// come (highlights.ts foreseePasses) and the hits to come are exact, cut to PREDICT_LEAD before.
+//
 // Pure and deterministic, so that a stretch of a replay gives the same cuts every time (tested in
 // tests/kart/broadcast.test.ts); src/kart/watch/broadcast/ runs it and draws what it says.
 import { cameraFor, FINISH_REACH, type TracksideCamera } from './broadcastCameras.ts'
@@ -19,7 +29,18 @@ import { cameraFor, FINISH_REACH, type TracksideCamera } from './broadcastCamera
 export type ShotKind = 'chase' | 'side' | 'low' | 'aerial' | 'trackside'
 
 /** Why the director is on a kart */
-export type CutReason = 'leader' | 'battle' | 'overtake' | 'hit' | 'jump' | 'finalLap' | 'finish'
+export type CutReason =
+  | 'leader'
+  | 'battle'
+  | 'overtake'
+  | 'hit'
+  | 'jump'
+  | 'finalLap'
+  | 'finish'
+  /** 2026-11-23: an overtake foreseen, before it happens */
+  | 'attack'
+  /** 2026-11-23: a hit foreseen: a shot closing on the kart */
+  | 'incoming'
 
 /** One kart as the director sees it */
 export interface BroadcastKart {
@@ -46,6 +67,23 @@ export interface BroadcastHit {
   readonly at: number
 }
 
+/** An item in flight (an item race), where it is now: `target` the kart it homes in on, if any */
+export interface BroadcastShot {
+  readonly n: number
+  readonly by: number
+  readonly target: number | null
+  readonly x: number
+  readonly z: number
+}
+
+/** An overtake known to come (a replay's future, highlights.ts foreseePasses): race time, seconds */
+export interface ForeseenPass {
+  readonly seat: number
+  readonly other: number
+  /** The moment the places swap */
+  readonly at: number
+}
+
 /** The race at one moment */
 export interface BroadcastMoment {
   /** Seconds from GO */
@@ -55,8 +93,10 @@ export interface BroadcastMoment {
   readonly laps: number
   /** The track's gates: a lap is this much progress */
   readonly gates: number
-  /** Every hit so far (older ones are ignored) */
+  /** Every hit so far (older ones are ignored); a replay's, those to come too */
   readonly hits: readonly BroadcastHit[]
+  /** The items in flight now (2026-11-23), for the hits foreseen live */
+  readonly shots?: readonly BroadcastShot[]
 }
 
 /** A caption the director calls for */
@@ -72,6 +112,28 @@ export interface DirectorOptions {
   readonly reducedMotion: boolean
   /** A kart to favour (a highlight's), if any */
   readonly favour?: number | null
+  /**
+   * 2026-11-23, a replay: the future is known. The overtakes to come (foreseePasses), and `hits`
+   * holds the hits to come as well: both are cut to PREDICT_LEAD (HIT_LEAD) before, with no guess
+   */
+  readonly foreseen?: readonly ForeseenPass[]
+}
+
+/** A pass the director expects: `seat` past `other`, made at race time `made`, due at `due` */
+export interface Prediction {
+  readonly seat: number
+  readonly other: number
+  readonly made: number
+  readonly due: number
+  /** A replay's, known to come (DirectorOptions.foreseen): it comes true when due */
+  readonly exact?: true
+}
+
+/** How the predictions have done: made, come true, let go (for the tests and the curious) */
+export interface Foresight {
+  readonly made: number
+  readonly came: number
+  readonly missed: number
 }
 
 export interface DirectorState {
@@ -97,6 +159,19 @@ export interface DirectorState {
   readonly finished: readonly number[]
   /** Turns of the leader's shots, so that they go round */
   readonly turn: number
+  /** 2026-11-23: each seat's heading at the last step (how fast it turns: the bend it is in) */
+  readonly headings: Readonly<Record<number, number>>
+  /**
+   * Pairs closing for a pass ("seat:other"): since when, and the gap then (metres along), before
+   * that is a prediction: the gap must really have shrunk meanwhile
+   */
+  readonly closing: Readonly<Record<string, { readonly since: number; readonly gap: number }>>
+  readonly predictions: readonly Prediction[]
+  /** Predictions let go, the chaser's say fading from `at` (and the pair not foreseen again a while) */
+  readonly retracting: readonly { readonly seat: number; readonly other: number; readonly at: number }[]
+  /** Each shot's place at the last step, to tell its speed */
+  readonly shotsSeen: Readonly<Record<number, { readonly x: number; readonly z: number }>>
+  readonly foresight: Foresight
 }
 
 /** A shot stays up at least this long, seconds (and this long with less motion asked for) */
@@ -119,6 +194,32 @@ export const CONFIRM_SECONDS = 0.8
 const ECHO_SECONDS = 4
 /** The race's first seconds shuffle the places: no overtakes counted before this */
 export const SETTLE_SECONDS = 4
+/** A pass is foreseen this far ahead at the most, seconds ... */
+export const PREDICT_HORIZON = 2.5
+/** ... the pair closing at least this fast, m/s (speed and the inside of the bend together) ... */
+export const PREDICT_CLOSING = 0.8
+/** ... for at least this long, seconds, before it is a prediction (one frame's wobble is not) ... */
+export const PREDICT_STEADY = 0.2
+/** ... the gap meanwhile shrunk by at least this share of what that closing speed makes ... */
+const PREDICT_SHRINK = 0.5
+/** ... and the one behind at most this far back, metres */
+export const PREDICT_METRES = 30
+/** A prediction not come true this long after it was due is let go, seconds */
+export const PREDICT_GRACE = 1.2
+/** A pass counts as foreseen if the prediction was made at least this long before it, seconds */
+export const PREDICT_EARLY = 0.5
+/** A replay's overtakes and hits to come are cut to this long before, seconds */
+export const PREDICT_LEAD = 2
+export const HIT_LEAD = 1.2
+/** A shot closing on a kart within this long, and passing this near it, is a hit foreseen */
+export const HIT_HORIZON = 1.5
+export const HIT_MISS_METRES = 3
+/** A prediction let go keeps a fading say this long, seconds */
+export const RETRACT_SECONDS = 1.5
+/** Something foreseen may cut a shot up this long (MIN_HOLD otherwise; never with less motion) */
+export const FORESEEN_HOLD = 1.2
+/** A bend: the pair turning at least this fast, rad/s */
+const BEND_TURN = 0.12
 /** A highlight's kart gets this much more say */
 const FAVOUR = 100
 /** What is on screen gets this much more say, so that only something better cuts away */
@@ -129,6 +230,8 @@ const WORTH: Readonly<Record<CutReason, number>> = {
   finish: 100,
   overtake: 80,
   hit: 75,
+  incoming: 72,
+  attack: 70,
   jump: 60,
   battle: 40,
   finalLap: 30,
@@ -158,6 +261,12 @@ export function startDirector(): DirectorState {
     lapsSeen: {},
     finished: [],
     turn: 0,
+    headings: {},
+    closing: {},
+    predictions: [],
+    retracting: [],
+    shotsSeen: {},
+    foresight: { made: 0, came: 0, missed: 0 },
   }
 }
 
@@ -277,13 +386,201 @@ function notice(
   }
 }
 
+const wrapAngle = (angle: number): number => {
+  let a = angle % (2 * Math.PI)
+  if (a > Math.PI) a -= 2 * Math.PI
+  if (a < -Math.PI) a += 2 * Math.PI
+  return a
+}
+
+/**
+ * When `behind` is expected to get past `ahead`, seconds from now, or null: how far it has to go to
+ * be a metre past (along the way `ahead` faces), over how fast it closes. It closes by the
+ * difference of their speeds, and in a bend by the inside line's shorter way round: a kart
+ * `lateral` metres to the inside of another, both turning at `turn` rad/s, gains about lateral ×
+ * turn m/s on it (an outside line loses as much)
+ */
+export function passIn(
+  ahead: Pick<BroadcastKart, 'x' | 'z' | 'heading' | 'speed'>,
+  behind: Pick<BroadcastKart, 'x' | 'z' | 'heading' | 'speed'>,
+  turn: number,
+): { seconds: number; gap: number } | null {
+  const fx = Math.sin(ahead.heading)
+  const fz = -Math.cos(ahead.heading)
+  const dx = ahead.x - behind.x
+  const dz = ahead.z - behind.z
+  const along = dx * fx + dz * fz
+  if (along > PREDICT_METRES || Math.hypot(dx, dz) > PREDICT_METRES) return null
+  // The kart's right is (cos h, sin h), and a heading growing is a turn to the right: how far
+  // right of the one ahead the one behind is, times the turn, is how far inside it is
+  const lateral = -(dx * Math.cos(ahead.heading) + dz * Math.sin(ahead.heading))
+  const inside = Math.abs(turn) >= BEND_TURN ? lateral * turn : 0
+  const closing = behind.speed - ahead.speed + inside
+  if (closing < PREDICT_CLOSING) return null
+  const seconds = Math.max(0, along + 1) / closing
+  return seconds <= PREDICT_HORIZON ? { seconds, gap: along } : null
+}
+
+/**
+ * When the shot `shot` (now where it is, `seconds` ago at `was`) reaches `kart`, seconds from now,
+ * or null: a shot homing in on that kart by how fast the gap closes, any other by its nearest pass
+ * of the kart, which must come within HIT_MISS_METRES
+ */
+export function shotReaches(
+  shot: Pick<BroadcastShot, 'x' | 'z' | 'target'>,
+  was: { readonly x: number; readonly z: number },
+  seconds: number,
+  kart: Pick<BroadcastKart, 'seat' | 'x' | 'z' | 'heading' | 'speed'>,
+): number | null {
+  if (!(seconds > 0)) return null
+  const svx = (shot.x - was.x) / seconds
+  const svz = (shot.z - was.z) / seconds
+  const kvx = Math.sin(kart.heading) * kart.speed
+  const kvz = -Math.cos(kart.heading) * kart.speed
+  const rx = kart.x - shot.x
+  const rz = kart.z - shot.z
+  const vx = svx - kvx
+  const vz = svz - kvz
+  const distance = Math.hypot(rx, rz)
+  if (shot.target === kart.seat) {
+    const closing = (rx * vx + rz * vz) / Math.max(1e-6, distance)
+    if (closing <= 0) return distance <= HIT_MISS_METRES ? 0 : null
+    const at = Math.max(0, distance - HIT_MISS_METRES / 2) / closing
+    return at <= HIT_HORIZON ? at : null
+  }
+  const speedSq = vx * vx + vz * vz
+  if (speedSq < 1e-6) return null
+  const at = (rx * vx + rz * vz) / speedSq
+  if (at < 0 || at > HIT_HORIZON) return null
+  return Math.hypot(rx - vx * at, rz - vz * at) <= HIT_MISS_METRES ? at : null
+}
+
+/**
+ * What the director sees coming (2026-11-23): the passes foreseen (a replay's, exact; live, from
+ * the pairs closing in), how the earlier ones turned out, and the hits foreseen. The state's notes
+ * for it, and the candidates it makes
+ */
+function foresee(
+  state: DirectorState,
+  previous: DirectorState,
+  moment: BroadcastMoment,
+  options: DirectorOptions,
+): { next: Partial<DirectorState>; list: Candidate[] } {
+  const list: Candidate[] = []
+  const time = moment.time
+  const step = Number.isFinite(previous.time) ? time - previous.time : 0
+  const racing = (kart: BroadcastKart) => kart.finishMs === null && !kart.out
+  const placeOf = (seat: number) => moment.karts.findIndex((kart) => kart.seat === seat)
+  let { made, came, missed } = state.foresight
+  const retracting = state.retracting.filter((one) => time - one.at < ECHO_SECONDS)
+  // How each prediction did: come true once the places swapped (the director's pass in waiting, or
+  // one confirmed), let go once past due and the grace, or once the two are no longer neighbours
+  const swapped = (one: Prediction) =>
+    [...state.pending, ...state.passes].some(
+      (pass) => pass.seat === one.seat && pass.other === one.other && pass.at >= one.made - PREDICT_STEADY,
+    )
+  const predictions: Prediction[] = []
+  for (const one of state.predictions) {
+    if (one.exact ? time >= one.due : swapped(one)) {
+      came++
+      continue
+    }
+    const behind = placeOf(one.seat)
+    const ahead = placeOf(one.other)
+    const apart = !one.exact && (behind < 0 || ahead < 0 || Math.abs(behind - ahead) !== 1)
+    if (time > one.due + PREDICT_GRACE || apart) {
+      missed++
+      retracting.push({ seat: one.seat, other: one.other, at: time })
+      continue
+    }
+    predictions.push(one)
+  }
+  const expects = (seat: number, other: number) =>
+    predictions.some((one) => one.seat === seat && one.other === other)
+  const closing: Record<string, { since: number; gap: number }> = {}
+  const headings: Record<number, number> = {}
+  for (const kart of moment.karts) headings[kart.seat] = kart.heading
+  if (options.foreseen) {
+    // A replay: the overtakes to come, exactly
+    for (const pass of options.foreseen) {
+      if (pass.at <= time || pass.at - time > PREDICT_LEAD) continue
+      if (predictions.some((one) => one.exact && one.seat === pass.seat && one.due === pass.at)) continue
+      predictions.push({ seat: pass.seat, other: pass.other, made: time, due: pass.at, exact: true })
+      made++
+    }
+  } else if (time >= SETTLE_SECONDS && step > 0) {
+    // Live: neighbouring places, the one behind closing in, steadily
+    const turnOf = (kart: BroadcastKart) => {
+      const was = state.headings[kart.seat]
+      return was === undefined ? 0 : wrapAngle(kart.heading - was) / step
+    }
+    for (let i = 0; i + 1 < moment.karts.length; i++) {
+      const ahead = moment.karts[i]!
+      const behind = moment.karts[i + 1]!
+      if (!racing(ahead) || !racing(behind)) continue
+      const pass = passIn(ahead, behind, (turnOf(ahead) + turnOf(behind)) / 2)
+      if (pass === null) continue
+      const key = `${behind.seat}:${ahead.seat}`
+      const first = state.closing[key] ?? { since: time, gap: pass.gap }
+      closing[key] = first
+      if (time - first.since < PREDICT_STEADY || expects(behind.seat, ahead.seat)) continue
+      // The gap really closing meanwhile, not one frame's speed
+      if (first.gap - pass.gap < PREDICT_CLOSING * (time - first.since) * PREDICT_SHRINK) continue
+      // Not the same two straight back after a pass between them
+      const echo = state.passes.some(
+        (pass) => pass.seat === ahead.seat && pass.other === behind.seat && time - pass.at < ECHO_SECONDS,
+      )
+      if (echo) continue
+      predictions.push({ seat: behind.seat, other: ahead.seat, made: time, due: time + pass.seconds })
+      made++
+    }
+  }
+  for (const one of predictions) {
+    // Known to come (a replay's): worth more than an overtake already over
+    const worth = one.exact ? WORTH.overtake + 5 : WORTH.attack
+    list.push({ seat: one.seat, reason: 'attack', worth, shot: 'side' })
+  }
+  // A prediction let go: the chaser's say fades, so the camera eases back rather than jumps
+  for (const one of retracting) {
+    if (time - one.at >= RETRACT_SECONDS || predictions.some((other) => other.seat === one.seat)) continue
+    const worth = WORTH.attack * (1 - (time - one.at) / RETRACT_SECONDS)
+    if (worth > 0) list.push({ seat: one.seat, reason: 'battle', worth, shot: null })
+  }
+  // The hits to come: a replay's exactly; live, a shot closing on a kart
+  const shotsSeen: Record<number, { x: number; z: number }> = {}
+  if (options.foreseen) {
+    for (const hit of moment.hits) {
+      if (hit.at > time && hit.at - time <= HIT_LEAD) {
+        list.push({ seat: hit.target, reason: 'incoming', worth: WORTH.incoming, shot: 'side' })
+      }
+    }
+  } else {
+    for (const shot of moment.shots ?? []) {
+      shotsSeen[shot.n] = { x: shot.x, z: shot.z }
+      const was = state.shotsSeen[shot.n]
+      if (!was) continue
+      for (const kart of moment.karts) {
+        if (kart.seat === shot.by || !racing(kart)) continue
+        if (shot.target !== null && shot.target !== kart.seat) continue
+        if (shotReaches(shot, was, step, kart) === null) continue
+        list.push({ seat: kart.seat, reason: 'incoming', worth: WORTH.incoming, shot: 'side' })
+      }
+    }
+  }
+  return {
+    next: { headings, closing, predictions, retracting, shotsSeen, foresight: { made, came, missed } },
+    list,
+  }
+}
+
 /** Who is worth showing now, best first */
 function candidates(
   state: Pick<DirectorState, 'overtakes' | 'finished'>,
   moment: BroadcastMoment,
   options: DirectorOptions,
+  foreseen: readonly Candidate[] = [],
 ): Candidate[] {
-  const list: Candidate[] = []
+  const list: Candidate[] = [...foreseen]
   const racing = moment.karts.filter((kart) => kart.finishMs === null && !kart.out)
   const lapLength = moment.gates
   const raceLength = lapLength * moment.laps
@@ -383,8 +680,10 @@ export function directorStep(
   const fresh = moment.time < previous.time || moment.time - previous.time > 3
   const base = fresh ? { ...startDirector(), cuts: previous.cuts, turn: previous.turn } : previous
   const { captions, next } = notice(base, moment)
-  const noticed: DirectorState = { ...base, ...next, time: moment.time }
-  const list = candidates(noticed, moment, options)
+  const seen: DirectorState = { ...base, ...next }
+  const ahead = foresee(seen, base, moment, options)
+  const noticed: DirectorState = { ...seen, ...ahead.next, time: moment.time }
+  const list = candidates(noticed, moment, options, ahead.list)
   const best = list[0]
   if (!best) return { state: { ...noticed, seat: null }, captions, cut: false }
   const kartOf = (seat: number | null) => moment.karts.find((kart) => kart.seat === seat)
@@ -405,7 +704,9 @@ export function directorStep(
   }
   // Nothing on screen yet, or its kart gone: at once
   if (noticed.seat === null || !onScreen) return cutTo(best, noticed.turn)
-  if (held < hold) return { state: noticed, captions, cut: false }
+  // Something foreseen cannot wait the whole hold: it is about to happen (never with less motion)
+  const soon = (best.reason === 'attack' || best.reason === 'incoming') && !options.reducedMotion
+  if (held < (soon ? Math.min(hold, FORESEEN_HOLD) : hold)) return { state: noticed, captions, cut: false }
   // What the kart on screen is worth now (it may have stopped fighting), plus its say
   const current = list.find((one) => one.seat === noticed.seat)
   const currentWorth = (current?.worth ?? 0) + STICKY

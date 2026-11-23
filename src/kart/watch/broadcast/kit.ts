@@ -8,4 +8,4 @@ registerMessages(kartBroadcastMessages)
 
 export { createBroadcastRun } from './broadcastRun.ts'
 export { BroadcastOverlay } from './BroadcastOverlay.tsx'
-export { pickHighlights, replayOrderAt, replayPassings } from '../../../../shared/kart/highlights.ts'
+export { foreseePasses, pickHighlights, replayOrderAt, replayPassings } from '../../../../shared/kart/highlights.ts'

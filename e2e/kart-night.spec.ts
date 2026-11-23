@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { manualClock } from './kartClock.ts'
 
 // 2026-11-20 (docs/ARCHITECTURE.md §4.46, §4.47): a night track's lights fall on the road, the
 // track's own song starts with the first key, and the music and effects volumes are kept. Headless
@@ -27,9 +28,14 @@ async function openNight(page: Page, quality: 'low' | 'medium') {
   await page.addInitScript((level) => {
     localStorage.setItem('tku-arcade.kart.quality', level)
   }, quality)
+  // 2026-11-23 (QA follow-up): the race's engine is a chunk of its own behind a loading screen, which
+  // a busy machine takes a while over: the race drawing, as long as loading takes, before the canvas
+  // (not a canvas within the default 5 s). On the test's clock (kartClock.ts): both pictures from the
+  // same place on the grid
+  await manualClock(page)
   await page.goto('/kart?track=danhai')
+  await expect.poll(async () => (await reading(page))?.frames ?? 0, { timeout: 45_000 }).toBeGreaterThan(20)
   await expect(page.locator('canvas').first()).toBeVisible()
-  await expect.poll(async () => (await reading(page))?.frames ?? 0, { timeout: 30_000 }).toBeGreaterThan(20)
 }
 
 /** The mean brightness, 0 to 255, of the road just ahead of the kart (the canvas's middle, low down) */
@@ -54,6 +60,8 @@ async function roadAhead(page: Page): Promise<number> {
 test('on a night track the headlights light the road ahead, and low quality turns them off', async ({
   page,
 }, testInfo) => {
+  // Two loads, each with its own allowance on a busy machine
+  test.info().setTimeout(test.info().timeout + 90_000)
   const errors = watchConsole(page)
   await openNight(page, 'medium')
   const lit = await roadAhead(page)

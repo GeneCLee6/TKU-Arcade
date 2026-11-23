@@ -36,6 +36,8 @@ const KART_PARTS = [
   ['shared/kart/i18n.board.ts', 'KART_BOARD_MESSAGES'],
   ['shared/kart/i18n.online.ts', 'KART_ONLINE_MESSAGES'],
   ['shared/kart/i18n.editor.ts', 'KART_EDITOR_MESSAGES'],
+  // 2026-11-23: the drivers' profiles and outfits, registered by the garage's driver card
+  ['shared/kart/i18n.drivers.ts', 'KART_DRIVER_MESSAGES'],
 ]
 // 2026-11-23 (e11-t06): the achievements' words, registered by their own lazy chunks
 const ACHIEVEMENTS = 'shared/achievements/i18n.ts'

@@ -8,7 +8,9 @@ import { joinRoom, newPerson } from './helpers.ts'
 // ready flow works, and axe finds nothing serious. A phone held upright gets the list and a word
 // about turning it. Screenshots go to test-results/ (KART_LOBBY_SHOTS=1).
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } })
-test.setTimeout(120_000)
+// (2026-11-23, QA follow-up: two pages of eight 3D racers each and four axe scans under software
+// drawing took most of two minutes on a busy machine, and now and then more)
+test.setTimeout(240_000)
 
 const BLOCKING = new Set(['serious', 'critical'])
 

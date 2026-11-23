@@ -2,6 +2,7 @@
 // the room's clock (pings, shortest round trip wins), sends this kart's frame every third physics
 // step, takes in everyone else's, and hands the race loop what it asks for (`SpikeNet`): the
 // countdown to the room's GO, the other karts to draw and to bump into, and their name tags.
+import type { OutfitId } from '../../../shared/kart/outfits.ts'
 import {
   clockOffset,
   clockSettled,
@@ -150,7 +151,7 @@ export interface RaceNetOptions {
    * 2026-11-20: the kart and driver a seat has picked (a member's `look`, a computer kart's), to draw
    * it on its place on the grid before any frame of its own has come; null when not known
    */
-  readonly lookOf?: (seat: number) => { kart: KartBody; driver: DriverId } | null
+  readonly lookOf?: (seat: number) => { kart: KartBody; driver: DriverId; outfit?: OutfitId } | null
 }
 
 /** A kart on the grid with no frame of its own yet (onGrid): standing still, the default kart */
@@ -664,6 +665,10 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
     place: () => orderOf(options.view().racers).indexOf(seat) + 1,
     others() {
       const view = options.view()
+      const outfitOf = (seat: number) => {
+        const outfit = options.lookOf?.(seat)?.outfit
+        return outfit ? { outfit } : {}
+      }
       poses = onGrid(remotes.poses(raceNow() / 1000), view)
       debug.others = poses.filter((pose) => !pose.stale).length
       const at = roughNow()
@@ -707,6 +712,8 @@ export function createRaceNet(options: RaceNetOptions): RaceNet {
           airborne: pose.frame.airborne === true,
           body: kart,
           driver,
+          // 2026-11-23 (shared/kart/outfits.ts): what they wear, as the room was told (not in a frame)
+          ...outfitOf(pose.seat),
           look: {
             speed: forward,
             steer: pose.frame.steer,

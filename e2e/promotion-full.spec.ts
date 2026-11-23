@@ -131,14 +131,20 @@ async function rematch(host: Page) {
   await expect(host.getByText('Game over')).toHaveCount(0)
 }
 
-/** How many of the board's cells lie wholly on the screen, with the page where it opens */
+/**
+ * How many of the board's cells lie wholly on the screen, with the page where it opens, and above the
+ * dock stuck to the foot of it. Where it opens is the top, but on a phone on its side, where the page
+ * brings the board up to the top of the screen itself (useBoardFit.ts, 2026-11-23)
+ */
 async function cellsOnScreen(page: Page): Promise<number> {
   return page.evaluate(() => {
-    window.scrollTo(0, 0)
+    let dock = document.querySelector('[data-roll-line]')
+    while (dock && getComputedStyle(dock).position !== 'sticky') dock = dock.parentElement
     const [width, height] = [window.innerWidth, window.innerHeight]
+    const bottom = dock ? dock.getBoundingClientRect().top : height
     return [...document.querySelectorAll('[data-cell]')].filter((cell) => {
       const box = cell.getBoundingClientRect()
-      return box.left >= 0 && box.top >= 0 && box.right <= width + 0.5 && box.bottom <= height + 0.5
+      return box.left >= 0 && box.top >= 0 && box.right <= width + 0.5 && box.bottom <= bottom + 0.5
     }).length
   })
 }
