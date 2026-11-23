@@ -412,3 +412,18 @@ heap snapshot 的差（第 1 場到第 4 場）：+2 875 個 native 物件（約
 
 - 房名的檢查（`shared/roomName.ts`）刻意不放在 `nickname.ts`／`protocol.ts` 裡：那兩個檔在大廳首屏，打包器會把線上對戰頁用到的匯出一起留在入口 chunk。
 - 合計之後如果真的長到不合理（例如某次把 three.js 打包兩份），`--chunks` 的清單一眼看得出來；CI 不再替它把關，靠 PR 本文寫數字（`NEXT.md` §3 第 3 點）。
+
+## 13. 車手骨架與車身動態的成本（2026-11-23，`feat/kart-models-anim`）
+
+`ARCHITECTURE.md` §4.86。前＝`main` `5eb85e7` 的正式建置，後＝這個分支，同一台機器（Intel UHD 770 內顯，ANGLE D3D11）、同一個 `vite preview`（port 9800）輪流量；1280×720@1、河濱、7 台電腦車、道具賽，熱身 5 秒後數 8 秒，fps 不鎖幀（**機器上同時有別的工作，fps 會飄 ±10–20%**，draw calls 比較可靠）。
+
+| 畫質 | fps 前 → 後 | draw calls 前 → 後 | 三角形 前 → 後 | JS ms/幀 前 → 後 |
+| --- | --- | --- | --- | --- |
+| 低 | 192 → 178 | 194 → 185 | 133k → 133k | 3.32 → 3.50 |
+| 中 | 104 → 98 | 236 → 258 | 207k → 214k | 6.36 → 6.98 |
+| 高 | 78 → 72 | 248 → 283 | 223k → 233k | 9.01 → 9.30 |
+
+- 低畫質的車手合併成靜止的幾個 mesh，沒有光暈與導流板，所以 draw calls 比之前少；中畫質每台近處的車多上臂／前臂兩組（左右共 4）、方向軛 1、光暈 1；高畫質再多兩片導流板。
+- 骨架每幀的成本是近處每台車：幾個 4×4 矩陣、兩次兩骨 IK、一個 `driveJoints`；遠處（LOD）與低畫質不算。
+- 從選單進比賽 371.1 → 374.8 kB（上限 480，`npm run budget`）：骨架、動作與車身動態約 3.7 kB，沒有拆 lazy（比賽一定要用）。
+- 量法：`node scripts/kart-fps.mjs --base http://localhost:9800 --qualities low,medium,high --warmup 5 --seconds 8`。

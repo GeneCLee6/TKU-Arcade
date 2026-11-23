@@ -311,6 +311,12 @@ export interface SpikeDebug {
   /** 2026-11-20 (§4.47), for looking at the drivers: this driver does this whatever the race says */
   gesture?: DriverGesture | null
   /**
+   * 2026-11-23 (§4.86), for looking at the skeleton and the kart's motion (scripts/kart-shots.mjs
+   * `--poses`): the look's steering, slide, stun and throttle as given here, whatever the kart does.
+   * Looks only; null or left out, as driven
+   */
+  pose?: { steer?: number; drift?: number; dazed?: number; throttle?: number } | null
+  /**
    * 2026-11-18, for looking at the effects (a screenshot, a curious owner): draws the kart as if a
    * boost of this kind ran, whatever the physics says. Looks only; null or left out, nothing
    */
@@ -969,6 +975,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       speed: forward,
       steer: debug.input.steer,
       drift: slideWay,
+      // 2026-11-23 (§4.86): the thrusters' halo follows the throttle as pressed
+      throttle: Number(debug.input.throttle),
       ...boostFx(boostKind ?? (boosting ? 'mini' : null)),
       // The sparks say where the release boost stands: gold once the drift has earned one and all
       // through the slide-out (counter-steer now), blue once it is caught (the throttle now)
@@ -986,6 +994,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       skid,
       ...(trialCourse?.terrain ? { airborne, landings } : {}),
       ...ownGesture(now),
+      ...(debug.pose ?? {}),
     }
     const pose = poseBetween(previous, current, clock.alpha)
     if (obstacles.length > 0) {
