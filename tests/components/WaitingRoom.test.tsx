@@ -6,6 +6,7 @@ import { WaitingRoom } from '../../src/components/WaitingRoom.tsx'
 import { kartMessages } from '../../shared/games/kart/i18n.ts'
 import { initLanguage, registerMessages, setLanguage } from '../../src/i18n/t.ts'
 import { memberName } from '../../src/lib/memberName.ts'
+import { forgetRoomPassword, readRoomPassword } from '../../src/lib/roomPassword.ts'
 import { stubDialog } from '../lib/stubDialog.ts'
 
 const ROOM = 'abcdefghij'
@@ -302,7 +303,7 @@ describe('public or private (shared/protocol.ts 19.)', () => {
     )
     fireEvent.click(within(visibility()).getByRole('button', { name: 'List in the lobby' }))
     expect(onSetPublic).toHaveBeenCalledExactlyOnceWith(true)
-    const listed = { ...view, room: { ...view.room, public: true as const, password: 'kite' } }
+    const listed = { ...view, room: { ...view.room, public: true as const, locked: true as const } }
     rerender(
       <ToastProvider>
         <WaitingRoom roomId={ROOM} view={listed} you="Al" onSit={vi.fn()} onReady={vi.fn()} onStart={vi.fn()} onKick={vi.fn()} onTransfer={vi.fn()} onDissolve={vi.fn()} onSetGame={vi.fn()} onSetOptions={vi.fn()} onSetPublic={onSetPublic} />
@@ -311,6 +312,43 @@ describe('public or private (shared/protocol.ts 19.)', () => {
     expect(visibility()).toHaveTextContent('Public, but not listed while it has a password.')
     fireEvent.click(within(visibility()).getByRole('button', { name: 'Make private' }))
     expect(onSetPublic).toHaveBeenLastCalledWith(false)
+  })
+})
+
+// 2026-11-23: the room keeps only a hash, so nobody is sent the password: the host sees the one this
+// browser set (src/lib/roomPassword.ts), everyone else only that there is one
+describe('the room password', () => {
+  afterEach(() => forgetRoomPassword(ROOM))
+
+  it('shows the host the password this browser set, and keeps it when set', async () => {
+    const onSetPassword = vi.fn()
+    const view = viewOf([al(), bo()])
+    const { rerender } = render(
+      <ToastProvider>
+        <WaitingRoom roomId={ROOM} view={view} you="Al" onSit={vi.fn()} onReady={vi.fn()} onStart={vi.fn()} onKick={vi.fn()} onTransfer={vi.fn()} onDissolve={vi.fn()} onSetGame={vi.fn()} onSetOptions={vi.fn()} onSetPassword={onSetPassword} />
+      </ToastProvider>,
+    )
+    fireEvent.change(await screen.findByLabelText('Room password (optional)'), { target: { value: ' kite ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }))
+    expect(onSetPassword).toHaveBeenCalledExactlyOnceWith('kite')
+    expect(readRoomPassword(ROOM)).toBe('kite')
+    const locked = { ...view, room: { ...view.room, locked: true as const } }
+    rerender(
+      <ToastProvider>
+        <WaitingRoom roomId={ROOM} view={locked} you="Al" onSit={vi.fn()} onReady={vi.fn()} onStart={vi.fn()} onKick={vi.fn()} onTransfer={vi.fn()} onDissolve={vi.fn()} onSetGame={vi.fn()} onSetOptions={vi.fn()} onSetPassword={onSetPassword} />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('kite')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the password' }))
+    expect(onSetPassword).toHaveBeenLastCalledWith(null)
+    expect(readRoomPassword(ROOM)).toBeNull()
+  })
+
+  it('tells a member only that there is one', async () => {
+    const view = viewOf([al(), bo()])
+    renderRoom({ ...view, room: { ...view.room, locked: true } }, 'Bo')
+    expect(await screen.findByText('This room has a password.')).toBeTruthy()
+    expect(screen.getByText(/ask whoever set it/)).toBeTruthy()
   })
 })
 

@@ -14,6 +14,7 @@
 | 連線上限 | 每房 72 條／64 人 | `e12-t06`：每房每位址 24 條、每位址每分鐘 120 次升級＋斷線重連另 240 次（§6） |
 | 暱稱 | 濾控制字元、方向覆寫、長度 | `e12-t06`：再濾零寬與隱形字元、擋冒充與基本髒話，伺服器端也檢查（§9） |
 | 卡丁車排行榜上傳 | — | 2026-11-23：伺服器嚴格解碼重播、逐樣本用房間的判定重跑、每位址每分鐘 6 次、256 kB 上限；擋得住改檔，擋不住會開車的腳本（§11） |
+| 房間密碼 | 明文存在房間儲存、放在成員的 view | 2026-11-23：只存加鹽 PBKDF2-SHA256（20,000 次），定時比較，舊房間載入時轉成雜湊；view／列表／日誌都沒有密碼；每房每位址 15 分鐘錯 10 次就鎖（§12） |
 | 擁有者端點 | `/api/stats` 要 `STATS_KEY` | 新的 `/api/admin/flags`、`/api/admin/usage` 共用同一個檢查（`worker/owner.ts`）；`e12-t06` 加上錯 5 次鎖一分鐘、比對不洩漏長度（§7） |
 
 ## 2. WebSocket 來源檢查
@@ -105,7 +106,7 @@ frame-ancestors 'none'
 | `GET /api/kart/board/replay`（下載重播） | 每 instance 每位址每分鐘 60 次、合計 1200 次 | `worker/kartBoard.ts` |
 | 聊天 | 每人每 10 秒 10 則、每則 500 字 | `shared/chat.ts`、`RoomHost` |
 | 表情 | 每人間隔 `REACTION_MIN_MS` | `RoomHost` |
-| 房間密碼 | 錯 `PASSWORD_TRIES` 次關掉 socket | `RoomHost` |
+| 房間密碼 | 每條 socket 錯 `PASSWORD_TRIES`（5）次關掉；**每房每位址 15 分鐘錯 `PASSWORD_FAILS`（10）次**後，那個位址到視窗結束前的加入一律 `rate_limited` 並關掉 socket，不再算雜湊（存在房間儲存，換 socket、休眠都不歸零；2026-11-23，§12） | `RoomHost` |
 | `GET /api/lobby`（大廳與卡丁車房間列表，2026-11-23） | **每 instance 每位址每分鐘 240 次**、instance 合計 2 萬次（記憶體，不走 `LimiterDO`：列表每 10 秒輪詢，每次多一個 DO 請求不划算；本機不限）；每個 instance 把 LobbyDO 的回答沿用 2 秒；`?game=` 不是遊戲 400 | `worker/app.ts`、`worker/lobby-list.ts` |
 | `POST /api/rooms/quick`（卡丁車快速加入，2026-11-23） | 找房吃上一列的 240 次；真的開新房時再吃 `POST /api/rooms` 的全部額度（每位址每分鐘 10 間）；房名照暱稱規則（§9），不合 400 `bad_name` | `worker/rooms.ts` |
 | `GET /api/rooms/<id>`、`GET /api/codes/<code>`、`GET /api/flags` | **沒有** | — |
@@ -198,3 +199,17 @@ PR 預覽站（`tku-arcade-pr-110`），從一台電腦（同一個 IPv6 /64）�
 - **暱稱不是身分**：還沒有帳號（F1），任何人都能用任何沒被擋的暱稱上傳，包括別人的暱稱（它只會在比原本快時蓋掉那一列）。F1 上線後的認領方式見 `ARCHITECTURE.md` §4.81。
 - **位址**：每分鐘 6 次是每個位址；換網路就能再傳。上傳很貴的部分（解壓、判樣本）一趟 1–7 ms CPU。
 - 重播檔是公開的：誰都能下載任何一列的 `.tkureplay`；裡面只有路線、時間與暱稱。
+
+## 12. 房間密碼只存雜湊（2026-11-23，`feat/room-security-push`）
+
+#168 回報「專案原本就沒有密碼雜湊，密碼是明碼門牌」：房間密碼（e1-t16）原本照打的字存在 RoomDO 儲存，還放在每個成員的 view 裡讓大家轉給朋友。它只是朋友間的門牌，但人會重複用自己慣用的字，所以改成：
+
+- **存什麼**：`RoomRecord.passwordHash = { salt, hash, iterations }`（`worker/room-password.ts`）。PBKDF2-SHA256，**每次設密碼一個新的 16 bytes 隨機 salt**，輸出 32 bytes，十六進位存。用 Web Crypto（`crypto.subtle`），Workers 與 Node 都有，不用 `nodejs_compat`。
+- **迭代 20,000 次**：本機量 ~3.4 ms CPU（Node 與 Workers 都是原生 BoringSSL／OpenSSL 的同一段），一次加入或 `set_password` 連同其他工作仍在免費方案每次事件 10 ms CPU 之內；100,000 次要 ~16 ms 會超過。線上猜密碼靠下面的速率限制擋，雜湊是讓「拿到一份儲存／備份／除錯輸出」的人讀不回原文。每筆雜湊記著自己的次數，以後調高不會鎖住舊房間。
+- **比對**：一定跑一次完整的 PBKDF2，再把 32 bytes 全部比完（`sameBytes`，沒有提早跳出，沿用 #110 管理金鑰 `sameKey` 的寫法）；錯的和對的花一樣久，跟猜中幾個字無關。
+- **非同步怎麼接**：`RoomHost` 是同步的（測試直接跑），雜湊是非同步的。`RoomHost.passwordWork(conn, raw)` 說這則訊息需不需要先算：新來的人帶密碼的 `join` 要比對、房主的 `set_password` 要雜湊；其他訊息（含帶 seat token 回來的成員、已被鎖的位址）回 `null` 走原本的快路。RoomDO 在 `blockConcurrencyWhile` 裡算完再把結果（`PasswordPrep`）交給 `message`，房間的訊息順序不變。建房（`POST /api/rooms` → `RoomDO.create`）在 DO 裡先雜湊再交給房間，明文不進儲存。沒有雜湊結果的 `set_password`（繞過 RoomDO）回 `unavailable`，絕不改存明文。
+- **遷移**：舊房間儲存裡的 `password`（明文）在 DO 下次載入時（建構子的 `blockConcurrencyWhile`，任何訊息之前）雜湊成 `passwordHash` 並在同一次寫入刪掉明文（`legacyPassword`／`migratePassword`）。遷移前的那一刻（只有 `RoomHost` 單獨跑時才會遇到）照樣能進：兩邊各取 SHA-256 再定時比較（`sameLegacyPassword`）。
+- **不出現的地方**：view 只有 `room.locked: true`（`RoomInfo.password` 拿掉了）；`summary()`、`listing()`／`GET /api/lobby` 只有 `locked`；錯誤只有 `password_required`／`wrong_password`／`rate_limited`；沒有任何 `console.*` 帶密碼（測試攔下所有 console 輸出檢查）。**代價**：房裡的人看不到密碼了。房主看到的是「這個瀏覽器設的那個」（設定時存在 `sessionStorage`，`src/lib/roomPassword.ts`，原本就拿來重連），其他成員只看到「這個房間有密碼」，要密碼問設的人。
+- **速率限制**：每條 socket 錯 5 次關掉（原本就有）；新加**每房每位址**（`connection.address`，§6 的位址雜湊；沒有位址的算同一個 `unknown`）15 分鐘錯 10 次就鎖到視窗結束，鎖住時連對的密碼也不收、也不算雜湊（擋 CPU 消耗）。計數存在房間儲存的 `pwfails` 一個 key（最多 200 個位址，舊的先丟），換 socket、DO 休眠都不歸零；房間刪掉就一起沒了。校園共用位址：一整桌朋友 15 分鐘內合計打錯 10 次才會被擋，朋友圈可以接受。
+- **擋不住的事**：密碼仍然從瀏覽器以明文經 TLS 送到 Worker（WebSocket 的 `join`、`POST /api/rooms` 的 body），Worker 與 DO 的記憶體裡短暫有它；Cloudflare 的請求日誌不記 body 與 WebSocket 內容。門牌最多 32 字，短的門牌被拿到雜湊後仍可離線暴力猜（20,000 次只是讓它慢）；它本來就不是保護帳號的密碼。
+- **測試**：`tests/worker/room-password.test.ts`（對／錯、每次 salt 不同、照存的次數比、`sameBytes` 每個位置都決定結果、近似與差很多的猜測花的時間同量級、舊明文比對）、`tests/worker/room-host.test.ts` 的「a room password」（建房設密碼、正確／錯誤、儲存與 view 只有雜湊／`locked`、成員回來不算雜湊、房主設定與拿掉、沒有雜湊不存明文、公開房標鎖、每 socket 5 次、每位址 10 次跨 socket 與休眠、鎖住時對的也不收且不算、換位址不受影響、視窗過後可再試、日誌不含密碼、舊明文遷移）、`tests/components/WaitingRoom.test.tsx`（房主看到自己設的、成員只看到有密碼）、`e2e/rooms-i3.spec.ts`。

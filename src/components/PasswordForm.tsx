@@ -11,9 +11,12 @@ import { FieldError, FieldLabel, FieldRow, TextInput } from './Field.tsx'
 /** A room with a password (e1-t16): asked of someone new, once; the seat token does the rest */
 export default function PasswordForm({
   wrong,
+  held = false,
   onSubmit,
 }: {
   wrong: boolean
+  /** 2026-11-23: this network sent the room too many wrong ones; it waits out the room's window */
+  held?: boolean
   onSubmit(password: string): void
 }) {
   const t = useT()
@@ -37,8 +40,8 @@ export default function PasswordForm({
           autoComplete="off"
           maxLength={MAX_PASSWORD_CHARS}
           value={value}
-          aria-invalid={wrong}
-          aria-describedby={wrong ? 'room-password-error' : undefined}
+          aria-invalid={wrong || held}
+          aria-describedby={wrong || held ? 'room-password-error' : undefined}
           autoFocus
           onChange={(event) => setValue(event.target.value)}
         />
@@ -46,9 +49,9 @@ export default function PasswordForm({
           {t('room.extra.password.enter')}
         </Button>
       </FieldRow>
-      {wrong && (
+      {(wrong || held) && (
         <FieldError id="room-password-error" role="alert">
-          {t('room.extra.password.wrong')}
+          {t(held ? 'room.extra.password.held' : 'room.extra.password.wrong')}
         </FieldError>
       )}
     </PasswordPanel>

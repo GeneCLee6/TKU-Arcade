@@ -35,6 +35,9 @@ const en = {
   'room.extra.stats.metric.game_started': 'Games started',
   'room.extra.stats.metric.game_finished': 'Games finished',
   'room.extra.password.is': 'Room password:',
+  'room.extra.password.locked': 'This room has a password.',
+  'room.extra.password.askHost':
+    'The room keeps only a scrambled copy of it, so nobody here is shown it: ask whoever set it.',
   'room.extra.password.setLabel': 'Room password (optional)',
   'room.extra.password.set': 'Set password',
   'room.extra.password.remove': 'Remove the password',
@@ -57,6 +60,8 @@ const en = {
   'room.extra.password.label': 'Room password',
   'room.extra.password.enter': 'Enter',
   'room.extra.password.wrong': 'That is not the password. Check with whoever opened the room.',
+  'room.extra.password.held':
+    'Too many wrong passwords from your network for this room. Try again in 15 minutes.',
   'room.extra.replay.title': 'Replay',
   'room.extra.replay.missing':
     'There is no finished game to replay in this room. A replay is there once a game ends, until the next one starts.',
@@ -107,6 +112,8 @@ const zhTW: Record<keyof typeof en, string> = {
   'room.extra.stats.metric.game_started': '開局',
   'room.extra.stats.metric.game_finished': '完局',
   'room.extra.password.is': '房間密碼：',
+  'room.extra.password.locked': '這個房間有密碼。',
+  'room.extra.password.askHost': '房間只存密碼打亂後的雜湊，房裡的人都看不到原文：要密碼請問設定的人。',
   'room.extra.password.setLabel': '房間密碼（選填）',
   'room.extra.password.set': '設定密碼',
   'room.extra.password.remove': '拿掉密碼',
@@ -128,6 +135,7 @@ const zhTW: Record<keyof typeof en, string> = {
   'room.extra.password.label': '房間密碼',
   'room.extra.password.enter': '進房',
   'room.extra.password.wrong': '密碼不對，跟開房的人確認一下。',
+  'room.extra.password.held': '你的網路對這個房間打錯太多次密碼了，15 分鐘後再試。',
   'room.extra.replay.title': '重播',
   'room.extra.replay.missing': '這個房間沒有可以重播的對局。一局結束後就能看，直到下一局開始。',
   'room.extra.replay.failed': '重播載入失敗，等一下再試。',

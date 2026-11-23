@@ -146,8 +146,8 @@ docs/                   本資料夾
 ### 房間密碼（I3，`e1-t16`）
 
 - **房主在等待室的邀請區設定或拿掉**（`set_password`，任何狀態都可以；去頭尾空白後 1–32 字）。一開始放在大廳的「新房間」上方，但 375 px 手機會把「新房間」擠出第一屏（D2 的規則），所以改到等待室：房間建好、分享連結之前設定。`POST /api/rooms` 也可以直接帶 `password`（太長或只有空白回 400 `bad_password`）。有密碼的房間**不會公開列出**（`listing()` 擋）。
-- 密碼原樣存在 `RoomRecord.password`：它是給朋友的門號，不是任何人自己的密碼。**房裡的成員**在 view 的 `room.password` 看得到（他們都是帶密碼進來或本來就在，方便轉告）；summary 只有 `locked: true`，listing 沒有這種房間，日誌不記。
-- `join` 可帶 `password`。**新的人**沒帶回 `password_required`、帶錯回 `wrong_password`，同一條 socket 錯 `PASSWORD_TRIES`（5）次就關掉；**拿著 seat token 回來的成員不用密碼**。前端（`src/lib/roomPassword.ts`）把密碼放 sessionStorage，重連時一起送；收到這兩個錯誤就停止連線、顯示密碼表單（`PasswordForm.tsx`，lazy），送出後重連。
+- ~~密碼原樣存在 `RoomRecord.password`、成員在 view 的 `room.password` 看得到~~（到 2026-11-23）。**現在只存加鹽雜湊** `RoomRecord.passwordHash`（PBKDF2-SHA256，`worker/room-password.ts`），view／summary／listing 只有 `locked: true`，舊房間載入時遷移；房主看到的是自己瀏覽器記著的那個（§4.88、`SECURITY.md` §12）。
+- `join` 可帶 `password`。**新的人**沒帶回 `password_required`、帶錯回 `wrong_password`，同一條 socket 錯 `PASSWORD_TRIES`（5）次就關掉（2026-11-23 起另有每房每位址 15 分鐘 10 次，`SECURITY.md` §12）；**拿著 seat token 回來的成員不用密碼**。前端（`src/lib/roomPassword.ts`）把密碼放 sessionStorage，重連時一起送；收到這兩個錯誤就停止連線、顯示密碼表單（`PasswordForm.tsx`，lazy），送出後重連。
 - 首屏預算：密碼表單、房主的設定（`RoomPasswordSetting.tsx`）、語音按鈕、公開房篩選、重播頁都是各自的 lazy chunk，字串放 `shared/games/roomExtras.ts`（`room.extra.*`，check-i18n 照樣檢查）；重播頁經由房間的 chunk 載入，否則 Vite 會把房間 chunk 拆成兩個、多出約 1.8 kB。
 
 ### 重播（I3，`e2-t09`）
@@ -1860,6 +1860,16 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **快速加入的競態**（#163，`worker/lobby-list.ts` 的 `QuickHolds`、`LobbyDO.claimQuick`／`releaseQuick`）：列表上沒有可加入的房時，先產生新房 id 向 LobbyDO 登記（一個物件、一次一個呼叫，`claim` 裡沒有 await）；同款遊戲 15 秒內已有登記就回那間，後到的每 150 ms 問那間房的 `summary()`，最多 3 秒：出現且還能加入就回 `200 { created: false }`，沒出現或已滿就放掉登記、開自己的。開房用登記的 id（`openRoom` 的 `firstId`）；吃不到建房額度或開房失敗會放掉登記。登記只放記憶體（LobbyDO 被換掉就等於沒登記，最多回到以前的「各開一間」）。
 - **建房表單收密碼**（#163，`OnlineView.tsx` 的 `CreateForm`）：「邀請朋友 → 開房間」多一格「密碼（選填）」，照 `normalizePassword`（去頭尾空白、最多 32 字、不能只有空白；不行就提示並鎖住送出）；送 `CreateRoomRequest.password`（伺服器本來就收）。密碼和房間原本一樣是明碼的門牌（房裡的人看得到，沒有雜湊）。**私人／公開的邏輯不變**：有密碼的房建立時不列（`public && password === null`），選公開又填密碼時表單直接說「不會列在公開列表上」。建好後 `keepRoomPassword` 先記住，建房的人進房不會被問密碼。
 - **測試**：`tests/kart/shotHeights.test.ts`（竹圍高架：上下層的泥灘與假箱子只打自己那層、空中飛過、沒有高度照平面；冰雹沿下層飛過高架路緣、打下層不打上層、本機預測一致、上層留在上層、空中丟的落回路面；障礙物的高度、泥灘只讓開自己那層；海霧的高度範圍；`isShot`、重播帶高度與舊檔不帶）、`tests/kart/minimapObstacles.test.tsx`（閘門巷四個障礙物隨時鐘變色、貨櫃移動、不給時鐘不變、沒有障礙物的賽道）、`tests/kart/pauseButton.test.tsx`、`tests/kart/closeCountdown.test.ts`、`tests/worker/lobby-list.test.ts`（兩個並發快速加入只開一間、都進那間、之後的第三個也進那間；登記的房沒出現就開自己的；`QuickHolds`）、`tests/kart/onlineView.test.tsx`（建房帶密碼、記住、只有空白不能送、公開＋密碼的提示、沒填不送）。
+
+### 4.88 路線圖外：房間密碼只存雜湊（2026-11-23，`feat/room-security-push`）
+
+#168 回報密碼是明碼門牌。細節與取捨在 `SECURITY.md` §12，這裡只記結構：
+
+- **`worker/room-password.ts`**：`hashRoomPassword`（16 bytes 隨機 salt、PBKDF2-SHA256 `PASSWORD_ITERATIONS` 20,000 次、32 bytes）、`verifyRoomPassword`（照存的次數重算、`sameBytes` 全部比完）、`sameLegacyPassword`（舊明文：兩邊 SHA-256 後定時比較）。
+- **同步的房間、非同步的雜湊**：`RoomHost.passwordWork(conn, raw)` 回 `Promise<PasswordPrep> | null`；只有「新來的人帶密碼的 `join`」（房間有密碼、token 不是成員、位址沒被鎖）與「房主的 `set_password`（非 null）」要算，其他都是 `null`。`RoomDO.webSocketMessage` 在 `blockConcurrencyWhile` 裡等它（和 `readFlags` 一樣保住訊息順序），再 `host.message(conn, raw, prep)`。`join` 只看 `prep.passwordOk`，`setPassword` 只收 `prep.passwordHash`（沒有就 `unavailable`）。`RoomDO.create` 先雜湊再 `host.create(…, PasswordHash | null, …)`；Worker（`POST /api/rooms`）照舊只做 `normalizePassword`。
+- **遷移**：`RoomRecord.password`（明文）保留成「舊房間」欄位；RoomDO 建構子在 `restore` 之後、任何訊息之前 `legacyPassword()` → `migratePassword(hash)`，同一次 `saveRoom` 刪掉明文。`isLocked()` 兩種都算。
+- **速率**：`StoredRoom.passwordFails`（儲存 key `pwfails`，`{ [位址雜湊]: { count, since } }`）、`PASSWORD_FAILS` 10、`PASSWORD_FAIL_WINDOW_MS` 15 分鐘、最多 200 個位址；鎖住的位址 `passwordWork` 直接回 `null`（不花 CPU），`join` 回 `rate_limited` 並以 4422（`badMessage`）關掉。
+- **協定**：`RoomInfo.password` 換成 `locked?: true`。前端 `RoomPasswordSetting` 收 `locked` 與 `known`（`readRoomPassword(roomId)`）；房主設定時 `WaitingRoom` 先 `keepRoomPassword`（拿掉時 `forgetRoomPassword`），所以房主看得到自己設的、別人只看到「這個房間有密碼」。卡丁車建房表單的提示改成「房間只存雜湊，請自己轉給朋友」。
 
 ## 5. i18n
 
