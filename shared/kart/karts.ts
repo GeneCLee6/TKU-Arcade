@@ -42,6 +42,7 @@
 // second hit. So in a race without items they are simply a little slower everywhere: the trade is
 // what they are for. The room reads these from the kart a frame names (rules.ts), as it reads the
 // top speed.
+import { DEFAULT_OUTFIT, isOutfitId, type OutfitId } from './outfits.ts'
 import type { ItemPerks } from './items.ts'
 import type { KartTuning } from './physics.ts'
 
@@ -585,14 +586,21 @@ export function loadoutOfByte(byte: number): { kart: KartId; driver: DriverId } 
   }
 }
 
-/** The kart and driver as a room member's `look` (shared/protocol.ts): `kart.driver` */
-export const lookOf = (kart: KartId, driver: DriverId): string => `${kart}.${driver}`
+/**
+ * The kart and driver as a room member's `look` (shared/protocol.ts): `kart.driver`, and since
+ * 2026-11-23 (outfits.ts) `kart.driver.outfit` when the outfit is not the race suit. A page from
+ * before reads the first two words and never sees the third
+ */
+export const lookOf = (kart: KartId, driver: DriverId, outfit: OutfitId = DEFAULT_OUTFIT): string =>
+  outfit === DEFAULT_OUTFIT ? `${kart}.${driver}` : `${kart}.${driver}.${outfit}`
 
-/** A member's `look` read back, or null for one that is not a kart's (or none) */
+/** A member's `look` read back, or null for one that is not a kart's (or none); an unknown outfit is the suit */
 export function parseLook(
   look: string | undefined | null,
-): { kart: KartId; driver: DriverId } | null {
+): { kart: KartId; driver: DriverId; outfit: OutfitId } | null {
   if (!look) return null
-  const [kart, driver] = look.split('.')
-  return isKartId(kart) && isDriverId(driver) ? { kart, driver } : null
+  const [kart, driver, outfit] = look.split('.')
+  return isKartId(kart) && isDriverId(driver)
+    ? { kart, driver, outfit: isOutfitId(outfit) ? outfit : DEFAULT_OUTFIT }
+    : null
 }

@@ -15,6 +15,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three'
+import { DEFAULT_OUTFIT, type OutfitId } from '../../shared/kart/outfits.ts'
 import type { Wall } from '../../shared/kart/walls.ts'
 import type { Track } from '../../shared/kart/track.ts'
 import {
@@ -126,6 +127,8 @@ export interface OtherKart extends Pose {
   readonly body: KartBody
   /** e10-t05b: who sits in it */
   readonly driver: DriverId
+  /** 2026-11-23 (shared/kart/outfits.ts): what they wear, as the room was told; the race suit left out */
+  readonly outfit?: OutfitId
   readonly look: KartLook
 }
 
@@ -244,6 +247,8 @@ export function createKartScene(
   quality: Quality = 'high',
   body: KartBody = 'tide',
   driver: DriverId = 'spade',
+  /** 2026-11-23 (shared/kart/outfits.ts): what this kart's driver wears */
+  outfit: OutfitId = DEFAULT_OUTFIT,
 ): KartScene {
   const settings = QUALITY[quality]
   const farAt = FAR_KART[quality]
@@ -353,7 +358,7 @@ export function createKartScene(
     driver: DRIVER_DETAIL[quality],
   }
   // The hover kart and its driver (e8-t07, 2026-11-14), with its sparks, trails and boost flames
-  const kart = buildKartModel(shadows, false, body, driver, finish, { shadowProxy: true })
+  const kart = buildKartModel(shadows, false, body, driver, finish, { shadowProxy: true, outfit })
   const car = kart.group
   scene.add(car)
   const effects = createKartEffects(scene, kart, false, finish.glow)
@@ -718,7 +723,8 @@ export function createKartScene(
         // kart meanwhile, and again as itself once the family has come
         const body = bodyReady(other.body) ? other.body : DEFAULT_KART
         if (body !== other.body) void loadBodies([other.body]).catch(() => {})
-        if (model && (model.body !== body || model.driver !== other.driver)) {
+        const otherOutfit = other.outfit ?? DEFAULT_OUTFIT
+        if (model && (model.body !== body || model.driver !== other.driver || model.outfit !== otherOutfit)) {
           scene.remove(model.group)
           otherEffects.get(other.id)?.dispose()
           otherEffects.delete(other.id)
@@ -728,7 +734,7 @@ export function createKartScene(
           model = undefined
         }
         if (!model) {
-          model = buildKartModel(false, false, body, other.driver, finish, { far: true })
+          model = buildKartModel(false, false, body, other.driver, finish, { far: true, outfit: otherOutfit })
           otherKarts.set(other.id, model)
           scene.add(model.group)
           otherEffects.set(other.id, createKartEffects(scene, model, true, finish.glow))

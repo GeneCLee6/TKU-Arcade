@@ -39,6 +39,7 @@ import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import { TUNING_KEYS, validValue } from '../../shared/kart/tuning.ts'
 import { collideWalls, KART_RADIUS } from '../../shared/kart/walls.ts'
 import { LOOK_PATTERN, parseClientMessage } from '../../shared/protocol.ts'
+import { OUTFIT_IDS } from '../../shared/kart/outfits.ts'
 import { driveFrames } from './raceDriver.ts'
 
 /** The top speed a kart settles at, flat out on the throttle alone */
@@ -222,13 +223,28 @@ describe('the vehicles and four drivers (e10-t05, and the series and bikes of 20
       for (const driver of DRIVER_IDS) {
         const look = lookOf(kart, driver)
         expect(LOOK_PATTERN.test(look)).toBe(true)
-        expect(parseLook(look)).toEqual({ kart, driver })
+        expect(parseLook(look)).toEqual({ kart, driver, outfit: 'race' })
         expect(parseClientMessage(JSON.stringify({ t: 'set_look', look }))).toEqual({
           t: 'set_look',
           look,
         })
+        // 2026-11-23 (outfits.ts): the outfit a third word, left out for the race suit
+        for (const outfit of OUTFIT_IDS) {
+          const dressed = lookOf(kart, driver, outfit)
+          expect(LOOK_PATTERN.test(dressed)).toBe(true)
+          expect(parseLook(dressed)).toEqual({ kart, driver, outfit })
+          expect(parseClientMessage(JSON.stringify({ t: 'set_look', look: dressed }))).toEqual({
+            t: 'set_look',
+            look: dressed,
+          })
+          // What a page from before the outfits reads of it: the kart and the driver, as ever
+          const [thenKart, thenDriver] = dressed.split('.')
+          expect({ kart: thenKart, driver: thenDriver }).toEqual({ kart, driver })
+        }
       }
     }
+    expect(lookOf('tide', 'spade', 'race')).toBe('tide.spade')
+    expect(parseLook('tide.spade.tuxedo')).toEqual({ kart: 'tide', driver: 'spade', outfit: 'race' })
     expect(parseLook('tide')).toBeNull()
     expect(parseLook('car.spade')).toBeNull()
     expect(parseLook(undefined)).toBeNull()
@@ -236,7 +252,7 @@ describe('the vehicles and four drivers (e10-t05, and the series and bikes of 20
       t: 'set_look',
       look: null,
     })
-    for (const look of ['', 'UPPER', 'a.b.c', 'x'.repeat(17), 3, '<script>']) {
+    for (const look of ['', 'UPPER', 'a.b.c.d', 'x'.repeat(17), 3, '<script>']) {
       expect(parseClientMessage(JSON.stringify({ t: 'set_look', look }))).toBeNull()
     }
   })

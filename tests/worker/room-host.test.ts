@@ -2649,6 +2649,17 @@ describe('a member look', () => {
     expect(bob.fresh().members[back.you]).not.toHaveProperty('look')
     expect(ann.errors).toEqual([])
   })
+
+  it("carries a kart driver's outfit as a third word (2026-11-23, shared/kart/outfits.ts)", () => {
+    const world = room()
+    const ann = world.join('Ann')
+    const bob = world.join('Bob')
+    ann.send({ t: 'set_look', look: 'heron.club.street' })
+    expect(bob.fresh().members[ann.you]?.look).toBe('heron.club.street')
+    ann.send({ t: 'set_look', look: 'heron.club' })
+    expect(bob.fresh().members[ann.you]?.look).toBe('heron.club')
+    expect(ann.errors).toEqual([])
+  })
 })
 
 // e12-t07: the room counts what it does, nothing else

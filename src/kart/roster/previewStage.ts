@@ -3,6 +3,7 @@
 // hand, and a switch opens its N2O shape. The same model the race draws (art/kartModel.ts), so what
 // is picked is what is driven. No post-processing and no shadows: it is a few hundred pixels across
 // and must cost next to nothing beside the race behind it.
+import { DEFAULT_OUTFIT, type OutfitId } from '../../../shared/kart/outfits.ts'
 import {
   CircleGeometry,
   Color,
@@ -26,8 +27,8 @@ import { buildKartEnvironment } from '../art/kartParts.ts'
 import type { DriverGesture } from '../driverGestures.ts'
 
 export interface PreviewStage {
-  /** Shows this vehicle and driver (again, or another) */
-  show(kart: KartId, driver: DriverId): void
+  /** Shows this vehicle and driver (again, or another), in `outfit` (2026-11-23: the race suit left out) */
+  show(kart: KartId, driver: DriverId, outfit?: OutfitId): void
   /** Opens or closes the N2O shape */
   boost(on: boolean): void
   /**
@@ -87,7 +88,7 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
   let yaw = 0.7
   let pitch = 0.36
   let model: KartModel | null = null
-  let shown: { kart: KartId; driver: DriverId } | null = null
+  let shown: { kart: KartId; driver: DriverId; outfit: OutfitId } | null = null
   let boosting = false
   let gesture: DriverGesture | undefined
   let dragging = false
@@ -96,6 +97,7 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
   let last = performance.now()
   let frame = 0
   let disposed = false
+  let closeIn = 0
 
   const resize = () => {
     const width = canvas.clientWidth
@@ -144,14 +146,22 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
     frame = requestAnimationFrame(draw)
     const seconds = Math.min(0.1, (now - last) / 1000)
     last = now
-    if (!dragging && !still) yaw += SPIN * seconds
-    const distance = 4.5
+    // 2026-11-23 (docs/KART-WORLD.md §3.3): a win plays to the camera: it swings round to the
+    // driver's front, a little to their side, and closes in on them; otherwise it turns by itself
+    const showing = gesture !== undefined && gesture !== 'idle'
+    if (showing && !dragging) {
+      const front = Math.PI - 0.45
+      const gap = Math.atan2(Math.sin(front - yaw), Math.cos(front - yaw))
+      yaw += gap * Math.min(1, seconds * 4)
+    } else if (!dragging && !still) yaw += SPIN * seconds
+    closeIn += ((showing ? 1 : 0) - closeIn) * Math.min(1, seconds * 4)
+    const distance = 4.5 - closeIn * 1.3
     camera.position.set(
       Math.sin(yaw) * Math.cos(pitch) * distance,
-      0.5 + Math.sin(pitch) * distance,
+      0.5 + Math.sin(pitch) * distance + closeIn * 0.2,
       Math.cos(yaw) * Math.cos(pitch) * distance,
     )
-    camera.lookAt(0, 0.42, 0)
+    camera.lookAt(0, 0.42 + closeIn * 0.4, 0)
     model?.update(
       {
         speed: boosting ? 60 : gesture ? 0 : 14,
@@ -167,9 +177,9 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
   }
   frame = requestAnimationFrame(draw)
 
-  const show = (kart: KartId, driver: DriverId): void => {
-    if (shown && shown.kart === kart && shown.driver === driver) return
-    const asked = { kart, driver }
+  const show = (kart: KartId, driver: DriverId, outfit: OutfitId = DEFAULT_OUTFIT): void => {
+    if (shown && shown.kart === kart && shown.driver === driver && shown.outfit === outfit) return
+    const asked = { kart, driver, outfit }
     shown = asked
     // 2026-11-21 (bodyLoad.ts): a family not fetched yet comes first; the last pick wins
     if (!bodyReady(kart)) {
@@ -177,7 +187,7 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
         () => {
           if (disposed || shown !== asked) return
           shown = null
-          show(kart, driver)
+          show(kart, driver, outfit)
         },
         () => {},
       )
@@ -187,11 +197,18 @@ export function createPreviewStage(container: HTMLElement, still: boolean): Prev
       scene.remove(model.group)
       model.dispose()
     }
-    model = buildKartModel(false, false, kart, driver, {
-      environment,
-      // 2026-11-22: the garage shows the body up close: its fine detail, as the race's quality has it
-      detail: BODY_DETAIL[loadQuality()],
-    })
+    model = buildKartModel(
+      false,
+      false,
+      kart,
+      driver,
+      {
+        environment,
+        // 2026-11-22: the garage shows the body up close: its fine detail, as the race's quality has it
+        detail: BODY_DETAIL[loadQuality()],
+      },
+      { outfit },
+    )
     scene.add(model.group)
   }
 

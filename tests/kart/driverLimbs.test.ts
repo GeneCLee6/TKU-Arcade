@@ -18,6 +18,7 @@ import {
 } from '../../src/kart/driverLimbs.ts'
 import { blendPose, gesturePose, REST, type GestureStyle } from '../../src/kart/driverGestures.ts'
 import { buildKartModel } from '../../src/kart/art/kartModel.ts'
+import { DRIVER_LOOKS } from '../../src/kart/art/driverLooks.ts'
 import { bakeSkinned } from '../../src/kart/art/driverSkin.ts'
 import { FRAME_MS, isDue, MAX_STRIDE, nextPacing, START_PACING } from '../../src/kart/lobby/lobbyPacing.ts'
 
@@ -119,14 +120,15 @@ describe('the standing gestures', () => {
   })
 
   it('wins with the legs too: a step, a jump, a kick back, a wide stance', () => {
-    const at = (style: GestureStyle) => gesturePose('cheer', 1.1, 0, style)
+    // 2026-11-23 (KART-WORLD §3.3): once the showpiece has played
+    const at = (style: GestureStyle) => gesturePose('cheer', 3, 0, style)
     expect(at('spade').leftStep).toBeGreaterThan(0.1)
-    const heart = Array.from({ length: 30 }, (_, i) => gesturePose('cheer', 0.5 + i * 0.05, 0, 'heart').bounce)
+    const heart = Array.from({ length: 30 }, (_, i) => gesturePose('cheer', 2 + i * 0.05, 0, 'heart').bounce)
     expect(Math.max(...heart)).toBeGreaterThan(0.06)
     expect(at('diamond').rightLift).toBeGreaterThan(0.05)
     expect(at('club').stance).toBeGreaterThan(0.08)
     expect(at('club').rightHand).toBe('fist')
-    expect(at('spade').leftHand).toBe('point')
+    expect(at('spade').rightHand).toBe('point')
     expect(gesturePose('wave', 0.4).rightHand).toBe('open')
   })
 
@@ -243,8 +245,12 @@ describe('a standing driver on a real model', () => {
     for (let i = 0; i < 120; i++) model.update({ speed: 0, steer: 0, drift: 0, boosting: false, gesture: 'stand' }, 1 / 30)
     const standing = ankles()
     expect(standing).toHaveLength(2)
-    // The ankle 8 cm over the ground (the sole under it)
-    for (const y of standing) expect(Math.abs(y - 0.08)).toBeLessThan(0.01)
+    // The ankle 8 cm over the ground (the sole under it), as tall as the driver (driverLooks.ts)
+    // (2026-11-23: the foot that is changing may be a little off the ground, at a random point of the
+    // wait; the one under the weight is on it)
+    const sole = 0.08 * DRIVER_LOOKS.spade.build.height
+    expect(Math.min(...standing)).toBeCloseTo(sole, 2)
+    expect(Math.max(...standing)).toBeLessThan(sole + 0.04)
     model.dispose()
   })
 

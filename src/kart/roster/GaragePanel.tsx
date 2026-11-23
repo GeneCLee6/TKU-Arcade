@@ -3,28 +3,46 @@
 import { lazy, Suspense, useEffect, useId, useRef } from 'react'
 import styled from 'styled-components'
 import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
+import type { OutfitId } from '../../../shared/kart/outfits.ts'
 import { Button } from '../../components/Button.tsx'
 import { displayType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { broadcastSolid } from '../ui/broadcast.ts'
 import { RosterPicker, type RosterT } from './RosterPicker.tsx'
+import { usePlayWin } from './usePlayWin.ts'
 
 // 2026-11-21 (docs/ARCHITECTURE.md §4.52): three.js comes when the garage opens, not with /kart's menu
 const KartPreview = lazy(() => import('./KartPreview.tsx'))
+// 2026-11-23 (docs/KART-WORLD.md §3): the driver's card and their outfits, with words of its own
+const DriverProfile = lazy(() => import('./DriverProfile.tsx'))
 
 export interface GaragePanelProps {
   t: RosterT
   kart: KartId
   driver: DriverId
+  /** 2026-11-23 (shared/kart/outfits.ts): what the driver wears */
+  outfit: OutfitId
   onKart(kart: KartId): void
   onDriver(driver: DriverId): void
+  onOutfit(outfit: OutfitId): void
   onClose(): void
   /** The track on /kart (2026-11-21): its quickest vehicles are recommended */
   track?: string
 }
 
-export function GaragePanel({ t, kart, driver, onKart, onDriver, onClose, track }: GaragePanelProps) {
+export function GaragePanel({
+  t,
+  kart,
+  driver,
+  outfit,
+  onKart,
+  onDriver,
+  onOutfit,
+  onClose,
+  track,
+}: GaragePanelProps) {
   const ids = useId()
+  const win = usePlayWin(driver)
   const title = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
     title.current?.focus()
@@ -52,11 +70,24 @@ export function GaragePanel({ t, kart, driver, onKart, onDriver, onClose, track 
         onKart={onKart}
         onDriver={onDriver}
         track={track}
+        profile={
+          <Suspense fallback={null}>
+            <DriverProfile
+              driver={driver}
+              outfit={outfit}
+              onOutfit={onOutfit}
+              onPlayWin={win.play}
+              playing={win.playing}
+            />
+          </Suspense>
+        }
         preview={
           <Suspense fallback={null}>
             <KartPreview
               kart={kart}
               driver={driver}
+              outfit={outfit}
+              {...(win.playing ? { pose: 'cheer' as const } : {})}
               label={t('kart.roster.preview', { kart: t(`kart.body.${kart}`) })}
               hint={t('kart.roster.previewHint')}
               morphLabel={t('kart.roster.morph')}

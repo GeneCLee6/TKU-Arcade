@@ -13,6 +13,7 @@ import {
   type DriverId,
   type KartId,
 } from '../../shared/kart/karts.ts'
+import { DEFAULT_OUTFIT, isOutfitId, outfitOpen, type OutfitId } from '../../shared/kart/outfits.ts'
 import { readStored, writeStored } from '../lib/storage.ts'
 
 export type KartBody = KartId
@@ -35,3 +36,16 @@ export function loadDriver(): DriverId {
 }
 
 export const saveDriver = (driver: DriverId): void => writeStored(DRIVER_KEY, driver)
+
+/**
+ * 2026-11-23 (shared/kart/outfits.ts): what each driver wears, kept per driver, so that a change of
+ * driver brings back what that one wore last. Only an outfit that is open (`outfitOpen`) is worn
+ */
+const outfitKey = (driver: DriverId) => `tku-arcade.kart.outfit.${driver}`
+
+export function loadOutfit(driver: DriverId): OutfitId {
+  const stored = readStored(outfitKey(driver))
+  return isOutfitId(stored) && outfitOpen(stored) ? stored : DEFAULT_OUTFIT
+}
+
+export const saveOutfit = (driver: DriverId, outfit: OutfitId): void => writeStored(outfitKey(driver), outfit)

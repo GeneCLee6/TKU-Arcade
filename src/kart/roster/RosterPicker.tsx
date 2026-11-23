@@ -88,6 +88,11 @@ export interface RosterPickerProps {
   preview?: ReactNode
   /** The track about to be raced (2026-11-21): its quickest vehicles are recommended */
   track?: string
+  /**
+   * 2026-11-23 (docs/KART-WORLD.md §3): the picked driver's card, their outfits and their win
+   * (DriverProfile.tsx, the caller's, loaded on its own); none, and there is only the one line
+   */
+  profile?: ReactNode
 }
 
 export function RosterPicker({
@@ -98,6 +103,7 @@ export function RosterPicker({
   onDriver,
   preview,
   track,
+  profile,
 }: RosterPickerProps) {
   const ids = useId()
   const spec = kartSpec(kart)
@@ -246,6 +252,7 @@ export function RosterPicker({
         ))}
       </Choices>
       <Blurb>{t(`kart.driverBlurb.${driver}`)}</Blurb>
+      {profile}
       {spec.kind === 'bike' && <Note data-testid="kart-bike-note">{t('kart.roster.bikeNote')}</Note>}
       {spec.series === 'item' && (
         <Note data-testid="kart-series-item-note">{t('kart.roster.itemNote')}</Note>
