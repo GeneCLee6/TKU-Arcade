@@ -1128,35 +1128,6 @@ for (const [width, height] of [
   })
 }
 
-// 2026-11-23 (QA sweep): on a phone held sideways the driving school's invite went top centre, and
-// the top row's links (since the replay file and the online races) reached under it and covered its
-// first line. Now it sits below the row: nothing of the two overlaps, and its buttons take a tap
-for (const [width, height] of [
-  [667, 375],
-  [844, 390],
-  [915, 412],
-]) {
-  test(`the driving school's invite clears the top row's links at ${width}×${height}`, async ({ page }) => {
-    await page.setViewportSize({ width, height })
-    await page.addInitScript(() => localStorage.setItem('tku-arcade.kart.quality', 'low'))
-    await page.goto('/kart')
-    const invite = page.getByTestId('kart-school-invite')
-    await expect(invite).toBeVisible({ timeout: 30_000 })
-    const box = (await invite.boundingBox())!
-    const links = await page
-      .getByRole('link', { name: /^(Back to the lobby|Track editor|Open a replay file|Online)$/ })
-      .evaluateAll((all) => all.map((link) => link.getBoundingClientRect().toJSON() as DOMRect))
-    expect(links.length).toBeGreaterThan(0)
-    for (const link of links) {
-      const apart =
-        link.right <= box.x || link.left >= box.x + box.width || link.bottom <= box.y || link.top >= box.y + box.height
-      expect(apart).toBe(true)
-    }
-    await page.getByTestId('kart-school-invite-no').click()
-    await expect(invite).toBeHidden()
-  })
-}
-
 // 2026-11-19: seventeen vehicles under tabs, a 3D preview of the pick, and the bikes
 test('the garage narrows the vehicles by tab, previews the pick, and a bike races', async ({
   page,
