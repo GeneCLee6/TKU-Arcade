@@ -45,6 +45,13 @@ const createLimit = new FixedWindowLimit(CREATES_PER_ADDRESS, CREATES_PER_INSTAN
 /** Open rooms quick join asks about (their summary) before it opens a new one */
 const QUICK_TRIES = 3
 
+/**
+ * 2026-11-23 (#163): sent to a room another quick join is opening, wait at most this long for it to
+ * be there, looking every QUICK_LOOK_MS; then open one's own
+ */
+const QUICK_WAIT_MS = 3_000
+const QUICK_LOOK_MS = 150
+
 const ROOM_PATH = /^\/api\/rooms\/([^/]+)$/
 const REPLAY_PATH = /^\/api\/rooms\/([^/]+)\/replay$/
 const CODE_PATH = /^\/api\/codes\/([^/]+)$/
@@ -223,10 +230,17 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
   return Response.json(opened, { status: 201, headers: noStore })
 }
 
-/** Opens the room asked for; null when no fresh id would take (not expected) */
-async function openRoom(env: Env, ask: RoomAsk): Promise<CreateRoomResponse | null> {
+/**
+ * Opens the room asked for; null when no fresh id would take (not expected). `firstId`: the id to try
+ * first (quick join's, held for it in the lobby)
+ */
+async function openRoom(
+  env: Env,
+  ask: RoomAsk,
+  firstId?: string,
+): Promise<CreateRoomResponse | null> {
   for (let attempt = 0; attempt < CREATE_ATTEMPTS; attempt++) {
-    const id = newRoomId()
+    const id = attempt === 0 && firstId !== undefined ? firstId : newRoomId()
     // The number first, so that the room can show it from the start. Should the id be taken (not
     // expected at ~59 bits), the number points at a room that is not there and is soon reused
     const code = await claimCode(env, id)
@@ -280,32 +294,92 @@ async function quickJoin(
     return fail('rate_limited', 429, { 'retry-after': '60' })
   }
   const rooms = await readLobby(env.LOBBY as unknown as LobbyLister, now)
+  const found = (id: string): Response =>
+    Response.json({ id, created: false } satisfies QuickJoinResponse, { headers: noStore })
   for (const room of quickRooms(rooms, gameId).slice(0, QUICK_TRIES)) {
-    const summary = await roomStub(env, room.id).summary()
-    if (
-      summary?.status === 'waiting' &&
-      summary.locked !== true &&
-      summary.gameId === gameId &&
-      summary.seated < summary.maxSeats
-    ) {
-      const found: QuickJoinResponse = { id: room.id, created: false }
-      return Response.json(found, { headers: noStore })
-    }
+    if (quickOpen(await roomStub(env, room.id).summary(), gameId)) return found(room.id)
+  }
+  // 2026-11-23 (#163): none listed. Another quick join may be opening one this moment (the list is
+  // a few seconds old): the lobby, one call at a time, holds the first new room for the game, and
+  // whoever asks meanwhile is sent to it once it is there
+  const lobby = lobbyStub(env)
+  const id = newRoomId()
+  const held = await claimQuick(lobby, gameId, id)
+  if (held !== null) {
+    if (await waitForQuickRoom(env, held, gameId)) return found(held)
+    // Full or never opened: the next one asking opens one, starting with this one
+    await releaseQuick(lobby, gameId, held)
+    await claimQuick(lobby, gameId, id)
   }
   if (!(await takeCreate(request, env, limit, now))) {
+    await releaseQuick(lobby, gameId, id)
     return fail('rate_limited', 429, { 'retry-after': '60' })
   }
-  const opened = await openRoom(env, {
-    gameId,
-    options: quickOptions(gameId, now),
-    isPublic: true,
-    password: null,
-    bots: null,
-    ...extras,
-  })
+  const opened = await openRoom(
+    env,
+    {
+      gameId,
+      options: quickOptions(gameId, now),
+      isPublic: true,
+      password: null,
+      bots: null,
+      ...extras,
+    },
+    id,
+  )
+  if (opened?.id !== id) await releaseQuick(lobby, gameId, id)
   if (!opened) return fail('unavailable', 503)
   const created: QuickJoinResponse = { ...opened, created: true }
   return Response.json(created, { status: 201, headers: noStore })
+}
+
+/** Whether a room's summary says quick join may send someone in: waiting, a free seat, no password */
+function quickOpen(
+  summary: Awaited<ReturnType<ReturnType<typeof roomStub>['summary']>>,
+  gameId: string,
+): boolean {
+  return (
+    summary?.status === 'waiting' &&
+    summary.locked !== true &&
+    summary.gameId === gameId &&
+    summary.seated < summary.maxSeats
+  )
+}
+
+/** The lobby's hold on quick join's new room for `gameId` (LobbyDO.claimQuick); null if unreachable */
+async function claimQuick(
+  lobby: ReturnType<typeof lobbyStub>,
+  gameId: string,
+  id: string,
+): Promise<string | null> {
+  try {
+    return await lobby.claimQuick(gameId, id)
+  } catch (error) {
+    console.error('quick hold failed', error)
+    return null
+  }
+}
+
+async function releaseQuick(lobby: ReturnType<typeof lobbyStub>, gameId: string, id: string): Promise<void> {
+  try {
+    await lobby.releaseQuick(gameId, id)
+  } catch (error) {
+    console.error('quick release failed', error)
+  }
+}
+
+/**
+ * Whether room `id`, which another quick join is opening, is there and open within QUICK_WAIT_MS
+ * (it may still be being made)
+ */
+async function waitForQuickRoom(env: Env, id: string, gameId: string): Promise<boolean> {
+  const until = Date.now() + QUICK_WAIT_MS
+  for (;;) {
+    const summary = await roomStub(env, id).summary()
+    if (summary !== null) return quickOpen(summary, gameId)
+    if (Date.now() + QUICK_LOOK_MS > until) return false
+    await new Promise((resolve) => setTimeout(resolve, QUICK_LOOK_MS))
+  }
 }
 
 function plainOptions(options: unknown): OptionValues | undefined {

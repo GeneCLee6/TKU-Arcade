@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// 2026-11-23 (#131, docs/ARCHITECTURE.md §4.87): a track driven the other way round. Hobe Fort Hill
+// 2026-11-23 (#131, docs/ARCHITECTURE.md §4.88): a track driven the other way round. Hobe Fort Hill
 // reversed is on /kart's course picker under its own name; the time trial on it starts from the
 // grid on the far side of the line, and the autopilot drives its first lap round (the jump turned
 // round, the gates the other way) with nobody going the wrong way. Headless Chromium draws with a

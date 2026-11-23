@@ -13,6 +13,8 @@ import {
   quickRooms,
   readLobby,
   type LobbyLister,
+  QuickHolds,
+  QUICK_HOLD_MS,
 } from '../../worker/lobby-list.ts'
 import { FixedWindowLimit } from '../../worker/rate-limit.ts'
 import { handleRooms } from '../../worker/rooms.ts'
@@ -136,13 +138,20 @@ describe('GET /api/lobby', () => {
 /** A database with no paused game (worker/flags.ts) */
 const NO_FLAGS = { prepare: () => ({ all: async () => ({ results: [] }) }) }
 
-/** Rooms by id for quick join: a summary each, and `create` for a new one */
-function quickSetup(rooms: RoomListing[], summaries: Record<string, unknown> = {}) {
+/**
+ * Rooms by id for quick join: a summary each, and `create` for a new one (open from then on, unless
+ * `gone`); the lobby holds quick join's new rooms as the LobbyDO does (QuickHolds)
+ */
+function quickSetup(rooms: RoomListing[], summaries: Record<string, unknown> = {}, gone = false) {
   const created: unknown[][] = []
-  const summary = vi.fn(async (id: string) => summaries[id] ?? null)
+  const made = new Set<string>()
+  const summary = vi.fn(async (id: string) => summaries[id] ?? (made.has(id) && !gone ? open(id) : null))
+  const holds = new QuickHolds()
   const lobby = {
     list: vi.fn(async () => rooms),
     claimCode: vi.fn(async () => null),
+    claimQuick: vi.fn(async (gameId: string, id: string) => holds.claim(gameId, id, Date.now())),
+    releaseQuick: vi.fn(async (gameId: string, id: string) => holds.release(gameId, id)),
   }
   const env = {
     DB: NO_FLAGS,
@@ -152,13 +161,16 @@ function quickSetup(rooms: RoomListing[], summaries: Record<string, unknown> = {
       get: (id: string) => ({
         summary: () => summary(id),
         create: vi.fn(async (...args: unknown[]) => {
+          // A room takes a moment to be made
+          await new Promise((resolve) => setTimeout(resolve, 20))
           created.push(args)
+          made.add(args[0] as string)
           return true
         }),
       }),
     },
   } as unknown as Env
-  return { env, created, summary }
+  return { env, created, summary, lobby }
 }
 
 const quick = (body: unknown, address = '203.0.113.9') =>
@@ -231,10 +243,42 @@ describe('POST /api/rooms/quick', () => {
     const reads = new FixedWindowLimit(10, 100)
     const url = new URL('https://x/api/rooms/quick')
     expect((await handleRooms(quick({ gameId: 'kart' }), env, url, creates, NOW, reads)).status).toBe(201)
-    expect((await handleRooms(quick({ gameId: 'kart' }), env, url, creates, NOW, reads)).status).toBe(429)
+    // (another game: the kart's new room is held for the next kart quick join, below)
+    expect((await handleRooms(quick({ gameId: 'promotion' }), env, url, creates, NOW, reads)).status).toBe(429)
     const get = await handleRooms(fromAddress('/api/rooms/quick'), env, url, creates, NOW, reads)
     expect(get.status).toBe(405)
   })
+
+  // 2026-11-23 (#163): two at once, no room listed: one new room, both sent to it
+  it('opens one room for two quick joins at the same moment, and sends both to it', async () => {
+    const { env, created } = quickSetup([])
+    const url = new URL('https://x/api/rooms/quick')
+    const [first, second] = await Promise.all(
+      ['203.0.113.9', '198.51.100.7'].map((address) =>
+        handleRooms(quick({ gameId: 'kart' }, address), env, url, ...limits()),
+      ),
+    )
+    expect(created).toHaveLength(1)
+    const bodies = [(await first!.json()) as { id: string; created: boolean }, (await second!.json()) as { id: string; created: boolean }]
+    expect(bodies[0]!.id).toBe(bodies[1]!.id)
+    expect(bodies.map((body) => body.created).sort()).toEqual([false, true])
+    expect([first!.status, second!.status].sort()).toEqual([200, 201])
+    // A while later, still unlisted (the list is a few seconds old): the same room, nothing new
+    const third = await handleRooms(quick({ gameId: 'kart' }, '192.0.2.1'), env, url, ...limits())
+    expect(await third.json()).toEqual({ id: bodies[0]!.id, created: false })
+    expect(created).toHaveLength(1)
+  })
+
+  it('opens its own when the held room is full or never came', async () => {
+    const { env, created, lobby } = quickSetup([], {}, true)
+    const url = new URL('https://x/api/rooms/quick')
+    expect((await handleRooms(quick({ gameId: 'kart' }), env, url, ...limits())).status).toBe(201)
+    // The first one's room is not there: after a wait, a room of its own
+    const late = await handleRooms(quick({ gameId: 'kart' }, '198.51.100.7'), env, url, ...limits())
+    expect(late.status).toBe(201)
+    expect(created).toHaveLength(2)
+    expect(lobby.releaseQuick).toHaveBeenCalled()
+  }, 10_000)
 
   it('limits the asking too, when it finds a room every time', async () => {
     const { env } = quickSetup(ROOMS, { busy: open('busy') })
@@ -257,5 +301,23 @@ describe('room names (2026-11-23)', () => {
     expect(roomNameIssue('   ')).toBe('empty')
     expect(roomNameIssue('x'.repeat(MAX_ROOM_NAME_CHARS + 1))).toBe('tooLong')
     expect(acceptableRoomName(42)).toBeNull()
+  })
+})
+
+describe('QuickHolds (2026-11-23, #163)', () => {
+  it('holds the first new room of a game for QUICK_HOLD_MS, a game at a time', () => {
+    const holds = new QuickHolds()
+    expect(holds.claim('kart', 'a', NOW)).toBeNull()
+    expect(holds.claim('kart', 'b', NOW + 10)).toBe('a')
+    // Asking again for its own: still its own
+    expect(holds.claim('kart', 'a', NOW + 20)).toBeNull()
+    expect(holds.claim('promotion', 'c', NOW + 20)).toBeNull()
+    // Past the hold, or let go: the next one opens its own
+    expect(holds.claim('kart', 'd', NOW + 20 + QUICK_HOLD_MS)).toBeNull()
+    holds.release('kart', 'd')
+    expect(holds.claim('kart', 'e', NOW + 21 + QUICK_HOLD_MS)).toBeNull()
+    // Only the room held is let go
+    holds.release('kart', 'zzz')
+    expect(holds.claim('kart', 'f', NOW + 22 + QUICK_HOLD_MS)).toBe('e')
   })
 })

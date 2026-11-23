@@ -1,4 +1,4 @@
-// 2026-11-23 (#131, docs/ARCHITECTURE.md §4.87): every reversed track is driven by the computer karts
+// 2026-11-23 (#131, docs/ARCHITECTURE.md §4.88): every reversed track is driven by the computer karts
 // at every difficulty, two seeds each, three laps: home, never the wrong way, never stuck. And a race
 // of computer karts in a room judged by the race room's own rules (the Worker's judgeFrame), on a
 // reversed track with branches and one with moving obstacles.

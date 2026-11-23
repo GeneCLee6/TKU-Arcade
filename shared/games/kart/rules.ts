@@ -66,6 +66,7 @@ import {
 import { TEAM_BOOST } from '../../kart/teamBoost.ts'
 import { courseOf, type Track } from '../../kart/track.ts'
 import { tickAtMs } from '../../kart/obstacles.ts'
+import { heightSeen, type Terrain } from '../../kart/terrain.ts'
 import { CLOSE_AFTER_FINISH_MS, closeAt, countdownMs } from '../../kart/opening.ts'
 import { formatTime } from '../../kart/timeTrial.ts'
 import { CUSTOM_PREFIX, isCustomId, isTrackCode } from '../../kart/editor/custom.ts'
@@ -181,11 +182,18 @@ type Memory = {
    */
   traces: Map<SeatId, TeamTrace>
   gauge: [number, number] | null
+  /**
+   * 2026-11-23, a track with terrain: how high each kart is, worked out from its frames as the
+   * others' browsers do (terrain.ts `heightSeen`), which the shots are judged by. Lost with the
+   * memory: then a kart at a crossing is taken to be on the lower road until its next frame
+   */
+  heights: Map<SeatId, number>
 }
 
 const memoryOf = (memory: RealtimeMemory): Memory => {
   if (!(memory.tracked instanceof Map)) memory.tracked = new Map<SeatId, Tracked>()
   if (!(memory.traces instanceof Map)) memory.traces = new Map<SeatId, TeamTrace>()
+  if (!(memory.heights instanceof Map)) memory.heights = new Map<SeatId, number>()
   if (!Array.isArray(memory.gauge)) memory.gauge = null
   return memory as unknown as Memory
 }
@@ -720,6 +728,22 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
       })
       tracked.set(seat, verdict.tracked)
       if (verdict.kind === 'refused') return { relay: null, actions: [] }
+      // 2026-11-23: how high the kart is now, on a track with terrain, and was at its last frame
+      // (only the item race needs it)
+      const terrain = state.mode === 'items' ? (courseOf(track).terrain ?? null) : null
+      const { heights } = memoryOf(memory)
+      const heightBefore = heights.get(seat)
+      const height = terrain
+        ? heightSeen(
+            terrain,
+            frame.x,
+            frame.z,
+            Math.hypot(frame.vx, frame.vz),
+            frame.airborne === true,
+            heightBefore,
+          )
+        : undefined
+      if (height !== undefined) heights.set(seat, height)
       const actions: KartAction[] = []
       if (verdict.lapAt !== null && state.phase === 'racing') {
         actions.push({ t: 'lap', seat, ms: Math.max(0, verdict.lapAt) })
@@ -731,10 +755,21 @@ export const kart: GameModule<KartState, KartAction, KartView, KartOptions> = {
         const last = before?.last
         const from: Fix | null =
           last && !frame.reset && now - before.lastAt <= PATH_GAP_MS
-            ? { x: last.x, z: last.z, at: before.lastAt }
+            ? {
+                x: last.x,
+                z: last.z,
+                at: before.lastAt,
+                ...(heightBefore !== undefined ? { y: heightBefore } : {}),
+              }
             : null
         const shots = foeShots(state.shots ?? [], seat, (one) => teamOfSeat(state, one))
-        const hit = shotHitting(shots, seat, from, { x: frame.x, z: frame.z, at: now })
+        const to: Fix = {
+          x: frame.x,
+          z: frame.z,
+          at: now,
+          ...(height !== undefined ? { y: height } : {}),
+        }
+        const hit = shotHitting(shots, seat, from, to, terrain)
         if (hit) actions.push({ t: 'hit', seat, shot: hit.n, at: now })
       }
       // 2026-11-18, a team race: what this frame earns the kart's team (team.ts)
@@ -773,8 +808,10 @@ export function shotHitting(
   seat: SeatId,
   from: Fix | null,
   to: Fix,
+  /** 2026-11-23: the track's terrain, by which a shot's height is judged */
+  terrain: Terrain | null = null,
 ): KartShot | null {
-  return shots.find((shot) => shotHits(shot, seat, from, to)) ?? null
+  return shots.find((shot) => shotHits(shot, seat, from, to, 0, terrain)) ?? null
 }
 
 // ── The team race (2026-11-18, shared/kart/team.ts) ──────────────────────────────────────────────────
@@ -994,6 +1031,12 @@ function judgeItem(
   const thrown = (shot: KartShot, targets: SeatId[] = []): KartAction[] => [
     { t: 'use', seat, item, at: now, targets, blocked: [], warps: [], shot },
   ]
+  // 2026-11-23: on a track with terrain, how high it was at its last frame (the shot carries it)
+  const terrain = courseOf(track).terrain ?? null
+  const heightOf = (one: SeatId) => {
+    const y = memory.heights.get(one)
+    return y === undefined ? {} : { y }
+  }
   const thrower = {
     seat,
     x: last.x,
@@ -1001,6 +1044,7 @@ function judgeItem(
     heading: last.heading,
     vx: last.vx,
     vz: last.vz,
+    ...heightOf(seat),
   }
   // 2026-11-23 (#150): the moving obstacles at this moment, by the race clock (obstacles.ts), which
   // a hailstone stops at and a puddle lies clear of
@@ -1081,19 +1125,23 @@ function judgeItem(
         z: there.z,
         heading: there.heading,
         speed: Math.hypot(there.vx, there.vz),
+        ...heightOf(next.seat),
       }
-      return thrown(layFog(state.used, thrower, target, now, courseOf(track).walls, blockers), [next.seat])
+      return thrown(
+        layFog(state.used, thrower, target, now, courseOf(track).walls, blockers, terrain),
+        [next.seat],
+      )
     }
     case 'skip': {
       const warp = skipTo(track, seat, last.x, last.z, own.nextGate, own.crossings)
       return warp ? letJump(applied([], [warp])) : []
     }
     case 'decoy':
-      return thrown(dropDecoy(state.used, thrower, now, blockers))
+      return thrown(dropDecoy(state.used, thrower, now, blockers, terrain))
     case 'hail':
-      return thrown(throwHail(state.used, thrower, now, courseOf(track).walls, blockers))
+      return thrown(throwHail(state.used, thrower, now, courseOf(track).walls, blockers, terrain))
     case 'puddle':
-      return thrown(dropPuddle(state.used, thrower, now, blockers))
+      return thrown(dropPuddle(state.used, thrower, now, blockers, undefined, terrain))
     case 'cloud':
       if (!next || !there || distance > SHOT_TUNING.cloudReach) return []
       return thrown(sendCloud(state.used, thrower, next.seat, distance, now), [next.seat])

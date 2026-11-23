@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers'
 import type { RoomListing } from '../shared/protocol.ts'
 import type { Env } from './app.ts'
 import { LobbyBoard, type LobbyEntry } from './lobby-board.ts'
+import { QuickHolds } from './lobby-list.ts'
 
 const ENTRY_PREFIX = 'room:'
 /** `code:<four digits>` → the id of the room that number belongs to (shared/room-code.ts) */
@@ -15,6 +16,8 @@ export class LobbyDO extends DurableObject<Env> {
   private readonly board: LobbyBoard
   /** The alarm as last set (or found), so it is only written when it moves */
   private alarmAt: number | null = null
+  /** 2026-11-23: quick join's rooms being opened (in memory: lost on eviction, which only reopens the race) */
+  private readonly quick = new QuickHolds()
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -58,6 +61,19 @@ export class LobbyDO extends DurableObject<Env> {
     if (holder !== null && holder !== roomId && holder !== replacing) return holder
     await this.ctx.storage.put(key, roomId)
     return null
+  }
+
+  /**
+   * RPC from POST /api/rooms/quick (2026-11-23): null when `roomId` is the new room to open for
+   * `gameId`, or the room another quick join is opening for it, to be sent to instead
+   */
+  async claimQuick(gameId: string, roomId: string): Promise<string | null> {
+    return this.quick.claim(gameId, roomId, Date.now())
+  }
+
+  /** RPC from POST /api/rooms/quick: that room was not opened, or is full or gone */
+  async releaseQuick(gameId: string, roomId: string): Promise<void> {
+    this.quick.release(gameId, roomId)
   }
 
   /** RPC from GET /api/codes/<code>: the room the number belongs to, or null */

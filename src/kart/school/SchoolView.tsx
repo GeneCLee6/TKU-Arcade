@@ -72,7 +72,7 @@ import {
   type Progress,
 } from './store.ts'
 import { schoolTrack } from '../../../shared/kart/tracks/school.ts'
-import { PauseLayer } from '../ui/PauseLayer.tsx'
+import { PauseButton, PauseLayer } from '../ui/PauseLayer.tsx'
 
 registerMessages(KART_MESSAGES)
 // This screen's own strings, in its own chunk: the menu and a race never load them (2026-11-22)
@@ -457,6 +457,7 @@ function LessonScreen({
         </How>
       </LessonPanel>
       <Actions>
+        {!shown.done && <PauseButton t={t} />}
         <Button type="button" $size="sm" $variant="secondary" onClick={restart} data-testid="kart-school-restart">
           {t('kart.school.restart')}
         </Button>

@@ -1820,7 +1820,7 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **房主代跑的短斷線寬限**（`BOT_HOST_GRACE_MS` 15 s；`KART-NETCODE.md` §25）：#90 是房主 socket 一關電腦車就退賽。現在房主的 socket 關掉時先不退，**同一個頁面**（`join` 的 `session`，#153）在 15 秒內回來就繼續代跑；超過 15 秒（`botGraceAt` 排進房間的 alarm，`sweep` 時判）、或房主從**另一個頁面**回來（重新整理、另開分頁：新頁面不會中途接手），才 `abandon`。轉移房主、離線太久被換掉、`leave` 照舊立刻退。15 秒小於卡丁車「20 秒沒有 frame 就退賽」（`RETIRE_AFTER_MS`），兩條規則不打架。**不做交接給別的玩家**：理由在 `KART-NETCODE.md` §25。
 - **預算**（擁有者照 #160 的建議）：`check-budget` 的「卡丁車全部 chunk 合計」改成只報不擋（照樣印出），擋的是「從選單進一場比賽」那列 480（`KART-PERF.md` §12）。
 - **測試**：`tests/worker/lobby-list.test.ts`（首頁只回可加入的、`game` 回全部與排序、舊列沒有 `status`；2 秒沿用與每個 binding 各自；`?game` 不存在 400；每位址限制、換位址不受影響、本機不限；快速加入：挑真人多的、問過房間才算、跳過剛滿／開賽／上鎖的、沒有就開本週賽道道具賽的公開房並帶房名與電腦車、房名與電腦車不合 400、開房吃建房額度、找房吃列表額度、只收 POST；房名規則）；`tests/worker/room-host.test.ts`、`room-robustness.test.ts`（坐滿與比賽中照列並標示、有密碼標 `locked`）；`tests/worker/room-bots.test.ts`（房主斷線 15 秒內不退、滿 15 秒退且比賽照跑、同一頁面 4 秒回來之後永遠不退且還能代送、另一個頁面回來立刻退、寬限中 hibernation、loading 時不卡開賽、只剩房主與電腦車；卡丁車房的列表帶房名、電腦車數、選項、不帶自訂代碼、電腦車坐 1、2 號等房主開賽）；`tests/worker/rooms.test.ts`（建房多兩個參數）；`tests/kart/onlineView.test.tsx`（狀態與篩選、列表的房名／賽道／人數／密碼／加入與觀戰、快速加入送 `seatBots`、開房預設私人帶房名、擋字的房名不能送、站長暫停的提示）；`tests/scripts/check-budget.test.ts`（合計再大也不擋、比賽那列超過 480 擋）；`e2e/kart-online.spec.ts`（兩個瀏覽器：Ann 從 `/kart` 左上「線上對戰」快速加入，Bob 用手機尺寸從列表看到那間「等待中」並按加入，兩人在同一個等待室）。
-- **已知限制**：列表是輪詢（每人每 10 秒一次 Worker 請求），不是推送；房間要有人進去才會出現在列表（快速加入開的房，房主一進來就列）；兩個人同時快速加入又都沒房時會各開一間（各自出現在對方的列表上）；有密碼的公開房只能在等待室事後設，建房表單不收密碼；房名沒有在比賽畫面顯示。
+- **已知限制**：列表是輪詢（每人每 10 秒一次 Worker 請求），不是推送；房間要有人進去才會出現在列表（快速加入開的房，房主一進來就列）；房名沒有在比賽畫面顯示（同時快速加入各開一間、建房表單不收密碼：§4.87 解決）。
 
 
 ### 4.85 路線圖外：桌遊牌桌的電競化（共用元件）（2026-11-23，`feat/boardgame-table-esports`）
@@ -1849,7 +1849,19 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **測試**：`tests/kart/driverRig.test.ts`（IK 手到目標、肘在 pole 那側、伸不到就伸直、太近就折；方向盤右轉右手下左手上；靜止坐正、右轉傾斜與看、甩尾看內側且反打、噴射後仰、暈眩搖晃且鬆手、肘角；四位車手的待機與勝利各不相同、待機手不離方向盤、四種勝利的形狀、從靜止升起、頒獎台換成自己的勝利；彈簧蹲低、空中升、落地壓縮回彈並停穩、長幀與短幀一致；光暈隨油門；導流板方向與上限）、`tests/kart/kartModelRig.test.ts`（真的車模型：右轉時右手下降左手上升、兩手距離不變；勝利時雙手舉高；低畫質車手合併、沒有手的關節）、`e2e/kart-spike.spec.ts`「the drivers' skeleton」（四位車手的駕駛、轉向、甩尾、暈眩、勝利，GPU 截圖附在報告，畫面有變、console 乾淨）。
 - **成本**：從選單進比賽 371.1 → 374.8 kB（上限 480）；fps 與 draw calls 見 `KART-PERF.md` §13。
 
-### 4.87 路線圖外：反向賽道（2026-11-23，NEXT §5「反向賽道與倒車賽段」，`feat/kart-reverse-tracks`）
+### 4.87 路線圖外：卡丁車玩法缺口（道具看高度、小地圖障礙物、暫停鍵、觀戰完賽倒數、快速加入競態、建房密碼）（2026-11-23，`feat/kart-gaps`）
+
+擁有者 2026-11-23「全照建議」。NEXT §5 的六個缺口。**物理不動**（`flatGolden`、`branchGolden` 不變），frame 格式不變。
+
+- **道具看高度**（`shared/kart/shots.ts`，`KART-NETCODE.md` §26）：有地形的賽道上，每個投射物多一個 `y`：泥灘、假道具箱、海霧是**放下那一刻所在路段的路面高度**（`groundAt` 帶丟的人的高度當 `near`：立體交叉的上層丟就在上層、在空中丟就落到下面那條路）；冰雹是**出手的高度**，之後沿所在路段飛（離開立體交叉區就是那裡唯一的路面；在區內從進區那點每 3 m 用 `near` 追著走，所以下層的冰雹留在高架下、上層的留在高架上），空中丟的冰雹照地形重力（30 m/s²）落回路面。命中（`shotHits`）在平面上最近的那一刻比高度：差超過車身（`KART_BODY_HEIGHT` 1.5 m）就不作用；海霧是一團霧，從車身以下到路面上 4 m 都算。牆（`rayToWall` 的 `passes`：有 `top`／`base` 的牆照車撞牆的規則，冰雹從上層路緣下方穿過）與會動的障礙物（`obstacleStop` 的 `heightAt`、`obstacleAtHeight`：欄杆只擋同一層、貨櫃擋到它的頂 2.6 m）也看冰雹當下的高度；泥灘、假道具箱只讓開自己那層的障礙物（`clearOfObstacles` 的 `y`），海霧只把自己那層的障礙物當牆。**房間**（`shared/games/kart/rules.ts`）在道具賽每收到一個 frame 用 `heightSeen`（和別人畫車的 `createHeightKeeper` 同一步：`airborne` 旗標＋上一個高度）記每台車的高度（`Memory.heights`，記憶體；遺失時那台在立體交叉先當下層，下一個 frame 就對）；出手時丟的人、海霧的目標都帶高度。**瀏覽器**的本機預測（`foreseeHit`）用自己車的真實 `y`；三個畫投射物的地方（比賽、觀戰、重播）用 `shotHeight` 畫在它那層（`ShotLook.y`）。**沒有 `y` 的投射物**（平路賽道、更新前的比賽與重播檔）完全照平面判定，舊重播照播；`isShot` 只多收一個可有可無的數字。
+- **小地圖畫障礙物**（`src/kart/Minimap.tsx`，#143）：`obstacles` 是賽道的 JSON，`place(…, tick)` 多帶比賽時鐘（`spikeLoop` 的 `onPose` 第五個參數；觀戰、重播用畫面的 `tick`）。欄杆畫成路寬方向的線：放下紅、預告琥珀、升起細綠；貨櫃畫在它當下滑到的位置：停著黃、預告琥珀、滑動中紅。每幀只改狀態變了的屬性與貨櫃的路徑，不經 React。沒有障礙物的賽道什麼都不多。
+- **暫停鍵**（#152）：駕訓班、挑戰（任務與獎牌）、計時賽各自按鈕列的第一顆多「暫停」（`PauseButton`，`Button` 的 `sm`：觸控時 44 px），按下去打開同一個暫停選單（`PauseLayer` 聽頁面內的 `kart-pause-open` 事件；選單不收鍵時——結果出來、別的面板開著——不開）。
+- **觀戰的完賽倒數**（#152）：倒數抽成 `src/kart/ui/useCloseCountdown.ts`（比賽畫面與觀戰共用，同一個 `closeAt`、同一個倒數音效）；觀戰畫面（含轉播 #164）用房間的時鐘（`createServerClock`）顯示同一個 `CloseCountdown`，隱藏介面時一起藏。
+- **快速加入的競態**（#163，`worker/lobby-list.ts` 的 `QuickHolds`、`LobbyDO.claimQuick`／`releaseQuick`）：列表上沒有可加入的房時，先產生新房 id 向 LobbyDO 登記（一個物件、一次一個呼叫，`claim` 裡沒有 await）；同款遊戲 15 秒內已有登記就回那間，後到的每 150 ms 問那間房的 `summary()`，最多 3 秒：出現且還能加入就回 `200 { created: false }`，沒出現或已滿就放掉登記、開自己的。開房用登記的 id（`openRoom` 的 `firstId`）；吃不到建房額度或開房失敗會放掉登記。登記只放記憶體（LobbyDO 被換掉就等於沒登記，最多回到以前的「各開一間」）。
+- **建房表單收密碼**（#163，`OnlineView.tsx` 的 `CreateForm`）：「邀請朋友 → 開房間」多一格「密碼（選填）」，照 `normalizePassword`（去頭尾空白、最多 32 字、不能只有空白；不行就提示並鎖住送出）；送 `CreateRoomRequest.password`（伺服器本來就收）。密碼和房間原本一樣是明碼的門牌（房裡的人看得到，沒有雜湊）。**私人／公開的邏輯不變**：有密碼的房建立時不列（`public && password === null`），選公開又填密碼時表單直接說「不會列在公開列表上」。建好後 `keepRoomPassword` 先記住，建房的人進房不會被問密碼。
+- **測試**：`tests/kart/shotHeights.test.ts`（竹圍高架：上下層的泥灘與假箱子只打自己那層、空中飛過、沒有高度照平面；冰雹沿下層飛過高架路緣、打下層不打上層、本機預測一致、上層留在上層、空中丟的落回路面；障礙物的高度、泥灘只讓開自己那層；海霧的高度範圍；`isShot`、重播帶高度與舊檔不帶）、`tests/kart/minimapObstacles.test.tsx`（閘門巷四個障礙物隨時鐘變色、貨櫃移動、不給時鐘不變、沒有障礙物的賽道）、`tests/kart/pauseButton.test.tsx`、`tests/kart/closeCountdown.test.ts`、`tests/worker/lobby-list.test.ts`（兩個並發快速加入只開一間、都進那間、之後的第三個也進那間；登記的房沒出現就開自己的；`QuickHolds`）、`tests/kart/onlineView.test.tsx`（建房帶密碼、記住、只有空白不能送、公開＋密碼的提示、沒填不送）。
+
+### 4.88 路線圖外：反向賽道（2026-11-23，NEXT §5「反向賽道與倒車賽段」，`feat/kart-reverse-tracks`）
 
 擁有者：「接著做未完成的」。14 張內建比賽賽道**全部**有反向版，各自是一張賽道（獨立 id），不是比賽選項：紀錄、幽靈車、排行榜、獎牌、`kart:meta` 前三名都分開，伺服器的 `judgeFrame` 也照 id 拿反向賽道的資料裁定（`raceTrack(id)`），協定不動。
 
