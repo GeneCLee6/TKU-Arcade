@@ -185,3 +185,49 @@ describe('a replay file (.tkureplay)', () => {
     expect(linkedReplay('')).toBeNull()
   })
 })
+
+// 2026-11-23 (docs/KART-NETCODE.md §11.4; #177's known limit): what each driver wore, in the header
+describe("a replay file's outfits", () => {
+  it('keeps what each racer wore, and an older file has none (the race suit)', async () => {
+    const replay = race(5)
+    const worn: ReplayFileInfo = { ...INFO, outfits: [{ seat: 1, outfit: 'street' }] }
+    const read = await readReplayFile(await writeReplayFile(replay, worn))
+    expect(read.ok && read.file.outfits).toEqual([{ seat: 1, outfit: 'street' }])
+    const old = await readReplayFile(await writeReplayFile(replay, INFO))
+    expect(old.ok && old.file.outfits).toBeUndefined()
+    // A page from before reads the new header as it always did (its fields are all still there)
+    const body = packReplayFile(replay, worn)
+    const headerLength = new DataView(body.buffer).getUint32(0, true)
+    const header = JSON.parse(new TextDecoder().decode(body.subarray(4, 4 + headerLength)))
+    expect(header).toMatchObject({ revision: 3, you: 0, savedAt: INFO.savedAt })
+    expect(header.names).toHaveLength(2)
+  })
+
+  it('leaves out an outfit it does not know, a seat twice, a racer not in it; never refuses the file', () => {
+    const replay = race(2)
+    const body = packReplayFile(replay, {
+      ...INFO,
+      outfits: [
+        { seat: 0, outfit: 'campus' },
+        { seat: 0, outfit: 'street' },
+        { seat: 1, outfit: 'tuxedo' as never },
+        { seat: 7, outfit: 'street' },
+      ],
+    })
+    const read = unpackReplayFile(body)
+    expect(read.ok && read.file.outfits).toEqual([{ seat: 0, outfit: 'campus' }])
+    // Not a list at all: no outfits, the file still read
+    const plain = packReplayFile(replay, INFO)
+    const length = new DataView(plain.buffer).getUint32(0, true)
+    const header = JSON.parse(new TextDecoder().decode(plain.subarray(4, 4 + length)))
+    const odd = new TextEncoder().encode(JSON.stringify({ ...header, outfits: 'street' }))
+    const rest = plain.subarray(4 + length)
+    const bent = new Uint8Array(4 + odd.length + rest.length)
+    new DataView(bent.buffer).setUint32(0, odd.length, true)
+    bent.set(odd, 4)
+    bent.set(rest, 4 + odd.length)
+    const oddRead = unpackReplayFile(bent)
+    expect(oddRead.ok).toBe(true)
+    expect(oddRead.ok && oddRead.file.outfits).toBeUndefined()
+  })
+})

@@ -242,10 +242,10 @@ export const SHOWPIECE_SECONDS = 3.2
 // finger pointed straight at the sky, the left fist on the hip, the weight forward
 const SPADE_WIN: readonly Key[] = [
   [0, {}],
-  [0.35, { rightUp: 0.55, rightOut: -0.75, rightBend: 1.3, leftUp: 0.25, leftOut: 0.35, leftBend: 1.2, twist: 0.28, headTurn: 0.35, headUp: -0.15, hipDrop: 0.04, rightHand: 'fist', leftHand: 'open' }],
-  [0.6, { rightUp: 0.6, rightOut: -0.8, rightBend: 1.35, leftUp: 0.25, leftOut: 0.35, leftBend: 1.2, twist: 0.34, headTurn: 0.4, headUp: -0.18, hipDrop: 0.05, rightHand: 'fist', leftHand: 'open' }],
+  [0.35, { rightUp: 0.5, rightOut: -0.62, rightBend: 1.3, leftUp: 0.25, leftOut: 0.35, leftBend: 1.2, twist: 0.2, headTurn: 0.3, headUp: 0, hipDrop: 0.04, rightHand: 'fist', leftHand: 'open' }],
+  [0.6, { rightUp: 0.55, rightOut: -0.66, rightBend: 1.35, leftUp: 0.25, leftOut: 0.35, leftBend: 1.2, twist: 0.24, headTurn: 0.34, headUp: 0, hipDrop: 0.05, rightHand: 'fist', leftHand: 'open' }],
   [0.9, { rightUp: 1.7, rightOut: 1.05, rightBend: 0.15, leftUp: 0.3, leftOut: 0.5, leftBend: 1.5, twist: -0.18, headTurn: -0.25, headUp: 0.1, leftStep: 0.08, rightHand: 'fist', leftHand: 'fist' }],
-  [1.25, { rightUp: 2.95, rightOut: 0.08, leftUp: 0.35, leftOut: 0.6, leftBend: 1.65, headUp: 0.38, headTurn: 0.05, torsoBack: 0.12, leftStep: 0.16, hipShift: -0.03, rightHand: 'point', leftHand: 'fist' }],
+  [1.25, { rightUp: 2.95, rightOut: 0.32, leftUp: 0.35, leftOut: 0.6, leftBend: 1.65, headUp: 0.38, headTurn: 0.05, torsoBack: 0.12, leftStep: 0.16, hipShift: -0.03, rightHand: 'point', leftHand: 'fist' }],
 ]
 
 // Hartie blows a kiss: a hand to the visor's chin, thrown out to the crowd (the hearts fly from it),
@@ -253,8 +253,8 @@ const SPADE_WIN: readonly Key[] = [
 const HEART_RAISED: Partial<GesturePose> = { leftUp: 2.55, rightUp: 2.55, leftOut: 0.95, rightOut: 0.95, leftBend: 1.25, rightBend: 1.25, headUp: 0.2, torsoBack: 0.1, leftHand: 'open', rightHand: 'open' }
 const HEART_WIN: readonly Key[] = [
   [0, {}],
-  [0.4, { rightUp: 1.75, rightOut: -0.2, rightBend: 2.1, headTilt: 0.18, headUp: 0.05, twist: 0.06, rightHand: 'open', leftHand: 'relax' }],
-  [0.62, { rightUp: 1.8, rightOut: -0.2, rightBend: 2.15, headTilt: 0.24, headUp: 0.08, twist: 0.08, rightHand: 'open', leftHand: 'relax' }],
+  [0.4, { rightUp: 1.35, rightOut: -0.4, rightBend: 1.45, headTilt: 0.18, headUp: 0.05, twist: 0.06, rightHand: 'open', leftHand: 'relax' }],
+  [0.62, { rightUp: 1.4, rightOut: -0.4, rightBend: 1.45, headTilt: 0.24, headUp: 0.08, twist: 0.08, rightHand: 'open', leftHand: 'relax' }],
   [0.85, { rightUp: 2.1, rightOut: 1.0, rightBend: 0.15, twist: -0.12, torsoBack: 0.1, headUp: 0.2, headTilt: -0.1, rightStep: 0.1, leftUp: 0.4, leftOut: 0.3, leftBend: 0.6, rightHand: 'open', leftHand: 'open' }],
   [1.5, { rightUp: 2.15, rightOut: 1.05, rightBend: 0.1, twist: -0.12, torsoBack: 0.1, headUp: 0.22, headTilt: -0.12, rightStep: 0.1, leftUp: 0.45, leftOut: 0.3, leftBend: 0.6, rightHand: 'open', leftHand: 'open' }],
   [1.95, HEART_RAISED],
@@ -268,8 +268,8 @@ export const KISS_FLIGHT = 1.7
 const DEE_SUM: Partial<GesturePose> = { leftUp: 1.2, leftOut: 0.15, leftBend: 1.35, prop: 1, rightUp: 1.15, rightOut: 0.3, rightBend: 1.4, headUp: -0.22, headTurn: -0.1, leftHand: 'grip', rightHand: 'point' }
 const DIAMOND_WIN: readonly Key[] = [
   [0, {}],
-  [0.35, { rightUp: 2.0, rightOut: -0.35, rightBend: 2.25, headUp: 0.02, rightHand: 'point', leftHand: 'relax' }],
-  [0.6, { rightUp: 2.15, rightOut: -0.35, rightBend: 2.1, headUp: 0.16, rightHand: 'point', leftHand: 'relax' }],
+  [0.35, { rightUp: 1.55, rightOut: -0.3, rightBend: 1.4, headUp: 0.02, rightHand: 'point', leftHand: 'relax' }],
+  [0.6, { rightUp: 1.65, rightOut: -0.3, rightBend: 1.35, headUp: 0.16, rightHand: 'point', leftHand: 'relax' }],
   [1.0, DEE_SUM],
   [1.9, DEE_SUM],
   [2.3, { leftUp: 1.45, leftOut: 0.15, leftBend: 1.25, prop: 1, rightUp: 2.25, rightOut: 0.35, rightBend: 0.55, vSign: 1, headUp: 0.12, headTilt: -0.18, headTurn: -0.2, hipShift: -0.035, rightLift: 0.12, rightStep: -0.12, leftHand: 'grip', rightHand: 'vee' }],
@@ -277,7 +277,7 @@ const DIAMOND_WIN: readonly Key[] = [
 
 // Clover curls a dumbbell twice, presses it overhead, puts it away and flexes both arms, roaring
 const CLOVER_CURL: Partial<GesturePose> = { rightUp: 0.35, rightOut: 0.1, rightBend: 0.2, prop: 1, stance: 0.1, hipDrop: 0.03, leftUp: 0.6, leftOut: 0.4, leftBend: 1.6, headUp: 0.05, rightHand: 'grip', leftHand: 'fist' }
-const CLOVER_PRESS: Partial<GesturePose> = { rightUp: 2.9, rightOut: 0.05, prop: 1, leftUp: 1.55, leftOut: 1.35, leftBend: 1.6, stance: 0.12, hipDrop: 0.02, headUp: 0.25, torsoBack: 0.08, rightHand: 'grip', leftHand: 'fist' }
+const CLOVER_PRESS: Partial<GesturePose> = { rightUp: 2.9, rightOut: 0.25, prop: 1, leftUp: 1.55, leftOut: 1.35, leftBend: 1.6, stance: 0.12, hipDrop: 0.02, headUp: 0.25, torsoBack: 0.08, rightHand: 'grip', leftHand: 'fist' }
 const CLOVER_WIN: readonly Key[] = [
   [0, {}],
   [0.3, CLOVER_CURL],

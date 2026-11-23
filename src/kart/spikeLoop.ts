@@ -63,9 +63,12 @@ import {
   CELEBRATE_SECONDS,
   countdownShot,
   finishShot,
+  groupHalfAngle,
   inIntro,
   openingShot,
+  pickGroupAngle,
   type CameraShot,
+  type GroupAngle,
 } from './director.ts'
 import { isRacePaused } from './race/raceClock.ts'
 import { beepsPlayed, playBeep, startBeep } from './audio/countBeeps.ts'
@@ -335,6 +338,8 @@ export interface SpikeDebug {
     readonly shots?: readonly { item: ShotItem; ahead: number; right: number; n?: number }[]
     readonly bursts?: readonly { kind: HitBurst['kind']; ahead: number; right: number }[]
   } | null
+  /** 2026-11-23 (director.ts's `pickGroupAngle`): where the group shot stands on this grid */
+  groupAngle?: GroupAngle
 }
 
 declare global {
@@ -709,6 +714,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
 
   // Whether a shot of director.ts's was last given to the scene
   let directed = false
+  // 2026-11-23 (§4.96): where the group shot stands, worked out once for this grid and screen shape
+  // (away from anything in the way)
+  let groupAngle: { key: string; angle: GroupAngle } | null = null
   // §4.43: the fly round skipped (any key or touch), and when this kart crossed the line
   let skipped = false
   let finishedAt: number | null = null
@@ -1043,11 +1051,22 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       )
     } else if (net?.gridSpots && trial?.phase === 'countdown') {
       const spots = net.gridSpots()
+      const aspect = window.innerWidth / Math.max(1, window.innerHeight)
+      const grounded = current.y ?? 0
+      const opens = !skipped && opening.group && (left === null || inIntro(left))
+      const key = `${spots.length}:${aspect.toFixed(2)}:${grounded.toFixed(1)}:${reduced}`
+      if (opens && groupAngle?.key !== key) {
+        groupAngle = {
+          key,
+          angle: pickGroupAngle(spots, scene.sightBlocked, grounded, groupHalfAngle(aspect), reduced),
+        }
+        debug.groupAngle = groupAngle.angle
+      }
       shot =
         (skipped
           ? null
-          : openingShot(spots, left, opening, reduced, current.y ?? 0, window.innerWidth / Math.max(1, window.innerHeight))) ??
-        countdownShot(spots, left, reduced, current.y ?? 0)
+          : openingShot(spots, left, opening, reduced, grounded, aspect, groupAngle?.angle)) ??
+        countdownShot(spots, left, reduced, grounded)
     }
     if (shot || directed) scene.shot(shot)
     directed = shot !== null

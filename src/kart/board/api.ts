@@ -9,13 +9,15 @@ import {
   type BoardResponse,
   type BoardUploadResponse,
 } from '../../../shared/kart/board.ts'
-import { ghostFromReplay } from '../../../shared/kart/boardRun.ts'
+import { ghostFromReplay, replayLoadout } from '../../../shared/kart/boardRun.ts'
+import { DEFAULT_OUTFIT } from '../../../shared/kart/outfits.ts'
 import { physicsStamp } from '../../../shared/kart/boardStamp.ts'
 import type { Ghost } from '../../../shared/kart/ghost.ts'
 import type { Replay } from '../../../shared/kart/replay.ts'
 import { readReplayFile, writeReplayFile } from '../../../shared/kart/replayFile.ts'
 import { recordKey } from '../../../shared/kart/track.ts'
 import { readStored, writeStored } from '../../lib/storage.ts'
+import { loadOutfit } from '../bodies.ts'
 import { spikeTrack, type SpikeCourse } from '../courses.ts'
 import { trackAchievement } from '../../achievements/track.ts'
 
@@ -45,11 +47,15 @@ export async function uploadRun(
   nick: string,
 ): Promise<UploadResult> {
   try {
+    // 2026-11-23: what the driver wore, so that the board's replay shows it (a frame cannot say)
+    const driver = replayLoadout(run.replay)?.driver
+    const outfit = driver ? loadOutfit(driver) : DEFAULT_OUTFIT
     const file = await writeReplayFile(run.replay, {
       revision: run.revision,
       names: [{ seat: 0, name: nick }],
       you: 0,
       savedAt: Date.now(),
+      ...(outfit !== DEFAULT_OUTFIT ? { outfits: [{ seat: 0, outfit }] } : {}),
     })
     const query = new URLSearchParams({
       track: run.track,

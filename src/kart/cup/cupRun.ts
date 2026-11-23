@@ -11,6 +11,7 @@
 import type { KartMode, KartTeams } from '../../../shared/games/kart/types.ts'
 import { MAX_LAPS } from '../../../shared/games/kart/info.ts'
 import { DRIVER_IDS, KART_IDS } from '../../../shared/kart/karts.ts'
+import { isOutfitId } from '../../../shared/kart/outfits.ts'
 import type { AnyRaceTrackId } from '../../../shared/kart/tracks/list.ts'
 import { BOT_NAMES, drawBots, MAX_BOTS, type BotEntry } from '../bots/roster.ts'
 import { isDifficulty, type Difficulty } from '../bots/skill.ts'
@@ -151,11 +152,13 @@ export function parseCupSetup(value: unknown): CupSetup | null {
 
 function parseEntry(value: unknown): BotEntry | null {
   if (typeof value !== 'object' || value === null) return null
-  const { name, kart, driver } = value as Record<string, unknown>
+  const { name, kart, driver, outfit } = value as Record<string, unknown>
   const okName = BOT_NAMES.find((one) => one === name)
   const okKart = KART_IDS.find((one) => one === kart)
   const okDriver = DRIVER_IDS.find((one) => one === driver)
-  return okName && okKart && okDriver ? { name: okName, kart: okKart, driver: okDriver } : null
+  if (!okName || !okKart || !okDriver) return null
+  // 2026-11-23: what the driver wears; a cup kept before then (or an outfit not known) has none
+  return { name: okName, kart: okKart, driver: okDriver, ...(isOutfitId(outfit) ? { outfit } : {}) }
 }
 
 /** A run from storage, or null when it is not one (a hand edit, an old format) */

@@ -8,9 +8,15 @@
 //   5  u8  flags: bit 0, the rest is deflated (deflate-raw)
 //   6  the rest: u32 length of the header's JSON, the header, then the replay's own bytes
 //
+// 2026-11-23 (docs/KART-NETCODE.md §11.4): the header may also say what each racer's driver wore
+// (`outfits`): a frame's body byte has no room for it. Left out (a file saved before then), or an
+// outfit this page does not know, the race suit is drawn. The file's version stays 1: a page from
+// before reads the header's fields it knows and leaves the rest.
+//
 // Reading one trusts nothing: the size is limited before and while it is inflated, the header is
 // checked field by field, and the replay itself by decodeReplay. Pure apart from the browser's (and
 // Node's) CompressionStream.
+import { isOutfitId, type OutfitId } from './outfits.ts'
 import type { Replay } from './replay.ts'
 import { decodeReplay, encodeReplay, REPLAY_LIMITS, REPLAY_MAGIC, REPLAY_VERSION } from './replayBlob.ts'
 
@@ -42,6 +48,8 @@ export interface ReplayFileInfo {
   readonly you: number | null
   /** When it was saved, ms since 1970 */
   readonly savedAt: number
+  /** 2026-11-23: what each racer's driver wore, by seat (the race suit left out); none in older files */
+  readonly outfits?: readonly { readonly seat: number; readonly outfit: OutfitId }[]
 }
 
 export interface ReplayFile extends ReplayFileInfo {
@@ -76,7 +84,31 @@ function checkInfo(value: unknown): ReplayFileInfo | null {
     if (typeof name !== 'string' || name.length > NAME_LENGTH * 4) return null
     kept.push({ seat: seat as number, name: cleanName(name) })
   }
-  return { revision: revision as number, names: kept, you: you as number | null, savedAt }
+  const outfits = checkOutfits(info.outfits)
+  return {
+    revision: revision as number,
+    names: kept,
+    you: you as number | null,
+    savedAt,
+    ...(outfits.length > 0 ? { outfits } : {}),
+  }
+}
+
+/**
+ * The outfits a header names, those that make sense: a seat once each, an outfit this page knows.
+ * Anything else is left out rather than the file refused (it only changes what a driver wears)
+ */
+function checkOutfits(value: unknown): { seat: number; outfit: OutfitId }[] {
+  if (!Array.isArray(value)) return []
+  const kept: { seat: number; outfit: OutfitId }[] = []
+  for (const one of value.slice(0, REPLAY_LIMITS.seats) as unknown[]) {
+    if (typeof one !== 'object' || one === null) continue
+    const { seat, outfit } = one as Record<string, unknown>
+    if (!Number.isInteger(seat) || (seat as number) < 0 || (seat as number) >= REPLAY_LIMITS.seats) continue
+    if (!isOutfitId(outfit) || kept.some((other) => other.seat === seat)) continue
+    kept.push({ seat: seat as number, outfit })
+  }
+  return kept
 }
 
 /** The file's contents before deflating: header and replay */
@@ -87,6 +119,9 @@ export function packReplayFile(replay: Replay, info: ReplayFileInfo): Uint8Array
       names: info.names.map(({ seat, name }) => ({ seat, name: cleanName(name) })),
       you: info.you,
       savedAt: info.savedAt,
+      ...(info.outfits && info.outfits.length > 0
+        ? { outfits: info.outfits.map(({ seat, outfit }) => ({ seat, outfit })) }
+        : {}),
     }),
   )
   const blob = encodeReplay(replay)
@@ -120,10 +155,13 @@ export function unpackReplayFile(body: Uint8Array): ReplayFileResult {
   if (!replay) return { ok: false, problem: 'broken' }
   // The names are of the racers in it, and whoever saved it raced in it or is nobody
   const racing = new Set(replay.racers.map((racer) => racer.seat))
+  const outfits = info.outfits?.filter((one) => racing.has(one.seat)) ?? []
   return {
     ok: true,
     file: {
-      ...info,
+      revision: info.revision,
+      savedAt: info.savedAt,
+      ...(outfits.length > 0 ? { outfits } : {}),
       names: info.names.filter((one) => racing.has(one.seat)),
       you: info.you !== null && racing.has(info.you) ? info.you : null,
       replay,
