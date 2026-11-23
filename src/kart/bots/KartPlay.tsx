@@ -2,7 +2,7 @@
 // docs/ARCHITECTURE.md §4.20) or a Grand Prix (§4.24). Each is its own lazy chunk, loaded only when
 // one starts. A Grand Prix under way (and not left for the menu) opens again on a reload. 2026-11-20
 // (§4.50): and the driving school; 2026-11-21 (§4.60): and the challenges; 2026-11-23 (§4.81): and
-// the leaderboard, whose rows' ghosts the time trial races.
+// the leaderboard, whose rows' ghosts the time trial races; 2026-11-23 (§4.82): and the online races.
 import { lazy, Suspense, useState } from 'react'
 import styled from 'styled-components'
 import { useT } from '../../i18n/useT.ts'
@@ -21,6 +21,8 @@ const SchoolView = lazy(() => import('../school/SchoolView.tsx'))
 const ChallengeView = lazy(() => import('../challenge/ChallengeView.tsx'))
 // 2026-11-23 (§4.81): the leaderboard, its own chunk
 const BoardView = lazy(() => import('../board/BoardView.tsx'))
+// 2026-11-23 (§4.82): the online races (the race rooms, quick join), its own chunk
+const OnlineView = lazy(() => import('../online/OnlineView.tsx'))
 
 type Playing =
   | { kind: 'bots'; setup: BotSetup }
@@ -28,6 +30,7 @@ type Playing =
   | { kind: 'school' }
   | { kind: 'challenge' }
   | { kind: 'board' }
+  | { kind: 'online' }
   | null
 
 function resumed(): Playing {
@@ -37,6 +40,8 @@ function resumed(): Playing {
   if (new URLSearchParams(window.location.search).has('challenge')) return { kind: 'challenge' }
   // /kart?board (or ?board=<track>) opens the leaderboard
   if (new URLSearchParams(window.location.search).has('board')) return { kind: 'board' }
+  // /kart?online opens the online races
+  if (new URLSearchParams(window.location.search).has('online')) return { kind: 'online' }
   const run = loadCupRun()
   if (!run || run.away) return null
   const next = resumeCup(run)
@@ -104,6 +109,19 @@ export function KartPlay() {
     setChase(ghost)
     setPlaying(null)
   }
+  // The online races are in the address too
+  const openOnline = () => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('online', '')
+    window.history.replaceState(null, '', url)
+    setPlaying({ kind: 'online' })
+  }
+  const leaveOnline = () => {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('online')
+    window.history.replaceState(null, '', url)
+    setPlaying(null)
+  }
   if (!playing) {
     return (
       <SpikePage
@@ -114,6 +132,7 @@ export function KartPlay() {
         onSchool={openSchool}
         onChallenge={openChallenge}
         onBoard={openBoard}
+        onOnline={openOnline}
         chase={chase}
         onStopChase={() => setChase(null)}
       />
@@ -128,7 +147,9 @@ export function KartPlay() {
                 ? 'kart.challenge.loading'
                 : playing.kind === 'board'
                   ? 'kart.board.opening'
-                  : 'kart.bots.loading',
+                  : playing.kind === 'online'
+                    ? 'kart.online.opening'
+                    : 'kart.bots.loading',
           )}
         </Loading>}>
       {playing.kind === 'bots' ? (
@@ -137,6 +158,8 @@ export function KartPlay() {
         <SchoolView onExit={leaveSchool} />
       ) : playing.kind === 'challenge' ? (
         <ChallengeView onExit={leaveChallenge} />
+      ) : playing.kind === 'online' ? (
+        <OnlineView onExit={leaveOnline} />
       ) : playing.kind === 'board' ? (
         <BoardView
           onExit={() => leaveBoard()}

@@ -122,6 +122,7 @@ export function SpikePage({
   onSchool,
   onChallenge,
   onBoard,
+  onOnline,
   chase = null,
   onStopChase,
 }: {
@@ -141,6 +142,8 @@ export function SpikePage({
    * week's; a time trial's results then offer to upload the run
    */
   onBoard?: (track?: string) => void
+  /** 2026-11-23 (§4.82): /kart's menu opens the online races (src/kart/online/) */
+  onOnline?: () => void
   /** 2026-11-23: a board row's ghost races along on its track, instead of this browser's own */
   chase?: BoardChase | null
   onStopChase?: () => void
@@ -485,6 +488,11 @@ export function SpikePage({
           {t('kart.spike.menu')}
         </MenuButton>
         <Buttons id={menuId} $open={menuOpen}>
+          {onOnline && (
+            <Button $size="sm" $variant="primary" onClick={onOnline} data-testid="kart-online-open">
+              {t('kart.online.open')}
+            </Button>
+          )}
           {onSchool && (
             <Button
               $size="sm"

@@ -1,5 +1,7 @@
 // JS budgets (docs/PRD/e12-platform-security-cost-ops.md): the main site and each board game's first
-// screen ≤ 150 kB gzip; the kart, three.js included, ≤ 600 kB gzip counted separately.
+// screen ≤ 150 kB gzip; a kart race from the menu, three.js included, ≤ 480 kB gzip counted separately.
+// Every kart chunk together (once ≤ 600 kB) is reported, not limited, since 2026-11-23 (docs/KART-PERF.md
+// §12): splitting a chunk only makes that sum bigger, and the race line is what a player waits for.
 //
 // A page's JS is what it loads before it can render: the entry chunk and its static imports, the
 // page's language (src/i18n/messages.<language>.ts, counted in the heavier of the two), plus for a
@@ -24,7 +26,9 @@ const MAIN_LIMIT = 150 * KB
 // cost it one meta line and a name; anything bigger belongs in the game's own chunks
 const LOBBY_LIMIT = 103 * KB
 const WARN_MARGIN = 10 * KB
-const KART_LIMIT = 600 * KB
+// 2026-11-23 (docs/KART-PERF.md §12): what every kart chunk together once had to stay under; still
+// printed beside the sum, which no longer fails the build
+const KART_TOTAL_REFERENCE = 600 * KB
 const ROOM_PAGE = 'src/pages/RoomPage.tsx'
 
 if (!existsSync(MANIFEST)) {
@@ -128,12 +132,16 @@ const budgets = [
   })),
 ]
 
-// Chunks the main site already loads are its budget's concern, not the kart's
+// Chunks the main site already loads are its budget's concern, not the kart's. 2026-11-23 (the owner,
+// as #160 suggested; docs/KART-PERF.md §12): every kart chunk together, the editor's, the school's,
+// the challenges' and the online rooms' included, is printed but no longer fails: the race line below
+// is what everyone waits for
+let kartTotal = null
 const kartEntries = lazyEntriesUnder('src/kart/')
 if (kartEntries.length > 0) {
   const keys = collectAll(kartEntries)
   for (const key of mainKeys) keys.delete(key)
-  budgets.push({ name: 'kart', keys, limit: KART_LIMIT, ownLanguage: false })
+  kartTotal = keys
 } else {
   console.log('skip kart: no lazy chunk under src/kart/ yet')
 }
@@ -141,9 +149,9 @@ if (kartEntries.length > 0) {
 // 2026-11-23 (docs/KART-PERF.md §11): what a race needs before its first frame, from /kart's menu:
 // the page and the race's engine, with the heaviest track's own quarter, the parts a track may need
 // (src/kart/art/trackParts.ts) and every family of vehicles (a grid of eight may span them all),
-// the main site's chunks left out as above. The kart line counts every chunk, the editor's, the
+// the main site's chunks left out as above. The kart's total counts every chunk, the editor's, the
 // school's and the challenges' included, which a racer may never fetch: this one is what everyone
-// waits for, and keeps room under it
+// waits for, and since 2026-11-23 the only kart line that fails the build
 const KART_RACE_LIMIT = 480 * KB
 const KART_PAGE = 'src/kart/bots/KartPlay.tsx'
 const KART_ENGINE = 'src/kart/spikeLoop.ts'
@@ -210,6 +218,15 @@ if (manifest[KART_ENGINE]?.isDynamicEntry) {
 }
 
 let failed = false
+if (kartTotal) {
+  const size = gzipSize(kartTotal)
+  console.log(
+    `info kart, every chunk together: ${(size / KB).toFixed(1)} kB gzip (not limited; was ${KART_TOTAL_REFERENCE / KB} kB until 2026-11-23)`,
+  )
+  if (SHOW_CHUNKS) {
+    for (const chunk of chunkSizes(kartTotal)) console.log(`       ${chunk.size} B  ${chunk.file}`)
+  }
+}
 for (const { name, keys } of kartReport) {
   console.log(`info ${name}: ${(gzipSize(keys) / KB).toFixed(1)} kB gzip (not limited)`)
   if (SHOW_CHUNKS) {

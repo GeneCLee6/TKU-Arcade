@@ -2375,7 +2375,8 @@ describe('the public listing (e1-t09)', () => {
     const world = publicRoom()
     expect(world.host.listing()).toBeNull()
     world.join('Ann')
-    expect(world.host.listing()).toEqual({
+    const listing = world.host.listing()
+    expect(listing).toMatchObject({
       id: ROOM_ID,
       gameId: 'tictactoe',
       host: 'Ann',
@@ -2383,22 +2384,26 @@ describe('the public listing (e1-t09)', () => {
       maxSeats: 2,
       createdAt: 10_000,
     })
+    // Waiting, open, unnamed, no computer players: none of the 2026-11-23 marks
+    for (const key of ['status', 'locked', 'name', 'bots']) expect(listing).not.toHaveProperty(key)
   })
 
-  it('goes away when the seats fill, the game starts or everyone leaves, and comes back', () => {
+  // 2026-11-23 (the kart's room list): full and playing rooms stay listed, saying so
+  it('says when the seats fill and the game starts, and goes when it ends or everyone leaves', () => {
     const world = publicRoom()
     const a = world.join('Ann')
     expect(world.host.listing()).not.toBeNull()
     const b = world.join('Bo')
-    expect(world.host.listing()).toBeNull()
+    expect(world.host.listing()).toMatchObject({ seated: 2, maxSeats: 2 })
+    expect(world.host.listing()).not.toHaveProperty('status')
     b.send({ t: 'sit', seat: null })
     expect(world.host.listing()).toMatchObject({ seated: 1 })
     b.send({ t: 'sit', seat: 1 })
     a.send({ t: 'start' })
     expect(a.view?.room.status).toBe('playing')
-    expect(world.host.listing()).toBeNull()
+    expect(world.host.listing()).toMatchObject({ status: 'playing', seated: 2 })
     a.send({ t: 'reopen' })
-    expect(world.host.listing()).toBeNull()
+    expect(world.host.listing()).not.toHaveProperty('status')
     b.send({ t: 'sit', seat: null })
     expect(world.host.listing()).toMatchObject({ seated: 1 })
     world.disconnect(a)
@@ -2464,15 +2469,17 @@ describe('a room password', () => {
     expect(world.join('Di').errors).toEqual([])
   })
 
-  it('takes a public room off the list while it has one', () => {
+  // 2026-11-23: listed as locked (the kart's room list shows it), and GET /api/lobby without a game
+  // leaves it out (worker/lobby-list.ts isOpenRoom)
+  it('marks a public room locked while it has one', () => {
     const world = new World()
     world.host.create(ROOM_ID, 'tictactoe', undefined, true)
     const ann = world.join('Ann')
-    expect(world.host.listing()).not.toBeNull()
+    expect(world.host.listing()).not.toHaveProperty('locked')
     ann.send({ t: 'set_password', password: 'tamsui' })
-    expect(world.host.listing()).toBeNull()
+    expect(world.host.listing()).toMatchObject({ locked: true })
     ann.send({ t: 'set_password', password: null })
-    expect(world.host.listing()).not.toBeNull()
+    expect(world.host.listing()).not.toHaveProperty('locked')
   })
 
   it('is never public, and closes a socket after too many wrong ones', () => {

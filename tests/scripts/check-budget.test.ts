@@ -83,16 +83,9 @@ describe('check-budget', () => {
     expect(output).toMatch(/FAIL first screen of src\/games\/promotion/)
   })
 
-  it('counts the kart separately, with its own limit', () => {
-    const under = runBudget({
-      'index.html': entry(10),
-      'src/kart/Scene.tsx': { file: 'assets/kart.js', kb: 400, isDynamicEntry: true },
-    })
-    expect(under.status).toBe(0)
-    expect(under.output).toMatch(/ok\s+main site/)
-    expect(under.output).toMatch(/ok\s+kart/)
-
-    const over = runBudget({
+  // 2026-11-23 (docs/KART-PERF.md §12): every kart chunk together is printed, never fails
+  it('reports every kart chunk together without failing, however big', () => {
+    const big = runBudget({
       'index.html': entry(10),
       'src/kart/Scene.tsx': {
         file: 'assets/kart.js',
@@ -102,8 +95,25 @@ describe('check-budget', () => {
       },
       '_three.js': { file: 'assets/three.js', kb: 300 },
     })
+    expect(big.status).toBe(0)
+    expect(big.output).toMatch(/ok\s+main site/)
+    expect(big.output).toMatch(/info kart, every chunk together: 7\d\d\.\d kB gzip \(not limited/)
+    expect(big.output).not.toMatch(/FAIL kart/)
+  })
+
+  it('fails a kart race from the menu over 480 kB', () => {
+    const race = (engineKb: number) =>
+      runBudget({
+        'index.html': entry(10),
+        'src/kart/bots/KartPlay.tsx': { file: 'assets/play.js', kb: 100, isDynamicEntry: true },
+        'src/kart/spikeLoop.ts': { file: 'assets/engine.js', kb: engineKb, isDynamicEntry: true },
+      })
+    const under = race(300)
+    expect(under.status).toBe(0)
+    expect(under.output).toMatch(/ok\s+kart race from the menu/)
+    const over = race(400)
     expect(over.status).toBe(1)
-    expect(over.output).toMatch(/FAIL kart/)
+    expect(over.output).toMatch(/FAIL kart race from the menu/)
   })
 
   it('fails with a clear message when the build has not run', () => {
