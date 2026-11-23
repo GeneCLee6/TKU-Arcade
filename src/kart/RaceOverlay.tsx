@@ -8,7 +8,8 @@ import { displayType } from '../styles/esports.ts'
 import { broadcast, digits, slam, splitShadow, ticker } from './ui/broadcast.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import type { SpikeTrial } from './spikeLoop.ts'
-import { Celebration } from './ui/RaceShow.tsx'
+import { Celebration, LapSplitCard } from './ui/RaceShow.tsx'
+import { formatDelta, useLapSplit } from './ui/lapSplit.ts'
 
 type KartT = (key: KartMessageKey, params?: MessageParams) => string
 
@@ -84,6 +85,40 @@ export const RaceClock = forwardRef<RaceClockHandle, { t: KartT; trial: SpikeTri
     )
   },
 )
+
+/**
+ * 2026-11-23 (ui/lapSplit.ts): each lap's time as the line is crossed, for a few seconds. `lapTimes`
+ * in seconds; `record` the best lap kept on this track (null: against this race's fastest)
+ */
+export function LapSplitShow({
+  t,
+  lapTimes,
+  record,
+}: {
+  t: KartT
+  lapTimes: readonly number[]
+  record: number | null
+}) {
+  const split = useLapSplit(lapTimes, record)
+  if (!split) return null
+  return (
+    <LapSplitCard
+      key={split.id}
+      label={t('kart.race.lapNumber', { lap: split.lap })}
+      time={formatTime(split.time)}
+      fastest={split.fastest ? t('kart.race.bestLap') : null}
+      delta={split.delta === null ? null : formatDelta(split.delta)}
+      faster={split.delta !== null && split.delta < 0}
+      against={
+        split.against === 'record'
+          ? t('kart.race.lapVsRecord')
+          : split.against === 'race'
+            ? t('kart.race.lapVsBest')
+            : null
+      }
+    />
+  )
+}
 
 export function RaceCenter({
   t,

@@ -10,14 +10,14 @@ import {
   closeAt,
   COUNT_MS,
   countdownMs,
+  GROUP_MS,
   introMs,
   openingStage,
-  PRESENT_MS,
 } from '../../shared/kart/opening.ts'
 import { gridSpot } from '../../shared/kart/race.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 import type { Track } from '../../shared/kart/track.ts'
-import { openingShot, presentShot, gridShot } from '../../src/kart/director.ts'
+import { groupShot, openingShot, gridShot } from '../../src/kart/director.ts'
 import { closeBeep, startBeep, BEEPS } from '../../src/kart/audio/countBeeps.ts'
 import {
   cappedPost,
@@ -67,51 +67,123 @@ function racing(seats: number, laps = 1): KartState {
   return act(state, { t: 'go' })
 }
 
-describe('the opening: each driver, then 3, 2, 1', () => {
-  it('keeps the whole opening of a full grid within ten seconds, the drivers within six', () => {
-    expect(countdownMs(8)).toBeLessThanOrEqual(10_000)
-    expect(8 * PRESENT_MS).toBeLessThanOrEqual(6_000)
-    expect(PRESENT_MS).toBeGreaterThanOrEqual(600)
-    expect(PRESENT_MS).toBeLessThanOrEqual(1_000)
-    // A smaller field waits less, and never past eight
-    expect(countdownMs(2)).toBeLessThan(countdownMs(8))
-    expect(countdownMs(12)).toBe(countdownMs(8))
-    expect(countdownMs(4)).toBe(introMs(4) + COUNT_MS)
+describe('the opening: one group shot, then 3, 2, 1', () => {
+  it('is short and the same for any field (2026-11-23: it grew with the field, 5.4 to 9.6 s)', () => {
+    expect(countdownMs(8)).toBe(countdownMs(2))
+    expect(countdownMs()).toBe(GROUP_MS + COUNT_MS)
+    expect(countdownMs(8)).toBeGreaterThanOrEqual(4_000)
+    expect(countdownMs(8)).toBeLessThanOrEqual(5_000)
+    expect(introMs(8)).toBe(GROUP_MS)
   })
 
-  it('presents every driver in grid order, pole first, then settles, then counts', () => {
-    const racers = 5
-    const seen: number[] = []
-    for (let left = countdownMs(racers) / 1000 - 1e-6; left > 0; left -= 1 / 60) {
-      const stage = openingStage(left, racers)!
-      if (stage.kind === 'present' && seen.at(-1) !== stage.index) seen.push(stage.index)
+  it('holds the group shot to the 3, then counts', () => {
+    let last = -1
+    for (let left = countdownMs() / 1000 - 1e-6; left > 0; left -= 1 / 60) {
+      const stage = openingStage(left)!
       if (left <= COUNT_MS / 1000) expect(stage.kind).toBe('count')
+      else {
+        expect(stage.kind).toBe('group')
+        if (stage.kind === 'group') {
+          expect(stage.share).toBeGreaterThanOrEqual(last)
+          last = stage.share
+        }
+      }
     }
-    expect(seen).toEqual([0, 1, 2, 3, 4])
-    expect(openingStage(3.5, racers)).toMatchObject({ kind: 'settle' })
-    expect(openingStage(null, racers)).toBeNull()
+    expect(openingStage(countdownMs() / 1000)).toEqual({ kind: 'group', share: 0 })
+    expect(openingStage(null)).toBeNull()
   })
 
-  it('stands in front of each driver, and glides to the grid shot before the 3', () => {
-    const spots = Array.from({ length: 4 }, (_, slot) => gridSpot(track, slot))
-    const look = { drivers: true, flyby: true }
-    const first = openingShot(spots, countdownMs(4) / 1000 - 0.01, look)!
+  /** Whether `point` is on the screen of a camera at `shot` (vertical field `fov` degrees, width / height `aspect`) */
+  function onScreen(
+    shot: { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } },
+    point: { x: number; y: number; z: number },
+    fov: number,
+    aspect: number,
+  ): boolean {
+    const sub = (a: typeof point, b: typeof point) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z })
+    const cross = (a: typeof point, b: typeof point) => ({
+      x: a.y * b.z - a.z * b.y,
+      y: a.z * b.x - a.x * b.z,
+      z: a.x * b.y - a.y * b.x,
+    })
+    const dot = (a: typeof point, b: typeof point) => a.x * b.x + a.y * b.y + a.z * b.z
+    const unit = (a: typeof point) => {
+      const length = Math.hypot(a.x, a.y, a.z)
+      return { x: a.x / length, y: a.y / length, z: a.z / length }
+    }
+    const forward = unit(sub(shot.target, shot.eye))
+    const right = unit(cross(forward, { x: 0, y: 1, z: 0 }))
+    const up = cross(right, forward)
+    const to = sub(point, shot.eye)
+    const depth = dot(to, forward)
+    if (depth <= 0) return false
+    const half = Math.tan(((fov / 2) * Math.PI) / 180)
+    return Math.abs(dot(to, up) / depth) <= half && Math.abs(dot(to, right) / depth) <= half * aspect
+  }
+
+  it('has every kart on the grid on the screen, all through it, wide or on a phone held upright', () => {
+    const look = { group: true }
+    // Scene.ts: 60 degrees on a wide screen, 80 held upright
+    const screens = [
+      { fov: 60, aspect: 16 / 9 },
+      { fov: 60, aspect: 844 / 390 },
+      { fov: 80, aspect: 390 / 844 },
+    ]
+    for (const id of ['riverside', 'danhai', 'zhuwei']) {
+      const course = raceTrack(id) as Track
+      for (const count of [2, 5, 8]) {
+        const spots = Array.from({ length: count }, (_, slot) => gridSpot(course, slot))
+        for (let left = countdownMs() / 1000; left > COUNT_MS / 1000; left -= 0.1) {
+          // Fitted to each screen (as close as it can come), and without one (fits them all)
+          const fitted = screens.map((screen) => ({ screen, shot: openingShot(spots, left, look, false, 0, screen.aspect)! }))
+          const plain = openingShot(spots, left, look)!
+          const shots = [...fitted, ...screens.map((screen) => ({ screen, shot: plain }))]
+          for (const { screen, shot } of shots) {
+            expect(shot).not.toBeNull()
+            for (const spot of spots) {
+              // The kart's middle, and its driver's head a little above it
+              for (const height of [0.3, 1.2]) {
+                expect(onScreen(shot, { x: spot.x, y: height, z: spot.z }, screen.fov, screen.aspect)).toBe(true)
+              }
+            }
+          }
+          // A wide screen comes closer than a phone held upright
+          const away = (shot: { eye: { x: number; z: number } }) => Math.hypot(shot.eye.x - spots[0]!.x, shot.eye.z - spots[0]!.z)
+          if (count === 8) expect(away(fitted[0]!.shot)).toBeLessThan(away(fitted[2]!.shot))
+        }
+      }
+    }
+  })
+
+  it('stands in front of the grid, looking back at the drivers, and pushes in', () => {
+    const spots = Array.from({ length: 6 }, (_, slot) => gridSpot(track, slot))
+    const look = { group: true }
     const pole = spots[0]!
     const ahead = { x: Math.sin(pole.heading), z: -Math.cos(pole.heading) }
-    // In front of the pole sitter, looking back at them
-    expect((first.eye.x - pole.x) * ahead.x + (first.eye.z - pole.z) * ahead.z).toBeGreaterThan(2)
-    expect(Math.hypot(first.target.x - pole.x, first.target.z - pole.z)).toBeLessThan(0.01)
-    // The end of the glide is the grid shot
-    const grid = gridShot(spots)!
-    const settled = openingShot(spots, COUNT_MS / 1000 + 1e-4, look)!
-    expect(Math.hypot(settled.eye.x - grid.eye.x, settled.eye.z - grid.eye.z)).toBeLessThan(0.05)
-    // From the 3 on, the countdown's own shot
+    const first = openingShot(spots, countdownMs() / 1000, look)!
+    const last = openingShot(spots, COUNT_MS / 1000 + 1e-4, look)!
+    // In front of the pole sitter, so the faces are seen
+    expect((first.eye.x - pole.x) * ahead.x + (first.eye.z - pole.z) * ahead.z).toBeGreaterThan(5)
+    const middle = {
+      x: spots.reduce((sum, spot) => sum + spot.x, 0) / spots.length,
+      z: spots.reduce((sum, spot) => sum + spot.z, 0) / spots.length,
+    }
+    const away = (shot: typeof first) => Math.hypot(shot.eye.x - middle.x, shot.eye.z - middle.z)
+    expect(away(last)).toBeLessThan(away(first))
+    // No jumps: frame to frame at 60 fps it moves little
+    let before = first
+    for (let left = countdownMs() / 1000; left > COUNT_MS / 1000; left -= 1 / 60) {
+      const shot = openingShot(spots, left, look)!
+      expect(Math.hypot(shot.eye.x - before.eye.x, shot.eye.y - before.eye.y, shot.eye.z - before.eye.z)).toBeLessThan(0.5)
+      before = shot
+    }
+    // Waiting for GO to be set: its start; from the 3 on, the countdown's own shot (behind the grid)
+    expect(openingShot(spots, null, look)).toEqual(first)
     expect(openingShot(spots, 2.5, look)).toBeNull()
-    // Turned off, the fly round; both off, nothing of its own
-    expect(openingShot(spots, 5, { drivers: false, flyby: true })).not.toBeNull()
-    expect(openingShot(spots, 5, { drivers: false, flyby: false })).toBeNull()
-    // Less motion asked for: a still shot of each driver
-    expect(presentShot(pole, 0, 0, true)).toEqual(presentShot(pole, 1, 0, true))
+    expect(gridShot(spots)).not.toBeNull()
+    // Turned off: nothing of its own; less motion asked for: standing still
+    expect(openingShot(spots, 4, { group: false })).toBeNull()
+    expect(groupShot(spots, 0, 0, true)).toEqual(groupShot(spots, 1, 0, true))
   })
 
   it('beeps at 3, 2, 1 and a brighter GO, once each', () => {
@@ -261,13 +333,16 @@ describe('the settings', () => {
   it('has sensible defaults and reads back field by field', () => {
     expect(parseSettings(null)).toEqual(DEFAULT_SETTINGS)
     expect(parseSettings('nonsense')).toEqual(DEFAULT_SETTINGS)
-    expect(parseSettings('{"effects":"ultra","shake":false,"driverIntro":1}')).toEqual({
+    expect(parseSettings('{"effects":"ultra","shake":false,"opening":"each"}')).toEqual({
       ...DEFAULT_SETTINGS,
       shake: false,
     })
-    saveSettings({ ...DEFAULT_SETTINGS, effects: 'low', driverIntro: false })
+    // 2026-11-23: the group shot by default; the old switches (each driver, the fly round) are gone
+    expect(DEFAULT_SETTINGS.opening).toBe('group')
+    expect(parseSettings('{"driverIntro":false,"flyby":false}').opening).toBe('group')
+    saveSettings({ ...DEFAULT_SETTINGS, effects: 'low', opening: 'off' })
     forgetSettingsForTest()
-    expect(loadSettings()).toMatchObject({ effects: 'low', driverIntro: false })
+    expect(loadSettings()).toMatchObject({ effects: 'low', opening: 'off' })
   })
 
   it('caps the developing of the picture by the effects level', () => {

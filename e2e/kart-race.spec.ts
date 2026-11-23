@@ -122,12 +122,33 @@ test('two people race each other in one room, from the countdown to the results'
 // 2026-11-17: a computer kart in a room of two. The host adds it in the waiting room; the host's
 // browser drives it and its frames go through the room like anyone's, so both see it, and it is in
 // the results with its name.
+/** 2026-11-23: the kart's sound on this page (spikeLoop.ts's debug): its state, music steps, beeps */
+const sound = (page: Page) =>
+  page.evaluate(
+    () =>
+      (window as unknown as { __kartSpike?: { sound?: { state: string; steps: number; beeps: number } } })
+        .__kartSpike?.sound ?? null,
+  )
+
+/** 2026-11-23: every lap time shown on this page as the line was crossed */
+const watchSplits = (page: Page) =>
+  page.addInitScript(() => {
+    const seen: string[] = []
+    ;(window as unknown as { __splits: string[] }).__splits = seen
+    new MutationObserver(() => {
+      const split = document.querySelector('[data-testid="kart-lap-split"]')
+      const text = split?.textContent ?? ''
+      if (text && seen.at(-1) !== text) seen.push(text)
+    }).observe(document, { subtree: true, childList: true, characterData: true })
+  })
+
 test('two people and a computer kart race one lap in one room', async ({ browser }) => {
   const viewport = { width: 480, height: 320 }
   const ann = await newPerson(browser, { viewport })
   const bob = await newPerson(browser, { viewport })
   for (const page of [ann, bob]) {
     await page.addInitScript(() => localStorage.setItem('tku-arcade.kart.quality', 'low'))
+    await watchSplits(page)
   }
   const response = await ann.request.post('/api/rooms', {
     data: { gameId: 'kart', options: { track: 'riverside', laps: 1, mode: 'race' } },
@@ -153,6 +174,19 @@ test('two people and a computer kart race one lap in one room', async ({ browser
   await ann.getByRole('button', { name: 'Start game' }).click()
 
   for (const page of [ann, bob]) await expect(page.getByTestId('kart-race')).toBeVisible()
+  // 2026-11-23 (owner: "no sound when you first get in, only once you start driving"): the clicks on
+  // Ready and Start woke the kart's sound, so that on the grid, no key pressed (the autopilot drives),
+  // the intro's music is scheduled and the 3, 2, 1 beeps sound
+  for (const page of [ann, bob]) {
+    await expect.poll(async () => (await sound(page))?.state, { timeout: 60_000 }).toBe('running')
+    await expect.poll(async () => (await sound(page))?.steps ?? 0, { timeout: 30_000 }).toBeGreaterThan(0)
+    await expect(page.getByTestId('kart-sound-tap')).toHaveCount(0)
+  }
+  // The 3, 2, 1 heard as well as GO (a beep sounds only on a running context): the sound was on
+  // through the countdown, not from GO on
+  for (const page of [ann, bob]) {
+    await expect.poll(async () => (await sound(page))?.beeps ?? 0, { timeout: 60_000 }).toBeGreaterThanOrEqual(3)
+  }
   // Each sees the other person's kart and the computer's, from their frames
   for (const page of [ann, bob]) {
     await expect.poll(async () => (await race(page))?.others ?? 0, { timeout: 90_000 }).toBe(2)
@@ -188,4 +222,9 @@ test('two people and a computer kart race one lap in one room', async ({ browser
   const results = bob.getByRole('region', { name: 'Results' })
   await expect(results).toContainText(botName)
   await expect(results.getByText(/Finished in \d:\d\d\.\d{3}/).first()).toBeVisible()
+  // 2026-11-23: whoever finished saw their lap's time as they crossed the line, the room's own
+  const splits = (
+    await Promise.all([ann, bob].map((page) => page.evaluate(() => (window as unknown as { __splits: string[] }).__splits)))
+  ).flat()
+  expect(splits.some((text) => /^Lap 1\s*\d:\d\d\.\d{3}/.test(text))).toBe(true)
 })

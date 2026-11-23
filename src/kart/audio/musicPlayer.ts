@@ -56,6 +56,9 @@ interface Playing {
 }
 
 const claims: { request: MusicRequest | null; race: boolean }[] = []
+/** Steps of music scheduled on this page so far, to be heard (the race's e2e reads it) */
+let scheduled = 0
+export const scheduledSteps = (): number => scheduled
 let timer: ReturnType<typeof setInterval> | null = null
 let playing: Playing | null = null
 
@@ -318,6 +321,7 @@ function tick(): void {
   now.clock = next
   // Silenced (the site's switch, or the music's volume at 0): the clock runs on, nothing is made
   if (!isSoundOn() || loadVolumes().music <= 0) return
+  scheduled += steps.length
   for (const { step, at } of steps) {
     if (step % 16 === 0 && mix.layers.pad) pad(bus, now, step, at, seconds * 16)
     for (const hit of drumsAt(now.song, step, mix.layers)) drum(bus, now, hit, at)

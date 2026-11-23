@@ -67,9 +67,9 @@ import {
   openingShot,
   type CameraShot,
 } from './director.ts'
-import { openingStage } from '../../shared/kart/opening.ts'
 import { isRacePaused } from './race/raceClock.ts'
-import { playBeep, startBeep } from './audio/countBeeps.ts'
+import { beepsPlayed, playBeep, startBeep } from './audio/countBeeps.ts'
+import { kartSoundState, startKartAudio } from './audio/unlock.ts'
 import { loadSettings } from './settings.ts'
 import {
   actionKeys,
@@ -115,7 +115,7 @@ import type { KartLook } from './art/kartModel.ts'
 import type { HitBurst, ItemCue } from './hitFx.ts'
 import type { ShotItem } from '../../shared/kart/shots.ts'
 import type { TouchSource } from './touch/touchSource.ts'
-import { claimMusic } from './audio/musicPlayer.ts'
+import { claimMusic, scheduledSteps } from './audio/musicPlayer.ts'
 import { sectionFor } from './audio/sequencer.ts'
 import { songFor } from './audio/songs.ts'
 import { createAmbience } from './audio/ambiencePlayer.ts'
@@ -249,13 +249,8 @@ export interface SpikeTrial {
   /** The best run in this kart on this track, seconds, and whether this run set it */
   readonly kartBestRun: number | null
   readonly newKartBestRun: boolean
-  /** 2026-11-20 (§4.43): a race's fly round the grid before the countdown, not skipped */
+  /** 2026-11-20 (§4.43): a race's opening before the 3, not skipped (2026-11-23: the group shot) */
   readonly intro: boolean
-  /**
-   * 2026-11-22 (§4.73): during the opening, the driver in front of the camera (their place in the
-   * race's list, the pole first); null otherwise, or when not presented here
-   */
-  readonly presenting: number | null
   /** ... and the finish's show, for CELEBRATE_SECONDS after crossing the line */
   readonly celebrating: boolean
 }
@@ -273,7 +268,6 @@ const sameTrial = (a: SpikeTrial | undefined, b: SpikeTrial): boolean =>
   a.kartBestRun === b.kartBestRun &&
   a.newKartBestRun === b.newKartBestRun &&
   a.intro === b.intro &&
-  a.presenting === b.presenting &&
   a.celebrating === b.celebrating
 
 /** What tests and a curious owner can read from the console. It stays after the loop stops. */
@@ -310,6 +304,11 @@ export interface SpikeDebug {
   totals?: { frames: number; calls: number; triangles: number; jsMs: number }
   /** 2026-11-20 (§4.46): the song and its part asked for this frame, `song:section` */
   music?: string
+  /**
+   * 2026-11-23 (audio/unlock.ts): the kart's sound this frame ('running', 'suspended', 'none'), the
+   * music's steps scheduled so far (musicPlayer.ts) and the start's beeps played
+   */
+  sound?: { state: string; steps: number; beeps: number }
   /** 2026-11-20 (§4.47), for looking at the drivers: this driver does this whatever the race says */
   gesture?: DriverGesture | null
   /**
@@ -365,7 +364,7 @@ export interface SpikeNet {
   readonly place?: () => number
   /**
    * 2026-11-23 (#152): whether the room's clock is settled here (shared/kart/net.ts's
-   * `clockSettled`); the opening presents its drivers only from then on. Absent: always
+   * `clockSettled`; the race screen tells the room it has loaded only then). Absent: always
    */
   readonly clockSettled?: () => boolean
   /** After each step: the race so far, the input it ran with, and whether the kart was reset */
@@ -636,6 +635,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   )
   // 2026-11-22: a bike's own engine, and as much sound as the quality has (audio/tiers.ts)
   const audio = createKartAudio({ quality: options.quality, kind: kartKind(kartId) })
+  // 2026-11-23 (audio/unlock.ts): the sound from the moment the race is built (the intro, the world
+  // round the track, the 3, 2, 1), not from the first key, wherever the browser lets this page
+  if (startKartAudio()) audio.unlock()
   // 2026-11-20 (§4.46): the track's song, by the race's part, and the world around the track
   const music = claimMusic(true)
   const song = songFor(track)
@@ -1015,19 +1017,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     }
     if (net) scene.others(net.others(), frameMs / 1000)
     // 2026-11-20: the countdown starts on the whole grid, and glides down behind this kart; before
-    // it, unless skipped, a fly round the grid (§4.43); at the finish the camera swings to the front
+    // it, unless skipped, the group shot from in front (2026-11-23, director.ts); at the finish the
+    // camera swings to the front
     const reduced = reducedMotion?.matches ?? false
     const left = net && trial?.phase === 'countdown' ? net.countdown() : null
-    // 2026-11-23 (#152): the drivers only once the room's clock is settled here (netRace.ts), so that
-    // every screen in the room shows the same one at the same moment; the whole grid until then
-    const settled = net?.clockSettled?.() ?? true
-    const introNow = !!net?.gridSpots && trial?.phase === 'countdown' && inIntro(left) && !skipped
-    // 2026-11-22 (§4.73): how the opening is shown here, each driver in turn by default
-    const settings = loadSettings()
-    const opening = { drivers: settings.driverIntro, flyby: settings.flyby }
-    const spotsNow = introNow && settled && net?.gridSpots ? net.gridSpots() : null
-    const stage = spotsNow ? openingStage(left, spotsNow.length) : null
-    const presenting = opening.drivers && stage?.kind === 'present' ? stage.index : null
+    const opening = { group: loadSettings().opening === 'group' }
+    const introNow =
+      !!net?.gridSpots && trial?.phase === 'countdown' && inIntro(left) && !skipped && opening.group
     // The start's beeps: 3, 2, 1 and GO, by the room's countdown in a race, this run's in a trial
     if (trial?.phase === 'countdown' || beepFrom !== null) {
       const counted = trial?.phase === 'countdown' ? (net ? left : trial.countdown) : 0
@@ -1048,7 +1044,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     } else if (net?.gridSpots && trial?.phase === 'countdown') {
       const spots = net.gridSpots()
       shot =
-        (introNow && settled ? openingShot(spots, left, opening, reduced, current.y ?? 0) : null) ??
+        (skipped
+          ? null
+          : openingShot(spots, left, opening, reduced, current.y ?? 0, window.innerWidth / Math.max(1, window.innerHeight))) ??
         countdownShot(spots, left, reduced, current.y ?? 0)
     }
     if (shot || directed) scene.shot(shot)
@@ -1104,6 +1102,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     const playing = section === 'menu' ? 'lounge' : song
     music.set({ song: playing, section, boosting })
     debug.music = `${playing}:${section}`
+    debug.sound = { state: kartSoundState(), steps: scheduledSteps(), beeps: beepsPlayed() }
     ambience?.update(pose.x, pose.z)
     // The crowd roars as the kart crosses the line
     if (run.crossings > crossingsHeard && trial?.phase !== 'countdown') ambience?.cheer()
@@ -1168,7 +1167,6 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
           news ? seconds(news.kartRunSteps) : kartBestRun === null ? null : seconds(kartBestRun),
         newKartBestRun: news?.kartBestRun ?? false,
         intro: introNow,
-        presenting,
         celebrating:
           trial.phase === 'finished' &&
           finishedAt !== null &&

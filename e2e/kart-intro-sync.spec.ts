@@ -1,13 +1,14 @@
 import { expect, test, type Page } from '@playwright/test'
 import { joinRoom, newPerson } from './helpers.ts'
 
-// 2026-11-23 (#152): every screen in a room shows the same driver at the same moment in the opening.
-// Two people and two computer karts; Bob's page is made slow on purpose: its socket is 20 ms out and
-// 120 ms back (not the same each way), and the first few clock answers come in while the page is busy
-// (held up 1.4 s and 0.5 s, as when it is still building the race). The drivers wait for the room's
-// clock to settle on each screen (shared/kart/net.ts's `clockSettled`), so the two clocks, and the
-// driver each shows, agree to well within 150 ms. Both screens run on this machine, as does the room,
-// so Date.now() is the same clock for all three.
+// 2026-11-23 (#152): every screen in a room shows the same moment of the opening. Two people and two
+// computer karts; Bob's page is made slow on purpose: its socket is 20 ms out and 120 ms back (not
+// the same each way), and the first few clock answers come in while the page is busy (held up 1.4 s
+// and 0.5 s, as when it is still building the race). Each screen settles the room's clock (shared/
+// kart/net.ts's `clockSettled`) before telling the room it has loaded, so the two clocks, and the 3,
+// 2, 1 each shows, agree to well within 150 ms. (Until #174 it was each driver presented in turn;
+// now one group shot, then the count.) Both screens run on this machine, as does the room, so
+// Date.now() is the same clock for all three.
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } })
 test.setTimeout(240_000)
 
@@ -27,15 +28,15 @@ const clockError = (page: Page): Promise<number | null> =>
     return performance.now() + race.offset - Date.now()
   })
 
-/** Every change of the driver card on this page, with when (Date.now()) */
+/** Every change of the countdown's number on this page, with when (Date.now()) */
 const watchCards = (page: Page) =>
   page.addInitScript(() => {
     const seen: { at: number; text: string }[] = []
     ;(window as unknown as { __cards: typeof seen }).__cards = seen
     let last = ''
     const look = () => {
-      const card = document.querySelector('[data-testid="kart-driver-card"]')
-      const text = card?.textContent?.match(/Grid \d/)?.[0] ?? ''
+      const card = document.querySelector('[data-testid="kart-countdown"]')
+      const text = card?.textContent?.match(/^[123]$/)?.[0] ?? ''
       if (text !== last) {
         last = text
         seen.push({ at: Date.now(), text })
@@ -47,7 +48,7 @@ const watchCards = (page: Page) =>
 const cards = (page: Page) =>
   page.evaluate(() => (window as unknown as { __cards: { at: number; text: string }[] }).__cards)
 
-test('two screens show the same driver at the same moment, one of them slow', async ({ browser }) => {
+test('two screens count 3, 2, 1 at the same moment, one of them slow', async ({ browser }) => {
   const viewport = { width: 480, height: 320 }
   const ann = await newPerson(browser, { viewport })
   const bob = await newPerson(browser, { viewport })
@@ -111,7 +112,7 @@ test('two screens show the same driver at the same moment, one of them slow', as
   await joinRoom(bob, `/r/${id}?autopilot`, 'Bob')
   await ann.getByTestId('kart-lobby-settings').click()
   await ann.getByTestId('kart-room-bots-level').selectOption('easy')
-  // Two computer karts: four drivers to present
+  // Two computer karts: four on the grid
   await ann.getByTestId('kart-room-bots-add').click()
   await ann.getByTestId('kart-room-bots-add').click()
   await ann.getByRole('button', { name: 'Close' }).click()
@@ -132,27 +133,26 @@ test('two screens show the same driver at the same moment, one of them slow', as
     await ann.waitForTimeout(150)
   }
   for (const page of [ann, bob]) {
-    await expect(page.getByTestId('kart-driver-card')).toBeHidden({ timeout: 30_000 })
+    await expect(page.getByTestId('kart-countdown')).toBeHidden({ timeout: 30_000 })
   }
   const [annCards, bobCards] = await Promise.all([cards(ann), cards(bob)])
-  // When each screen first showed each driver, ms apart (a screen draws a few frames a second here)
+  // When each screen first showed each number, ms apart (a screen draws a few frames a second here)
   const apart: number[] = []
   for (const shown of annCards) {
     if (!shown.text) continue
     const other = bobCards.find((one) => one.text === shown.text)
-    // Only a driver both showed from the start of their turn (not the one on when the clock settled)
+    // Only a number both showed from its start (not the one on when the page first looked)
     if (other && shown !== annCards.find((one) => one.text) && other !== bobCards.find((one) => one.text)) {
       apart.push(Math.abs(shown.at - other.at))
     }
   }
   console.log(
     `clock apart (ms): max ${Math.max(...errors).toFixed(0)} of ${errors.length};`,
-    `driver turns apart (ms): ${apart.map((one) => one.toFixed(0)).join(', ') || 'none'}`,
+    `counts apart (ms): ${apart.map((one) => one.toFixed(0)).join(', ') || 'none'}`,
   )
   expect(errors.length).toBeGreaterThan(5)
   expect(Math.max(...errors)).toBeLessThan(150)
-  // Every driver after the first on both screens, each turn begun on both within the clocks'
-  // difference and a frame (the cards change on a drawn frame)
+  // The 2 and the 1 on both screens, each begun on both within the clocks' difference and a frame
   expect(apart.length).toBeGreaterThanOrEqual(2)
   for (const one of apart) expect(one).toBeLessThan(200)
 })
