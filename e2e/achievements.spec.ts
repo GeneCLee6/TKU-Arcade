@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { newPerson } from './helpers.ts'
 
-// e11-t06 (AC-11.3, docs/ARCHITECTURE.md §4.81): achievements kept in the browser. A time trial on the
+// e11-t06 (AC-11.3, docs/ARCHITECTURE.md §4.82): achievements kept in the browser. A time trial on the
 // test oval, driven to the finish by the autopilot, unlocks "Chequered Debut": its badge waits for
 // the finish (never over the race), then the profile page shows it unlocked. And the lobby's way in,
 // the wall's filter and the hidden ones, in both languages, with no serious axe problems. Headless

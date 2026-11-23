@@ -24,12 +24,24 @@ import { watchKartRun } from '../achievements/kartHook.ts'
 import { holdAchievements } from '../achievements/track.ts'
 import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
-import { DEFAULT_KART, kartKind, kartMass, kartRadius, type DriverId, type KartId } from '../../shared/kart/karts.ts'
+import {
+  applyKart,
+  DEFAULT_DRIVER,
+  DEFAULT_KART,
+  kartKind,
+  kartMass,
+  kartRadius,
+  loadoutByte,
+  type DriverId,
+  type KartId,
+} from '../../shared/kart/karts.ts'
 import type { KartBody } from './bodies.ts'
 import { courseOf, recordKey, type Track } from '../../shared/kart/track.ts'
 import { spikeTrack, type SpikeCourse } from './courses.ts'
 import { HUD_STEPS } from './hudSteps.ts'
 import { bumpKart } from '../../shared/kart/race.ts'
+import type { BoardRecorder } from '../../shared/kart/boardRun.ts'
+import type { Replay } from '../../shared/kart/replay.ts'
 import {
   COUNTDOWN_SECONDS,
   currentLap,
@@ -74,6 +86,7 @@ import {
   kartSkidding,
   kartSlip,
   kartSpeed,
+  KART_TUNING,
   NO_INPUT,
   poseBetween,
   STEP_SECONDS,
@@ -441,6 +454,32 @@ export interface SpikeOptions {
    * time already in it); null for none
    */
   readonly ghost?: Ghost | null
+  /**
+   * 2026-11-23 (§4.81, the leaderboard): at the finish of a time trial on its own laps with the
+   * standard tuning, the run recorded for the board (shared/kart/boardRun.ts). Given only on a
+   * track with a board (SpikePage); the recorder is fetched when the loop starts, and a run whose GO
+   * comes before it has arrived is not recorded
+   */
+  readonly onBoardRun?: (run: BoardRunDone) => void
+}
+
+/** A time trial finished and recorded for the leaderboard (`onBoardRun`) */
+export interface BoardRunDone {
+  readonly replay: Replay
+  /** The track's id and layout revision */
+  readonly track: string
+  readonly revision: number
+  /** From GO to the finish, ms */
+  readonly totalMs: number
+  /** Whether this run set the track's best in this browser */
+  readonly newBest: boolean
+}
+
+/** Whether `tuning` is the standard one for `kart`: only such a run goes on the board */
+function standardTuning(tuning: KartTuning, kart: KartId): boolean {
+  const standard = applyKart(KART_TUNING, kart) as Record<string, number>
+  const given = tuning as Record<string, number>
+  return Object.keys(standard).every((key) => given[key] === standard[key])
 }
 
 /** One physics step, for `onStep` */
@@ -559,8 +598,22 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let bestLap: number | null = keyOfRecords ? loadBestLap(keyOfRecords) : null
   let recorder: GhostRecorder | null = null
   let news: RecordNews | null = null
-  // e11-t06 (§4.81): the race's feats for the achievements, watched from its steps
+  // e11-t06 (§4.82): the race's feats for the achievements, watched from its steps
   let feats = track ? watchKartRun(track, kartId) : null
+  // 2026-11-23 (§4.81): the run as the leaderboard keeps it, on a built-in track's own laps alone;
+  // `boardTuning` is the tuning it started with, which must stay the standard one to the finish
+  const boardable = !net && !!track && !!options.onBoardRun && ownLaps === undefined
+  // Its own small chunk (the tape, replay.ts), so that the race's engine does not carry it
+  let recorders: typeof import('../../shared/kart/boardRun.ts') | null = null
+  if (boardable) {
+    void import('../../shared/kart/boardRun.ts')
+      .then((module) => {
+        recorders = module
+      })
+      .catch(() => undefined)
+  }
+  let board: BoardRecorder | null = null
+  let boardTuning: KartTuning | null = null
   const scene = createKartScene(
     container,
     course.walls,
@@ -779,6 +832,36 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
             kartBestRun = ghost.total
           }
           bestLap = news.lapSteps
+        }
+        if (boardable && track) {
+          if (was === 'countdown' && trial.phase === 'racing') {
+            board = recorders && standardTuning(tuning, kartId)
+              ? recorders.createBoardRecorder(
+                  track.id,
+                  track.laps,
+                  loadoutByte(kartId, options.driver ?? DEFAULT_DRIVER),
+                )
+              : null
+            boardTuning = tuning
+          }
+          // A tuning changed during the run (the test page's panel) takes it off the board
+          if (board && tuning !== boardTuning) board = null
+          if (board && was !== 'finished') {
+            board.step(trial, input, trial.run.resets !== before.resets)
+            if (trial.phase === 'finished') {
+              const replay = board.finish(trial)
+              board = null
+              if (replay) {
+                options.onBoardRun?.({
+                  replay,
+                  track: track.id,
+                  revision: track.revision ?? 1,
+                  totalMs: replay.racers[0]!.finishMs ?? 0,
+                  newBest: news?.bestRun ?? false,
+                })
+              }
+            }
+          }
         }
       } else {
         run = stepRun(run, input, course, tuning, rules)
@@ -1216,6 +1299,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       trial = startTrial(trialCourse)
       run = trial.run
       recorder = null
+      board = null
       news = null
       feats = track ? watchKartRun(track, kartId) : null
       finishedAt = null

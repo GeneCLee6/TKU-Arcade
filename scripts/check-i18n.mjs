@@ -33,6 +33,7 @@ const KART = 'shared/kart/i18n.ts' // Registered by the kart's lazy chunk, so no
 const KART_PARTS = [
   ['shared/kart/i18n.school.ts', 'KART_SCHOOL_MESSAGES'],
   ['shared/kart/i18n.challenge.ts', 'KART_CHALLENGE_MESSAGES'],
+  ['shared/kart/i18n.board.ts', 'KART_BOARD_MESSAGES'],
   ['shared/kart/i18n.editor.ts', 'KART_EDITOR_MESSAGES'],
 ]
 // 2026-11-23 (e11-t06): the achievements' words, registered by their own lazy chunks

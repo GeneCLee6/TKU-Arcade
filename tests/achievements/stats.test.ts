@@ -175,6 +175,7 @@ describe('the kart stores and the rest', () => {
 
   it('a leaderboard place and the app', () => {
     expect(unlocks(apply([{ type: 'kart.leaderboard', track: 'riverside', rank: 3 }]))).toContain('kart-leaderboard')
+    expect(unlocks(apply([{ type: 'kart.leaderboard', track: 'riverside', rank: 101 }]))).not.toContain('kart-leaderboard')
     expect(unlocks(apply([{ type: 'platform.app' }]))).toContain('platform-app')
   })
 

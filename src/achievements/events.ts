@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): what the games tell the achievements. Only types:
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): what the games tell the achievements. Only types:
 // every screen that reports something imports `trackAchievement` (track.ts), which loads the engine
 // (engine.ts) when it is first needed. No game's rules change: each event is derived from what a screen
 // already has (a race's steps, a room's result, the kart's stores).
@@ -85,10 +85,7 @@ export type AchievementEvent =
   | KartProgressEvent
   /** Something the kart keeps changed (a medal, stars, a cup): the engine reads the stores again */
   | { readonly type: 'kart.sync' }
-  /**
-   * A place on a track's leaderboard (feat/kart-leaderboard reports it when it is merged; until
-   * then nothing sends it). `rank` is 1-based
-   */
+  /** A run uploaded to a track's leaderboard (src/kart/board/api.ts) and its rank there, 1-based */
   | { readonly type: 'kart.leaderboard'; readonly track: string; readonly rank: number }
   /** A room's game ended with this person in it: the engine works out what it was (room.ts) */
   | { readonly type: 'room.result'; readonly view: RoomView; readonly you: string }

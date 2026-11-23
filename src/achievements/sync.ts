@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): the kart's progress, read from what the kart
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): the kart's progress, read from what the kart
 // already keeps (challenge medals and missions, school stars, cup bests, best runs), as one event. The
 // engine reads it on its first event of a visit and whenever the kart says a store changed
 // (KART_PROGRESS_EVENT), so a medal won before achievements existed unlocks its badge too. Read

@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): what a room's finished game was for this person,
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): what a room's finished game was for this person,
 // from the room's view as every browser already has it (shared/protocol.ts RoomView). Pure. A
 // spectator gets nothing; a race room becomes a kart race, anything else a board game's result.
 import type { RoomView } from '../../shared/protocol.ts'

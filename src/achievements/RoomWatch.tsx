@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): the room page's side of the achievements, small:
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): the room page's side of the achievements, small:
 // when a game ends while this person watches the room, the room's view goes to the engine (room.ts
 // works out what it was). A result already there on joining is not counted again (a reload, a late
 // join); nor is a spectator's (room.ts).

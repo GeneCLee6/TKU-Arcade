@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, AC-11.3; docs/ARCHITECTURE.md §4.81): every achievement, as data. A rule
+// 2026-11-23 (e11-t06, AC-11.3; docs/ARCHITECTURE.md §4.82): every achievement, as data. A rule
 // names a counter or a tally of the stats (stats.ts) and how far it must get; `evaluate` is the one
 // function that reads them. The words are the rule's id under `ach.rule.` (shared/achievements/
 // i18n.ts), original in both languages: no other game's achievement names.

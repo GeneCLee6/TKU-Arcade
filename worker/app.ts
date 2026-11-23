@@ -7,6 +7,7 @@ import { handleVoice } from './voice.ts'
 import type { LobbyResponse } from '../shared/protocol.ts'
 import { handleAuth, isAuthPath } from './auth.ts'
 import { handleClientError } from './errors.ts'
+import { handleBoardAdmin, handleKartBoard } from './kartBoard.ts'
 import { LOBBY_NAME } from './lobby-board.ts'
 import type { LimiterDO } from './limiter.ts'
 import type { LobbyDO } from './lobby.ts'
@@ -103,6 +104,10 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   if (url.pathname === '/api/telemetry') return handleTelemetry(request, env, url)
   if (isAuthPath(url.pathname)) return handleAuth(request, env, url)
   if (url.pathname === '/api/errors') return handleClientError(request, env, url)
+  if (url.pathname === '/api/kart/board' || url.pathname === '/api/kart/board/replay') {
+    return handleKartBoard(request, env, url)
+  }
+  if (url.pathname === '/api/admin/kart-board') return handleBoardAdmin(request, env, url)
   if (url.pathname.startsWith('/api/')) return notFound()
   if (url.pathname.startsWith('/ws/')) return handleRoomSocket(request, env, url)
   return env.ASSETS.fetch(request)

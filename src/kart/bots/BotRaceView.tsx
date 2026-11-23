@@ -162,7 +162,7 @@ function BotRound({
     view.racers.find((racer) => racer.seat === game.playerSeat)?.finishMs != null,
   )
 
-  // e11-t06 (§4.81): where the race ended for the player, to the achievements, once
+  // e11-t06 (§4.82): where the race ended for the player, to the achievements, once
   const over = view.phase === 'finished'
   useEffect(() => {
     if (!over) return

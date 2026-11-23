@@ -1,7 +1,7 @@
 // 2026-11-23 (e11-t06): the kart's lists the achievements count against: vehicles, race tracks, cups,
 // driving school lessons, each challenge chapter's missions. Copied, not imported: importing the kart's
 // own modules into the achievements' chunks made the bundler split them out of the kart's first
-// screen into chunks of their own (docs/ARCHITECTURE.md §4.81). tests/achievements/kartLists.test.ts
+// screen into chunks of their own (docs/ARCHITECTURE.md §4.82). tests/achievements/kartLists.test.ts
 // fails the moment a copy and the kart's list differ, so a new kart or track is added here too.
 export const KART_IDS = [
   'tide',

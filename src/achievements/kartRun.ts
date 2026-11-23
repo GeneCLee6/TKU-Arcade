@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): a race's feats, from its physics steps as the game
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): a race's feats, from its physics steps as the game
 // loop ran them (spikeLoop.ts's steps, through kartHook.ts): the start, the combo, the share spent
 // boosting, drift jumps, High Tides, high platforms, wall gaps and real branches. At the finish, one
 // `kart.run` event. Pure but for that report: `watchRun` takes steps and gives the event once.

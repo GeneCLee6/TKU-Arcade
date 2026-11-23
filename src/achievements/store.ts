@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): the achievements as this browser keeps them, in
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): the achievements as this browser keeps them, in
 // localStorage through lib/storage.ts (which never throws: blocked, they last until the page closes).
 // One small JSON value, the same shape an account will take in once signing in exists (F1):
 //

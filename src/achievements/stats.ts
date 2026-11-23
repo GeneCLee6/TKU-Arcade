@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): what the achievements count, and how each event
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): what the achievements count, and how each event
 // changes it. Pure: the engine loads, applies, evaluates and saves; the tests pass made-up events.
 //
 // Two shapes only, so that a rule (rules.ts) can name any of it and an account (F1) can merge two
@@ -177,6 +177,8 @@ export function applyEvent(stats: Stats, event: AchievementEvent, at: Date): Sta
       applyProgress(draft, event)
       break
     case 'kart.leaderboard':
+      // On the public board: its top BOARD_TOP (shared/kart/board.ts)
+      if (event.rank < 1 || event.rank > 100) return stats
       draft.add('kart.leaderboard')
       draft.tally('kart.boards', event.track)
       break

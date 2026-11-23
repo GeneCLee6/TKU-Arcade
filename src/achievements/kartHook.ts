@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): the race engine's side of the achievements, small:
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): the race engine's side of the achievements, small:
 // the game loop (spikeLoop.ts) hands it every step; the watch itself (kartRun.ts) loads in the
 // countdown, and the steps until then wait for it. Never throws into the loop.
 import type { Track } from '../../shared/kart/track.ts'

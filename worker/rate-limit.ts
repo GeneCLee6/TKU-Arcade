@@ -53,6 +53,11 @@ export const SHARED_LIMITS = {
   resume: 240,
   /** Wrong owner keys, after which the address is locked out for a minute (worker/owner.ts) */
   ownerFail: 5,
+  /**
+   * 2026-11-23: runs uploaded to the kart's leaderboard (worker/kartBoard.ts). Each is inflated and
+   * judged sample by sample; a player uploads one at the end of a run, a minute or more apart
+   */
+  board: 6,
 } as const
 
 export type SharedBucket = keyof typeof SHARED_LIMITS

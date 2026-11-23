@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): the badges waiting to be shown, one at a time, top
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): the badges waiting to be shown, one at a time, top
 // right. A burst (the first visit after an update, where earlier progress unlocks a handful at once)
 // shows the first few and one "and N more", not a minute of badges. While a race runs they wait
 // (track.ts's hold); the component (Popups.tsx) loads with the first badge, in a root of its own.

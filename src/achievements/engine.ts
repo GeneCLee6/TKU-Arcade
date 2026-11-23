@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, AC-11.3; docs/ARCHITECTURE.md §4.81): the achievements' engine, loaded by the
+// 2026-11-23 (e11-t06, AC-11.3; docs/ARCHITECTURE.md §4.82): the achievements' engine, loaded by the
 // first event (track.ts). An event becomes the stats' events (a room's result, the kart's stores),
 // the stats change (stats.ts), the rules are evaluated (rules.ts), what is new is kept (store.ts)
 // and queued as a badge (popups.ts). One event at a time, each reading what is kept first, so that

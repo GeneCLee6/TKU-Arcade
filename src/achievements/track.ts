@@ -1,4 +1,4 @@
-// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.81): the achievements' one door, small enough for
+// 2026-11-23 (e11-t06, docs/ARCHITECTURE.md §4.82): the achievements' one door, small enough for
 // every first screen. A screen reports what happened; the engine (engine.ts, the rules, the store,
 // the badges) loads only then. Never throws, never waits: an achievement must not cost a game anything.
 import type { AchievementEvent } from './events.ts'
