@@ -5,8 +5,9 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import type { TradersAction, TradersMoveView, TradersView } from '../../../shared/games/traders/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
+import { PhaseBar, Ticker } from '../../components/table/tableKit.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
-import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { Market } from './Market.tsx'
@@ -135,6 +136,12 @@ export default function TradersScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage>
+        {/* The broadcast's caption (DESIGN §3.9): the last round starting */}
+        <TableCaption
+          id={view.finalRound && !game.over ? 'final' : null}
+          text={t('games.traders.ui.finalRound', { target: view.target })}
+          tone="magenta"
+        />
         <Header>
           <Round>{t('games.traders.ui.round', { round: view.round })}</Round>
           {view.finalRound && !game.over ? (
@@ -215,7 +222,7 @@ const Stage = styled.div`
   max-width: 640px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -223,10 +230,8 @@ const Header = styled.div`
   gap: ${space.xs}px ${space.md}px;
 `
 
-const Round = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The round as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Round = styled(Ticker)``
 
 const Target = styled.span`
   color: ${color.muted};

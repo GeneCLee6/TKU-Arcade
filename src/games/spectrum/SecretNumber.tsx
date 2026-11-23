@@ -2,12 +2,12 @@ import { useState } from 'react'
 import styled from 'styled-components'
 import type { SpectrumTopic } from '../../../shared/games/spectrum/types.ts'
 import { Button } from '../../components/Button.tsx'
-import { Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { displayType, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { position } from './numberLine.ts'
 import { leaning } from './screenState.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 interface SecretNumberProps {
   number: number

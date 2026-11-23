@@ -1829,9 +1829,10 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 
 - **`src/components/table/tableKit.ts`**（靜態、約 1.1 kB gzip，用到它的遊戲首屏才帶）：`tablePanel`、`tableSurface(base)`／`hueSurface`、`turnGlow`、`nameplate`、`digits`、`mix`（`color-mix` 的唯一寫法）、`Ticker`、`RankPlate`、`PhaseBar`、`slantMark`。只有樣式，不管遊戲邏輯。
 - **事件字幕**：`TableCaption`（`src/components/LateParts.tsx`）只是 `captionChunk`（`src/lib/lateParts.ts`）的殼；`EventCaption.tsx` 首屏之後才載。介面是 `{ id, text, tone }`：`id` 變成新的值就丟一則字幕，`null` 或掛上時的那個值不丟（重連、晚進來的人不會看到舊事件）。字由 `::after { content: attr(data-text) }` 畫、整塊 `aria-hidden`：字幕只重複畫面上已有的字，DOM 裡不多一份（`getByText` 不會撞兩個）。哪個時刻算事件由各遊戲從 `view` 推（德州撲克的 `allIn`／`handEnd`、放風箏 `log` 最後一筆 `play` 且 `!ok`、陞官圖 `getCell(from).rank !== getCell(to).rank` 且動畫放完、默契牌局 `reveal` 放完）。
-- **房間側欄**（`RoomInPlay.tsx`，每款都帶）：成員列成名牌（`--seat` 由列的 `style` 給）；輪到的那列遊戲色框＋外光、斜的「輪到」牌；頭像外的倒數環 `TurnRing.tsx` 走 `turnRingChunk`（首屏之後），環的寬度用負 margin 抵掉，載入前後版面不動。環的進度是 CSS 動畫：`animation-duration` ＝ 倒數總長、`animation-delay` ＝ 已過的時間取負，換 deadline 就換一個元件重算。
+- **房間側欄**（`RoomInPlay.tsx`，每款都帶）：成員列成名牌（`--seat` 由列的 `style` 給）；輪到的那列遊戲色框（第二個 PR 起拿掉外光，讓陞官圖完整版留在 140 以下）、斜的「輪到」牌；頭像外的倒數環 `TurnRing.tsx` 走 `turnRingChunk`（首屏之後），環的寬度用負 margin 抵掉，載入前後版面不動。環的進度是 CSS 動畫：`animation-duration` ＝ 倒數總長、`animation-delay` ＝ 已過的時間取負，換 deadline 就換一個元件重算。
 - **為了首屏**：`CoverSection`（遊戲卡在某個座位時的處理）搬到自己的檔案、走 `coverChunk`（只有遊戲卡住才用得到），抵掉側欄新樣式的成本。陞官圖兩個首屏只帶字幕的殼與側欄樣式，不 import `tableKit`。
 - **首屏**（`npm run budget`，對照 `5eb85e7`）：見各 PR（第一個 PR：陞官圖 139.7 → 139.9、完整版 139.9 → 140.0；德州撲克 132.5 → 134.8、放風箏 130.7 → 132.7、默契牌局 131.6 → 133.7；沒套用的遊戲 +0.1）。
+- **第二個 PR**（其餘 12 款）：牌桌上的 `glass`／`roomParts` 的 `Section` 換成 `tablePanel`／`TableSection`（import 改名，畫面結構不動）；八款有 `Header`＋`Round` 的頂列換成 `PhaseBar`＋`Ticker`，宮燈點點、撞詞、搭橋的頂列同樣；計分板 `PlateRow`＋`RankPlate`（`placeOf` 同分同名次，名次牌 `aria-hidden`）。字幕的事件：朝堂暗鬥紀錄最後一筆是 `challenge`／`proved`／`caught`／`out`（用 `logLine` 那一行）、社辦牌陣 `history` 最後一輪、奪祕笈 `lastRound`、芥末餃子 `roundEnd` 的第一行、真假朗讀 `honest`、誰的詞不一樣 `reveal`、光譜猜題 `phase === 'reveal'`、撞詞 `reveal` 的判定、滬尾商行 `finalRound`、宮燈點點 `news` 有 `early`、慘度排排站 `last`。首屏：各款 +0.9～1.5 kB（`tableKit` 與字幕的殼），全部在 136 kB 以下。
 - **測試**：`tests/setup.ts` 先載 `captionChunk`、`coverChunk`、`turnRingChunk`；既有的畫面測試、`test:sweep`（每款從等待室玩到再來一局，含 axe）照跑。
 
 ### 4.86 路線圖外：車手骨架動畫、細節、車身動態與 21 台車的配色（2026-11-23，`feat/kart-models-anim`）

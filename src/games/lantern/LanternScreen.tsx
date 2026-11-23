@@ -4,12 +4,14 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import type { LanternAction, LanternHow, LanternView } from '../../../shared/games/lantern/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType, SLANT } from '../../styles/esports.ts'
+import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { Lantern, type LanternLook } from './Lantern.tsx'
 import { answerKey, moonVotes, newsLines, promptOf, unlit } from './screenState.ts'
+import { PhaseBar, tablePanel, Ticker } from '../../components/table/tableKit.ts'
 
 /** If the room never answers a press, the button comes back after this */
 const ANSWER_WAIT_MS = 4000
@@ -114,6 +116,12 @@ export default function LanternScreen({ room, game }: GameScreenProps) {
 
         {game.chatLocked && <Notice role="note">{t('games.lantern.ui.noTalking')}</Notice>}
 
+        {/* The broadcast's caption (DESIGN §3.9): a lantern lit too early */}
+        <TableCaption
+          id={view.news.some((item) => item.kind === 'early') ? `news-${view.newsId}` : null}
+          text={lines[0] ?? ''}
+          tone="magenta"
+        />
         <News role="status" data-testid="news">
           {lines.length > 0 && (
             <NewsCard key={view.newsId} $bad={view.news.some((item) => item.kind === 'early')}>
@@ -231,7 +239,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -239,10 +247,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Level = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The card, level or mode as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Level = styled(Ticker)``
 
 const Facts = styled.div`
   display: flex;
@@ -305,7 +311,7 @@ const NewsCard = styled.div<{ $bad: boolean }>`
 `
 
 const Panel = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.md}px;

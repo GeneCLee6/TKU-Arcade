@@ -3,6 +3,7 @@ import type { WbCard, WbDuoCard } from '../../../shared/games/word-bridge/types.
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { CellLook } from './screenState.ts'
+import { hueSurface } from '../../components/table/tableKit.ts'
 
 type Face = WbCard | WbDuoCard | 'found'
 
@@ -84,12 +85,14 @@ export function Grid({ words, looks, pickable, selected, onSelect, sideNames }: 
   )
 }
 
+// The grid on the game's table top (DESIGN §3.9)
 const Board = styled.ul`
+  ${hueSurface}
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: ${space.xs}px;
   margin: 0;
-  padding: 0;
+  padding: ${space.xs}px;
   list-style: none;
 
   & > li {

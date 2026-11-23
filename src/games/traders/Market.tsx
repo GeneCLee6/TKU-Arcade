@@ -2,6 +2,7 @@ import styled from 'styled-components'
 import type { TradersView } from '../../../shared/games/traders/types.ts'
 import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { useT } from '../../i18n/useT.ts'
+import { slantMark } from '../../components/table/tableKit.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { tradersPieces as piece } from '../../styles/tradersTokens.ts'
 import { CardFace, PatronTile } from './pieces.tsx'
@@ -85,10 +86,13 @@ export const Section = styled.section`
 `
 
 export const Heading = styled.h2`
+  ${slantMark}
   margin: 0;
   color: ${color.muted};
   font-size: ${fontSize.sm}px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 `
 
 export const Help = styled.p`

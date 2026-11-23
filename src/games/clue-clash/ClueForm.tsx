@@ -3,9 +3,9 @@ import styled from 'styled-components'
 import { clashKey, clueProblem, MAX_CLUE_LENGTH, tidyClue } from '../../../shared/games/clue-clash/clue.ts'
 import { Button } from '../../components/Button.tsx'
 import { FieldError, FieldLabel, TextInput } from '../../components/Field.tsx'
-import { Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 interface ClueFormProps {
   /** How many clues you write: two with three players */

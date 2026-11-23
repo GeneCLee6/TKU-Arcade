@@ -1,11 +1,12 @@
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { BluffView } from '../../../shared/games/bluff/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
-import { Heading, List, Row, Section } from '../../components/roomParts.ts'
+import { Heading, List, Row } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { seatColor } from '../../styles/tokens.ts'
 import { Body, Choice, Choices, Count, Muted, Name, Pill, Tag, Top } from './bluffParts.ts'
 import { deciders } from './screenState.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 /** A seat to vote for or give the sticker to; `null` is "no sticker"; `undefined`, nothing picked yet */
 export type Pick = SeatId | null | undefined
