@@ -57,7 +57,7 @@ function resumed(): Playing {
  * thrown away and run again, state initialisers too: taking `bots` off in the initialiser lost it
  * for that second run, and the panel now and then did not open
  */
-export function useBotsAsked(): boolean {
+function useBotsAsked(): boolean {
   const [asked] = useState(() => new URL(window.location.href).searchParams.has('bots'))
   useEffect(() => {
     if (!asked) return
