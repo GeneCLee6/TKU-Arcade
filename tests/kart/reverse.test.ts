@@ -11,6 +11,8 @@ import {
   forwardId,
   isReverseId,
   reverseId,
+  closesFlownLane,
+  REVERSE_REVISION,
   reverseTrack,
   turnJumps,
 } from '../../shared/kart/tracks/reverse.ts'
@@ -60,7 +62,7 @@ describe('reversing a track', () => {
     expect(reversed.id).toBe(`${id}-rev`)
     // A reversed track's records are its own, and follow its original's revision
     expect(recordKey(reversed)).not.toBe(recordKey(json))
-    expect(reversed.revision).toBe(json.revision ?? 1)
+    expect(reversed.revision).toBe((json.revision ?? 1) + REVERSE_REVISION - 1)
     // Road point 0 (the line) stays; the rest the other way round, each leaning the other way
     reversed.road.forEach((point, index) => {
       const was = json.road[(n - index) % n]!
@@ -103,10 +105,21 @@ describe('reversing a track', () => {
     })
   })
 
-  it('has no guide of its original’s: the computer karts drive it by its road', () => {
-    for (const id of REVERSE_TRACK_IDS) {
-      expect(trackGuide(id)).toBeUndefined()
-      expect(routeGuide(id)).toBeUndefined()
+  it('has guides of its own only where the reversed road asks something technical (reverseGuides.ts)', () => {
+    const guided = REVERSE_TRACK_IDS.filter((id) => trackGuide(id) !== undefined)
+    const routed = REVERSE_TRACK_IDS.filter((id) => routeGuide(id) !== undefined)
+    expect(guided).toEqual(['wharf-rev', 'lanes-rev'])
+    expect(routed).toEqual(['wharf-rev', 'works-rev', 'zhuwei-rev'])
+  })
+
+  it('leaves out a fence across a lane flown into, and only that (the quay, the well)', () => {
+    for (const id of RACE_TRACK_IDS) {
+      const json = RACE_TRACKS[id]
+      const { track, notes } = reverseTrack(json)
+      const opened = id === 'wharf' || id === 'lanes' ? 1 : 0
+      expect(notes.fencesOpened, id).toBe(opened)
+      expect(track.walls).toHaveLength(json.walls.length - opened)
+      json.walls.forEach((wall) => expect(closesFlownLane(json, wall)).toBe(opened > 0 && !track.walls.includes(wall)))
     }
   })
 
