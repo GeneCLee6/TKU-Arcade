@@ -10,12 +10,13 @@ import { weeklyTrack } from '../../../shared/kart/board.ts'
 import { KART_ONLINE_MESSAGES } from '../../../shared/kart/i18n.online.ts'
 import { KART_MESSAGES, type KartMessageKey } from '../../../shared/kart/i18n.ts'
 import { RACE_TRACK_IDS, type RaceTrackId } from '../../../shared/kart/tracks/list.ts'
-import type { RoomListing } from '../../../shared/protocol.ts'
+import { MAX_PASSWORD_CHARS, normalizePassword, type RoomListing } from '../../../shared/protocol.ts'
 import { MAX_ROOM_NAME_CHARS, normalizeRoomName, roomNameIssue } from '../../../shared/roomName.ts'
 import { Button } from '../../components/Button.tsx'
 import { registerMessages, type MessageParams } from '../../i18n/t.ts'
 import { useT } from '../../i18n/useT.ts'
 import { readNickname } from '../../lib/nickname.ts'
+import { keepRoomPassword } from '../../lib/roomPassword.ts'
 import { useNavigate } from '../../lib/useRouter.ts'
 import { displayType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
@@ -207,7 +208,11 @@ export default function OnlineView({ onExit }: { onExit: () => void }) {
                   setBusy(null)
                   if (answer === 'paused' || answer === 'rate_limited' || answer === 'bad_name' || answer === 'failed') {
                     setProblem(answer)
-                  } else navigate(`/r/${answer}`)
+                  } else {
+                    // Its maker walks in without being asked for it
+                    if (ask.password) keepRoomPassword(answer, ask.password)
+                    navigate(`/r/${answer}`)
+                  }
                 }}
               />
             ) : (
@@ -372,10 +377,28 @@ function CreateForm({
   weekly: RaceTrackId
   busy: boolean
   onCancel: () => void
-  onCreate: (ask: { options: Record<string, string | number>; public: boolean; name?: string }) => void
+  onCreate: (ask: {
+    options: Record<string, string | number>
+    public: boolean
+    name?: string
+    password?: string
+  }) => void
 }) {
-  const ids = { name: useId(), track: useId(), mode: useId(), teams: useId(), issue: useId() }
+  const ids = {
+    name: useId(),
+    track: useId(),
+    mode: useId(),
+    teams: useId(),
+    issue: useId(),
+    password: useId(),
+    passwordNote: useId(),
+  }
   const [name, setName] = useState('')
+  // 2026-11-23 (#163): a password from the start (the waiting room can still set or take it away)
+  const [password, setPassword] = useState('')
+  const passwordTyped = password !== ''
+  const passwordClean = normalizePassword(password)
+  const passwordBad = passwordTyped && passwordClean === null
   const [track, setTrack] = useState<RaceTrackId>(weekly)
   const [mode, setMode] = useState('items')
   const [teams, setTeams] = useState('solo')
@@ -386,12 +409,13 @@ function CreateForm({
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (issue) return
+    if (issue || passwordBad) return
     const clean = typed ? normalizeRoomName(name) : null
     onCreate({
       options: { track, mode, teams },
       public: isPublic,
       ...(clean ? { name: clean } : {}),
+      ...(passwordClean ? { password: passwordClean } : {}),
     })
   }
 
@@ -469,8 +493,32 @@ function CreateForm({
           <label htmlFor={`${ids.name}-public`}>{t('kart.online.create.public')}</label>
         </Check>
       </Who>
+      <Field>
+        <label htmlFor={ids.password}>{t('kart.online.create.password')}</label>
+        <input
+          id={ids.password}
+          autoComplete="off"
+          value={password}
+          maxLength={MAX_PASSWORD_CHARS * 2}
+          aria-invalid={passwordBad}
+          aria-describedby={ids.passwordNote}
+          onChange={(event) => setPassword(event.target.value)}
+          data-testid="kart-online-create-password"
+        />
+        {passwordBad ? (
+          <Problem id={ids.passwordNote} data-testid="kart-online-password-issue">
+            {t('kart.online.create.passwordBad', { max: MAX_PASSWORD_CHARS })}
+          </Problem>
+        ) : (
+          <Note id={ids.passwordNote} data-testid="kart-online-password-note">
+            {passwordClean && isPublic
+              ? t('kart.online.create.passwordUnlisted')
+              : t('kart.online.create.passwordHint')}
+          </Note>
+        )}
+      </Field>
       <FormButtons>
-        <Button type="submit" disabled={busy || issue !== null} data-testid="kart-online-create-go">
+        <Button type="submit" disabled={busy || issue !== null || passwordBad} data-testid="kart-online-create-go">
           {busy ? t('kart.online.create.going') : t('kart.online.create.go')}
         </Button>
         <Button type="button" $variant="ghost" onClick={onCancel}>
