@@ -2007,7 +2007,7 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **全螢幕的第一下 Esc**（`src/lib/fullscreen.ts`、`PauseLayer.tsx`）：Chromium 進全螢幕後 `navigator.keyboard.lock(['Escape'])`（#151 起就有；這次加單元測試與 e2e 確認比賽中真的鎖了、Esc 開暫停選單、仍在全螢幕）。Firefox／Safari 沒有 Keyboard Lock，Esc 由瀏覽器拿去離開全螢幕、頁面收不到按鍵：`fullscreen.ts` 記住「是不是頁面自己要離開」（`exitFullscreen` 設 `leaving`），全螢幕結束而不是頁面要的，就發 `onBrowserExit`；`PauseLayer` 在 `enabled` 時聽它，打開選單（單機暫停、多人房只開選單），和 Chromium 第一下 Esc 一樣。滑掉、F11 也算（比賽中離開全螢幕本來就該停一下）。頁面自己的「離開全螢幕」不觸發。
 - **卡丁車 e2e 的測試時鐘**（`src/kart/testClock.ts`、`e2e/kartClock.ts`）：測試在頁面載入前設 `window.__kartTest = { manual: true }`，`spikeLoop` 就不照牆上時鐘步進，只在測試呼叫 `__kartTest.step(n, until)` 時跑 `n` 步（一幀最多 120 步），`until` 第一次成立的那一步就停（比賽停在那一步，等測試按下一個鍵）。步進本身完全是原本的程式（`stepTrial`／`stepRun`、輸入、HUD），只換「什麼時候跑」：沒有設定的人（正式版、其他測試）走 `advanceClock` 原路，`flatGolden`／`branchGolden` 不變。`stepUntil` 的條件函式用 DevTools 協定送過去（`evaluateHandle`），不用 `new Function`（建置版 CSP 擋）。改用的：`kart-spike` 加速條放開視窗、搖桿、河濱（另加載入寬限）、`kart-night` 夜間車燈（先等比賽畫出來再等 canvas，兩次載入各有寬限）；`kart-lobby` 8 車手＋4 次 axe 不是物理問題，逾時 120 → 240 s。
 
-### 4.97 路線圖外：房間的社交——快捷表情、短語、玩家名片（2026-11-23，`feat/room-social`，#PRNUM）
+### 4.97 路線圖外：房間的社交——快捷表情、短語、玩家名片（2026-11-23，`feat/room-social`，#181）
 
 擁有者：「把它們想像是在做一個線上遊戲就知道怎麼做了」「總之要電競化專業化」。不需要帳號，所有房間（等待室、遊戲中、結算；卡丁車等待室、比賽中、觀戰）都有。
 

@@ -8,8 +8,9 @@ import { everyoneReady, setIntOption, setSelectOption, takeFirstChip } from './h
 // Words that stay Latin in both languages. Nicknames here are Chinese, so that they need no entry
 // Overtrick is the bridge table's platform, whose name is English only (its DESIGN.md §6; e1-t13)
 // The originals' own names, in the one sentence a rules page gives them (CLAUDE.md rule 1)
+// GG: the quick phrase is the same two letters in both languages (src/components/social/)
 const ALLOWED =
-  /TKU Arcade|Overtrick|\bEN\b|QR code|Shift\+Enter|\bEnter\b|9upper|TIME2PLAY GAMES|\bito\b|Arclight/g
+  /TKU Arcade|\bGG\b|Overtrick|\bEN\b|QR code|Shift\+Enter|\bEnter\b|9upper|TIME2PLAY GAMES|\bito\b|Arclight/g
 
 async function englishLeft(page: Page): Promise<string[]> {
   return page.evaluate((allowed) => {
