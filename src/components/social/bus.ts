@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.97): the one tiny piece of the room's social layer every room
+// 2026-11-23 (docs/ARCHITECTURE.md §4.98): the one tiny piece of the room's social layer every room
 // screen carries. A name anywhere in a room (NameButton) asks for that member's card through here; the
 // lazy layer (SocialLayer.tsx) listens. Bubbles find where a member sits on screen by SOCIAL_MEMBER
 // (a name, a seat card) or, where a screen only knows seats (the kart's name tags), SOCIAL_SEAT.

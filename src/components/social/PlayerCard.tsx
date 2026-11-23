@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.97): a member's player card, opened from their name anywhere in a
+// 2026-11-23 (docs/ARCHITECTURE.md §4.98): a member's player card, opened from their name anywhere in a
 // room. What it shows is what that member's own browser sent (RoomMember.profile, shared/social.ts):
 // their title, achievements, games and wins, favourite vehicle, driver and best lap. Its own lazy
 // chunk, with the words it needs: the achievements' names, the vehicles', drivers' and tracks'.

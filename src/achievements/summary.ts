@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.97): the few numbers of this person's achievements a room may
+// 2026-11-23 (docs/ARCHITECTURE.md §4.98): the few numbers of this person's achievements a room may
 // see on their card (shared/social.ts ProfileSummary), worked out from the save (store.ts): never the
 // save itself. Pure but for `currentSummary`, which reads the stores.
 import {

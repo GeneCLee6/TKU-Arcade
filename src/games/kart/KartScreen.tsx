@@ -68,6 +68,8 @@ export default function KartScreen({ room, game }: GameScreenProps) {
   // 2026-11-20: what each seat picked, to draw it on the grid before its frames come
   const lookOf = (seat: number) =>
     parseLook(Object.values(room.view.members).find((one) => one.seat === seat)?.look)
+  // 2026-11-23: what each one's driver wears (not in a frame), for watching and the replay
+  const outfitOf = (seat: number) => lookOf(seat)?.outfit
   const me = view.racers.find((racer) => racer.seat === view.you)
   // §4.43: the finish's show plays out before the room's results
   const holding = useFinishHold(me?.finishMs != null)
@@ -81,6 +83,7 @@ export default function KartScreen({ room, game }: GameScreenProps) {
           view={view}
           realtime={room.realtime}
           nameOf={nameOf}
+          outfitOf={outfitOf}
           onClose={() => setWatchChoice(false)}
         />
       </Suspense>
@@ -147,7 +150,7 @@ export default function KartScreen({ room, game }: GameScreenProps) {
               )}
               {canReplay && finished && (
                 <Suspense fallback={null}>
-                  <ReplayShare replay={finished} nameOf={nameOf} you={view.you} />
+                  <ReplayShare replay={finished} nameOf={nameOf} you={view.you} outfitOf={outfitOf} />
                 </Suspense>
               )}
               {canChange && (
@@ -195,6 +198,7 @@ export default function KartScreen({ room, game }: GameScreenProps) {
           <ReplayView
             replay={replay}
             nameOf={nameOf}
+            outfitOf={outfitOf}
             you={view.you}
             onClose={() => setReplay(null)}
             highlights={highlights}

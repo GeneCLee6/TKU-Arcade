@@ -162,7 +162,7 @@ function AchievementTile({
 }
 
 /**
- * 2026-11-23 (docs/ARCHITECTURE.md §4.97): what rooms see of this card (summary.ts): whether they
+ * 2026-11-23 (docs/ARCHITECTURE.md §4.98): what rooms see of this card (summary.ts): whether they
  * see it at all, and which unlocked achievement it shows as a title
  */
 function CardSettings({ done, saved, t }: { done: readonly Rule[]; saved: Saved; t: Translate }) {

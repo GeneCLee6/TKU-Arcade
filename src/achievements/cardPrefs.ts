@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.97): what this person chose for their player card, kept in this
+// 2026-11-23 (docs/ARCHITECTURE.md §4.98): what this person chose for their player card, kept in this
 // browser: whether rooms see it, which achievement it shows as a title, and whether emotes float
 // during a race. "My profile" sets the first two, the room's emote panel the third. Small, with no
 // import but storage, so the profile page and the room's social layer can both carry it.

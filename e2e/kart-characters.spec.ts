@@ -130,3 +130,53 @@ test.describe('the garage', () => {
     expect(errors).toEqual([])
   })
 })
+
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #177 measured only the hands): the race room's pictures
+// (lobby/lobbyStage.ts) of all four drivers standing by their karts, as they press Ready: each one's
+// own win, at its start, its middle and as it ends, attached to the report (and kept with
+// KART_CHARACTER_SHOTS=1). tests/kart/gestureClearance.test.ts keeps the arms out of the helmets.
+// The stage is mounted straight from the dev server's modules: it needs `npm run dev`.
+test.describe('the race room', () => {
+  test.use({ viewport: { width: 1440, height: 620 } })
+  test('four drivers standing, each with their own win on Ready', async ({ page }, info) => {
+    const errors = watchConsole(page)
+    await page.goto('/')
+    await page.evaluate(async () => {
+      document.body.innerHTML =
+        '<div id="room" style="display:flex;gap:8px;padding:8px;background:#1b2030"></div>'
+      const room = document.getElementById('room')!
+      const path = '/src/kart/lobby/lobbyStage.ts'
+      const { createLobbyStage } = await import(/* @vite-ignore */ path)
+      const stage = createLobbyStage({ still: false, slow: false })
+      const drivers = ['spade', 'heart', 'diamond', 'club']
+      drivers.forEach((driver, slot) => {
+        const canvas = document.createElement('canvas')
+        canvas.style.cssText = 'width:344px;height:600px'
+        canvas.dataset.testid = `room-${driver}`
+        room.append(canvas)
+        stage.attach(slot, canvas)
+        stage.set(slot, { kart: 'tide', driver, ready: false })
+      })
+      ;(window as unknown as { __ready(): void }).__ready = () =>
+        drivers.forEach((driver, slot) => stage.set(slot, { kart: 'tide', driver, ready: true }))
+    })
+    await page.waitForTimeout(2_000)
+    const shots = new Set<string>()
+    const shoot = async (name: string) => {
+      const png = await page.locator('#room').screenshot()
+      shots.add(png.toString('base64'))
+      await keep(info, name, png)
+    }
+    await shoot('room-standing')
+    await page.evaluate(() => (window as unknown as { __ready(): void }).__ready())
+    let since = 0
+    for (const at of [550, 1600, 3000]) {
+      await page.waitForTimeout(at - since)
+      since = at
+      await shoot(`room-win-${at}`)
+    }
+    // Standing, then three moments of the win: every picture its own
+    expect(shots.size).toBe(4)
+    expect(errors).toEqual([])
+  })
+})

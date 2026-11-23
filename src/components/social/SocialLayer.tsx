@@ -1,4 +1,4 @@
-// The room's social layer (e7-t11's reactions, grown 2026-11-23; docs/ARCHITECTURE.md §4.97): one lazy
+// The room's social layer (e7-t11's reactions, grown 2026-11-23; docs/ARCHITECTURE.md §4.98): one lazy
 // chunk over every room screen, waiting room, game, result, the race and watching it.
 //
 // - Emotes and phrases (shared/social.ts): a button in a corner opens twelve emotes and eight canned

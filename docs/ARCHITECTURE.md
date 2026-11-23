@@ -2007,7 +2007,54 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **全螢幕的第一下 Esc**（`src/lib/fullscreen.ts`、`PauseLayer.tsx`）：Chromium 進全螢幕後 `navigator.keyboard.lock(['Escape'])`（#151 起就有；這次加單元測試與 e2e 確認比賽中真的鎖了、Esc 開暫停選單、仍在全螢幕）。Firefox／Safari 沒有 Keyboard Lock，Esc 由瀏覽器拿去離開全螢幕、頁面收不到按鍵：`fullscreen.ts` 記住「是不是頁面自己要離開」（`exitFullscreen` 設 `leaving`），全螢幕結束而不是頁面要的，就發 `onBrowserExit`；`PauseLayer` 在 `enabled` 時聽它，打開選單（單機暫停、多人房只開選單），和 Chromium 第一下 Esc 一樣。滑掉、F11 也算（比賽中離開全螢幕本來就該停一下）。頁面自己的「離開全螢幕」不觸發。
 - **卡丁車 e2e 的測試時鐘**（`src/kart/testClock.ts`、`e2e/kartClock.ts`）：測試在頁面載入前設 `window.__kartTest = { manual: true }`，`spikeLoop` 就不照牆上時鐘步進，只在測試呼叫 `__kartTest.step(n, until)` 時跑 `n` 步（一幀最多 120 步），`until` 第一次成立的那一步就停（比賽停在那一步，等測試按下一個鍵）。步進本身完全是原本的程式（`stepTrial`／`stepRun`、輸入、HUD），只換「什麼時候跑」：沒有設定的人（正式版、其他測試）走 `advanceClock` 原路，`flatGolden`／`branchGolden` 不變。`stepUntil` 的條件函式用 DevTools 協定送過去（`evaluateHandle`），不用 `new Function`（建置版 CSP 擋）。改用的：`kart-spike` 加速條放開視窗、搖桿、河濱（另加載入寬限）、`kart-night` 夜間車燈（先等比賽畫出來再等 canvas，兩次載入各有寬限）；`kart-lobby` 8 車手＋4 次 axe 不是物理問題，逾時 120 → 240 s。
 
-### 4.97 路線圖外：房間的社交——快捷表情、短語、玩家名片（2026-11-23，`feat/room-social`，#181）
+### 4.97 路線圖外：卡丁車第四輪細修（重播與觀戰的服裝、電腦車手的服裝、頒獎台名牌、開場鏡頭避開建築、iOS 聲音、等待室勝利動作）（2026-11-23，`feat/kart-polish-4`，#179）
+
+擁有者：「電競化專業化、當成線上遊戲來做」。#176、#177 留下的六個已知限制。物理、裁定、frame 格式都不動。
+
+**一、重播與觀戰的服裝**（#177 的限制：frame 的車 byte 已滿，別人的服裝顯示賽車服）
+
+- **觀戰**（`SpectateView.tsx` 的 `outfitOf`）：從房間成員資料取 `look` 的第三個字（等待室同步的那個，`KartScreen.tsx` 的 `lookOf(seat).outfit`），每幀交給場景；換了就重建那台車（`Scene.ts` 本來就比對 `OtherKart.outfit`）。
+- **重播**（`ReplayView.tsx` 的 `outfitOf`）：房間比賽用成員的 `look`；對戰電腦、大獎賽用自己這套與每位電腦車手抽到的那套；從檔案開的用檔頭。精華（#164）是同一個 `ReplayView`，跟著有。
+- **重播檔**（`shared/kart/replayFile.ts`，`KART-NETCODE.md` §11.4）：檔頭 JSON 多一個選用的 `outfits: [{ seat, outfit }]`（賽車服省略；沒人知道就整欄不寫）。**檔案版本不變（1）**：舊頁面讀檔頭只取它認得的欄位，新檔照開（顯示賽車服）；新頁面讀舊檔沒有這欄 → 賽車服。讀檔時逐筆驗證（座位 0–31、同一座位只取第一筆、不認得的服裝丟掉、不是陣列就當沒有），**只丟欄位不拒收整個檔**；也只留真的在重播裡的座位。`ReplayShare`／`fileInfo` 帶 `outfitOf` 寫進去。
+- **排行榜重播**（#161，`board/api.ts`）：上傳時從重播第一個樣本的車手（`replayLoadout`）取這個瀏覽器記的那套服裝寫進檔頭；伺服器原封不動存，下載後在 `/kart/replay` 看得到。追幽靈車照舊是自己的車與車手（幽靈車本來就不畫別人的樣子）。
+
+**二、電腦車手的服裝**（#177 的限制：單機對戰電腦、大獎賽、挑戰的電腦車手都穿賽車服）
+
+- `bots/roster.ts`：`BotEntry.outfit`，`drawBots` 從**另一條亂數流**（`seed ^ OUTFIT_SALT`）抽，所以同一個 seed 抽到的名字、車、車手和以前完全一樣（測試逐一比對舊演算法）。比賽中（`lookOf={(seat) => game.entries[seat]}`，`netRace.ts` 本來就讀 `outfit`）、每場頒獎台、大獎賽總頒獎台、重播都照這套。
+- 大獎賽存檔（`cupRun.ts` 的 `parseEntry`）：有認得的服裝就留，沒有（更新前存的）或不認得 → 不帶（賽車服），存檔照樣讀得回來。
+
+**三、頒獎台冠軍特寫的名牌**（#177 的限制：特寫時下方名牌蓋到車頭）
+
+- `PodiumCeremony.tsx`：到 `WINNER_SHOW_AT`（3.8 s，鏡頭開始推近）時，第二、三名的名牌收起，冠軍的名牌移到車不在的地方：**寬螢幕左下角**（寬 min(240 px, 24vw)，車佔畫面中間），**直拿移到上方標題下**（特寫時車寬佔滿、車鼻到畫面底）；從左邊滑進。減少動態時鏡頭不推近，名牌照舊三張在下方。
+- **量的方法**（`e2e/kart-podium.spec.ts`）：舞台多一個 `window.__kartPodium.winnerBox()`（`podiumStage.ts`）：冠軍的車與車手每個實體頂點（不含發光、火焰、放下的獎盃）照當下姿勢投影到畫面上的外框；在 1280×720、844×390、390×844 三種畫面推近後量冠軍名牌的框，**兩個框不重疊**，另兩張名牌不見；截圖附在報告。直接用 dev server 的模組掛上元件（不必跑完一場比賽），所以要 `npm run dev`。
+
+**四、團體鏡頭被建築擋住**（#176 的限制：只看起跑格，沒檢查鏡頭前方）
+
+- **檢查**（`src/kart/art/sightLine.ts` 的 `createSightTest`）：拿這張賽道**畫出來的樣子**（`buildTrackArt` 的群組：建築、牆、地標、樹、山坡地面）做射線：從鏡頭到點、再從點到鏡頭各一次（單面的牆或地面只有正面擋得到），只算看得見、不透明（不透明度 ≥ 0.6、會寫深度）的 mesh；離點 1 m、離鏡頭 0.3 m 內的不算（車下的路面）。
+- **換角度**（`director.ts`）：`groupShot` 多一個 `angle`，`GROUP_ANGLES` 依序：`front`（原本的）、`high`（同方向、每公尺高 0.85、至少 7 m，越過矮牆與拱門往下拍）、`left`／`right`（從兩個前角，轉 0.85 rad）、`behind`（側後方高處）、`top`（近乎正上方）。每個角度的距離一樣照螢幕寬高比算、照樣推近與平移。`groupShotHidden` 在推近的開頭、中間、結尾看每台車：**車手的頭看得到、而且車身左右至少一邊看得到**才算有拍到；`pickGroupAngle` 取第一個每台都拍到的角度，都不行就取擋最少的。
+- **執行時**（`spikeLoop.ts`）：開場要用團體鏡頭時（含等 GO 的時候）算一次，記住（同一個起跑格、同一個螢幕比例、同一個高度、同一個減少動態設定就不再算）；先試 `front`，大部分情況 3 個時刻 × 每台 3 個點就決定了。場景多一個 `sightBlocked`（第一次問才收集 mesh）。`__kartSpike.groupAngle` 看用了哪個。自訂賽道也一樣適用。
+- **測試涵蓋全部賽道**（`tests/kart/groupShotSight.test.ts`）：28 張（14＋反向 14）在 Node 用真的 `buildTrackArt`（含賽道零件與街區，貼圖空白）建出來，2 台與 8 台 × 16:9、844×390、390×844 × 一般與減少動態，選到的角度每台車都拍到。實測：寬螢幕與手機橫拿全部 28 張 `front` 就看得到；**直拿手機**（要退到約 46 m 才放得下 8 台）8 台時 26 張的 `front` 至少擋到一台（例如河濱反向與海港是鏡頭前約 9 m 的環形地標擋住整排，其他多是彎道外的建築與樹），換成 `high` 後全部看得到（只有老街、竹圍高架正向不用換）。
+- 跑一次約 110 秒（28 張賽道的場景在 Node 建）。
+
+**五、iOS 的聲音**（#176 的限制：iOS Safari 的靜音開關、從背景回來沒試）
+
+- `audio/bus.ts`：
+  - **`interrupted`**：Safari 的 AudioContext 除了 `suspended` 還有 `interrupted`（來電、Siri、別的 App 出聲、切到背景），原本只喚醒 `suspended`，所以 iOS 回來一直沒聲音。現在除了 `running`、`closed` 都叫 `resume()`（`wantsWaking`）。
+  - **`visibilitychange`**：頁面到背景時主動 `suspend()`（口袋裡不出聲、省電），回到前景 `resume()`；Safari 從上一頁快取回來的 `pageshow` 也喚醒。
+  - **`statechange`**：頁面看得到時 context 被瀏覽器改成非 running（被打斷），立刻試著喚醒；任何狀態變化都通知（`onKartBusChange`）。
+  - **靜音開關**：iOS 的 WebAudio 預設跟著靜音開關（「環境音」類別）；Safari 16.4+ 有 Audio Session API，網站總音效開著時設 `navigator.audioSession.type = 'playback'`（像影片一樣，靜音開關打開也有聲音；代價是會暫停別的 App 正在放的音樂），關掉時設回 `auto`。沒有這個 API 的瀏覽器什麼都不做。
+- `audio/unlock.ts` 的 `useKartSoundLocked`：聽 `onKartBusChange` 與 `visibilitychange`，回前景 0.3 s 內知道喚醒失敗（例如 iOS 來電後要手勢）就顯示「點一下開聲音」（原本 0.4 s 輪詢照舊）；頁面在背景時不顯示。
+- **測試**：`tests/kart/audioWake.test.ts`（假的 AudioContext：`interrupted` 由手勢喚醒、背景暫停回前景喚醒、看得到時被打斷會自己喚醒但背景時不會、喚醒被拒時通知且下一次點擊恢復、`audioSession` 隨總音效開關）；`e2e/kart-audio.spec.ts`：從選單開對戰電腦，模擬頁面到背景（`visibilityState`）→ 不是 running、沒有按鈕，回前景 → running；再把 `resume` 改成拒絕（像 iOS 來電後）→ 回前景出現「點一下開聲音」，點下去 → running、按鈕消失。WebKit 與 Chromium 各跑一次；**Playwright 的 WebKit 在 Windows 沒有 WebAudio**，那邊自動略過並寫原因（Linux、macOS 會跑）。真的 iPhone 靜音開關與來電仍要實機試（NEXT §2.1）。
+
+**六、等待室站姿的勝利動作逐人檢查**（#177 只量了手的位置）
+
+- 截圖（`e2e/kart-characters.spec.ts`「the race room」：四人站在車旁按準備，開始、中間、結束各一張，附在報告）＋近拍正面與側面看過四人。找到的：**拋飛吻（心心）與推護目鏡（小方）的前臂穿進安全帽約 4 cm**（手從側面繞進面罩），**拔劍指天（阿桃）與舉啞鈴（梅子）舉高的手臂貼著安全帽側面**（大安全帽的邊緣蓋到手臂），坐姿的阿桃拔劍時頭往下看、下巴壓到握方向盤的手。
+- 修（`driverGestures.ts` 的關鍵影格）：飛吻改成手肘在前、前臂直立，手停在面罩下巴前（`rightUp` 1.75 → 1.35、`rightBend` 2.1 → 1.45、往內 0.4）；推護目鏡同理（2.0／2.25 → 1.55／1.4）；指天與推舉的手臂往外張（`rightOut` 0.08 → 0.32、0.05 → 0.25）；拔劍時頭不再低下、轉身少一點。
+- **檢查**（`tests/kart/gestureClearance.test.ts`）：真的模型逐 1/30 s 播勝利動作＋1 s，每隻手臂當三段膠囊（上臂、前臂、手套），安全帽（頭上不擺動的 mesh）每個頂點進到膠囊多深：**站姿 ≤ 1 cm**（只准碰到：飛吻碰面罩下巴、推護目鏡），**坐姿手臂 ≤ 2.5 cm、手套 ≤ 3.5 cm**（坐姿頭靠在方向盤上方，原本前臂穿進 4 cm 以上）。改之前站姿四人中兩人超過 4 cm。
+- 等待室卡片的取景沒改（卡片外框交給 `feat/app-shell-no-scroll`）。
+
+**相容與效能**：協定與 frame 不動；重播檔版本不變、新舊互讀；電腦車抽籤同 seed 結果不變；執行時每場開場多一次射線檢查（`front` 通常 3 個時刻 × 8 台 × 3 個點、來回兩次，最多 6 個角度）。從選單進比賽（最重的賽道）392.7 → 395.4 kB gzip（480 上限；three.js 的 Raycaster 與射線檢查），網站首屏、卡丁車房首屏不變。
+### 4.98 路線圖外：房間的社交——快捷表情、短語、玩家名片（2026-11-23，`feat/room-social`，#181）
 
 擁有者：「把它們想像是在做一個線上遊戲就知道怎麼做了」「總之要電競化專業化」。不需要帳號，所有房間（等待室、遊戲中、結算；卡丁車等待室、比賽中、觀戰）都有。
 

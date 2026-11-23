@@ -14,7 +14,7 @@
 // nothing touched yet), the race screen asks for a tap (`useKartSoundLocked`, RaceView.tsx).
 import { useEffect, useState } from 'react'
 import { isSoundOn, useSoundOn } from '../../lib/sound.ts'
-import { madeKartBus, unlockKartAudio } from './bus.ts'
+import { madeKartBus, onKartBusChange, unlockKartAudio } from './bus.ts'
 
 const unlock = () => {
   unlockKartAudio()
@@ -72,13 +72,27 @@ export function useKartSoundLocked(): boolean {
   const [locked, setLocked] = useState(false)
   useEffect(() => {
     if (!on || typeof window === 'undefined' || typeof window.AudioContext !== 'function') return
-    const look = () => setLocked(isSoundOn() && kartSoundState() !== 'running')
+    // In the background nothing is asked (the sound is suspended there on purpose)
+    const look = () =>
+      setLocked(isSoundOn() && document.visibilityState !== 'hidden' && kartSoundState() !== 'running')
     // A moment's grace: a context woken by the gesture that brought the player here is running soon
     const first = window.setTimeout(look, 600)
     const timer = window.setInterval(look, LOOK_EVERY_MS)
+    // 2026-11-23 (bus.ts): back from the background, or interrupted (iOS), it is known at once; a
+    // wake that is still on its way gets the same grace
+    let settle = 0
+    const changed = () => {
+      window.clearTimeout(settle)
+      settle = window.setTimeout(look, 300)
+    }
+    const stop = onKartBusChange(changed)
+    document.addEventListener('visibilitychange', changed)
     return () => {
       window.clearTimeout(first)
+      window.clearTimeout(settle)
       window.clearInterval(timer)
+      stop()
+      document.removeEventListener('visibilitychange', changed)
     }
   }, [on])
   return on && locked

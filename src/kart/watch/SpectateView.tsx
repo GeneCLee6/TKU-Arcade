@@ -7,6 +7,7 @@ import { loadoutOfByte } from '../../../shared/kart/karts.ts'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KartView } from '../../../shared/games/kart/types.ts'
 import { itemBoxes } from '../../../shared/kart/items.ts'
+import type { OutfitId } from '../../../shared/kart/outfits.ts'
 import { readRelayed, type KartFrame } from '../../../shared/kart/net.ts'
 import { shotHeight, shotLive, shotPosition } from '../../../shared/kart/shots.ts'
 import { courseOf } from '../../../shared/kart/track.ts'
@@ -76,9 +77,14 @@ export interface SpectateViewProps {
   realtime: RoomRealtime
   nameOf: (seat: number) => string
   onClose: () => void
+  /**
+   * 2026-11-23: what each racer's driver wears, as the room's members say (the third word of their
+   * `look`): a frame's body byte has no room for it. Nothing for a seat: the race suit
+   */
+  outfitOf?: (seat: number) => OutfitId | undefined
 }
 
-export default function SpectateView({ view, realtime, nameOf, onClose }: SpectateViewProps) {
+export default function SpectateView({ view, realtime, nameOf, onClose, outfitOf }: SpectateViewProps) {
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
   const tagLayer = useRef<HTMLDivElement>(null)
@@ -93,6 +99,11 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
   const courseKey = `games.kart.track.${track?.id}`
   const courseTitle = hasMessage(courseKey) ? t(courseKey as TextKey) : null
   const [order, setOrder] = useState<number[]>(() => view.racers.map((racer) => racer.seat))
+  // What each driver wears, as the room says now (read by the drawing loop)
+  const outfitRef = useRef(outfitOf)
+  useLayoutEffect(() => {
+    outfitRef.current = outfitOf
+  })
   // A racer watching after the finish starts on someone else
   const [follow, setFollow] = useState<number | null>(null)
   const [overhead, setOverhead] = useState(false)
@@ -178,6 +189,10 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
                   .map((racer) => racer.seat)
               : [],
           )
+          const outfitFor = (seat: number) => {
+            const outfit = outfitRef.current?.(seat)
+            return outfit ? { outfit } : {}
+          }
           const karts = poses.map((pose): WatchedKart => ({
             id: pose.seat,
             x: pose.x,
@@ -189,6 +204,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
             skidding: pose.frame.skidding,
             // e10-t05: the frame's body byte names the kart and its driver
             ...kartOfByte(pose.frame.body),
+            ...outfitFor(pose.seat),
             look: {
               speed: pose.vx * Math.sin(pose.heading) - pose.vz * Math.cos(pose.heading),
               steer: pose.frame.steer,

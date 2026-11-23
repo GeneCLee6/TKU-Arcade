@@ -82,11 +82,14 @@ export default function ReplayFilePage() {
   if (opened.kind === 'ready') {
     const { file, changed } = opened
     const names = new Map(file.names.map((one) => [one.seat, one.name]))
+    // 2026-11-23: what each one wore, where the file says (older files: the race suit)
+    const outfits = new Map(file.outfits?.map((one) => [one.seat, one.outfit]))
     return (
       <Suspense fallback={<p role="status">{t('games.kart.replay.reading')}</p>}>
         <ReplayView
           replay={file.replay}
           nameOf={(seat) => names.get(seat) || t('games.kart.replay.seat', { seat: seat + 1 })}
+          outfitOf={(seat) => outfits.get(seat)}
           you={file.you}
           revision={file.revision}
           notice={changed ? t('games.kart.replay.revision') : null}
