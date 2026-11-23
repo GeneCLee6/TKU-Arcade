@@ -146,8 +146,8 @@ docs/                   本資料夾
 ### 房間密碼（I3，`e1-t16`）
 
 - **房主在等待室的邀請區設定或拿掉**（`set_password`，任何狀態都可以；去頭尾空白後 1–32 字）。一開始放在大廳的「新房間」上方，但 375 px 手機會把「新房間」擠出第一屏（D2 的規則），所以改到等待室：房間建好、分享連結之前設定。`POST /api/rooms` 也可以直接帶 `password`（太長或只有空白回 400 `bad_password`）。有密碼的房間**不會公開列出**（`listing()` 擋）。
-- 密碼原樣存在 `RoomRecord.password`：它是給朋友的門號，不是任何人自己的密碼。**房裡的成員**在 view 的 `room.password` 看得到（他們都是帶密碼進來或本來就在，方便轉告）；summary 只有 `locked: true`，listing 沒有這種房間，日誌不記。
-- `join` 可帶 `password`。**新的人**沒帶回 `password_required`、帶錯回 `wrong_password`，同一條 socket 錯 `PASSWORD_TRIES`（5）次就關掉；**拿著 seat token 回來的成員不用密碼**。前端（`src/lib/roomPassword.ts`）把密碼放 sessionStorage，重連時一起送；收到這兩個錯誤就停止連線、顯示密碼表單（`PasswordForm.tsx`，lazy），送出後重連。
+- ~~密碼原樣存在 `RoomRecord.password`、成員在 view 的 `room.password` 看得到~~（到 2026-11-23）。**現在只存加鹽雜湊** `RoomRecord.passwordHash`（PBKDF2-SHA256，`worker/room-password.ts`），view／summary／listing 只有 `locked: true`，舊房間載入時遷移；房主看到的是自己瀏覽器記著的那個（§4.88、`SECURITY.md` §12）。
+- `join` 可帶 `password`。**新的人**沒帶回 `password_required`、帶錯回 `wrong_password`，同一條 socket 錯 `PASSWORD_TRIES`（5）次就關掉（2026-11-23 起另有每房每位址 15 分鐘 10 次，`SECURITY.md` §12）；**拿著 seat token 回來的成員不用密碼**。前端（`src/lib/roomPassword.ts`）把密碼放 sessionStorage，重連時一起送；收到這兩個錯誤就停止連線、顯示密碼表單（`PasswordForm.tsx`，lazy），送出後重連。
 - 首屏預算：密碼表單、房主的設定（`RoomPasswordSetting.tsx`）、語音按鈕、公開房篩選、重播頁都是各自的 lazy chunk，字串放 `shared/games/roomExtras.ts`（`room.extra.*`，check-i18n 照樣檢查）；重播頁經由房間的 chunk 載入，否則 Vite 會把房間 chunk 拆成兩個、多出約 1.8 kB。
 
 ### 重播（I3，`e2-t09`）
@@ -1861,7 +1861,25 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **建房表單收密碼**（#163，`OnlineView.tsx` 的 `CreateForm`）：「邀請朋友 → 開房間」多一格「密碼（選填）」，照 `normalizePassword`（去頭尾空白、最多 32 字、不能只有空白；不行就提示並鎖住送出）；送 `CreateRoomRequest.password`（伺服器本來就收）。密碼和房間原本一樣是明碼的門牌（房裡的人看得到，沒有雜湊）。**私人／公開的邏輯不變**：有密碼的房建立時不列（`public && password === null`），選公開又填密碼時表單直接說「不會列在公開列表上」。建好後 `keepRoomPassword` 先記住，建房的人進房不會被問密碼。
 - **測試**：`tests/kart/shotHeights.test.ts`（竹圍高架：上下層的泥灘與假箱子只打自己那層、空中飛過、沒有高度照平面；冰雹沿下層飛過高架路緣、打下層不打上層、本機預測一致、上層留在上層、空中丟的落回路面；障礙物的高度、泥灘只讓開自己那層；海霧的高度範圍；`isShot`、重播帶高度與舊檔不帶）、`tests/kart/minimapObstacles.test.tsx`（閘門巷四個障礙物隨時鐘變色、貨櫃移動、不給時鐘不變、沒有障礙物的賽道）、`tests/kart/pauseButton.test.tsx`、`tests/kart/closeCountdown.test.ts`、`tests/worker/lobby-list.test.ts`（兩個並發快速加入只開一間、都進那間、之後的第三個也進那間；登記的房沒出現就開自己的；`QuickHolds`）、`tests/kart/onlineView.test.tsx`（建房帶密碼、記住、只有空白不能送、公開＋密碼的提示、沒填不送）。
 
-### 4.88 路線圖外：反向賽道（2026-11-23，NEXT §5「反向賽道與倒車賽段」，`feat/kart-reverse-tracks`）
+### 4.88 路線圖外：房間密碼只存雜湊（2026-11-23，`feat/room-security-push`）
+
+#168 回報密碼是明碼門牌。細節與取捨在 `SECURITY.md` §12，這裡只記結構：
+
+- **`worker/room-password.ts`**：`hashRoomPassword`（16 bytes 隨機 salt、PBKDF2-SHA256 `PASSWORD_ITERATIONS` 20,000 次、32 bytes）、`verifyRoomPassword`（照存的次數重算、`sameBytes` 全部比完）、`sameLegacyPassword`（舊明文：兩邊 SHA-256 後定時比較）。
+- **同步的房間、非同步的雜湊**：`RoomHost.passwordWork(conn, raw)` 回 `Promise<PasswordPrep> | null`；只有「新來的人帶密碼的 `join`」（房間有密碼、token 不是成員、位址沒被鎖）與「房主的 `set_password`（非 null）」要算，其他都是 `null`。`RoomDO.webSocketMessage` 在 `blockConcurrencyWhile` 裡等它（和 `readFlags` 一樣保住訊息順序），再 `host.message(conn, raw, prep)`。`join` 只看 `prep.passwordOk`，`setPassword` 只收 `prep.passwordHash`（沒有就 `unavailable`）。`RoomDO.create` 先雜湊再 `host.create(…, PasswordHash | null, …)`；Worker（`POST /api/rooms`）照舊只做 `normalizePassword`。
+- **遷移**：`RoomRecord.password`（明文）保留成「舊房間」欄位；RoomDO 建構子在 `restore` 之後、任何訊息之前 `legacyPassword()` → `migratePassword(hash)`，同一次 `saveRoom` 刪掉明文。`isLocked()` 兩種都算。
+- **速率**：`StoredRoom.passwordFails`（儲存 key `pwfails`，`{ [位址雜湊]: { count, since } }`）、`PASSWORD_FAILS` 10、`PASSWORD_FAIL_WINDOW_MS` 15 分鐘、最多 200 個位址；鎖住的位址 `passwordWork` 直接回 `null`（不花 CPU），`join` 回 `rate_limited` 並以 4422（`badMessage`）關掉。
+- **協定**：`RoomInfo.password` 換成 `locked?: true`。前端 `RoomPasswordSetting` 收 `locked` 與 `known`（`readRoomPassword(roomId)`）；房主設定時 `WaitingRoom` 先 `keepRoomPassword`（拿掉時 `forgetRoomPassword`），所以房主看得到自己設的、別人只看到「這個房間有密碼」。卡丁車建房表單的提示改成「房間只存雜湊，請自己轉給朋友」。
+
+### 4.89 路線圖外：卡丁車房間列表改推送（2026-11-23，`feat/kart-room-push`）
+
+`/kart?online` 的列表從 10 秒輪詢改成 LobbyDO 推送，細節、成本比較在 `NETWORK.md` §6。結構：
+
+- **`shared/lobby-feed.ts`**：路徑與版本、三種訊息（`rooms` 完整列表、`room` 新增或變化、`gone` 移除）、`parseLobbyFeed`／`applyLobbyFeed`，以及從 `worker/lobby-list.ts` 搬過來的 `isOpenRoom`／`humansOf`／`lobbyRooms`（Worker 那邊 re-export，兩端同一份排序與截斷）。
+- **`worker/lobby-feed.ts`**（不碰 Cloudflare）：`admitWatcher`（全站、每位址上限）、`feedChange(before, after, paused)`、`watcherTag`。**`worker/lobby-board.ts`**：`LobbyBoardDeps.changed`，回報、移除、逾時都會叫。**`worker/lobby.ts`**：`fetch` 收升級（hibernatable、依遊戲加標籤、送完整列表）、`webSocketMessage` 只回 `ping`、其他關掉、`pushChange` 送給那款遊戲的 socket；暫停旗標 60 秒快取。**`worker/app.ts`**：`/ws/lobby` → `handleLobbySocket`（Origin、遊戲、每位址記憶體限制、位址雜湊標頭），要排在 `/ws/<房號>` 前面。
+- **頁面**：`src/lib/lobbyFeed.ts` 的 `watchLobby(gameId, { onRooms, onFallback })`；`OnlineView` 的 `useKartRooms` 先推送，`onFallback` 後才開輪詢的計時器；開頭那次 `GET` 若比推送晚到就丟掉。`OnlineView` 本來就是自己的 lazy chunk，所以推送客戶端不進任何首屏。大廳首頁沒改（首屏 102.2／103 kB，理由在 `NETWORK.md` §6.3）。
+
+### 4.90 路線圖外：反向賽道（2026-11-23，NEXT §5「反向賽道與倒車賽段」，`feat/kart-reverse-tracks`）
 
 擁有者：「接著做未完成的」。14 張內建比賽賽道**全部**有反向版，各自是一張賽道（獨立 id），不是比賽選項：紀錄、幽靈車、排行榜、獎牌、`kart:meta` 前三名都分開，伺服器的 `judgeFrame` 也照 id 拿反向賽道的資料裁定（`raceTrack(id)`），協定不動。
 

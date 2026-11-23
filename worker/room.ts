@@ -27,8 +27,10 @@ import {
   type OpenSocket,
   type RoomRecord,
   type SeqAck,
+  type StoredRoom,
 } from './room-host.ts'
 import type { StoredGame } from './room-turn.ts'
+import { hashRoomPassword } from './room-password.ts'
 
 const ROOM_KEY = 'room'
 const MEMBERS_KEY = 'members'
@@ -43,6 +45,8 @@ const CHAT_PREFIX = 'chat:'
 const chatKey = (id: number) => CHAT_PREFIX + String(id).padStart(12, '0')
 /** What each member's page has had handled (shared/protocol.ts 20.), one key per member */
 const ACK_PREFIX = 'ack:'
+/** Wrong room passwords by hashed address (RoomHost PASSWORD_FAILS), one key for all of them */
+const PASSWORD_FAILS_KEY = 'pwfails'
 /** The most keys one `storage.delete` takes */
 const DELETE_BATCH = 128
 /** How long the paused games (e12-t11) read from D1 are trusted before a game may start on them */
@@ -125,6 +129,8 @@ export class RoomDO extends DurableObject<Env> {
         saveAck: (member, ack) =>
           void (ack ? storage.put(ACK_PREFIX + member, ack) : storage.delete(ACK_PREFIX + member)),
         clearAll: () => void storage.deleteAll(),
+        savePasswordFails: (fails) =>
+          void (fails ? storage.put(PASSWORD_FAILS_KEY, fails) : storage.delete(PASSWORD_FAILS_KEY)),
       },
       games: getGame,
       now: Date.now,
@@ -139,7 +145,7 @@ export class RoomDO extends DurableObject<Env> {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG))
     void ctx.blockConcurrencyWhile(async () => {
       const [stored, chat, acks, alarm] = await Promise.all([
-        storage.get<unknown>([ROOM_KEY, MEMBERS_KEY, REV_KEY, GAME_KEY, LOBBY_KEY]),
+        storage.get<unknown>([ROOM_KEY, MEMBERS_KEY, REV_KEY, GAME_KEY, LOBBY_KEY, PASSWORD_FAILS_KEY]),
         storage.list<ChatMessage>({ prefix: CHAT_PREFIX }),
         storage.list<SeqAck>({ prefix: ACK_PREFIX }),
         storage.getAlarm(),
@@ -156,10 +162,16 @@ export class RoomDO extends DurableObject<Env> {
           acks: Object.fromEntries(
             [...acks].map(([key, ack]) => [key.slice(ACK_PREFIX.length), ack]),
           ),
+          passwordFails:
+            (stored.get(PASSWORD_FAILS_KEY) as StoredRoom['passwordFails'] | undefined) ?? {},
         },
         ctx.getWebSockets().map((ws) => ws.deserializeAttachment() as OpenSocket),
         alarm,
       )
+      // A room from before 2026-11-23 kept its password as typed: hashed now, before any message,
+      // and the text is gone from storage with the same write (worker/room-password.ts)
+      const legacy = this.host.legacyPassword()
+      if (legacy !== null) this.host.migratePassword(await hashRoomPassword(legacy))
     })
   }
 
@@ -175,7 +187,9 @@ export class RoomDO extends DurableObject<Env> {
     name: string | null = null,
     seatBots: SeatBots | null = null,
   ): Promise<boolean> {
-    const created = this.host.create(id, gameId, options, isPublic, code, password, bots, name, seatBots)
+    // Hashed here, before the room keeps anything: the text is never stored (worker/room-password.ts)
+    const hash = password === null ? null : await hashRoomPassword(password)
+    const created = this.host.create(id, gameId, options, isPublic, code, hash, bots, name, seatBots)
     // A room nobody ever joins is cleaned up too
     await this.settle()
     return created
@@ -260,7 +274,11 @@ export class RoomDO extends DurableObject<Env> {
       this.host.heartbeat(conn, Date.now())
     } else if (typeof data === 'string') {
       if (startsAGame(data, this.host.startsOnJoin())) await this.readFlags()
-      this.host.message(conn, data)
+      // A newcomer's password checked, or the host's new one hashed (2026-11-23): asynchronous, so
+      // nothing else runs meanwhile and the room's messages keep their order
+      const work = this.host.passwordWork(conn, data)
+      const prep = work ? await this.ctx.blockConcurrencyWhile(() => work) : undefined
+      this.host.message(conn, data, prep)
     }
     else this.host.binary(conn, data)
     await this.settle()

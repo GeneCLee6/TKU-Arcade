@@ -1,4 +1,4 @@
-// 2026-11-23 (#131, docs/ARCHITECTURE.md §4.88): the tracks driven the other way round. The reversal
+// 2026-11-23 (#131, docs/ARCHITECTURE.md §4.90): the tracks driven the other way round. The reversal
 // itself (shared/kart/tracks/reverse.ts), what it does to each thing that has a direction, and every
 // reversed track's geometry; the computer karts' three laps are in reverseBots.test.ts.
 import { describe, expect, it } from 'vitest'

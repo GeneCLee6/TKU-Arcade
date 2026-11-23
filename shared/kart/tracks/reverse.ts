@@ -1,5 +1,5 @@
 // 2026-11-23 (#131, docs/NEXT.md §5: "reverse tracks; the jumps and branches have a direction, see
-// to them first"): a track driven the other way round, docs/ARCHITECTURE.md §4.88. The reversed
+// to them first"): a track driven the other way round, docs/ARCHITECTURE.md §4.90. The reversed
 // track is worked out from the track itself, never drawn by hand, so that it follows every change
 // to the original: same ground, same walls, same scenery, the other way round.
 //

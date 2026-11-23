@@ -233,10 +233,10 @@ export type RoomInfo = {
   /** The room's short number (shared/room-code.ts), when it has one */
   code?: string
   /**
-   * The room's password, when it has one (e1-t16): only members are sent a view, and each of them
-   * got in with it or was already there, so they may see it to pass it on
+   * The room has a password (e1-t16). Never the password itself (2026-11-23): the room keeps only a
+   * salted hash of it (worker/room-password.ts), so whoever set or typed it passes it on
    */
-  password?: string
+  locked?: true
   /**
    * Listed on the home page while it waits for people and has no password (19. above); absent for
    * a room reachable by link only
@@ -337,7 +337,9 @@ export type PatchMessage = { t: 'patch'; rev: number; ops: PatchOp[] }
  * - `cannot_cover`: `cover` of a seat that is not in `RoomView.coverable`, or in a way it does not allow
  * - `unavailable`: this server does not do that yet
  * - `password_required`: `join` of someone new, without a password, to a room that has one (e1-t16)
- * - `wrong_password`: `join` with the wrong one; after PASSWORD_TRIES of them the socket is closed
+ * - `wrong_password`: `join` with the wrong one; after PASSWORD_TRIES of them the socket is closed,
+ *   and so is every join from an address that sent the room PASSWORD_FAILS wrong ones in the last
+ *   15 minutes (2026-11-23, after a `rate_limited`)
  * - `game_disabled`: `start`, `rematch` or `set_game` of a game the owner has paused (e12-t11); a
  *   game already being played goes on to its end
  */

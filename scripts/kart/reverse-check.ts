@@ -1,4 +1,4 @@
-// How each built-in race track reverses (docs/ARCHITECTURE.md §4.88): whether the reversed track
+// How each built-in race track reverses (docs/ARCHITECTURE.md §4.90): whether the reversed track
 // passes the track check, and what was done to its jumps and branches. `npm run kart:reverse`
 import { parseTrack } from '../../shared/kart/track.ts'
 import { RACE_TRACKS } from '../../shared/kart/tracks/registry.ts'
