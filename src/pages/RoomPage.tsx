@@ -405,6 +405,9 @@ function LobbyLink({ onLeave, compact }: { onLeave?: () => void; compact?: boole
 // The app shell (AppShell.tsx): the rest of the screen under the top bar, a column. The room's body
 // (a game's layout, the waiting room) takes what the bars above it leave and shares it out to its own
 // scrolling panels. Anything else (a nickname to give, a problem) scrolls here, never the page
+// The waiting room's two columns; a wide screen gives the seats its width (2026-11-23)
+// A game needs the width its board can use, and on a phone every pixel of it
+// A board that fits itself to the screen (the promotion board, e3-t10) can use all of a big one
 const Main = styled.main`
   display: grid;
   gap: ${space.lg}px;
@@ -416,7 +419,6 @@ const Main = styled.main`
     margin: 0;
   }
 
-  /* The waiting room's two columns; a wide screen gives the seats its width (2026-11-23) */
   &:has([data-room-columns]) {
     width: min(1120px, 100%);
 
@@ -425,12 +427,10 @@ const Main = styled.main`
     }
   }
 
-  /* A game needs the width its board can use, and on a phone every pixel of it */
   &:has([data-wide-room]) {
     width: min(1280px, 100%);
   }
 
-  /* A board that fits itself to the screen (the promotion board, e3-t10) can use all of a big one */
   &:has([data-fit-screen]) {
     width: min(2200px, 100%);
   }

@@ -29,10 +29,10 @@ const panelFill = (fill: string) =>
  * A broadcast panel, in place of the shell's glass: over the race, behind a clock, a place, a list
  * of standings. The element itself is not clipped, so focus rings inside it are whole
  */
+// Blur is for a screen with room to show it; a phone gets the plain, cheaper panel
 export const broadcast = css`
   ${clippedFill(cutClip(12), panelFill(color.panel))}
 
-  /* Blur is for a screen with room to show it; a phone gets the plain, cheaper panel */
   @media (min-width: 900px) {
     &::before {
       -webkit-backdrop-filter: blur(10px);

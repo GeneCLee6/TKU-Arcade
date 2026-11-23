@@ -8,6 +8,8 @@ import { color, fontSize, space } from '../styles/tokens.ts'
 import { Card } from './Card.tsx'
 
 // The game's hue becomes the accent inside: its strip, its monogram, its "New room"
+// The hue down from the top edge, on the same cut shape as the glass
+// Lifted, a neon edge in the game's hue, and the cover leans in (2026-11-23)
 export const Body = styled(Card)<{ $hue: string }>`
   --color-accent: ${(p) => p.$hue};
   display: flex;
@@ -20,7 +22,6 @@ export const Body = styled(Card)<{ $hue: string }>`
     transition: box-shadow 0.2s;
   }
 
-  /* The hue down from the top edge, on the same cut shape as the glass */
   &::after {
     content: '';
     position: absolute;
@@ -36,7 +37,6 @@ export const Body = styled(Card)<{ $hue: string }>`
     pointer-events: none;
   }
 
-  /* Lifted, a neon edge in the game's hue, and the cover leans in (2026-11-23) */
   &:hover,
   &:focus-within {
     translate: 0 -${space.xs}px;

@@ -2007,7 +2007,7 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **全螢幕的第一下 Esc**（`src/lib/fullscreen.ts`、`PauseLayer.tsx`）：Chromium 進全螢幕後 `navigator.keyboard.lock(['Escape'])`（#151 起就有；這次加單元測試與 e2e 確認比賽中真的鎖了、Esc 開暫停選單、仍在全螢幕）。Firefox／Safari 沒有 Keyboard Lock，Esc 由瀏覽器拿去離開全螢幕、頁面收不到按鍵：`fullscreen.ts` 記住「是不是頁面自己要離開」（`exitFullscreen` 設 `leaving`），全螢幕結束而不是頁面要的，就發 `onBrowserExit`；`PauseLayer` 在 `enabled` 時聽它，打開選單（單機暫停、多人房只開選單），和 Chromium 第一下 Esc 一樣。滑掉、F11 也算（比賽中離開全螢幕本來就該停一下）。頁面自己的「離開全螢幕」不觸發。
 - **卡丁車 e2e 的測試時鐘**（`src/kart/testClock.ts`、`e2e/kartClock.ts`）：測試在頁面載入前設 `window.__kartTest = { manual: true }`，`spikeLoop` 就不照牆上時鐘步進，只在測試呼叫 `__kartTest.step(n, until)` 時跑 `n` 步（一幀最多 120 步），`until` 第一次成立的那一步就停（比賽停在那一步，等測試按下一個鍵）。步進本身完全是原本的程式（`stepTrial`／`stepRun`、輸入、HUD），只換「什麼時候跑」：沒有設定的人（正式版、其他測試）走 `advanceClock` 原路，`flatGolden`／`branchGolden` 不變。`stepUntil` 的條件函式用 DevTools 協定送過去（`evaluateHandle`），不用 `new Function`（建置版 CSP 擋）。改用的：`kart-spike` 加速條放開視窗、搖桿、河濱（另加載入寬限）、`kart-night` 夜間車燈（先等比賽畫出來再等 canvas，兩次載入各有寬限）；`kart-lobby` 8 車手＋4 次 axe 不是物理問題，逾時 120 → 240 s。
 
-### 4.94 路線圖外：房間是一個畫面（app shell），面板改按鈕（2026-11-23，`feat/app-shell-no-scroll`）
+### 4.97 路線圖外：房間是一個畫面（app shell），面板改按鈕（2026-11-23，`feat/app-shell-no-scroll`）
 
 擁有者 2026-11-23：「要把它做成像一個安裝在桌面上的線上遊戲一樣，而不只是網頁遊戲，整體全螢幕後就不會再滑動，其他部分可以由按鈕來取代…每個遊戲都是。」設計規則在 `DESIGN.md` §4.1。
 
@@ -2022,7 +2022,7 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - 舞台 `Stage`（`data-game-stage`）包住結算面板與遊戲；寬螢幕 `GameColumn` 是 `minmax(0,1fr) auto` 兩列（舞台、dock），側欄 `SideColumn`（`data-side-panel`）自己捲；手機 `Narrow` 是 flex 欄：急事（倒數、卡住的座位，包在 `Urgent`）、舞台、`PhoneDock`。橫拿手機（`orientation: landscape` 且高 ≤ 560 px）`Narrow` 改成兩欄格線，dock 佔右欄兩列、按鈕換行。這些都寫在 `:root[data-app-shell] &` 底下，殼以外（重播頁）不變。
 - `panels?: GamePanel[]`（`{ id, label, content }`）：寬螢幕依序放在側欄（成員與聊天之間，全部攤開，元件測試與桌機 e2e 照舊找得到），手機變成 dock 的按鈕與抽屜的分頁（成員、遊戲的面板、聊天；聊天的未讀數照舊）。標籤共用 `room.panel.log／scores／reference／others`。8 款遊戲用了：德州撲克（`HandLog`）、王座（`ActionLog`、`RoleGuide`）、真假朗讀與光譜（`Scoreboard`）、悲慘人生（`AllLines`）、撞詞（`History`）、放風箏（`Log`）、密信（紀錄與牌表）。德州撲克的牌桌在殼裡高度上限 `max(240px, 50dvh)`。
 - `useFitZoom`：`ResizeObserver` 看舞台與裡面的 `Fit`，內容比舞台高就把 `Fit` 的 `style.zoom` 設成 `舞台高 ÷ 內容高`（無條件捨去到 0.01），有多餘 4% 以上再放大回去；最小 `MIN_ZOOM` 0.75，**粗指標且高度 > 560 px（直拿手機）不縮**（44 px 按鈕）。直接改元素不經 React（加一張牌就重算，不重繪）；寬度變大內容會變矮，所以會調幾次，一秒內最多 10 次，超過就一秒後再看一次。遊戲中才開；有 `data-fit-screen`（陞官圖）就不動。
-- `useBoardFit`（陞官圖）：dock 在圖版右邊（`left >= 舞台 right`）時不再扣 dock 高度，橫拿手機的圖版因此拿到整個高度（`feat/qa-followups` 也在處理 844×390，合併時以合併後為準）。
+- `useBoardFit`（陞官圖）：dock 在圖版右邊（`left >= 舞台 right`）時不扣 dock 高度，橫拿手機的圖版拿到整個高度（標題列下、控制欄左邊）；§4.96（#178）的「圖版拿整個畫面再把頁面捲上去」在殼裡不捲（頁面捲不動），控制欄改到右邊後 844×390 的 `stageHeight` 也不再落到那條分支。結果：844×390 非專注模式完整版 79 格都在畫面上（`promotion-full.spec.ts` 的 `cellsOnScreen` 照舊通過）。
 
 **等待室**（`WaitingRoom.tsx`）
 
