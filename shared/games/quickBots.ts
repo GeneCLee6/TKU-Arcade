@@ -28,6 +28,11 @@ const QUICK_BOT_DEFAULTS: Readonly<Record<string, number>> = {
   palace: 3,
   'secret-scroll': 3,
   wasabi: 3,
+  // 2026-11-23
+  kite: 2,
+  lantern: 2,
+  'silent-table': 3,
+  misery: 3,
 }
 
 /**
