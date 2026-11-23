@@ -281,6 +281,55 @@ export const kartDrivers = {
   club: { suit: '#101A14', panel: '#17A650', helmet: '#1B1D24', visor: '#55F59B', crest: '#3DFF86', trim: '#F5C542' },
 } as const
 
+/**
+ * 2026-11-23 (docs/KART-WORLD.md §3.2, shared/kart/outfits.ts): what each driver wears, three outfits
+ * each, all our own. `body` the torso, `sleeve` the arms, `legs` the trousers, `panel` the colour
+ * blocks and bands, `trim` the gloves and piping, `boot` the shoes, `accent` the outfit's own marks
+ * (stripes, a patch, pockets). The race suit is kartDrivers' colours, as before
+ */
+export const kartOutfits = {
+  spade: {
+    race: { body: '#15181E', sleeve: '#15181E', legs: '#15181E', panel: '#DDE4F0', trim: '#8793B0', boot: '#8793B0', accent: '#AFC2FF' },
+    // A long charcoal coat over dark trousers, the scarf's ice blue in its lining
+    street: { body: '#2B2F38', sleeve: '#2B2F38', legs: '#14161B', panel: '#5D6676', trim: '#1E2128', boot: '#E8ECF2', accent: '#AFC2FF' },
+    // The club's jacket: navy, white sleeves, ice-blue bands
+    campus: { body: '#1B2A4A', sleeve: '#EEF2F8', legs: '#23262E', panel: '#AFC2FF', trim: '#EEF2F8', boot: '#1B2A4A', accent: '#EEF2F8' },
+  },
+  heart: {
+    race: { body: '#1A1216', sleeve: '#1A1216', legs: '#1A1216', panel: '#E0143F', trim: '#F4F4F6', boot: '#F4F4F6', accent: '#FF2E5C' },
+    // A pink hoodie, white strings, black joggers, white trainers
+    street: { body: '#FF7FA3', sleeve: '#FF7FA3', legs: '#1C1A20', panel: '#FFE3EC', trim: '#FFFFFF', boot: '#FFFFFF', accent: '#E0143F' },
+    // The cheer squad's jacket: white, red sleeves and bands
+    campus: { body: '#F7F4F2', sleeve: '#D8143D', legs: '#D8143D', panel: '#D8143D', trim: '#F7F4F2', boot: '#F7F4F2', accent: '#FF2E5C' },
+  },
+  diamond: {
+    race: { body: '#1A1510', sleeve: '#1A1510', legs: '#1A1510', panel: '#F2811D', trim: '#2A2C33', boot: '#2A2C33', accent: '#FF9A1F' },
+    // A sand utility vest with pockets over a grey long sleeve, olive trousers
+    street: { body: '#C9B48A', sleeve: '#5C6068', legs: '#4E5338', panel: '#8E7A52', trim: '#2A2C33', boot: '#6B4B2A', accent: '#F2811D' },
+    // A cream blazer with orange piping, the club's crest on the pocket
+    campus: { body: '#EFE6D2', sleeve: '#EFE6D2', legs: '#3A3328', panel: '#F2811D', trim: '#3A3328', boot: '#3A2A1C', accent: '#F2811D' },
+  },
+  club: {
+    race: { body: '#101A14', sleeve: '#101A14', legs: '#101A14', panel: '#17A650', trim: '#F5C542', boot: '#F5C542', accent: '#3DFF86' },
+    // A green tracksuit, yellow stripes down the arms and legs
+    street: { body: '#11663A', sleeve: '#11663A', legs: '#11663A', panel: '#0B3D23', trim: '#F5C542', boot: '#FFFFFF', accent: '#F5C542' },
+    // The club's jersey: yellow, green yoke and number
+    campus: { body: '#F5C542', sleeve: '#17A650', legs: '#1B2A22', panel: '#17A650', trim: '#17A650', boot: '#1B2A22', accent: '#0F6B33' },
+  },
+} as const
+
+/**
+ * 2026-11-23 (§3.2): each driver's own things besides the helmet: Spade's scarf, Hartie's ponytail
+ * and its ribbon, Dee's headset, Clover's towel; and what each one wins with (Hartie's hearts, Dee's
+ * calculator, Clover's dumbbell)
+ */
+export const kartFeatures = {
+  spade: { main: '#DDE4F0', second: '#6F8CFF' },
+  heart: { main: '#2A1A1E', second: '#FF2E5C', hearts: '#FF4F7B' },
+  diamond: { main: '#2A2C33', second: '#FF9A1F', screen: '#B8FF7A' },
+  club: { main: '#F4F1E8', second: '#17A650', metal: '#9AA3AD' },
+} as const
+
 /** The livery's marks (kartModel.ts): the number's white ink, and a cut through a mark's middle */
 export const kartLivery = {
   ink: '#F4F7FA',

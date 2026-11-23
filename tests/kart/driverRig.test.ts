@@ -11,7 +11,7 @@ import {
   WHEEL_LOCK,
   type DriveState,
 } from '../../src/kart/driverRig.ts'
-import { gesturePose, REST, type GestureStyle } from '../../src/kart/driverGestures.ts'
+import { gesturePose, REST, SHOWPIECE_SECONDS, type GestureStyle } from '../../src/kart/driverGestures.ts'
 import {
   landingKick,
   SPRING_REST,
@@ -156,20 +156,27 @@ describe('each driver waits and wins their own way', () => {
     }
   })
 
-  it('wins as each one does: one fist up, a heart over the helmet, a V, both arms flexed', () => {
-    const spade = gesturePose('cheer', 1.5, 0, 'spade')
+  it('wins as each one does, once their showpiece has played (KART-WORLD §3.3)', () => {
+    // Spade: the finger pointed at the sky, the other fist on the hip
+    const spade = gesturePose('cheer', SHOWPIECE_SECONDS, 0, 'spade')
     expect(spade.rightUp).toBeGreaterThan(2.5)
     expect(spade.leftUp).toBeLessThan(2)
-    const heart = gesturePose('cheer', 1.5, 0, 'heart')
+    expect(spade.rightHand).toBe('point')
+    // Hartie: a heart over the helmet
+    const heart = gesturePose('cheer', SHOWPIECE_SECONDS, 0, 'heart')
     expect(Math.min(heart.leftUp, heart.rightUp)).toBeGreaterThan(2.3)
     expect(Math.min(heart.leftBend, heart.rightBend)).toBeGreaterThan(1)
-    const diamond = gesturePose('cheer', 1.5, 0, 'diamond')
+    // Dee: a V, the calculator still held up in the other hand
+    const diamond = gesturePose('cheer', SHOWPIECE_SECONDS, 0, 'diamond')
     expect(diamond.vSign).toBe(1)
     expect(diamond.rightUp).toBeGreaterThan(2)
-    expect(diamond.leftUp).toBe(0)
-    const club = gesturePose('cheer', 1.5, 0, 'club')
+    expect(diamond.prop).toBe(1)
+    expect(diamond.leftHand).toBe('grip')
+    // Clover: both arms flexed, the dumbbell put away
+    const club = gesturePose('cheer', SHOWPIECE_SECONDS, 0, 'club')
     expect(Math.min(club.leftOut, club.rightOut)).toBeGreaterThan(1.2)
     expect(Math.min(club.leftBend, club.rightBend)).toBeGreaterThan(1.4)
+    expect(club.prop).toBe(0)
   })
 
   it('rises into the win from rest, and turns to their own win on the podium after a while', () => {

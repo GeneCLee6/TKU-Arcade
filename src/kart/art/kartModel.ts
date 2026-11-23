@@ -66,11 +66,13 @@ import {
 } from '../boostFx.ts'
 import { bodyDetailTexture, wearDecal, type BodyDetailLevel } from './bodyDetail.ts'
 import { buildDriver, STANDING_HIP, type DriverDetail } from './driverModel.ts'
-import { blendPose, gesturePose, REST, type DriverGesture, type GesturePose } from '../driverGestures.ts'
+import { DEFAULT_OUTFIT, type OutfitId } from '../../../shared/kart/outfits.ts'
+import { blendPose, gesturePose, heartFlight, REST, type DriverGesture, type GesturePose } from '../driverGestures.ts'
 import { driveJoints, elbowBend, reachArm } from '../driverRig.ts'
 import {
   poseLeg,
   seatedLegs,
+  smoothStep,
   standingLegs,
   STILL_LEGS,
   type HandShape,
@@ -155,6 +157,8 @@ export interface KartModel {
   readonly group: Group
   readonly body: KartBody
   readonly driver: DriverId
+  /** 2026-11-23 (shared/kart/outfits.ts): what the driver wears */
+  readonly outfit: OutfitId
   /** The glow colour: the drift sparks and trails match it */
   readonly glow: string
   /** Under the back corners, in the kart's own frame (x, z): where the drift trails and sparks start */
@@ -253,6 +257,8 @@ export interface KartDetail {
    * same way (the race room's place cards, src/kart/lobby/lobbyStage.ts); in a race they sit
    */
   readonly standing?: boolean
+  /** 2026-11-23 (docs/KART-WORLD.md §3.2): what the driver wears; the race suit when left out */
+  readonly outfit?: OutfitId
 }
 
 /** The racing number, slanted, with a bar under it: white over the driver's colour */
@@ -671,10 +677,12 @@ export function buildKartModel(
   const crouch = standing ? 0 : (bike?.crouch ?? 0)
   // Standing, they stand on the ground beside the cockpit, off to the left of it as seen from in
   // front, turned a little towards the kart
-  const driver = buildDriver(kit, driverId, driverDetail)
+  const outfit = extra.outfit ?? DEFAULT_OUTFIT
+  const driver = buildDriver(kit, driverId, driverDetail, outfit)
   if (standing) {
     const box = solidBox(chassis)
-    driver.group.position.set(box.max.x + STAND_ACROSS, STANDING_HIP, seat.z + STAND_AHEAD)
+    // 2026-11-23 (§3.1): the hips as high as the driver is tall
+    driver.group.position.set(box.max.x + STAND_ACROSS, STANDING_HIP * driver.scale, seat.z + STAND_AHEAD)
     driver.group.rotation.y = STAND_TURN
     group.add(driver.group)
   } else {
@@ -743,12 +751,23 @@ export function buildKartModel(
         // The grip, from the wheel to the chassis, to the seat (not turned), to the torso, to the shoulder
         if (bike) grip.set(side * 0.15, -0.01, 0.015)
         else grip.set(side * GRIP, 0, 0.01).applyMatrix4(wheel.matrix)
-        grip.applyMatrix4(bar.matrix).sub(driver.group.position).applyMatrix4(toTorso).sub(arm.position)
+        grip
+          .applyMatrix4(bar.matrix)
+          .sub(driver.group.position)
+          .divideScalar(driver.scale)
+          .applyMatrix4(toTorso)
+          .sub(arm.position)
         // The elbows out to the sides and a little down and back
         pole.set(side, -0.55, 0.35)
         reach = reachArm(grip, pole, ikTurn)
       }
       const up = (left ? g.leftUp : g.rightUp) + joints.loose[index]! * drive
+      // 2026-11-23 (docs/KART-WORLD.md §3.3): an arm well off the wheel is raised from hanging, as
+      // standing, not from reaching to the grip: a win's arm up is up, not up and back over the seat
+      if (!standing) {
+        const away = smoothStep(0.5, 1.2, Math.abs(up))
+        if (away > 0) ikTurn.slerp(hanging[index]!, away)
+      }
       turnBy.set(up, 0, left ? g.leftOut : -g.rightOut)
       gestureTurn.setFromEuler(turnBy)
       arm.quaternion.multiplyQuaternions(gestureTurn, ikTurn)
@@ -939,11 +958,15 @@ export function buildKartModel(
   const flameColour = new Color()
   const ease = (from: number, to: number, rate: number, seconds: number) =>
     from + (to - from) * (1 - Math.exp(-rate * seconds))
+  // 2026-11-23 (§3.1): the clock a scarf's tails and a ponytail flutter by; seated they lean out of a turn
+  let swingClock = Math.random() * 10
+  const drive01 = standing ? 0 : 1
 
   return {
     group,
     body,
     driver: driverId,
+    outfit,
     glow: colours.glow,
     rearContacts,
     thrusters,
@@ -1062,6 +1085,26 @@ export function buildKartModel(
             bike: bike !== undefined,
           },
         )
+        // 2026-11-23 (docs/KART-WORLD.md §3.3): what the win holds and throws; (§3.1) a scarf's tails
+        // and a ponytail streaming back with the speed, swaying with the head and the bounce
+        for (const prop of driver.props) prop?.scale.setScalar(gestured.prop)
+        for (const [index, heart] of driver.hearts.entries()) {
+          const at = heartFlight(gestured.burst, index)
+          heart.scale.setScalar(at ? at.scale : 0)
+          if (at) {
+            heart.position.set(at.x, at.y, at.z)
+            heart.rotation.set(0, at.spin, 0)
+          }
+        }
+        if (driver.swings.length > 0) {
+          swingClock += seconds
+          const flutter = Math.sin(swingClock * (6 + speedShare * 10)) * (0.04 + speedShare * 0.08)
+          const lift = 0.15 + speedShare * 0.95 + gestured.bounce * 3
+          for (const swing of driver.swings) {
+            swing.rotation.x = -lift + flutter
+            swing.rotation.z = -steered * 0.25 * drive01 - gestured.headTilt * 0.6 + Math.sin(swingClock * 2.1) * 0.05
+          }
+        }
       }
       if (!far) {
         const turn = -vaneAngle(steered, slid, speedShare)

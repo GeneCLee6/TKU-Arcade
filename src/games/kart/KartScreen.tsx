@@ -224,6 +224,7 @@ function podiumOf(
         name: nameOf(seat),
         kart: look?.kart ?? DEFAULT_KART,
         driver: look?.driver ?? DEFAULT_DRIVER,
+        ...(look ? { outfit: look.outfit } : {}),
         line: raceTime(finishMs),
         you: seat === view.you,
       }

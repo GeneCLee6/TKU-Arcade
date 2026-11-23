@@ -2,6 +2,7 @@
 // by itself, a drag (or the arrow keys) turns it by hand, and a switch shows its N2O shape. Loaded
 // on its own (three.js): /kart's garage has it already, the waiting room fetches it when a kart room
 // opens. Where there is no WebGL it draws nothing, and the garage is the cards and bars it always was.
+import { DEFAULT_OUTFIT, type OutfitId } from '../../../shared/kart/outfits.ts'
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
@@ -14,6 +15,8 @@ import type { DriverGesture } from '../driverGestures.ts'
 export interface KartPreviewProps {
   kart: KartId
   driver: DriverId
+  /** 2026-11-23 (shared/kart/outfits.ts): what the driver wears; the race suit left out */
+  outfit?: OutfitId
   /** What the picture is, for a screen reader */
   label: string
   hint: string
@@ -28,6 +31,7 @@ export interface KartPreviewProps {
 export default function KartPreview({
   kart,
   driver,
+  outfit = DEFAULT_OUTFIT,
   label,
   hint,
   morphLabel,
@@ -49,14 +53,14 @@ export default function KartPreview({
       stage.current = null
     }
   }, [])
-  useEffect(() => stage.current?.show(kart, driver), [kart, driver])
+  useEffect(() => stage.current?.show(kart, driver, outfit), [kart, driver, outfit])
   useEffect(() => stage.current?.label(label), [label])
   useEffect(() => stage.current?.boost(open), [open])
   useEffect(() => stage.current?.pose(pose), [pose])
 
   if (missing) return null
   return (
-    <Frame data-testid="kart-preview" data-kart={kart} data-open={open} data-pose={pose} $still={!!pose}>
+    <Frame data-testid="kart-preview" data-kart={kart} data-outfit={outfit} data-open={open} data-pose={pose} $still={!!pose}>
       <Holder ref={holder} />
       {!pose && (
         <>

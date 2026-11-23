@@ -3,14 +3,18 @@
 import { useEffect, useState } from 'react'
 import { isKartId, lookOf, parseLook, type DriverId, type KartId } from '../../../shared/kart/karts.ts'
 import type { RoomMember } from '../../../shared/protocol.ts'
-import { loadBody, loadDriver, saveBody, saveDriver } from '../bodies.ts'
+import type { OutfitId } from '../../../shared/kart/outfits.ts'
+import { loadBody, loadDriver, loadOutfit, saveBody, saveDriver, saveOutfit } from '../bodies.ts'
 import { prefetchKart, RACE_ENGINE } from '../load/kartLoad.ts'
 
 export interface RoomLook {
   kart: KartId
   driver: DriverId
+  /** 2026-11-23 (shared/kart/outfits.ts): what the driver wears, kept per driver */
+  outfit: OutfitId
   setKart(kart: KartId): void
   setDriver(driver: DriverId): void
+  setOutfit(outfit: OutfitId): void
 }
 
 /**
@@ -27,8 +31,9 @@ export function useRoomLook(
 ): RoomLook {
   const [kart, setKart] = useState<KartId>(loadBody)
   const [driver, setDriver] = useState<DriverId>(loadDriver)
+  const [outfit, setOutfit] = useState<OutfitId>(() => loadOutfit(loadDriver()))
   const mine = members[you]?.look
-  const look = lookOf(kart, driver)
+  const look = lookOf(kart, driver, outfit)
   useEffect(() => {
     if (members[you] && mine !== look) onSetLook(look)
   }, [members, you, mine, look, onSetLook])
@@ -46,6 +51,7 @@ export function useRoomLook(
   return {
     kart,
     driver,
+    outfit,
     setKart(next) {
       saveBody(next)
       setKart(next)
@@ -53,6 +59,12 @@ export function useRoomLook(
     setDriver(next) {
       saveDriver(next)
       setDriver(next)
+      // Each driver in what they wore last
+      setOutfit(loadOutfit(next))
+    },
+    setOutfit(next) {
+      saveOutfit(driver, next)
+      setOutfit(next)
     },
   }
 }

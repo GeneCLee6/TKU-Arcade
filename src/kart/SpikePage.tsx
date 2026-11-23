@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { setSoundOn, useSoundOn } from '../lib/sound.ts'
 import { loadQuality, QUALITIES, saveQuality, type Quality } from './quality.ts'
-import { KART_BODIES, loadBody, loadDriver, saveBody, saveDriver, type KartBody } from './bodies.ts'
+import { KART_BODIES, loadBody, loadDriver, loadOutfit, saveBody, saveDriver, saveOutfit, type KartBody } from './bodies.ts'
+import type { OutfitId } from '../../shared/kart/outfits.ts'
 import { applyKart, type DriverId } from '../../shared/kart/karts.ts'
 import { trackMeta } from '../../shared/kart/meta.ts'
 import styled, { css, keyframes } from 'styled-components'
@@ -88,6 +89,7 @@ const CALLOUT_MS = 900
 interface GaragePick {
   body?: KartBody
   driver?: DriverId
+  outfit?: OutfitId
 }
 
 type Open = 'controls' | 'tuning' | 'garage' | 'bots' | 'cup' | 'settings' | undefined
@@ -173,6 +175,8 @@ export function SpikePage({
   // e10-t05: the kart and driver to race with; the kart's numbers go on top of the tuning
   const [body, setBody] = useState<KartBody>(loadBody)
   const [driver, setDriver] = useState<DriverId>(loadDriver)
+  // 2026-11-23 (shared/kart/outfits.ts): what the driver wears, kept per driver
+  const [outfit, setOutfit] = useState<OutfitId>(() => loadOutfit(loadDriver()))
   const driven = useMemo(() => applyKart(tuning, body), [tuning, body])
   const controls = useRef({ bindings, rules, tuning: driven, enabled: !controlsOpen })
   useEffect(() => {
@@ -267,6 +271,7 @@ export function SpikePage({
         quality,
         body,
         driver,
+        outfit,
         ghostPick,
         onPose: (x, z, heading, nextGate, tick) => minimap.current?.place(x, z, heading, nextGate, tick),
         onTrial: (next) => {
@@ -290,7 +295,7 @@ export function SpikePage({
       // The probe passed but three.js still could not start
       queueMicrotask(() => setFailure('noWebgl'))
     }
-  }, [course, track, autopiloted, asked, drivers, pilot, quality, body, driver, ghostPick, touchSource, coachStep, engine, hasBoard, chaseGhost])
+  }, [course, track, autopiloted, asked, drivers, pilot, quality, body, driver, outfit, ghostPick, touchSource, coachStep, engine, hasBoard, chaseGhost])
 
   const switchCourse = (next: PlayCourse) => {
     const url = new URL(window.location.href)
@@ -375,10 +380,10 @@ export function SpikePage({
   // the countdown should not run behind the open panel (PR #86's known limit)
   const [garagePick, setGaragePick] = useState<GaragePick>({})
   const pending = useRef<GaragePick>({})
-  const racing = useRef({ body, driver })
+  const racing = useRef({ body, driver, outfit })
   useEffect(() => {
-    racing.current = { body, driver }
-  }, [body, driver])
+    racing.current = { body, driver, outfit }
+  }, [body, driver, outfit])
   const closeGarage = useCallback(() => {
     setOpen(undefined)
     const pick = pending.current
@@ -387,10 +392,12 @@ export function SpikePage({
     const now = racing.current
     const nextBody = pick.body ?? now.body
     const nextDriver = pick.driver ?? now.driver
-    if (nextBody !== now.body || nextDriver !== now.driver) {
+    const nextOutfit = pick.outfit ?? (pick.driver ? loadOutfit(pick.driver) : now.outfit)
+    if (nextBody !== now.body || nextDriver !== now.driver || nextOutfit !== now.outfit) {
       setTrial(undefined)
       setBody(nextBody)
       setDriver(nextDriver)
+      setOutfit(nextOutfit)
     }
     queueMicrotask(() => focusOpener(garageOpener.current))
   }, [])
@@ -415,7 +422,14 @@ export function SpikePage({
   }
   const pickGarageDriver = (next: DriverId) => {
     saveDriver(next)
-    pending.current = { ...pending.current, driver: next }
+    // Each driver in what they wore last
+    const { outfit: _was, ...rest } = pending.current
+    pending.current = { ...rest, driver: next }
+    setGaragePick(pending.current)
+  }
+  const pickGarageOutfit = (next: OutfitId) => {
+    saveOutfit(pending.current.driver ?? racing.current.driver, next)
+    pending.current = { ...pending.current, outfit: next }
     setGaragePick(pending.current)
   }
 
@@ -845,8 +859,10 @@ export function SpikePage({
             t={t}
             kart={garagePick.body ?? body}
             driver={garagePick.driver ?? driver}
+            outfit={garagePick.outfit ?? (garagePick.driver ? loadOutfit(garagePick.driver) : outfit)}
             onKart={pickGarageBody}
             onDriver={pickGarageDriver}
+            onOutfit={pickGarageOutfit}
             onClose={closeGarage}
             track={course === 'custom' ? undefined : course}
           />
