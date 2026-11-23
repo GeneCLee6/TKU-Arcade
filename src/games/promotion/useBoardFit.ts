@@ -57,7 +57,9 @@ export function useBoardFit(dock: RefObject<HTMLElement | null>, fitStage: boole
       const top = stage.getBoundingClientRect().top + window.scrollY
       // Not innerHeight: a phone's address bar coming and going would resize the board on every scroll
       const screen = document.documentElement.clientHeight || window.innerHeight
-      setHeight(stageHeight(screen, top, bar?.offsetHeight ?? 0))
+      // 2026-11-23 (app shell): a phone on its side has the dock as a rail beside the board, not under it
+      const beside = bar !== null && bar.getBoundingClientRect().left >= stage.getBoundingClientRect().right - 1
+      setHeight(stageHeight(screen, top, bar && !beside ? bar.offsetHeight : 0))
     }
     measureRef.current = measure
     measure()

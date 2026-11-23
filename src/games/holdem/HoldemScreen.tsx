@@ -82,6 +82,8 @@ export default function HoldemScreen({ room, game }: GameScreenProps) {
       room={room}
       seatTint
       turnSeat={game.over ? null : toAct}
+      // The hand's log and the last hands, behind a button: the table keeps the screen (app shell)
+      panels={[{ id: 'log', label: t('room.panel.log'), content: <HandLog view={view} names={names} /> }]}
       dock={
         <Dock>
           <MainLine data-testid="holdem-prompt">{t(prompt.key, prompt.params)}</MainLine>
@@ -95,7 +97,6 @@ export default function HoldemScreen({ room, game }: GameScreenProps) {
         <Table view={view} nameOf={nameOf} toAct={toAct} winning={winning} />
         <YourHand view={view} winning={winning} over={game.over} onAct={send} />
         {view.last !== null && view.last.hand === view.hand && <HandResult view={view} names={names} winning={winning} />}
-        <HandLog view={view} names={names} />
         <Note>{t('games.holdem.ui.playChips')}</Note>
       </Stage>
     </GameLayout>

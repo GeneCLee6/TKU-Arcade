@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Browser, type BrowserContextOptions, type Page } from '@playwright/test'
-import { joinRoom, newPerson } from './helpers.ts'
+import { joinRoom, newPerson, inPanel } from './helpers.ts'
 
 // 放風箏 (owner's request 2026-11-14): two players through the real room on phones, with a note in
 // two taps, a kite flown (or its line snapped) and one set aside
@@ -52,12 +52,12 @@ test('two players pass a note, fly a kite and set one aside, on phones', async (
   await ann.getByTestId('hint-pad').getByRole('button', { name: `Note: ${rank}` }).click()
   await expect(bob.getByTestId('notes')).toHaveText(/Notes 7\/8/)
   await expect(bob.getByTestId('own-card').first()).toHaveAccessibleName(new RegExp(`Known: ${rank}`))
-  await expect(bob.getByTestId('log')).toContainText(`Ann → Bob: ${rank}`)
+  await inPanel(bob, 'Log', () => expect(bob.getByTestId('log')).toContainText(`Ann → Bob: ${rank}`))
 
   // Bob flies that card: it goes up or its line snaps, and he draws a new one
   await bob.getByTestId('own-card').first().click()
   await bob.getByRole('button', { name: 'Fly it' }).click()
-  await expect(ann.getByTestId('log')).toContainText(/Bob flew/)
+  await inPanel(ann, 'Log', () => expect(ann.getByTestId('log')).toContainText(/Bob flew/))
   await expect(bob.getByTestId('own-card')).toHaveCount(5)
 
   // Ann sets one aside for the note back

@@ -11,6 +11,7 @@ import { clippedFill, cornerClip, displayType, monoType, slantClip } from '../st
 import { color, fontSize, seatColor, space } from '../styles/tokens.ts'
 import { Button } from './Button.tsx'
 import { Avatar } from './Avatar.tsx'
+import type { GamePanel } from './GameLayout.tsx'
 import { GameSetup } from './GameSetup.tsx'
 import { DissolveButton, SeatedGateButton } from './HostControls.tsx'
 import { MemberEntry } from './MemberEntry.tsx'
@@ -46,6 +47,11 @@ export interface WaitingRoomProps {
   chat?: LobbyChat
   /** 2026-11-22: leaving the room on purpose, from the race room's waiting room (shared/protocol.ts 17.) */
   onLeave?(): void
+  /**
+   * 2026-11-23 (app shell): on a phone, the bar under the seats whose buttons open the invitation, the
+   * setup and the chat in a sheet, in place of the right-hand column
+   */
+  phoneDock?(panels: readonly GamePanel[]): ReactNode
 }
 
 // e1-t16: its own chunk, with its strings
@@ -76,6 +82,7 @@ export function WaitingRoom({
   aside,
   chat,
   onLeave,
+  phoneDock,
 }: WaitingRoomProps) {
   const t = useT()
   const members = Object.values(view.members)
@@ -177,8 +184,8 @@ export function WaitingRoom({
 
   return (
     // Two columns when wide: who is here and starting on the left, inviting and setting up on the right.
-    // One on a phone, in the same order
-    <Layout data-room-columns="">
+    // On a phone the seats, with the rest behind the dock's buttons (`phoneDock`)
+    <Layout data-room-columns="" data-room-body="" $docked={phoneDock !== undefined}>
       <Column>
         <Section>
           <Heading>{t('room.waiting.seats')}</Heading>
@@ -270,7 +277,14 @@ export function WaitingRoom({
         )}
       </Column>
 
-      <Column>{side}</Column>
+      {phoneDock ? (
+        phoneDock([
+          { id: 'invite', label: t('room.panel.invite'), content: invite },
+          { id: 'setup', label: t('room.panel.setup'), content: setup },
+        ])
+      ) : (
+        <Column>{side}</Column>
+      )}
     </Layout>
   )
 }
@@ -361,11 +375,44 @@ const VisibilityRow = styled.div`
   gap: ${space.sm}px;
 `
 
-const Layout = styled.div`
+// The app shell (AppShell.tsx): one screen. Wide, each column scrolls inside itself; on a phone the
+// seats scroll above the dock
+const Layout = styled.div<{ $docked: boolean }>`
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: ${space.xl}px;
+
+  :root[data-app-shell] & {
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+    gap: ${space.lg}px;
+
+    & > div {
+      min-height: 0;
+      align-content: start;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    ${(p) =>
+      p.$docked
+        ? `
+      display: flex;
+      flex-direction: column;
+      gap: ${space.sm}px;
+
+      & > div:first-child {
+        flex: 1 1 0;
+      }
+
+      & > div:not(:first-child) {
+        flex: none;
+        overflow: visible;
+      }
+    `
+        : ''}
+  }
 
   @media (min-width: 900px) {
     grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
@@ -543,6 +590,7 @@ const Column = styled.div`
   gap: ${space.xl}px;
 `
 
+// In the app shell Ready and Start stay in reach however many seats scroll above them
 const StartBar = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -558,6 +606,13 @@ const StartBar = styled.div`
   box-shadow:
     inset 0 2px 0 ${color.accent},
     inset 0 0 0 1px ${color.line};
+
+  :root[data-app-shell] & {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background-color: ${color.bg};
+  }
 `
 
 // The room's id, big and mono, as people read it out to each other

@@ -90,8 +90,46 @@ export async function setRoomOption(
   change: (host: Page) => Promise<void>,
   shown: string,
 ): Promise<void> {
-  await change(host)
-  await expect(guest.locator('dl > div', { hasText: label }).locator('dd')).toHaveText(shown)
+  await withSetup(host, () => change(host))
+  await withSetup(guest, () =>
+    expect(guest.locator('dl > div', { hasText: label }).locator('dd')).toHaveText(shown),
+  )
+}
+
+/**
+ * A game's panel (GameLayout's `panels`: a log, the scores), wherever it is: in the side column of a
+ * wide screen, behind the dock's button on a phone (2026-11-23, the app shell), opened for `act`
+ */
+export async function inPanel<T>(page: Page, label: string, act: () => Promise<T>): Promise<T> {
+  const button = page.locator('[data-dock]').getByRole('button', { name: label, exact: true })
+  if (!(await button.isVisible())) return act()
+  await button.click()
+  const sheet = page.getByRole('dialog')
+  await expect(sheet).toBeVisible()
+  try {
+    return await act()
+  } finally {
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+  }
+}
+
+/**
+ * The waiting room's setup, wherever it is: in the right-hand column of a wide screen, behind the
+ * dock's Settings button on a phone (2026-11-23, the app shell), opened for `act` and closed after
+ */
+export async function withSetup<T>(page: Page, act: () => Promise<T>): Promise<T> {
+  const button = page.locator('[data-dock]').getByRole('button', { name: /^(Settings|房間設定)$/ })
+  if (!(await button.isVisible())) return act()
+  await button.click()
+  const sheet = page.getByRole('dialog')
+  await expect(sheet).toBeVisible()
+  try {
+    return await act()
+  } finally {
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+  }
 }
 
 export const setIntOption = (host: Page, guest: Page, label: string, value: string) =>
@@ -187,10 +225,12 @@ export async function playSilentRound(
 export async function playToResult(host: Page, guest: Page): Promise<Locator> {
   await createRoom(host, 'Ann')
   await joinRoom(guest, host.url(), 'Bob')
-  const limit = host.getByRole('spinbutton', { name: 'Round limit' })
-  await limit.fill('10')
-  await limit.press('Enter')
-  await expect(guest.getByText('10', { exact: true })).toBeVisible()
+  await withSetup(host, async () => {
+    const limit = host.getByRole('spinbutton', { name: 'Round limit' })
+    await limit.fill('10')
+    await limit.press('Enter')
+  })
+  await withSetup(guest, () => expect(guest.getByText('10', { exact: true })).toBeVisible())
   await host.getByRole('button', { name: 'Start game' }).click()
   await expect(host.locator('[data-cell]').first()).toBeVisible()
 

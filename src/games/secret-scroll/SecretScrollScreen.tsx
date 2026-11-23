@@ -74,9 +74,44 @@ export default function SecretScrollScreen({ room, game }: GameScreenProps) {
   const forced = myTurn && playable.length === 1 && playable[0] === 7 && (me?.hand?.length ?? 0) === 2 &&
     me?.hand?.some((card) => card === 5 || card === 6)
 
+  const log = (
+    <LogPanel aria-labelledby="scroll-log" data-testid="scroll-log">
+      <PanelTitle id="scroll-log">{t('games.secret-scroll.ui.log')}</PanelTitle>
+      {view.events.length === 0 && <SmallLine>{t('games.secret-scroll.ui.logEmpty')}</SmallLine>}
+      {/* Scrolls once long: focusable, so that a keyboard can scroll it too (axe, QA sweep 2026-11) */}
+      <Log tabIndex={0} aria-labelledby="scroll-log">
+        {[...view.events].reverse().map((event, index) =>
+          eventLines(event, nameOf, cardName, list).map((line, at) => (
+            <LogLine key={`${view.events.length - index}-${at}`} $mine={line.mine === true} $sub={at > 0}>
+              {t(line.key, line.params)}
+            </LogLine>
+          )),
+        )}
+      </Log>
+    </LogPanel>
+  )
+  const reference = (
+    <Reference>
+      <summary>{t('games.secret-scroll.ui.reference')}</summary>
+      <RefList>
+        {deckList(view.beggars).map(([card, count]) => (
+          <li key={card}>
+            <ScrollCardFace card={card} small /> <Copies>{t('games.secret-scroll.ui.copies', { count })}</Copies>{' '}
+            {t(`games.secret-scroll.text.${card}`)}
+          </li>
+        ))}
+      </RefList>
+    </Reference>
+  )
+
   return (
     <GameLayout
       room={room}
+      // 2026-11-23 (app shell): beside the board on a wide screen, a button away on a phone
+      panels={[
+        { id: 'log', label: t('room.panel.log'), content: log },
+        { id: 'reference', label: t('room.panel.reference'), content: reference },
+      ]}
       seatTint
       turnSeat={view.phase === 'turn' ? view.current : null}
       dock={
@@ -244,33 +279,6 @@ export default function SecretScrollScreen({ room, game }: GameScreenProps) {
           </HandPanel>
         )}
         {me === null && <SmallLine>{t('games.secret-scroll.ui.spectating')}</SmallLine>}
-
-        <LogPanel aria-labelledby="scroll-log" data-testid="scroll-log">
-          <PanelTitle id="scroll-log">{t('games.secret-scroll.ui.log')}</PanelTitle>
-          {view.events.length === 0 && <SmallLine>{t('games.secret-scroll.ui.logEmpty')}</SmallLine>}
-          {/* Scrolls once long: focusable, so that a keyboard can scroll it too (axe, QA sweep 2026-11) */}
-          <Log tabIndex={0} aria-labelledby="scroll-log">
-            {[...view.events].reverse().map((event, index) =>
-              eventLines(event, nameOf, cardName, list).map((line, at) => (
-                <LogLine key={`${view.events.length - index}-${at}`} $mine={line.mine === true} $sub={at > 0}>
-                  {t(line.key, line.params)}
-                </LogLine>
-              )),
-            )}
-          </Log>
-        </LogPanel>
-
-        <Reference>
-          <summary>{t('games.secret-scroll.ui.reference')}</summary>
-          <RefList>
-            {deckList(view.beggars).map(([card, count]) => (
-              <li key={card}>
-                <ScrollCardFace card={card} small /> <Copies>{t('games.secret-scroll.ui.copies', { count })}</Copies>{' '}
-                {t(`games.secret-scroll.text.${card}`)}
-              </li>
-            ))}
-          </RefList>
-        </Reference>
       </Stage>
     </GameLayout>
   )

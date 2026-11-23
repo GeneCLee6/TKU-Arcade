@@ -153,7 +153,13 @@ export const roomZhTW: Record<RoomMessageKey, string> = {
   'room.bot.name.lighthouse': '燈塔',
   // C2
   'room.panel.chatUnread': '聊天（{count} 則新訊息）',
+  'room.panel.invite': '邀請',
+  'room.panel.log': '紀錄',
   'room.panel.members': '成員',
+  'room.panel.others': '其他人',
+  'room.panel.reference': '說明',
+  'room.panel.scores': '計分',
+  'room.panel.setup': '房間設定',
   'room.panel.title': '房間',
   'room.turnBadge': '輪到',
   'room.result.heading': '結果',

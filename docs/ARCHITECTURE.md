@@ -1961,6 +1961,33 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 
 **測試**：`tests/kart/raceFlow.test.ts`（開場固定且 4–5 s、團體鏡頭到「3」才換、**三張賽道 × 2／5／8 台 × 開場每 0.1 s，每台車的車身與車手頭都在 16:9、844×390、直拿 390×844 的視錐內（照各自寬高比調過距離的、與不給寬高比的都算）**、寬螢幕比直拿近、在車前朝後、推近、每幀移動 < 0.5 m、GO 未定停在起點、關掉沒有自己的鏡頭、減少動態靜止；設定預設團體鏡頭、舊欄位忽略）、`tests/kart/raceShow.test.ts`、`tests/kart/lapSplit.test.ts`（第一圈不標最快、比上一圈快標最快且負差、比紀錄、`−` 號、只顯示 2.6 s、完賽改紀錄仍比舊紀錄、重新加入不補播）、`tests/kart/lobbyLayout.test.ts`（房主先、兩列都填滿 12 欄、7 位是 4＋3）；e2e `kart-bots`（從選單點進來、還沒按任何鍵：開場卡、context `running`、音樂已排程、倒數嗶聲有響、沒有「點一下開聲音」；一圈的圈時卡）、`kart-race`（兩人＋電腦：按準備／開始的人進場就 `running`、倒數中音樂已排程、嗶聲；完賽的人看到「Lap 1 0:xx.xxx」）、`kart-intro-sync`（改成量兩個畫面的 2、1 出現時刻，差 < 200 ms）、`kart-lobby`、`kart-bots`、`kart-watch-portrait`、`phones`（亮相卡改開場卡）。
 
+### 4.94 路線圖外：房間是一個畫面（app shell），面板改按鈕（2026-11-23，`feat/app-shell-no-scroll`）
+
+擁有者 2026-11-23：「要把它做成像一個安裝在桌面上的線上遊戲一樣，而不只是網頁遊戲，整體全螢幕後就不會再滑動，其他部分可以由按鈕來取代…每個遊戲都是。」設計規則在 `DESIGN.md` §4.1。
+
+**殼**（`src/components/AppShell.tsx`）
+
+- `<AppShell />`：掛著的時候 `<html data-app-shell>`；全域樣式只在這個屬性下生效：`html` 高 100%、`overflow: hidden`、`overscroll-behavior: none`；`body` `position: fixed; inset: 0`（iOS 的橡皮筋與下拉重新整理沒有東西可拉）、`touch-action: pan-x pan-y`（不能雙指放大頁面；面板是自己的捲動容器，照樣能捲）；`#root` 變成整個畫面高的 flex 欄；高 560 px 以下 `#root > header`（網站頂欄）收起。放在房間的 chunk（與之後的 App 主選單共用），**不在大廳的 chunk**：大廳在瀏覽器裡照舊是能捲的網頁。
+- `RoomPage` 渲染 `<AppShell />`，所以房間的每個階段（暱稱、密碼、等待、遊戲、結果、出問題）都是殼。`Main` 在殼裡是 `flex: 1` 的欄，標題列等 `flex: none`，房間本體（帶 `data-room-body` 的元素：`GameLayout` 的 `Wide`／`Narrow`、等待室的 `Layout`）吃掉剩下高度；沒有本體的畫面（暱稱表單、問題）就在 `Main` 裡捲。
+- 標題列：`RoomHeading` 多一個 `back`（`LobbyLink compact`，按了照舊先 `leave`）；房間底部那條「回到大廳」拿掉（結算面板自己那條還在）。
+
+**遊戲版面**（`GameLayout.tsx`）
+
+- 舞台 `Stage`（`data-game-stage`）包住結算面板與遊戲；寬螢幕 `GameColumn` 是 `minmax(0,1fr) auto` 兩列（舞台、dock），側欄 `SideColumn`（`data-side-panel`）自己捲；手機 `Narrow` 是 flex 欄：急事（倒數、卡住的座位，包在 `Urgent`）、舞台、`PhoneDock`。橫拿手機（`orientation: landscape` 且高 ≤ 560 px）`Narrow` 改成兩欄格線，dock 佔右欄兩列、按鈕換行。這些都寫在 `:root[data-app-shell] &` 底下，殼以外（重播頁）不變。
+- `panels?: GamePanel[]`（`{ id, label, content }`）：寬螢幕依序放在側欄（成員與聊天之間，全部攤開，元件測試與桌機 e2e 照舊找得到），手機變成 dock 的按鈕與抽屜的分頁（成員、遊戲的面板、聊天；聊天的未讀數照舊）。標籤共用 `room.panel.log／scores／reference／others`。8 款遊戲用了：德州撲克（`HandLog`）、王座（`ActionLog`、`RoleGuide`）、真假朗讀與光譜（`Scoreboard`）、悲慘人生（`AllLines`）、撞詞（`History`）、放風箏（`Log`）、密信（紀錄與牌表）。德州撲克的牌桌在殼裡高度上限 `max(240px, 50dvh)`。
+- `useFitZoom`：`ResizeObserver` 看舞台與裡面的 `Fit`，內容比舞台高就把 `Fit` 的 `style.zoom` 設成 `舞台高 ÷ 內容高`（無條件捨去到 0.01），有多餘 4% 以上再放大回去；最小 `MIN_ZOOM` 0.75，**粗指標且高度 > 560 px（直拿手機）不縮**（44 px 按鈕）。直接改元素不經 React（加一張牌就重算，不重繪）；寬度變大內容會變矮，所以會調幾次，一秒內最多 10 次，超過就一秒後再看一次。遊戲中才開；有 `data-fit-screen`（陞官圖）就不動。
+- `useBoardFit`（陞官圖）：dock 在圖版右邊（`left >= 舞台 right`）時不再扣 dock 高度，橫拿手機的圖版因此拿到整個高度（`feat/qa-followups` 也在處理 844×390，合併時以合併後為準）。
+
+**等待室**（`WaitingRoom.tsx`）
+
+- 新的 `phoneDock(panels)`：手機時 `RoomPage` 傳 `RoomChatPanel`（多了 `panels`），等待室把「邀請」（房號、連結、QR、公開、密碼）與「房間設定」（遊戲與規則、解散）交給它，變成 dock 的按鈕，右欄不渲染；寬螢幕不變。殼裡兩欄各自捲，`StartBar` `position: sticky; bottom: 0`（底色 `bg`）。
+
+**測試**
+
+- `e2e/app-shell.spec.ts`（新）：16 款桌遊各開一桌（最少人數），等待室與第一手在 1280×720、1920×1080、844×390、390×844 四種尺寸：頁面捲不動（`scrollTo` 後 `scrollY` 仍 0、`scrollHeight` ≤ 視窗）、不橫捲、房間本體／舞台／dock 都在畫面內、開始鈕在畫面內；手機尺寸用鍵盤 Enter 打開 dock 的面板（焦點進抽屜、頁面仍不捲），Esc 關閉、焦點回按鈕；寬螢幕側欄在畫面內。卡丁車：等待室四種尺寸、比賽 1280×720 與 844×390（滾輪捲不動）、中途進來的人看到的名次（`GameLayout`）四種尺寸。舞台還要在裡面捲多少印成軟性訊息（`SHELL_SHOTS=1` 存截圖）。
+- `e2e/sweep.ts` 的 `checkLayout`：有 `data-app-shell` 時頁面能往下捲就是硬錯誤，所以 `npm run test:sweep`（16 款從等待室到結算、再來一局，三種尺寸）都檢查。
+- `e2e/helpers.ts` 新的 `withSetup`：手機上先按 dock 的「房間設定」再改選項、改完 Esc；`setRoomOption`、`playToResult` 用它。`e2e/mobile.spec.ts`：等待室改查 dock 的「邀請／房間設定／聊天」按鈕（邀請在前）、打開邀請有「邀請朋友」、Esc 焦點回來、頁面不捲。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

@@ -66,6 +66,11 @@ export default function PalaceScreen({ room, game }: GameScreenProps) {
   return (
     <GameLayout
       room={room}
+      // 2026-11-23 (app shell): beside the board on a wide screen, a button away on a phone
+      panels={[
+        { id: 'log', label: t('room.panel.log'), content: <ActionLog log={view.log} names={names} /> },
+        { id: 'reference', label: t('room.panel.reference'), content: <RoleGuide /> },
+      ]}
       seatTint
       turnSeat={game.over ? null : view.turn}
       dock={
@@ -107,8 +112,6 @@ export default function PalaceScreen({ room, game }: GameScreenProps) {
         {choosing && <ActionPicker key={view.step} view={view} legal={legal} disabled={asked} nameOf={nameOf} onAct={send} />}
         <Hand view={view} disabled={asked} onAct={send} />
         <Court view={view} nameOf={nameOf} />
-        <ActionLog log={view.log} names={names} />
-        <RoleGuide />
       </Stage>
     </GameLayout>
   )

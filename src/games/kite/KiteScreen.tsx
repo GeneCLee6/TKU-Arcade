@@ -99,6 +99,10 @@ export default function KiteScreen({ room, game }: GameScreenProps) {
   return (
     <GameLayout
       room={room}
+      // 2026-11-23 (app shell): beside the board on a wide screen, a button away on a phone
+      panels={[
+        { id: 'log', label: t('room.panel.log'), content: <Log view={view} nameOf={nameOf} /> },
+      ]}
       seatTint
       turnSeat={game.over ? null : view.current}
       resultUnranked
@@ -254,7 +258,6 @@ export default function KiteScreen({ room, game }: GameScreenProps) {
 
         <Lower>
           <Discards view={view} />
-          <Log view={view} nameOf={nameOf} />
         </Lower>
       </Stage>
     </GameLayout>

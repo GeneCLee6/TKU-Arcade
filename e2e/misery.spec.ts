@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Browser, type BrowserContextOptions, type Page } from '@playwright/test'
-import { joinRoom, newPerson } from './helpers.ts'
+import { joinRoom, newPerson, withSetup } from './helpers.ts'
 
 // 慘度排排站 (owner's request 2026-11-14): two players through the real room on phones, steals on and
 // the clock off; a card is placed (and stolen when the first try misses), revealed to both, and the
@@ -49,7 +49,7 @@ test('two players place, steal, reveal and draw, on phones', async ({ browser })
   test.setTimeout(180_000)
   const people = await players(browser)
   const [first] = people
-  await first.getByRole('combobox', { name: 'Time to guess' }).selectOption({ label: 'No clock' })
+  await withSetup(first, () => first.getByRole('combobox', { name: 'Time to guess' }).selectOption({ label: 'No clock' }))
   await first.getByRole('button', { name: 'Start game' }).click()
 
   // Card 1: everyone sees the same event, nobody its index; three starting cards each

@@ -160,7 +160,13 @@ export const roomEn = {
   'room.bot.name.lighthouse': 'Lighthouse',
   // C2: the game's side panel and its drawer on a phone
   'room.panel.chatUnread': 'Chat ({count} new)',
+  'room.panel.invite': 'Invite',
+  'room.panel.log': 'Log',
   'room.panel.members': 'Members',
+  'room.panel.others': 'Others',
+  'room.panel.reference': 'Guide',
+  'room.panel.scores': 'Scores',
+  'room.panel.setup': 'Settings',
   'room.panel.title': 'Room',
   'room.turnBadge': 'Up now',
   'room.result.heading': 'Results',

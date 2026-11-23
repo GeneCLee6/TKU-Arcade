@@ -106,6 +106,10 @@ export default function SpectrumScreen({ room, game }: GameScreenProps) {
   return (
     <GameLayout
       room={room}
+      // 2026-11-23 (app shell): beside the board on a wide screen, a button away on a phone
+      panels={[
+        { id: 'scores', label: t('room.panel.scores'), content: <Scoreboard view={view} nameOf={nameOf} /> },
+      ]}
       seatTint
       seatDetail={seatDetail}
       turnSeat={view.phase === 'answering' ? null : view.guesser}
@@ -246,7 +250,6 @@ export default function SpectrumScreen({ room, game }: GameScreenProps) {
 
         {shown && <RoundReveal view={view} nameOf={nameOf} animate={animate} />}
 
-        <Scoreboard view={view} nameOf={nameOf} />
       </Stage>
     </GameLayout>
   )

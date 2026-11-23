@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Browser, type BrowserContextOptions, type Page } from '@playwright/test'
-import { joinRoom, newPerson } from './helpers.ts'
+import { joinRoom, newPerson, inPanel } from './helpers.ts'
 
 // 朝堂暗鬥 (owner's request 2026-11-14): three players through the real room on phones, with a
 // stipend, a claim that is challenged, a lost backer and the response window's clock
@@ -61,7 +61,7 @@ test('three players take a stipend, challenge a claim and lose a backer, on phon
   const scan = await new AxeBuilder({ page: actor }).analyze()
   expect(scan.violations.map((violation) => violation.id)).toEqual([])
   await actor.getByTestId('action-picker').getByRole('button', { name: /Stipend/ }).click()
-  await expect(first.getByTestId('action-log')).toContainText('takes a stipend.')
+  await inPanel(first, 'Log', () => expect(first.getByTestId('action-log')).toContainText('takes a stipend.'))
 
   // A levy: everyone else may challenge, and one does
   actor = await onTurn(people)
@@ -70,7 +70,7 @@ test('three players take a stipend, challenge a claim and lose a backer, on phon
   for (const person of others) await expect(person.getByRole('button', { name: 'Challenge' })).toBeVisible()
   await expect(actor.getByTestId('palace-prompt')).toHaveText('Waiting for the others to answer.')
   await others[0].getByRole('button', { name: 'Challenge' }).click()
-  await expect(first.getByTestId('action-log')).toContainText('challenges')
+  await inPanel(first, 'Log', () => expect(first.getByTestId('action-log')).toContainText('challenges'))
 
   // Whoever was wrong picks a backer to turn face up
   await expect
@@ -80,14 +80,14 @@ test('three players take a stipend, challenge a claim and lose a backer, on phon
     await Promise.all(people.map(async (person) => ((await person.getByTestId('lose-card').count()) > 0 ? person : null)))
   ).find((person) => person !== null) as Page
   await loser.getByTestId('lose-card').first().click()
-  await expect(first.getByTestId('action-log')).toContainText('loses a backer')
+  await inPanel(first, 'Log', () => expect(first.getByTestId('action-log')).toContainText('loses a backer'))
   await expect(first.getByTestId('court').getByText('1 face down')).toHaveCount(1)
 
   // A royal grant nobody blocks: the window's clock runs out and everyone left passes
   actor = await onTurn(people)
   await actor.getByTestId('action-picker').getByRole('button', { name: /Royal grant/ }).click()
-  await expect(first.getByTestId('action-log')).toContainText('Time is up: the rest pass.', { timeout: 25_000 })
-  await expect(first.getByTestId('action-log')).toContainText('gains 2 silver.')
+  await inPanel(first, 'Log', () => expect(first.getByTestId('action-log')).toContainText('Time is up: the rest pass.', { timeout: 25_000 }))
+  await inPanel(first, 'Log', () => expect(first.getByTestId('action-log')).toContainText('gains 2 silver.'))
   await close(people)
 })
 
