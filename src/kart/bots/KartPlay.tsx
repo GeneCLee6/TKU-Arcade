@@ -3,7 +3,7 @@
 // one starts. A Grand Prix under way (and not left for the menu) opens again on a reload. 2026-11-20
 // (§4.50): and the driving school; 2026-11-21 (§4.60): and the challenges; 2026-11-23 (§4.81): and
 // the leaderboard, whose rows' ghosts the time trial races; 2026-11-23 (§4.83): and the online races.
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { useT } from '../../i18n/useT.ts'
 import { space } from '../../styles/tokens.ts'
@@ -52,20 +52,26 @@ function resumed(): Playing {
 /**
  * /kart?bots (2026-11-21, the lobby's "Play the computer"): the menu opens on the race against the
  * computer's settings. Read once and taken off the address, so that closing the panel and reloading
- * comes back to the plain menu
+ * comes back to the plain menu. 2026-11-23 (QA sweep): only read during render; the address is
+ * changed once the page is on screen. A first render that suspends (a lazy chunk still coming) is
+ * thrown away and run again, state initialisers too: taking `bots` off in the initialiser lost it
+ * for that second run, and the panel now and then did not open
  */
-function botsAsked(): boolean {
-  const url = new URL(window.location.href)
-  if (!url.searchParams.has('bots')) return false
-  url.searchParams.delete('bots')
-  window.history.replaceState(null, '', url)
-  return true
+export function useBotsAsked(): boolean {
+  const [asked] = useState(() => new URL(window.location.href).searchParams.has('bots'))
+  useEffect(() => {
+    if (!asked) return
+    const url = new URL(window.location.href)
+    url.searchParams.delete('bots')
+    window.history.replaceState(null, '', url)
+  }, [asked])
+  return asked
 }
 
 export function KartPlay() {
   const t = useT()
   const [playing, setPlaying] = useState<Playing>(resumed)
-  const [openBots] = useState(botsAsked)
+  const openBots = useBotsAsked()
   // The school is in the address, so that a reload stays in it
   const openSchool = () => {
     const url = new URL(window.location.href)

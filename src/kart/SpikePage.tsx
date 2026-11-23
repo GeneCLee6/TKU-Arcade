@@ -892,9 +892,11 @@ const Invite = styled.section`
     margin: 0;
   }
 
-  /* A phone held sideways: the map and the clock have the left; the invite goes top centre */
+  /* A phone held sideways: the map and the clock have the left; the invite goes top centre, under
+     the top row (2026-11-23, QA sweep: since the replay and online links the row reaches past the
+     middle on a phone, and covered the invite's first line) */
   @media (max-height: 500px) {
-    top: ${space.sm}px;
+    top: ${space.xxxl + space.sm}px;
     left: 50%;
     translate: -50% 0;
     width: min(340px, calc(100% - 320px));
