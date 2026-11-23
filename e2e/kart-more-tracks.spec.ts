@@ -76,6 +76,7 @@ test('the race against the computer and the Grand Prix offer the four tracks', a
     'Rivermouth Cup',
     'Flood Tide Cup',
     'Backstreet Cup',
+    'Reverse Cup',
   ])
   await cup.getByTestId('kart-cup-cup').selectOption('flood')
   // In racing order: the easiest first, the expert's last
