@@ -1,4 +1,4 @@
-// The kart's online play (2026-11-23, docs/ARCHITECTURE.md §4.82): the race rooms' list, quick join
+// The kart's online play (2026-11-23, docs/ARCHITECTURE.md §4.83): the race rooms' list, quick join
 // and a new room, over GET /api/lobby?game=kart, POST /api/rooms/quick and POST /api/rooms.
 import type { OptionValues } from '../../../shared/games/types.ts'
 import type {

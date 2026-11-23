@@ -256,7 +256,7 @@ export function quickOptions(gameId: string, now: number): OptionValues | undefi
 }
 
 /**
- * POST /api/rooms/quick (2026-11-23, docs/ARCHITECTURE.md §4.82): the best open public room of the
+ * POST /api/rooms/quick (2026-11-23, docs/ARCHITECTURE.md §4.83): the best open public room of the
  * game (worker/lobby-list.ts quickRooms), checked with the room itself since the list may be a few
  * seconds old; else a new public room, which is a new room like any (the same limits)
  */

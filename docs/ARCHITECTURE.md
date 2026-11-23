@@ -1769,7 +1769,24 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **之後綁帳號（F1）**：`kart_board` 加 `account_id` 欄（可為 null）；登入的人上傳時伺服器用 token 的帳號、不再信網址的暱稱；第一次登入時可以「認領」自己暱稱的列（同 `nick_key`、帳號為 null 的設成自己的帳號，之後那個暱稱只有本人能上傳）；未登入的照舊用暱稱，兩種列放同一張榜。賽季（AC-11.4 的另一半）＝在主鍵前加 `season`，每季開新榜、舊的保留。
 - **測試**：`tests/kart/board.test.ts`（14 張圖用自動駕駛與 master 電腦車的手跑真的一趟都通過、按重置鍵 40 次也通過、幽靈車和重播對得上；改速度、跳點、重置到不能重置的地方、繞在路旁、整段時間壓縮、時間不符、少一圈、樣本缺一個、不從起點開始、別張賽道、別的 revision、不同形狀、壞檔都被拒；本週賽道每週一換、14 週走完一輪；`BOARD_TRACKS` 等於 `RACE_TRACK_IDS`）；`tests/worker/kart-board.test.ts`（真的 SQLite 跑 migration：收下真的一趟、回傳名次與重播、同暱稱只留最快、名次與 100 名外的自己、平手先到先排、別的 revision 不混、物理戳記／revision／暱稱／賽道錯、竄改與壞檔與過大都拒且記原因、每分鐘 6 次、外站來源 403、擁有者刪除）；`e2e/kart-board.spec.ts`（選單打開排行榜 → 自動駕駛跑完滬尾砲台坡一趟 → 上傳 → 在榜上看到 → 下載 `.tkureplay` → 和它的幽靈車比）。另外跑過 14 張圖 × 新手／普通／專家／大師 × 輪流各種車款、一半夾重置的 56 趟，**0 趟誤拒**；伺服器判一趟 0.6–7 ms。
 
-### 4.82 路線圖外：卡丁車線上對戰入口（房間列表、快速加入、房名）、房主代跑的短斷線寬限（2026-11-23，`feat/kart-online-browse`）
+### 4.82 路線圖外：成就與個人檔案（本機版）（2026-11-23，`e11-t06`，`feat/achievements-profile`）
+
+AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化專業化」、授權照建議決定，這批先做**存在瀏覽器**的版本，資料格式設計成 F1 上線後原封不動上傳。程式在 `src/achievements/`，字串在 `shared/achievements/i18n.ts`。
+
+- **事件**（`events.ts`，只有型別）：不改任何遊戲規則，從畫面已經有的東西推：`kart.run`（卡丁車一場跑到終點，任何模式，由物理步推出完美起跑、最高連段、噴射覆蓋率、甩尾起跳、漲潮、上高台、穿縫、真岔路）、`kart.race`（有對手的比賽的名次、最強電腦等級、團隊勝負：對戰電腦／大獎賽在 `BotRaceView`，房間在 `room.ts`）、`board.result`（房間結果裡自己的名次；合作遊戲看 summary key 判斷整桌成功，放風箏帶分數、默契牌局帶關數）、`kart.progress`（挑戰獎牌與任務、駕訓星等、大獎賽最佳、最佳紀錄：`sync.ts` 直接讀卡丁車自己的 localStorage）、`kart.leaderboard`（計時賽排行榜上傳成功、名次在前 100：`src/kart/board/api.ts` 的 `uploadRun` 送，§4.81）、`platform.app`（從主畫面打開：引擎每次都問 `isStandalone()`）。
+- **入口很小**（`track.ts` 的 `trackAchievement`、`holdAchievements`）：只有一個動態 import，引擎要等第一個事件才載；中間再隔一層空的 `load.ts`，讓首屏只帶一個短 import 而不是引擎所有 chunk 的清單（`/me` 的 `profileRoute.ts` 同理）。房間頁的 `RoomWatch` 直接走 `load.ts`（`track.ts` 會在每個房間變成一個獨立 chunk）。卡丁車的 store（挑戰、駕訓、大獎賽）存檔後只發一個 window 事件 `tku-arcade:kart-progress`，什麼都不 import；成就要用的卡丁車清單（車、比賽賽道、盃、課、各章任務）抄在 `kartLists.ts`，`tests/achievements/kartLists.test.ts` 對不上就失敗——直接 import 會讓 bundler 把那些模組從 `/kart` 首屏拆成獨立 chunk（量過，+1.3 kB）。
+- **比賽的步**（`kartHook.ts` → `kartRun.ts`）：`spikeLoop` 每一物理步把 `SpikeStep` 交給 `watchKartRun`（重新開始時換一個新的）；`kartRun.ts` 在倒數時載入，之前的步先排著。岔路用 `forkAt`（只算 `rise` 未定義的真岔路）、高台用 `onPlatform`、穿縫用賽道 guide 的 `slots`（判定同挑戰模式的「穿縫」：從牆線負側到正側、離縫中心 5.5 m 內）。到終點那一步送出一次 `kart.run`。
+- **規則**（`rules.ts`）：一張表，54 條（卡丁車 28、桌遊 21、平台 5，隱藏 5），每條是 `{ id, category, tier 1–3, hidden?, game?, when }`；`when` 只有四種：計數器 ≥ min、tally 含全部／含某個／至少 min 種。`evaluate`、`progressOf`、`newlyUnlocked` 是純函式。id 永遠不改（存檔與將來的帳號都用它）。名稱與描述全部原創、雙語，`{game}` 帶大廳上的遊戲名（暫名改了不用動成就字串）。
+- **統計**（`stats.ts`）：只有兩種形狀：`n`（計數器，多數只增；`*.max*`、`kart.gold` 等取最大；`board.streak` 唯一會歸零）與 `t`（每個 id 的次數，`kart.bestLap` 存最低 ms）。`applyEvent(stats, event, at)` 純函式；`mergeStats` 逐鍵取大（最佳圈取小）。
+- **引擎**（`engine.ts`）：一次一個事件（Promise 串起來），每次先讀存檔再寫，兩個分頁不會互蓋；每次造訪的第一個事件順便讀卡丁車的 store（成就上線前拿的獎牌也算）。新解鎖的記時間、存檔、排進彈出佇列。
+- **彈出**（`popups.ts` 佇列、`Popups.tsx` 畫面、`popupsRoot.tsx` 自己的 React root）：右上角轉播風格徽章，一次一個 5 秒（滑鼠指著或焦點在上面時不走）；比賽中（`trial.phase === 'racing'` 且沒暫停）`spikeLoop` 每幀設 `holdAchievements(true)`，排著等到終點或暫停選單才出；一次解鎖一大串（第一次造訪時補發）只顯示前兩個加「另外解鎖了 N 個」。WebAudio 合成音（`sound.ts`，等級越高多一個音，網站音效關掉就不響）；`prefers-reduced-motion` 不滑入、不掃光；`role="status"` 的區域一直在頁面上。
+- **存檔**（`store.ts`）：localStorage `tku-arcade.achievements`，`{ "format": 1, "stats": { "n": {…}, "t": {…} }, "unlocked": { "<規則 id>": <ms> } }`；讀到不對的值逐欄丟掉（不認得的規則 id 保留，可能是新版寫的）；storage 不能用時活到關頁。
+- **F1 之後的遷移**：(1) D1 加 `achievements`（`account_id`、`format`、`stats` JSON、`unlocked` JSON、`updated_at`）；(2) 登入後第一次把本機 `Saved` 原樣 POST 到 `/api/me/achievements`，伺服器用 `mergeSaved`（`store.ts`，同一支純函式搬到 `shared/`）和帳號那份合併：解鎖取聯集、時間取早，計數器取大、最佳圈取小——同一個人兩台裝置不會重複加總（代價是兩台的總和只算較大的那台）；(3) 之後事件仍先在本機算，再定期推送；排行榜類（`kart.leaderboard`）改由伺服器發。格式升級時 `format` 加一，舊格式在伺服器轉。
+- **頁面**（`/me`，`ProfilePage.tsx`，lazy）：選手卡（暱稱或「訪客選手」、解鎖數與百分比、進度條、「只存在這個瀏覽器」）、統計（完成局數、桌遊勝場、卡丁車完賽與冠軍、總噴射時間、最愛車款與賽道、各遊戲勝率表、各賽道最佳圈速表）、成就牆（全部／卡丁車／桌遊／平台篩選；未解鎖灰、可計數的有進度條；隱藏且未解鎖顯示「隱藏成就」與「？」徽章）。大廳暱稱那一列多一個「我的檔案」連結。
+- **首屏**（`npm run budget`）：對照合併排行榜後的 main：大廳 101.9 → 102.1 kB；各桌遊首屏 +0.2～0.3 kB（房間頁的 `RoomWatch`）；`/kart` 236.1 → 236.4 kB；卡丁車房間首屏 135.5 → 135.8 kB；比賽引擎（不是首屏）286.4 → 286.9 kB。
+- **測試**：`tests/achievements/`：每條規則剛好達標與差一點、事件推導（統計、房間、比賽步：真的碼頭倉庫岔路與高台、山城坡巷的縫）、存檔與壞資料、合併、彈出排隊與比賽中暫停、引擎（補讀 store、一次一個）、個人檔案頁；e2e `e2e/achievements.spec.ts`：測試橢圓計時賽讓自動駕駛跑完，比賽中沒有徽章、終點出現「格子旗初登場」、點進 `/me` 顯示已解鎖；大廳入口、篩選、隱藏、手機版面與 axe。
+
+### 4.83 路線圖外：卡丁車線上對戰入口（房間列表、快速加入、房名）、房主代跑的短斷線寬限（2026-11-23，`feat/kart-online-browse`）
 
 擁有者 2026-11-22 要「電競化專業化」、照建議決定。以前卡丁車多人只能從大廳卡片開房、貼連結進來；現在 `/kart` 左上（賽道編輯器、重播檔那一列）多一個醒目的「線上對戰」。不放進右上的按鈕列：1280 寬時那一列會折成兩行、蓋住車庫的關閉鈕（`kart-spike.spec.ts` 抓到的）。
 

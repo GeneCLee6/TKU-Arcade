@@ -1,4 +1,4 @@
-// The kart's room list and quick join (2026-11-23, docs/ARCHITECTURE.md §4.82): what GET /api/lobby
+// The kart's room list and quick join (2026-11-23, docs/ARCHITECTURE.md §4.83): what GET /api/lobby
 // answers with and without `game`, its limit per address, and POST /api/rooms/quick finding an open
 // room or opening a new public one. The Durable Objects are stand-ins, as in rooms.test.ts.
 import { describe, expect, it, vi } from 'vitest'

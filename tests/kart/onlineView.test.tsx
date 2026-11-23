@@ -1,4 +1,4 @@
-// The kart's online races (2026-11-23, docs/ARCHITECTURE.md §4.82): the room list's states and
+// The kart's online races (2026-11-23, docs/ARCHITECTURE.md §4.83): the room list's states and
 // filters, quick join (with computer karts for a new room) and a new room (named, private unless
 // asked), against a stand-in for the API.
 import { act, fireEvent, render, screen, within } from '@testing-library/react'

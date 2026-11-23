@@ -2,7 +2,7 @@
 // docs/ARCHITECTURE.md §4.20) or a Grand Prix (§4.24). Each is its own lazy chunk, loaded only when
 // one starts. A Grand Prix under way (and not left for the menu) opens again on a reload. 2026-11-20
 // (§4.50): and the driving school; 2026-11-21 (§4.60): and the challenges; 2026-11-23 (§4.81): and
-// the leaderboard, whose rows' ghosts the time trial races; 2026-11-23 (§4.82): and the online races.
+// the leaderboard, whose rows' ghosts the time trial races; 2026-11-23 (§4.83): and the online races.
 import { lazy, Suspense, useState } from 'react'
 import styled from 'styled-components'
 import { useT } from '../../i18n/useT.ts'
@@ -21,7 +21,7 @@ const SchoolView = lazy(() => import('../school/SchoolView.tsx'))
 const ChallengeView = lazy(() => import('../challenge/ChallengeView.tsx'))
 // 2026-11-23 (§4.81): the leaderboard, its own chunk
 const BoardView = lazy(() => import('../board/BoardView.tsx'))
-// 2026-11-23 (§4.82): the online races (the race rooms, quick join), its own chunk
+// 2026-11-23 (§4.83): the online races (the race rooms, quick join), its own chunk
 const OnlineView = lazy(() => import('../online/OnlineView.tsx'))
 
 type Playing =

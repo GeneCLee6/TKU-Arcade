@@ -1,4 +1,4 @@
-// A room's name (2026-11-23, the kart's "New room" and quick join; docs/ARCHITECTURE.md §4.82): shown
+// A room's name (2026-11-23, the kart's "New room" and quick join; docs/ARCHITECTURE.md §4.83): shown
 // to strangers in the room list, so it keeps to what a nickname may say (shared/nickname.ts), only
 // longer. Its own module, so that the first load of the lobby does not carry it.
 import { nameProblem, type NameIssue } from './nickname.ts'

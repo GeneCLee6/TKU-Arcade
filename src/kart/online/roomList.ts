@@ -1,4 +1,4 @@
-// What the kart's room list shows (2026-11-23, docs/ARCHITECTURE.md §4.82), without React: a listed
+// What the kart's room list shows (2026-11-23, docs/ARCHITECTURE.md §4.83), without React: a listed
 // room's state, its people, and the filters. The order is the server's (worker/lobby-list.ts).
 import type { RoomListing } from '../../../shared/protocol.ts'
 

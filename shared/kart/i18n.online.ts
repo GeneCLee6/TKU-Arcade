@@ -1,4 +1,4 @@
-// The kart's online play (2026-11-23; docs/ARCHITECTURE.md §4.82): the public race rooms, quick join
+// The kart's online play (2026-11-23; docs/ARCHITECTURE.md §4.83): the public race rooms, quick join
 // and a new room. Registered by its own lazy chunk (src/kart/online/), not merged into KART_MESSAGES;
 // the menu's way in is in i18n.menu.ts. `npm run check-i18n` checks them. `en` is the source.
 const en = {

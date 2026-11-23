@@ -46,5 +46,8 @@ export function loadCupBest(cup: CupId): CupOutcome | null {
 export function keepCupBest(cup: CupId, outcome: CupOutcome): boolean {
   if (!betterOutcome(outcome, loadCupBest(cup))) return false
   writeStored(bestKey(cup), JSON.stringify(outcome))
+  // e11-t06: a cup won is an achievement
+  // (src/achievements/kartLists.ts KART_PROGRESS_EVENT: nothing to import)
+  window.dispatchEvent(new Event('tku-arcade:kart-progress'))
   return true
 }

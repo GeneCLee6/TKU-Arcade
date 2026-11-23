@@ -1,4 +1,4 @@
-// /kart?online (2026-11-23, docs/ARCHITECTURE.md §4.82): the kart's online races, as a broadcast's
+// /kart?online (2026-11-23, docs/ARCHITECTURE.md §4.83): the kart's online races, as a broadcast's
 // match centre. Quick join (an open public room, or a new public one on the track of the week), a new
 // room for friends (named, public or private), and the public race rooms: waiting or racing, people
 // and computer karts, locked or not, kept fresh while the page is visible. Its own lazy chunk: the

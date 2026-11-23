@@ -26,6 +26,7 @@ import { memberName, withBotNames } from '../lib/memberName.ts'
 import { useParams } from '../lib/useRouter.ts'
 import { clippedFill, displayType, monoType, SLANT, slantClip } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
+import { RoomWatch } from '../achievements/RoomWatch.tsx'
 
 // e7-t11: its own chunk, with its strings
 const Reactions = lazy(() => import('../components/Reactions.tsx'))
@@ -299,6 +300,8 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
       ) : (
         <GameLayout room={parts} />
       )}
+      {/* e11-t06: a game's end, to the achievements */}
+      <RoomWatch view={view} you={you} />
       {/* A result carries its own, where it can be seen without passing the board */}
       {!(view.room.status === 'ended' && view.game?.result) && <LobbyLink onLeave={room.leave} />}
     </>

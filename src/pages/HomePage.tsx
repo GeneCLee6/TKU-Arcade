@@ -17,6 +17,7 @@ import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { createRoom, fetchPausedGames } from '../lib/rooms.ts'
 import { useNavigate } from '../lib/useRouter.ts'
+import { Link } from '../lib/router.tsx'
 import type { QuickBots } from '../../shared/protocol.ts'
 import { clippedFill, displayType, SLANT, slantClip } from '../styles/esports.ts'
 import { color, font, fontSize, space } from '../styles/tokens.ts'
@@ -63,6 +64,7 @@ export function HomePage() {
   // Whoever left the lobby meanwhile should not be carried off to the new room
   useEffect(() => () => inFlight.current?.abort(), [])
 
+
   useEffect(() => {
     const controller = new AbortController()
     // Added to, not replaced: a refusal may have marked one meanwhile
@@ -98,6 +100,12 @@ export function HomePage() {
     setAsking(null)
   }
 
+  const profile = (
+    <Link to="/me" data-testid="profile-link">
+      {t('lobby.profile')}
+    </Link>
+  )
+
   return (
     <>
       <TopBar />
@@ -116,20 +124,25 @@ export function HomePage() {
             <Title>{APP_NAME}</Title>
             <Tagline>{t('home.tagline')}</Tagline>
             {/* Signed in (e1-t13): the fixed name and sign-out, where a guest's nickname would be */}
-            {account !== null ? (
+            {/* e11-t06: "My profile" (achievements and stats) beside who is playing; for someone
+                new it comes at the end, where it does not push the first game down on a phone */}
+            {(account !== null || nickname !== null) && (
               <PlayingAs>
-                <span>{t('account.playingAs', { name: account.name })}</span>
-                <AccountControl />
+                {account !== null ? (
+                  <>
+                    <span>{t('account.playingAs', { name: account.name })}</span>
+                    <AccountControl />
+                  </>
+                ) : (
+                  <>
+                    <span>{t('lobby.playingAs', { name: nickname ?? '' })}</span>
+                    <Button $variant="ghost" $size="sm" onClick={() => setAsking({ gameId: null })}>
+                      {t('lobby.changeNickname')}
+                    </Button>
+                  </>
+                )}
+                {profile}
               </PlayingAs>
-            ) : (
-              nickname !== null && (
-                <PlayingAs>
-                  <span>{t('lobby.playingAs', { name: nickname })}</span>
-                  <Button $variant="ghost" $size="sm" onClick={() => setAsking({ gameId: null })}>
-                    {t('lobby.changeNickname')}
-                  </Button>
-                </PlayingAs>
-              )
             )}
             {!app && <JoinRoomForm />}
             <InstallApp />
@@ -175,6 +188,7 @@ export function HomePage() {
             screen. Nothing at all while sign-in is not configured */}
         {account === null && (
           <SignInRow>
+            {nickname === null && profile}
             <AccountControl />
           </SignInRow>
         )}
@@ -306,7 +320,9 @@ const Art = styled.div`
 
 const SignInRow = styled.div`
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: ${space.md}px;
 
   &:empty {
     display: none;

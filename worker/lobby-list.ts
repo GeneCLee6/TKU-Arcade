@@ -1,5 +1,5 @@
 // What GET /api/lobby and POST /api/rooms/quick make of the lobby's rooms (2026-11-23, the kart's
-// room list and quick join; docs/ARCHITECTURE.md §4.82). The LobbyDO keeps every listed room, open,
+// room list and quick join; docs/ARCHITECTURE.md §4.83). The LobbyDO keeps every listed room, open,
 // full, locked or playing (worker/lobby-board.ts); the home page is still shown only the open ones,
 // a game's own list all of its rooms, the open ones first.
 import { LOBBY_LIST_LIMIT, type RoomListing } from '../shared/protocol.ts'
