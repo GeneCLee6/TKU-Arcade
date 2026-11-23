@@ -2021,7 +2021,7 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 
 - 舞台 `Stage`（`data-game-stage`）包住結算面板與遊戲；寬螢幕 `GameColumn` 是 `minmax(0,1fr) auto` 兩列（舞台、dock），側欄 `SideColumn`（`data-side-panel`）自己捲；手機 `Narrow` 是 flex 欄：急事（倒數、卡住的座位，包在 `Urgent`）、舞台、`PhoneDock`。橫拿手機（`orientation: landscape` 且高 ≤ 560 px）`Narrow` 改成兩欄格線，dock 佔右欄兩列、按鈕換行。這些都寫在 `:root[data-app-shell] &` 底下，殼以外（重播頁）不變。
 - `panels?: GamePanel[]`（`{ id, label, content }`）：寬螢幕依序放在側欄（成員與聊天之間，全部攤開，元件測試與桌機 e2e 照舊找得到），手機變成 dock 的按鈕與抽屜的分頁（成員、遊戲的面板、聊天；聊天的未讀數照舊）。標籤共用 `room.panel.log／scores／reference／others`。8 款遊戲用了：德州撲克（`HandLog`）、王座（`ActionLog`、`RoleGuide`）、真假朗讀與光譜（`Scoreboard`）、悲慘人生（`AllLines`）、撞詞（`History`）、放風箏（`Log`）、密信（紀錄與牌表）。德州撲克的牌桌在殼裡高度上限 `max(240px, 50dvh)`。
-- `useFitZoom`：`ResizeObserver` 看舞台與裡面的 `Fit`，內容比舞台高就把 `Fit` 的 `style.zoom` 設成 `舞台高 ÷ 內容高`（無條件捨去到 0.01），有多餘 4% 以上再放大回去；最小 `MIN_ZOOM` 0.75，**粗指標且高度 > 560 px（直拿手機）不縮**（44 px 按鈕）。直接改元素不經 React（加一張牌就重算，不重繪）；寬度變大內容會變矮，所以會調幾次，一秒內最多 10 次，超過就一秒後再看一次。遊戲中才開；有 `data-fit-screen`（陞官圖）就不動。
+- `useFitZoom` → `fitZoom.ts`（遊戲第一次畫完後才載入，不進首屏）：`ResizeObserver` 看舞台與裡面的 `Fit`，內容比舞台高就把 `Fit` 的 `style.zoom` 設成 `舞台高 ÷ 內容高`（無條件捨去到 0.01）；**只在舞台本身變大小時（換螢幕、轉向、dock 變高變矮）才放大回去**，遊戲內容自己變化只會再縮——寬度變大內容變矮，若內容一變就放大，會縮放輪流、按鈕一直在動（`spectrum.spec.ts` 點不到「問這題」就是這樣抓到的）。最小 `MIN_ZOOM` 0.75，**粗指標且高度 > 560 px（直拿手機）不縮**（44 px 按鈕）。直接改元素不經 React；一秒內最多 10 次，超過就一秒後再看一次。遊戲中才縮；有 `data-fit-screen`（陞官圖）就不動。舞台捲得動時才 `tabIndex=0`（axe 的 scrollable-region-focusable），否則拿掉（陞官圖專注模式的 Tab 只在圖版裡）。
 - `useBoardFit`（陞官圖）：dock 在圖版右邊（`left >= 舞台 right`）時不扣 dock 高度，橫拿手機的圖版拿到整個高度（標題列下、控制欄左邊）；§4.96（#178）的「圖版拿整個畫面再把頁面捲上去」在殼裡不捲（頁面捲不動），控制欄改到右邊後 844×390 的 `stageHeight` 也不再落到那條分支。結果：844×390 非專注模式完整版 79 格都在畫面上（`promotion-full.spec.ts` 的 `cellsOnScreen` 照舊通過）。
 
 **等待室**（`WaitingRoom.tsx`）

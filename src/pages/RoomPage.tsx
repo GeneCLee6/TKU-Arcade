@@ -614,7 +614,7 @@ const BackLink = styled(Link)<{ $compact?: boolean }>`
   justify-self: start;
   min-height: 44px;
   color: ${color.text};
-  ${(p) => (p.$compact ? `padding: 0 ${space.sm}px; white-space: nowrap; &::before { content: '‹'; margin-right: ${space.xs}px; }` : '')}
+  ${(p) => (p.$compact ? `padding: 0 ${space.sm}px; white-space: nowrap; &::before { content: '‹'; content: '‹' / ''; margin-right: ${space.xs}px; }` : '')}
 
   @media (max-width: 899px) {
     :root[data-app-shell] && {
