@@ -3,6 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import type { RoomStatus } from '../../shared/protocol.ts'
 import { isRoomId } from '../../shared/room-id.ts'
 import { AccountControl } from '../components/AccountControl.tsx'
+import { AppShell } from '../components/AppShell.tsx'
 import { LateChatPanel as ChatPanel, LateConnectionBanner as ConnectionBanner } from '../components/LateParts.tsx'
 import { Button } from '../components/Button.tsx'
 import { GameLayout, RoomChatPanel, type RoomParts } from '../components/GameLayout.tsx'
@@ -62,6 +63,7 @@ export function RoomPage() {
   const { id = '' } = useParams()
   return (
     <>
+      <AppShell />
       <TopBar />
       <Main>{isRoomId(id) ? <RoomEntry key={id} id={id} /> : <NotFound />}</Main>
     </>
@@ -235,6 +237,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         <ConnectionBanner reconnecting={session.reconnecting} onTryNow={room.reconnectNow} />
       </ConnectionStatus>
       <RoomHeading
+        back={<LobbyLink onLeave={room.leave} compact />}
         title={gameTitle(t, view.room.gameId)}
         members={Object.keys(view.members).length}
         gameId={view.room.gameId}
@@ -283,9 +286,13 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
                 : undefined
             }
             onLeave={room.leave}
+            // On a phone the chat, the invitation and the setup are a sheet, its bar under the seats
+            phoneDock={
+              compact && !kartLobby
+                ? (panels) => <RoomChatPanel room={parts} panels={panels} />
+                : undefined
+            }
           />
-          {/* On a phone the chat is a drawer, its bar stuck to the bottom of the whole page */}
-          {compact && !kartLobby && <RoomChatPanel room={parts} />}
         </Suspense>
       ) : view.game && Screen ? (
         // While its code loads the room is already all there, chat included
@@ -303,13 +310,12 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
       )}
       {/* e11-t06: a game's end, to the achievements */}
       <RoomWatch view={view} you={you} />
-      {/* A result carries its own, where it can be seen without passing the board */}
-      {!(view.room.status === 'ended' && view.game?.result) && <LobbyLink onLeave={room.leave} />}
     </>
   )
 }
 
 function RoomHeading({
+  back,
   title,
   members,
   gameId,
@@ -317,6 +323,8 @@ function RoomHeading({
   extra,
   status,
 }: {
+  /** 2026-11-23 (app shell): the way out, at the start of the bar as a game's exit button */
+  back?: ReactNode
   title: string
   members: number
   gameId?: string
@@ -331,6 +339,7 @@ function RoomHeading({
   return (
     // The game's hue spreads to the whole page from here (GlobalStyle)
     <HeadingRow data-game={gameId}>
+      {back}
       <Title>{title}</Title>
       {status !== undefined && (
         <StatusTag $live={status === 'playing'} data-status={status}>
@@ -383,15 +392,22 @@ function RetryButton({ onClick }: { onClick: () => void }) {
 }
 
 /** `onLeave`: from inside a room, which is left on purpose on the way (shared/protocol.ts 17.) */
-function LobbyLink({ onLeave }: { onLeave?: () => void }) {
+function LobbyLink({ onLeave, compact }: { onLeave?: () => void; compact?: boolean }) {
   const t = useT()
   return (
-    <BackLink to="/" onClick={onLeave}>
+    <BackLink to="/" onClick={onLeave} $compact={compact}>
       {t('room.backToLobby')}
     </BackLink>
   )
 }
 
+
+// The app shell (AppShell.tsx): the rest of the screen under the top bar, a column. The room's body
+// (a game's layout, the waiting room) takes what the bars above it leave and shares it out to its own
+// scrolling panels. Anything else (a nickname to give, a problem) scrolls here, never the page
+// The waiting room's two columns; a wide screen gives the seats its width (2026-11-23)
+// A game needs the width its board can use, and on a phone every pixel of it
+// A board that fits itself to the screen (the promotion board, e3-t10) can use all of a big one
 const Main = styled.main`
   display: grid;
   gap: ${space.lg}px;
@@ -403,7 +419,6 @@ const Main = styled.main`
     margin: 0;
   }
 
-  /* The waiting room's two columns; a wide screen gives the seats its width (2026-11-23) */
   &:has([data-room-columns]) {
     width: min(1120px, 100%);
 
@@ -412,12 +427,10 @@ const Main = styled.main`
     }
   }
 
-  /* A game needs the width its board can use, and on a phone every pixel of it */
   &:has([data-wide-room]) {
     width: min(1280px, 100%);
   }
 
-  /* A board that fits itself to the screen (the promotion board, e3-t10) can use all of a big one */
   &:has([data-fit-screen]) {
     width: min(2200px, 100%);
   }
@@ -425,6 +438,36 @@ const Main = styled.main`
   @media (max-width: 899px) {
     &:has([data-wide-room]) {
       padding: ${space.md}px ${space.sm}px ${space.sm}px;
+    }
+  }
+
+  :root[data-app-shell] & {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: ${space.sm}px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: ${space.sm}px max(${space.lg}px, env(safe-area-inset-right))
+      max(${space.sm}px, env(safe-area-inset-bottom)) max(${space.lg}px, env(safe-area-inset-left));
+
+    & > * {
+      flex: none;
+    }
+
+    & > [data-room-body] {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
+    &:has([data-room-body]) {
+      overflow: hidden;
+    }
+
+    @media (max-width: 899px) {
+      padding: ${space.xs}px max(${space.sm}px, env(safe-area-inset-right))
+        max(${space.xs}px, env(safe-area-inset-bottom)) max(${space.sm}px, env(safe-area-inset-left));
     }
   }
 `
@@ -439,10 +482,15 @@ const ConnectionStatus = styled.div`
 
   &:empty {
     margin-bottom: -${space.lg}px;
+
+    :root[data-app-shell] & {
+      margin-bottom: -${space.sm}px;
+    }
   }
 `
 
-// A broadcast bar (2026-11-23): the hue down from the left, hairlines above and below
+// A broadcast bar (2026-11-23): the hue down from the left, hairlines above and below. In the app
+// shell a game's bar, as low as it can be, on one line where the screen is short
 const HeadingRow = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -457,6 +505,19 @@ const HeadingRow = styled.div`
   box-shadow:
     inset 0 1px 0 ${color.line},
     inset 0 -1px 0 ${color.line};
+
+  :root[data-app-shell] & {
+    padding: ${space.xs}px 0;
+
+    @media (max-height: 560px) {
+      flex-wrap: nowrap;
+
+      & > h1 {
+        min-width: 0;
+        font-size: ${fontSize.lg}px;
+      }
+    }
+  }
 `
 
 const pulse = keyframes`
@@ -527,8 +588,14 @@ const Title = styled.h1`
   }
 `
 
-// A slanted tag
+// A slanted tag. Not on a phone's room, whose members are a button away in the dock
 const MemberCount = styled.p`
+  @media (max-width: 899px) {
+    :root[data-app-shell] & {
+      display: none;
+    }
+  }
+
   ${clippedFill(slantClip(8), color.raised)}
   ${monoType}
   padding: ${space.xs}px ${space.lg}px;
@@ -540,12 +607,27 @@ const Muted = styled.p`
   color: ${color.muted};
 `
 
-const BackLink = styled(Link)`
+// In a phone's room bar the arrow alone, named all the same (the words are only too small to see)
+const BackLink = styled(Link)<{ $compact?: boolean }>`
   display: inline-flex;
   align-items: center;
   justify-self: start;
   min-height: 44px;
   color: ${color.text};
+  ${(p) => (p.$compact ? `padding: 0 ${space.sm}px; white-space: nowrap; &::before { content: '‹'; content: '‹' / ''; margin-right: ${space.xs}px; }` : '')}
+
+  @media (max-width: 899px) {
+    :root[data-app-shell] && {
+      justify-content: center;
+      min-width: 44px;
+      font-size: 0;
+
+      &::before {
+        margin: 0;
+        font-size: ${fontSize.xl}px;
+      }
+    }
+  }
 `
 
 const SignInInstead = styled.div`

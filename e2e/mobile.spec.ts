@@ -104,15 +104,26 @@ test.describe('the waiting room at 375 px', () => {
 
     await expectNoSidewaysScroll(page)
     await expectNoSidewaysScroll(guest)
-    await expectFingerSizedControls(page, ['Start game', 'Copy link', /^Make host/])
+    await expectFingerSizedControls(page, ['Start game', /^Make host/, /^Invite$/, /^Settings$/, /^Chat$/])
+    await page.getByRole('button', { name: 'Invite', exact: true }).click()
+    await expectFingerSizedControls(page, ['Copy link'])
+    await expectNoSidewaysScroll(page)
     await guest.context().close()
   })
 
-  test('the invitation comes before the game setup', async ({ page }) => {
+  // 2026-11-23 (app shell): the room is one screen; sharing it, the setup and the chat are a sheet,
+  // and sharing it is the first of the dock's buttons
+  test('the invitation comes before the game setup, a sheet away', async ({ page }) => {
     await createRoom(page, 'Ann')
-    const invite = await page.getByRole('heading', { name: 'Invite friends' }).boundingBox()
-    const setup = await page.getByRole('heading', { name: 'Game and rules' }).boundingBox()
-    expect(invite?.y ?? Infinity).toBeLessThan(setup?.y ?? 0)
+    const dock = page.locator('[data-dock]')
+    const buttons = await dock.getByRole('button').allTextContents()
+    expect(buttons.indexOf('Invite')).toBeGreaterThanOrEqual(0)
+    expect(buttons.indexOf('Invite')).toBeLessThan(buttons.indexOf('Settings'))
+    await dock.getByRole('button', { name: 'Invite' }).click()
+    await expect(page.getByRole('dialog').getByRole('heading', { name: 'Invite friends' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(dock.getByRole('button', { name: 'Invite' })).toBeFocused()
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeLessThanOrEqual(0)
   })
 
   test('nothing stays stuck behind the chat bar at the end of the page', async ({ page }) => {

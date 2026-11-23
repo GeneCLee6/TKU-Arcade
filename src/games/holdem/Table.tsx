@@ -171,6 +171,7 @@ const Hidden = styled.h2`
   margin: 0;
 `
 
+// In the room's app shell (one screen) a flatter table leaves your cards in sight under it
 const Felt = styled.section`
   position: relative;
   width: 100%;
@@ -194,6 +195,10 @@ const Felt = styled.section`
   @media (min-width: 720px) {
     aspect-ratio: 16 / 10;
     border-radius: 50%;
+  }
+
+  :root[data-app-shell] & {
+    max-height: max(240px, 50dvh);
   }
 `
 

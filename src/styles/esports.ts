@@ -34,6 +34,7 @@ export const clippedFill = (clip: string, fill: string) => css`
 `
 
 /** A glass panel: see-through over the grid floor, a hairline edge, one corner cut */
+// Blur is for a screen with room to show it; a phone gets the plain, cheaper glass
 export const glass = css`
   ${clippedFill(cornerClip(16), color.panel)}
 
@@ -41,7 +42,6 @@ export const glass = css`
     box-shadow: inset 0 0 0 1px ${color.line};
   }
 
-  /* Blur is for a screen with room to show it; a phone gets the plain, cheaper glass */
   @media (min-width: 900px) {
     &::before {
       -webkit-backdrop-filter: blur(14px);

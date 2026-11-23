@@ -56,6 +56,10 @@ export default function MiseryScreen({ room, game }: GameScreenProps) {
   return (
     <GameLayout
       room={room}
+      // 2026-11-23 (app shell): beside the board on a wide screen, a button away on a phone
+      panels={[
+        { id: 'others', label: t('room.panel.others'), content: <AllLines view={view} nameOf={nameOf} final={game.over} /> },
+      ]}
       seatTint
       turnSeat={turnSeat}
       dock={
@@ -113,7 +117,6 @@ export default function MiseryScreen({ room, game }: GameScreenProps) {
             />
           </Mine>
         )}
-        <AllLines view={view} nameOf={nameOf} final={game.over} />
       </Stage>
     </GameLayout>
   )

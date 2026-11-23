@@ -66,9 +66,10 @@ export function Dialog({ open, onClose, title, children, actions }: DialogProps)
   )
 }
 
+// A long body scrolls inside: the phone's own chrome must not hide the buttons
+// On a phone it sits at the bottom, where a thumb can reach its buttons
 const Panel = styled.dialog`
   width: min(480px, calc(100vw - ${space.xxl}px));
-  /* A long body scrolls inside: the phone's own chrome must not hide the buttons */
   max-height: calc(100dvh - ${space.xxl}px);
   padding: 0;
   overflow-y: auto;
@@ -84,7 +85,6 @@ const Panel = styled.dialog`
     background: ${color.overlay};
   }
 
-  /* On a phone it sits at the bottom, where a thumb can reach its buttons */
   @media (max-width: 599px) {
     width: 100%;
     max-width: 100%;

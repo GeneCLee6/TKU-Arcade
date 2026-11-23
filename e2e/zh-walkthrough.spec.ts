@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
-import { everyoneReady, setIntOption, setSelectOption, takeFirstChip } from './helpers.ts'
+import { everyoneReady, inPanel, setIntOption, setSelectOption, takeFirstChip, withSetup } from './helpers.ts'
 
 // e7-t08 (AC-7.3): the site in Traditional Chinese, screen by screen, with nothing left in English.
 // The list of screens is docs/ZH-WALKTHROUGH.md. It reads what is on the screen and what a screen
@@ -136,11 +136,15 @@ for (const [label, viewport, touch] of [
         ['轉移房主：小博', '要把房主轉移給 小博 嗎？'],
         ['解散房間', '要解散這個房間嗎？'],
       ]) {
-        await host.getByRole('button', { name: button }).click()
-        const dialog = host.getByRole('dialog', { name: title })
-        await expect(dialog).toBeVisible()
-        await expectAllChinese(host, title)
-        await dialog.getByRole('button', { name: '取消' }).click()
+        // Dissolving is in the setup, a sheet away on a phone (the app shell)
+        const ask = async () => {
+          await host.getByRole('button', { name: button }).click()
+          const dialog = host.getByRole('dialog', { name: title })
+          await expect(dialog).toBeVisible()
+          await expectAllChinese(host, title)
+          await dialog.getByRole('button', { name: '取消' }).click()
+        }
+        await (button === '解散房間' ? withSetup(host, ask) : ask())
       }
 
       await host.getByRole('button', { name: '怎麼玩' }).click()
@@ -150,10 +154,13 @@ for (const [label, viewport, touch] of [
       await rules.getByRole('button', { name: '關閉' }).click()
 
       // The shortest game there is, so that it reaches the result in reasonable time
-      const limit = host.getByRole('spinbutton', { name: '回合上限' })
-      await limit.fill('10')
-      await limit.press('Enter')
-      await expect(guest.getByText('10', { exact: true })).toBeVisible()
+      // (On a phone the setup is a sheet away: the app shell)
+      await withSetup(host, async () => {
+        const limit = host.getByRole('spinbutton', { name: '回合上限' })
+        await limit.fill('10')
+        await limit.press('Enter')
+      })
+      await withSetup(guest, () => expect(guest.getByText('10', { exact: true })).toBeVisible())
 
       await host.getByRole('button', { name: '開始遊戲' }).click()
       await expect(host.locator('[data-cell]')).toHaveCount(79)
@@ -205,8 +212,10 @@ for (const [label, viewport, touch] of [
       await over.getByRole('button', { name: '回到等待室' }).click()
       await expect(host.getByRole('heading', { name: '座位', exact: true })).toBeVisible()
 
-      await host.getByRole('button', { name: '解散房間' }).click()
-      await host.getByRole('dialog').getByRole('button', { name: '解散房間' }).click()
+      await withSetup(host, async () => {
+        await host.getByRole('button', { name: '解散房間' }).click()
+        await host.getByRole('dialog', { name: '要解散這個房間嗎？' }).getByRole('button', { name: '解散房間' }).click()
+      })
       await expect(guest.getByRole('alert')).toBeVisible()
       await expectAllChinese(guest, 'room dissolved')
 
@@ -313,7 +322,8 @@ for (const [label, viewport, touch] of [
       await expectAllChinese(host, 'Bluff Reader waiting room')
 
       // The host's room password setting, and the reactions open
-      await expect(host.getByLabel('房間密碼（選填）')).toBeVisible()
+      // On a phone it is in the invitation, a sheet away (the app shell)
+      await inPanel(host, '邀請', () => expect(host.getByLabel('房間密碼（選填）')).toBeVisible())
       await host.getByRole('button', { name: '表情' }).click()
       await expectAllChinese(host, 'reactions open, password setting')
       await host.getByRole('button', { name: '拍手' }).click()

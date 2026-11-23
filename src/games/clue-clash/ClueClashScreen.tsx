@@ -60,6 +60,10 @@ export default function ClueClashScreen({ room, game }: GameScreenProps) {
   return (
     <GameLayout
       room={room}
+      // 2026-11-23 (app shell): beside the board on a wide screen, a button away on a phone
+      panels={[
+        { id: 'log', label: t('room.panel.log'), content: <History history={view.history} nameOf={nameOf} /> },
+      ]}
       seatTint
       turnSeat={game.over ? null : view.guesser}
       resultUnranked
@@ -195,7 +199,6 @@ export default function ClueClashScreen({ room, game }: GameScreenProps) {
           </Section>
         )}
 
-        <History history={view.history} nameOf={nameOf} />
       </Stage>
     </GameLayout>
   )

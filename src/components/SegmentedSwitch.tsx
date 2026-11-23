@@ -46,6 +46,8 @@ const Group = styled.div`
 `
 
 // Slanted like the tabs and buttons; the fill is on ::before so the focus ring stays whole
+// A finger's height, but the top bar still has to stay one row down to a 360px phone
+// Filled and bold, so the state is not carried by colour alone
 const Segment = styled.button`
   ${clippedFill(slantClip(7), color.raised)}
   min-height: 32px;
@@ -58,7 +60,6 @@ const Segment = styled.button`
   font-weight: 700;
   cursor: pointer;
 
-  /* A finger's height, but the top bar still has to stay one row down to a 360px phone */
   @media (max-width: 480px) {
     min-width: 32px;
     min-height: 44px;
@@ -74,7 +75,6 @@ const Segment = styled.button`
     background: ${color.raisedHover};
   }
 
-  /* Filled and bold, so the state is not carried by colour alone */
   &[aria-pressed='true'] {
     color: ${color.onAccent};
     font-weight: 900;

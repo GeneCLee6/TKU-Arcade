@@ -7,6 +7,11 @@ const gameHueRules = Object.entries(gameHues)
   .join('\n')
 
 // Base page styles. Dark unless theme.ts pins light or system with <html data-theme>.
+// On <html>, not <body>: the glow and the grid floor below sit between the two
+// The night sky: the current hue's glow up at the right, magenta down at the left
+// A faint grid floor in perspective. Still on purpose: a moving one repaints the whole page
+// :root so that it beats a component's own outline, such as the one marking whose turn it is
+// What Tab lands on must not end up behind the phone layout's dock, stuck to the bottom
 export const GlobalStyle = createGlobalStyle`
   :root {
     color-scheme: light;
@@ -31,7 +36,6 @@ export const GlobalStyle = createGlobalStyle`
     box-sizing: border-box;
   }
 
-  /* On <html>, not <body>: the glow and the grid floor below sit between the two */
   html {
     background: ${color.bg};
   }
@@ -46,7 +50,6 @@ export const GlobalStyle = createGlobalStyle`
     text-size-adjust: 100%;
   }
 
-  /* The night sky: the current hue's glow up at the right, magenta down at the left */
   body::before,
   body::after {
     content: '';
@@ -62,7 +65,6 @@ export const GlobalStyle = createGlobalStyle`
       radial-gradient(45% 40% at 4% 100%, color-mix(in srgb, ${color.magenta} 12%, transparent), transparent 70%);
   }
 
-  /* A faint grid floor in perspective. Still on purpose: a moving one repaints the whole page */
   body::after {
     left: -60%;
     right: -60%;
@@ -78,13 +80,11 @@ export const GlobalStyle = createGlobalStyle`
     mask-image: linear-gradient(to top, ${color.text}, transparent 80%);
   }
 
-  /* :root so that it beats a component's own outline, such as the one marking whose turn it is */
   :root :focus-visible {
     outline: 2px solid ${color.accent};
     outline-offset: 3px;
   }
 
-  /* What Tab lands on must not end up behind the phone layout's dock, stuck to the bottom */
   @media (max-width: 899px) {
     html {
       scroll-padding-bottom: 140px;

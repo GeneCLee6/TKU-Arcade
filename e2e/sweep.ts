@@ -93,7 +93,7 @@ export function watchConsole(page: Page, name: string, problems: Problems): void
   page.on('pageerror', (error) => problems.hard.push(`${name} uncaught: ${error.message}`))
 }
 
-/** A whole page scrolling sideways, or a raw i18n key on screen */
+/** A whole page scrolling sideways (a room's, either way), or a raw i18n key on screen */
 export async function checkLayout(page: Page, where: string, problems: Problems, zh: boolean): Promise<void> {
   const found = await page.evaluate((zhPage) => {
     const out: { hard: string[]; soft: string[] } = { hard: [], soft: [] }
@@ -110,6 +110,15 @@ export async function checkLayout(page: Page, where: string, problems: Problems,
         }
       }
       out.hard.push(`scrolls sideways: ${root.scrollWidth} > ${root.clientWidth} (${widest})`)
+    }
+    // 2026-11-23: a room is one screen (the app shell, docs/DESIGN.md §4.1): its page never scrolls
+    if (root.hasAttribute('data-app-shell')) {
+      window.scrollTo(0, 10_000)
+      const scrolled = window.scrollY
+      window.scrollTo(0, 0)
+      if (scrolled > 0 || root.scrollHeight > root.clientHeight + 1) {
+        out.hard.push(`the room's page scrolls: ${root.scrollHeight} > ${root.clientHeight}`)
+      }
     }
     const text = document.body.innerText
     const keys = text.match(/\b(?:games|room|kart|lobby|ui)\.[a-z][\w-]*\.[\w.-]+/g)

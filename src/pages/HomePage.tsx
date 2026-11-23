@@ -228,6 +228,7 @@ function HeroArt() {
   )
 }
 
+// So that the first game's "New room" is on a phone's first screen
 const Main = styled.main`
   display: grid;
   gap: ${space.xl}px;
@@ -235,7 +236,6 @@ const Main = styled.main`
   margin: 0 auto;
   padding: ${space.lg}px ${space.lg}px ${space.xxxl}px;
 
-  /* So that the first game's "New room" is on a phone's first screen */
   @media (max-width: 480px) {
     gap: ${space.lg}px;
     padding-top: ${space.md}px;
@@ -273,6 +273,7 @@ const Intro = styled.div`
 `
 
 // A slanted magenta tag
+// A phone needs the height for the first game
 const Eyebrow = styled.p`
   ${clippedFill(slantClip(10), color.magenta)}
   margin: 0;
@@ -281,7 +282,6 @@ const Eyebrow = styled.p`
   ${displayType}
   font-size: ${fontSize.sm}px;
 
-  /* A phone needs the height for the first game */
   @media (max-width: 480px) {
     display: none;
   }
@@ -298,13 +298,13 @@ const Title = styled.h1`
   text-shadow: 0 0 ${space.xxl}px color-mix(in srgb, ${color.brand} 45%, transparent);
 `
 
+// The title says enough on a phone, whose first screen is for the first game (2026-11-23)
 const Tagline = styled.p`
   margin: 0;
   max-width: 34em;
   color: ${color.muted};
   font-size: ${fontSize.lg}px;
 
-  /* The title says enough on a phone, whose first screen is for the first game (2026-11-23) */
   @media (max-width: 480px) {
     display: none;
   }

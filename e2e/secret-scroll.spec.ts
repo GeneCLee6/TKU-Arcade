@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Browser, type BrowserContextOptions, type Page } from '@playwright/test'
-import { joinRoom, newPerson } from './helpers.ts'
+import { joinRoom, newPerson, inPanel } from './helpers.ts'
 
 // 奪祕笈 (owner's brief 2026-11-14): two players through the real room on phones, playing whatever
 // the hand allows until a round ends, then into the next round
@@ -71,13 +71,12 @@ test('two players play a round to its end and deal the next, on phones', async (
     // The one waiting holds one card; the mover two
     const other = mover === ann ? bob : ann
     await expect(other.getByTestId('your-hand').locator('[data-card]')).toHaveCount(1)
-    const before = await ann.getByTestId('scroll-log').getByRole('listitem').count()
+    // The log is a panel: beside the table when wide, behind the dock's Log on a phone (app shell)
+    const logged = () => inPanel(ann, 'Log', () => ann.getByTestId('scroll-log').getByRole('listitem').count())
+    const before = await logged()
     await playOnce(mover)
     await expect
-      .poll(async () =>
-        (await ann.getByTestId('round-end').count()) > 0 ||
-        (await ann.getByTestId('scroll-log').getByRole('listitem').count()) > before,
-      )
+      .poll(async () => (await ann.getByTestId('round-end').count()) > 0 || (await logged()) > before)
       .toBe(true)
   }
 

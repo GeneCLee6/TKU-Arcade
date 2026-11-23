@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Browser, type BrowserContextOptions, type Page } from '@playwright/test'
-import { joinRoom, newPerson } from './helpers.ts'
+import { joinRoom, newPerson, inPanel } from './helpers.ts'
 
 // 德州撲克 (owner's request 2026-11-14): three players through the real room on phones: a call, a raise
 // with the quick sizes, two folds, the uncalled raise back, and the next hand dealt with the button moved
@@ -63,7 +63,7 @@ test('three players call, raise with the quick sizes and fold, on phones', async
   const scan = await new AxeBuilder({ page: actor }).analyze()
   expect(scan.violations.map((violation) => violation.id)).toEqual([])
   await actor.getByRole('button', { name: 'Call 20' }).click()
-  await expect(first.getByTestId('hand-log')).toContainText('calls 20.')
+  await inPanel(first, 'Log', () => expect(first.getByTestId('hand-log')).toContainText('calls 20.'))
 
   // The small blind raises the pot: 50 in the middle and 10 to call, so the pot raise goes to 20 + 60
   actor = await onTurn(people)
@@ -80,7 +80,7 @@ test('three players call, raise with the quick sizes and fold, on phones', async
   await actor.getByTestId('raise-panel').getByRole('button', { name: 'Pot', exact: true }).click()
   await expect(actor.getByTestId('raise-amount')).toHaveText('80')
   await actor.getByRole('button', { name: 'Raise to 80' }).click()
-  await expect(first.getByTestId('hand-log')).toContainText('raises to 80.')
+  await inPanel(first, 'Log', () => expect(first.getByTestId('hand-log')).toContainText('raises to 80.'))
 
   // The other two fold: the raise nobody called comes back, and nothing is shown
   for (let fold = 0; fold < 2; fold++) {
@@ -88,10 +88,10 @@ test('three players call, raise with the quick sizes and fold, on phones', async
     await actor.getByRole('button', { name: 'Fold' }).click()
   }
   await expect(first.getByTestId('hand-result')).toContainText('everyone else folded')
-  await expect(first.getByTestId('hand-log')).toContainText('nobody called goes back')
+  await inPanel(first, 'Log', () => expect(first.getByTestId('hand-log')).toContainText('nobody called goes back'))
 
   // A few seconds later the next hand is dealt
-  await expect(first.getByTestId('hand-log')).toContainText('Hand 2:', { timeout: 15_000 })
+  await inPanel(first, 'Log', () => expect(first.getByTestId('hand-log')).toContainText('Hand 2:', { timeout: 15_000 }))
   await expect(first.getByTestId('your-hand').getByRole('img')).toHaveCount(2)
   await close(people)
 })

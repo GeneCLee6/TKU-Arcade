@@ -72,10 +72,14 @@ export function useBoardFit(dock: RefObject<HTMLElement | null>, fitStage: boole
       const top = stage.getBoundingClientRect().top + window.scrollY
       // Not innerHeight: a phone's address bar coming and going would resize the board on every scroll
       const screen = document.documentElement.clientHeight || window.innerHeight
-      const below = bar?.offsetHeight ?? 0
+      // 2026-11-23 (app shell): a phone on its side has the dock as a rail beside the board, not under
+      // it; and a room's page never scrolls, so the board is not brought up to the top either
+      const beside = bar !== null && bar.getBoundingClientRect().left >= stage.getBoundingClientRect().right - 1
+      const below = bar && !beside ? bar.offsetHeight : 0
       const height = stageHeight(screen, top, below)
       setHeight(height)
-      if (!brought && screen <= SHORT_SCREEN && top + height + below + BELOW > screen + 1) {
+      const shell = document.documentElement.hasAttribute('data-app-shell')
+      if (!shell && !brought && screen <= SHORT_SCREEN && top + height + below + BELOW > screen + 1) {
         brought = true
         // Once the new height is on the page
         requestAnimationFrame(() => window.scrollTo(0, top))
