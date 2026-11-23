@@ -34,6 +34,12 @@ export type LobbyBoardDeps = {
     drop(id: string): void
   }
   now(): number
+  /**
+   * 2026-11-23 (the pushed list, worker/lobby-feed.ts): an entry was added, replaced (`before` its
+   * old listing) or removed (`after` null). Also for a replacement with the same listing (a room's
+   * heartbeat): the feed decides what is worth sending
+   */
+  changed?(before: RoomListing | null, after: RoomListing | null): void
 }
 
 /**
@@ -55,14 +61,19 @@ export class LobbyBoard {
   }
 
   report(id: string, listing: RoomListing | null): void {
+    const before = this.entries.get(id)?.listing ?? null
     if (listing === null) {
-      if (this.entries.delete(id)) this.deps.storage.drop(id)
+      if (this.entries.delete(id)) {
+        this.deps.storage.drop(id)
+        this.deps.changed?.(before, null)
+      }
       return
     }
     if (!this.entries.has(id) && this.entries.size >= LOBBY_MAX_ROOMS) return
     const entry = { listing, heardAt: this.deps.now() }
     this.entries.set(id, entry)
     this.deps.storage.save(entry)
+    this.deps.changed?.(before, listing)
   }
 
   /**
@@ -83,6 +94,7 @@ export class LobbyBoard {
       if (entry.heardAt <= oldest) {
         this.entries.delete(id)
         this.deps.storage.drop(id)
+        this.deps.changed?.(entry.listing, null)
       }
     }
   }

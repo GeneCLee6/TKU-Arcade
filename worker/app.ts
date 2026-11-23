@@ -8,14 +8,22 @@ import type { LobbyResponse } from '../shared/protocol.ts'
 import { handleAuth, isAuthPath } from './auth.ts'
 import { handleClientError } from './errors.ts'
 import { handleBoardAdmin, handleKartBoard } from './kartBoard.ts'
-import { lobbyReadLimit, lobbyRooms, readLobby, type LobbyLister } from './lobby-list.ts'
-import { addressKey, clientAddress, isLoopback } from './address.ts'
+import {
+  lobbyReadLimit,
+  lobbyRooms,
+  lobbyWatchLimit,
+  readLobby,
+  type LobbyLister,
+} from './lobby-list.ts'
+import { ADDRESS_HEADER, addressKey, clientAddress, isLoopback } from './address.ts'
+import { CloseCode } from '../shared/protocol.ts'
 import { getGame } from '../shared/games/index.ts'
 import type { FixedWindowLimit } from './rate-limit.ts'
 import type { LimiterDO } from './limiter.ts'
 import type { LobbyDO } from './lobby.ts'
+import { LOBBY_NAME } from './lobby-board.ts'
 import type { RoomDO } from './room.ts'
-import { handleRoomCode, handleRooms, handleRoomSocket } from './rooms.ts'
+import { handleRoomCode, handleRooms, handleRoomSocket, refuseSocket } from './rooms.ts'
 
 export interface Env {
   /** The React app's static assets (wrangler `assets`) */
@@ -109,6 +117,42 @@ export async function handleLobby(
   return Response.json(body, { headers: noStore })
 }
 
+/**
+ * /ws/lobby?game=<id> (2026-11-23, shared/lobby-feed.ts): the game's room list, pushed by the LobbyDO.
+ * Same origin only, a game this site has, and LOBBY_WATCHES_PER_ADDRESS upgrades a minute per
+ * address in this instance (memory only: a page opens one and keeps it, so a shared limiter's extra
+ * request is not worth it). The LobbyDO caps how many are open at once (worker/lobby-feed.ts)
+ */
+export async function handleLobbySocket(
+  request: Request,
+  env: Env,
+  url: URL,
+  limit: FixedWindowLimit = lobbyWatchLimit,
+  now: number = Date.now(),
+): Promise<Response> {
+  if (request.headers.get('Upgrade') !== 'websocket') {
+    return Response.json({ error: 'expected_websocket' }, { status: 426, headers: noStore })
+  }
+  const origin = request.headers.get('Origin')
+  if (origin !== null && origin !== url.origin) {
+    return Response.json({ error: 'forbidden_origin' }, { status: 403, headers: noStore })
+  }
+  const game = url.searchParams.get('game')
+  if (game === null || !getGame(game)) {
+    return Response.json({ error: 'unknown_game' }, { status: 400, headers: noStore })
+  }
+  const address = clientAddress(request)
+  const key = await addressKey(address)
+  // Refused with the close the page falls back to polling on, not a failed upgrade it would retry
+  if ((address === null || !isLoopback(address)) && !limit.take(key, now)) {
+    return refuseSocket(CloseCode.tooManyConnections, 'too many connections')
+  }
+  const headers = new Headers(request.headers)
+  headers.set(ADDRESS_HEADER, key)
+  const lobby = env.LOBBY.get(env.LOBBY.idFromName(LOBBY_NAME))
+  return lobby.fetch(new Request(request, { headers }))
+}
+
 // The Worker answers /api/* and /ws/* (wrangler `run_worker_first`) and hands everything else to
 // the static assets (the React app; client routes fall back to index.html).
 export async function handleRequest(request: Request, env: Env): Promise<Response> {
@@ -135,6 +179,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   }
   if (url.pathname === '/api/admin/kart-board') return handleBoardAdmin(request, env, url)
   if (url.pathname.startsWith('/api/')) return notFound()
+  if (url.pathname === '/ws/lobby') return handleLobbySocket(request, env, url)
   if (url.pathname.startsWith('/ws/')) return handleRoomSocket(request, env, url)
   return env.ASSETS.fetch(request)
 }

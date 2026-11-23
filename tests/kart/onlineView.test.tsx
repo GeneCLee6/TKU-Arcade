@@ -9,6 +9,7 @@ import { RouterContext, type RouterValue } from '../../src/lib/useRouter.ts'
 import OnlineView from '../../src/kart/online/OnlineView.tsx'
 import { readRoomPassword } from '../../src/lib/roomPassword.ts'
 import { ALL_ROOMS, filterRooms, roomState } from '../../src/kart/online/roomList.ts'
+import { FakeWebSocket } from '../lib/fakeWebSocket.ts'
 
 vi.mock('../../src/kart/audio/useMenuMusic.ts', () => ({ useMenuMusic: () => {} }))
 
@@ -43,8 +44,15 @@ describe('roomList', () => {
 
 type Call = { url: string; body: unknown }
 
-function setup(rooms: RoomListing[] = ROOMS, answers: Record<string, () => Response> = {}) {
+function setup(
+  rooms: RoomListing[] = ROOMS,
+  answers: Record<string, () => Response> = {},
+  { push = false }: { push?: boolean } = {},
+) {
   const calls: Call[] = []
+  // Polled unless a test plays the pushed list's server (src/lib/lobbyFeed.ts)
+  if (push) FakeWebSocket.install()
+  else vi.stubGlobal('WebSocket', undefined)
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -68,6 +76,28 @@ beforeEach(() => setLanguage('en'))
 afterEach(() => vi.unstubAllGlobals())
 
 describe('OnlineView', () => {
+  // 2026-11-23: pushed by the LobbyDO, each change shown as it comes, without asking again
+  it('shows the pushed list live, with each change as it comes', async () => {
+    const { calls } = setup([], {}, { push: true })
+    const socket = FakeWebSocket.last
+    expect(socket.url).toContain('/ws/lobby?game=kart')
+    act(() => {
+      socket.open()
+      socket.receive(JSON.stringify({ t: 'rooms', rooms: [ROOMS[0]] }))
+    })
+    expect((await screen.findAllByTestId('kart-online-room')).map((row) => row.dataset.room)).toEqual([
+      'aaaaaaaaaa',
+    ])
+    expect(screen.getByTestId('kart-online-updated').textContent).toBe('Live: changes show as they happen')
+    act(() => socket.receive(JSON.stringify({ t: 'room', room: ROOMS[3] })))
+    expect(screen.getAllByTestId('kart-online-room').map((row) => row.dataset.state)).toEqual(['open', 'racing'])
+    act(() => socket.receive(JSON.stringify({ t: 'gone', id: 'aaaaaaaaaa' })))
+    expect(screen.getAllByTestId('kart-online-room')).toHaveLength(1)
+    // Asked once at the start (before the feed's first list), never again on a timer
+    const asked = calls.filter((call) => call.url.startsWith('/api/lobby')).length
+    expect(asked).toBeLessThanOrEqual(1)
+  })
+
   it('lists the rooms with their state, track, mode, people and password, and joins or watches', async () => {
     const { calls, navigate } = setup()
     const rows = await screen.findAllByTestId('kart-online-room')

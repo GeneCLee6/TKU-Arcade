@@ -108,6 +108,7 @@ frame-ancestors 'none'
 | 表情 | 每人間隔 `REACTION_MIN_MS` | `RoomHost` |
 | 房間密碼 | 每條 socket 錯 `PASSWORD_TRIES`（5）次關掉；**每房每位址 15 分鐘錯 `PASSWORD_FAILS`（10）次**後，那個位址到視窗結束前的加入一律 `rate_limited` 並關掉 socket，不再算雜湊（存在房間儲存，換 socket、休眠都不歸零；2026-11-23，§12） | `RoomHost` |
 | `GET /api/lobby`（大廳與卡丁車房間列表，2026-11-23） | **每 instance 每位址每分鐘 240 次**、instance 合計 2 萬次（記憶體，不走 `LimiterDO`：列表每 10 秒輪詢，每次多一個 DO 請求不划算；本機不限）；每個 instance 把 LobbyDO 的回答沿用 2 秒；`?game=` 不是遊戲 400 | `worker/app.ts`、`worker/lobby-list.ts` |
+| `/ws/lobby`（卡丁車房間列表推送，2026-11-23） | 同站 `Origin`；**每 instance 每位址每分鐘 30 次升級**、instance 合計 3,000 次（記憶體，本機不限），超過以 4429 關掉、不叫醒 LobbyDO；LobbyDO 同時開著的**全站 1,000 條、每位址 12 條**，超過 4429（頁面退回輪詢）；頁面只能送 `ping`，其他訊息關掉（4422） | `worker/app.ts`、`worker/lobby-feed.ts` |
 | `POST /api/rooms/quick`（卡丁車快速加入，2026-11-23） | 找房吃上一列的 240 次；真的開新房時再吃 `POST /api/rooms` 的全部額度（每位址每分鐘 10 間）；房名照暱稱規則（§9），不合 400 `bad_name` | `worker/rooms.ts` |
 | `GET /api/rooms/<id>`、`GET /api/codes/<code>`、`GET /api/flags` | **沒有** | — |
 | `/api/telemetry` | 只收區間計數，見 `worker/telemetry.ts` | — |

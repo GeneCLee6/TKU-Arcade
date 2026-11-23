@@ -1871,6 +1871,14 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **速率**：`StoredRoom.passwordFails`（儲存 key `pwfails`，`{ [位址雜湊]: { count, since } }`）、`PASSWORD_FAILS` 10、`PASSWORD_FAIL_WINDOW_MS` 15 分鐘、最多 200 個位址；鎖住的位址 `passwordWork` 直接回 `null`（不花 CPU），`join` 回 `rate_limited` 並以 4422（`badMessage`）關掉。
 - **協定**：`RoomInfo.password` 換成 `locked?: true`。前端 `RoomPasswordSetting` 收 `locked` 與 `known`（`readRoomPassword(roomId)`）；房主設定時 `WaitingRoom` 先 `keepRoomPassword`（拿掉時 `forgetRoomPassword`），所以房主看得到自己設的、別人只看到「這個房間有密碼」。卡丁車建房表單的提示改成「房間只存雜湊，請自己轉給朋友」。
 
+### 4.89 路線圖外：卡丁車房間列表改推送（2026-11-23，`feat/kart-room-push`）
+
+`/kart?online` 的列表從 10 秒輪詢改成 LobbyDO 推送，細節、成本比較在 `NETWORK.md` §6。結構：
+
+- **`shared/lobby-feed.ts`**：路徑與版本、三種訊息（`rooms` 完整列表、`room` 新增或變化、`gone` 移除）、`parseLobbyFeed`／`applyLobbyFeed`，以及從 `worker/lobby-list.ts` 搬過來的 `isOpenRoom`／`humansOf`／`lobbyRooms`（Worker 那邊 re-export，兩端同一份排序與截斷）。
+- **`worker/lobby-feed.ts`**（不碰 Cloudflare）：`admitWatcher`（全站、每位址上限）、`feedChange(before, after, paused)`、`watcherTag`。**`worker/lobby-board.ts`**：`LobbyBoardDeps.changed`，回報、移除、逾時都會叫。**`worker/lobby.ts`**：`fetch` 收升級（hibernatable、依遊戲加標籤、送完整列表）、`webSocketMessage` 只回 `ping`、其他關掉、`pushChange` 送給那款遊戲的 socket；暫停旗標 60 秒快取。**`worker/app.ts`**：`/ws/lobby` → `handleLobbySocket`（Origin、遊戲、每位址記憶體限制、位址雜湊標頭），要排在 `/ws/<房號>` 前面。
+- **頁面**：`src/lib/lobbyFeed.ts` 的 `watchLobby(gameId, { onRooms, onFallback })`；`OnlineView` 的 `useKartRooms` 先推送，`onFallback` 後才開輪詢的計時器；開頭那次 `GET` 若比推送晚到就丟掉。`OnlineView` 本來就是自己的 lazy chunk，所以推送客戶端不進任何首屏。大廳首頁沒改（首屏 102.2／103 kB，理由在 `NETWORK.md` §6.3）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

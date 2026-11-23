@@ -3,7 +3,7 @@
 // room for friends (named, public or private), and the public race rooms: waiting or racing, people
 // and computer karts, locked or not, kept fresh while the page is visible. Its own lazy chunk: the
 // kart's menu and a race never load it.
-import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import styled, { css } from 'styled-components'
 import { BOT_LEVELS, type BotLevel } from '../../../shared/games/kart/bots.ts'
 import { weeklyTrack } from '../../../shared/kart/board.ts'
@@ -22,7 +22,15 @@ import { displayType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { useMenuMusic } from '../audio/useMenuMusic.ts'
 import { broadcast, digits, ticker } from '../ui/broadcast.ts'
-import { KART_ROOMS_POLL_MS, createKartRoom, fetchKartRooms, quickJoin, type RoomFailure } from './api.ts'
+import { watchLobby } from '../../lib/lobbyFeed.ts'
+import {
+  KART_GAME,
+  KART_ROOMS_POLL_MS,
+  createKartRoom,
+  fetchKartRooms,
+  quickJoin,
+  type RoomFailure,
+} from './api.ts'
 import {
   ALL_ROOMS,
   driversIn,
@@ -50,12 +58,34 @@ const failureKey = (failure: RoomFailure): KartMessageKey =>
         ? 'kart.online.name.blocked'
         : 'kart.online.error.failed'
 
-type List = { rooms: RoomListing[] | null; failed: boolean; at: number | null }
+type List = { rooms: RoomListing[] | null; failed: boolean; at: number | null; live: boolean }
 
-/** The kart's rooms, asked for again every KART_ROOMS_POLL_MS while the page is visible */
+/**
+ * The kart's rooms. Pushed since 2026-11-23 (src/lib/lobbyFeed.ts: the LobbyDO sends each change as
+ * it happens); where pushing does not work here, asked for again every KART_ROOMS_POLL_MS while the
+ * page is visible, as before. Refresh asks once more either way
+ */
 function useKartRooms(): List & { refresh: () => void } {
-  const [list, setList] = useState<List>({ rooms: null, failed: false, at: null })
+  const [list, setList] = useState<List>({ rooms: null, failed: false, at: null, live: false })
   const [asked, setAsked] = useState(0)
+  const [polling, setPolling] = useState(false)
+  /** The feed has sent a list: the first poll's answer, if it comes later, is older */
+  const pushed = useRef(false)
+  // Pushed: the list as the feed has it now
+  useEffect(() => {
+    if (polling) return
+    return watchLobby(KART_GAME, {
+      onRooms: (rooms) => {
+        pushed.current = true
+        setList({ rooms, failed: false, at: Date.now(), live: true })
+      },
+      onFallback: () => {
+        setPolling(true)
+        setList((previous) => ({ ...previous, live: false }))
+      },
+    })
+  }, [polling])
+  // Polled: once at the start and on Refresh, and every KART_ROOMS_POLL_MS when not pushed
   useEffect(() => {
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -65,15 +95,16 @@ function useKartRooms(): List & { refresh: () => void } {
       clearTimeout(timer)
       const rooms = await fetchKartRooms(controller.signal)
       if (controller.signal.aborted || mine !== latest) return
+      if (!polling && asked === 0 && pushed.current) return
       setList((previous) =>
-        rooms ? { rooms, failed: false, at: Date.now() } : { ...previous, failed: true },
+        rooms ? { ...previous, rooms, failed: false, at: Date.now() } : { ...previous, failed: true },
       )
       // A hidden tab asks nothing: coming back asks at once
-      if (!document.hidden) timer = setTimeout(() => void poll(), KART_ROOMS_POLL_MS)
+      if (polling && !document.hidden) timer = setTimeout(() => void poll(), KART_ROOMS_POLL_MS)
     }
     const onVisibility = () => {
       clearTimeout(timer)
-      if (!document.hidden) void poll()
+      if (polling && !document.hidden) void poll()
     }
     void poll()
     document.addEventListener('visibilitychange', onVisibility)
@@ -82,7 +113,7 @@ function useKartRooms(): List & { refresh: () => void } {
       clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [asked])
+  }, [asked, polling])
   const refresh = useCallback(() => setAsked((n) => n + 1), [])
   return { ...list, refresh }
 }
@@ -237,8 +268,10 @@ export default function OnlineView({ onExit }: { onExit: () => void }) {
 
         <ListHead>
           <SectionTitle>{t('kart.online.list.title')}</SectionTitle>
-          <Updated aria-live="off">
-            {age !== null && t('kart.online.list.updated', { seconds: age })}
+          <Updated aria-live="off" data-testid="kart-online-updated" data-live={list.live}>
+            {list.live
+              ? t('kart.online.list.live')
+              : age !== null && t('kart.online.list.updated', { seconds: age })}
           </Updated>
           <Button type="button" $size="sm" $variant="ghost" onClick={list.refresh} data-testid="kart-online-refresh">
             {t('kart.online.list.refresh')}

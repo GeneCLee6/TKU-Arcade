@@ -46,6 +46,7 @@ const en = {
   // The list
   'kart.online.list.title': 'Public rooms',
   'kart.online.list.updated': 'Updated {seconds} s ago',
+  'kart.online.list.live': 'Live: changes show as they happen',
   'kart.online.list.refresh': 'Refresh',
   'kart.online.list.loading': 'Looking for rooms…',
   'kart.online.list.failed': 'The room list could not be reached. It will try again.',
@@ -129,6 +130,7 @@ const zhTW: Record<KartOnlineKey, string> = {
 
   'kart.online.list.title': '公開房間',
   'kart.online.list.updated': '{seconds} 秒前更新',
+  'kart.online.list.live': '即時：有變化馬上更新',
   'kart.online.list.refresh': '重新整理',
   'kart.online.list.loading': '找房間中…',
   'kart.online.list.failed': '連不上房間列表，等一下會自己再試。',
