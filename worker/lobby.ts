@@ -1,8 +1,20 @@
 import { DurableObject } from 'cloudflare:workers'
-import type { RoomListing } from '../shared/protocol.ts'
+import { LOBBY_FEED_VERSION, type LobbyFeedMessage } from '../shared/lobby-feed.ts'
+import {
+  CloseCode,
+  HEARTBEAT_PING,
+  HEARTBEAT_PONG,
+  type RoomListing,
+} from '../shared/protocol.ts'
+import { ADDRESS_HEADER } from './address.ts'
 import type { Env } from './app.ts'
+import { disabledGames } from './flags.ts'
 import { LobbyBoard, type LobbyEntry } from './lobby-board.ts'
+import { admitWatcher, feedChange, watcherTag, type LobbyWatcher } from './lobby-feed.ts'
 import { QuickHolds } from './lobby-list.ts'
+
+/** How long the paused games (e12-t11) read from D1 are trusted by the pushed list */
+const FEED_FLAGS_TTL_MS = 60_000
 
 const ENTRY_PREFIX = 'room:'
 /** `code:<four digits>` → the id of the room that number belongs to (shared/room-code.ts) */
@@ -18,6 +30,8 @@ export class LobbyDO extends DurableObject<Env> {
   private alarmAt: number | null = null
   /** 2026-11-23: quick join's rooms being opened (in memory: lost on eviction, which only reopens the race) */
   private readonly quick = new QuickHolds()
+  /** The paused games as last read, and when (the pushed list leaves their rooms out) */
+  private paused: { games: Set<string>; at: number } | null = null
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -28,7 +42,11 @@ export class LobbyDO extends DurableObject<Env> {
         drop: (id) => void storage.delete(ENTRY_PREFIX + id),
       },
       now: Date.now,
+      // 2026-11-23: the pushed list (worker/lobby-feed.ts); sending to a socket costs no request
+      changed: (before, after) => this.pushChange(before, after),
     })
+    // The pages' heartbeat, answered without waking the object
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG))
     void ctx.blockConcurrencyWhile(async () => {
       const [entries, alarm] = await Promise.all([
         storage.list<LobbyEntry>({ prefix: ENTRY_PREFIX }),
@@ -85,6 +103,100 @@ export class LobbyDO extends DurableObject<Env> {
   async releaseCode(code: string, roomId: string): Promise<void> {
     const key = CODE_PREFIX + code
     if ((await this.ctx.storage.get<string>(key)) === roomId) await this.ctx.storage.delete(key)
+  }
+
+  /**
+   * The pushed list (2026-11-23, shared/lobby-feed.ts): the upgrade from /ws/lobby, forwarded by the
+   * Worker (worker/app.ts handleLobbySocket), which checked the origin, the game and the address's
+   * allowance. A hibernatable socket tagged with its game; the first frame is the game's whole list
+   */
+  override async fetch(request: Request): Promise<Response> {
+    if (request.headers.get('Upgrade') !== 'websocket') {
+      return new Response('Expected WebSocket', { status: 426 })
+    }
+    const url = new URL(request.url)
+    const game = url.searchParams.get('game') ?? ''
+    const address = request.headers.get(ADDRESS_HEADER)
+    const { 0: client, 1: server } = new WebSocketPair()
+    const watchers = this.ctx
+      .getWebSockets()
+      .map((ws) => ws.deserializeAttachment() as LobbyWatcher | null)
+      .filter((watcher): watcher is LobbyWatcher => watcher !== null)
+    const admission =
+      url.searchParams.get('v') !== String(LOBBY_FEED_VERSION)
+        ? { ok: false as const, code: CloseCode.versionMismatch, reason: 'feed version mismatch' }
+        : admitWatcher(watchers, address)
+    if (!admission.ok) {
+      // As RoomDO: a refused socket is a plain one, closed once the upgrade is done
+      server.accept()
+      server.close(admission.code, admission.reason)
+      return new Response(null, { status: 101, webSocket: client })
+    }
+    const watcher: LobbyWatcher = { game, address, openedAt: Date.now() }
+    this.ctx.acceptWebSocket(server, [watcherTag(game)])
+    server.serializeAttachment(watcher)
+    const paused = await this.pausedGames()
+    const rooms = paused.has(game)
+      ? []
+      : this.board.list().filter((room) => room.gameId === game)
+    const first: LobbyFeedMessage = { t: 'rooms', rooms }
+    server.send(JSON.stringify(first))
+    return new Response(null, { status: 101, webSocket: client })
+  }
+
+  /** A watcher sends nothing but the heartbeat (answered by the runtime): anything else closes it */
+  override async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer): Promise<void> {
+    if (data === HEARTBEAT_PING) {
+      ws.send(HEARTBEAT_PONG)
+      return
+    }
+    try {
+      ws.close(CloseCode.badMessage, 'the list is only listened to')
+    } catch {
+      // Already closed
+    }
+  }
+
+  override async webSocketClose(ws: WebSocket): Promise<void> {
+    try {
+      ws.close()
+    } catch {
+      // Already closed
+    }
+  }
+
+  override async webSocketError(ws: WebSocket): Promise<void> {
+    await this.webSocketClose(ws)
+  }
+
+  /** Tells the watchers of the room's game what changed, if anything worth telling */
+  private pushChange(before: RoomListing | null, after: RoomListing | null): void {
+    const gameId = after?.gameId ?? before?.gameId
+    if (gameId === undefined) return
+    const sockets = this.ctx.getWebSockets(watcherTag(gameId))
+    if (sockets.length === 0) return
+    const message = feedChange(before, after, this.paused?.games.has(gameId) === true)
+    if (!message) return
+    const payload = JSON.stringify(message)
+    for (const ws of sockets) {
+      try {
+        ws.send(payload)
+      } catch {
+        // Closing; webSocketClose follows
+      }
+    }
+  }
+
+  /**
+   * The paused games, from D1 unless read in the last FEED_FLAGS_TTL_MS. Read when a page starts
+   * watching; between those the last answer stands (a paused game's rooms cannot start a game anyway)
+   */
+  private async pausedGames(): Promise<Set<string>> {
+    const now = Date.now()
+    if (this.paused && now - this.paused.at < FEED_FLAGS_TTL_MS) return this.paused.games
+    const games = await disabledGames(this.env.DB)
+    this.paused = { games, at: now }
+    return games
   }
 
   override async alarm(): Promise<void> {

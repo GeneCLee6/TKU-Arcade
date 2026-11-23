@@ -11,6 +11,7 @@
 | React | `src/lib/useRoom.ts`、`src/pages/RoomPage.tsx`、`src/components/ConnectionBanner.tsx` | 斷線提示、送不出的提示、重新整理 |
 | Worker | `worker/rooms.ts` `handleRoomSocket` | Origin 檢查、每位址升級限制（`LimiterDO`）、轉給 RoomDO |
 | RoomDO | `worker/room.ts`、`worker/room-host.ts` | hibernation、`ping`→`pong` 自動回應（不叫醒物件）、每 15 s 的 sweep 讀自動回應時間、45 s 離線→`absent`／轉房主、90 s 讓座（等待／結束時） |
+| 卡丁車房間列表（2026-11-23） | `src/lib/lobbyFeed.ts`、`worker/lobby.ts`、`worker/lobby-feed.ts` | `/ws/lobby?game=kart` 推送公開房的變化；同樣的心跳與退避，隱藏分頁放掉；推不了就退回 10 s 輪詢（§6） |
 
 ## 2. 查到的斷線原因
 
@@ -107,3 +108,39 @@ Playwright 讓房間 socket 經過一個可以關掉或拒絕的中繼：
 - `tests/lib/roomConnection.test.ts`「delivered once」：同一連線的 session 不變、新連線換一個；編號順序；死掉後只重送 `ack` 之後的、原號；斷線期間排隊的接在後面；確認後不再重送；兩種逾時；舊伺服器不編號；上限 64；前一則的回音不算後一則的。
 - `e2e/network.spec.ts`：中繼在**送出那一下**讓 socket 無聲死掉，分「到了但回音丟了」與「根本沒到」兩種，重連後對方桌上都剛好少一個籌碼、沒有「可能沒送到」、中繼只看到那個動作過去一次；`Promise.all([點, setOffline(true)])` 讓點與斷網互相搶，回來後剛好一次；原本「斷網再上線」的測試從「2 或 3 個」改成剛好 2 個。`e2e/connection.spec.ts` 的「無聲死掉」改成不用再按、自己送到。
 - `npm run net:soak` 也帶 `session` 與 `seq`，摘要多 `acked`、`slowestAckMs`（本機 2 人 1 分鐘：15 下全確認，最慢 23 ms）。
+
+## 6. 卡丁車房間列表改推送（2026-11-23，`feat/kart-room-push`）
+
+`/kart?online` 的公開房列表（#163，`ARCHITECTURE.md` §4.83）原本每 10 秒 `GET /api/lobby?game=kart`（Worker 沿用 2 秒）。現在列表頁開一條 WebSocket 到 LobbyDO，房間一變就推過來；做不到時退回原本的輪詢。
+
+### 6.1 怎麼運作
+
+- **路徑**：`/ws/lobby?game=<id>&v=1`（`shared/lobby-feed.ts` 的 `lobbyFeedPath`、`LOBBY_FEED_VERSION`）。Worker（`worker/app.ts` 的 `handleLobbySocket`）檢查同站 `Origin`、遊戲存在、每 instance 每位址每分鐘 30 次升級（記憶體，`lobbyWatchLimit`；本機不限），把位址雜湊放進 `x-tku-address` 轉給 LobbyDO。
+- **LobbyDO**（`worker/lobby.ts`）：`ctx.acceptWebSocket(server, ['game:<id>'])`，attachment 記遊戲、位址雜湊、開的時間；同時開著的上限全站 `MAX_LOBBY_WATCHERS`（1,000）、每位址 `MAX_LOBBY_WATCHERS_PER_ADDRESS`（12），超過接受後以 **4429** 關掉（頁面改輪詢）。版本不合以 `versionMismatch` 關掉。第一個 frame 是 `{ t: 'rooms', rooms }`（那款遊戲列著的全部房，暫停的遊戲給空的）。
+- **差異**：`LobbyBoard` 多一個 `changed(before, after)`（新增、換掉、移除、逾時清掉都會叫）；`feedChange`（`worker/lobby-feed.ts`）決定要送什麼：新的或內容變了 `{ t: 'room', room }`、不再列 `{ t: 'gone', id }`、房間 4 分鐘一次的心跳回報（內容一樣）什麼都不送。RoomDO 本來就會在人數、狀態、密碼、房名、選項改變時回報（`syncLobby`），所以新增、人數改變、開賽、結束、關房都會即時到；只有「房主一直沒回報、10 分鐘逾時」那種才晚。暫停的遊戲（e12-t11）在 LobbyDO 記 60 秒，推送時把它的房當成 `gone`。
+- **休眠友善**：沒有計時器、沒有每個 socket 的記憶體狀態；心跳 `ping` 由 `setWebSocketAutoResponse` 回 `pong`，不叫醒物件。只有房間回報（本來就有的 RPC）叫醒它，這時順手 `send` 給那款遊戲的 socket。頁面送 `ping` 以外的任何東西就被關掉（4422），所以沒有訊息速率要限。
+- **頁面**（`src/lib/lobbyFeed.ts` 的 `watchLobby`，沿用 #149／#153 的習慣）：每 15 秒 `ping`，超過 35 秒什麼都沒聽到就當死掉重開；斷線後等 1、2、4、8、15、30 秒（最多少 25% 的抖動）再連，連上收到完整列表就歸零；分頁隱藏就放掉 socket，回來時重開（新的完整列表）。**退回輪詢**：沒有 `WebSocket`、連 3 次都在收到列表前就斷（代理、擴充套件、舊 Worker）、或被 4429／版本不合關掉，就呼叫 `onFallback`，`OnlineView` 改回每 10 秒輪詢。頁面一開始仍先問一次 `GET /api/lobby`（推送的第一個列表通常比它先到，晚到的那份會被丟掉），「重新整理」照樣問一次。列表上方的「N 秒前更新」在推送時改成「即時：有變化馬上更新」（`data-live`）。
+- 兩端用同一個 `lobbyRooms`（從 `worker/lobby-list.ts` 搬到 `shared/lobby-feed.ts`），推送拼出來的列表和輪詢的順序、截斷一模一樣。
+
+### 6.2 成本：和輪詢比
+
+一個人開著列表 10 分鐘、期間有 20 次房間變化：
+
+| | 輪詢（原本） | 推送 |
+| --- | --- | --- |
+| Worker 請求 | 60（每 10 秒） | 1（升級）＋開頭 1 次 `GET /api/lobby` |
+| LobbyDO 請求 | 最多 60（Worker 沿用 2 秒，同一個 instance 上的人共用；最壞每人各一個 instance） | 1（WebSocket 連線）＋開頭那次 `GET` 最多 1 |
+| D1 讀（暫停旗標） | 60（每次 `GET /api/lobby`） | LobbyDO 60 秒最多 1 次 |
+| 送出的變化 | 最晚 10 秒（＋2 秒快取）才看到 | 房間回報後立刻；送出的訊息不算請求 |
+| 心跳 | — | 每 15 秒一個 `ping`，auto-response 回答、不叫醒物件 |
+
+LobbyDO 喚醒次數只跟「房間變化」有關（本來就有的回報 RPC），跟看列表的人數無關；看的人多時差最多。代價：每條連線一個 DO 連線請求（免費額度每日 10 萬次），斷線重連與切回分頁各再一次；DO 醒著處理回報的時間多了對每個 socket `send` 的那點 CPU。
+
+### 6.3 還沒做
+
+- 大廳首頁的公開房列表**沒有**改（還是 15 秒輪詢，分頁隱藏時停）。首屏 102.2／103 kB，推送客戶端（約 1 kB gzip）只能首屏後 lazy 載入；首頁的列表只列「可以加入的房」，晚 15 秒的代價比卡丁車列表小，所以先不動。要做時：`watchLobby` 支援 `game` 為空（全部遊戲、只列可加入的）並在 LobbyDO 加一個 `game:*` 標籤。
+- 「RoomDO 回報 LobbyDO 失敗」時只靠下一個事件或掃描重試（原本就這樣），那段時間推送也不會有。
+
+### 6.4 測試
+
+`tests/lib/lobbyFeed.test.ts`（完整列表＋差異照順序、`pong` 與壞 frame 不理、心跳與沒聲音就重開、斷線退避重連、連 3 次失敗改輪詢、4429／版本不合立刻改輪詢、沒有 WebSocket、隱藏分頁放掉回來重開）、`tests/worker/lobby-feed.test.ts`（每站／每位址上限、`feedChange` 的新增／變化／心跳不送／移除／暫停、`LobbyBoard.changed` 跟著回報與逾時、頁面拼出的列表等於 `GET /api/lobby` 的、`/ws/lobby` 的位址雜湊、Origin、遊戲、426、超過額度 4429 不叫醒 LobbyDO）、`tests/kart/onlineView.test.tsx`（推送的列表即時出現與更新、不再定時輪詢；其他測試照舊走輪詢）、`e2e/kart-online.spec.ts`（Bob 先開列表，Ann 快速加入開房，Ann 進到等待室後 2 秒內 Bob 的列表出現那一列，不按重新整理）。
