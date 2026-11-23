@@ -62,6 +62,13 @@ class Client {
   send(message: unknown) {
     this.world.host.message(this.conn, JSON.stringify(message))
   }
+
+  /** As RoomDO sends it: the password hashed first (`passwordWork`) */
+  async sendChecked(message: unknown) {
+    const raw = JSON.stringify(message)
+    const work = this.world.host.passwordWork(this.conn, raw)
+    this.world.host.message(this.conn, raw, work ? await work : undefined)
+  }
   get errors(): string[] {
     return this.received.flatMap((message) => (message.t === 'error' ? [message.code] : []))
   }
@@ -482,7 +489,7 @@ describe('rooms nobody uses, and public or not (shared/protocol.ts 19.)', () => 
     expect(world.host.listing()).toBeNull()
   })
 
-  it('shows members whether the room is public, and lets the host list it or take it off', () => {
+  it('shows members whether the room is public, and lets the host list it or take it off', async () => {
     const world = room('holdem')
     const ann = world.join('Ann')
     const bob = world.join('Bob')
@@ -494,7 +501,7 @@ describe('rooms nobody uses, and public or not (shared/protocol.ts 19.)', () => 
     expect(bob.view!.room.public).toBe(true)
     expect(world.host.listing()).toMatchObject({ id: ROOM_ID, host: 'Ann' })
     // With a password: listed as locked (2026-11-23), which the home page's list leaves out
-    ann.send({ t: 'set_password', password: 'kite' })
+    await ann.sendChecked({ t: 'set_password', password: 'kite' })
     expect(world.host.listing()).toMatchObject({ locked: true })
     ann.send({ t: 'set_password', password: null })
     ann.send({ t: 'set_public', public: false })

@@ -8,34 +8,44 @@ import { Button } from './Button.tsx'
 import { FieldLabel, FieldRow, TextInput } from './Field.tsx'
 
 interface RoomPasswordSettingProps {
-  /** The room's password, null for none */
-  password: string | null
-  /** The host's: set it, or take it away with null. Without it the password is only shown */
+  /** Whether the room has a password */
+  locked: boolean
+  /** The password as this browser set or typed it (src/lib/roomPassword.ts), null when it has none */
+  known: string | null
+  /** The host's: set it, or take it away with null. Without it the room only says it has one */
   onSet?: (password: string | null) => void
 }
 
 /**
- * The room's password in the invitation (e1-t16): the host sets or takes it away; everyone in the
- * room sees it, to pass on with the link. Someone new is asked for it; members already in are not.
+ * The room's password in the invitation (e1-t16): the host sets or takes it away; someone new is
+ * asked for it, members already in are not. Since 2026-11-23 the room keeps only a salted hash, so
+ * nobody is sent the password: the host sees the one this browser set, others only that there is one.
  */
-export default function RoomPasswordSetting({ password, onSet }: RoomPasswordSettingProps) {
+export default function RoomPasswordSetting({ locked, known, onSet }: RoomPasswordSettingProps) {
   const t = useT()
   const [draft, setDraft] = useState('')
   const typed = normalizePassword(draft)
+  const shown =
+    known !== null ? (
+      <Shown>
+        {t('room.extra.password.is')} <Value translate="no">{known}</Value>
+      </Shown>
+    ) : (
+      <Shown>{t('room.extra.password.locked')}</Shown>
+    )
 
   if (!onSet) {
     return (
-      <Shown>
-        {t('room.extra.password.is')} <Value translate="no">{password}</Value>
-      </Shown>
+      <Block>
+        <Shown>{t('room.extra.password.locked')}</Shown>
+        <Hint>{t('room.extra.password.askHost')}</Hint>
+      </Block>
     )
   }
-  if (password !== null) {
+  if (locked) {
     return (
       <Block>
-        <Shown>
-          {t('room.extra.password.is')} <Value translate="no">{password}</Value>
-        </Shown>
+        {shown}
         <Hint>{t('room.extra.password.setHint')}</Hint>
         <div>
           <Button $variant="ghost" $size="sm" onClick={() => onSet(null)}>

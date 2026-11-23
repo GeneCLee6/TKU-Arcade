@@ -36,11 +36,14 @@ import {
 } from '../../shared/protocol.ts'
 import type { Account } from '../../shared/account.ts'
 import {
+  PASSWORD_FAIL_WINDOW_MS,
+  PASSWORD_FAILS,
   PASSWORD_TRIES,
   RoomHost,
   type OpenSocket,
   type StoredRoom,
 } from '../../worker/room-host.ts'
+import { hashRoomPassword } from '../../worker/room-password.ts'
 
 const ROOM_ID = 'abcdefghij'
 
@@ -81,6 +84,13 @@ class Client {
 
   send(message: unknown) {
     this.world.host.message(this.conn, JSON.stringify(message))
+  }
+
+  /** As RoomDO sends it: the password checked or hashed first (`passwordWork`), then the message */
+  async sendChecked(message: unknown) {
+    const raw = JSON.stringify(message)
+    const work = this.world.host.passwordWork(this.conn, raw)
+    this.world.host.message(this.conn, raw, work ? await work : undefined)
   }
 
   get seat() {
@@ -155,6 +165,10 @@ class World {
           this.steps.clear()
           this.chat.clear()
         },
+        savePasswordFails: (fails) => {
+          if (fails) this.put('pwfails', fails)
+          else this.store.delete('pwfails')
+        },
       },
       games: (id) => this.modules[id] ?? null,
       now: () => this.clock,
@@ -176,6 +190,7 @@ class World {
       rev: read('rev', 0),
       game: read('game', null),
       chat: [...this.chat.values()].map((json) => JSON.parse(json) as ChatMessage),
+      passwordFails: read('pwfails', {}),
     }
   }
 
@@ -201,13 +216,18 @@ class World {
   }
 
   /** `account`: what the Worker found in the session (e1-t13), none for a guest */
-  open(account: Account | null = null): Client {
+  open(account: Account | null = null, address: string | null = null): Client {
     expect(this.host.admit(String(PROTOCOL_VERSION))).toEqual({ ok: true })
     const conn = `conn-${++this.nextConn}`
     const client = new Client(this, conn)
     this.clients.set(conn, client)
-    this.sockets.push({ conn, openedAt: this.clock, ...(account ? { account } : {}) })
-    this.host.opened(conn, this.clock, account)
+    this.sockets.push({
+      conn,
+      openedAt: this.clock,
+      ...(account ? { account } : {}),
+      ...(address ? { address } : {}),
+    })
+    this.host.opened(conn, this.clock, account, address)
     return client
   }
 
@@ -2422,76 +2442,186 @@ describe('the public listing (e1-t09)', () => {
   })
 })
 
-// e1-t16: a room password lets in someone new only with it; a member coming back needs none
+// e1-t16: a room password lets in someone new only with it; a member coming back needs none.
+// 2026-11-23: the room keeps only a salted hash, and no view, summary, listing or log has the password
 describe('a room password', () => {
-  function locked() {
+  async function locked() {
     const world = new World()
-    expect(world.host.create(ROOM_ID, 'tictactoe', undefined, true, null, 'tamsui')).toBe(true)
+    const hash = await hashRoomPassword('tamsui')
+    expect(world.host.create(ROOM_ID, 'tictactoe', undefined, true, null, hash)).toBe(true)
     return world
   }
 
-  it('asks someone new for it, refuses a wrong one, and lets the right one in', () => {
-    const world = locked()
+  it('asks someone new for it, refuses a wrong one, and lets the right one in', async () => {
+    const world = await locked()
     const ann = world.join('Ann')
     expect(ann.errors.at(-1)).toEqual({ t: 'error', code: 'password_required' })
     expect(ann.view).toBeNull()
-    ann.send({ t: 'join', name: 'Ann', token: null, password: 'danshui' })
+    await ann.sendChecked({ t: 'join', name: 'Ann', token: null, password: 'danshui' })
     expect(ann.errors.at(-1)).toEqual({ t: 'error', code: 'wrong_password' })
-    ann.send({ t: 'join', name: 'Ann', token: null, password: '  tamsui ' })
+    await ann.sendChecked({ t: 'join', name: 'Ann', token: null, password: '  tamsui ' })
     expect(Object.values(ann.view?.members ?? {}).map((member) => member.name)).toEqual(['Ann'])
   })
 
-  it('lets a member back with their token alone, and shows it only to members', () => {
-    const world = locked()
+  it('keeps only a salted hash, and no view or summary has the password', async () => {
+    const world = await locked()
     const ann = world.open()
-    ann.send({ t: 'join', name: 'Ann', token: null, password: 'tamsui' })
-    const token = ann.token
-    world.disconnect(ann)
-    const back = world.join('Ann', token)
-    expect(back.errors).toEqual([])
-    expect(back.view?.room.password).toBe('tamsui')
+    await ann.sendChecked({ t: 'join', name: 'Ann', token: null, password: 'tamsui' })
+    const stored = world.store.get('room') ?? ''
+    expect(stored).not.toContain('tamsui')
+    expect(JSON.parse(stored)).toMatchObject({
+      passwordHash: { salt: expect.stringMatching(/^[0-9a-f]{32}$/), hash: expect.any(String) },
+    })
+    expect(JSON.parse(stored)).not.toHaveProperty('password')
+    expect(ann.view?.room.locked).toBe(true)
+    expect(ann.raw.join('')).not.toContain('tamsui')
+    expect(ann.raw.join('')).not.toContain(JSON.parse(stored).passwordHash.hash)
     expect(JSON.stringify(world.host.summary())).not.toContain('tamsui')
     expect(world.host.summary()).toMatchObject({ locked: true })
   })
 
-  it('is set and taken away by the host only, in the waiting room or later', () => {
+  it('lets a member back with their token alone, without checking anything', async () => {
+    const world = await locked()
+    const ann = world.open()
+    await ann.sendChecked({ t: 'join', name: 'Ann', token: null, password: 'tamsui' })
+    const token = ann.token
+    world.disconnect(ann)
+    const back = world.open()
+    // A page sends the password it kept along with its token: no derivation for a member
+    const raw = JSON.stringify({ t: 'join', name: 'Ann', token, password: 'tamsui' })
+    expect(world.host.passwordWork(back.conn, raw)).toBeNull()
+    back.send({ t: 'join', name: 'Ann', token })
+    expect(back.errors).toEqual([])
+    expect(back.view?.room.locked).toBe(true)
+  })
+
+  it('is set and taken away by the host only, in the waiting room or later', async () => {
     const world = room()
     const ann = world.join('Ann')
     const bob = world.join('Bob')
-    bob.send({ t: 'set_password', password: 'mine' })
+    await bob.sendChecked({ t: 'set_password', password: 'mine' })
     expect(bob.errors.at(-1)).toEqual({ t: 'error', code: 'forbidden' })
-    ann.send({ t: 'set_password', password: ' tamsui ' })
-    expect(bob.fresh().room.password).toBe('tamsui')
+    await ann.sendChecked({ t: 'set_password', password: ' tamsui ' })
+    expect(bob.fresh().room.locked).toBe(true)
+    expect(world.store.get('room')).not.toContain('tamsui')
     const cy = world.join('Cy')
     expect(cy.errors.at(-1)).toEqual({ t: 'error', code: 'password_required' })
-    ann.send({ t: 'set_password', password: null })
-    expect(ann.fresh().room).not.toHaveProperty('password')
+    await cy.sendChecked({ t: 'join', name: 'Cy', token: null, password: 'tamsui' })
+    expect(cy.view).not.toBeNull()
+    await ann.sendChecked({ t: 'set_password', password: null })
+    expect(ann.fresh().room).not.toHaveProperty('locked')
+    expect(JSON.parse(world.store.get('room') ?? '{}')).not.toHaveProperty('passwordHash')
     expect(world.join('Di').errors).toEqual([])
+  })
+
+  it('never keeps the text when the hash is missing', () => {
+    const world = room()
+    const ann = world.join('Ann')
+    // Not through RoomDO (no `passwordWork`): refused rather than stored as typed
+    ann.send({ t: 'set_password', password: 'tamsui' })
+    expect(ann.errors.at(-1)).toEqual({ t: 'error', code: 'unavailable' })
+    expect(world.store.get('room')).not.toContain('tamsui')
+    expect(ann.fresh().room).not.toHaveProperty('locked')
   })
 
   // 2026-11-23: listed as locked (the kart's room list shows it), and GET /api/lobby without a game
   // leaves it out (worker/lobby-list.ts isOpenRoom)
-  it('marks a public room locked while it has one', () => {
+  it('marks a public room locked while it has one', async () => {
     const world = new World()
     world.host.create(ROOM_ID, 'tictactoe', undefined, true)
     const ann = world.join('Ann')
     expect(world.host.listing()).not.toHaveProperty('locked')
-    ann.send({ t: 'set_password', password: 'tamsui' })
+    await ann.sendChecked({ t: 'set_password', password: 'tamsui' })
     expect(world.host.listing()).toMatchObject({ locked: true })
-    ann.send({ t: 'set_password', password: null })
+    expect(JSON.stringify(world.host.listing())).not.toContain('tamsui')
+    await ann.sendChecked({ t: 'set_password', password: null })
     expect(world.host.listing()).not.toHaveProperty('locked')
   })
 
-  it('is never public, and closes a socket after too many wrong ones', () => {
-    const world = locked()
+  it('is never public, and closes a socket after too many wrong ones', async () => {
+    const world = await locked()
     const ann = world.open()
-    ann.send({ t: 'join', name: 'Ann', token: null, password: 'tamsui' })
+    await ann.sendChecked({ t: 'join', name: 'Ann', token: null, password: 'tamsui' })
     expect(world.host.listing()).toBeNull()
     const guesser = world.open()
     for (let attempt = 0; attempt < PASSWORD_TRIES; attempt++) {
-      guesser.send({ t: 'join', name: 'Eve', token: null, password: `guess-${attempt}` })
+      await guesser.sendChecked({ t: 'join', name: 'Eve', token: null, password: `guess-${attempt}` })
     }
     expect(guesser.closed).not.toBeNull()
+  })
+
+  it('limits wrong passwords per address over new sockets and hibernation, for a while', async () => {
+    const world = await locked()
+    const guess = async (address: string, password: string) => {
+      const client = world.open(null, address)
+      await client.sendChecked({ t: 'join', name: 'Eve', token: null, password })
+      return client
+    }
+    for (let attempt = 0; attempt < PASSWORD_FAILS - 1; attempt++) {
+      const client = await guess('eve-home', `guess-${attempt}`)
+      expect(client.errors.at(-1)).toEqual({ t: 'error', code: 'wrong_password' })
+      // Waking from hibernation forgets nothing: the counts are stored
+      if (attempt === 3) world.hibernate()
+    }
+    // The last one allowed closes the socket, and from then on even the right password is turned
+    // away from that address, without a derivation
+    expect((await guess('eve-home', 'one-more')).closed).toBe(CloseCode.badMessage)
+    const raw = JSON.stringify({ t: 'join', name: 'Eve', token: null, password: 'tamsui' })
+    const held = world.open(null, 'eve-home')
+    expect(world.host.passwordWork(held.conn, raw)).toBeNull()
+    held.send(JSON.parse(raw))
+    expect(held.errors.at(-1)).toEqual({ t: 'error', code: 'rate_limited' })
+    expect(held.closed).toBe(CloseCode.badMessage)
+    // Another address is not held up by it
+    expect((await guess('ann-home', 'tamsui')).view).not.toBeNull()
+    // Once the window is over, that address may try again
+    world.clock += PASSWORD_FAIL_WINDOW_MS
+    expect((await guess('eve-home', 'tamsui')).view).not.toBeNull()
+  })
+
+  it('logs nothing with the password in it', async () => {
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => {}),
+    )
+    try {
+      const world = await locked()
+      const ann = world.open()
+      await ann.sendChecked({ t: 'join', name: 'Ann', token: null, password: 'wrong-one' })
+      await ann.sendChecked({ t: 'join', name: 'Ann', token: null, password: 'tamsui' })
+      await ann.sendChecked({ t: 'set_password', password: 'newdoor' })
+      for (const spy of spies) {
+        const logged = JSON.stringify(spy.mock.calls)
+        for (const secret of ['tamsui', 'wrong-one', 'newdoor']) expect(logged).not.toContain(secret)
+      }
+    } finally {
+      for (const spy of spies) spy.mockRestore()
+    }
+  })
+
+  // A room stored before 2026-11-23 has its password as typed: still let in until RoomDO hashes it
+  it('takes a password stored as typed, and moves it to a hash', async () => {
+    const world = room()
+    const ann = world.join('Ann')
+    const legacy = { ...JSON.parse(world.store.get('room') ?? '{}'), password: 'tamsui' }
+    world.store.set('room', JSON.stringify(legacy))
+    world.hibernate()
+    expect(world.host.legacyPassword()).toBe('tamsui')
+    expect(world.host.summary()).toMatchObject({ locked: true })
+    const bob = world.open()
+    await bob.sendChecked({ t: 'join', name: 'Bob', token: null, password: 'danshui' })
+    expect(bob.errors.at(-1)).toEqual({ t: 'error', code: 'wrong_password' })
+    await bob.sendChecked({ t: 'join', name: 'Bob', token: null, password: 'tamsui' })
+    expect(bob.view).not.toBeNull()
+    // What RoomDO does on load
+    world.host.migratePassword(await hashRoomPassword('tamsui'))
+    expect(world.host.legacyPassword()).toBeNull()
+    expect(world.store.get('room')).not.toContain('tamsui')
+    expect(JSON.parse(world.store.get('room') ?? '{}')).toHaveProperty('passwordHash')
+    world.hibernate()
+    const cy = world.open()
+    await cy.sendChecked({ t: 'join', name: 'Cy', token: null, password: 'tamsui' })
+    expect(cy.view).not.toBeNull()
+    expect(ann.fresh().room.locked).toBe(true)
   })
 
   it('leaves an open room open', () => {

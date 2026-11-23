@@ -26,7 +26,9 @@ test('a room password: set by the host, asked of someone new, refused when wrong
   await bob.getByLabel('Room password').fill('tamsui')
   await bob.getByRole('button', { name: 'Enter' }).click()
   await expect(bob.getByRole('heading', { name: 'Seats' })).toBeVisible()
-  await expect(bob.getByText('Room password: tamsui')).toBeVisible()
+  // 2026-11-23: the room keeps only a hash, so a member is told there is one, never what it is
+  await expect(bob.getByText('This room has a password.')).toBeVisible()
+  await expect(bob.getByText('Room password: tamsui')).toHaveCount(0)
   // Back after a reload, by the seat token
   await bob.reload()
   await expect(bob.getByRole('heading', { name: 'Seats' })).toBeVisible()
