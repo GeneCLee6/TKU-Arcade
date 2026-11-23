@@ -1,4 +1,4 @@
-// The leaderboard's walls (2026-11-23, docs/SECURITY.md §11, docs/ARCHITECTURE.md §4.93): whether a
+// The leaderboard's walls (2026-11-23, docs/SECURITY.md §11, docs/ARCHITECTURE.md §4.94): whether a
 // run uploaded to the board went through a wall between two of its samples. boardCheck.ts judges
 // every sample as a room judges a frame; a room does not look at walls (a live frame may be late,
 // and the walls are the browser's physics), so a forged file could cut a corner through the kerb as

@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/SECURITY.md §11, docs/ARCHITECTURE.md §4.93): every lawful source of a board run,
+// 2026-11-23 (docs/SECURITY.md §11, docs/ARCHITECTURE.md §4.94): every lawful source of a board run,
 // judged by the Worker's own checkBoardRun (now with the walls, boardWalls.ts): each board track
 // (the 14 and the 14 reversed), each of the four drivers (bots/drivers.ts: novice, average, expert,
 // and the master on the technical line: drift jumps, the slots, the platforms, the real branches) and

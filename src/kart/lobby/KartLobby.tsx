@@ -21,7 +21,17 @@
 //     Start, which waits on everyone and says for whom).
 //   - A phone held upright gets a list instead, and is asked to turn sideways. 2026-11-23 (§4.91): with
 //     a big 3D picture of your own racer (or the first in the line) over it.
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import styled, { css, keyframes } from 'styled-components'
 import type { ChatMessage } from '../../../shared/chat.ts'
 import type { BotLevel } from '../../../shared/games/kart/bots.ts'
@@ -66,8 +76,10 @@ import type { LobbyStage } from './lobbyStage.ts'
 /** lobbyStage.ts's HERO (imported as a type only: the stage's chunk comes later, with three.js) */
 const HERO_SLOT = 8
 import { seatState, waitingOn } from './readiness.ts'
+import { COLUMNS, placeOrder, spanOf } from './lobbyLayout.ts'
 import { raceTrackId, useLobbyTrack } from './lobbyTrack.ts'
 import { TrackCard } from './TrackCard.tsx'
+import { useKartAudioUnlock } from '../audio/unlock.ts'
 
 registerMessages(kartLobbyMessages)
 registerMessages(kartTeamMessages)
@@ -190,6 +202,9 @@ export default function KartLobby({
 }: KartLobbyProps) {
   const t = useT()
   const language = useLanguage()
+  // 2026-11-23 (audio/unlock.ts): the click on Ready or Start wakes the kart's sound, so that the race
+  // has its intro and its 3, 2, 1 from its first frame
+  useKartAudioUnlock()
   const { room, members } = view
   const me = members[you]
   const isHost = me?.host === true
@@ -227,6 +242,10 @@ export default function KartLobby({
   const managed = managing ? members[managing] : undefined
   const myPick = parseLook(me?.look)
   const chatLabel = unread > 0 ? t('room.panel.chatUnread', { count: unread }) : t('chat.heading')
+  // 2026-11-23 (owner: "the host should be one bigger card on its own, the others smaller"): the
+  // host's place first and big, then the others in seat order (lobbyLayout.ts)
+  const host = seated.find((member) => member.host)
+  const order = placeOrder(room.maxSeats, host ? (host.seat as number) : null)
 
   return (
     <Stage ref={root} data-room-columns="" data-kart-lobby="" data-testid="kart-lobby">
@@ -281,9 +300,10 @@ export default function KartLobby({
         <Line aria-labelledby="kart-lobby-line">
           <LineHeading id="kart-lobby-line">{t('games.kart.lobby.lineUp')}</LineHeading>
           <Places data-testid="kart-picks">
-            {Array.from({ length: room.maxSeats }, (_, seat) => {
+            {order.map((seat, place) => {
               const member = seated.find((other) => other.seat === seat)
               const index = member ? seated.indexOf(member) : -1
+              const fit = place === 0 ? null : spanOf(place - 1, order.length - 1)
               return member ? (
                 <PlaceCard
                   key={member.id}
@@ -293,6 +313,7 @@ export default function KartLobby({
                   viewerIsHost={isHost}
                   team={teams ? sides[index] : undefined}
                   stage={stage}
+                  span={fit}
                   onManage={() => setManaging(member.id)}
                 />
               ) : (
@@ -300,6 +321,7 @@ export default function KartLobby({
                   key={`open-${seat}`}
                   seat={seat}
                   stage={stage}
+                  span={fit}
                   canSit={me !== undefined}
                   onSit={onSit}
                   onAddBot={
@@ -381,8 +403,18 @@ export default function KartLobby({
             </Watchers>
           )}
         </Rail>
-        {/* Upright only (first, the body being upright in reverse): the big picture of your racer */}
-        <HeroPicture stage={stage} member={myPick ? me ?? null : (seated.find((one) => parseLook(one.look)) ?? null)} />
+        {/* Upright only (first, the body being upright in reverse): the big picture of the host
+            (2026-11-23; or, before the host has a kart, yours or the first in the line) */}
+        <HeroPicture
+          stage={stage}
+          member={
+            host && parseLook(host.look)
+              ? host
+              : myPick
+                ? (me ?? null)
+                : (seated.find((one) => parseLook(one.look)) ?? null)
+          }
+        />
       </Body>
 
       <Sideways>{t('games.kart.lobby.sideways')}</Sideways>
@@ -556,7 +588,16 @@ function HeroPicture({ stage, member }: { stage: LobbyStage | null; member: Room
         })}
       />
       <HeroName aria-hidden="true">
-        <strong>{name}</strong>
+        <strong>
+          {member.host && (
+            <Crown data-hero-crown="">
+              <svg viewBox="0 0 24 16" width="22" height="15" aria-hidden="true" focusable="false">
+                <path d="M2 14 L4 4 L9 9 L12 2 L15 9 L20 4 L22 14 Z" fill="currentColor" />
+              </svg>
+            </Crown>
+          )}{' '}
+          {name}
+        </strong>
         <span>
           {t(`kart.body.${pick.kart}`)} · {t(`kart.driver.${pick.driver}`)}
         </span>
@@ -573,10 +614,18 @@ interface PlaceCardProps {
   team: 0 | 1 | undefined
   /** The 3D pictures; null before they come or without WebGL, when the flat drawing shows */
   stage: LobbyStage | null
+  /** 2026-11-23: the columns of twelve it spans beside the host's big place; null: it is that place */
+  span: number | null
   onManage(): void
 }
 
-function PlaceCard({ seat, member, isYou, viewerIsHost, team, stage, onManage }: PlaceCardProps) {
+/** The big place's or a small one's attributes: which it is, and the columns it spans */
+const placeLayout = (span: number | null) =>
+  span === null
+    ? { 'data-lead': '' }
+    : { style: { '--span': span } as CSSProperties }
+
+function PlaceCard({ seat, member, isYou, viewerIsHost, team, stage, span, onManage }: PlaceCardProps) {
   const t = useT()
   const canvas = usePicture(stage, seat, member)
   const pick = parseLook(member.look)
@@ -600,6 +649,7 @@ function PlaceCard({ seat, member, isYou, viewerIsHost, team, stage, onManage }:
       data-member={member.id}
       data-state={state}
       data-testid="kart-lobby-place"
+      {...placeLayout(span)}
     >
       <Picture $swatch={swatch}>
         {pick && (
@@ -683,13 +733,14 @@ interface OpenPlaceProps {
   onSit(seat: number): void
   /** The host's way to put a computer kart here: only on the first open place, where it goes */
   onAddBot?: () => void
+  span: number | null
 }
 
-function OpenPlace({ seat, stage, canSit, onSit, onAddBot }: OpenPlaceProps) {
+function OpenPlace({ seat, stage, canSit, onSit, onAddBot, span }: OpenPlaceProps) {
   const t = useT()
   usePicture(stage, seat, null)
   return (
-    <Place $state="open" $swatch={color.line} data-testid="kart-lobby-open">
+    <Place $state="open" $swatch={color.line} data-testid="kart-lobby-open" {...placeLayout(span)}>
       <Picture $swatch={color.line}>
         <Badges>
           <SeatNumber aria-label={t('games.kart.lobby.seat', { seat: seat + 1 })}>
@@ -1002,9 +1053,11 @@ const LineHeading = styled.h2`
   clip-path: inset(50%);
 `
 
+// 2026-11-23 (lobbyLayout.ts): the host's place big down the left, the others on two rows of twelve
+// columns beside it, each spanning its share (--span)
 const Places = styled.ol`
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 6fr) repeat(${COLUMNS}, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: ${space.sm}px;
   height: 100%;
@@ -1012,16 +1065,34 @@ const Places = styled.ol`
   padding: 0;
   list-style: none;
 
-  /* Wide enough for a row of eight that are still tall: a cinema screen */
+  & > [data-lead] {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+
+  & > :not([data-lead]) {
+    grid-column: auto / span var(--span, 3);
+  }
+
+  /* A phone on its side, and a cinema screen: the host's place a little narrower, the others wider */
+  @media ${SHORT} {
+    grid-template-columns: minmax(0, 4fr) repeat(${COLUMNS}, minmax(0, 1fr));
+  }
+
   @container (min-aspect-ratio: 3 / 1) {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 4fr) repeat(${COLUMNS}, minmax(0, 1fr));
   }
 
   @media ${UPRIGHT} {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
     height: auto;
+
+    & > [data-lead],
+    & > :not([data-lead]) {
+      grid-column: auto;
+      grid-row: auto;
+    }
   }
 `
 
@@ -1204,6 +1275,12 @@ const Crown = styled.span`
   display: inline-flex;
   color: ${color.warning};
   filter: drop-shadow(0 0 6px ${color.warning});
+
+  /* The host's big place: a big crown */
+  [data-lead] & svg {
+    width: 34px;
+    height: 23px;
+  }
 `
 
 const Chip = styled.span<{ $tone: string }>`
@@ -1275,6 +1352,16 @@ const Plate = styled.div<{ $team?: 0 | 1 }>`
       grid-column: 2;
       grid-row: 1;
     }
+
+    /* 2026-11-23: a small place beside the host's is too narrow for both: the state under the name */
+    [data-testid='kart-lobby-place']:not([data-lead]) & {
+      grid-template-columns: minmax(0, 1fr);
+
+      & > [data-testid='kart-lobby-state'] {
+        grid-column: 1;
+        grid-row: auto;
+      }
+    }
   }
 
   @media ${UPRIGHT} {
@@ -1288,6 +1375,11 @@ const Who = styled.span<{ $fit: number }>`
   font-size: calc(clamp(${fontSize.sm}px, 1.6vh + 6px, ${fontSize.lg}px) * ${({ $fit }) => $fit});
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  /* The host's big place: the name big too */
+  [data-lead] & {
+    font-size: calc(clamp(${fontSize.lg}px, 2.6vh + 8px, ${fontSize.xxl}px) * ${({ $fit }) => $fit});
+  }
 
   /* 2026-11-23 (#151): a phone on its side cut long names (and a computer's tag) off: shrunk, and
      on two lines if it still does not fit */
@@ -1327,11 +1419,16 @@ const Tags = styled.ul`
     background: ${color.raised};
   }
 
-  /* One line on a phone on its side: what does not fit goes */
+  /* One line on a phone on its side: what does not fit goes; on a small place, none (the team's
+     colour is the plate's stripe, a computer's chip is on the picture) */
   @media ${SHORT} {
     flex-wrap: nowrap;
     overflow: hidden;
     font-size: 9px;
+
+    [data-testid='kart-lobby-place']:not([data-lead]) & {
+      display: none;
+    }
   }
 `
 

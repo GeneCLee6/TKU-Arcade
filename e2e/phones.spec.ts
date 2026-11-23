@@ -114,7 +114,7 @@ for (const phone of PHONES) {
       await ann.goto('/kart?bots')
       await ann.getByTestId('kart-bots-start').click({ timeout: 60_000 })
       await expect(ann.getByTestId('kart-race')).toBeVisible({ timeout: 60_000 })
-      await expect(ann.getByTestId('kart-driver-card')).toBeVisible({ timeout: 60_000 })
+      await expect(ann.getByTestId('kart-intro')).toBeVisible({ timeout: 60_000 })
       await look(ann, 'kart-intro', problems)
       await ann.context().close()
       report(problems)

@@ -24,7 +24,9 @@ import { keyLabel, loadBindings, loadRules, loadTuning, useKeyLayout } from '../
 import { BoostVeil, CALLOUT_CLEAR, CalloutText, Hud } from '../Hud.tsx'
 import { Minimap, type MinimapHandle } from '../Minimap.tsx'
 import { loadQuality } from '../quality.ts'
-import { RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
+import { LapSplitShow, RaceCenter, RaceClock, type RaceClockHandle } from '../RaceOverlay.tsx'
+import { useKartAudioUnlock } from '../audio/unlock.ts'
+import { SoundTap } from '../ui/SoundTap.tsx'
 import { supportsWebGL2 } from '../webgl.ts'
 import type { SpikeHud, SpikeStep, SpikeTrial } from '../spikeLoop.ts'
 import { RACE_ENGINE } from '../load/kartLoad.ts'
@@ -41,7 +43,6 @@ import { TeamPanel, TeamScore, TeamVeil } from './TeamHud.tsx'
 import {
   Celebration,
   CloseCountdown,
-  DriverCard,
   FinalLapBanner,
   IntroCard,
   PlaceArrow,
@@ -248,6 +249,8 @@ export default function RaceView({
   pause,
 }: RaceViewProps) {
   const t = useT()
+  // 2026-11-23 (audio/unlock.ts): every gesture here wakes the kart's sound
+  useKartAudioUnlock()
   const stage = useRef<HTMLDivElement>(null)
   const [failure, setFailure] = useState(() => !supportsWebGL2())
   // The item key's name follows the keyboard's layout once the browser has said it
@@ -546,6 +549,8 @@ export default function RaceView({
   const total = view.racers.length
   const place = order.indexOf(seat) + 1
   const me = view.racers.find((racer) => racer.seat === seat)
+  // 2026-11-23: this racer's laps as the room counted them, seconds
+  const lapSeconds = (me?.lapMs ?? []).map((ms) => ms / 1000)
   const finished = me?.finishMs != null || trial?.phase === 'finished'
   const ready = view.racers.filter((racer) => racer.loaded).length
   const firstItemKey = actionKeys(settings.bindings, 'item')[0]
@@ -578,14 +583,6 @@ export default function RaceView({
   // The track's name on the fly round's card; a custom track has none of its own here
   const courseKey = `kart.course.${view.track}`
   const courseTitle = courseKey in KART_MESSAGES.en ? t(courseKey as KartMessageKey) : null
-  // 2026-11-22 (§4.73): the driver in front of the camera during the opening
-  const presented = trial?.presenting != null ? view.racers[trial.presenting] : undefined
-  const presentedLook = presented
-    ? presented.seat === seat
-      ? { kart: loadout.body, driver: loadout.driver }
-      : (lookOf?.(presented.seat) ?? null)
-    : null
-  const presentedSide = presented ? teamOf(presented.seat) : null
 
   return (
     <Page
@@ -594,6 +591,7 @@ export default function RaceView({
       style={touch.shown ? touchSpace(touch.settings) : undefined}
     >
       <Stage ref={stage} role="img" aria-label={t('games.kart.race.canvas')} />
+      <SoundTap label={t('kart.race.soundTap')} />
       {!engine && (
         <KartLoading
           t={t}
@@ -698,29 +696,7 @@ export default function RaceView({
       {view.phase === 'countdown' && !counting && (
         <Center role="status">{t('games.kart.race.ready')}</Center>
       )}
-      {presented && trial?.presenting != null && (
-        <DriverCard
-          key={`driver-${presented.seat}`}
-          grid={t('kart.flow.intro.grid', { place: trial.presenting + 1 })}
-          name={nameOf(presented.seat)}
-          ride={
-            presentedLook
-              ? t('kart.flow.intro.rides', {
-                  kart: t(`kart.body.${presentedLook.kart}` as KartMessageKey),
-                  driver: t(`kart.driver.${presentedLook.driver}` as KartMessageKey),
-                })
-              : null
-          }
-          stripe={presentedSide === null ? color.accent : teamColor(presentedSide)}
-          you={
-            presented.seat === seat && nameOf(seat) !== t('kart.flow.intro.you')
-              ? t('kart.flow.intro.you')
-              : null
-          }
-          skip={t(touch.shown ? 'kart.race.introSkipTouch' : 'kart.race.introSkip')}
-        />
-      )}
-      {trial?.intro && !presented && (
+      {trial?.intro && (
         <IntroCard
           title={courseTitle}
           laps={t('kart.race.introLaps', { count: view.laps })}
@@ -732,6 +708,8 @@ export default function RaceView({
         (counting || (trial.phase === 'racing' && trial.wrongWay)) && (
           <RaceCenter t={t} trial={trial} onRestart={() => {}} />
         )}
+      {/* 2026-11-23: each lap's time as the line is crossed, by the room's own laps */}
+      <LapSplitShow t={t} lapTimes={lapSeconds} record={trial?.bestLap ?? null} />
       {finalLap && !finished && closeLeft === null && <FinalLapBanner text={t('kart.race.finalLap')} />}
       {closeLeft !== null && !finished && (
         <CloseCountdown

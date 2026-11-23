@@ -80,10 +80,15 @@ export const BEEPS: Record<CountBeep, Voice> = {
   },
 }
 
+let played = 0
+/** How many beeps have sounded on this page (the race's e2e reads it, spikeLoop.ts's debug) */
+export const beepsPlayed = (): number => played
+
 /** Plays one now; nothing before the first gesture has made the sound (bus.ts) */
 export function playBeep(kind: CountBeep): void {
   const bus = kartBus()
   if (!bus) return
+  played++
   const { context } = bus
   const voice = BEEPS[kind]
   const start = context.currentTime + 0.005

@@ -1,4 +1,4 @@
-// 2026-11-23 (NEXT §5, docs/ARCHITECTURE.md §4.93): the broadcast's director looks ahead. A race of
+// 2026-11-23 (NEXT §5, docs/ARCHITECTURE.md §4.94): the broadcast's director looks ahead. A race of
 // real drivers (botRace.ts: the physics and a driver's hands, late starters coming through the field)
 // watched as a replay knows its future: every overtake foreseen at least PREDICT_EARLY before the
 // places swap, the passer on screen before it; watched live, guessed from the pairs closing in (speed,
