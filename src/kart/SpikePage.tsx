@@ -188,6 +188,7 @@ export function SpikePage({
   // e10-t07: a shared track's link (?custom=<code>) opens on that track
   const [linked] = useState<Linked>(linkedTrack)
   const custom = linked !== null && linked !== 'bad' ? linked : null
+  const editorPath = custom ? `/kart/editor?custom=${custom.code}` : '/kart/editor'
   const customName = custom ? custom.name || t('kart.editor.untitled') : ''
   const [course, setCourse] = useState<PlayCourse>(() => {
     if (custom) return 'custom'
@@ -474,17 +475,18 @@ export function SpikePage({
           <Link to="/">{t('kart.spike.back')}</Link>
           {play && (
             <>
-              {' · '}
-              <Link
-                to={custom ? `/kart/editor?custom=${custom.code}` : '/kart/editor'}
-                data-testid="kart-editor-link"
-              >
-                {t(custom ? 'kart.editor.editCopy' : 'kart.editor.open')}
-              </Link>
-              {' · '}
-              <Link to="/kart/replay" data-testid="kart-replay-file-link">
-                {t('kart.spike.replayFile')}
-              </Link>
+              {/* 2026-11-23 (QA follow-up): on a compact screen these two move into the menu, so
+                  that the row stays short enough for the driving school's invite beside it */}
+              <WideLinks>
+                {' · '}
+                <Link to={editorPath} data-testid="kart-editor-link">
+                  {t(custom ? 'kart.editor.editCopy' : 'kart.editor.open')}
+                </Link>
+                {' · '}
+                <Link to="/kart/replay" data-testid="kart-replay-file-link">
+                  {t('kart.spike.replayFile')}
+                </Link>
+              </WideLinks>
               {onOnline && (
                 <>
                   {' · '}
@@ -510,6 +512,39 @@ export function SpikePage({
             </BadLink>
           )}
         </Panel>
+        {invite && onSchool && open === undefined && (
+          // 2026-11-23 (QA follow-up): in the top row, so that on a phone held sideways it sits
+          // between the back link and the menu button and can never run under either. Over the
+          // race with the row, so out of the way while a panel (the garage, the controls) is open
+          <Invite role="region" aria-label={t('kart.school.open')} data-testid="kart-school-invite">
+            <InviteLong>{t('kart.school.invite')}</InviteLong>
+            <InviteShort>{t('kart.school.inviteShort')}</InviteShort>
+            <InviteButtons>
+              <Button
+                $size="sm"
+                onClick={() => {
+                  answerInvite()
+                  onSchool()
+                }}
+                data-testid="kart-school-invite-go"
+              >
+                <InviteLong as="span">{t('kart.school.inviteGo')}</InviteLong>
+                <InviteShort as="span">{t('kart.school.open')}</InviteShort>
+              </Button>
+              <Button
+                $size="sm"
+                $variant="secondary"
+                onClick={() => {
+                  answerInvite()
+                  setInvite(false)
+                }}
+                data-testid="kart-school-invite-no"
+              >
+                {t('kart.school.inviteNo')}
+              </Button>
+            </InviteButtons>
+          </Invite>
+        )}
         <MenuButton
           ref={menuButton}
           $variant="primary"
@@ -522,6 +557,16 @@ export function SpikePage({
           {t('kart.spike.menu')}
         </MenuButton>
         <Buttons id={menuId} $open={menuOpen}>
+          {play && (
+            <MenuLinks>
+              <Link to={editorPath} data-testid="kart-menu-editor-link">
+                {t(custom ? 'kart.editor.editCopy' : 'kart.editor.open')}
+              </Link>
+              <Link to="/kart/replay" data-testid="kart-menu-replay-file-link">
+                {t('kart.spike.replayFile')}
+              </Link>
+            </MenuLinks>
+          )}
           {onSchool && (
             <Button
               $size="sm"
@@ -706,41 +751,23 @@ export function SpikePage({
       )}
       {callout && <CalloutText key={`callout-${callout.id}`} t={t} callout={callout.callout} />}
       <CoachTip t={t} coach={coach} bindings={bindings} touch={touch.shown} />
-      {invite && onSchool && (
-        <Invite role="region" aria-label={t('kart.school.open')} data-testid="kart-school-invite">
-          <p>{t('kart.school.invite')}</p>
-          <InviteButtons>
-            <Button
-              $size="sm"
-              onClick={() => {
-                answerInvite()
-                onSchool()
-              }}
-              data-testid="kart-school-invite-go"
-            >
-              {t('kart.school.inviteGo')}
-            </Button>
-            <Button
-              $size="sm"
-              $variant="secondary"
-              onClick={() => {
-                answerInvite()
-                setInvite(false)
-              }}
-              data-testid="kart-school-invite-no"
-            >
-              {t('kart.school.inviteNo')}
-            </Button>
-          </InviteButtons>
-        </Invite>
-      )}
       {track && (
         <MapCorner $touch={touch.shown ? (touch.settings.leftHanded ? 'right' : 'left') : null}>
           {trial && <RaceClock ref={clock} t={t} trial={trial} />}
           {chasing && (
             <ChaseBanner data-testid="kart-board-chasing">
-              <span>{t('kart.board.chasing', { nick: chasing.nick, time: formatTime(chasing.totalMs / 1000) })}</span>
-              <Button $size="sm" $variant="secondary" onClick={onStopChase} data-testid="kart-board-stop-chase">
+              <span>
+                {t('kart.board.chasing', {
+                  nick: chasing.nick,
+                  time: formatTime(chasing.totalMs / 1000),
+                })}
+              </span>
+              <Button
+                $size="sm"
+                $variant="secondary"
+                onClick={onStopChase}
+                data-testid="kart-board-stop-chase"
+              >
                 {t('kart.board.stopChase')}
               </Button>
             </ChaseBanner>
@@ -903,16 +930,16 @@ const WallFlash = styled.div`
   animation: ${flash} 0.5s ease-out;
 `
 
-// 2026-11-20 (§4.50): under the top row on the left, clear of the map and the HUD
+// 2026-11-20 (§4.50): under the top row on the left, clear of the map and the HUD. It is a child of
+// the top row (so under the open menu, which comes after it there), placed by hand on a tall screen
 const Invite = styled.section`
   ${broadcastSolid}
-  /* Under the top row's open menu (its z-index), over the race */
   position: absolute;
-  top: 64px;
-  left: ${space.sm}px;
+  top: ${64 - space.sm}px;
+  left: 0;
   display: grid;
   gap: ${space.sm}px;
-  width: min(340px, calc(100% - ${2 * space.sm}px));
+  width: min(340px, 100%);
   padding: ${space.sm}px ${space.md}px;
   color: ${color.text};
   font-size: ${fontSize.sm}px;
@@ -921,12 +948,38 @@ const Invite = styled.section`
     margin: 0;
   }
 
-  /* A phone held sideways: the map and the clock have the left; the invite goes top centre */
+  /* 2026-11-23 (QA follow-up): a phone held sideways. Under the row the map and the clock have one
+     side, the touch buttons the other, and the coach's tip the middle (22% down): the invite becomes
+     one line in the row itself, between the back link and the menu button (a flex item, so under
+     neither whatever their length in either language), no taller than they are with their 44 px
+     buttons, so the map starting 64 px down stays clear */
   @media (max-height: 500px) {
-    top: ${space.sm}px;
-    left: 50%;
-    translate: -50% 0;
-    width: min(340px, calc(100% - 320px));
+    position: relative;
+    top: 0;
+    flex: 0 1 auto;
+    min-width: 0;
+    width: auto;
+    display: flex;
+    align-items: center;
+    padding: ${space.xs}px ${space.sm}px;
+    line-height: 1.25;
+  }
+`
+
+// The invite's words: the whole sentence, or (held sideways) its first question only
+const InviteLong = styled.p`
+  @media (max-height: 500px) {
+    display: none;
+  }
+`
+
+const InviteShort = styled.p`
+  display: none;
+
+  @media (max-height: 500px) {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
   }
 `
 
@@ -934,6 +987,16 @@ const InviteButtons = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: ${space.sm}px;
+
+  @media (max-height: 500px) {
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+
+    button {
+      padding: 0 ${space.md}px;
+      white-space: nowrap;
+    }
+  }
 `
 
 const BadLink = styled.p`
@@ -991,6 +1054,38 @@ const Numbers = styled(Panel).attrs({ as: 'dl' })`
 const OnlineLink = styled(Link)`
   color: ${color.accent};
   font-weight: 700;
+`
+
+// The links that leave /kart (the editor, a replay file) at the top of the open menu, on a compact
+// screen only: on a wide one they are in the panel on the left
+const WideLinks = styled.span`
+  @media ${KART_COMPACT} {
+    display: none;
+  }
+`
+
+const MenuLinks = styled.div`
+  display: none;
+
+  @media ${KART_COMPACT} {
+    display: grid;
+    gap: ${space.xs}px;
+    padding: 0 ${space.xs}px ${space.xs}px;
+    font-size: ${fontSize.sm}px;
+
+    a {
+      padding: ${space.xs}px 0;
+    }
+
+    @media (pointer: coarse) {
+      a {
+        display: flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0;
+      }
+    }
+  }
 `
 
 const MenuButton = styled(Button)`

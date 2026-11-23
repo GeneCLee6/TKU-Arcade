@@ -9,6 +9,7 @@ import {
   exitFullscreen,
   fullscreenMode,
   lockLandscape,
+  onBrowserExit,
   setAutoFullscreen,
   subscribeFullscreen,
   toggleFullscreen,
@@ -68,6 +69,41 @@ describe('full screen (2026-11-22)', () => {
     shown = null
     document.dispatchEvent(new Event('fullscreenchange'))
     expect(fullscreenMode()).toBe('off')
+  })
+
+  // 2026-11-23 (QA follow-up): the first Esc in full screen, the same in every browser
+  it('keeps Esc for the page while full screen where Keyboard Lock is offered, and lets it go after', async () => {
+    giveApi()
+    const lock = vi.fn(async () => {})
+    const unlock = vi.fn()
+    Object.defineProperty(navigator, 'keyboard', { configurable: true, value: { lock, unlock } })
+    await enterFullscreen()
+    expect(lock).toHaveBeenCalledWith(['Escape'])
+    exitFullscreen()
+    expect(unlock).toHaveBeenCalled()
+    Reflect.deleteProperty(navigator, 'keyboard')
+  })
+
+  it('says when the browser, not the page, ended full screen (Esc in Firefox and Safari)', async () => {
+    giveApi()
+    const heard = vi.fn()
+    const off = onBrowserExit(heard)
+    // The page's own way out (a button, the pause menu): not the browser's
+    await enterFullscreen()
+    exitFullscreen()
+    expect(heard).not.toHaveBeenCalled()
+    // The browser's Esc
+    await enterFullscreen()
+    shown = null
+    document.dispatchEvent(new Event('fullscreenchange'))
+    expect(heard).toHaveBeenCalledTimes(1)
+    // Going in is not coming out, and nothing more once undone
+    await enterFullscreen()
+    expect(heard).toHaveBeenCalledTimes(1)
+    off()
+    shown = null
+    document.dispatchEvent(new Event('fullscreenchange'))
+    expect(heard).toHaveBeenCalledTimes(1)
   })
 
   it('falls back to focus mode where there is no API or it is refused, and Esc leaves it', async () => {

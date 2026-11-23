@@ -56,6 +56,7 @@ import {
   type TrialPhase,
 } from '../../shared/kart/timeTrial.ts'
 import { advanceClock } from '../../shared/kart/clock.ts'
+import { testClock } from './testClock.ts'
 import { obstaclesOf } from '../../shared/kart/obstacles.ts'
 import { obstacleCues } from './obstacleCues.ts'
 import { startRun, stepRun, type Run, type Spot } from '../../shared/kart/course.ts'
@@ -719,6 +720,9 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
 
   let firstFrameAt: number | null = null
   let loadMs = 0
+  // 2026-11-23 (QA follow-up): a browser test's clock in place of the wall's (testClock.ts); null
+  // whenever no test asked for it
+  const manual = testClock()
   const frame = (now: number) => {
     handle = requestAnimationFrame(frame)
     const workFrom = performance.now()
@@ -754,10 +758,13 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       itemTapped = false
       throttleTapped = false
     }
-    const clock = advanceClock(accumulator, frameMs / 1000)
+    const clock = manual
+      ? { steps: paused ? 0 : manual.take(), accumulator: 0, alpha: 1 }
+      : advanceClock(accumulator, frameMs / 1000)
     accumulator = clock.accumulator
     let callout: Callout | undefined
-    for (let step = 0; step < clock.steps; step++) {
+    let ran = 0
+    while (ran < clock.steps) {
       const pilot = net?.autopilot ?? options.autopilot
       const driven = pilot && trial ? pilot(trial) : null
       const keyed = enabled
@@ -935,9 +942,11 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       }
       feats?.(step)
       options.onStep?.(step)
+      ran++
+      if (manual?.stepped(run.kart, input)) break
     }
     const current = run.kart
-    debug.tick += clock.steps
+    debug.tick += ran
     debug.frames++
     debug.state = current
     debug.gamepad = pad?.id

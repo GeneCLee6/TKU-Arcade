@@ -14,6 +14,8 @@ const en = {
   'kart.school.invite': 'New to the kart? The driving school teaches the drift and the instant boost in a few minutes.',
   'kart.school.inviteGo': 'Go to the driving school',
   'kart.school.inviteNo': 'No thanks',
+  // A phone held sideways: the invite is one line in the top row (2026-11-23)
+  'kart.school.inviteShort': 'New to the kart?',
   'kart.school.tip': 'Tip',
   'kart.school.closeTip': 'Close the tip',
 
@@ -62,6 +64,7 @@ const zhTW: Record<KartMenuKey, string> = {
   'kart.school.invite': '第一次開卡丁車？駕訓班幾分鐘就教會甩尾和瞬間加速。',
   'kart.school.inviteGo': '去駕訓班',
   'kart.school.inviteNo': '不用了',
+  'kart.school.inviteShort': '第一次開卡丁車？',
   'kart.school.tip': '提示',
   'kart.school.closeTip': '關閉提示',
 
