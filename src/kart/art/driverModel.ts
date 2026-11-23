@@ -6,7 +6,7 @@
 // its back, gloves and boots. Looks only: every driver drives the same. The kart model mounts the
 // driver at its seat (kartModel.ts), so any driver sits in any kart.
 //
-// 2026-11-23 (docs/ARCHITECTURE.md §4.85; owner: "more and more real, more striking ... esports,
+// 2026-11-23 (docs/ARCHITECTURE.md §4.86; owner: "more and more real, more striking ... esports,
 // professional"): a skeleton and more detail. Each arm is a shoulder, an elbow and a hand on joints
 // of their own (built hanging straight down, so that driverRig.ts can bend them to the wheel and
 // kartModel.ts can raise them in a gesture), the hands are gloves with a palm, curled fingers, a thumb

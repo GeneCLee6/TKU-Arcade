@@ -23,7 +23,7 @@ import {
   vaneAngle,
 } from '../../src/kart/kartMotion.ts'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.85): the driver's skeleton and the kart's motion, as pure sums
+// 2026-11-23 (docs/ARCHITECTURE.md §4.86): the driver's skeleton and the kart's motion, as pure sums
 
 /** Where the hand ends up for a shoulder turn and an elbow bend (the arm built hanging down -y) */
 function handOf(turn: Quaternion, bend: number): Vector3 {

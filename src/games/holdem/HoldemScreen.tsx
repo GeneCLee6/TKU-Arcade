@@ -6,8 +6,10 @@ import type { Card } from '../../../shared/poker/hand.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
 import { Heading } from '../../components/roomParts.ts'
+import { TableCaption } from '../../components/LateParts.tsx'
+import { digits, tablePanel } from '../../components/table/tableKit.ts'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType } from '../../styles/esports.ts'
+import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { BetBar } from './BetBar.tsx'
@@ -57,6 +59,23 @@ export default function HoldemScreen({ room, game }: GameScreenProps) {
   const toAct = view.phase.kind === 'bet' ? view.phase.toAct : null
   const prompt = promptOf(view, myTurn, names)
   const winning = winningCards(view)
+  // The broadcast's caption (DESIGN §3.9): whoever is all in, then who took the pot
+  const allIn = view.players.filter((player) => player.allIn && !player.folded && !player.out)
+  const lastPot = view.last !== null && view.last.hand === view.hand ? view.last.pots[0] : undefined
+  const caption =
+    view.phase.kind === 'handEnd' && lastPot !== undefined && lastPot.winners.length > 0
+      ? {
+          id: `win-${view.hand}`,
+          text: t('games.holdem.ui.wins', { name: nameOf(lastPot.winners[0].seat), chips: lastPot.winners[0].amount }),
+          tone: 'accent' as const,
+        }
+      : allIn.length > 0
+        ? {
+            id: `allin-${view.hand}-${allIn.map((player) => player.seat).join(',')}`,
+            text: `${allIn.map((player) => nameOf(player.seat)).join(' · ')} — ${t('games.holdem.ui.allIn')}`,
+            tone: 'magenta' as const,
+          }
+        : null
 
   return (
     <GameLayout
@@ -72,6 +91,7 @@ export default function HoldemScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage>
+        <TableCaption id={caption?.id ?? null} text={caption?.text ?? ''} tone={caption?.tone} />
         <Table view={view} nameOf={nameOf} toAct={toAct} winning={winning} />
         <YourHand view={view} winning={winning} over={game.over} onAct={send} />
         {view.last !== null && view.last.hand === view.hand && <HandResult view={view} names={names} winning={winning} />}
@@ -195,7 +215,7 @@ const Stage = styled.div`
 `
 
 const Panel = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.md}px ${space.lg}px;
@@ -203,6 +223,12 @@ const Panel = styled.section`
 
 const ResultPanel = styled(Panel)`
   box-shadow: inset 4px 0 0 ${color.accent};
+
+  &::before {
+    box-shadow:
+      inset 0 0 0 1px ${color.line},
+      inset 0 3px 0 ${color.accent};
+  }
 `
 
 const HandRow = styled.div`
@@ -225,9 +251,8 @@ const Facts = styled.div`
 `
 
 const Chips = styled.span`
-  ${monoType}
+  ${digits}
   font-size: ${fontSize.lg}px;
-  font-weight: 800;
 `
 
 const Controls = styled.div`

@@ -2,11 +2,13 @@
 // loaded, then the part itself. A tap on a phone's dock before the sheet has arrived opens it as soon
 // as it has.
 import { createElement, useEffect } from 'react'
-import { bannerChunk, chatPanelChunk, drawerChunk } from '../lib/lateParts.ts'
+import { bannerChunk, captionChunk, chatPanelChunk, coverChunk, drawerChunk } from '../lib/lateParts.ts'
 import type { ChatPanelProps } from './ChatPanel.tsx'
 import type { ConnectionBannerProps } from './ConnectionBanner.tsx'
+import type { CoverSectionProps } from './CoverSection.tsx'
 import type { DrawerProps } from './Drawer.tsx'
 import type { TabsProps } from './Tabs.tsx'
+import type { CaptionProps } from './table/EventCaption.tsx'
 
 export function LateChatPanel(props: ChatPanelProps) {
   const ChatPanel = chatPanelChunk.use()
@@ -31,4 +33,15 @@ export function LateConnectionBanner(props: ConnectionBannerProps) {
     if (Banner === null && reconnecting) bannerChunk.load().catch(() => {})
   }, [Banner, reconnecting])
   return Banner && createElement(Banner, props)
+}
+
+export function LateCoverSection(props: CoverSectionProps) {
+  const CoverSection = coverChunk.use()
+  return CoverSection && createElement(CoverSection, props)
+}
+
+/** A board game's event caption over the table (docs/DESIGN.md §3.9), once its code is in */
+export function TableCaption(props: CaptionProps) {
+  const Caption = captionChunk.use()
+  return Caption && createElement(Caption, props)
 }

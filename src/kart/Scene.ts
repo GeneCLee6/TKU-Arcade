@@ -344,7 +344,7 @@ export function createKartScene(
     ? null
     : buildKartEnvironment(renderer, theme.skyTop, theme.skyHorizon)
   // 2026-11-22 (#99): the bodies' fine detail by the quality (art/bodyDetail.ts): none on low
-  // 2026-11-23 (§4.85): and the drivers' (art/driverModel.ts): plain and still on low
+  // 2026-11-23 (§4.86): and the drivers' (art/driverModel.ts): plain and still on low
   const finish: KartFinish = {
     environment,
     glow: post?.glow ?? 1,

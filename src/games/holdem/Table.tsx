@@ -3,7 +3,8 @@ import type { HoldemPublicPlayer, HoldemView } from '../../../shared/games/holde
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { Card } from '../../../shared/poker/hand.ts'
 import { useT } from '../../i18n/useT.ts'
-import { monoType } from '../../styles/esports.ts'
+import { digits, mix, turnGlow } from '../../components/table/tableKit.ts'
+import { clippedFill, monoType, slantClip } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { CardBack, CardFace, CardSlot } from './PokerCard.tsx'
 import { seatSpots } from './screenState.ts'
@@ -134,6 +135,7 @@ function SeatBox({
       $faded={player.out || player.folded}
       data-testid={`seat-${player.seat}`}
       aria-current={turn ? 'step' : undefined}
+      style={{ ['--seat' as string]: seatColor(player.seat) }}
     >
       <Name>
         <Dot style={{ background: seatColor(player.seat) }} aria-hidden="true" />
@@ -176,10 +178,17 @@ const Felt = styled.section`
   margin: 0 auto;
   aspect-ratio: 3 / 4;
   border-radius: 50% / 42%;
-  background: radial-gradient(ellipse at 50% 40%, ${color.feltClimbing} -60%, ${color.feltPlain} 70%);
+  /* The felt under a broadcast's lights (DESIGN §3.9): a spot from above, a fine weave, a dark edge */
+  background:
+    radial-gradient(ellipse at 50% 30%, ${mix(color.onFelt, 12)}, transparent 55%),
+    repeating-linear-gradient(45deg, ${mix(color.onFelt, 3)} 0 1px, transparent 1px 6px),
+    radial-gradient(ellipse at 50% 40%, ${color.feltClimbing} -60%, ${color.feltPlain} 70%);
   box-shadow:
     inset 0 0 0 6px ${color.chipInk},
-    inset 0 0 0 9px ${color.chipFace};
+    inset 0 0 0 9px ${color.chipFace},
+    inset 0 0 60px ${mix(color.chipInk, 55)},
+    0 0 0 1px ${mix(color.accent, 50)},
+    0 0 36px ${mix(color.accent, 22)};
   color: ${color.onFelt};
 
   @media (min-width: 720px) {
@@ -203,14 +212,18 @@ const Board = styled.div`
   gap: 4px;
 `
 
+// The pot: a slanted plate, a broadcast's score
 const Pot = styled.p`
-  ${monoType}
+  ${clippedFill(slantClip(8), color.chipInk)}
+  ${digits}
   margin: 0;
-  padding: 2px ${space.sm}px;
-  border-radius: 999px;
-  background: ${color.chipInk};
+  padding: 2px ${space.lg}px;
   color: ${color.chipFace};
-  font-weight: 800;
+  font-size: ${fontSize.md}px;
+
+  &::before {
+    box-shadow: inset 0 -2px 0 ${color.chipFace};
+  }
 `
 
 const Blinds = styled.p`
@@ -231,11 +244,14 @@ const Box = styled.div<{ $turn: boolean; $you: boolean; $faded: boolean }>`
   justify-items: center;
   width: 70px;
   padding: 3px 4px;
-  border-radius: 8px;
+  /* A nameplate: the seat's colour along the top, the game's hue round whoever is to act */
+  border-radius: 2px;
+  /* Plain surface under the words: a folded seat's faded text keeps its contrast */
   background: ${color.surface};
   color: ${color.text};
-  border: 2px solid ${(p) => (p.$turn ? color.accent : p.$you ? color.brand : color.line)};
-  box-shadow: ${(p) => (p.$turn ? `0 0 12px ${color.accent}` : 'none')};
+  border: 2px solid ${(p) => (p.$you ? color.brand : color.line)};
+  border-top: 3px solid var(--seat);
+  ${(p) => (p.$turn ? turnGlow : '')}
   /* Folded or out: the seat's words fade, never cards it shows (2026-11-23: a shown 10 of diamonds in a
      faded seat was 1.9:1 against the dimmed card, axe serious in the phone sweep) */
   & > :not([data-holes]) {
@@ -278,8 +294,7 @@ const Dot = styled.span`
 `
 
 const Stack = styled.span`
-  ${monoType}
-  font-weight: 800;
+  ${digits}
 `
 
 const Holes = styled.span`

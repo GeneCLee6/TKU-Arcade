@@ -8,7 +8,7 @@
 //        [--karts tide,comet] [--kinds none,mini,n2o,team,start] [--quality high]
 //        [--track riverside] [--views rear,side,front] [--mobile] [--drive] [--hud]
 //
-// 2026-11-23 (docs/ARCHITECTURE.md §4.85): `--poses drive,steer,drift,boost,daze,idle,cheer` instead
+// 2026-11-23 (docs/ARCHITECTURE.md §4.86): `--poses drive,steer,drift,boost,daze,idle,cheer` instead
 // shoots the drivers' skeleton, each of `--drivers spade,heart,diamond,club` in each pose, from
 // `--views` (`driver` is close on the cockpit), through `__kartSpike.pose` and `.gesture`.
 //
@@ -55,7 +55,7 @@ const VIEWS = {
   over: { orbit: 0.2, back: 1.3, up: 2.1 },
 }
 
-// 2026-11-23 (§4.85): what each pose sets on the look (spikeLoop.ts's debug `pose`, `gesture`, `fx`)
+// 2026-11-23 (§4.86): what each pose sets on the look (spikeLoop.ts's debug `pose`, `gesture`, `fx`)
 const POSES = {
   drive: { pose: { steer: 0, drift: 0, throttle: 1 } },
   steer: { pose: { steer: 1, drift: 0, throttle: 1 } },

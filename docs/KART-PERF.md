@@ -415,7 +415,7 @@ heap snapshot 的差（第 1 場到第 4 場）：+2 875 個 native 物件（約
 
 ## 13. 車手骨架與車身動態的成本（2026-11-23，`feat/kart-models-anim`）
 
-`ARCHITECTURE.md` §4.85。前＝`main` `5eb85e7` 的正式建置，後＝這個分支，同一台機器（Intel UHD 770 內顯，ANGLE D3D11）、同一個 `vite preview`（port 9800）輪流量；1280×720@1、河濱、7 台電腦車、道具賽，熱身 5 秒後數 8 秒，fps 不鎖幀（**機器上同時有別的工作，fps 會飄 ±10–20%**，draw calls 比較可靠）。
+`ARCHITECTURE.md` §4.86。前＝`main` `5eb85e7` 的正式建置，後＝這個分支，同一台機器（Intel UHD 770 內顯，ANGLE D3D11）、同一個 `vite preview`（port 9800）輪流量；1280×720@1、河濱、7 台電腦車、道具賽，熱身 5 秒後數 8 秒，fps 不鎖幀（**機器上同時有別的工作，fps 會飄 ±10–20%**，draw calls 比較可靠）。
 
 | 畫質 | fps 前 → 後 | draw calls 前 → 後 | 三角形 前 → 後 | JS ms/幀 前 → 後 |
 | --- | --- | --- | --- | --- |

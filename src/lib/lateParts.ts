@@ -25,3 +25,23 @@ export const drawerChunk = lateChunk(() =>
 export const bannerChunk = lateChunk(() =>
   import('../components/ConnectionBanner.tsx').then((module) => module.ConnectionBanner),
 )
+
+/** The ring round the avatar of whoever is to move (docs/DESIGN.md §3.9): only for the eye */
+export const turnRingChunk = lateChunk(() =>
+  import('../components/table/TurnRing.tsx').then((module) => module.TurnRing),
+)
+
+/**
+ * A board game's event caption (docs/DESIGN.md §3.9): the big slanted words a broadcast throws over the
+ * table when something happens (all in, a line snapped, a promotion). Nothing needs it before the first
+ * move, so it shows nothing until its code is in.
+ */
+export const captionChunk = lateChunk(() =>
+  import('../components/table/EventCaption.tsx').then((module) => module.EventCaption),
+)
+
+
+/** The seats a game is stuck on (CoverSection.tsx): only once a seat has kept everyone waiting */
+export const coverChunk = lateChunk(() =>
+  import('../components/CoverSection.tsx').then((module) => module.CoverSection),
+)

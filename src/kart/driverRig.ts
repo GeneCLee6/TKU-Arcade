@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.85): the driver's skeleton, worked out in code. No outside model
+// 2026-11-23 (docs/ARCHITECTURE.md §4.86): the driver's skeleton, worked out in code. No outside model
 // and no skinning: the driver (art/driverModel.ts) is a few rigid parts hung on joints, the hips on the
 // seat, the torso on the hips, the head on the torso, each arm a shoulder, an elbow and a hand. This
 // file is the arithmetic, pure so that a test can read it: given how the kart is steered, how far it

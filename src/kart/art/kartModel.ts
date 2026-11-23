@@ -135,7 +135,7 @@ export interface KartLook {
    */
   readonly gesture?: DriverGesture
   /**
-   * 2026-11-23 (§4.85, kartMotion.ts): the throttle as pressed, 0 to 1 (this browser's own kart):
+   * 2026-11-23 (§4.86, kartMotion.ts): the throttle as pressed, 0 to 1 (this browser's own kart):
    * the thrusters' halo follows it. Left out, it is read from how the kart gathers speed
    */
   readonly throttle?: number
@@ -206,7 +206,7 @@ const HOVER = 0.27
 const BIKE_LEAN = 0.52
 /** How much lower it rides with its shape open */
 const MORPH_DROP = 0.07
-/** 2026-11-23 (§4.85): the yoke's grips this far either side of its middle, where the hands go */
+/** 2026-11-23 (§4.86): the yoke's grips this far either side of its middle, where the hands go */
 const GRIP = 0.13
 
 /** What the scene lends a kart's paint (Scene.ts): the environment to reflect, and how bright to glow */
@@ -224,7 +224,7 @@ export interface KartFinish {
    */
   readonly detail?: BodyDetailLevel
   /**
-   * 2026-11-23 (§4.85, driverModel.ts): how much of the driver is drawn and moved by the quality:
+   * 2026-11-23 (§4.86, driverModel.ts): how much of the driver is drawn and moved by the quality:
    * low merges a plain driver standing still (hands on the wheel) and leaves out the thrusters'
    * halo; only high has the nose's vanes. Left out, the full driver (and the vanes)
    */
@@ -422,7 +422,7 @@ export function buildKartModel(
   const environment = finish.environment ?? null
   const bright = finish.glow ?? 1
   const detailLevel: BodyDetailLevel = ghost ? 'off' : (finish.detail ?? 'off')
-  // 2026-11-23 (§4.85): the driver's detail; on low the driver stands still, merged
+  // 2026-11-23 (§4.86): the driver's detail; on low the driver stands still, merged
   const driverDetail: DriverDetail = finish.driver ?? 'high'
   const lowDriver = driverDetail === 'low'
   const geometries: BufferGeometry[] = []
@@ -632,7 +632,7 @@ export function buildKartModel(
 
   // A yoke in front of the driver, on a column: two grips and a lit read-out between them. On a
   // bike (2026-11-19), low bars over the tank instead: a clip-on each side of a small read-out.
-  // 2026-11-23 (§4.85): the yoke turns about its column (`wheel`) and the driver's hands go with it
+  // 2026-11-23 (§4.86): the yoke turns about its column (`wheel`) and the driver's hands go with it
   const bar = bike
     ? hinge(chassis, 0, bike.bar.y, bike.bar.z)
     : hinge(chassis, 0, seat.y + 0.4, seat.z - 0.46)
@@ -673,7 +673,7 @@ export function buildKartModel(
     chassis.add(driver.group)
   }
 
-  // 2026-11-23 (§4.85, driverRig.ts): the skeleton. The joints from the drive and the gesture, the
+  // 2026-11-23 (§4.86, driverRig.ts): the skeleton. The joints from the drive and the gesture, the
   // hands on the wheel (two bones from each shoulder to its grip), or raised off it by the gesture
   const { torso, head, arms, elbows } = driver
   const ikTurn = new Quaternion()
@@ -757,7 +757,7 @@ export function buildKartModel(
     }
   }
 
-  // 2026-11-23 (§4.85, kartMotion.ts): a vane standing on each side of the nose, turning with the
+  // 2026-11-23 (§4.86, kartMotion.ts): a vane standing on each side of the nose, turning with the
   // steering; found by looking straight down onto the body ahead of the cockpit. On the high quality
   // only (two draws a kart), and not on a bike (its bars turn) or a ghost
   const vanes: Group[] = []
@@ -887,7 +887,7 @@ export function buildKartModel(
   let gestureSeconds = 0
   let gestured: GesturePose = REST
   const gestureSeed = Math.random()
-  // 2026-11-23 (§4.85, kartMotion.ts): the spring under the body, the landings seen and how long it
+  // 2026-11-23 (§4.86, kartMotion.ts): the spring under the body, the landings seen and how long it
   // has flown; the steering, the slide and the throttle as the driver and the thrusters follow them
   let spring = SPRING_REST
   let landingsSeen = 0
@@ -992,7 +992,7 @@ export function buildKartModel(
         Math.sin(bob) * (0.045 - speedShare * 0.02) +
         Math.sin(bob * 7.3) * 0.006 * speedShare
 
-      // The driver (§4.85, driverRig.ts): into the turn, thrown back by a boost and by pulling away,
+      // The driver (§4.86, driverRig.ts): into the turn, thrown back by a boost and by pulling away,
       // forward under braking, the shoulders and the head to the inside of a drift, the wheel turned
       // and the hands with it; stunned, they sway, the head lolls and the hands come loose
       const heat = reading.heat

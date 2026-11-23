@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.85): how a kart's body moves on its thrusters besides the bob,
+// 2026-11-23 (docs/ARCHITECTURE.md §4.86): how a kart's body moves on its thrusters besides the bob,
 // bank and pitch it already had (art/kartModel.ts): a spring under it, so that it squats as it pulls
 // away, rides up a little in the air and is pressed down by a landing and bounces back; the thruster
 // glow by the throttle; and how far the vanes at its nose turn with the steering. Looks only, pure so

@@ -4,7 +4,7 @@
 // hit they already sway (kartModel.ts, #99). Which gesture when, and the pose it makes, pure so that
 // a test can read them; kartModel.ts eases between them and puts them on the driver.
 //
-// 2026-11-23 (§4.85, driverRig.ts): the driver has elbows and hands now, so a pose can bend an arm
+// 2026-11-23 (§4.86, driverRig.ts): the driver has elbows and hands now, so a pose can bend an arm
 // (a flexed arm, hands meeting over the helmet), tilt the head, turn the torso and show a V; and the
 // wait on the grid and the win across the line are each driver's own (`GestureStyle`).
 

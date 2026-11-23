@@ -203,7 +203,7 @@ for (const [name, viewport] of [
   })
 }
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.85): the drivers' skeleton and the kart's motion, on the GPU this
+// 2026-11-23 (docs/ARCHITECTURE.md §4.86): the drivers' skeleton and the kart's motion, on the GPU this
 // runs on. Each driver steers, drifts, is stunned and wins (their own win), through the spike's debug
 // `pose` and `gesture`; every picture is attached to the report, and the win differs from the drive
 test.describe("the drivers' skeleton", () => {

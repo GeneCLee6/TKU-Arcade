@@ -311,7 +311,7 @@ export interface SpikeDebug {
   /** 2026-11-20 (§4.47), for looking at the drivers: this driver does this whatever the race says */
   gesture?: DriverGesture | null
   /**
-   * 2026-11-23 (§4.85), for looking at the skeleton and the kart's motion (scripts/kart-shots.mjs
+   * 2026-11-23 (§4.86), for looking at the skeleton and the kart's motion (scripts/kart-shots.mjs
    * `--poses`): the look's steering, slide, stun and throttle as given here, whatever the kart does.
    * Looks only; null or left out, as driven
    */
@@ -975,7 +975,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       speed: forward,
       steer: debug.input.steer,
       drift: slideWay,
-      // 2026-11-23 (§4.85): the thrusters' halo follows the throttle as pressed
+      // 2026-11-23 (§4.86): the thrusters' halo follows the throttle as pressed
       throttle: Number(debug.input.throttle),
       ...boostFx(boostKind ?? (boosting ? 'mini' : null)),
       // The sparks say where the release boost stands: gold once the drift has earned one and all

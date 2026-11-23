@@ -238,7 +238,7 @@ export const harbourScene = {
  * kartDrivers, below: any driver sits in any kart
  */
 export const kartBodies = {
-  // 2026-11-23 (§4.85; owner: "more striking"): not all satin black any more, so that 21 karts tell
+  // 2026-11-23 (§4.86; owner: "more striking"): not all satin black any more, so that 21 karts tell
   // apart at a glance: six stay dark (tide, eel, squid, swift, cormorant, the flagship), five are
   // pale (pearl, silver, white, cream) and ten are painted in a colour of their own, the neon picked
   // to stand out on it

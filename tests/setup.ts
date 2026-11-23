@@ -27,9 +27,12 @@ if (typeof document !== 'undefined') {
     lateParts.chatPanelChunk.load(),
     lateParts.drawerChunk.load(),
     lateParts.bannerChunk.load(),
+    lateParts.turnRingChunk.load(),
     boardChunk.load(),
     inertChunk.load(),
     loadDetailStrings(),
+    lateParts.captionChunk.load(),
+    lateParts.coverChunk.load(),
   ])
   await Promise.all([loadRoomStrings(), loadFullStrings(), ...GAME_CARDS.map((game) => loadScreenStrings(game.id))])
   await Promise.all([

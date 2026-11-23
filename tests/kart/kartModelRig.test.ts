@@ -2,7 +2,7 @@ import { Mesh, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { buildKartModel } from '../../src/kart/art/kartModel.ts'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.85): the skeleton put on a real kart model: the hands stay on
+// 2026-11-23 (docs/ARCHITECTURE.md §4.86): the skeleton put on a real kart model: the hands stay on
 // the wheel as it turns, a low quality's driver is merged and still, the nose's vanes turn
 
 const LOOK = { speed: 20, steer: 0, drift: 0, boosting: false }
