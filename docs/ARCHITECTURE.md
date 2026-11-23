@@ -1879,6 +1879,27 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **`worker/lobby-feed.ts`**（不碰 Cloudflare）：`admitWatcher`（全站、每位址上限）、`feedChange(before, after, paused)`、`watcherTag`。**`worker/lobby-board.ts`**：`LobbyBoardDeps.changed`，回報、移除、逾時都會叫。**`worker/lobby.ts`**：`fetch` 收升級（hibernatable、依遊戲加標籤、送完整列表）、`webSocketMessage` 只回 `ping`、其他關掉、`pushChange` 送給那款遊戲的 socket；暫停旗標 60 秒快取。**`worker/app.ts`**：`/ws/lobby` → `handleLobbySocket`（Origin、遊戲、每位址記憶體限制、位址雜湊標頭），要排在 `/ws/<房號>` 前面。
 - **頁面**：`src/lib/lobbyFeed.ts` 的 `watchLobby(gameId, { onRooms, onFallback })`；`OnlineView` 的 `useKartRooms` 先推送，`onFallback` 後才開輪詢的計時器；開頭那次 `GET` 若比推送晚到就丟掉。`OnlineView` 本來就是自己的 lazy chunk，所以推送客戶端不進任何首屏。大廳首頁沒改（首屏 102.2／103 kB，理由在 `NETWORK.md` §6.3）。
 
+### 4.90 路線圖外：反向賽道（2026-11-23，NEXT §5「反向賽道與倒車賽段」，`feat/kart-reverse-tracks`）
+
+擁有者：「接著做未完成的」。14 張內建比賽賽道**全部**有反向版，各自是一張賽道（獨立 id），不是比賽選項：紀錄、幽靈車、排行榜、獎牌、`kart:meta` 前三名都分開，伺服器的 `judgeFrame` 也照 id 拿反向賽道的資料裁定（`raceTrack(id)`），協定不動。
+
+- **反轉是純函式**（`shared/kart/tracks/reverse.ts` 的 `reverseTrack(json)`）：從原賽道算出來、不手畫，原賽道改了反向跟著改。
+  - **路**：路點反序、**路點 0 不動**（反向第 i 點＝原本第 (n − i) % n 點），所以起終點線、拱門、計時塔都在原地；每點的 `bank` 取反。
+  - **檢查點**：gate 0 還是終點線，其餘反序，每條的 a／b 對調（a 永遠在正確行進方向的左邊）；復位點留在自己的檢查點、方向轉 180°。所以原本為了岔路口、立體交叉讓開的檢查點，反向也照樣讓開。
+  - **起跑格與計時賽起點**：線的另一邊 `LINE_BACK` 10 m 一排八格（`circuit.ts` 抽出 `gridBehindLine`，原賽道的輸出逐位相同）。
+  - **跳台**（`turnJumps`）：在原地轉過來：跳台兩側的路點**互換它們高出平直路面的量**（平直路面＝跳台前兩點到後兩點的直線），上坡就換到反向車來的那一側、落差到另一側；再反一次回到原樣。換過去太陡（編輯器的跳台落差只有 3 m，觀音山坡道兩個）就把新坡降到剛好 `MAX_GRADE`；連這樣都太陡（高台階頂的跳台，反著開是一面牆）就拿掉跳台、把那段路緩成斜坡。14 張都不用拿掉。
+  - **岔路**：從原本的匯合點離開、在原本的入口接回，自己的路反序、跳台照主路的方式轉。**從主路跳台飛進去的岔路**（高台 `rise`、高架廠區越過矮欄的裝卸平台）反向關閉：盡頭的落差反著是一面牆、矮欄是牆，進不去；站在它上面的加速帶、道具箱一起拿掉（防波堤屋頂兩條、高架廠區一條）。飛進去的那個跳台留著，當普通跳台。
+  - **加速帶**轉 180°；**道具箱、牆（含有 `top` 的矮欄、島）、裝飾**原地不動。
+  - **障礙物**：同一個位置（`at` 換成反向的路點）、同一個比賽時鐘；左右對調（閘門的 `from`／`to`、貨櫃的 `a`／`b` 取反）。到的時間點跟原向不同，閘門的節奏照時鐘，電腦車照樣會等。
+  - **導引**（`guides.ts`）屬於原賽道的路點，不帶過去：反向賽道沒有安全線、技術線、甩尾起跳提示、穿縫目標（`trackGuide('x-rev')` 是 undefined）。電腦車靠路、牆、跳台自己開（和沒有導引的賽道一樣）；專家照樣會走反向後還開著的岔路。彎道箭頭板與路緣石是畫的時候從路算的（`cornerSigns.ts`），自己就指新方向。
+- **id 與 revision**（`reverseId.ts`）：`<原 id>-rev`（`isReverseId`、`forwardId`、`reverseId`）；revision＝原賽道的 revision＋`REVERSE_REVISION`（1）− 1，所以原賽道改版或反轉方式改了（調高 `REVERSE_REVISION`），反向的紀錄都會另起（`recordKey`，例如 `harbour-rev@15`）。名稱 `Golden Riverbank (Reverse)`／`金色水岸（反向）`（`kart.course.<id>-rev`、`games.kart.track.<id>-rev`）。
+- **登記**（`list.ts`）：`REVERSE_TRACK_IDS`（14 個）、`AnyRaceTrackId`、`ALL_RACE_TRACK_IDS`（原向在前、反向在後）、`isRaceTrackId`。`registry.ts` 的 `raceTrack` 認得反向 id（第一次用時反轉並 `parseTrack` 檢查、快取）；`courses.ts` 的 `spikeTrack` 也是。`RACE_TRACK_IDS` 仍只有原向 14 張（成就「跑遍每張賽道」、配樂表、場景表都照原向）。
+- **選單**：計時賽的賽道選單、對戰電腦、線上開房、房間的賽道選項（`info.ts` 的 choices）、排行榜都列 28 張；大獎賽多一個**反向盃**（`reverse`：金色水岸、紅樹林水道、滬尾砲台坡、竹圍高架的反向；成就的 `CUP_IDS` 同步）。排行榜 `BOARD_TRACKS` 是 28 張，**本週賽道照舊只在原向 14 張輪**（`WEEKLY_TRACKS`，加了反向沒有讓輪替跳號）。獎牌牆 28 張（`npm run kart:medals` 的 `ALL` 含反向）。
+- **畫面**：反向賽道站在原賽道的地上，美術照原賽道：主題、天空、配樂、環境音、在地場景（`trackScenery` 的 loader、`localPlan`、`skillStyleOf`、`ledgeArt` 的牆色、老街的燈籠）都用 `forwardId(track.id)` 查。沿著路順序擺的場景（漁港、五虎崗、老街、觀音山、紅樹林／砲台／淡海／大屯的在地場景）拿**原賽道**擺（`trackArt.ts` 的 `groundTrack`），因為它們用「從某點到某點」的路段與「路的右邊」；其他（跳台的坡、彎道板、岔路、障礙物、慶典拱門）用反向賽道本身。關閉的平台底下的建築也一起不畫。
+- **倒車賽段（沒做）**：物理的倒車極速 `reverseSpeed` 10 m/s，是前進極速（約 68 m/s）的 15%：倒車 100 m 要 10 秒以上，鏡頭朝前看不到要去的地方，而且倒車本來就會觸發「逆向」。評估不好玩，挑戰模式不加這一關。
+- **工具**：`node --experimental-strip-types scripts/kart/reverse-check.ts` 印每張反向後跳台／岔路／加速帶的處理與 `parseTrack` 結果。
+- **測試**：`tests/kart/reverse.test.ts`（id 規則；每張反兩次回到原本的路、檢查點、復位點、跳台；路點 0 不動、`bank` 取反、終點線兩端對調、加速帶轉向、跳台全部原地轉、飛進去的岔路關閉其他保留且路反序、障礙物時鐘不變左右對調；反向沒有導引；防波堤屋頂三座高台關閉、平台上兩條加速帶拿掉；跳台轉兩次回原樣、高台階的跳台拿掉並緩坡；每張反向的檢查點照路序、間隔不超過一圈五分之一、復位點在路內 3 m 以上且朝路的方向、八格在路上且離跳台 20 m 以上、彼此不重疊、終點線在前方），`tests/kart/reverseBots.test.ts`（每張反向四級電腦車各兩個種子三圈完賽、沒逆向；高架廠區反向與漁人碼頭反向的道具賽由房間規則裁定到結束），`tests/kart/board.test.ts`（28 份榜，每張的真實跑法都通過伺服器重跑），`e2e/kart-reverse.spec.ts`（從選單選滬尾砲台坡（反向）、計時賽自動駕駛跑過第一圈、沒有復位、飛過轉過來的跳台）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

@@ -3,13 +3,15 @@
 // A track from the editor names its own; the harbour is a sunset, the campus a clear morning, the
 // old street a night market and every other track a sunny afternoon.
 import type { Track, TrackThemeName } from '../../../shared/kart/track.ts'
+import { forwardId } from '../../../shared/kart/tracks/reverseId.ts'
 
 export const themeNameOf = (track: Pick<Track, 'id' | 'theme'>): TrackThemeName =>
   track.theme ??
-  (track.id === 'harbour'
+  // A reversed track (2026-11-23) is drawn as its original is
+  (forwardId(track.id) === 'harbour'
     ? 'sunset'
-    : track.id === 'tamkang'
+    : forwardId(track.id) === 'tamkang'
       ? 'campus'
-      : track.id === 'oldstreet'
+      : forwardId(track.id) === 'oldstreet'
         ? 'night'
         : 'day')

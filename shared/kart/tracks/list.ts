@@ -26,3 +26,30 @@ export const RACE_TRACK_IDS = [
 ] as const
 
 export type RaceTrackId = (typeof RACE_TRACK_IDS)[number]
+
+// 2026-11-23 (#131): the tracks driven the other way round (reverse.ts), each its own id, the
+// original's with `-rev`: its own records, ghost, board and medals. Only those that pass every check
+// the originals do (docs/KART-WORLD.md §7 has which, and why the others are left out)
+export const REVERSE_TRACK_IDS = [
+  'riverside-rev',
+  'harbour-rev',
+  'tamkang-rev',
+  'oldstreet-rev',
+  'guanyin-rev',
+  'mangrove-rev',
+  'fort-rev',
+  'danhai-rev',
+  'datun-rev',
+  'wharf-rev',
+  'lanes-rev',
+  'works-rev',
+  'zhuwei-rev',
+  'breakwater-rev',
+] as const satisfies readonly `${RaceTrackId}-rev`[]
+
+export type ReverseTrackId = (typeof REVERSE_TRACK_IDS)[number]
+/** Every track a race can be set to: the originals, then the reversed ones */
+export type AnyRaceTrackId = RaceTrackId | ReverseTrackId
+export const ALL_RACE_TRACK_IDS: readonly AnyRaceTrackId[] = [...RACE_TRACK_IDS, ...REVERSE_TRACK_IDS]
+export const isRaceTrackId = (value: unknown): value is AnyRaceTrackId =>
+  typeof value === 'string' && (ALL_RACE_TRACK_IDS as readonly string[]).includes(value)

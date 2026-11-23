@@ -13,7 +13,7 @@ import { writeFileSync } from 'node:fs'
 import { KART_TUNING } from '../shared/kart/physics.ts'
 import { CHALLENGE_TRACK_IDS } from '../shared/kart/tracks/challenge.ts'
 import { routeGuide, trackGuide } from '../shared/kart/tracks/guides.ts'
-import { RACE_TRACK_IDS } from '../shared/kart/tracks/list.ts'
+import { ALL_RACE_TRACK_IDS } from '../shared/kart/tracks/list.ts'
 import { createDriver } from '../src/kart/bots/drivers.ts'
 import { missionTrack, runMission } from '../src/kart/challenge/headless.ts'
 import { calibrate, type MedalTimes } from '../src/kart/challenge/medals.ts'
@@ -22,7 +22,8 @@ import { isRaceMission, MISSIONS } from '../src/kart/challenge/missions.ts'
 import { DRIVERS, measure, type DriverId } from './kart/drivers.ts'
 
 const SEEDS = [7, 14, 21]
-const ALL = [...RACE_TRACK_IDS, ...CHALLENGE_TRACK_IDS]
+// 2026-11-23 (#131): the reversed tracks after the originals, each its own medals
+const ALL = [...ALL_RACE_TRACK_IDS, ...CHALLENGE_TRACK_IDS]
 const onlyAt = process.argv.indexOf('--only')
 const only = onlyAt >= 0 ? new Set((process.argv[onlyAt + 1] ?? '').split(',')) : null
 const TRACKS = only ? ALL.filter((id) => only.has(id)) : ALL

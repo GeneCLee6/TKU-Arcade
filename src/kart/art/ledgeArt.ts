@@ -29,6 +29,7 @@ import type { RoadPoint } from '../../../shared/kart/track.ts'
 import { ledgeScene, skillCue } from '../../styles/kartTokens.ts'
 import { chevronTexture } from './skillKit.ts'
 import type { ArtKit } from './trackArt.ts'
+import { forwardId } from '../../../shared/kart/tracks/reverseId.ts'
 
 /** The building's walls reach this far below the ground, metres (no gap on a slope) */
 const FOOTING = 1
@@ -94,7 +95,7 @@ export function buildLedges(
   const ledges = trackLedges(track)
   if (ledges.length === 0) return null
   const wallColour =
-    ledgeScene.walls[track.id as keyof typeof ledgeScene.walls] ?? ledgeScene.walls.other
+    ledgeScene.walls[forwardId(track.id) as keyof typeof ledgeScene.walls] ?? ledgeScene.walls.other
   const wall = standard(wallColour)
   wall.side = DoubleSide
   const parapet = standard(ledgeScene.parapet)
