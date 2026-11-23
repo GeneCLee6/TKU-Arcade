@@ -38,7 +38,7 @@ export const START_BUTTON = 9
 const OPEN_EVENT = 'kart-pause-open'
 
 /** Opens the pause menu on this page, as Esc would (nothing while it is not taking the keys) */
-export function openKartPause(): void {
+function openKartPause(): void {
   window.dispatchEvent(new Event(OPEN_EVENT))
 }
 

@@ -47,8 +47,7 @@ import {
   PlaceArrow,
 } from '../ui/RaceShow.tsx'
 import { PauseLayer, type PauseLayerProps } from '../ui/PauseLayer.tsx'
-import { closeAt } from '../../../shared/kart/opening.ts'
-import { closeBeep, playBeep } from '../audio/countBeeps.ts'
+import { useCloseCountdown } from '../ui/useCloseCountdown.ts'
 import { placeBump } from '../ui/placeBump.ts'
 import { TouchControls } from '../touch/TouchControls.tsx'
 import { useTouchControls } from '../touch/useTouchControls.ts'
@@ -518,26 +517,8 @@ export default function RaceView({
   }, [placeShift])
   // 2026-11-22 (§4.73): after the first finish, the seconds left to everyone still out, with a tock
   // for each (shared/kart/opening.ts; the room closes the race at that moment)
-  const closing = closeAt(view)
-  const [closeTicks, setCloseLeft] = useState<number | null>(null)
-  const closeLeft = closing !== null && view.phase === 'racing' ? closeTicks : null
-  useEffect(() => {
-    if (closing === null || view.phase !== 'racing') return
-    let before: number | null = null
-    const tick = () => {
-      const now = raceNet.current?.serverNow() ?? null
-      if (now === null) return
-      const left = (closing - now) / 1000
-      const beep = closeBeep(before, left)
-      if (beep) playBeep(beep)
-      before = left
-      const shown = Math.max(0, Math.ceil(left))
-      setCloseLeft((was) => (was === shown ? was : shown))
-    }
-    tick()
-    const timer = window.setInterval(tick, 100)
-    return () => window.clearInterval(timer)
-  }, [closing, view.phase])
+  // (ui/useCloseCountdown.ts, which the watcher's screen shares)
+  const closeLeft = useCloseCountdown(view, () => raceNet.current?.serverNow() ?? null)
 
   const onFinalLap = racing && trial.laps > 1 && trial.lap === trial.laps
   useEffect(() => {

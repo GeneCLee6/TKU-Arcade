@@ -44,11 +44,18 @@ import {
   WatchStage,
 } from './WatchParts.tsx'
 import { placeTags, TAG_HEIGHT, useWatchKeys } from './watchDom.ts'
+import { useCloseCountdown } from '../ui/useCloseCountdown.ts'
+import { CloseCountdown } from '../ui/RaceShow.tsx'
+import { KART_FLOW_MESSAGES } from '../../../shared/kart/i18n.flow.ts'
+import { registerMessages } from '../../i18n/t.ts'
 import { Button } from '../../components/Button.tsx'
 import { color } from '../../styles/tokens.ts'
 import { TeamGauges, TeamScore } from '../race/TeamHud.tsx'
 import type { BroadcastReadout, BroadcastRun } from './broadcast/broadcastRun.ts'
 import { prefersReducedMotion, useBroadcastKit } from './broadcastSwitch.ts'
+
+// The countdown's words (2026-11-23), without the rest of the kart's
+registerMessages(KART_FLOW_MESSAGES)
 
 /** The kart and driver a frame's body byte names (e10-t05) */
 function kartOfByte(byte: number) {
@@ -99,6 +106,8 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
   const followRef = useRef(follow)
   const overheadRef = useRef(overhead)
   const frames = useRef(new Map<number, KartFrame>())
+  /** The room's clock while the race is drawn (the countdown after the first finish reads it) */
+  const roomClock = useRef<{ now(): number } | null>(null)
   useLayoutEffect(() => {
     latest.current = view
     followRef.current = follow
@@ -136,6 +145,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
     if (!stage.current || !track || failure || !engine) return
     const remotes = createRemotes()
     const clock = createServerClock(realtime)
+    roomClock.current = clock
     const stopListening = realtime.listen((data) => {
       const relayed = readRelayed(data)
       if (!relayed) return
@@ -316,6 +326,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       stop?.()
       stopListening()
       clock.stop()
+      roomClock.current = null
       stopUnlock()
       player.dispose()
     }
@@ -336,6 +347,10 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       setReadout(null)
     }
   }, [kit, broadcastOn, track])
+
+  // 2026-11-23 (#152): after the first finish, the seconds left to everyone still out, with a tock
+  // for each, as the racers see them (shared/kart/opening.ts; the room closes the race then)
+  const closeLeft = useCloseCountdown(view, () => roomClock.current?.now() ?? null)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -390,6 +405,13 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
       />
       {clean && <CleanHint data-keep="">{t('games.kart.broadcast.cleanHint')}</CleanHint>}
       {directing && <Overlay t={t} readout={readout} nameOf={nameOf} laps={view.laps} live />}
+      {closeLeft !== null && (
+        <CloseCountdown
+          label={t('kart.flow.close.label')}
+          seconds={closeLeft}
+          timeUp={t('kart.flow.close.timeUp')}
+        />
+      )}
       {!engine && (
         <KartLoading
           t={t}
