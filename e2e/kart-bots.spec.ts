@@ -29,7 +29,7 @@ test('one person races a computer kart in an item race, from the menu to the res
   await page.addInitScript(() => {
     localStorage.setItem('tku-arcade.kart.quality', 'low')
     localStorage.setItem('tku-arcade.language', 'en')
-    // 2026-11-23 (§4.96): in street wear, kept in the replay's file
+    // 2026-11-23 (§4.97): in street wear, kept in the replay's file
     localStorage.setItem('tku-arcade.kart.driver', 'heart')
     localStorage.setItem('tku-arcade.kart.outfit.heart', 'street')
   })
@@ -147,7 +147,7 @@ test('one person races a computer kart in an item race, from the menu to the res
   expect(download.suggestedFilename()).toMatch(/^tku-kart-riverside-\d{8}-\d{4}\.tkureplay$/)
   const file = testInfo.outputPath('race.tkureplay')
   await download.saveAs(file)
-  // 2026-11-23 (§4.96): what each driver wore is in the file's header (a frame has no room for it):
+  // 2026-11-23 (§4.97): what each driver wore is in the file's header (a frame has no room for it):
   // the player's street wear (the player is the last seat); the computer's own draw, unless the suit
   const saved = await readReplayFile(new Uint8Array(readFileSync(file)))
   expect(saved.ok && saved.file.outfits).toContainEqual({ seat: 1, outfit: 'street' })

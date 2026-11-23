@@ -131,7 +131,7 @@ test.describe('the garage', () => {
   })
 })
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.96; #177 measured only the hands): the race room's pictures
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #177 measured only the hands): the race room's pictures
 // (lobby/lobbyStage.ts) of all four drivers standing by their karts, as they press Ready: each one's
 // own win, at its start, its middle and as it ends, attached to the report (and kept with
 // KART_CHARACTER_SHOTS=1). tests/kart/gestureClearance.test.ts keeps the arms out of the helmets.

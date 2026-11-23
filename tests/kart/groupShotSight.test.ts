@@ -19,7 +19,7 @@ import {
   type GroupAngle,
 } from '../../src/kart/director.ts'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.96; #176's known limit): the group shot before the start must
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #176's known limit): the group shot before the start must
 // see every driver. Every track (reversed ones too) is built as it is drawn, in Node, and the line
 // from the camera to each kart's head and body tested against it, all through the push-in, on a wide
 // screen, a phone on its side and one held upright. Where the shot from in front is blocked the
@@ -85,7 +85,7 @@ function gridOf(track: Track, count: number): { spots: Spot[]; y: number } {
 describe('the group shot on every track', () => {
   const chosen = new Map<string, GroupAngle[]>()
   afterAll(() => {
-    // For the record (docs/ARCHITECTURE.md §4.96): where the opening stands on each track
+    // For the record (docs/ARCHITECTURE.md §4.97): where the opening stands on each track
     const moved = [...chosen].filter(([, angles]) => angles.some((angle) => angle !== 'front'))
     console.info(`group shot: ${moved.length} of ${chosen.size} tracks moved`, Object.fromEntries(moved))
   })

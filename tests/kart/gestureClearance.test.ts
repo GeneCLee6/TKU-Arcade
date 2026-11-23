@@ -4,7 +4,7 @@ import { DRIVER_IDS } from '../../shared/kart/karts.ts'
 import { buildKartModel } from '../../src/kart/art/kartModel.ts'
 import { SHOWPIECE_SECONDS } from '../../src/kart/driverGestures.ts'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.96; #177 measured only where the hands go): each driver's own
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #177 measured only where the hands go): each driver's own
 // win, played through on the real model, the arms kept out of the helmet. Each arm as three capsules
 // (the upper arm, the forearm, the glove), every vertex of the helmet (what hangs from the head and
 // does not swing: shell, visor, crest, the thing of their own) tested against them at every 30th of a

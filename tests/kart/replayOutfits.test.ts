@@ -8,7 +8,7 @@ import { DRIVER_IDS, KART_IDS } from '../../shared/kart/karts.ts'
 import { BOT_NAMES } from '../../shared/games/kart/bots.ts'
 import { fileInfo, outfitsOf } from '../../src/kart/watch/replayFiles.ts'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.96; #177's known limits): the computer's drivers each in an
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #177's known limits): the computer's drivers each in an
 // outfit of their own, and every replay's file saying what everyone wore
 
 describe("the computer's drivers' outfits", () => {

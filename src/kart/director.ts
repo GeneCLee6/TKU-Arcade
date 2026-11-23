@@ -160,7 +160,7 @@ export interface OpeningLook {
 }
 
 /**
- * 2026-11-23 (docs/ARCHITECTURE.md §4.96): where the group shot stands. `front` is the shot as it
+ * 2026-11-23 (docs/ARCHITECTURE.md §4.97): where the group shot stands. `front` is the shot as it
  * was; on a track where something stands between it and the grid (a building by the start, a wall,
  * a landmark, a hill) the opening takes the first of the others that sees every kart
  * (`pickGroupAngle`): higher up, from either front corner, from behind and high, from overhead

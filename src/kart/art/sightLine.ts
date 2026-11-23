@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/ARCHITECTURE.md §4.96; #176's known limit): whether anything solid in a track's
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #176's known limit): whether anything solid in a track's
 // art stands between two points, for the group shot before the start (director.ts's
 // `pickGroupAngle`) to stand where it sees every kart. Asked of the art as it is drawn (a building,
 // a wall, a landmark, a tree, a hill), so it holds for every track, a reversed one and one made in

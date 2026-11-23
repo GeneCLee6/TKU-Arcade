@@ -18,13 +18,24 @@ export interface BoardFitSpace {
 export const MIN_STAGE = 240
 /** Between the stage and the dock under it, and under the dock */
 export const BELOW = 20
+/**
+ * A screen this short or shorter (a phone on its side) is where the stage may take the whole screen:
+ * the top bar is not stuck to the top there (TopBar.tsx), so nothing covers a stage scrolled up to it.
+ * On a taller one a page scrolled down would leave the result, shown above the board, out of sight
+ */
+export const SHORT_SCREEN = 500
 
 /**
  * The stage's height: the screen below where the stage starts, less the dock and the gap round it.
+ * Where that is less than the board's least on a short screen (a phone on its side, 2026-11-23: the bar, the room's
+ * heading and the dock left the board under a third of the screen, the foot of it out of sight), the
+ * whole screen above the dock instead, and the page scrolls the stage up to the top (useBoardFit).
  * Pure, so that it is the same number for the same screen whatever the dock happens to say
  */
-export const stageHeight = (screen: number, top: number, dock: number): number =>
-  Math.max(MIN_STAGE, Math.floor(screen - top - dock - BELOW))
+export const stageHeight = (screen: number, top: number, dock: number): number => {
+  const below = Math.floor(screen - top - dock - BELOW)
+  return below < MIN_STAGE && screen <= SHORT_SCREEN ? Math.max(MIN_STAGE, below + Math.floor(top)) : Math.max(MIN_STAGE, below)
+}
 
 /**
  * The space for the whole board (e3-t10). The stage, from where it starts on the page, takes what is
@@ -49,6 +60,10 @@ export function useBoardFit(dock: RefObject<HTMLElement | null>, fitStage: boole
   useLayoutEffect(() => {
     if (!stage || typeof ResizeObserver !== 'function') return undefined
     const bar = dock.current?.parentElement ?? null
+    // A stage that takes the whole screen (see stageHeight) comes up to the top of it, once each time
+    // it is fitted (the game opens, focus mode ends): from there the board and the dock are all on
+    // the screen, the bar and the heading a scroll up (not stuck on so short a screen, TopBar.tsx)
+    let brought = false
     const measure = () => {
       if (!fitStage) {
         setHeight(null)
@@ -57,7 +72,14 @@ export function useBoardFit(dock: RefObject<HTMLElement | null>, fitStage: boole
       const top = stage.getBoundingClientRect().top + window.scrollY
       // Not innerHeight: a phone's address bar coming and going would resize the board on every scroll
       const screen = document.documentElement.clientHeight || window.innerHeight
-      setHeight(stageHeight(screen, top, bar?.offsetHeight ?? 0))
+      const below = bar?.offsetHeight ?? 0
+      const height = stageHeight(screen, top, below)
+      setHeight(height)
+      if (!brought && screen <= SHORT_SCREEN && top + height + below + BELOW > screen + 1) {
+        brought = true
+        // Once the new height is on the page
+        requestAnimationFrame(() => window.scrollTo(0, top))
+      }
     }
     measureRef.current = measure
     measure()

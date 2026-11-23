@@ -45,7 +45,7 @@ export interface PodiumStage {
 }
 
 /**
- * 2026-11-23 (docs/ARCHITECTURE.md §4.96): where the winner's kart and driver are on the screen now,
+ * 2026-11-23 (docs/ARCHITECTURE.md §4.97): where the winner's kart and driver are on the screen now,
  * CSS pixels from the page's top left, for the test that checks the name plate stays off them in the
  * close-up (e2e/kart-podium.spec.ts)
  */

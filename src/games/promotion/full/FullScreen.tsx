@@ -27,7 +27,6 @@ import { fullArtHref, fullKnob } from './fullArt.ts'
 import type { FullFlight, FullPiece } from './FullBoard.tsx'
 import { FullDice } from './FullDice.tsx'
 import { useFullData } from './fullData.ts'
-import type { SquareLayout } from './fullSquare.ts'
 import { beforeTransfers, degreeText, householdText, transferText } from './fullMoney.ts'
 import { SETTLE_STEPS } from './settleSteps.ts'
 import { useTurnPlayback } from './useTurnPlayback.ts'
@@ -52,9 +51,6 @@ const FullCellDetail = lazy(() => import('./FullCellDetail.tsx').then((module) =
 /** Below this many CSS pixels a cell is drawn dense: bigger names, seals without words */
 const DENSE_CELL = 48
 const BOARD_MARGIN = 8
-/** The least room inside the square board's outer ring for a decision's card to go there */
-const PROMPT_MIN_W = 300
-const PROMPT_MIN_H = 150
 /** If the room never answers a roll, the button comes back after this */
 const ROLL_ANSWER_MS = 4000
 
@@ -261,24 +257,6 @@ export default function FullScreen({ room, game }: GameScreenProps) {
         })
       : data.words.turnSentence(t, language, last, playerOf(last.seat), nameOf(last.seat))
     : ''
-  // The card goes where it does not hide the cell it is about
-  const pendingBox = deciding && layout ? layout.byId.get(pending.cell) : undefined
-  const promptOnTop = pendingBox !== undefined && layout !== null && pendingBox.y + pendingBox.height / 2 > layout.height / 2
-  // On the square board, inside the outer ring (where every cell that asks is), if the card has room
-  const promptArea = (() => {
-    if (!deciding || !layout || !box || !fit || zoomLevel !== MIN_ZOOM) return null
-    if (!('square' in layout)) return null
-    const { inner } = (layout as SquareLayout).square
-    const left = (box.width - layout.width * fit.scale) / 2
-    const top = (box.height - layout.height * fit.scale) / 2
-    const area = {
-      x: left + inner.x * fit.scale,
-      y: top + inner.y * fit.scale,
-      width: inner.width * fit.scale,
-      height: inner.height * fit.scale,
-    }
-    return area.width >= PROMPT_MIN_W && area.height >= PROMPT_MIN_H ? area : null
-  })()
 
   let mainText: string
   if (playing && last) mainText = t('games.promotion.full.rolling', { name: nameOf(last.seat) })
@@ -480,8 +458,9 @@ export default function FullScreen({ room, game }: GameScreenProps) {
                   timer={decisionTimer}
                   waiting={asked}
                   onAnswer={answer}
-                  top={promptOnTop}
-                  area={promptArea}
+                  layout={layout}
+                  box={zoomLevel === MIN_ZOOM ? box : null}
+                  scale={fit?.scale ?? 0}
                 />
               </Suspense>
             )}

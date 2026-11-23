@@ -4,7 +4,7 @@
 // music and the effects be set apart (volumes.ts). A browser only lets a page make sound after a
 // gesture: `unlockKartAudio` from a key or a tap makes the context, or wakes a suspended one.
 //
-// 2026-11-23 (docs/ARCHITECTURE.md §4.96; #176's known limit, iOS): a context is not only
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #176's known limit, iOS): a context is not only
 // 'suspended' before a gesture. Safari puts it in 'interrupted' (a call, Siri, another app's sound,
 // the page sent to the background) and does not always give it back by itself; any browser may
 // suspend it in the background. So: the page going to the background suspends it here (nothing

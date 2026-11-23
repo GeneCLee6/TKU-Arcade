@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.96; #176's known limit): the kart's sound in Safari's engine
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #176's known limit): the kart's sound in Safari's engine
 // (Playwright's WebKit; an iPhone's Safari is the same engine, its silent switch and its calls are
 // not there to press), and in Chromium. Playwright's WebKit on Windows has no WebAudio at all: there
 // the WebKit run is skipped and says so (on Linux and macOS it runs). What can be shown: the page
@@ -62,7 +62,7 @@ for (const engine of ['webkit', 'chromium'] as const) {
         await expect
           .poll(async () => (await sound(page))?.sound?.state, { timeout: 30_000 })
           .toBe('running')
-        // 2026-11-23 (§4.96): the group shot stood somewhere clear of the scenery
+        // 2026-11-23 (§4.97): the group shot stood somewhere clear of the scenery
         await expect
           .poll(async () => (await sound(page))?.groupAngle ?? null, { timeout: 30_000 })
           .not.toBeNull()

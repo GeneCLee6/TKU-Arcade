@@ -35,7 +35,7 @@ export default function PodiumCeremony({ entries, title, onDone }: PodiumCeremon
   const holder = useRef<HTMLDivElement>(null)
   const [missing, setMissing] = useState(false)
   const [winner, setWinner] = useState(false)
-  // 2026-11-23 (§4.96): the camera's close-up on the winner, when the plates make way for the kart
+  // 2026-11-23 (§4.97): the camera's close-up on the winner, when the plates make way for the kart
   const [closeUp, setCloseUp] = useState(false)
   const doneRef = useRef(onDone)
   useEffect(() => {
@@ -194,7 +194,7 @@ const Plates = styled.div<{ $close: boolean }>`
   pointer-events: none;
 
   /*
-   * 2026-11-23 (§4.96): in the winner's close-up the kart fills the middle of the picture, its nose
+   * 2026-11-23 (§4.97): in the winner's close-up the kart fills the middle of the picture, its nose
    * low in it. The second and third plates go, and the winner's moves to where the kart is not: the
    * lower left on a wide screen (the kart takes the middle), at the top under the title on a tall one
    * (the kart there fills the width, its nose down to the bottom). e2e/kart-podium.spec.ts measures it

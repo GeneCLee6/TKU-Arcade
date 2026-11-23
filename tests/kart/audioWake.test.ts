@@ -11,7 +11,7 @@ import {
 import { kartSoundState } from '../../src/kart/audio/unlock.ts'
 import { setSoundOn } from '../../src/lib/sound.ts'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.96; #176's known limit): the kart's sound on iOS. Safari's
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #176's known limit): the kart's sound on iOS. Safari's
 // context goes 'interrupted' (a call, the background) as well as 'suspended', and the silent switch
 // mutes WebAudio unless the page plays like a video. A context of our own stands in for the browser's.
 

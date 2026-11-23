@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// 2026-11-23 (docs/ARCHITECTURE.md §4.96; #177's known limit: "the name plate covers the winner's
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #177's known limit: "the name plate covers the winner's
 // nose in the close-up"): the podium's ceremony on its own, at a wide screen, a phone on its side and
 // one held upright. Once the camera has closed in on the winner, the winner's plate is clear of the
 // winner's kart and driver as drawn (the stage's own projection of them, podiumStage.ts), and the
