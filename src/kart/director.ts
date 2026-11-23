@@ -5,7 +5,8 @@
 //
 // The countdown: the camera starts high behind the whole grid, every kart on it in view (the pole
 // sitter's included, whose rivals are all behind it), and glides down behind this kart during the
-// "2", so that it is in its place for the "1" when the throttle counts.
+// "2", so that it is in its place for the "1" when the throttle counts. Before it, the group shot
+// from in front (2026-11-23, `groupShot`).
 import type { Spot } from '../../shared/kart/course.ts'
 import { COUNT_MS, countdownMs, openingStage } from '../../shared/kart/opening.ts'
 
@@ -38,6 +39,7 @@ export const GLIDE_TO = 1.05
 export const CUT_AT = 1.6
 
 const forwardOf = (heading: number) => ({ x: Math.sin(heading), z: -Math.cos(heading) })
+const lerp = (a: number, b: number, share: number) => a + (b - a) * share
 
 /** Where the camera sees the whole grid from: behind it, up high, along the pole's heading, far enough back to see it all */
 export function gridShot(spots: readonly Spot[], y = 0): Omit<CameraShot, 'blend'> | null {
@@ -107,121 +109,86 @@ export function countdownShot(
 
 // ── The race's show (2026-11-20, docs/ARCHITECTURE.md §4.43) ────────────────────────────────────
 //
-// Before the countdown the camera flies once round the grid: from high up the road ahead, looking
-// back at the karts' faces, round one side to behind them, where it settles on the grid shot for the
-// 3, 2, 1. Anyone may skip it on their own screen (spikeLoop.ts). At the finish the camera swings
-// round from behind this kart to in front of it, low, and stays there.
+// 2026-11-23 (owner: "don't present everyone at the start, just one shot with everyone in it"): before
+// the 3, 2, 1 the camera stands in front of the grid, up a little, and takes the whole field in one
+// shot, the drivers' faces to it (each in their idle or ready pose, driverGestures.ts), pushing in
+// slowly. At the 3 it cuts to the grid shot from behind, which glides down behind this kart for the
+// 1 (`countdownShot`). Where in the opening it is comes from the seconds to GO (shared/kart/opening.ts),
+// the same on every screen in a room. Anyone may skip it on their own screen (spikeLoop.ts). At the
+// finish the camera swings round from behind this kart to in front of it, low, and stays there.
+
+/** The group shot lasts until this much countdown left, where the 3 comes */
+export const INTRO_TO = COUNT_MS / 1000
+/** ... and from this much (the whole opening) */
+export const INTRO_FROM = countdownMs() / 1000
 
 /**
- * The fly round lasts from this much countdown left (a full grid of eight; 2026-11-22: the opening
- * grows with the field, shared/kart/opening.ts, and `introShot` is told where it starts) ...
+ * The group shot: each outermost kart at most this far off where the camera looks across (radians;
+ * a phone held upright sees about 21 degrees either side, Scene.ts's 80-degree view at 9:19.5)
  */
-export const INTRO_FROM = countdownMs(8) / 1000
-/** ... to this much, where the 3 comes */
-export const INTRO_TO = COUNT_MS / 1000
-/** How far from the middle of the grid it flies, and how high (start, end), metres */
-export const INTRO_RADIUS = 27
-export const INTRO_UP: readonly [number, number] = [12, 7]
-/** The share of the fly round spent flying; the rest settles on the grid shot */
-const INTRO_FLY = 0.75
+export const GROUP_HALF_ANGLE = (17 * Math.PI) / 180
+/** ... never nearer the middle of the grid than this, metres, and this high for each metre away */
+export const GROUP_NEAREST = 9
+export const GROUP_RISE = 0.42
+/** The push in: from this much further away to the shot's own distance */
+export const GROUP_PUSH = 1.22
+/** ... and a drift across, metres either side of dead ahead over the shot */
+export const GROUP_DRIFT = 1.6
 
-const lerp = (a: number, b: number, share: number) => a + (b - a) * share
-const lerpPoint = (a: Point3, b: Point3, share: number): Point3 => ({
-  x: lerp(a.x, b.x, share),
-  y: lerp(a.y, b.y, share),
-  z: lerp(a.z, b.z, share),
-})
-
-/** Whether `left` seconds of countdown are still in the fly round */
+/** Whether `left` seconds of countdown are still before the 3 (the group shot) */
 export const inIntro = (left: number | null): boolean => left !== null && left > INTRO_TO
 
+/** How the opening is shown on this screen (the settings, src/kart/settings.ts) */
+export interface OpeningLook {
+  /** The group shot; without it the grid shot from behind all the way */
+  readonly group: boolean
+}
+
 /**
- * The fly round's shot with `left` seconds of countdown left, the fly round having started at
- * `from` seconds left; null outside it
+ * The group shot, `share` (0 to 1) of the way through it: in front of the grid, looking back at it,
+ * far enough for every kart on it to be on the screen; null without a grid
  */
-export function introShot(
+export function groupShot(
   spots: readonly Spot[],
-  left: number,
+  share: number,
   y = 0,
-  from = INTRO_FROM,
+  reducedMotion = false,
 ): CameraShot | null {
-  const grid = gridShot(spots, y)
   const pole = spots[0]
-  if (!grid || !pole || left <= INTRO_TO) return null
-  const share = Math.max(0, Math.min(1, (from - left) / Math.max(0.1, from - INTRO_TO)))
+  if (!pole) return null
   const forward = forwardOf(pole.heading)
   const side = { x: -forward.z, z: forward.x }
   const middle = {
     x: spots.reduce((sum, spot) => sum + spot.x, 0) / spots.length,
     z: spots.reduce((sum, spot) => sum + spot.z, 0) / spots.length,
   }
-  const fly = smooth(Math.min(1, share / INTRO_FLY), 0, 1)
-  // Round from ahead (0) by the side to behind (π)
-  const angle = Math.PI * fly
-  const around = {
-    x: forward.x * Math.cos(angle) + side.x * Math.sin(angle),
-    z: forward.z * Math.cos(angle) + side.z * Math.sin(angle),
-  }
-  const flying: Omit<CameraShot, 'blend'> = {
-    eye: {
-      x: middle.x + around.x * INTRO_RADIUS,
-      y: y + lerp(INTRO_UP[0], INTRO_UP[1], fly),
-      z: middle.z + around.z * INTRO_RADIUS,
-    },
-    target: { x: middle.x, y: y + 0.5, z: middle.z },
-  }
-  const settle = smooth(share, INTRO_FLY, 1)
-  return {
-    eye: lerpPoint(flying.eye, grid.eye, settle),
-    target: lerpPoint(flying.target, grid.target, settle),
-    blend: 1,
-  }
-}
-
-// ── Each driver presented (2026-11-22, docs/ARCHITECTURE.md §4.73) ────────────────────────────────
-//
-// Before the 3, 2, 1, the camera stands in front of each kart in turn (grid order, the pole first),
-// low and close, looking at the driver's face, and drifts a little across it during the driver's
-// turn; then glides from the last one to the grid shot. Where in the opening it is comes from the
-// seconds to GO and the number on the grid (shared/kart/opening.ts), so every screen in a room shows
-// the same driver at the same moment.
-
-/** The camera in front of a driver: this far ahead of the kart, this high, metres */
-export const PRESENT_BACK = 3.6
-export const PRESENT_UP = 1.15
-/** ... drifting from this many radians off dead ahead to this many during the driver's turn */
-export const PRESENT_SWEEP: readonly [number, number] = [0.42, -0.18]
-
-/** How the opening is shown on this screen (the settings, src/kart/settings.ts) */
-export interface OpeningLook {
-  /** Each driver presented in turn */
-  readonly drivers: boolean
-  /** Without that, the fly round the grid (§4.43) */
-  readonly flyby: boolean
-}
-
-/** The shot of the driver at `spot`, `share` (0 to 1) of the way through their turn */
-export function presentShot(spot: Spot, share: number, y = 0, reducedMotion = false): CameraShot {
-  const forward = forwardOf(spot.heading)
-  const side = { x: -forward.z, z: forward.x }
-  const drift = reducedMotion ? 0.5 : smooth(share, 0, 1)
-  const angle = lerp(PRESENT_SWEEP[0], PRESENT_SWEEP[1], drift)
-  const back = PRESENT_BACK - (reducedMotion ? 0 : 0.5 * drift)
+  // Furthest across the road from the middle, and furthest ahead of it (the pole, nearest the camera)
+  const across = Math.max(
+    0,
+    ...spots.map((spot) => Math.abs((spot.x - middle.x) * side.x + (spot.z - middle.z) * side.z)),
+  )
+  const ahead = Math.max(
+    0,
+    ...spots.map((spot) => (spot.x - middle.x) * forward.x + (spot.z - middle.z) * forward.z),
+  )
+  const distance = Math.max(GROUP_NEAREST, ahead + across / Math.tan(GROUP_HALF_ANGLE))
+  const along = reducedMotion ? 0.5 : smooth(share, 0, 1)
+  const away = distance * lerp(GROUP_PUSH, 1, along)
+  const drift = GROUP_DRIFT * lerp(1, -1, along)
   return {
     eye: {
-      x: spot.x + (forward.x * Math.cos(angle) + side.x * Math.sin(angle)) * back,
-      y: y + PRESENT_UP,
-      z: spot.z + (forward.z * Math.cos(angle) + side.z * Math.sin(angle)) * back,
+      x: middle.x + forward.x * away + side.x * drift,
+      y: y + away * GROUP_RISE,
+      z: middle.z + forward.z * away + side.z * drift,
     },
-    target: { x: spot.x, y: y + 0.75, z: spot.z },
+    target: { x: middle.x, y: y + 0.6, z: middle.z },
     blend: 1,
   }
 }
 
 /**
- * The opening's shot with `left` seconds to GO: each driver, then the glide to the grid (or the fly
- * round, when the drivers are not presented); null from the 3 on, or when the grid shot itself is
- * all there is (both turned off), for `countdownShot` to take over
+ * The opening's shot with `left` seconds to GO (null: GO not set yet, still loading): the group shot;
+ * null from the 3 on, or with the group shot turned off, for `countdownShot` to take over
  */
 export function openingShot(
   spots: readonly Spot[],
@@ -230,29 +197,11 @@ export function openingShot(
   reducedMotion = false,
   y = 0,
 ): CameraShot | null {
-  const stage = openingStage(left, spots.length)
-  if (!stage || stage.kind === 'count' || left === null) return null
-  if (look.drivers) {
-    if (stage.kind === 'present') {
-      const spot = spots[stage.index]
-      return spot ? presentShot(spot, stage.share, y, reducedMotion) : null
-    }
-    const grid = gridShot(spots, y)
-    const last = spots[Math.min(spots.length, 8) - 1]
-    if (!grid || !last) return null
-    if (reducedMotion) return { ...grid, blend: 1 }
-    const from = presentShot(last, 1, y)
-    const settle = smooth(stage.share, 0, 1)
-    return {
-      eye: lerpPoint(from.eye, grid.eye, settle),
-      target: lerpPoint(from.target, grid.target, settle),
-      blend: 1,
-    }
-  }
-  if (look.flyby && !reducedMotion) {
-    return introShot(spots, left, y, countdownMs(spots.length) / 1000)
-  }
-  return null
+  if (!look.group) return null
+  // Before GO is set (the others still loading) the shot waits at its start
+  const stage = left === null ? { kind: 'group' as const, share: 0 } : openingStage(left)
+  if (!stage || stage.kind === 'count') return null
+  return groupShot(spots, stage.share, y, reducedMotion)
 }
 
 /** The finish: the swing round to the front takes this long, seconds */

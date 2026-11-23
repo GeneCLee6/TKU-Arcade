@@ -5,7 +5,7 @@
 import styled, { css, keyframes } from 'styled-components'
 import { displayType, monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
-import { broadcast, slam, splitShadow, streak, ticker } from './broadcast.ts'
+import { broadcast, digits, slam, splitShadow, streak, ticker } from './broadcast.ts'
 import { Confetti } from './Confetti.tsx'
 
 const BIG = 'clamp(72px, min(20vh, 24vw), 168px)'
@@ -35,6 +35,43 @@ export function FinalLapBanner({ text }: { readonly text: string }) {
     <Banner role="status" data-testid="kart-final-lap">
       {text}
     </Banner>
+  )
+}
+
+/**
+ * 2026-11-23 (lapSplit.ts): the lap just finished, at the top middle: "Lap 2 0:31.420", marked when
+ * it is the race's fastest so far, and its difference from the best, faster green, slower red
+ */
+export function LapSplitCard({
+  label,
+  time,
+  fastest,
+  delta,
+  faster,
+  against,
+}: {
+  readonly label: string
+  readonly time: string
+  /** "Fastest lap", or null */
+  readonly fastest: string | null
+  /** "+0.42", or null */
+  readonly delta: string | null
+  readonly faster: boolean
+  /** What the difference is against, for a screen reader */
+  readonly against: string | null
+}) {
+  return (
+    <Split role="status" data-testid="kart-lap-split" data-fastest={fastest ? '' : undefined}>
+      <SplitLap>{label}</SplitLap>
+      <SplitTime>{time}</SplitTime>
+      {fastest && <SplitFastest data-testid="kart-lap-fastest">{fastest}</SplitFastest>}
+      {delta && (
+        <SplitDelta $faster={faster} data-testid="kart-lap-delta" data-faster={faster ? '' : undefined}>
+          {against && <SplitHidden>{against} </SplitHidden>}
+          {delta}
+        </SplitDelta>
+      )}
+    </Split>
   )
 }
 
@@ -124,6 +161,59 @@ const Banner = styled.p`
   ${streak(color.warning)}
 `
 
+const Split = styled.section`
+  ${broadcast}
+  position: absolute;
+  top: max(${space.xl}px, 9%);
+  left: 50%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: ${space.xs}px ${space.md}px;
+  max-width: calc(100% - ${2 * space.lg}px);
+  padding: ${space.sm}px ${space.lg}px;
+  translate: -50% 0;
+  pointer-events: none;
+  ${slam(320)}
+`
+
+const SplitLap = styled.span`
+  ${ticker(color.accent)}
+  padding: 0 ${space.md}px;
+  color: ${color.onAccent};
+  ${displayType}
+  font-size: ${fontSize.lg}px;
+  text-transform: uppercase;
+`
+
+const SplitTime = styled.span`
+  ${digits}
+  color: ${color.text};
+  font-size: clamp(${fontSize.xl}px, 5vh, 40px);
+`
+
+const SplitFastest = styled.span`
+  ${displayType}
+  color: ${color.magenta};
+  font-size: ${fontSize.lg}px;
+  text-transform: uppercase;
+`
+
+const SplitDelta = styled.span<{ $faster: boolean }>`
+  ${digits}
+  color: ${({ $faster }) => ($faster ? color.success : color.danger)};
+  font-size: ${fontSize.xl}px;
+`
+
+const SplitHidden = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+`
+
 const Show = styled.div`
   position: absolute;
   inset: 0;
@@ -194,43 +284,7 @@ export const PlaceArrow = styled.span<{ $up: boolean }>`
   }
 `
 
-// ── 2026-11-22 (docs/ARCHITECTURE.md §4.73): each driver presented, and the close's countdown ──────
-
-/**
- * During the opening, the driver in front of the camera: a lower third with their place on the grid,
- * name, kart and driver, and their team's colour (a team race) or the accent. Keyed by the driver, so
- * that each one slides in afresh
- */
-export function DriverCard({
-  grid,
-  name,
-  ride,
-  stripe,
-  you,
-  skip,
-}: {
-  readonly grid: string
-  readonly name: string
-  readonly ride: string | null
-  /** The team's colour, or the accent */
-  readonly stripe: string
-  readonly you: string | null
-  readonly skip: string
-}) {
-  return (
-    <Lower role="status" data-testid="kart-driver-card" style={{ borderLeftColor: stripe }}>
-      <LowerGrid style={{ background: stripe }}>{grid}</LowerGrid>
-      <LowerBody>
-        <LowerName>
-          {name}
-          {you && <LowerYou>{you}</LowerYou>}
-        </LowerName>
-        {ride && <LowerRide>{ride}</LowerRide>}
-      </LowerBody>
-      <LowerSkip>{skip}</LowerSkip>
-    </Lower>
-  )
-}
+// ── 2026-11-22 (docs/ARCHITECTURE.md §4.73): the close's countdown ──────────────────────────────────
 
 /**
  * The seconds left after the first finish, for a racer still out on the track: a big number under a
@@ -255,93 +309,6 @@ export function CloseCountdown({
     </Close>
   )
 }
-
-const slideIn = keyframes`
-  from { opacity: 0; transform: translateX(-40px) skewX(-10deg); }
-  to { opacity: 1; transform: none; }
-`
-
-const Lower = styled.section`
-  ${broadcast}
-  position: absolute;
-  left: max(${space.lg}px, 6vw);
-  bottom: 22%;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: stretch;
-  gap: 0 ${space.md}px;
-  min-width: min(380px, calc(100% - ${2 * space.lg}px));
-  max-width: calc(100% - ${2 * space.lg}px);
-  padding: 0 ${space.lg}px 0 0;
-  border-left: 6px solid ${color.accent};
-  pointer-events: none;
-  animation: ${slideIn} 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-`
-
-const LowerGrid = styled.span`
-  ${displayType}
-  display: grid;
-  place-items: center;
-  min-width: 3.4em;
-  padding: ${space.sm}px;
-  color: ${color.bg};
-  font-size: ${fontSize.lg}px;
-  text-transform: uppercase;
-`
-
-const LowerBody = styled.div`
-  display: grid;
-  align-content: center;
-  gap: 2px;
-  min-width: 0;
-  padding: ${space.sm}px 0;
-`
-
-const LowerName = styled.strong`
-  ${displayType}
-  display: flex;
-  align-items: baseline;
-  gap: ${space.sm}px;
-  overflow: hidden;
-  color: ${color.text};
-  font-size: ${fontSize.xxl}px;
-  line-height: 1.1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
-
-const LowerYou = styled.span`
-  ${ticker(color.accent, 6)}
-  padding: 0 ${space.sm}px;
-  color: ${color.onAccent};
-  font-size: ${fontSize.sm}px;
-`
-
-const LowerRide = styled.span`
-  ${monoType}
-  overflow: hidden;
-  color: ${color.muted};
-  font-size: ${fontSize.sm}px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
-
-const LowerSkip = styled.span`
-  ${monoType}
-  grid-column: 1 / -1;
-  padding: 2px ${space.sm}px;
-  color: ${color.muted};
-  font-size: 12px;
-  animation: ${blink} 0.8s ease-in-out infinite alternate;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-`
 
 const Close = styled.div`
   position: absolute;

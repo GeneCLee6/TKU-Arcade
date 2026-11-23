@@ -14,17 +14,20 @@ export interface RaceSettings {
   readonly effects: EffectsLevel
   /** The camera's shake on a hit, a landing, a boost's kick */
   readonly shake: boolean
-  /** Before the 3, 2, 1: each driver presented in turn */
-  readonly driverIntro: boolean
-  /** ... or, when the drivers are not presented, the fly round the grid (§4.43) */
-  readonly flyby: boolean
+  /**
+   * Before the 3, 2, 1 (2026-11-23): the group shot of the whole grid, or none (the grid shot from
+   * behind all the way). It was each driver presented in turn, or a fly round the grid
+   */
+  readonly opening: OpeningShow
 }
+
+export type OpeningShow = 'group' | 'off'
+export const OPENING_SHOWS: readonly OpeningShow[] = ['group', 'off']
 
 export const DEFAULT_SETTINGS: RaceSettings = {
   effects: 'high',
   shake: true,
-  driverIntro: true,
-  flyby: true,
+  opening: 'group',
 }
 
 /** The share of the particles each level lays */
@@ -58,8 +61,9 @@ export function parseSettings(stored: string | null): RaceSettings {
         ? (json.effects as EffectsLevel)
         : DEFAULT_SETTINGS.effects,
       shake: flag(json.shake, DEFAULT_SETTINGS.shake),
-      driverIntro: flag(json.driverIntro, DEFAULT_SETTINGS.driverIntro),
-      flyby: flag(json.flyby, DEFAULT_SETTINGS.flyby),
+      opening: OPENING_SHOWS.includes(json.opening as OpeningShow)
+        ? (json.opening as OpeningShow)
+        : DEFAULT_SETTINGS.opening,
     }
   } catch {
     return DEFAULT_SETTINGS

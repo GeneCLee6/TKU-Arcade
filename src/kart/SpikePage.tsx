@@ -28,7 +28,8 @@ import {
 import { BoostVeil, CalloutText, Hud } from './Hud.tsx'
 import { supportsWebGL2 } from './webgl.ts'
 import { Minimap, type MinimapHandle } from './Minimap.tsx'
-import { RaceCenter, RaceClock, type RaceClockHandle } from './RaceOverlay.tsx'
+import { LapSplitShow, RaceCenter, RaceClock, type RaceClockHandle } from './RaceOverlay.tsx'
+import { SoundTap } from './ui/SoundTap.tsx'
 import type { BoardRunDone, SpikeHud, SpikeStats, SpikeTrial } from './spikeLoop.ts'
 import type { BoardChase } from './board/chase.ts'
 import { formatTime } from '../../shared/kart/timeTrial.ts'
@@ -441,6 +442,8 @@ export function SpikePage({
   return (
     <Page style={touch.shown ? touchSpace(touch.settings) : undefined}>
       <Stage ref={stage} role="img" aria-label={t('kart.spike.canvas')} />
+      {/* 2026-11-23 (audio/unlock.ts): on the grid, a tap for the sound if the browser holds it back */}
+      {trial?.phase === 'countdown' && <SoundTap label={t('kart.race.soundTap')} />}
       {!engine && (
         <KartLoading
           t={t}
@@ -752,6 +755,7 @@ export function SpikePage({
         </MapCorner>
       )}
       <TouchControls t={t} touch={touch} hud={hud} maxStored={tuning.maxStoredBoosts} />
+      {track && trial && <LapSplitShow t={t} lapTimes={trial.lapTimes} record={trial.bestLap} />}
       {track && trial && (
         <RaceCenter
           t={t}

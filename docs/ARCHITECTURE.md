@@ -1656,7 +1656,7 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - 存 `localStorage` 的 `tku-arcade.kart.settings`（`lib/storage.ts`，讀寫失敗不丟例外，存不了就提示只活到關頁）；預設：特效高、晃動開、亮相開、繞場開。壞掉的值逐欄回預設（`parseSettings`）。
 - 特效等級：粒子量（煙、火花、噴射火焰、N2O 的尾焰）乘 35%／70%／100%（`effects.ts` 的發射率），後處理的上限 off／bloom／full，和畫質取較低的（`cappedPost`）。晃動關掉時 `Scene.ts` 的鏡頭震動與被打中的晃動乘 0。畫質、特效、晃動在建場景時讀，所以「下一場起生效」；音量、開場、提示立刻生效。
 
-**起跑前車手亮相**（`shared/kart/opening.ts`、`director.ts` 的 `openingShot`／`presentShot`、`RaceShow.tsx` 的 `DriverCard`）
+**起跑前車手亮相**（`shared/kart/opening.ts`、`director.ts` 的 `openingShot`／`presentShot`、`RaceShow.tsx` 的 `DriverCard`）（**2026-11-23 起由 §4.93 的團體鏡頭取代**，`presentShot`、`DriverCard`、繞場的 `introShot` 都拿掉，開場固定 4.8 s）
 
 - 開場長度跟著人數：每位車手 0.7 s（8 人 5.6 s）＋ 1 s 滑到起跑格全景＋ 3、2、1 ＝ `countdownMs(n)`：8 人 9.6 s、4 人 6.8 s、2 人 5.4 s（原本固定 6.5 s）。房間在 `realtime.clock` 用它定 `goAt`、`timers` 的 `go` 也用它（同一個 `racers.length`），所有人同步；每個瀏覽器從「離 GO 幾秒」與人數算出現在輪到誰（`openingStage`），所以同一房間每個人同一刻看到同一位車手。
 - 鏡頭：每位車手的車前 3.6 m、高 1.15 m，看著車手的臉，這 0.7 s 內從左前 0.42 rad 慢慢掃到右前 −0.18 rad 並推近 0.5 m；最後一位之後 1 s 平滑接上起跑格全景，「3」出現時已就位。照起跑格順序（竿位先）。減少動態時每位是靜止鏡頭、直接切全景。

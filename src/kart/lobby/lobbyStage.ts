@@ -75,7 +75,7 @@ export interface LobbyStageOptions {
 
 /** A picture's size, CSS pixels: its canvas's, in steps of STEP, no bigger than this */
 const START = { width: 220, height: 220 }
-const MAX = { width: 380, height: 420 }
+const MAX = { width: 520, height: 640 }
 const MAX_HERO = { width: 560, height: 420 }
 const MIN = 80
 const STEP = 20

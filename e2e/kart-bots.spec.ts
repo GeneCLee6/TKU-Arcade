@@ -49,14 +49,26 @@ test('one person races a computer kart in an item race, from the menu to the res
   await setup.getByTestId('kart-bots-start').click()
 
   await expect(page.getByTestId('kart-race')).toBeVisible({ timeout: 30_000 })
-  // 2026-11-22 (§4.73): each driver presented first (the computer, then you), with their place on the
-  // grid and their kart; skipped by a key
-  const card = page.getByTestId('kart-driver-card')
+  // 2026-11-23 (owner: "one shot with everyone in it"): one group shot of the grid under the track's
+  // card, skipped by a key. And the sound is on already, no key pressed: the click on the menu's
+  // Race woke it (owner: "no sound when you first get in, only once you start driving")
+  const card = page.getByTestId('kart-intro')
   await expect(card).toBeVisible({ timeout: 30_000 })
-  await expect(card).toContainText(/Grid [12]/)
+  await expect(card).toContainText('Golden Riverbank')
+  await expect(page.getByTestId('kart-driver-card')).toHaveCount(0)
+  const sound = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __kartSpike?: { sound?: { state: string; steps: number; beeps: number } } })
+          .__kartSpike?.sound ?? null,
+    )
+  await expect.poll(async () => (await sound())?.state, { timeout: 10_000 }).toBe('running')
+  await expect.poll(async () => (await sound())?.steps ?? 0, { timeout: 10_000 }).toBeGreaterThan(0)
+  await expect(page.getByTestId('kart-sound-tap')).toHaveCount(0)
   await page.keyboard.press('KeyM')
   await expect(card).toBeHidden()
-  await expect(page.getByTestId('kart-intro')).toBeHidden()
+  // The 3, 2, 1 and GO heard (a beep sounds only on a running context)
+  await expect.poll(async () => (await sound())?.beeps ?? 0, { timeout: 30_000 }).toBeGreaterThanOrEqual(3)
   await expect
     .poll(async () => (await race(page))?.counted ?? false, { timeout: 30_000 })
     .toBe(true)
@@ -108,7 +120,9 @@ test('one person races a computer kart in an item race, from the menu to the res
   await menu.getByTestId('kart-pause-resume').click()
   await expect(menu).toBeHidden()
   await expect.poll(ticks, { timeout: 10_000 }).toBeGreaterThan(held)
-  // One lap: the finish's show (the place, the confetti), the podium, then the results with both karts
+  // One lap: its time as the line is crossed (2026-11-23), the finish's show (the place, the
+  // confetti), the podium, then the results with both karts
+  await expect(page.getByTestId('kart-lap-split')).toContainText(/Lap 1\s*\d:\d\d\.\d{3}/, { timeout: 180_000 })
   await expect(page.getByTestId('kart-celebration')).toBeVisible({ timeout: 180_000 })
   const podium = page.getByTestId('kart-podium')
   await expect(podium).toBeVisible({ timeout: 180_000 })
