@@ -2,10 +2,11 @@ import styled, { css, keyframes } from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { SpectrumAnswererView } from '../../../shared/games/spectrum/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
-import { Heading, List, Row, Section } from '../../components/roomParts.ts'
+import { Heading, List, Row } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 interface AnswerProgressProps {
   answerers: readonly SpectrumAnswererView[]

@@ -4,13 +4,15 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import type { WasabiAction, WasabiPlayerView, WasabiView } from '../../../shared/games/wasabi/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType, SLANT } from '../../styles/esports.ts'
+import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { Dumpling } from './Dumpling.tsx'
 import { dumpling } from './palette.ts'
 import { promptOf, roundLines } from './screenState.ts'
+import { hueSurface, PhaseBar, tablePanel, Ticker, turnGlow } from '../../components/table/tableKit.ts'
 
 /** If the room never answers a press, the buttons come back after this */
 const ANSWER_WAIT_MS = 4000
@@ -114,6 +116,11 @@ export default function WasabiScreen({ room, game }: GameScreenProps) {
           </Facts>
         </Header>
 
+        {/* The broadcast's caption (DESIGN §3.9): the round's first line */}
+        <TableCaption
+          id={view.phase === 'roundEnd' && lines.length > 0 ? `round-${view.round}` : null}
+          text={lines.length > 0 ? t(lines[0].key, lines[0].params) : ''}
+        />
         {lines.length > 0 && (
           <RoundPanel data-testid="round-end" aria-live="polite">
             {lines.map((line, index) => (
@@ -325,7 +332,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -333,10 +340,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Round = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The round as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Round = styled(Ticker)``
 
 const Facts = styled.div`
   display: flex;
@@ -358,18 +363,21 @@ const Fact = styled.span`
   }
 `
 
+// The steamers on the game's table top (DESIGN §3.9)
 const Table = styled.div`
+  ${hueSurface}
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: ${space.sm}px;
+  padding: ${space.sm}px;
 `
 
 const SteamerBox = styled.section<{ $turn: boolean; $out: boolean }>`
-  ${glass}
+  ${tablePanel}
   display: grid;
   padding: ${space.sm}px;
   opacity: ${({ $out }) => ($out ? 0.55 : 1)};
-  box-shadow: ${({ $turn }) => ($turn ? `inset 0 0 0 2px ${color.accent}` : 'none')};
+  ${({ $turn }) => $turn && turnGlow}
 `
 
 const EatButton = styled.button`
@@ -476,17 +484,17 @@ const panel = `
 `
 
 const LadderPanel = styled.section`
-  ${glass}
+  ${tablePanel}
   ${panel}
 `
 
 const HandPanel = styled.section`
-  ${glass}
+  ${tablePanel}
   ${panel}
 `
 
 const RoundPanel = styled.section`
-  ${glass}
+  ${tablePanel}
   ${panel}
 
   & > p {

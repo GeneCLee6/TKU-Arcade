@@ -1,10 +1,11 @@
 import styled from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { WbView } from '../../../shared/games/word-bridge/types.ts'
-import { Heading, Section } from '../../components/roomParts.ts'
+import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { clueCount, turnsOf } from './screenState.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 /** Every clue so far, newest first, with what each pick turned out to be */
 export function ClueLog({ view, nameOf }: { view: WbView; nameOf(seat: SeatId): string }) {

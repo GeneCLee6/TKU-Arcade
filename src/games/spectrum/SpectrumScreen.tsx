@@ -5,10 +5,11 @@ import type { SpectrumAction, SpectrumView } from '../../../shared/games/spectru
 import type { RoomMember } from '../../../shared/protocol.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
-import { Heading, Section } from '../../components/roomParts.ts'
+import { TableCaption } from '../../components/LateParts.tsx'
+import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { useReducedMotion } from '../../lib/useMediaQuery.ts'
-import { monoType, SLANT } from '../../styles/esports.ts'
+import { SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { AnswerCards } from './AnswerCards.tsx'
@@ -29,6 +30,7 @@ import {
 } from './screenState.ts'
 import { TopicCard } from './TopicCard.tsx'
 import { TopicChoice } from './TopicChoice.tsx'
+import { PhaseBar, TableSection as Section, Ticker } from '../../components/table/tableKit.ts'
 
 /** If the room never answers a guess or "next", the button comes back after this */
 const ANSWER_WAIT_MS = 4000
@@ -136,6 +138,8 @@ export default function SpectrumScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage>
+        {/* The broadcast's caption (DESIGN §3.9): the numbers coming out */}
+        <TableCaption id={view.phase === 'reveal' ? `reveal-${view.round}` : null} text={t('games.spectrum.ui.prompt.reveal')} />
         <Header>
           <Round>{t('games.spectrum.ui.round', { round: view.round, rounds: view.totalRounds })}</Round>
           <Steps phase={view.phase} />
@@ -294,7 +298,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -302,10 +306,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Round = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The round as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Round = styled(Ticker)``
 
 const Guesser = styled.span`
   font-weight: 700;

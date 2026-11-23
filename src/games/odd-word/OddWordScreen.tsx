@@ -4,8 +4,10 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import type { OddWordAction, OddWordView } from '../../../shared/games/odd-word/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
+import { PhaseBar, Ticker } from '../../components/table/tableKit.ts'
 import { useT } from '../../i18n/useT.ts'
-import { monoType, SLANT } from '../../styles/esports.ts'
+import { SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { RoundReveal } from './RoundReveal.tsx'
@@ -86,6 +88,11 @@ export default function OddWordScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage>
+        {/* The broadcast's caption (DESIGN §3.9): the odd word, as the reveal shows it */}
+        <TableCaption
+          id={view.reveal !== null ? `reveal-${view.round}` : null}
+          text={view.reveal === null ? '' : `${t('games.odd-word.ui.oddWord')} · ${view.reveal.pair.odd}`}
+        />
         <Header>
           <Round>{t('games.odd-word.ui.round', { round: view.round, rounds: view.totalRounds })}</Round>
           <Facts>
@@ -114,7 +121,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -122,10 +129,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Round = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The round as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Round = styled(Ticker)``
 
 const Facts = styled.div`
   display: flex;

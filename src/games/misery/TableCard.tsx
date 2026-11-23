@@ -4,10 +4,11 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import type { MiseryAttempt, MiseryReveal, MiseryView } from '../../../shared/games/misery/types.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
 import { useReducedMotion } from '../../lib/useMediaQuery.ts'
-import { displayType, glass, monoType, SLANT } from '../../styles/esports.ts'
+import { displayType, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { IndexBadge } from './MiseryCardFace.tsx'
 import { attemptText, miseryFill } from './screenState.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 /** How long the index takes to climb to its value at a reveal */
 const COUNT_MS = 1100
@@ -135,7 +136,7 @@ const shimmer = keyframes`
 `
 
 const Panel = styled.section<{ $edge: string }>`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.md}px;
   padding: ${space.lg}px;

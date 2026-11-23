@@ -1,12 +1,13 @@
 import styled from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { SpectrumView } from '../../../shared/games/spectrum/types.ts'
-import { Heading, Section } from '../../components/roomParts.ts'
+import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { NumberLine } from './NumberLine.tsx'
 import { revealMarks } from './numberLine.ts'
 import { gains } from './screenState.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 interface RoundRevealProps {
   view: SpectrumView

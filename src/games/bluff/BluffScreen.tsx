@@ -5,9 +5,11 @@ import type { BluffAction, BluffView } from '../../../shared/games/bluff/types.t
 import type { RoomMember } from '../../../shared/protocol.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
+import { PhaseBar, Ticker } from '../../components/table/tableKit.ts'
 import { useT } from '../../i18n/useT.ts'
 import { useReducedMotion } from '../../lib/useMediaQuery.ts'
-import { monoType, SLANT } from '../../styles/esports.ts'
+import { SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { ReadingOrder } from './ReadingOrder.tsx'
@@ -132,6 +134,11 @@ export default function BluffScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage>
+        {/* The broadcast's caption (DESIGN §3.9): who the honest reader was, as the reveal says */}
+        <TableCaption
+          id={shown && view.honest !== null ? `honest-${view.round}` : null}
+          text={view.honest === null ? '' : t('games.bluff.ui.honestWas', { name: nameOf(view.honest) })}
+        />
         <Header>
           <Round>{t('games.bluff.ui.round', { round: view.round, rounds: view.totalRounds })}</Round>
           <Steps phase={view.phase} />
@@ -203,7 +210,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -211,10 +218,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Round = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The round as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Round = styled(Ticker)``
 
 const Judge = styled.span`
   font-weight: 700;
