@@ -340,9 +340,14 @@ function RoomHeading({
       {gameId !== undefined && (
         <HeadingAction>
           {extra}
-          <Suspense>
-            <FullscreenButton iconOnly />
-          </Suspense>
+          {/* 2026-11-23 (QA sweep): not while Promotion is played, whose board has its own full
+              screen (the board and the roll, #29): two buttons called "Full screen" that do
+              different things */}
+          {!(gameId === 'promotion' && status === 'playing') && (
+            <Suspense>
+              <FullscreenButton iconOnly />
+            </Suspense>
+          )}
           <HowToPlay gameId={gameId} edition={edition} />
         </HeadingAction>
       )}
