@@ -351,3 +351,9 @@ export const WHARF: TrackJson = {
   jumps: made.jumps,
   branches,
 }
+
+/**
+ * Where the technical places are, by main road point: what the reversed track's guide is touched up
+ * by (reverseGuides.ts)
+ */
+export const WHARF_MARKS = { rows, rowsIn, rowsOut, ramp1, ramp2, quayIn, quayOut, stackFrom } as const
