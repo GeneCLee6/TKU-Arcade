@@ -12,6 +12,9 @@ import type { TrackGuide } from './guide.ts'
 import { HARBOUR_GUIDE } from './harbour.ts'
 import { LANES_GUIDE } from './lanes.ts'
 import { OLDSTREET_GUIDE, OLDSTREET_ROUTE_GUIDE } from './oldstreet.ts'
+import { raceTrack } from './registry.ts'
+import { reverseGuides } from './reverseGuides.ts'
+import { forwardId, isReverseId } from './reverseId.ts'
 import { WHARF_GUIDE, WHARF_ROUTE_GUIDE } from './wharf.ts'
 import { WORKS_GUIDE, WORKS_ROUTE_GUIDE } from './works.ts'
 import { ZHUWEI_GUIDE, ZHUWEI_ROUTE_GUIDE } from './zhuwei.ts'
@@ -42,9 +45,36 @@ const ROUTE_GUIDES: Readonly<Record<string, TrackGuide>> = {
   danhai: DANHAI_ROUTE_GUIDE,
 }
 
+const own = <T>(table: Readonly<Record<string, T>>, id: string): T | undefined =>
+  Object.hasOwn(table, id) ? table[id] : undefined
+
+// 2026-11-23 (reverseGuides.ts): a reversed track's guides are its original's, carried over and
+// touched up, worked out on first use
+const reversedCache = new Map<string, { main?: TrackGuide; route?: TrackGuide }>()
+function reversed(id: string): { main?: TrackGuide; route?: TrackGuide } {
+  const known = reversedCache.get(id)
+  if (known) return known
+  const original = forwardId(id)
+  const main = own(GUIDES, original)
+  const route = own(ROUTE_GUIDES, original)
+  const forward = main || route ? raceTrack(original) : null
+  const back = forward ? raceTrack(id) : null
+  const made =
+    forward && back
+      ? reverseGuides({
+          forward,
+          reversed: back,
+          ...(main ? { main } : {}),
+          ...(route ? { route } : {}),
+        })
+      : {}
+  reversedCache.set(id, made)
+  return made
+}
+
 export const trackGuide = (id: string): TrackGuide | undefined =>
-  Object.hasOwn(GUIDES, id) ? GUIDES[id] : undefined
+  isReverseId(id) ? reversed(id).main : own(GUIDES, id)
 
 /** The guide of a track's route down every branch, if it has one */
 export const routeGuide = (id: string): TrackGuide | undefined =>
-  Object.hasOwn(ROUTE_GUIDES, id) ? ROUTE_GUIDES[id] : undefined
+  isReverseId(id) ? reversed(id).route : own(ROUTE_GUIDES, id)

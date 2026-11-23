@@ -1,4 +1,4 @@
-// 2026-11-23 (docs/SECURITY.md §11, docs/ARCHITECTURE.md §4.92): the leaderboard's walls
+// 2026-11-23 (docs/SECURITY.md §11, docs/ARCHITECTURE.md §4.93): the leaderboard's walls
 // (shared/kart/boardWalls.ts). Real runs go through no wall, with the master's technical line (drift
 // jumps over the fences, onto the platforms, down the real branches) and the reset key; a forged run
 // that cuts through a kerb between two gates, steps through one and back, or claims a flight off no

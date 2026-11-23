@@ -220,3 +220,9 @@ export const LANES: TrackJson = {
   decor: [],
   jumps: made.jumps,
 }
+
+/**
+ * Where the technical places are, by road point: what the reversed track's guide is touched up by
+ * (reverseGuides.ts)
+ */
+export const LANES_MARKS = { yards, yardsIn, yardsOut, step1, step2, step3, wellIn, wellOut } as const

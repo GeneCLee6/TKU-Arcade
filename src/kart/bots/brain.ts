@@ -137,6 +137,11 @@ const CARE_GRIP = 0.5
 const CARE_WARY = 0.8
 const CARE_BRAKE = 0.45
 const NO_EDGE = { own: Infinity, best: Infinity, steer: 0 } as const
+/**
+ * The S-bends (2026-11-23, skill.esses; docs/KART-FEEL.md §13.5): out of a drift, while the road
+ * still bends its way by at least this share of what the grip gives, the hands turn with it
+ */
+const ESSES_BEND = 0.2
 
 type Move =
   | { readonly kind: 'none' }
@@ -631,6 +636,12 @@ export function createBotBrain(
   }
 
   const classic = t.model === MODEL_CLASSIC
+  /**
+   * The S-bends habit (skill.esses), on the road's own line only; on a guide's lines the hands drive
+   * as they did (2026-11-23: on a safe line the hard kart would come up to the expert, whose route
+   * through Zhuwei's cut earns next to no gauge; on a technical one the expert met the works' walls)
+   */
+  const esses = (skill.esses ?? false) && line === null
   /** A whole number between the two, drawn; `fallback` (and nothing drawn) when the skill has none */
   const drawn = (range: readonly [number, number] | undefined, fallback: number): number =>
     range ? Math.round(range[0] + (range[1] - range[0]) * rng.float()) : fallback
@@ -673,8 +684,12 @@ export function createBotBrain(
     lineUp: boolean,
     /** Watching the wall: how soon the road's edge comes, on the hands' line and the best (edgeAhead) */
     edge: { readonly own: number; readonly best: number; readonly steer: number },
+    /** The way the kart travels, against the road's own direction here: radians, + to the right */
+    across: number,
   ): KartInput => {
     wasDrifting = kart.drifting
+    /** The S-bends (skill.esses): whether the road ahead still bends `way` (-1 left, 1 right) */
+    const bendsOn = (way: number) => Math.sign(want) === way && Math.abs(want) > gripTurn * ESSES_BEND
     // Watching the wall (2026-11-22, #100): out of a drift, an edge coming that no line the kart
     // has can miss at this speed: off the throttle, no charge fired, an instant boost waits; nearer,
     // the brake. The hands' own line meeting the edge: the line that lasts instead
@@ -719,9 +734,15 @@ export function createBotBrain(
     if (move.kind === 'lift') {
       // A dash waiting (the car still sliding, or just straightened): lift, then press afresh
       const { steps, double, counter, wait = 0 } = move
-      // The counter-steer is what pulls the slide straight: never changed; once straight, the safe line
-      const steer =
-        counter !== undefined && kart.slideDirection !== 0 ? counter : safe(gripSteer)
+      // The counter-steer is what pulls the slide straight; once straight, the safe line. By skill
+      // (esses, 2026-11-23): while the road still bends the drift's way, no counter-steer, which
+      // swings the nose towards the outside: the hands steer the way the kart is to go
+      const turnsOn = esses && counter !== undefined && bendsOn(-counter)
+      const steer = turnsOn
+        ? safe(clampSteer(want / gripTurn))
+        : counter !== undefined && kart.slideDirection !== 0
+          ? counter
+          : safe(gripSteer)
       if (wait > 0) {
         // Slow hands: the drift is let go, the throttle still down for a moment
         move = { kind: 'lift', steps, double, counter, wait: wait - 1 }
@@ -791,14 +812,28 @@ export function createBotBrain(
         (kart.driftSeconds < skill.holdSeconds || !kart.burstReady)
       const earning = dashPlan && ((!held && (goesOn || nearly)) || committed)
       if (earning && (kart.driftPeak ?? 0) < holdSlip) into = Math.max(into, deepInto)
+      // The S-bends (by skill, 2026-11-23): the kart carried across the road towards the outside of
+      // the drift, its line no longer coming round with the road: the stick is not eased out of it
+      if (esses && across * dir < 0) into = Math.max(into, 0)
       // The corner is over (or the car has come round too far) and no dash is about to be earned.
       // Through a long bend the drift is held, steering out of it, not let go and begun again
       const over =
         Math.sign(want) !== dir ||
         (Math.abs(want) < gripTurn * CLASSIC_END_NOW &&
           Math.abs(later) < gripTurn * CLASSIC_END_LATER)
+      // ... and the road turning the other way, a drift that has earned its instant boost is let go
+      // at once, not held on for a deeper mark into the bend the other way; nor for its full length
+      // (skill.holdSeconds) once the kart already points to that bend's outside
+      const switching =
+        esses &&
+        kart.burstReady &&
+        Math.sign(want) === -dir &&
+        (!committed || across * dir > 0)
       const done =
-        (kart.driftSeconds > 0.15 && over && (!earning || (outOfRoom && kart.burstReady))) || lineUp
+        (kart.driftSeconds > 0.15 &&
+          over &&
+          (!earning || switching || (outOfRoom && kart.burstReady))) ||
+        lineUp
       if (done) {
         // Out of the corner: let go, counter-steer and lift, then press afresh for the dash; or
         // just let go
@@ -806,7 +841,9 @@ export function createBotBrain(
           const lift = liftMove(-dir)
           move = lift
           const waits = (lift.wait ?? 0) > 0
-          return { ...base, throttle: waits ? kart.throttleHeld : false, steer: -dir }
+          // By skill (esses): no counter-steer while the road still bends the drift's way
+          const steer = esses && bendsOn(dir) ? gripSteer : -dir
+          return { ...base, throttle: waits ? kart.throttleHeld : false, steer }
         }
         return { ...base, steer: gripSteer }
       }
@@ -979,6 +1016,7 @@ export function createBotBrain(
             tricks && !guide!.cuesOnly
             ? NO_EDGE
             : edgeAhead(kart.x, kart.z, speed, travel, nearest, gripTurn, gripSteerNow, CARE_WARY)
+      const way = roadDirection(road, nearest)
       return classicHands(
         kart,
         sense,
@@ -995,6 +1033,7 @@ export function createBotBrain(
           fallback === 0 &&
           slotAhead(kart.x, kart.z, nearest, SLOT_CALM) !== null,
         edge,
+        wrap(travel - Math.atan2(way.dx, -way.dz)),
       )
     }
 

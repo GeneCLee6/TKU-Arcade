@@ -138,8 +138,10 @@ export const DRIVERS: Readonly<Record<DriverId, Driver>> = {
       startBoost: 1,
       // Fires a charge anywhere short of a real corner, so that the stock is never full for long
       boostAt: 0.6,
-      // People's hands: the computer karts' care at the wall is theirs (2026-11-22, #100)
+      // People's hands: the computer karts' care at the wall is theirs (2026-11-22, #100), and
+      // their way through the S-bends (2026-11-23): the medals are weighed without them
       wallCare: 0,
+      esses: false,
     },
     hands: { ...STEADY_HANDS, shake: 0.02 },
   },
@@ -161,8 +163,10 @@ export const DRIVERS: Readonly<Record<DriverId, Driver>> = {
       releaseBoosts: 1,
       startBoost: 1,
       boostAt: 0.6,
-      // People's hands: the computer karts' care at the wall is theirs (2026-11-22, #100)
+      // People's hands: the computer karts' care at the wall is theirs (2026-11-22, #100), and
+      // their way through the S-bends (2026-11-23): the medals are weighed without them
       wallCare: 0,
+      esses: false,
       tricks: true,
       // 2026-11-22: and the timed landing (docs/KART-FEEL.md §22)
       landTap: true,

@@ -138,7 +138,7 @@ export function island(
  * Where the straight line from `from` to `to` (each a road point and metres right of the middle)
  * crosses the road at every road point between them: metres right of the middle, by road point
  */
-function chordOffsets(
+export function chordOffsets(
   road: readonly RoadPoint[],
   from: readonly [number, number],
   to: readonly [number, number],
@@ -163,7 +163,7 @@ function chordOffsets(
 }
 
 /** A line's steps from one hold to the next eased over a few road points */
-function smooth(offsets: readonly number[]): number[] {
+export function smooth(offsets: readonly number[]): number[] {
   let line = [...offsets]
   const count = line.length
   for (let pass = 0; pass < 3; pass++) {
