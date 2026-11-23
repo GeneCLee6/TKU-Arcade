@@ -20,6 +20,8 @@ import {
   type GhostPick,
   type RecordNews,
 } from './records.ts'
+import { watchKartRun } from '../achievements/kartHook.ts'
+import { holdAchievements } from '../achievements/track.ts'
 import { createKartAudio } from './kartAudio.ts'
 import type { Quality } from './quality.ts'
 import {
@@ -596,6 +598,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
   let bestLap: number | null = keyOfRecords ? loadBestLap(keyOfRecords) : null
   let recorder: GhostRecorder | null = null
   let news: RecordNews | null = null
+  // e11-t06 (§4.82): the race's feats for the achievements, watched from its steps
+  let feats = track ? watchKartRun(track, kartId) : null
   // 2026-11-23 (§4.81): the run as the leaderboard keeps it, on a built-in track's own laps alone;
   // `boardTuning` is the tuning it started with, which must stay the standard one to the finish
   const boardable = !net && !!track && !!options.onBoardRun && ownLaps === undefined
@@ -713,6 +717,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     // 2026-11-22 (§4.73): paused (a race with no one else in it, raceClock.ts), no time passes: no
     // step, no countdown, nothing moves; the picture is still drawn (the menu blurs it)
     const paused = isRacePaused()
+    // e11-t06: an achievement's badge waits while the race runs, and shows at the finish or the pause
+    holdAchievements(trial?.phase === 'racing' && !paused)
     const frameMs = lastFrame === undefined || paused || wasPaused ? 0 : now - lastFrame
     lastFrame = now
     wasPaused = paused
@@ -903,14 +909,16 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       }
       debug.input = input
       if (net && trial) net.afterStep(trial, input, run.resets !== before.resets)
-      options.onStep?.({
+      const step: SpikeStep = {
         before: before.kart,
         after: run.kart,
         input,
         trial,
         hit: run.hitSpeed,
         hitBefore: before.hitSpeed,
-      })
+      }
+      feats?.(step)
+      options.onStep?.(step)
     }
     const current = run.kart
     debug.tick += clock.steps
@@ -1268,6 +1276,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     stopped = true
     debug.running = false
     cancelAnimationFrame(handle)
+    holdAchievements(false)
     window.removeEventListener('keydown', onKeyDown)
     window.removeEventListener('pointerdown', skip)
     window.removeEventListener('keyup', onKeyUp)
@@ -1292,6 +1301,7 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
       recorder = null
       board = null
       news = null
+      feats = track ? watchKartRun(track, kartId) : null
       finishedAt = null
       skipped = false
       beepFrom = null

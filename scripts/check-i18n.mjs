@@ -34,8 +34,11 @@ const KART_PARTS = [
   ['shared/kart/i18n.school.ts', 'KART_SCHOOL_MESSAGES'],
   ['shared/kart/i18n.challenge.ts', 'KART_CHALLENGE_MESSAGES'],
   ['shared/kart/i18n.board.ts', 'KART_BOARD_MESSAGES'],
+  ['shared/kart/i18n.online.ts', 'KART_ONLINE_MESSAGES'],
   ['shared/kart/i18n.editor.ts', 'KART_EDITOR_MESSAGES'],
 ]
+// 2026-11-23 (e11-t06): the achievements' words, registered by their own lazy chunks
+const ACHIEVEMENTS = 'shared/achievements/i18n.ts'
 const SOURCE_ROOT = 'src'
 
 const USER_VISIBLE_ATTRIBUTES = new Set(['aria-label', 'title', 'placeholder', 'alt', 'label'])
@@ -321,6 +324,12 @@ if (existsSync(KART)) {
     }
   }
 }
+const achievementMessages = existsSync(ACHIEVEMENTS) ? await load(ACHIEVEMENTS, 'ACHIEVEMENT_MESSAGES') : {}
+const achievementsEn = achievementMessages.en ?? {}
+checkParity(achievementsEn, `${ACHIEVEMENTS} (en)`, achievementMessages['zh-TW'] ?? {}, `${ACHIEVEMENTS} (zh-TW)`)
+for (const key of Object.keys(achievementsEn)) {
+  if (!key.startsWith('ach.')) problems.push(`${ACHIEVEMENTS}: '${key}': keys here start with ach.`)
+}
 for (const [catalog, file] of [[siteEn, SITE_EN], [siteZh, SITE_ZH], [roomEn, ROOM_EN]]) {
   for (const key of Object.keys(catalog)) {
     if (key.startsWith('games.')) problems.push(`${file}: '${key}': games.* belongs to game modules`)
@@ -340,6 +349,7 @@ if (problems.length > 0) {
     Object.keys(gamesEn).length +
     Object.keys(screensEn).length +
     Object.keys(kartEn).length +
+    Object.keys(achievementsEn).length +
     kartPartKeys
   console.log(`ok   check-i18n: ${keys} keys, ${sourceFiles.length} source files`)
 }

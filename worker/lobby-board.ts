@@ -1,6 +1,5 @@
 import {
   LOBBY_HEARTBEAT_MS,
-  LOBBY_LIST_LIMIT,
   LOBBY_MAX_ROOMS,
   LOBBY_TTL_MS,
   type RoomListing,
@@ -66,14 +65,16 @@ export class LobbyBoard {
     this.deps.storage.save(entry)
   }
 
-  /** Newest first. Ignores rooms past their time even if the alarm has not removed them yet */
+  /**
+   * Every room listed, newest first (at most LOBBY_MAX_ROOMS). Ignores rooms past their time even if
+   * the alarm has not removed them yet. What a caller is shown of them is worker/lobby-list.ts
+   */
   list(): RoomListing[] {
     const oldest = this.deps.now() - LOBBY_TTL_MS
     return [...this.entries.values()]
       .filter((entry) => entry.heardAt > oldest)
       .map((entry) => entry.listing)
       .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, LOBBY_LIST_LIMIT)
   }
 
   sweep(): void {

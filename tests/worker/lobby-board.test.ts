@@ -14,6 +14,7 @@ import {
   type LobbyEntry,
   type LobbyReport,
 } from '../../worker/lobby-board.ts'
+import { lobbyRooms } from '../../worker/lobby-list.ts'
 
 const listing = (id: string, over: Partial<RoomListing> = {}): RoomListing => ({
   id,
@@ -95,8 +96,10 @@ describe('LobbyBoard', () => {
       board.report(`room-${i}`, listing(`room-${i}`, { createdAt: i }))
     }
     expect(stored.size).toBe(LOBBY_MAX_ROOMS)
-    expect(board.list()).toHaveLength(LOBBY_LIST_LIMIT)
+    // Every room it keeps, newest first: worker/lobby-list.ts cuts what a caller sees to LOBBY_LIST_LIMIT
+    expect(board.list()).toHaveLength(LOBBY_MAX_ROOMS)
     expect(board.list()[0].createdAt).toBe(LOBBY_MAX_ROOMS - 1)
+    expect(lobbyRooms(board.list(), null)).toHaveLength(LOBBY_LIST_LIMIT)
     // A room already listed can still update and leave
     board.report('room-0', listing('room-0', { seated: 2 }))
     expect(stored.get('room-0')?.listing.seated).toBe(2)

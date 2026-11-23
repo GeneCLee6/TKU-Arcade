@@ -37,6 +37,10 @@ const en = {
   'kart.board.chasing': 'Racing the ghost of {nick} ({time})',
   'kart.board.stopChase': 'Stop',
 
+  // Online races (i18n.online.ts, 2026-11-23): the menu's way in
+  'kart.online.open': 'Online',
+  'kart.online.opening': 'Loading the rooms…',
+
   // The track editor (i18n.editor.ts): what /kart shows of a shared track
   'kart.editor.open': 'Track editor',
   'kart.editor.editCopy': 'Edit a copy of this track',
@@ -77,6 +81,8 @@ const zhTW: Record<KartMenuKey, string> = {
   'kart.board.opening': '排行榜載入中…',
   'kart.board.chasing': '正在和 {nick} 的幽靈車比（{time}）',
   'kart.board.stopChase': '停止',
+  'kart.online.open': '線上對戰',
+  'kart.online.opening': '房間載入中…',
 
   // The track editor (i18n.editor.ts): what /kart shows of a shared track
   'kart.editor.open': '賽道編輯器',

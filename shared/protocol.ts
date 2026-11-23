@@ -70,9 +70,11 @@
 //    game is played. A computer seat is always ready and never offline, and plays like any other;
 //    its moves come from the host's browser: an `action` with `botSeat`, and binary frames wrapped in
 //    PROXY_FRAME. The room takes either only from the host and only for a computer seat in the game;
-//    everything else about them is judged as for anyone. When the host's socket closes or the host
-//    changes during a game, the game is told nobody will move the computer seats any more
-//    (`RealtimeModule.abandon`: the kart retires them).
+//    everything else about them is judged as for anyone. When the host changes during a game, or
+//    (2026-11-23) the host's socket has been closed for BOT_HOST_GRACE_MS, or the host comes back on
+//    another page, the game is told nobody will move the computer seats any more
+//    (`RealtimeModule.abandon`: the kart retires them). The same page back within the grace (its
+//    `session`, 20.) goes on moving them.
 // 15. Teams (2026-11-18, the kart's team race). `set_team` puts a member on a side (0 or 1) or, with
 //    null, leaves it to the game: one's own, or anyone's from the host (`member`), in any status
 //    but `playing`. It is `RoomMember.team`, and each seat's goes to the game when it starts
@@ -143,6 +145,12 @@ export const STALE_AFTER_MS = 90_000
 export const JOIN_TIMEOUT_MS = 10_000
 /** How long until a disconnected member is `absent`, and loses the host if they had it (AC-2.3) */
 export const RECONNECT_GRACE_MS = 45_000
+/**
+ * 2026-11-23 (14. above): how long the computer karts of a host whose socket closed during the race
+ * wait for the same page to come back before they are given up. Under the kart's RETIRE_AFTER_MS
+ * (20 s without a frame), which would retire them anyway
+ */
+export const BOT_HOST_GRACE_MS = 15_000
 /**
  * How long a kicked member cannot join again (E1): their seat token, their account, or their
  * address with their name (18. above). Five minutes before 2026-11-22
@@ -234,6 +242,8 @@ export type RoomInfo = {
    * a room reachable by link only
    */
   public?: true
+  /** 2026-11-23: what the host called the room (shared/roomName.ts, nickname rules); absent: none */
+  name?: string
 }
 
 /** One person in the room. The seat token is never part of the view: only its owner gets it */
@@ -567,13 +577,34 @@ type ClientBody =
  * the game's fewest players and at most at its most, `level` is one of the game's `bots.levels`;
  * anything else is refused (400 `bad_bots`). Such a room is never public
  */
+/**
+ * `name` (2026-11-23): the room's name, shown in the lists (shared/roomName.ts: what a nickname may
+ * not say either, else 400 `bad_name`). `seatBots` (2026-11-23): computer players already seated in a game
+ * whose host's browser runs them (`GameModule.bots` without `bot`: the kart), in seats 1 and on; the
+ * room stays as public as asked and waits for its host to start, unlike `bots`
+ */
 export type CreateRoomRequest = {
   gameId: string
   options?: OptionValues
   public?: boolean
   password?: string
   bots?: QuickBots
+  name?: string
+  seatBots?: SeatBots
 }
+
+/** CreateRoomRequest.seatBots: `count` computer players at `level` */
+export type SeatBots = { count: number; level: string }
+
+/**
+ * POST /api/rooms/quick (2026-11-23, the kart's "Quick join"): a public room of `gameId` that is
+ * waiting, has a free seat and no password, or else a new public one (the game's quick defaults:
+ * the kart's track of the week and items), named `name` and with `seatBots` seated
+ */
+export type QuickJoinRequest = { gameId: string; name?: string; seatBots?: SeatBots }
+
+/** 200 (an open room found) or 201 (a new one) from POST /api/rooms/quick */
+export type QuickJoinResponse = { id: string; created: boolean; code?: string | null }
 
 /**
  * CreateRoomRequest.bots: `count` computer players at `level`, or (2026-11-22) each at its own
@@ -657,12 +688,30 @@ export type RoomListing = {
   gameId: string
   /** The host's nickname */
   host: string
+  /** Seated members, computer players included */
   seated: number
   maxSeats: number
   createdAt: number
+  /**
+   * 2026-11-23 (the kart's room list): absent means `waiting`. A public room stays listed while its
+   * game is played, for spectators; GET /api/lobby without `game` still answers only open ones
+   */
+  status?: 'waiting' | 'playing'
+  /** 2026-11-23: a public room with a password: listed, but someone new must bring it */
+  locked?: true
+  /** 2026-11-23: the room's name (RoomInfo.name) */
+  name?: string
+  /** 2026-11-23: how many of `seated` are computer players */
+  bots?: number
+  /** 2026-11-23: the room's `select` and `int` options (a track, a mode; never typed text) */
+  options?: Record<string, string | number>
 }
 
-/** GET /api/lobby: newest first */
+/**
+ * GET /api/lobby: the rooms waiting for people, with a free seat and no password, newest first.
+ * GET /api/lobby?game=<id> (2026-11-23): every listed room of that game, open, full, locked or
+ * playing, the open ones first (`lobbyRooms`, worker/lobby-list.ts)
+ */
 export type LobbyResponse = { rooms: RoomListing[] }
 
 /** How often the home page asks for the list, while it is visible */
@@ -713,6 +762,14 @@ const LONE_JOINER =
  * not say is shared/nickname.ts
  */
 export function normalizeName(raw: unknown): string | null {
+  return normalizeText(raw, MAX_NAME_CHARS)
+}
+
+/**
+ * `normalizeName` up to `maxChars`: also a room's name (2026-11-23, shared/roomName.ts, which stays
+ * out of the first load)
+ */
+export function normalizeText(raw: unknown, maxChars: number): string | null {
   if (typeof raw !== 'string') return null
   // NFC last: removing a character can bring together two that compose
   const name = raw
@@ -723,7 +780,7 @@ export function normalizeName(raw: unknown): string | null {
     .trim()
     .normalize('NFC')
   // Only zero-width characters would look like nobody at all in the seat list
-  if (name.replace(/[\p{Cf}\s]/gu, '') === '' || [...name].length > MAX_NAME_CHARS) return null
+  if (name.replace(/[\p{Cf}\s]/gu, '') === '' || [...name].length > maxChars) return null
   return name
 }
 

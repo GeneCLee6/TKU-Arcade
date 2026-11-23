@@ -12,6 +12,7 @@ import {
   HEARTBEAT_PONG,
   newSeatToken,
   type QuickBots,
+  type SeatBots,
   type RoomSummary,
   type ServerMessage,
 } from '../shared/protocol.ts'
@@ -171,8 +172,10 @@ export class RoomDO extends DurableObject<Env> {
     code: string | null = null,
     password: string | null = null,
     bots: QuickBots | null = null,
+    name: string | null = null,
+    seatBots: SeatBots | null = null,
   ): Promise<boolean> {
-    const created = this.host.create(id, gameId, options, isPublic, code, password, bots)
+    const created = this.host.create(id, gameId, options, isPublic, code, password, bots, name, seatBots)
     // A room nobody ever joins is cleaned up too
     await this.settle()
     return created

@@ -8,7 +8,10 @@ import type { LobbyResponse } from '../shared/protocol.ts'
 import { handleAuth, isAuthPath } from './auth.ts'
 import { handleClientError } from './errors.ts'
 import { handleBoardAdmin, handleKartBoard } from './kartBoard.ts'
-import { LOBBY_NAME } from './lobby-board.ts'
+import { lobbyReadLimit, lobbyRooms, readLobby, type LobbyLister } from './lobby-list.ts'
+import { addressKey, clientAddress, isLoopback } from './address.ts'
+import { getGame } from '../shared/games/index.ts'
+import type { FixedWindowLimit } from './rate-limit.ts'
 import type { LimiterDO } from './limiter.ts'
 import type { LobbyDO } from './lobby.ts'
 import type { RoomDO } from './room.ts'
@@ -66,20 +69,43 @@ const noStore = { 'cache-control': 'no-store' }
 
 const notFound = () => Response.json({ error: 'not_found' }, { status: 404, headers: noStore })
 
-/** GET /api/lobby: the public rooms waiting for people */
-async function handleLobby(request: Request, env: Env): Promise<Response> {
+/**
+ * GET /api/lobby: the public rooms waiting for people; `?game=<id>` (2026-11-23, the kart's room
+ * list): every listed room of that game, playing ones too (worker/lobby-list.ts). Limited per address
+ * in memory only (a list polls; the shared limiter would cost a request of its own each time)
+ */
+export async function handleLobby(
+  request: Request,
+  env: Env,
+  url: URL = new URL(request.url),
+  limit: FixedWindowLimit = lobbyReadLimit,
+  now: number = Date.now(),
+): Promise<Response> {
   if (request.method !== 'GET') {
     return Response.json(
       { error: 'method_not_allowed' },
       { status: 405, headers: { ...noStore, allow: 'GET' } },
     )
   }
+  const game = url.searchParams.get('game')
+  if (game !== null && !getGame(game)) {
+    return Response.json({ error: 'unknown_game' }, { status: 400, headers: noStore })
+  }
+  // Local development (the browser tests) polls from one machine
+  const address = clientAddress(request)
+  if ((address === null || !isLoopback(address)) && !limit.take(await addressKey(address), now)) {
+    return Response.json(
+      { error: 'rate_limited' },
+      { status: 429, headers: { ...noStore, 'retry-after': '60' } },
+    )
+  }
   const [rooms, paused] = await Promise.all([
-    env.LOBBY.get(env.LOBBY.idFromName(LOBBY_NAME)).list(),
+    readLobby(env.LOBBY as unknown as LobbyLister, now),
     disabledGames(env.DB),
   ])
   // A paused game's rooms cannot start a game (e12-t11): nobody is invited to them
-  const body: LobbyResponse = { rooms: rooms.filter((room) => !paused.has(room.gameId)) }
+  const shown = rooms.filter((room) => !paused.has(room.gameId))
+  const body: LobbyResponse = { rooms: lobbyRooms(shown, game) }
   return Response.json(body, { headers: noStore })
 }
 
@@ -95,7 +121,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     return handleRooms(request, env, url)
   }
   if (url.pathname.startsWith('/api/codes/')) return handleRoomCode(request, env, url)
-  if (url.pathname === '/api/lobby') return handleLobby(request, env)
+  if (url.pathname === '/api/lobby') return handleLobby(request, env, url)
   if (url.pathname === '/api/voice') return handleVoice(request, env)
   if (url.pathname === '/api/stats') return handleStats(request, env)
   if (url.pathname === '/api/flags') return handleFlags(request, env)
