@@ -23,11 +23,17 @@ const run: KartRunEvent = {
 }
 
 beforeEach(() => {
+  // Noon: a game between midnight and five unlocks one more (CI runs on UTC, any hour)
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 10, 23, 12))
   localStorage.clear()
   resetEngine()
   clearPopups()
 })
-afterEach(() => localStorage.clear())
+afterEach(() => {
+  vi.useRealTimers()
+  localStorage.clear()
+})
 
 describe('the engine', () => {
   it('counts an event, keeps what it unlocked and queues its badges, once', async () => {
