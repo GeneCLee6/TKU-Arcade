@@ -8,6 +8,10 @@
 //        [--karts tide,comet] [--kinds none,mini,n2o,team,start] [--quality high]
 //        [--track riverside] [--views rear,side,front] [--mobile] [--drive] [--hud]
 //
+// 2026-11-23 (docs/ARCHITECTURE.md §4.85): `--poses drive,steer,drift,boost,daze,idle,cheer` instead
+// shoots the drivers' skeleton, each of `--drivers spade,heart,diamond,club` in each pose, from
+// `--views` (`driver` is close on the cockpit), through `__kartSpike.pose` and `.gesture`.
+//
 // Not a test: nothing is compared. The pictures go to `--out` (ignored by git).
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -44,7 +48,29 @@ const VIEWS = {
   top: { orbit: 0.2, back: 2.2, up: 5.5 },
   // 2026-11-22: close in on the body, for its fine detail (art/bodyDetail.ts)
   close: { orbit: 1.1, back: 1.6, up: 0.9 },
+  // 2026-11-23: close on the driver from ahead and to the side, and from behind
+  driver: { orbit: 2.3, back: 2.0, up: 1.25 },
+  cockpit: { orbit: 0.35, back: 1.9, up: 1.5 },
+  portrait: { orbit: 2.5, back: 1.5, up: 1.1 },
+  over: { orbit: 0.2, back: 1.3, up: 2.1 },
 }
+
+// 2026-11-23 (§4.85): what each pose sets on the look (spikeLoop.ts's debug `pose`, `gesture`, `fx`)
+const POSES = {
+  drive: { pose: { steer: 0, drift: 0, throttle: 1 } },
+  steer: { pose: { steer: 1, drift: 0, throttle: 1 } },
+  left: { pose: { steer: -1, drift: 0, throttle: 1 } },
+  drift: { pose: { steer: 1, drift: 1, throttle: 1 } },
+  boost: { pose: { steer: 0, drift: 0, throttle: 1 }, fx: 'n2o' },
+  daze: { pose: { steer: 0, drift: 0, dazed: 1, throttle: 0 } },
+  idle: { gesture: 'idle', wait: 2600 },
+  wave: { gesture: 'wave' },
+  pump: { gesture: 'pump', wait: 450 },
+  cheer: { gesture: 'cheer', wait: 1400 },
+  trophy: { gesture: 'trophy' },
+}
+const poses = option('poses', '').split(',').filter(Boolean)
+const drivers = option('drivers', 'spade,heart,diamond,club').split(',')
 
 mkdirSync(out, { recursive: true })
 const browser = await chromium.launch({
@@ -57,6 +83,52 @@ const context = await browser.newContext({
   hasTouch: mobile,
   isMobile: mobile,
 })
+if (poses.length > 0) {
+  for (const kart of karts) {
+    for (const who of drivers) {
+      const page = await context.newPage()
+      page.on('pageerror', (error) => console.error(`[${kart}/${who}] ${error.message}`))
+      await page.addInitScript(
+        ([body, person, level]) => {
+          localStorage.setItem('tku-arcade.kart.body', body)
+          localStorage.setItem('tku-arcade.kart.driver', person)
+          localStorage.setItem('tku-arcade.kart.quality', level)
+        },
+        [kart, who, quality],
+      )
+      await page.goto(`${base}/kart/spike?track=${track}`)
+      await page.addStyleTag({ content: 'body *:not(canvas):not(:has(canvas)) { visibility: hidden !important }' })
+      await page.waitForFunction(() => (window.__kartSpike?.frames ?? 0) > 20, undefined, { timeout: 60_000 })
+      for (const name of poses) {
+        const set = POSES[name]
+        for (const view of views) {
+          await page.evaluate(
+            ([wanted, look]) => {
+              window.__kartSpike.pose = wanted.pose ?? { steer: 0, drift: 0 }
+              window.__kartSpike.gesture = wanted.gesture ?? null
+              window.__kartSpike.fx = wanted.fx ?? null
+              window.__kartSpike.view = look
+            },
+            [set, VIEWS[view] ?? null],
+          )
+          await page.waitForTimeout(set.wait ?? 900)
+          const file = join(out, `${kart}-${who}-${name}-${view}-${quality}.png`)
+          await page.locator('canvas').first().screenshot({ path: file })
+          console.log(file)
+          // Back to rest between poses, so that a gesture starts from its beginning
+          await page.evaluate(() => {
+            window.__kartSpike.gesture = null
+            window.__kartSpike.fx = null
+          })
+          await page.waitForTimeout(250)
+        }
+      }
+      await page.close()
+    }
+  }
+  await browser.close()
+  process.exit(0)
+}
 for (const kart of karts) {
   const page = await context.newPage()
   page.on('pageerror', (error) => console.error(`[${kart}] ${error.message}`))
