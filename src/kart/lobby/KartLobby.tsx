@@ -21,6 +21,7 @@
 //     Start, which waits on everyone and says for whom).
 //   - A phone held upright gets a list instead, and is asked to turn sideways. 2026-11-23 (§4.91): with
 //     a big 3D picture of your own racer (or the first in the line) over it.
+import { NameButton } from '../../components/social/NameButton.tsx'
 import {
   lazy,
   Suspense,
@@ -705,7 +706,8 @@ function PlaceCard({ seat, member, isYou, viewerIsHost, team, stage, span, onMan
           data-name=""
           title={name}
         >
-          {name}
+          {/* 2026-11-23: a person's name opens their card (src/components/social/) */}
+          {member.bot ? name : <NameButton member={member.id} name={name} />}
         </Who>
         <Kart>
           <span>{kartName}</span>

@@ -22,14 +22,15 @@ import { fetchRoomSummary, type RoomLookup } from '../lib/rooms.ts'
 import { Link } from '../lib/router.tsx'
 import { useCompact } from '../lib/useMediaQuery.ts'
 import { useRoom } from '../lib/useRoom.ts'
-import { memberName, withBotNames } from '../lib/memberName.ts'
+import { withBotNames } from '../lib/memberName.ts'
 import { useParams } from '../lib/useRouter.ts'
 import { clippedFill, displayType, monoType, SLANT, slantClip } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
 import { RoomWatch } from '../achievements/RoomWatch.tsx'
 
-// e7-t11: its own chunk, with its strings
-const Reactions = lazy(() => import('../components/Reactions.tsx'))
+// e7-t11's reactions, grown into emotes, phrases and player cards (2026-11-23): one chunk of its own,
+// with its strings, over every screen of the room
+const SocialLayer = lazy(() => import('../components/social/SocialLayer.tsx'))
 
 // Only a room that has not started shows it: a game's first screen does not wait for the seats and
 // the options form (every new game's lobby strings come out of the same 150 kB)
@@ -240,19 +241,16 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         gameId={view.room.gameId}
         status={view.room.status}
         edition={view.room.options.edition === 'full' ? 'full' : 'simple'}
-        extra={
-          <Suspense>
-            <Reactions
-              reactions={room.reactions}
-              onReact={room.react}
-              nameOf={(member) => {
-                const one = view.members[member]
-                return one ? memberName(one, view.room.gameId) : ''
-              }}
-            />
-          </Suspense>
-        }
       />
+      <Suspense>
+        <SocialLayer
+          view={view}
+          you={you}
+          reactions={room.reactions}
+          onReact={room.react}
+          onSendProfile={room.sendProfile}
+        />
+      </Suspense>
       {view.room.status === 'waiting' ? (
         <Suspense fallback={<p role="status">{t('common.loading')}</p>}>
           <WaitingRoom
@@ -314,7 +312,6 @@ function RoomHeading({
   members,
   gameId,
   edition,
-  extra,
   status,
 }: {
   title: string
@@ -322,8 +319,6 @@ function RoomHeading({
   gameId?: string
   /** Which rules "how to play" opens, for a game with two editions */
   edition?: RulesEdition
-  /** Beside "how to play": the reactions (e7-t11), so that they take no row of their own */
-  extra?: ReactNode
   /** Once in the room: waiting, live or final, on a ticker beside the title (2026-11-23) */
   status?: RoomStatus
 }) {
@@ -340,7 +335,6 @@ function RoomHeading({
       <MemberCount>{t('room.memberCount', { count: members })}</MemberCount>
       {gameId !== undefined && (
         <HeadingAction>
-          {extra}
           {/* 2026-11-23 (QA sweep): not while Promotion is played, whose board has its own full
               screen (the board and the roll, #29): two buttons called "Full screen" that do
               different things */}

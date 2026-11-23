@@ -192,7 +192,7 @@ export default function LanternScreen({ room, game }: GameScreenProps) {
           <h2 id="lantern-table">{t('games.lantern.ui.table')}</h2>
           <Seats>
             {view.players.map((player) => (
-              <SeatRow key={player.seat} data-testid={`seat-${player.seat}`} $you={player.seat === view.you}>
+              <SeatRow key={player.seat} data-testid={`seat-${player.seat}`} data-social-seat={player.seat} $you={player.seat === view.you}>
                 <Dot style={{ background: seatColor(player.seat) }} aria-hidden="true" />
                 <SeatName>{nameOf(player.seat)}</SeatName>
                 <Pips aria-hidden="true">

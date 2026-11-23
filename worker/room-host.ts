@@ -1,6 +1,7 @@
 import type { Account } from '../shared/account.ts'
 import { CHAT_CHUNK, CHAT_HISTORY, ChatRateLimit, type ChatMessage } from '../shared/chat.ts'
 import type { ReplayStep } from '../shared/games/match.ts'
+import { PROFILE_MIN_MS, REACTION_RATE, type ProfileSummary } from '../shared/social.ts'
 import { keepHidden, parseOptions } from '../shared/games/options.ts'
 import { quickBotLevel } from '../shared/games/quickBots.ts'
 import { createRng } from '../shared/games/rng.ts'
@@ -149,6 +150,8 @@ export type MemberRecord = {
   account?: string
   /** A game's cosmetic choice, shown to everyone (e10-t05, RoomMember.look) */
   look?: string
+  /** 2026-11-23: what they show of their profile (RoomMember.profile, shared/social.ts) */
+  profile?: ProfileSummary
   /**
    * The hashed address (worker/address.ts) this member last joined from, for a kick's ban
    * (shared/protocol.ts 18.); absent when unknown. Never part of a view
@@ -317,6 +320,10 @@ export class RoomHost {
   private readonly deps: RoomHostDeps
   /** When each member last reacted (e7-t11); forgotten on hibernation, which costs nothing */
   private readonly reactedAt = new Map<string, number>()
+  /** 2026-11-23 (shared/social.ts): the reactions' own window, apart from the chat's; in memory */
+  private readonly reactionRate = new ChatRateLimit(REACTION_RATE)
+  /** When each member's card last changed (PROFILE_MIN_MS); in memory */
+  private readonly profiledAt = new Map<string, number>()
   /**
    * A real-time game's scratch space (e2-t11), for the game it was made for: in memory only, so
    * an eviction starts it over and the module rebuilds what it needs from the next frames
@@ -774,6 +781,9 @@ export class RoomHost {
         return
       case 'react':
         this.react(member, message.reaction)
+        return
+      case 'profile_summary':
+        this.setProfile(member, message.profile)
         return
       case 'chat':
         this.postChat(conn, member, message.text)
@@ -1526,6 +1536,8 @@ export class RoomHost {
       } else {
         this.members.delete(member.id)
         this.chatRate.forget(member.id)
+        this.reactionRate.forget(member.id)
+        this.profiledAt.delete(member.id)
       }
       this.saveMembers()
       if (wasHost) {
@@ -1577,6 +1589,8 @@ export class RoomHost {
       for (const member of gone) {
         this.members.delete(member.id)
         this.chatRate.forget(member.id)
+        this.reactionRate.forget(member.id)
+        this.profiledAt.delete(member.id)
       }
       this.saveMembers()
     })
@@ -1660,10 +1674,31 @@ export class RoomHost {
     const now = this.deps.now()
     const last = this.reactedAt.get(member.id)
     if (last !== undefined && now - last < REACTION_MIN_MS) return
+    // 2026-11-23: and no more than REACTION_RATE in its window (a held key, a script)
+    if (!this.reactionRate.take(member.id, now)) return
     this.reactedAt.set(member.id, now)
     for (const [open, { member: id }] of this.conns) {
       if (id !== null) this.deps.sockets.send(open, { t: 'reaction', member: member.id, reaction })
     }
+  }
+
+  /**
+   * 2026-11-23 (shared/protocol.ts 21.): the member's card, already checked by parseProfileSummary;
+   * null hides it. Kept with the members, so a restart keeps it; never part of a game
+   */
+  private setProfile(member: MemberRecord, profile: ProfileSummary | null): void {
+    if (member.bot) return
+    if (JSON.stringify(member.profile ?? null) === JSON.stringify(profile)) return
+    const now = this.deps.now()
+    const last = this.profiledAt.get(member.id)
+    // Hiding is always taken at once; showing again or a change waits its turn
+    if (profile !== null && last !== undefined && now - last < PROFILE_MIN_MS) return
+    this.profiledAt.set(member.id, now)
+    this.change(() => {
+      if (profile === null) delete member.profile
+      else member.profile = profile
+      this.saveMembers()
+    })
   }
 
   private isChatLocked(): boolean {
@@ -1822,6 +1857,8 @@ export class RoomHost {
     this.change(() => {
       this.members.delete(target.id)
       this.chatRate.forget(target.id)
+      this.reactionRate.forget(target.id)
+      this.profiledAt.delete(target.id)
       this.saveMembers()
       room.bans = [
         ...room.bans.filter((ban) => ban.until > now),
@@ -2106,6 +2143,7 @@ export class RoomHost {
         online: member.conn !== null || member.bot !== undefined,
         absent: member.absent,
         ...(member.look !== undefined ? { look: member.look } : {}),
+        ...(member.profile !== undefined ? { profile: member.profile } : {}),
         ...(member.team !== undefined ? { team: member.team } : {}),
         ...(member.bot ? { bot: { ...member.bot } } : {}),
       }

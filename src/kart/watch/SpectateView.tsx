@@ -2,6 +2,7 @@
 // or never sat down) and for a racer who has finished or dropped out. Every joined socket already
 // gets every kart's frames (docs/KART-NETCODE.md §2): they are drawn as a racer draws the others
 // (remotes.ts, 100 ms behind), and the camera follows the kart chosen, from behind or from above.
+import { SOCIAL_SEAT } from '../../components/social/bus.ts'
 import { loadoutOfByte } from '../../../shared/kart/karts.ts'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KartView } from '../../../shared/games/kart/types.ts'
@@ -452,7 +453,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose, outfitOf
       )}
       <TagLayer ref={tagLayer} aria-hidden="true">
         {view.racers.map((one) => (
-          <NameTag key={one.seat} data-tag={one.seat} style={{ display: 'none' }}>
+          <NameTag key={one.seat} data-tag={one.seat} {...{ [SOCIAL_SEAT]: one.seat }} style={{ display: 'none' }}>
             {nameOf(one.seat)}
           </NameTag>
         ))}

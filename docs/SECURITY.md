@@ -105,7 +105,8 @@ frame-ancestors 'none'
 | `POST /api/kart/board`（排行榜上傳，2026-11-23） | **每位址每分鐘 6 次**（`LimiterDO` 的 `board` 桶）＋每 instance 每位址 6 次、合計 120 次；body 256 kB（邊讀邊數）；超過 429 `rateLimited`／413 | `worker/kartBoard.ts` |
 | `GET /api/kart/board/replay`（下載重播） | 每 instance 每位址每分鐘 60 次、合計 1200 次 | `worker/kartBoard.ts` |
 | 聊天 | 每人每 10 秒 10 則、每則 500 字 | `shared/chat.ts`、`RoomHost` |
-| 表情 | 每人間隔 `REACTION_MIN_MS` | `RoomHost` |
+| 表情與快捷短語（2026-11-23） | 每人間隔 `REACTION_MIN_MS`（500 ms）**且每 10 秒 6 個**（`REACTION_RATE`，和聊天分開計），超過的安靜丟掉；只收清單內的編號（0–19，`shared/social.ts`），**不收自由文字**，清單外關 socket | `RoomHost`、`shared/social.ts` |
+| 玩家名片（`profile_summary`，2026-11-23） | 只收白名單欄位（稱號 id、成就數／總數、局數、勝場、車款／車手／賽道 id、圈速），整數與範圍檢查、id 限 `[a-z][a-z0-9-]{0,47}`、JSON ≤ 400 字，不合關 socket；同一人 2 s 內只收一次變更（隱藏隨時）；不收電腦成員的。內容是對方瀏覽器自稱的數字，畫面註明「資料來自對方自己的瀏覽器」 | `RoomHost`、`shared/social.ts` |
 | 房間密碼 | 每條 socket 錯 `PASSWORD_TRIES`（5）次關掉；**每房每位址 15 分鐘錯 `PASSWORD_FAILS`（10）次**後，那個位址到視窗結束前的加入一律 `rate_limited` 並關掉 socket，不再算雜湊（存在房間儲存，換 socket、休眠都不歸零；2026-11-23，§12） | `RoomHost` |
 | `GET /api/lobby`（大廳與卡丁車房間列表，2026-11-23） | **每 instance 每位址每分鐘 240 次**、instance 合計 2 萬次（記憶體，不走 `LimiterDO`：列表每 10 秒輪詢，每次多一個 DO 請求不划算；本機不限）；每個 instance 把 LobbyDO 的回答沿用 2 秒；`?game=` 不是遊戲 400 | `worker/app.ts`、`worker/lobby-list.ts` |
 | `/ws/lobby`（卡丁車房間列表推送，2026-11-23） | 同站 `Origin`；**每 instance 每位址每分鐘 30 次升級**、instance 合計 3,000 次（記憶體，本機不限），超過以 4429 關掉、不叫醒 LobbyDO；LobbyDO 同時開著的**全站 1,000 條、每位址 12 條**，超過 4429（頁面退回輪詢）；頁面只能送 `ping`，其他訊息關掉（4422） | `worker/app.ts`、`worker/lobby-feed.ts` |

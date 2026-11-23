@@ -37,7 +37,7 @@ export function Court({ view, nameOf }: { view: PalaceView; nameOf(seat: SeatId)
           const name = nameOf(player.seat)
           const tag = tagOf(player.seat)
           return (
-            <Line key={player.seat} $mark={seatColor(player.seat)} $out={player.out} data-seat={player.seat}>
+            <Line key={player.seat} $mark={seatColor(player.seat)} $out={player.out} data-seat={player.seat} data-social-seat={player.seat}>
               <Avatar name={name} tint={seatColor(player.seat)} />
               <Who>
                 <Name>

@@ -855,8 +855,8 @@ describe('chat', () => {
     fireEvent.click(screen.getByRole('button', { name: en['chat.send'] }))
     await act(async () => {})
 
-    const sent = FakeWebSocket.last.sent.at(-1)
-    expect(sent).toBe(JSON.stringify({ t: 'chat', text: 'hi' }))
+    // The player card (src/components/social/) may go out around it
+    expect(FakeWebSocket.last.sent).toContain(JSON.stringify({ t: 'chat', text: 'hi' }))
     expect(chatBox()).toHaveValue('')
 
     serverSays(

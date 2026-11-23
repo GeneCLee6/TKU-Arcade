@@ -29,7 +29,7 @@ export function Scoreboard({ view, nameOf }: { view: BluffView; nameOf(seat: Sea
           const name = nameOf(player.seat)
           const gain = gained.get(player.seat)
           return (
-            <PlateRow key={player.seat} $mark={seatColor(player.seat)}>
+            <PlateRow key={player.seat} $mark={seatColor(player.seat)} data-social-seat={player.seat}>
               {/* The list is in order already: the plate only shows it, ties sharing a place */}
               <RankPlate $lead={place === 1} aria-hidden="true">
                 {place}

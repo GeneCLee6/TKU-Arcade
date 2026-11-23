@@ -140,7 +140,7 @@ export function Rivals({
       <Heading id="traders-rivals">{t('games.traders.ui.rivals')}</Heading>
       <RivalList>
         {players.map((player) => (
-          <Rival key={player.seat} $turn={player.seat === turn} data-testid={`rival-${player.seat}`}>
+          <Rival key={player.seat} $turn={player.seat === turn} data-testid={`rival-${player.seat}`} data-social-seat={player.seat}>
             <RivalHead>
               <RivalName $seat={player.seat}>{nameOf(player.seat)}</RivalName>
               <Facts>

@@ -576,6 +576,7 @@ function SeatChip({
       aria-pressed={pressed}
       onClick={onClick}
       data-seat-chip={player.seat}
+      data-social-seat={player.seat}
       data-status={player.status}
       title={`${name} · ${degreeText(t, player)}`}
     >
