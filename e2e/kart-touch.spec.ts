@@ -400,6 +400,91 @@ test.describe('the drift by touch, the settings and the keyboard', () => {
   })
 })
 
+// 2026-11-23 (QA follow-up of docs/QA-SWEEP-2026-11-23.md): the first time on /kart, the driving
+// school's invite. Held sideways it sits in the top row, between the back link (and "Online") and
+// the menu button: under none of them, nor the HUD, the map, the clock or the touch buttons, both
+// ways round and in both languages
+for (const [width, height] of [
+  [844, 390],
+  [667, 375],
+  [915, 412],
+]) {
+  for (const leftHanded of [false, true]) {
+    test.describe(`the driving school's invite, ${width}×${height}${leftHanded ? ', left-handed' : ''}`, () => {
+      test.use({ viewport: { width, height }, hasTouch: true, isMobile: true })
+
+      for (const locale of ['en', 'zh-TW'] as const) {
+        test(`clear of the top row and the HUD (${locale})`, async ({ page }, testInfo) => {
+          await openTrial(page, locale, {
+            steer: 'buttons',
+            autoThrottle: true,
+            scale: 1,
+            opacity: 0.6,
+            leftHanded,
+            vibrate: true,
+          })
+          const invite = page.getByTestId('kart-school-invite')
+          await expect(invite).toBeVisible()
+          const box = (await invite.boundingBox())!
+          expect(box.x).toBeGreaterThanOrEqual(0)
+          expect(box.y).toBeGreaterThanOrEqual(0)
+          expect(box.x + box.width).toBeLessThanOrEqual(width)
+          expect(box.y + box.height).toBeLessThanOrEqual(height)
+          // Wide enough to read: the text in a few lines, not a column of words
+          expect(box.width).toBeGreaterThanOrEqual(200)
+          const others: [string, Box | null][] = [
+            [
+              'the back link',
+              await page
+                .getByRole('link', { name: locale === 'en' ? 'Back to the lobby' : '回大廳' })
+                .boundingBox(),
+            ],
+            ['the online link', await page.getByTestId('kart-online-open').boundingBox()],
+            ['the menu button', await page.getByTestId('kart-menu').boundingBox()],
+            ['the HUD', await page.getByTestId('kart-hud').boundingBox()],
+            [
+              'the map',
+              await page
+                .getByRole('img', { name: locale === 'en' ? 'Track map' : '賽道小地圖' })
+                .boundingBox(),
+            ],
+            ['the clock', await page.getByTestId('kart-race-clock').boundingBox()],
+          ]
+          for (const id of [
+            'kart-touch-left',
+            'kart-touch-right',
+            'kart-touch-gas',
+            'kart-touch-brake',
+            'kart-touch-drift',
+            'kart-touch-boost',
+            'kart-touch-reset',
+            'kart-touch-settings',
+          ]) {
+            others.push([id, await page.getByTestId(id).boundingBox()])
+          }
+          await testInfo.attach(`invite-${width}-${leftHanded ? 'lefty' : 'right'}-${locale}`, {
+            body: await page.screenshot(),
+            contentType: 'image/png',
+          })
+          for (const [name, other] of others) {
+            expect(other, `${name} is on the screen`).not.toBeNull()
+            expect(overlap(box, other!), `the invite over ${name}`).toBe(false)
+          }
+          // The menu opens over the invite, and its links that leave /kart are there
+          await page.getByTestId('kart-menu').tap()
+          await expect(page.getByTestId('kart-menu-editor-link')).toBeVisible()
+          await expect(page.getByTestId('kart-menu-replay-file-link')).toBeVisible()
+          await expect(page.getByTestId('kart-editor-link')).toBeHidden()
+          // Answering it puts it away for good
+          await page.getByTestId('kart-menu').tap()
+          await invite.getByTestId('kart-school-invite-no').tap()
+          await expect(invite).toHaveCount(0)
+        })
+      }
+    })
+  }
+}
+
 test.describe('a mouse and keyboard', () => {
   test.use({ viewport: { width: 1280, height: 720 } })
 

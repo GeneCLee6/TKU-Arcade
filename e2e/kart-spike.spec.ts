@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+import { manualClock, step, stepUntil } from './kartClock.ts'
 import { pinTheme } from './helpers.ts'
 
 // e8-t01: the spike at /kart/spike; e8-t02a and e8-t12 add the gauge, boosts, gamepad and remapping;
@@ -45,21 +46,6 @@ const framesOf = (page: Page): Promise<number> =>
   page.evaluate(() => (window as unknown as { __kartSpike?: KartReading }).__kartSpike?.frames ?? 0)
 
 /**
- * Waits, frame by frame, for the window after a drift's slide-out is caught by a counter-steer, in
- * which a fresh press of the throttle fires a release boost, with the throttle seen up: a press now
- * lands inside it
- */
-const releaseWindowOpen = (page: Page) =>
-  page.waitForFunction(
-    () => {
-      const state = (window as unknown as { __kartSpike: KartReading }).__kartSpike.state
-      return state.releaseWindow > 0 && !state.throttleHeld
-    },
-    undefined,
-    { polling: 'raf', timeout: 5000 },
-  )
-
-/**
  * 2026-11-18: the gauge goes by the quality of the drift, and at the yard's speeds (it is 140 m
  * across) a drift in circles fills next to nothing. For the tests that only want a charge to fire,
  * the page starts with numbers of its own, as the tuning panel would store them: a gauge that fills
@@ -88,9 +74,12 @@ function watchConsole(page: Page): string[] {
 }
 
 async function openSpike(page: Page) {
+  // 2026-11-23 (QA follow-up): the race drawing, as long as loading takes on a busy machine (an
+  // allowance of its own on top of the test's time), before the canvas
+  test.info().setTimeout(test.info().timeout + LOADING_MS)
   await page.goto('/kart/spike?fps=1')
+  await expect.poll(() => framesOf(page), { timeout: LOADING_MS }).toBeGreaterThan(5)
   await expect(page.locator('canvas')).toBeVisible()
-  await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
 }
 
 /** What share of the screenshot is the commonest colour, and how many colours there are */
@@ -122,6 +111,8 @@ const speedOf = async (page: Page) => {
 }
 
 const LONG = { timeout: 30_000 }
+/** As long as the race's chunks may take to load on a busy machine (as in kart-touch.spec.ts) */
+const LOADING_MS = 45_000
 
 async function drive(page: Page) {
   const start = await reading(page)
@@ -410,26 +401,29 @@ test.describe('the boost gauge', () => {
     page,
   }) => {
     const errors = watchConsole(page)
+    // 2026-11-23 (QA follow-up): on the test's clock (kartClock.ts), so that the release window, half
+    // a second of race, is not missed between two slow frames of a busy machine's software drawing
+    await manualClock(page)
     await quickGauge(page)
     await openSpike(page)
     const stored = page.getByTestId('kart-stored')
     await expect(stored).toHaveAttribute('aria-label', 'Boosts ready: 0 of 2')
 
     await page.keyboard.down('ArrowUp')
-    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(20)
+    expect(await stepUntil(page, (state) => Math.hypot(state.vx, state.vz) > 20)).toBe(true)
     await page.keyboard.down('ArrowRight')
     await page.keyboard.down('z')
-    await expect.poll(async () => (await reading(page)).state.drifting, LONG).toBe(true)
-    await expect.poll(async () => (await reading(page)).state.gauge, LONG).toBeGreaterThan(20)
+    expect(await stepUntil(page, (state) => state.drifting)).toBe(true)
+    expect(await stepUntil(page, (state) => state.gauge > 20)).toBe(true)
     await expect(page.getByTestId('kart-gauge')).not.toHaveAttribute('aria-valuenow', '0')
 
     // A few seconds of drifting fill the gauge into a stored boost
-    await expect.poll(async () => (await reading(page)).state.storedBoosts, LONG).toBe(1)
+    expect(await stepUntil(page, (state) => state.storedBoosts === 1)).toBe(true)
     await expect(stored).toHaveAttribute('aria-label', 'Boosts ready: 1 of 2')
 
     // Fired while still drifting: a quick press is enough
     await page.keyboard.press('x')
-    await expect.poll(async () => (await reading(page)).state.boostSeconds, LONG).toBeGreaterThan(0)
+    expect(await stepUntil(page, (state) => state.boostSeconds > 0, 10)).toBe(true)
     const boosted = await reading(page)
     expect(boosted.state.storedBoosts).toBe(0)
     expect(boosted.state.chain).toBe(0)
@@ -444,21 +438,15 @@ test.describe('the boost gauge', () => {
     await page.keyboard.up('ArrowUp')
     await page.keyboard.up('z')
     await page.keyboard.up('ArrowRight')
-    await expect.poll(async () => (await reading(page)).state.slideDirection, LONG).toBe(1)
+    expect(await stepUntil(page, (state) => state.slideDirection === 1)).toBe(true)
     await page.keyboard.down('ArrowLeft')
-    await releaseWindowOpen(page)
+    // The race stands on the first step of the window: the press lands inside it whatever the machine
+    expect(await stepUntil(page, (state) => state.releaseWindow > 0 && !state.throttleHeld)).toBe(true)
     await page.keyboard.down('ArrowUp')
     await page.keyboard.up('ArrowLeft')
     // (The yard is small: the wall may come within a moment of the boost and end the chain, so
     // the boost still running counts as well as the chain's first link)
-    await page.waitForFunction(
-      () => {
-        const { state } = (window as unknown as { __kartSpike: KartReading }).__kartSpike
-        return state.chain === 1 || state.miniSeconds > 0
-      },
-      undefined,
-      { polling: 'raf', timeout: 10_000 },
-    )
+    expect(await stepUntil(page, (state) => state.chain === 1 || state.miniSeconds > 0, 600)).toBe(true)
     // (2026-11-18: pressed once the car has straightened, the instant boost is a late one, and the
     // callout says so)
     await expect(page.getByTestId('kart-callout')).toHaveAttribute('data-kind', 'late')
@@ -520,35 +508,38 @@ test.describe('a gamepad (simulated: a real pad cannot be tested headless)', () 
     page,
   }) => {
     const errors = watchConsole(page)
+    // 2026-11-23 (QA follow-up): on the test's clock, as the boost gauge's test (kartClock.ts)
+    await manualClock(page)
     await fakeGamepad(page)
     await quickGauge(page)
     await openSpike(page)
     await expect(page.getByTestId('kart-gamepad')).toHaveText('Test gamepad (STANDARD GAMEPAD)')
 
     await padPress(page, 0, true) // A
-    await expect.poll(() => speedOf(page), LONG).toBeGreaterThan(20)
+    expect(await stepUntil(page, (state) => Math.hypot(state.vx, state.vz) > 20)).toBe(true)
     // 0.6 on the stick is half way from the dead zone (0.2) to full
     await padAxis(page, 0, 0.6)
-    await expect.poll(async () => (await reading(page)).input.steer, LONG).toBeCloseTo(0.5, 5)
+    await step(page, 2)
+    expect((await reading(page)).input.steer).toBeCloseTo(0.5, 5)
     await padPress(page, 5, true) // RB
-    await expect.poll(async () => (await reading(page)).state.drifting, LONG).toBe(true)
+    expect(await stepUntil(page, (state) => state.drifting)).toBe(true)
     expect((await reading(page)).state.driftDirection).toBe(1)
     // The stick all the way into the drift: only a deep drift earns the instant boost (2026-11-18),
     // and half way in it stops just short
     await padAxis(page, 0, 1)
-    await expect.poll(async () => (await reading(page)).state.storedBoosts, LONG).toBe(1)
+    expect(await stepUntil(page, (state) => state.storedBoosts === 1)).toBe(true)
 
     await padPress(page, 2, true) // X
-    await expect.poll(async () => (await reading(page)).state.boostSeconds, LONG).toBeGreaterThan(0)
+    expect(await stepUntil(page, (state) => state.boostSeconds > 0, 10)).toBe(true)
     await padPress(page, 2, false)
     // Drift and throttle let go, the stick the other way to catch the slide-out, the throttle
     // pressed again in time: a release boost
     await padPress(page, 5, false)
     await padPress(page, 0, false)
     await padAxis(page, 0, -0.8)
-    await releaseWindowOpen(page)
+    expect(await stepUntil(page, (state) => state.releaseWindow > 0 && !state.throttleHeld)).toBe(true)
     await padPress(page, 0, true)
-    await expect.poll(async () => (await reading(page)).state.chain, LONG).toBe(1)
+    expect(await stepUntil(page, (state) => state.chain === 1, 120)).toBe(true)
     await padAxis(page, 0, 0)
     await padPress(page, 0, false)
     expect(errors).toEqual([])
@@ -997,9 +988,13 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
   page,
 }) => {
   const errors = watchConsole(page)
+  // 2026-11-23 (QA follow-up): the race and its chunks load first, as long as that takes on a busy
+  // machine (an allowance of its own), and the drive is on the test's clock (kartClock.ts)
+  test.info().setTimeout(test.info().timeout + LOADING_MS)
+  await manualClock(page)
   await page.goto('/kart')
+  await expect.poll(() => framesOf(page), { timeout: LOADING_MS }).toBeGreaterThan(5)
   await expect(page.locator('canvas')).toBeVisible()
-  await expect.poll(() => framesOf(page)).toBeGreaterThan(5)
   await expect(page.getByTestId('kart-course')).toHaveValue('riverside')
   await expect(page.getByTestId('kart-course').locator('option')).toHaveText([
     'Test oval',
@@ -1044,13 +1039,14 @@ test('the kart page races on Riverside without the tuning tools, and the sound s
   await sound.click()
   await expect(sound).not.toHaveText(before ?? '')
   // Drive and drift a moment: the kart, its smoke and its marks run without a complaint
-  await expect(page.getByTestId('kart-countdown')).toHaveCount(0, { timeout: 8000 })
+  await step(page, 5 * 60)
+  await expect(page.getByTestId('kart-countdown')).toHaveCount(0)
   await page.locator('canvas').click()
   await page.keyboard.down('ArrowUp')
-  await page.waitForTimeout(2500)
+  await step(page, 150)
   await page.keyboard.down('ArrowLeft')
   await page.keyboard.down('KeyZ')
-  await page.waitForTimeout(600)
+  await step(page, 36)
   await page.keyboard.up('KeyZ')
   await page.keyboard.up('ArrowLeft')
   await page.keyboard.up('ArrowUp')

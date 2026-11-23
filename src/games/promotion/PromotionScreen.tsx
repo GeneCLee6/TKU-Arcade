@@ -393,7 +393,9 @@ function SoundButton() {
 
 // Full screen and focus mode are the same layout: the frame over the whole screen, the board beside
 // a rail (below it when the screen stands upright). Focus mode is what a browser without the
-// Fullscreen API gets, the page's chrome covered instead of the browser's
+// Fullscreen API gets, the page's chrome covered instead of the browser's. Its padding keeps it out
+// from under the status bar, the notch and the home indicator (installed as an app). (Notes here,
+// not in the CSS: a comment in a styled template ships to every visitor, 2026-11-23)
 const Frame = styled.div<{ $immersed: boolean }>`
   ${(p) =>
     p.$immersed
@@ -404,7 +406,6 @@ const Frame = styled.div<{ $immersed: boolean }>`
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
     gap: ${space.sm}px;
-    /* Out from under the status bar, the notch and the home indicator (installed as an app) */
     padding: calc(${space.sm}px + env(safe-area-inset-top)) calc(${space.sm}px + env(safe-area-inset-right))
       calc(${space.sm}px + env(safe-area-inset-bottom)) calc(${space.sm}px + env(safe-area-inset-left));
     background: ${color.bg};
@@ -431,13 +432,13 @@ const Toolbar = styled.div`
   gap: ${space.xs}px ${space.sm}px;
 `
 
+// Its padding is room for the focus ring, which this scrolling strip would otherwise cut off
 const SeatStrip = styled.div`
   flex: 1 1 200px;
   display: flex;
   gap: ${space.xs}px;
   min-width: 0;
   overflow-x: auto;
-  /* Room for the focus ring, which this scrolling strip would otherwise cut off */
   padding: ${space.xs}px;
 `
 
