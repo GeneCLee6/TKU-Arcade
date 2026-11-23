@@ -1,5 +1,5 @@
 import { Quaternion, SkinnedMesh, Vector3 } from 'three'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   HAND_SHAPES,
   handCurl,
@@ -226,8 +226,12 @@ describe('the skin', () => {
 })
 
 describe('a standing driver on a real model', () => {
-  it('keeps the soles on the ground standing, through a change of feet', () => {
+  // Each model's gestures start at a random point of their loop (kartModel.ts gestureSeed): checked
+  // at several, the sole within a centimetre of the ground (2026-11-23: one fixed 5 mm was flaky)
+  it.each([0, 0.25, 0.5, 0.75, 0.99])('keeps the soles on the ground standing, through a change of feet (seed %s)', (seed) => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(seed)
     const model = buildKartModel(false, false, 'tide', 'spade', {}, { standing: true })
+    random.mockRestore()
     const ankles = () => {
       model.group.updateMatrixWorld(true)
       const found: number[] = []

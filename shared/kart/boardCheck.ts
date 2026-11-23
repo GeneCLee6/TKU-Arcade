@@ -21,6 +21,7 @@ import { loadoutOfByte, type DriverId, type KartId } from './karts.ts'
 import { courseOf, type Track } from './track.ts'
 import type { KartFrame } from './net.ts'
 import type { BoardRefusal } from './board.ts'
+import { throughWall } from './boardWalls.ts'
 
 /** The most samples a run may have: 15 minutes at ten a second, with room for resets */
 export const BOARD_MAX_SAMPLES = 12_000
@@ -28,6 +29,8 @@ export const BOARD_MAX_SAMPLES = 12_000
 export const BOARD_MAX_GAP_TICKS = 6
 /** A judged lap may end this much before or after the file says, ms: one sample and a little */
 export const BOARD_LAP_SLACK_MS = 120
+/** The finish line may be this far ahead of the last sample still, metres (its centimetre rounding) */
+const FINISH_NUDGE = 0.02
 /** The first sample is the grid: this close to the start, metres, and this slow, m/s */
 const START_REACH = 2
 const START_SPEED = 1
@@ -143,18 +146,43 @@ export function checkBoardRun(file: ReplayFile, track: Track, revision: number):
     const frame = sample.reset
       ? frameOf(sample)
       : { ...frameOf(sample), crossings: tracked.crossings, nextGate: tracked.nextGate }
-    const verdict = judgeFrame(tracked, frame, {
+    const context = {
       track: judged,
       slot: 0,
       now: (frame.tick * 1000) / TICKS_PER_SECOND,
       goAt: 0,
       laps: lapEnds.length,
       speedCap,
-    })
+    }
+    let verdict = judgeFrame(tracked, frame, context)
+    // The finish (2026-11-23): the kart is kept to the centimetre, so a finish a hair past the line
+    // can be kept on it, and a sample on the line has not crossed it. The last sample, one gate short
+    // of what it says, is judged FINISH_NUDGE further on along its way: never more than that
+    if (
+      index === samples.length - 1 &&
+      verdict.kind === 'taken' &&
+      !sample.reset &&
+      verdict.tracked.crossings < sample.crossings
+    ) {
+      const speed = Math.hypot(sample.vx, sample.vz)
+      if (speed > 0) {
+        const nudged = {
+          ...frame,
+          x: frame.x + (sample.vx / speed) * FINISH_NUDGE,
+          z: frame.z + (sample.vz / speed) * FINISH_NUDGE,
+        }
+        const again = judgeFrame(tracked, nudged, context)
+        if (again.kind === 'taken' && again.tracked.crossings === sample.crossings) verdict = again
+      }
+    }
     if (verdict.kind === 'refused') return refuse(verdict.why, index)
     tracked = verdict.tracked
     if (verdict.lapAt !== null) lapEnds.push(verdict.lapAt)
   }
+  // The walls (2026-11-23, boardWalls.ts): no chord between two samples through a kerb, a fence or
+  // a platform's face that stood in the way at the kart's height
+  const through = throughWall(course.walls, course.terrain, samples)
+  if (through >= 0) return refuse('wall', through)
   if (lapsDone(tracked.crossings) !== track.laps || lapEnds.length !== track.laps) return refuse('laps')
 
   // The times: each judged lap end within a sample of the file's, the total the last sample's tick
