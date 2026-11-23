@@ -52,6 +52,8 @@ export default function KartScreen({ room, game }: GameScreenProps) {
   // Watching live: null until chosen, and then the default is whether there is no kart to drive
   const [watchChoice, setWatchChoice] = useState<boolean | null>(null)
   const [replay, setReplay] = useState<Replay | null>(null)
+  // 2026-11-23: the replay opened on its highlights (the broadcast's)
+  const [highlights, setHighlights] = useState(false)
   const [garage, setGarage] = useState(false)
   // The race as recorded, made once the race is over (for the file)
   const [finished, setFinished] = useState<Replay | null>(null)
@@ -122,10 +124,25 @@ export default function KartScreen({ room, game }: GameScreenProps) {
               {canReplay && (
                 <Button
                   $variant="secondary"
-                  onClick={() => setReplay(recording.recorder.replay())}
+                  onClick={() => {
+                    setHighlights(false)
+                    setReplay(recording.recorder.replay())
+                  }}
                   data-testid="kart-replay-open"
                 >
                   {t('games.kart.replay.watch')}
+                </Button>
+              )}
+              {canReplay && (
+                <Button
+                  $variant="secondary"
+                  onClick={() => {
+                    setHighlights(true)
+                    setReplay(recording.recorder.replay())
+                  }}
+                  data-testid="kart-highlights-results"
+                >
+                  {t('games.kart.highlights.watch')}
                 </Button>
               )}
               {canReplay && finished && (
@@ -180,6 +197,7 @@ export default function KartScreen({ room, game }: GameScreenProps) {
             nameOf={nameOf}
             you={view.you}
             onClose={() => setReplay(null)}
+            highlights={highlights}
           />
         </Suspense>
       )}

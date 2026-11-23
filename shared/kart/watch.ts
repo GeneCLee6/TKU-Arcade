@@ -60,7 +60,17 @@ export function cycleSeat(
 
 /** What a watcher can ask for */
 export type WatchCommand =
-  'next' | 'previous' | 'view' | 'pause' | 'back' | 'forward' | 'slower' | 'faster'
+  | 'next'
+  | 'previous'
+  | 'view'
+  | 'pause'
+  | 'back'
+  | 'forward'
+  | 'slower'
+  | 'faster'
+  // 2026-11-23: the broadcast on or off, and the interface hidden or shown (a clean picture)
+  | 'broadcast'
+  | 'clean'
 
 const KEYS: Readonly<Record<string, WatchCommand>> = {
   ArrowRight: 'next',
@@ -79,6 +89,8 @@ const KEYS: Readonly<Record<string, WatchCommand>> = {
   Comma: 'slower',
   Equal: 'faster',
   Period: 'faster',
+  KeyB: 'broadcast',
+  KeyH: 'clean',
 }
 
 /** The command for a key (a KeyboardEvent's `code`), if any */
@@ -86,7 +98,8 @@ export const keyCommand = (code: string): WatchCommand | null => KEYS[code] ?? n
 
 /**
  * The standard gamepad's buttons (W3C "standard" mapping): bumpers and the d-pad's sides change kart,
- * Y the view, A play and pause, the triggers seek, the d-pad's up and down the speed
+ * Y the view, A play and pause, the triggers seek, the d-pad's up and down the speed, the back
+ * (view) button the broadcast
  */
 const PAD: readonly (readonly [number, WatchCommand])[] = [
   [5, 'next'],
@@ -99,6 +112,8 @@ const PAD: readonly (readonly [number, WatchCommand])[] = [
   [7, 'forward'],
   [12, 'faster'],
   [13, 'slower'],
+  // 2026-11-23: the broadcast on the back (view) button
+  [8, 'broadcast'],
 ]
 
 /** The commands of the buttons pressed since the last reading (held ones count once) */

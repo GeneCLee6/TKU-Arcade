@@ -28,6 +28,15 @@ const en = {
   'games.kart.replay.used': '{name}: {item}',
   'games.kart.replay.keys': 'Space or A: play · J L or triggers: ±5 s · − + or d-pad: speed',
   'games.kart.replay.partial': 'Recorded from when you came in',
+  // 2026-11-23: the broadcast (src/kart/watch/broadcast/) and the highlights
+  'games.kart.broadcast.toggle': 'Broadcast',
+  'games.kart.broadcast.clean': 'Hide interface',
+  'games.kart.broadcast.cleanHint': 'Press H or tap to show the interface',
+  'games.kart.broadcast.keys': 'B: broadcast · H: hide interface',
+  'games.kart.highlights.watch': 'Watch highlights',
+  'games.kart.highlights.done': 'That was the highlights',
+  'games.kart.highlights.again': 'Watch them again',
+  'games.kart.highlights.full': 'Watch the whole race',
 }
 
 const zhTW: Record<keyof typeof en, string> = {
@@ -58,6 +67,14 @@ const zhTW: Record<keyof typeof en, string> = {
   'games.kart.replay.used': '{name}：{item}',
   'games.kart.replay.keys': '空白鍵或 A：播放 · J L 或扳機：±5 秒 · − + 或十字鍵：速度',
   'games.kart.replay.partial': '從你進房間時開始錄',
+  'games.kart.broadcast.toggle': '轉播',
+  'games.kart.broadcast.clean': '隱藏介面',
+  'games.kart.broadcast.cleanHint': '按 H 或點一下畫面，顯示介面',
+  'games.kart.broadcast.keys': 'B：轉播 · H：隱藏介面',
+  'games.kart.highlights.watch': '看精華',
+  'games.kart.highlights.done': '精華播完了',
+  'games.kart.highlights.again': '再看一次',
+  'games.kart.highlights.full': '看完整比賽',
 }
 
 export const kartWatchMessages = { en, 'zh-TW': zhTW }

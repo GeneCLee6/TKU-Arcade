@@ -69,7 +69,7 @@ import {
   startRig,
   type Chased,
 } from './camera.ts'
-import type { CameraShot } from './director.ts'
+import type { CameraShot, Point3 } from './director.ts'
 import { cappedPost, loadSettings } from './settings.ts'
 
 const GROUND_SIZE = 400
@@ -184,6 +184,11 @@ export interface KartScene {
    * (the grid during the countdown); null for the chase camera alone
    */
   shot(shot: CameraShot | null): void
+  /**
+   * 2026-11-23 (the broadcast): where the watching camera stands and the point it looks at, as the
+   * last `watch` drew it; heights over the followed kart's road, as a shot's are
+   */
+  cameraPose(): { readonly eye: Point3; readonly target: Point3 }
   /** Puts the camera straight behind the car at once, as after a reset */
   snapCamera(heading: number, y?: number): void
   /**
@@ -406,6 +411,8 @@ export function createKartScene(
   let cameraY = 0
   let looking: { orbit?: number; back?: number; up?: number } | null = null
   let directed: CameraShot | null = null
+  /** Where the watching camera looked last (2026-11-23: the broadcast's glides start from it) */
+  const watchLook = new Vector3()
   const projected = new Vector3()
   /** Where a point is on screen as of the last frame drawn, in CSS pixels of the container */
   const onScreen = (x: number, y: number, z: number): ScreenPoint => {
@@ -624,16 +631,33 @@ export function createKartScene(
       if (overhead) {
         // High above and a little behind, still turning with the kart's way so the road reads ahead
         camera.position.set(x - sin * OVERHEAD_BACK, OVERHEAD_UP + cameraY, z + cos * OVERHEAD_BACK)
-        camera.lookAt(x + sin * CAMERA_LOOK_AHEAD * 4, cameraY, z - cos * CAMERA_LOOK_AHEAD * 4)
+        watchLook.set(x + sin * CAMERA_LOOK_AHEAD * 4, cameraY, z - cos * CAMERA_LOOK_AHEAD * 4)
       } else {
         const back = CAMERA_BACK + (motion ? Math.min(1.5, rig.pace) * CAMERA_PULL : 0)
         camera.position.set(x - sin * back, CAMERA_UP + cameraY, z + cos * back)
-        camera.lookAt(
-          x + sin * CAMERA_LOOK_AHEAD,
-          CAMERA_LOOK_UP + cameraY,
-          z - cos * CAMERA_LOOK_AHEAD,
-        )
+        watchLook.set(x + sin * CAMERA_LOOK_AHEAD, CAMERA_LOOK_UP + cameraY, z - cos * CAMERA_LOOK_AHEAD)
       }
+      // 2026-11-23 (the broadcast, broadcastShots.ts): the director's shot over it, its heights
+      // over the followed kart's road
+      if (directed && directed.blend > 0) {
+        const b = Math.min(1, directed.blend)
+        const { eye, target } = directed
+        camera.position.set(
+          camera.position.x + (eye.x - camera.position.x) * b,
+          camera.position.y + (eye.y + cameraY - camera.position.y) * b,
+          camera.position.z + (eye.z - camera.position.z) * b,
+        )
+        watchLook.set(
+          watchLook.x + (target.x - watchLook.x) * b,
+          watchLook.y + (target.y + cameraY - watchLook.y) * b,
+          watchLook.z + (target.z - watchLook.z) * b,
+        )
+        if (b >= 1 && camera.fov !== baseFov) {
+          camera.fov = baseFov
+          camera.updateProjectionMatrix()
+        }
+      }
+      camera.lookAt(watchLook)
       present(motion ? rig.boost : 0, frameSeconds, false)
       tune(frameSeconds)
     },
@@ -648,6 +672,12 @@ export function createKartScene(
     },
     shot(shot) {
       directed = shot
+    },
+    cameraPose() {
+      return {
+        eye: { x: camera.position.x, y: camera.position.y - cameraY, z: camera.position.z },
+        target: { x: watchLook.x, y: watchLook.y - cameraY, z: watchLook.z },
+      }
     },
     snapCamera(heading, y) {
       rig = startRig(heading)

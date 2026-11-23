@@ -2,7 +2,7 @@
 // being watched (its name, place and lap; its item in the race's own slot), the buttons to change kart and view, the keys, and
 // the name tags over the other karts.
 import type { ReactNode } from 'react'
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 import type { ItemId } from '../../../shared/kart/items.ts'
 import type { WatchCommand } from '../../../shared/kart/watch.ts'
 import type { Translate } from '../../i18n/t.ts'
@@ -57,6 +57,7 @@ export function WatchedItem({ t, item }: { t: Translate; item: ItemId | null | u
 export function WatchControls({
   t,
   overhead,
+  broadcast: broadcasting,
   onCommand,
   onClose,
   keys,
@@ -64,6 +65,8 @@ export function WatchControls({
 }: {
   t: Translate
   overhead: boolean
+  /** 2026-11-23: whether the broadcast directs the camera */
+  broadcast: boolean
   onCommand: (command: WatchCommand) => void
   onClose: () => void
   keys: string
@@ -82,11 +85,28 @@ export function WatchControls({
         <Button $variant="secondary" $size="sm" onClick={() => onCommand('view')}>
           {overhead ? t('games.kart.watch.chase') : t('games.kart.watch.overhead')}
         </Button>
+        <Button
+          $variant={broadcasting ? 'primary' : 'secondary'}
+          $size="sm"
+          aria-pressed={broadcasting}
+          onClick={() => onCommand('broadcast')}
+          data-testid="kart-broadcast-toggle"
+        >
+          {t('games.kart.broadcast.toggle')}
+        </Button>
+        <Button
+          $variant="ghost"
+          $size="sm"
+          onClick={() => onCommand('clean')}
+          data-testid="kart-clean-toggle"
+        >
+          {t('games.kart.broadcast.clean')}
+        </Button>
         <Button $variant="ghost" $size="sm" onClick={onClose} data-testid="kart-watch-close">
           {t('games.kart.watch.close')}
         </Button>
       </Row>
-      <Keys>{keys}</Keys>
+      <Keys>{`${keys} · ${t('games.kart.broadcast.keys')}`}</Keys>
     </Controls>
   )
 }
@@ -97,6 +117,33 @@ export const WatchPage = styled.main`
   z-index: 20;
   overflow: hidden;
   background: ${color.bg};
+
+  /* 2026-11-23: the interface hidden, a clean picture to record or project: the scene alone */
+  &[data-clean='true'] > :not([data-keep]) {
+    display: none;
+  }
+`
+
+const hintOut = keyframes`
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+`
+
+/** With the interface hidden: how to get it back, for a moment, then nothing over the picture */
+export const CleanHint = styled.p`
+  ${monoType}
+  position: absolute;
+  bottom: ${space.lg}px;
+  left: 50%;
+  margin: 0;
+  padding: ${space.xs}px ${space.md}px;
+  border-radius: ${radius.component}px;
+  color: ${color.text};
+  background: color-mix(in srgb, ${color.bg} 70%, transparent);
+  font-size: ${fontSize.sm}px;
+  translate: -50% 0;
+  pointer-events: none;
+  animation: ${hintOut} 3s ease-out forwards;
 `
 
 export const WatchStage = styled.div`

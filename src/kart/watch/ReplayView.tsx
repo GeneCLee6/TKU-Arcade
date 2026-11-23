@@ -54,6 +54,7 @@ import { KartLoading } from '../load/KartLoading.tsx'
 import { useKartLoad } from '../load/useKartLoad.ts'
 import ReplayShare from './ReplayShare.tsx'
 import {
+  CleanHint,
   Fallback,
   MapCorner,
   WatchTop,
@@ -69,6 +70,9 @@ import {
   WatchStage,
 } from './WatchParts.tsx'
 import { placeTags, TAG_HEIGHT, unlockOnGesture, useWatchKeys } from './watchDom.ts'
+import type { Highlight } from '../../../shared/kart/highlights.ts'
+import type { BroadcastReadout, BroadcastRun } from './broadcast/broadcastRun.ts'
+import { prefersReducedMotion, useBroadcastKit } from './broadcastSwitch.ts'
 
 /** The kart and driver a frame's body byte names (e10-t05) */
 function kartOfByte(byte: number) {
@@ -78,6 +82,8 @@ function kartOfByte(byte: number) {
 
 /** How often the controls and the panel catch up with the playhead */
 const UI_MS = 100
+/** 2026-11-23: how often the broadcast's overlay catches up with the director */
+const READOUT_MS = 200
 /** An item used shows this long after its moment, ticks */
 const NOTE_TICKS = 2 * TICKS_PER_SECOND
 const SHIELD_TICKS = msToTicks(ITEM_TUNING.shieldMs)
@@ -95,6 +101,14 @@ export interface ReplayViewProps {
    */
   revision?: number
   notice?: string | null
+  /** 2026-11-23: open on the race's highlights, played with the broadcast (the results' button) */
+  highlights?: boolean
+}
+
+/** The highlights being played: which of them */
+interface Clips {
+  readonly list: readonly Highlight[]
+  readonly index: number
 }
 
 /** Every kart at `tick` */
@@ -153,6 +167,7 @@ export default function ReplayView({
   onClose,
   revision,
   notice,
+  highlights = false,
 }: ReplayViewProps) {
   const t = useT()
   const stage = useRef<HTMLDivElement>(null)
@@ -179,6 +194,17 @@ export default function ReplayView({
     you !== null && reel.samples.has(you) ? you : (seats[0] ?? null),
   )
   const [overhead, setOverhead] = useState(false)
+  // 2026-11-23 (the broadcast, docs/KART-NETCODE.md §11.6): the director picks the kart and the
+  // camera; the interface hidden for a clean picture; and the highlights, played one after another
+  const [broadcastOn, setBroadcastOn] = useState(highlights)
+  const [clean, setClean] = useState(false)
+  const kit = useBroadcastKit(broadcastOn)
+  const run = useRef<BroadcastRun | null>(null)
+  const [readout, setReadout] = useState<BroadcastReadout | null>(null)
+  const [wantClips, setWantClips] = useState(highlights)
+  const clips = useRef<Clips | null>(null)
+  const [clipShown, setClipShown] = useState<Clips | null>(null)
+  const [clipsDone, setClipsDone] = useState(false)
   const followRef = useRef(follow)
   const overheadRef = useRef(overhead)
   useLayoutEffect(() => {
@@ -194,20 +220,57 @@ export default function ReplayView({
     head.current = next
     setShown(next)
   }
+  /** The highlights from the first, the broadcast on */
+  const playClips = (list: readonly Highlight[]) => {
+    const first = list[0]
+    setClipsDone(false)
+    if (!first) return
+    clips.current = { list, index: 0 }
+    setClipShown(clips.current)
+    setBroadcastOn(true)
+    run.current?.favour(first.seat)
+    move({ tick: first.from, playing: true, speed: 1 })
+  }
+  /** Out of the highlights: the replay as it was */
+  const endClips = () => {
+    clips.current = null
+    setClipShown(null)
+    setClipsDone(false)
+    run.current?.favour(null)
+  }
+  /** The broadcast off, the camera left on the kart it was showing */
+  const takeOver = () => {
+    const shown = run.current?.readout().seat
+    if (shown !== undefined && shown !== null) setFollow(shown)
+    endClips()
+    setBroadcastOn(false)
+  }
   const command = (which: WatchCommand) => {
     const now = head.current
     switch (which) {
+      case 'clean':
+        setClean((on) => !on)
+        return
+      case 'broadcast':
+        if (broadcastOn) takeOver()
+        else setBroadcastOn(true)
+        return
       case 'view':
+        if (broadcastOn) takeOver()
         setOverhead((on) => !on)
         return
       case 'next':
-      case 'previous':
-        setFollow((seat) => cycleSeat(order, seat, which === 'next' ? 1 : -1))
+      case 'previous': {
+        const from = broadcastOn ? (run.current?.readout().seat ?? follow) : follow
+        if (broadcastOn) takeOver()
+        setFollow(cycleSeat(order, from, which === 'next' ? 1 : -1))
         return
+      }
       case 'pause':
         return move(togglePlayhead(now, reel))
       case 'back':
       case 'forward': {
+        endClips()
         const jump = SEEK_SECONDS * TICKS_PER_SECOND * (which === 'back' ? -1 : 1)
         return move(seekPlayhead(now, now.tick + jump, reel))
       }
@@ -231,6 +294,10 @@ export default function ReplayView({
       at: (event.tick * 1000) / TICKS_PER_SECOND,
     }))
     const hitEffects = fxEvents.flatMap((event) => effectsOf(event))
+    // The broadcast's hits: an item that landed, on whom, by race time
+    const landed = reel.replay.events
+      .filter((event) => event.hit && event.targets.length > 0)
+      .map((event) => ({ by: event.by, target: event.targets[0]!, at: event.tick / TICKS_PER_SECOND }))
     // #86: and the items sound around the kart followed, while it plays through them
     const player = createCuePlayer(loadQuality())
     const stopUnlock = unlockOnGesture(player)
@@ -241,15 +308,78 @@ export default function ReplayView({
       stop = engine.startWatchLoop(stage.current, {
         track,
         quality: loadQuality(),
-        frame(seconds) {
+        frame(seconds, scene) {
           const sought = lastTick !== null && head.current.tick !== lastTick
           head.current = advancePlayhead(head.current, seconds, reel)
+          // The highlights: one over, the next; the last over, the replay waits
+          const playing = clips.current
+          const clip = playing?.list[playing.index]
+          if (playing && clip && head.current.tick >= Math.min(clip.to, reel.end)) {
+            const next = playing.list[playing.index + 1]
+            if (next) {
+              clips.current = { list: playing.list, index: playing.index + 1 }
+              run.current?.favour(next.seat)
+              head.current = { tick: next.from, playing: true, speed: 1 }
+            } else {
+              clips.current = null
+              head.current = { ...head.current, playing: false }
+            }
+            const now = clips.current
+            queueMicrotask(() => {
+              setClipShown(now)
+              if (!now) setClipsDone(true)
+            })
+          }
           const tick = head.current.tick
           lastTick = tick
           const karts = kartsAt(reel, tick)
           const nowMs = (tick * 1000) / TICKS_PER_SECOND
           const playedThrough = !sought && lastMs !== null && nowMs > lastMs && nowMs - lastMs < 500
           const where = (seat: number) => karts.find((kart) => kart.id === seat)
+          // The broadcast: the director picks the kart and the shot
+          let follow = followRef.current
+          let shot = null
+          const director = run.current
+          if (director) {
+            const directed = director.step(
+              {
+                time: tick / TICKS_PER_SECOND,
+                order: orderAt(track, reel, tick),
+                karts: [...reel.samples].flatMap(([seat, samples]) => {
+                  const one = sampleAt(samples, tick)
+                  return one
+                    ? [
+                        {
+                          seat,
+                          x: one.x,
+                          z: one.z,
+                          heading: one.heading,
+                          vx: one.vx,
+                          vz: one.vz,
+                          airborne: one.airborne === true,
+                          crossings: one.crossings,
+                          nextGate: one.nextGate,
+                        },
+                      ]
+                    : []
+                }),
+                racers: reel.replay.racers.map((racer) => ({
+                  seat: racer.seat,
+                  finishMs:
+                    racer.finishMs !== null && msToTicks(racer.finishMs) <= tick
+                      ? racer.finishMs
+                      : null,
+                  out: racer.out && tick >= (reel.samples.get(racer.seat)?.at(-1)?.tick ?? 0),
+                  lapMs: racer.lapMs.slice(0, lapsAt(racer, tick)),
+                })),
+                hits: landed,
+              },
+              seconds,
+              () => scene.cameraPose(),
+            )
+            follow = directed.follow
+            shot = directed.shot
+          }
           const hits = hitFrameOf(
             hitEffects,
             playedThrough ? crossed(hitEffects, lastMs as number, nowMs) : [],
@@ -261,7 +391,7 @@ export default function ReplayView({
             playedThrough ? lastMs : null,
             nowMs,
             head.current.speed,
-            followRef.current,
+            follow,
             where,
           )
           for (const one of heard) player.cue(one.cue, one.volume)
@@ -285,7 +415,15 @@ export default function ReplayView({
                 }
               : null
           // 2026-11-22: the reel's ticks are the race clock: the moving obstacles as they were
-          return { karts, follow: followRef.current, overhead: overheadRef.current, props, hits, tick }
+          return {
+            karts,
+            follow,
+            overhead: director ? false : overheadRef.current,
+            props,
+            hits,
+            tick,
+            shot,
+          }
         },
         drawn(scene, frame) {
           const others = frame.karts.filter((kart) => kart.id !== frame.follow)
@@ -303,6 +441,12 @@ export default function ReplayView({
             const gate = sampleAt(samples, head.current.tick)?.nextGate ?? 0
             minimap.current?.place(followed.x, followed.z, followed.heading, gate)
           }
+          // 2026-11-23: the broadcast's map shows every kart (the dots, when it is on)
+          minimap.current?.others?.(
+            frame.karts
+              .filter((kart) => kart.id !== frame.follow)
+              .map((kart) => ({ seat: kart.id, x: kart.x, z: kart.z })),
+          )
         },
         onCommand: (which) => commandRef.current(which),
         onContextLost: () => setFailure(true),
@@ -316,6 +460,39 @@ export default function ReplayView({
       player.dispose()
     }
   }, [track, reel, failure, engine])
+
+  // The broadcast's director, once its chunk is here (the gaps worked out once from the whole
+  // replay); gone when it is turned off
+  useEffect(() => {
+    if (!kit || !broadcastOn || !track) return
+    run.current = kit.createBroadcastRun({
+      track,
+      laps: reel.replay.laps,
+      reducedMotion: prefersReducedMotion(),
+      passings: kit.replayPassings(track, reel),
+    })
+    const playing = clips.current
+    if (playing) run.current.favour(playing.list[playing.index]?.seat ?? null)
+    const timer = setInterval(() => setReadout(run.current?.readout() ?? null), READOUT_MS)
+    return () => {
+      clearInterval(timer)
+      run.current = null
+      setReadout(null)
+    }
+  }, [kit, broadcastOn, track, reel])
+
+  // The highlights, picked once the broadcast's chunk is here
+  const clipList = useMemo(
+    () => (kit && track ? kit.pickHighlights(track, reel) : null),
+    [kit, track, reel],
+  )
+  useEffect(() => {
+    if (!wantClips || !clipList) return
+    setWantClips(false)
+    playClips(clipList)
+    // playClips only sets state and refs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantClips, clipList])
 
   // The controls follow the playhead a few times a second, not every frame
   useEffect(() => {
@@ -371,13 +548,34 @@ export default function ReplayView({
       ).totals
     : null
 
+  const Overlay = kit?.BroadcastOverlay
+  const directing = broadcastOn && Overlay !== undefined && readout !== null
+  const clipNow = clipShown?.list[clipShown.index]
+
   return (
-    <WatchPage data-testid="kart-replay">
+    <WatchPage data-testid="kart-replay" data-clean={clean}>
       <WatchStage
         ref={stage}
         role="img"
         aria-label={t('games.kart.watch.canvas', { name: name ?? '' })}
+        data-keep=""
+        onClick={() => setClean(false)}
       />
+      {clean && <CleanHint data-keep="">{t('games.kart.broadcast.cleanHint')}</CleanHint>}
+      {directing && (
+        <Overlay
+          t={t}
+          readout={readout}
+          nameOf={nameOf}
+          laps={replay.laps}
+          live={false}
+          highlight={
+            clipShown && clipNow
+              ? { n: clipShown.index + 1, total: clipShown.list.length, kind: clipNow.kind }
+              : null
+          }
+        />
+      )}
       {!engine && (
         <KartLoading
           t={t}
@@ -396,14 +594,16 @@ export default function ReplayView({
       </TagLayer>
       <WatchTop>
         <TopLeft>
-          <Title>{t('games.kart.replay.title')}</Title>
-          <WatchedPanel
-            t={t}
-            name={name}
-            place={follow === null ? 0 : order.indexOf(follow) + 1}
-            total={replay.racers.length}
-            detail={detail}
-          />
+          {!directing && <Title>{t('games.kart.replay.title')}</Title>}
+          {!directing && (
+            <WatchedPanel
+              t={t}
+              name={name}
+              place={follow === null ? 0 : order.indexOf(follow) + 1}
+              total={replay.racers.length}
+              detail={detail}
+            />
+          )}
           {teamGauge && teamTotals && (
             <>
               <TeamScore t={t} totals={teamTotals} mine={null} />
@@ -416,7 +616,7 @@ export default function ReplayView({
             </Note>
           )}
           {reel.start > 0 && <Note>{t('games.kart.replay.partial')}</Note>}
-          {recent.map((event) => (
+          {!directing && recent.map((event) => (
             <Note key={`${event.tick}-${event.by}-${event.item}`}>
               {t('games.kart.replay.used', {
                 name: nameOf(event.by),
@@ -434,16 +634,42 @@ export default function ReplayView({
           }
         />
         <MapCorner>
-          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} />
+          <Minimap
+            ref={minimap}
+            t={t}
+            road={track.road}
+            gates={track.gates}
+            forks={track.forks}
+            dots={directing ? seats.map((seat) => ({ seat, fill: color.text })) : undefined}
+          />
         </MapCorner>
       </WatchTop>
       <WatchControls
         t={t}
         overhead={overhead}
+        broadcast={broadcastOn}
         onCommand={command}
         onClose={onClose}
         keys={`${t('games.kart.watch.keys')} · ${t('games.kart.replay.keys')}`}
       >
+        {clipsDone && clipList && (
+          <Row data-testid="kart-highlights-done">
+            <Note role="status">{t('games.kart.highlights.done')}</Note>
+            <Button $size="sm" onClick={() => playClips(clipList)}>
+              {t('games.kart.highlights.again')}
+            </Button>
+            <Button
+              $variant="secondary"
+              $size="sm"
+              onClick={() => {
+                endClips()
+                move({ tick: reel.start, playing: true, speed: 1 })
+              }}
+            >
+              {t('games.kart.highlights.full')}
+            </Button>
+          </Row>
+        )}
         <Timeline>
           <Time>{raceTime(ms(tick))}</Time>
           <input
@@ -455,7 +681,10 @@ export default function ReplayView({
             aria-label={t('games.kart.replay.timeline')}
             aria-valuetext={raceTime(ms(tick))}
             data-testid="kart-replay-timeline"
-            onChange={(event) => move(seekPlayhead(head.current, Number(event.target.value), reel))}
+            onChange={(event) => {
+              endClips()
+              move(seekPlayhead(head.current, Number(event.target.value), reel))
+            }}
           />
           <Time>{raceTime(ms(reel.end))}</Time>
         </Timeline>
@@ -482,6 +711,19 @@ export default function ReplayView({
           </Speed>
           <Button $variant="ghost" $size="sm" onClick={() => command('faster')}>
             {t('games.kart.replay.faster')}
+          </Button>
+          <Button
+            $variant="ghost"
+            $size="sm"
+            onClick={() => {
+              if (clipList) return playClips(clipList)
+              setWantClips(true)
+              setBroadcastOn(true)
+            }}
+            disabled={clipList !== null && clipList.length === 0}
+            data-testid="kart-highlights-open"
+          >
+            {t('games.kart.highlights.watch')}
           </Button>
           <ReplayShare replay={replay} nameOf={nameOf} you={you} revision={revision} size="sm" />
         </Row>
