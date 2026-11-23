@@ -32,7 +32,7 @@ import { cupOf } from './cups.ts'
 import { Trophy } from './Trophy.tsx'
 import { useMenuMusic } from '../audio/useMenuMusic.ts'
 import { isKartId } from '../../../shared/kart/karts.ts'
-import { loadBody, loadDriver } from '../bodies.ts'
+import { loadBody, loadDriver, loadOutfit } from '../bodies.ts'
 import { prefetchKart, RACE_ENGINE } from '../load/kartLoad.ts'
 import { podiumSeats } from '../ceremony/podium.ts'
 
@@ -131,6 +131,7 @@ export default function CupView({ run: first, onMenu }: CupViewProps) {
                   name: nameOf(seat),
                   kart: mine ? loadBody() : entry.kart,
                   driver: mine ? loadDriver() : entry.driver,
+                  ...(mine ? { outfit: loadOutfit(loadDriver()) } : {}),
                   line: t('kart.flow.podium.points', {
                     points: table.find((one) => one.seat === seat)?.points ?? 0,
                   }),
@@ -152,6 +153,7 @@ export default function CupView({ run: first, onMenu }: CupViewProps) {
             <KartPreview
               kart={loadBody()}
               driver={loadDriver()}
+              outfit={loadOutfit(loadDriver())}
               label={t(outcome.place <= 3 ? 'kart.cup.podiumDriver' : 'kart.cup.offPodiumDriver')}
               hint=""
               morphLabel=""

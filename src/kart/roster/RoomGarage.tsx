@@ -15,17 +15,21 @@ import { useT } from '../../i18n/useT.ts'
 import { memberName } from '../../lib/memberName.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { RosterPicker } from './RosterPicker.tsx'
+import { usePlayWin } from './usePlayWin.ts'
 import { useRoomLook, type RoomLook } from './useRoomLook.ts'
 
 registerMessages(KART_ROSTER_MESSAGES)
 
 // The 3D preview brings three.js with it: fetched only once the garage opens
 const KartPreview = lazy(() => import('./KartPreview.tsx'))
+// 2026-11-23 (docs/KART-WORLD.md §3): the driver's card and their outfits, with words of its own
+const DriverProfile = lazy(() => import('./DriverProfile.tsx'))
 
 /** The picker itself, with its 3D preview: inside the waiting room's garage dialog */
 export function RoomGarage({ look, track }: { look: RoomLook; track?: string }) {
   const t = useT()
-  const { kart, driver } = look
+  const { kart, driver, outfit } = look
+  const win = usePlayWin(driver)
   return (
     <div data-testid="kart-room-garage">
       <RosterPicker
@@ -35,11 +39,24 @@ export function RoomGarage({ look, track }: { look: RoomLook; track?: string }) 
         onKart={look.setKart}
         onDriver={look.setDriver}
         track={track}
+        profile={
+          <Suspense fallback={null}>
+            <DriverProfile
+              driver={driver}
+              outfit={outfit}
+              onOutfit={look.setOutfit}
+              onPlayWin={win.play}
+              playing={win.playing}
+            />
+          </Suspense>
+        }
         preview={
           <Suspense fallback={null}>
             <KartPreview
               kart={kart}
               driver={driver}
+              outfit={outfit}
+              {...(win.playing ? { pose: 'cheer' as const } : {})}
               label={t('kart.roster.preview', { kart: t(`kart.body.${kart}`) })}
               hint={t('kart.roster.previewHint')}
               morphLabel={t('kart.roster.morph')}

@@ -42,8 +42,10 @@ import {
   REVEAL_AT,
   revealed,
   PODIUM_GESTURE,
+  podiumGesture,
+  WINNER_SHOW_AT,
 } from '../../src/kart/ceremony/podium.ts'
-import { gesturePose } from '../../src/kart/driverGestures.ts'
+import { gesturePose, SHOWPIECE_SECONDS } from '../../src/kart/driverGestures.ts'
 import { bytes, driveFrames } from './raceDriver.ts'
 
 // 2026-11-22 (owner: "Esc pauses, a ten-second countdown after the first finish, a podium, each
@@ -310,6 +312,15 @@ describe('the podium', () => {
     expect(podiumCamera(0, true)).toEqual(podiumCamera(5, true))
     // The winner lifts the trophy: both hands high and close together
     expect(PODIUM_GESTURE[1]).toBe('trophy')
+    // 2026-11-23 (KART-WORLD §3.3): then their own win, the camera in close on them
+    expect(podiumGesture(1, WINNER_SHOW_AT - 0.1)).toBe('trophy')
+    expect(podiumGesture(1, WINNER_SHOW_AT + 0.1)).toBe('cheer')
+    expect(podiumGesture(2, WINNER_SHOW_AT + 0.1)).toBe(PODIUM_GESTURE[2])
+    const close = podiumCamera(WINNER_SHOW_AT + 1.5)
+    expect(close.eye.z).toBeLessThan(end.eye.z - 3)
+    expect(close.target.y).toBeGreaterThan(end.target.y)
+    expect((CEREMONY_MS / 1000 - WINNER_SHOW_AT) * 1000).toBeGreaterThan(SHOWPIECE_SECONDS * 1000 - 1)
+    expect(podiumCamera(WINNER_SHOW_AT + 1.5, true)).toEqual(podiumCamera(0, true))
     const pose = gesturePose('trophy', 1)
     expect(pose.leftUp).toBeGreaterThan(2.5)
     expect(pose.leftOut).toBeLessThan(0.3)

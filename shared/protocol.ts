@@ -526,8 +526,11 @@ export type ReactMessage = { t: 'react'; reaction: number }
  */
 export type SetPasswordMessage = { t: 'set_password'; password: string | null }
 
-/** What a `look` may be: one or two short lowercase words joined by a dot */
-export const LOOK_PATTERN = /^[a-z0-9-]{1,16}(?:\.[a-z0-9-]{1,16})?$/
+/**
+ * What a `look` may be: one to three short lowercase words joined by dots (2026-11-23: the third, a
+ * kart driver's outfit, shared/kart/outfits.ts; a page from before reads the first two)
+ */
+export const LOOK_PATTERN = /^[a-z0-9-]{1,16}(?:\.[a-z0-9-]{1,16}){0,2}$/
 
 /** Show the others a cosmetic choice (RoomMember.look), or take it away with null. Any status */
 export type SetLookMessage = { t: 'set_look'; look: string | null }

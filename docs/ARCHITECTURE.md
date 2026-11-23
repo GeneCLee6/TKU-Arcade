@@ -1930,6 +1930,21 @@ AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化�
 - **工具**：`node --experimental-strip-types scripts/kart/reverse-guide-check.ts [ids]` 印每份導引（原向與反向）的提示、縫與兩條線穿牆的地方。
 - **測試**：`tests/kart/reverseGuides.test.ts`（有反向導引的五份；每份長度對、有技術內容、兩條線不穿牆、每道縫離牆 1.4 m 以上且在技術線上、提示在反向的跳台上、落地點在前方 20 點內；帶過來的線是原向的鏡像、縫在原位反過來；漁人碼頭等不給；頂尖 vs 熟練：碼頭倉庫反向三種子平均快 ≥ 8%、山城坡巷反向 ≥ 5%、都不復位，高架廠區、竹圍高架反向頂尖比熟練快），`tests/kart/reverse.test.ts`（反向 revision 跟 `REVERSE_REVISION`；哪幾張有導引；只有碼頭倉庫與山城坡巷各拿掉一道欄）、`tests/kart/botBends.test.ts`。
 
+### 4.93 路線圖外：車手的背景、樣貌、服裝、勝利動畫（2026-11-23，`feat/kart-characters`）
+
+擁有者：「還可以建立每個人物角色的背景，勝利動畫，服裝，樣貌，每個人都不同……把它們想像是在做一個線上遊戲就知道怎麼做了。」設定與表格在 `KART-WORLD.md` §3.0–3.4。**只改外觀**：物理、裁定、frame 格式都不動。全部程式產生（`ASSETS.md` 不用登記）。
+
+- **資料**（`src/kart/art/driverLooks.ts`，純資料、測試讀）：每位車手的身形（身高、肩寬、厚度，限制 0.88–1.16）、安全帽款（`blade`／`bubble`／`facet`／`moto`）、特徵（`scarf`／`ponytail`／`headset`／`towel`）、勝利道具（`calculator`／`dumbbell`）、會不會拋愛心、三套服裝的剪裁（`suit`／`coat`／`hoodie`／`vest`／`tracksuit`／`varsity`／`blazer`／`jersey`）；顏色在 `kartTokens.ts` 的 `kartOutfits`（每人 × 每套：上身、袖、褲、拼色、手套、鞋、點綴）與 `kartFeatures`。
+- **模型**（`driverModel.ts` 的 `buildDriver(kit, driver, detail, outfit)`）：整個車手 `group.scale` = 身高；上身的外殼（軀幹、拼色、領、背號、安全帶）放在一個 `shell` 群組裡做 (肩寬, 1, 厚度) 的非等比縮放，手臂與頭掛在沒縮放的 `torso` 上（不會被剪切變形）；肩關節 x 乘肩寬、四肢的 `LatheGeometry` 先乘厚度再蒙皮。安全帽與特徵在 `driverHelmets.ts`，服裝多出來的零件在 `driverOutfits.ts`（賽車服自己的安全帶、護甲、護膝、縫線只在 `suit`），道具與愛心在 `driverProps.ts`。`kartModel.ts`：站著的髖部高度 `STANDING_HIP × scale`；握把位置換到上身座標前先除以 `scale`（手照樣抓在方向軛上）；`KartDetail.outfit`、`KartModel.outfit`。
+- **會動的部分**：圍巾尾巴與馬尾各掛在一個 pivot 上，`update` 依速度往後飄（`-(0.15 + speed × 0.95 + bounce × 3)`）、小幅抖動、跟著轉向與歪頭擺；道具掛在手的關節下（不是骨頭，所以不進蒙皮），`scale` = 動作的 `prop`；六顆愛心掛在上身，位置與大小由純函式 `heartFlight(burst, i)` 算（依序飛出、扇形、放大再縮小）。都只在中、高畫質；低畫質車手照舊合併後不動（`rigged` 為 false），沒有道具與擺動。
+- **勝利動畫**（`driverGestures.ts`）：`GesturePose` 多 `prop`、`burst`；`keyed(t, keys)` 在關鍵影格之間 smoothstep 過渡（手勢在兩格中點切換）；四人的 `cheer` 改成 3.2 s 的演出（`SHOWPIECE_SECONDS`）再停在最後姿勢、持續小動作：阿桃拔劍指天、心心拋飛吻（`KISS_AT` 0.78 s 起愛心飛 1.7 s）再比愛心、小方推護目鏡按計算機再比 V、梅子彎舉兩下推過頭再秀肌肉。用 `cheer` 的地方都自動換成新的：完賽、等待室按準備（`lobbyStage.ts` 的 `CHEER_FOR` 改成 `SHOWPIECE_SECONDS`）、頒獎台亞軍、大獎賽頒獎（`podium` 3 s 後）。
+- **頒獎台**（`ceremony/podium.ts`）：`CEREMONY_MS` 7 → 8 s；冠軍 `podiumGesture(1, t)` 在 `WINNER_SHOW_AT` 3.8 s 前舉獎盃、之後放下獎盃演自己的勝利；`podiumCamera` 在 3.8 s 起 0.8 s 推近到冠軍特寫（眼睛在台上 1.55 m、4.4 m 前，看台上 1.0 m，左右小幅漂），減少動態時不動。
+- **同步**：成員的 `look` 加第三個字＝服裝（`kart.driver.outfit`；賽車服省略）。`LOOK_PATTERN` 放寬到一到三個字，舊頁面只讀前兩個字。**frame 的車 byte 不動**（5 bit 車＋3 bit 車手已滿）：服裝比賽中不會變，跟成員資料走一次就夠；`netRace.ts` 的 `others()` 用 `lookOf(seat).outfit` 畫別人，`Scene.ts` 的 `OtherKart.outfit` 變了就重建那台車。頒獎台、等待室的位置卡、房主加的電腦車（隨機服裝）都照成員的 `look`。重播、觀戰只有 frame，顯示賽車服（`KART-NETCODE.md` 協定表）。
+- **車庫**（`roster/DriverProfile.tsx`，lazy，字在 `shared/kart/i18n.drivers.ts`，也 lazy）：`RosterPicker` 多一個 `profile` 插槽（和 `preview` 一樣由呼叫端給），`/kart` 的車庫（`GaragePanel`）與等待室的車庫（`RoomGarage`）都放；身形、個性、出身、口頭禪、擅長賽道、勝利動作、和其他三人的關係、三套服裝（`radiogroup`，鎖住的會 `disabled` 加「未解鎖」）、「看勝利動作」（`usePlayWin`：預覽的 `pose` 設成 `cheer` 4 s，`previewStage.ts` 這時把鏡頭轉到車手正面偏一側、推近 1.3 m）。服裝存在 `localStorage` 的 `tku-arcade.kart.outfit.<車手>`（`bodies.ts` 的 `loadOutfit`／`saveOutfit`，經 `storage.ts` 的 try/catch），`useRoomLook` 換車手就換回那人上次的服裝；`/kart` 關車庫時服裝變了也重開比賽（同換車）。
+- **解鎖**（`shared/kart/outfits.ts`）：`OUTFIT_UNLOCK` 是每套將來要對應的成就 id（測試檢查都存在於 `RULE_IDS`），`outfitOpen(outfit, unlocked?)` 在 `OUTFITS_GATED` 為 true 前一律回 true；`loadOutfit` 也問它，所以將來鎖上時舊的選擇會退回賽車服。
+- **效能**：從選單進比賽（最重的賽道）387.9 → 392.7 kB gzip（480 kB 上限）：服裝與安全帽的幾何是比賽本身要用的（自己與別人的車手）；背景文字與車手資料卡片在車庫打開時才載入。網站首屏、卡丁車首屏各 +0.0／+0.2 kB。中、高畫質一位車手多約 10–25 個 mesh（安全帽、特徵、服裝零件，`flatten` 依群組合併後每人多約 3–6 個 draw；道具與愛心平常縮成 0）；低畫質照舊合併成固定幾個 mesh。
+- **測試**：`tests/kart/driverLooks.test.ts`（資料驗證：身形在限制內、四種輪廓／安全帽／特徵互不相同、每人三套剪裁與配色不同、同一套四人顏色不同、兩語都有每段背景、解鎖對應的成就存在；`loadOutfit` 每人各記、壞值退回；`keyed`、`heartFlight`、四人勝利的階段；每人 × 每套 × 低／高畫質都建得起來；身高；勝利時道具與愛心真的出現）、`karts.test.ts`（三個字的 look 寫、讀、伺服器收、舊頁面讀到的前兩個字）、`room-host.test.ts`（三個字的 look 傳給別人）、`raceFlow.test.ts`（冠軍先舉獎盃再演、特寫推近、演完才結束）、`driverRig`／`driverLimbs` 改成新的勝利；`e2e/kart-characters.spec.ts`（真 GPU：四人 × 三套正面、勝利三個時刻的截圖附在報告，`KART_CHARACTER_SHOTS=1` 另存 `test-results/`；車庫選服裝、重新整理後還在、換車手換回他自己的）。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。

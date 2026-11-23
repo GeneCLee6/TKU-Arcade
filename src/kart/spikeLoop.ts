@@ -1,4 +1,6 @@
 import { TEST_ARENA } from '../../shared/kart/arena.ts'
+import type { OutfitId } from '../../shared/kart/outfits.ts'
+import { loadOutfit } from './bodies.ts'
 import type { KartTelemetry } from '../../shared/protocol.ts'
 import {
   finishRecording,
@@ -429,6 +431,8 @@ export interface SpikeOptions {
   readonly body?: KartBody
   /** e10-t05b: who sits in it, looks only */
   readonly driver?: DriverId
+  /** 2026-11-23 (shared/kart/outfits.ts): what the driver wears; left out, what this browser keeps */
+  readonly outfit?: OutfitId
   /** Every frame, where the car is: the minimap moves its marker with it, outside React */
   readonly onPose?: (x: number, z: number, heading: number, nextGate: number, tick?: number) => void
   /** 2026-11-17: which ghost races along: the track's overall best (the default), this kart's, none */
@@ -627,6 +631,8 @@ export function startSpikeLoop(container: HTMLElement, options: SpikeOptions): (
     options.quality,
     options.body,
     options.driver,
+    // 2026-11-23 (shared/kart/outfits.ts): what the driver wears, as picked in the garage
+    options.outfit ?? loadOutfit(options.driver ?? DEFAULT_DRIVER),
   )
   // 2026-11-22: a bike's own engine, and as much sound as the quality has (audio/tiers.ts)
   const audio = createKartAudio({ quality: options.quality, kind: kartKind(kartId) })

@@ -5,11 +5,12 @@
 // The show lasts CEREMONY_MS (anyone may skip it): the stage dark, then the lights come up on third,
 // second and first in turn as each driver's plate slams in, confetti with the winner, the camera
 // gliding in from wide and swaying slowly while they wave, cheer and lift the trophy.
+import type { OutfitId } from '../../../shared/kart/outfits.ts'
 import type { DriverId, KartId } from '../../../shared/kart/karts.ts'
 import type { DriverGesture } from '../driverGestures.ts'
 
 /** The whole show, ms; the results follow */
-export const CEREMONY_MS = 7_000
+export const CEREMONY_MS = 8_000
 /** A skip is taken only after this long, so that the key that ended the race does not skip it */
 export const SKIP_AFTER_MS = 600
 /** When each place is revealed, seconds into the show: third, then second, then the winner */
@@ -20,6 +21,18 @@ export const STEP_X: Record<1 | 2 | 3, number> = { 1: 0, 2: -2.9, 3: 2.9 }
 /** What each place does up there */
 export const PODIUM_GESTURE: Record<1 | 2 | 3, DriverGesture> = { 1: 'trophy', 2: 'cheer', 3: 'wave' }
 
+/**
+ * 2026-11-23 (docs/KART-WORLD.md §3.3): the winner puts the cup down this many seconds in and plays
+ * their own win (driverGestures.ts's showpiece), the camera closing in on them (`podiumCamera`)
+ */
+export const WINNER_SHOW_AT = 3.8
+/** The close-up's glide in, s */
+const CLOSE_GLIDE = 0.8
+
+/** What `place` does `seconds` into the show, once revealed: the winner lifts the cup, then their own win */
+export const podiumGesture = (place: PodiumPlace, seconds: number): DriverGesture =>
+  place === 1 && seconds >= WINNER_SHOW_AT ? 'cheer' : PODIUM_GESTURE[place]
+
 export type PodiumPlace = 1 | 2 | 3
 
 export interface PodiumEntry {
@@ -28,6 +41,8 @@ export interface PodiumEntry {
   readonly name: string
   readonly kart: KartId
   readonly driver: DriverId
+  /** 2026-11-23 (shared/kart/outfits.ts): what they wear; the race suit left out */
+  readonly outfit?: OutfitId
   /** Under the name: the race time, or a Grand Prix's points */
   readonly line: string
   readonly you: boolean
@@ -77,8 +92,13 @@ const smooth = (share: number) => {
 export function podiumCamera(seconds: number, reducedMotion = false): PodiumCamera {
   const glide = reducedMotion ? 1 : smooth(seconds / GLIDE_SECONDS)
   const sway = reducedMotion ? 0 : Math.sin(Math.max(0, seconds - GLIDE_SECONDS) * 0.45) * 1.4
+  // 2026-11-23 (§3.3): then in close on the winner while they play their own win, drifting a little
+  const close = reducedMotion ? 0 : smooth((seconds - WINNER_SHOW_AT) / CLOSE_GLIDE)
+  const drift = Math.sin(Math.max(0, seconds - WINNER_SHOW_AT) * 0.6) * 0.5
+  const top = STEP_HEIGHT[1]
+  const mix = (wide: number, near: number) => wide + (near - wide) * close
   return {
-    eye: { x: sway, y: 1.6 + 1.1 * glide, z: 14 - 5.2 * glide },
-    target: { x: 0, y: 1.5 - 0.2 * glide, z: 0 },
+    eye: { x: mix(sway, drift), y: mix(1.6 + 1.1 * glide, top + 1.55), z: mix(14 - 5.2 * glide, 4.4) },
+    target: { x: 0, y: mix(1.5 - 0.2 * glide, top + 1.0), z: 0 },
   }
 }

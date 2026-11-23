@@ -252,7 +252,7 @@
 
 | 方向 | 格式 | 內容 |
 | --- | --- | --- |
-| 瀏覽器 → 房間 | JSON `{ t: 'set_look', look }` | 等待室裡（任何狀態都收）：`look` 是 `kart.driver`（例 `heron.club`），null 拿掉。房間只檢查格式，存在成員上，所有人的 `RoomMember.look` 都看得到 |
+| 瀏覽器 → 房間 | JSON `{ t: 'set_look', look }` | 等待室裡（任何狀態都收）：`look` 是 `kart.driver`（例 `heron.club`），2026-11-23 起可加第三個字＝服裝（`kart.driver.outfit`，例 `heron.club.street`；賽車服省略，所以沒換服裝的人送的字串和以前一模一樣；舊頁面 `split('.')` 只讀前兩個字，照樣看得到車與車手；`LOOK_PATTERN` 放寬到一到三個字），null 拿掉。服裝**不放進 frame**：車 byte 已經用滿（5 bit 車＋3 bit 車手），服裝只在比賽前選、比賽中不會變，所以跟著成員資料走一次就夠，別人的車在比賽中照 `netRace.ts` 的 `lookOf(seat).outfit` 畫（重播與觀戰只看 frame，顯示賽車服）。房間只檢查格式，存在成員上，所有人的 `RoomMember.look` 都看得到 |
 | 比賽中 | frame 第 2 個 byte | 車 index 5 bit ＋角色 index 3 bit（`shared/kart/karts.ts` 的 `loadoutByte`／`loadoutOfByte`；2026-11-19 起，位元配置見下）。別人的畫面照這個畫車與角色、照車款決定碰撞圓與質量；伺服器照這個決定速度上限 |
 
 - **車 byte 的位元（2026-11-19，`feat/kart-vehicle-roster`；frame 大小、其他欄位、協定版本都沒變）**：車款從 6 台變 17 台，原本「車 4 bit＋角色 4 bit」只裝得下 16 台。新配置：**bit 0–3＝車 index 的低 4 位、bit 4–6＝角色 index（最多 8 位）、bit 7＝車 index 的第 5 位（最多 32 台）**。

@@ -521,9 +521,10 @@ function usePicture(stage: LobbyStage | null, seat: number, member: RoomMember |
   }, [stage, seat])
   const kart = pick?.kart
   const driver = pick?.driver
+  const outfit = pick?.outfit
   useEffect(() => {
-    stage?.set(seat, kart && driver ? { kart, driver, ready } : null)
-  }, [stage, seat, kart, driver, ready])
+    stage?.set(seat, kart && driver ? { kart, driver, outfit, ready } : null)
+  }, [stage, seat, kart, driver, outfit, ready])
   useEffect(() => () => stage?.set(seat, null), [stage, seat])
   return canvas
 }
