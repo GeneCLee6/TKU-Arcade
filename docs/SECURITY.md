@@ -13,6 +13,7 @@
 | 建房速率 | 原本沒有限制 | 每個 Worker instance 每個位址每分鐘 30 間（§6）；`e12-t06` 加上跨 instance 的每位址每分鐘 10 間（原 5 間，擁有者 2026-11-22 調高） |
 | 連線上限 | 每房 72 條／64 人 | `e12-t06`：每房每位址 24 條、每位址每分鐘 120 次升級＋斷線重連另 240 次（§6） |
 | 暱稱 | 濾控制字元、方向覆寫、長度 | `e12-t06`：再濾零寬與隱形字元、擋冒充與基本髒話，伺服器端也檢查（§9） |
+| 卡丁車排行榜上傳 | — | 2026-11-23：伺服器嚴格解碼重播、逐樣本用房間的判定重跑、每位址每分鐘 6 次、256 kB 上限；擋得住改檔，擋不住會開車的腳本（§11） |
 | 擁有者端點 | `/api/stats` 要 `STATS_KEY` | 新的 `/api/admin/flags`、`/api/admin/usage` 共用同一個檢查（`worker/owner.ts`）；`e12-t06` 加上錯 5 次鎖一分鐘、比對不洩漏長度（§7） |
 
 ## 2. WebSocket 來源檢查
@@ -100,6 +101,8 @@ frame-ancestors 'none'
 | WebSocket（房內） | 每房 `MAX_CONNECTIONS`（72）條、`MAX_MEMBERS`（64）人；**每房每位址 `MAX_CONNECTIONS_PER_ADDRESS`（24）條**（含旁觀，`e12-t06`），超過 4429 | `RoomHost.admit` |
 | 擁有者金鑰 | 每位址每分鐘錯 5 次後鎖一分鐘（§7） | `worker/owner.ts` |
 | `POST /api/errors` | 每位址每分鐘 10 則、instance 合計 120 則 | `worker/errors.ts` |
+| `POST /api/kart/board`（排行榜上傳，2026-11-23） | **每位址每分鐘 6 次**（`LimiterDO` 的 `board` 桶）＋每 instance 每位址 6 次、合計 120 次；body 256 kB（邊讀邊數）；超過 429 `rateLimited`／413 | `worker/kartBoard.ts` |
+| `GET /api/kart/board/replay`（下載重播） | 每 instance 每位址每分鐘 60 次、合計 1200 次 | `worker/kartBoard.ts` |
 | 聊天 | 每人每 10 秒 10 則、每則 500 字 | `shared/chat.ts`、`RoomHost` |
 | 表情 | 每人間隔 `REACTION_MIN_MS` | `RoomHost` |
 | 房間密碼 | 錯 `PASSWORD_TRIES` 次關掉 socket | `RoomHost` |
@@ -119,7 +122,7 @@ frame-ancestors 'none'
 
 ## 7. 擁有者端點
 
-`/api/stats`、`/api/admin/flags`（GET／PUT）、`/api/admin/usage` 都走 `worker/owner.ts` 的 `ownerRefusal`：
+`/api/stats`、`/api/admin/flags`（GET／PUT）、`/api/admin/usage`、`/api/admin/kart-board`（DELETE，2026-11-23）都走 `worker/owner.ts` 的 `ownerRefusal`：
 
 - 沒有 `STATS_KEY` secret → 404（站上看不出有這些端點）。
 - 金鑰用 `Authorization: Bearer <key>`，固定時間比對（`e12-t06` 起連長度都不洩漏：時間只看正確金鑰的長度）；**不在網址裡**，所以不會出現在 Worker 日誌或瀏覽器紀錄，Worker 也不 log 標頭；別的網站的頁面不能讓瀏覽器帶這個標頭，所以 PUT 沒有 CSRF 問題（跨站的帶自訂標頭請求要過 CORS preflight，本站不回 CORS 標頭）。
@@ -161,3 +164,33 @@ PR 預覽站（`tku-arcade-pr-110`），從一台電腦（同一個 IPv6 /64）�
 - **每房每位址**：同一個房間開 26 條並送 `join` → 24 條留著、第 25、26 條 **4429**。
 - **暱稱**：`join` 送 `系統`、`Admin` → 4422；`A` + 零寬空格 + `l` → 正常加入。
 - **擁有者金鑰**：預覽沒有 `STATS_KEY`（端點 404），鎖定只有單元測試。
+
+## 11. 卡丁車排行榜的防作弊（2026-11-23，`feat/kart-leaderboard`）
+
+計時賽排行榜（`ARCHITECTURE.md` §4.81）收的是瀏覽器錄的重播檔，所以**檔案裡的每個 byte 都當成攻擊者寫的**。目標是朋友圈等級：改一下檔案、改一下時間、拿別張圖或舊版路線的檔案，都上不了榜；真的要作弊的人得寫一個在物理限制內開車的程式。
+
+**伺服器做的事**（`worker/kartBoard.ts` → `shared/kart/boardCheck.ts`，任何一項不過就拒收、不寫入）：
+
+| 檢查 | 擋什麼 | 拒收原因 |
+| --- | --- | --- |
+| 同站來源（`Origin`）、每位址每分鐘 6 次、body 256 kB 邊讀邊數 | 別的網站代送、洗版、大檔 | 403、`rateLimited`、`tooBig` |
+| 賽道是 14 張內建比賽賽道之一；網址的 `revision` 與檔頭的 `revision` 都等於伺服器現在的路線版本 | 自訂與挑戰賽道、舊路線的成績混進新榜 | `track`、`revision` |
+| 物理戳記（`boardStamp.ts`：所有調參、車款數字的雜湊＋手動的 `BOARD_PHYSICS_REVISION`）等於這次部署的 | 部署前開著的分頁用舊物理跑的成績 | `physics` |
+| 暱稱照 #110 的規則（`acceptableName`：不可見字元、冒充、髒話） | 冒充、亂取名 | `nickname` |
+| 嚴格解碼（`readReplayFile`：檔案 2 MB、解壓邊解邊數 8 MB、標頭逐欄、meta 逐欄、每個陣列有上限、多的 bytes 就整個不收；`KART-NETCODE.md` §11.4） | 壞檔、壓縮炸彈、塞奇怪欄位 | `file` |
+| 形狀：一台車、`mode: 'race'`、本賽道的圈數、沒有道具事件與子彈、沒有隊伍 | 拿比賽或道具賽的重播來充 | `shape` |
+| 樣本：從 tick 0、在計時賽起點 2 m 內、速度 < 1 m/s 開始；相鄰樣本 1–6 tick（錄影器每 6 tick 一個，**不能有洞**）；最多 12,000 個；整趟同一個車款車手 byte；只有最後一個樣本是「完賽」 | 截掉一段、從中間開始、半路換車 | `samples` |
+| **每個樣本用房間判 live frame 的同一個 `judgeFrame`**：車款自己的速度上限（`speedCapFor`，所有加速疊起來 × 1.5）、兩個樣本間的距離不能超過速度上限允許的＋12 m、重置只能落在復位點／起點 30 m 內、不能穿過關著的閘門或貨櫃、座標在 ±20 km 內 | 改速度、瞬移、假重置、穿閘門 | `speed`、`jump`、`reset`、`obstacle`、`far` |
+| **gate 由伺服器自己數**（線段穿過 gate 才算、照順序、倒著過會退回去）；房間會在 gate 附近相信車子自己報的數字（live frame 可能掉），重播不會掉樣本，所以只有「重置」那一個樣本的自報被參考（重置是立刻存的，可能剛好跟在過 gate 之後） | 繞在路旁、抄近路漏 gate、少跑一圈 | `laps` |
+| 伺服器數到的圈數＝賽道圈數；每一圈結束的時間（在兩個樣本間內插）和檔案寫的累計時間差 ≤ 120 ms；總時間＝最後一個樣本的 tick（±1 ms）；各圈加起來＝總時間 | 改成績、改圈時間、整段時間壓縮 | `time`、`laps` |
+
+拒收時 Worker 日誌一行 `{"event":"kart_board_refused","why":…,"track":…,"at":<第幾個樣本>}`，並記進 `daily_metrics`（`metric = 'board_upload'`，`game` 欄＝原因）；收下的記 `improved` 或 `kept`。擁有者看到明顯不對的成績，`DELETE /api/admin/kart-board?id=<列 id>`（`Authorization: Bearer <STATS_KEY>`；列 id 在 `GET /api/kart/board` 的回應裡）。
+
+**擋不住的事**（寫清楚，不假裝）：
+
+- **會開車的程式**：改瀏覽器、注入腳本、或用站上測試用的 `?autopilot` 開出來的一趟，只要每一步都在物理之內，就是一趟真的可以開出來的成績，伺服器分不出是誰在開。內建的自動駕駛是慢的保守駕駛，上得了榜但排不前面；寫一個比人快的程式要花的力氣，遠超過朋友圈的排行榜值得的。速度上限是「所有加速同時疊起來再 × 1.5」，所以「一直維持接近上限」的假檔也過得了速度檢查，只是這種檔要自己把整條路的每個樣本、gate 與時間都算對。
+- **穿牆**：伺服器不檢查樣本有沒有穿過牆（地形、立體交叉、高台讓「牆」不是平面線段，判錯會誤殺正常的成績）。抄近路穿牆的檔案通常會漏 gate 而被拒，但在 gate 範圍內穿過一段牆的不會。
+- **調參**：只在瀏覽器擋（只有標準調參的一趟會給上傳鈕）；伺服器看不到調參，只靠速度上限與跳點。
+- **暱稱不是身分**：還沒有帳號（F1），任何人都能用任何沒被擋的暱稱上傳，包括別人的暱稱（它只會在比原本快時蓋掉那一列）。F1 上線後的認領方式見 `ARCHITECTURE.md` §4.81。
+- **位址**：每分鐘 6 次是每個位址；換網路就能再傳。上傳很貴的部分（解壓、判樣本）一趟 1–7 ms CPU。
+- 重播檔是公開的：誰都能下載任何一列的 `.tkureplay`；裡面只有路線、時間與暱稱。

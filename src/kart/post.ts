@@ -52,6 +52,13 @@ export interface Post {
   render(scene: Scene, camera: Camera, frame: PostFrame): void
   /** After the renderer's size changes */
   resize(): void
+  /**
+   * 2026-11-23 (resolution.ts's `starved`): stops smoothing the scene's edges (its buffer's
+   * multisampling), for a phone that cannot keep up even with fewer pixels
+   */
+  shed(): void
+  /** Whether the scene's edges are still smoothed */
+  readonly smoothed: boolean
   dispose(): void
 }
 
@@ -329,6 +336,15 @@ export function createPost(renderer: WebGLRenderer, level: PostLevel, samples: n
       draw(final, null)
     },
     resize,
+    shed() {
+      if (sceneTarget.samples === 0) return
+      sceneTarget.samples = 0
+      // Made again on its next use, without the multisampled buffers (the texture stays the same)
+      sceneTarget.dispose()
+    },
+    get smoothed() {
+      return sceneTarget.samples > 0
+    },
     dispose() {
       sceneTarget.dispose()
       for (const one of [...downs, ...ups]) one.dispose()

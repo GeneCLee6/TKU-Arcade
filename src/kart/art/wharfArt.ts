@@ -116,6 +116,7 @@ export function buildWharf(kit: ArtKit, plan: WharfPlan): { update(seconds: numb
       z: (north + south) / 2,
       width: seaWidth,
       depth: south - north,
+      near: box,
       y: 0.04,
       depthAt: (x) => (x - seaX) / 60,
       ...waterScene.wharf,

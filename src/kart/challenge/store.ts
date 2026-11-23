@@ -67,6 +67,9 @@ export const loadProgress = (): ChallengeProgress => parseProgress(readStored(CH
 
 const save = (progress: ChallengeProgress): ChallengeProgress => {
   writeStored(CHALLENGE_KEY, JSON.stringify(progress))
+  // e11-t06: a medal or a mission may unlock an achievement
+  // (src/achievements/kartLists.ts KART_PROGRESS_EVENT: nothing to import)
+  window.dispatchEvent(new Event('tku-arcade:kart-progress'))
   return progress
 }
 

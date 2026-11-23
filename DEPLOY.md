@@ -345,6 +345,7 @@ npx wrangler d1 execute tku-arcade --remote --command   "INSERT INTO game_flags 
 | `create` | 每位址每分鐘 10 間新房（擁有者 2026-11-22 從 5 間調高） |
 | `socket` | 每位址每分鐘 120 次 WebSocket 升級 |
 | `ownerFail` | 每位址每分鐘 5 次錯的擁有者金鑰（之後鎖一分鐘） |
+| `board` | 每位址每分鐘 6 次卡丁車排行榜上傳（2026-11-23，§16） |
 
 - 依位址雜湊（`worker/address.ts`）的第一個字分 16 個物件；只在記憶體，不寫儲存。正式站與每個預覽是不同的 Worker，各有自己的 LimiterDO。
 - 要改數字：改 `worker/rate-limit.ts` 的 `SHARED_LIMITS`，合併即生效。
@@ -352,3 +353,20 @@ npx wrangler d1 execute tku-arcade --remote --command   "INSERT INTO game_flags 
 - 每房每位址 24 條連線是程式常數（`shared/protocol.ts` 的 `MAX_CONNECTIONS_PER_ADDRESS`）。
 - DO migration 只增不改（§7）：`v2` 加了 `LimiterDO`，之後不要改它或拿掉。
 - Cloudflare 的 Rate Limiting binding（`ratelimits`）試過，在這個帳號上一律回 `success: true`，所以沒用（`docs/SECURITY.md` §6）。
+
+## 16. 卡丁車計時賽排行榜（2026-11-23，`feat/kart-leaderboard`）
+
+**擁有者不用做任何設定。** 資料表由 `migrations/0006_kart_board.sql` 建（部署與預覽的 workflow 在建置前自動套用遷移，§6）；重播檔存在同一張 D1 表的 BLOB 欄，**不需要新的 R2 bucket**；速率限制用現有的 `LimiterDO`（新的 `board` 桶，§15）。
+
+- **預覽站**：用共用的 staging 資料庫（`tku-arcade-staging`），所以每個 PR 預覽看到的是同一份測試榜；e2e 會在上面留下 `E2E` 開頭暱稱的成績，沒關係。
+- **容量**：一趟的重播 8–25 kB；一張榜 100 人約 1–2.5 MB，14 張全滿約 35 MB（免費方案 D1 5 GB）。每次看榜讀那張榜的前 100 列加一次計數；每次上傳寫一列。
+- **拿掉一筆成績**（作弊、不雅暱稱）：列 id 在 `GET /api/kart/board?track=<賽道>` 的回應裡。
+
+  ```bash
+  curl -X DELETE -H "Authorization: Bearer $STATS_KEY"     "https://tku-arcade.genelee-pro.workers.dev/api/admin/kart-board?id=<列 id>"
+  ```
+
+  沒設 `STATS_KEY` 時這個端點是 404（§12）。
+- **看拒收原因**：Worker 日誌搜 `kart_board_refused`；或 D1 `SELECT day, game, count FROM daily_metrics WHERE metric = 'board_upload' ORDER BY day DESC`（`game` 欄是原因；`improved`／`kept` 是收下的）。
+- **物理改了**：只改數字（調參、車款）的話物理戳記自動變；改了物理的程式（`stepKart` 等）但數字沒變，要手動把 `shared/kart/boardStamp.ts` 的 `BOARD_PHYSICS_REVISION` 加 1。戳記變了只影響「部署前就開著的分頁」（它們的上傳被拒，請重新整理），榜上的舊成績保留。路線改了（`revision` 加 1）就是新的一張榜，舊榜留在資料庫但不顯示。
+- **之後要用 R2 存重播**（例如開放自訂賽道、量變大）：在後台建 bucket、`wrangler.jsonc` 頂層與 `env.preview` 各加一個 binding，`kart_board.replay` 改存 key；沒有 bucket 時照舊存 D1。現在不需要。

@@ -1,9 +1,9 @@
 import { createElement, lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
+import type { RoomStatus } from '../../shared/protocol.ts'
 import { isRoomId } from '../../shared/room-id.ts'
 import { AccountControl } from '../components/AccountControl.tsx'
-import { ChatPanel } from '../components/ChatPanel.tsx'
-import { ConnectionBanner } from '../components/ConnectionBanner.tsx'
+import { LateChatPanel as ChatPanel, LateConnectionBanner as ConnectionBanner } from '../components/LateParts.tsx'
 import { Button } from '../components/Button.tsx'
 import { GameLayout, RoomChatPanel, type RoomParts } from '../components/GameLayout.tsx'
 import { HowToPlay } from '../components/HowToPlay.tsx'
@@ -26,6 +26,7 @@ import { memberName, withBotNames } from '../lib/memberName.ts'
 import { useParams } from '../lib/useRouter.ts'
 import { clippedFill, displayType, monoType, SLANT, slantClip } from '../styles/esports.ts'
 import { color, fontSize, space } from '../styles/tokens.ts'
+import { RoomWatch } from '../achievements/RoomWatch.tsx'
 
 // e7-t11: its own chunk, with its strings
 const Reactions = lazy(() => import('../components/Reactions.tsx'))
@@ -236,6 +237,7 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
         title={gameTitle(t, view.room.gameId)}
         members={Object.keys(view.members).length}
         gameId={view.room.gameId}
+        status={view.room.status}
         edition={view.room.options.edition === 'full' ? 'full' : 'simple'}
         extra={
           <Suspense>
@@ -298,6 +300,8 @@ function RoomSession({ id, name, title, members }: RoomSessionProps) {
       ) : (
         <GameLayout room={parts} />
       )}
+      {/* e11-t06: a game's end, to the achievements */}
+      <RoomWatch view={view} you={you} />
       {/* A result carries its own, where it can be seen without passing the board */}
       {!(view.room.status === 'ended' && view.game?.result) && <LobbyLink onLeave={room.leave} />}
     </>
@@ -310,6 +314,7 @@ function RoomHeading({
   gameId,
   edition,
   extra,
+  status,
 }: {
   title: string
   members: number
@@ -318,12 +323,19 @@ function RoomHeading({
   edition?: RulesEdition
   /** Beside "how to play": the reactions (e7-t11), so that they take no row of their own */
   extra?: ReactNode
+  /** Once in the room: waiting, live or final, on a ticker beside the title (2026-11-23) */
+  status?: RoomStatus
 }) {
   const t = useT()
   return (
     // The game's hue spreads to the whole page from here (GlobalStyle)
     <HeadingRow data-game={gameId}>
       <Title>{title}</Title>
+      {status !== undefined && (
+        <StatusTag $live={status === 'playing'} data-status={status}>
+          {t(`room.status.${status}`)}
+        </StatusTag>
+      )}
       <MemberCount>{t('room.memberCount', { count: members })}</MemberCount>
       {gameId !== undefined && (
         <HeadingAction>
@@ -385,9 +397,13 @@ const Main = styled.main`
     margin: 0;
   }
 
-  /* The waiting room's two columns */
+  /* The waiting room's two columns; a wide screen gives the seats its width (2026-11-23) */
   &:has([data-room-columns]) {
     width: min(1120px, 100%);
+
+    @media (min-width: 1280px) {
+      width: min(1440px, 100%);
+    }
   }
 
   /* A game needs the width its board can use, and on a phone every pixel of it */
@@ -420,11 +436,57 @@ const ConnectionStatus = styled.div`
   }
 `
 
+// A broadcast bar (2026-11-23): the hue down from the left, hairlines above and below
 const HeadingRow = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: ${space.xs}px ${space.md}px;
+  padding: ${space.sm}px 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, ${color.accent} 14%, transparent),
+    transparent 60%
+  );
+  box-shadow:
+    inset 0 1px 0 ${color.line},
+    inset 0 -1px 0 ${color.line};
+`
+
+const pulse = keyframes`
+  50% {
+    opacity: 0.3;
+  }
+`
+
+// Waiting, live or final: a slanted tag; live is magenta with a beating dot
+const StatusTag = styled.p<{ $live: boolean }>`
+  ${(p) => clippedFill(slantClip(8), p.$live ? color.magenta : color.accent)}
+  display: inline-flex;
+  align-items: center;
+  gap: ${space.xs}px;
+  padding: ${space.xs}px ${space.lg}px;
+  color: ${color.onAccent};
+  ${displayType}
+  font-size: ${fontSize.sm}px;
+  text-transform: uppercase;
+
+  &::after {
+    content: '';
+    display: ${(p) => (p.$live ? 'block' : 'none')};
+    order: -1;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: ${pulse} 1.2s steps(2) infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      animation: none;
+    }
+  }
 `
 
 const HeadingAction = styled.div`

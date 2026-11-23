@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import styled, { css, keyframes } from 'styled-components'
+import styled from 'styled-components'
 import { APP_NAME } from '../../shared/app.ts'
 import { LOBBY_GAMES } from '../../shared/games/lobby.ts'
 import { AccountControl } from '../components/AccountControl.tsx'
@@ -17,8 +17,9 @@ import { useAccount } from '../lib/account.ts'
 import { readNickname } from '../lib/nickname.ts'
 import { createRoom, fetchPausedGames } from '../lib/rooms.ts'
 import { useNavigate } from '../lib/useRouter.ts'
+import { Link } from '../lib/router.tsx'
 import type { QuickBots } from '../../shared/protocol.ts'
-import { clippedFill, displayType, slantClip } from '../styles/esports.ts'
+import { clippedFill, displayType, SLANT, slantClip } from '../styles/esports.ts'
 import { color, font, fontSize, space } from '../styles/tokens.ts'
 
 // The games that are not open yet (E3): their own chunk, strings included, so they cost the first load
@@ -33,6 +34,11 @@ const PublicRooms = lazy(() =>
 // 2026-11-21: "Play the computer", after the first paint too: every game's first screen shares the
 // lobby's entry chunk, so the lobby's own extras stay out of it
 const QuickPlay = lazy(() => import('../components/QuickPlay.tsx'))
+
+// 2026-11-23: the hero's arena, in the cards' pictures' chunk (only a wide screen shows it)
+const HeroArena = lazy(() =>
+  import('../components/GameArt.tsx').then(({ HeroArena }) => ({ default: HeroArena })),
+)
 
 /** The lobby: the games, a link box and the public rooms (e1-t02, e1-t09) */
 export function HomePage() {
@@ -57,6 +63,7 @@ export function HomePage() {
 
   // Whoever left the lobby meanwhile should not be carried off to the new room
   useEffect(() => () => inFlight.current?.abort(), [])
+
 
   useEffect(() => {
     const controller = new AbortController()
@@ -93,6 +100,12 @@ export function HomePage() {
     setAsking(null)
   }
 
+  const profile = (
+    <Link to="/me" data-testid="profile-link">
+      {t('lobby.profile')}
+    </Link>
+  )
+
   return (
     <>
       <TopBar />
@@ -111,20 +124,25 @@ export function HomePage() {
             <Title>{APP_NAME}</Title>
             <Tagline>{t('home.tagline')}</Tagline>
             {/* Signed in (e1-t13): the fixed name and sign-out, where a guest's nickname would be */}
-            {account !== null ? (
+            {/* e11-t06: "My profile" (achievements and stats) beside who is playing; for someone
+                new it comes at the end, where it does not push the first game down on a phone */}
+            {(account !== null || nickname !== null) && (
               <PlayingAs>
-                <span>{t('account.playingAs', { name: account.name })}</span>
-                <AccountControl />
+                {account !== null ? (
+                  <>
+                    <span>{t('account.playingAs', { name: account.name })}</span>
+                    <AccountControl />
+                  </>
+                ) : (
+                  <>
+                    <span>{t('lobby.playingAs', { name: nickname ?? '' })}</span>
+                    <Button $variant="ghost" $size="sm" onClick={() => setAsking({ gameId: null })}>
+                      {t('lobby.changeNickname')}
+                    </Button>
+                  </>
+                )}
+                {profile}
               </PlayingAs>
-            ) : (
-              nickname !== null && (
-                <PlayingAs>
-                  <span>{t('lobby.playingAs', { name: nickname })}</span>
-                  <Button $variant="ghost" $size="sm" onClick={() => setAsking({ gameId: null })}>
-                    {t('lobby.changeNickname')}
-                  </Button>
-                </PlayingAs>
-              )
             )}
             {!app && <JoinRoomForm />}
             <InstallApp />
@@ -149,10 +167,11 @@ export function HomePage() {
             </span>
           </PublicChoice>
           <Grid>
-            {LOBBY_GAMES.map((game) => (
+            {LOBBY_GAMES.map((game, index) => (
               <li key={game.id}>
                 <GameCard
                   game={game}
+                  index={index}
                   disabled={creating}
                   paused={paused.includes(game.id)}
                   onNewRoom={() => handleNewRoom(game.id)}
@@ -169,6 +188,7 @@ export function HomePage() {
             screen. Nothing at all while sign-in is not configured */}
         {account === null && (
           <SignInRow>
+            {nickname === null && profile}
             <AccountControl />
           </SignInRow>
         )}
@@ -184,15 +204,14 @@ export function HomePage() {
   )
 }
 
-/** The hero's picture: tiles in the games' and the site's colours. Only for the eye */
+/** The hero's picture on a wide screen: the games' arena (GameArt.tsx). Only for the eye */
 function HeroArt() {
   const t = useT()
   return (
     <Art aria-hidden="true">
-      <Tile $at="a">{t('home.heroGlyph')}</Tile>
-      <Tile $at="b" />
-      <Tile $at="c" />
-      <Tile $at="d" />
+      <Suspense>
+        <HeroArena glyph={t('home.heroGlyph')} />
+      </Suspense>
     </Art>
   )
 }
@@ -233,6 +252,12 @@ const Intro = styled.div`
     max-width: 560px;
     margin-top: ${space.md}px;
   }
+
+  @media (max-width: 480px) {
+    & > form {
+      margin-top: ${space.xs}px;
+    }
+  }
 `
 
 // A slanted magenta tag
@@ -267,8 +292,9 @@ const Tagline = styled.p`
   color: ${color.muted};
   font-size: ${fontSize.lg}px;
 
+  /* The title says enough on a phone, whose first screen is for the first game (2026-11-23) */
   @media (max-width: 480px) {
-    font-size: ${fontSize.md}px;
+    display: none;
   }
 `
 
@@ -281,88 +307,57 @@ const PlayingAs = styled.p`
   overflow-wrap: anywhere;
 `
 
-const float = keyframes`
-  50% {
-    translate: 0 -${space.sm}px;
-  }
-`
-
 // Hidden on a phone, where the games must start on the first screen
 const Art = styled.div`
-  position: relative;
-  min-height: 320px;
+  width: min(100%, 400px);
+  aspect-ratio: 1;
+  justify-self: center;
 
   @media (max-width: 899px) {
     display: none;
   }
 `
 
-const tiles = {
-  a: css`
-    left: 8%;
-    top: 6%;
-    width: 140px;
-    height: 140px;
-    background: ${color.gamePromotion};
-    color: ${color.onAccent};
-    font-family: ${font.displayZh};
-    font-size: 80px;
-    font-weight: 900;
-    rotate: -10deg;
-    clip-path: ${slantClip(18)};
-  `,
-  b: css`
-    right: 6%;
-    top: 0;
-    width: 110px;
-    height: 150px;
-    background: linear-gradient(160deg, ${color.brand}, transparent 120%);
-    rotate: 9deg;
-    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
-    animation-delay: -2s;
-  `,
-  c: css`
-    left: 30%;
-    bottom: 4%;
-    width: 220px;
-    height: 110px;
-    background: linear-gradient(120deg, ${color.brand}, ${color.magenta});
-    clip-path: ${slantClip(28)};
-    animation-delay: -4s;
-  `,
-  d: css`
-    right: 12%;
-    bottom: 18%;
-    width: 72px;
-    height: 72px;
-    background: ${color.magenta};
-    rotate: 45deg;
-    animation-delay: -3s;
-  `,
-}
-
-const Tile = styled.span<{ $at: keyof typeof tiles }>`
-  position: absolute;
-  display: grid;
-  place-items: center;
-  line-height: 1;
-  animation: ${float} 6s ease-in-out infinite;
-  ${(p) => tiles[p.$at]}
-`
-
 const SignInRow = styled.div`
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: ${space.md}px;
 
   &:empty {
     display: none;
   }
 `
 
+// A broadcast heading (2026-11-23): a slanted bar in the hue, the title, a hairline to the edge
 const SectionTitle = styled.h2`
+  display: flex;
+  align-items: center;
+  gap: ${space.sm}px;
   margin: 0 0 ${space.md}px;
   ${displayType}
   font-size: ${fontSize.xl}px;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: none;
+    width: ${space.sm}px;
+    height: 0.9em;
+    background: ${color.accent};
+    transform: skewX(${SLANT});
+  }
+
+  &::after {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, ${color.accent}, transparent);
+    transform: none;
+  }
+
+  @media (max-width: 480px) {
+    margin-bottom: ${space.sm}px;
+  }
 `
 
 const PublicChoice = styled.label`
@@ -373,6 +368,16 @@ const PublicChoice = styled.label`
   margin-bottom: ${space.md}px;
   font-weight: 700;
   cursor: pointer;
+
+  /* A phone says who can see the room once it is ticked: the first game's New room needs the
+     height (2026-11-23) */
+  @media (max-width: 480px) {
+    margin-bottom: ${space.sm}px;
+
+    &:not(:has(input:checked)) small {
+      display: none;
+    }
+  }
 `
 
 const PublicCheck = styled.input`

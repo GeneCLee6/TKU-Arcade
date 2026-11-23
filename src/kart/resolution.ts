@@ -4,6 +4,11 @@
 // take it a step back up, but never to a ratio that was too slow for a while after (so that it
 // does not seesaw). A machine that keeps up never leaves the quality's own ratio: the picture on high
 // is exactly as it was. Pure: Scene.ts applies the ratio.
+//
+// 2026-11-23 (docs/KART-PERF.md §11): a phone still too slow at the smallest ratio for SHED_SECONDS
+// in a row is `starved`: the scene then gives up the picture's own smoothing (post.ts's multisampled
+// buffer, the dearest pass on a phone's GPU), once, for the rest of the race. Again never on a
+// machine that keeps up.
 
 /** Frames a second below which the picture gets smaller */
 export const LOW_FPS = 50
@@ -19,6 +24,8 @@ const STEP = 0.85
 export const MIN_SHARE = 0.6
 /** A frame longer than this (the tab hidden, a stall) is not counted */
 const HITCH_SECONDS = 0.25
+/** Seconds in a row too slow at the smallest ratio before the smoothing goes */
+export const SHED_SECONDS = 3
 
 export interface Resolution {
   /** The quality's own pixel ratio, the most */
@@ -33,6 +40,8 @@ export interface Resolution {
   /** A ratio found too slow, and how many more seconds it stays out of reach */
   readonly ceiling: number
   readonly blocked: number
+  /** Seconds in a row too slow at the smallest ratio */
+  readonly starved: number
 }
 
 export const startResolution = (top: number): Resolution => ({
@@ -43,6 +52,7 @@ export const startResolution = (top: number): Resolution => ({
   steady: 0,
   ceiling: Infinity,
   blocked: 0,
+  starved: 0,
 })
 
 const round = (ratio: number) => Math.round(ratio * 100) / 100
@@ -57,9 +67,9 @@ export function nextResolution(state: Resolution, frameSeconds: number): Resolut
   const blocked = Math.max(0, state.blocked - seconds)
   const ceiling = blocked > 0 ? state.ceiling : Infinity
   const floor = round(state.top * MIN_SHARE)
-  const fresh = { ...state, frames: 0, seconds: 0, blocked, ceiling }
+  const fresh = { ...state, frames: 0, seconds: 0, blocked, ceiling, starved: 0 }
   if (fps < LOW_FPS) {
-    if (state.ratio <= floor) return { ...fresh, steady: 0 }
+    if (state.ratio <= floor) return { ...fresh, steady: 0, starved: state.starved + seconds }
     return {
       ...fresh,
       ratio: Math.max(floor, round(state.ratio * STEP)),

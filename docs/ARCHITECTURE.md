@@ -1730,6 +1730,71 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 - **測試**：`tests/kart/ledges.test.ts`（拋物線與門檻、快一點上得去慢一點撞牆落回主路不重置、預測、格式拒絕、四張賽道的門檻與省的距離、伺服器圈時、電腦車的選擇與噴射）；`technical.test.ts` 的四張圖、`challenge.test.ts` 的章節數。
 - **限制（照實寫）**：(1) 只有「從主路跳台斜飛到旁邊平台」一種形狀；平台不能在主路正上方（岔路必須離開主路）。(2) 平台沒有「掉下去落回主路」的開放邊：側邊是牆，失誤是撞牆或掉進縫。(3) 電腦車對準靠一個簡單的追點；斜角 40° 的網寮屋頂偶爾會偏。(4) 平台的建築是方塊，沒有各圖專屬造型。
 
+### 4.78 路線圖外：桌遊介面電競化（大廳、等待室、標題列、結果）（2026-11-23，#155，`feat/esports-board-ui`）
+
+樣式規則在 `DESIGN.md` §3.7。程式上：
+
+- `GameArt.tsx`（lazy chunk）多 `GameCover`（卡片封面，`seedOf(id)` 決定斜槓位置）與 `HeroArena`（大廳主視覺）兩個具名匯出，`GameCard`、`HomePage` 用 `lazy(() => import(...).then(({ X }) => ({ default: X })))` 拿；`ART` 多了 `kart`。`gameCardParts.ts` 多 `Cover`（固定高、切角、`color: accent`，SVG 全用 `currentColor`）。
+- `WaitingRoom.tsx`：座位清單改成 `SeatGrid`／`SeatCard`（仍是 `ul`／`li`，座位號、`入座` 的無障礙名稱不變），`MemberEntry` 原樣放在名牌裡；空位不再用 `FreeSeatRow`（遊戲中的成員面板照舊用）。`Avatar` 多一個選用的 `size`。
+- `RoomPage.tsx` 的 `RoomHeading` 多 `status`（`room.status.*`）；`ResultPanel.tsx` 多 `room.result.final`、`room.result.winner`。
+- **首屏**：大廳 101.5 → 101.6 kB（封面框與 hover 的樣式；色塊主視覺搬出首屏抵掉一部分）；房間的 chunk 多約 1.3 kB（陞官圖首屏 145.5 → 146.8 kB；合併 #153 之後 147.2 kB，上限 150）。
+
+### 4.79 路線圖外：手機大廳的第一個畫面、首屏瘦身、模擬手機巡檢（2026-11-23，`feat/site-polish-mobile`）
+
+- **大廳**：`QuickPlay.tsx` 多 `open` 狀態與只在 480 px 以下出現的 `Toggle`（`aria-expanded`、`aria-controls="quick-play-games"`、`data-quick-toggle`）；收合時 `[data-fold]`（說明、難度、清單）在手機上 `display: none`，寬螢幕不看這個狀態。`GameCard` 的連結與「建立房間」包進 `Actions`：寬螢幕 `display: contents`（版面和原本一樣），手機一列。`HomePage` 的標語、公開房說明（`:has(input:checked)`）、間距在 480 px 以下收緊。樣式見 `DESIGN.md` §4。
+- **首屏之後才載的部分**（`src/lib/lateChunk.ts`）：一個動態 import，畫面第一次 render 後開始載，載到了就同步 render（不像 `React.lazy` 每次掛載都要等一輪）；`tests/setup.ts` 一開始全部載好，所以測試照舊同步。用在：
+  - `src/lib/lateParts.ts`：結果（`ResultPanel`，`GameLayout` 用 `createElement`）、聊天（`ChatPanel`）、手機抽屜與分頁（`Drawer`、`Tabs`）、斷線提示（`ConnectionBanner`；它本來就延遲 1 s 才出現，載入失敗會在下一次斷線重試）。元件在 `src/components/LateParts.tsx`。
+  - 陞官圖簡化版：畫圖版的 `PromotionBoard` 與格子說明 `CellDetail`（`src/games/promotion/boardChunk.ts`；來之前留一塊同尺寸的空位，畫面不跳）；畫面字串改成分語言（`i18n.detail.en.ts`／`zh-TW.ts`，`detailStrings.ts`，`check-budget` 的 `SCREEN_LANGUAGE_PARTS` 有列）；圖版專用的幾何（棋子位置、飛行弧線、官名斷行）搬到 `boardGeometry.ts`；圖版字型（`loadBoardFont`）改由圖版要；`MOVE_MS`／`ROLL_MS` 搬到 `playbackTimes.ts`（圖版不再拉進播放與音效）。
+  - 全螢幕的 `inertOthers`（`useImmersive.ts` 的 `inertChunk`，按全螢幕時通常早已載好；萬一還沒就載到再套）。
+- **首屏**（zh-TW，上限 150、警告區 140 以上）：陞官圖簡化版 147.2 → 139.4 kB、完整版 142.6 → 139.6 kB；其他 15 款各少約 2–3 kB（例如光譜 137.0 → 134.1、卡丁車房間 138.3 → 135.4、德州撲克 134.9 → 132.1）；主站 101.6 → 101.9 kB（收合鈕的樣式與字串）。
+- **結果的分數數上去**：`ResultPanel` 的 `CountUp`，只有瀏覽器說可以動（`prefers-reduced-motion: no-preference`）時才數，React 不管那段文字（`useLayoutEffect` 直接寫 `textContent`），前後都是最後的分數。
+- **模擬手機巡檢**（`e2e/phones.spec.ts`，不進 CI）：iPhone（WebKit 375 × 812、390 × 844 中文）與 Android（Chromium 412 × 915）各走大廳、展開「跟電腦玩」、德州撲克對電腦一手、卡丁車等待室（直拿與橫拿）、`/kart?bots` 開場亮相，用 `e2e/sweep.ts` 的 `checkLayout`（橫向捲動、裸 key、被擋的按鈕、被截斷的字）與 `checkAxe`（serious 以上）。找到並修了：德州撲克手機座位名字被硬切（「Heron (CPU)」成「Heron (C」；`Table.tsx` 名字改最多兩行）、卡丁車等待室中文「加電腦車」的無障礙名稱不含看得到的字（axe `label-content-name-mismatch`）、收合列按鈕在 WebKit 沒靠右；`npm run test:sweep` 手機那兩種另外抓到德州撲克蓋牌座位整格半透明，連它亮出來的牌也淡掉（方塊 10 對比 1.9:1，axe serious），改成只淡座位的字。開發模式 React 掛兩次時 Safari 把「連線中就關掉的 socket」記成錯誤，只在 dev server 出現，列為提醒不擋。`E2E_PORT=5199 npx playwright test phones.spec.ts --workers=1`；`PHONE_SHOTS=1` 存截圖到 `test-results/phones/`。
+- **CI**：`sweep` job 在巡檢前多跑 `e2e/mobile.spec.ts`（`playwright.config.ts` 設了 `E2E_PORT` 就自己起 dev server），約一分半。
+
+### 4.80 路線圖外：卡丁車第二輪效能與預算（2026-11-23，#160，`feat/kart-perf-2`）
+
+擁有者 2026-11-22：「整夜繼續開發」「電競化專業化」，朋友多半用手機玩。#124 之後加了障礙物、立體交叉、車身貼圖、真的海、等待室 8 個 3D 車手、頒獎台、高台，卡丁車 chunk 合計 567.8／600 kB。量法、前後表在 `KART-PERF.md` §11。
+
+- **量測腳本**（`scripts/kart-fps.mjs`）：在頁面裡包住 WebGL（`bufferData`、`texImage2D`／`texStorage2D`、`renderbufferStorage(Multisample)`、刪除、`WEBGL_lose_context`），每列多一欄 GPU 記憶體（不含畫布本身）；`--scene podium|lobby|soak` 量頒獎台、等待室（8 位車手，要 Worker：`npm run preview`）、連續 N 場一圈賽（每場結果畫面強制 GC 後記 JS heap、GPU、DOM 節點、監聽器）；`--pause 4` 量暫停選單蓋著時的成本；`--track all` 包含 `zhuwei`、`breakwater`。
+- **賽道的「有才有」零件**（`src/kart/art/trackFeatures.ts`、`trackParts.ts`）：岔路（`forkArt`）、高台（`ledgeArt`）、立體交叉（`crossingArt`）、會動的障礙物（`obstacleArt`）、夜間燈光（`nightLights`）不再跟引擎一起載，合成**一個** lazy chunk。要不要載看賽道自己的資料（`forks`／`branches`、`crossings`、`obstacles`、夜間主題），不看 id，所以編輯器的賽道也對；寧可多載。`kartLoad.ts` 的計畫拿到整條賽道時一起載（只有 id 的預先下載只載專屬場景）；`buildTrackArt` 多一個參數 `features`（預設 `loadedFeatures(track)`），`Scene.ts` 的夜燈從那裡拿；`headlightLevel` 搬到 `art/headlights.ts`（每張圖都要問）。`tests/kart/trackFeatures.test.ts` 逐張內建賽道檢查「美術要畫的都在清單裡」。
+- **選單的面板**（`src/kart/ui/menuPanels.ts`）：車庫、對戰電腦設定、大獎賽、調校、操作設定、設定、觸控設定合成一個 lazy chunk，第一次打開任何一個才下載（`React.lazy`，各自的 `Suspense` 不蓋住暫停層）。`?autopilot=<driver>`（測試用的電腦車駕駛）要的電腦車大腦改成用到才載。
+- **暫停時不重畫**（`KartScene.hold`）：單機暫停時世界不動，`draw`／`watch` 畫一幀之後就不畫，畫布尺寸變了或解除暫停才再畫；暫停選單後面的模糊照舊（瀏覽器保留最後一幀）。
+- **手機跟不上時放棄平滑邊緣**（`resolution.ts` 的 `starved`、`post.ts` 的 `shed`）：動態解析度已經降到底（該畫質的 60%）還連續 `SHED_SECONDS` 3 秒低於 50 fps，就把後處理場景緩衝的 MSAA 拿掉（這場比賽不再恢復）；跟得上的機器永遠不會走到這步。
+- **水面依邊長、依遠近切格**（`seaWater.ts`）：高畫質的浪要頂點，原本兩邊都照長邊切（最多 220 × 220 = 97 000 個三角形），60 m 寬、2 km 長的河橫向每 27 cm 一個頂點，3 km 見方的海每 15 m 一個。改成：賽道範圍（`WaterOptions.near`，呼叫端給 `trackBounds`）外加 `NEAR_MARGIN` 150 m 內每 12 m 一列（`WAVE_VERTEX`，比原本還密），往外每列間距 ×1.4、最寬 240 m（`waveTicks`、`gradedPlane`，頂點順序與法線同 `PlaneGeometry`）；沒給 `near` 的照邊長平均切。浪的公式、shader 不變。
+- **頁面共用的貼圖會留住舊 renderer**（`art/sharedTextures.ts`）：three.js 每個 renderer 上傳貼圖時在貼圖上掛一個 `dispose` 監聽；活得跟頁面一樣久的貼圖（我們的車身細節 `bodyDetail.ts`、three.js 自己的標準材質查表 DFG LUT，模組層級單例、沒匯出）就把每個用過的 renderer 整個留住（WebGLState、buffer 物件、closure）。比賽、頒獎台、車庫、等待室的 renderer 在 `dispose` 開頭呼叫 `releaseSharedTextures(renderer, scene)`：從畫過的材質的 uniforms 找到那張查表（找到一次就記住），連同車身細節一起 `dispose()`（只釋放 GPU 副本與監聽，貼圖本身照用，下一幀重新上傳）。
+- **正式建置不同步讀 shader 記錄**：`renderer.debug.checkShaderErrors` 在 `import.meta.env.PROD` 關掉，比賽中第一次出現的道具、特效的 shader 不會因為讀編譯記錄卡住一幀；`npm run dev` 照舊檢查。
+- **預算**（`scripts/check-budget.mjs`）：多一列「從選單進一場比賽要等的」（`/kart` 頁面＋引擎＋最重的賽道專屬場景＋賽道零件＋所有車系，不含主站），上限 480 kB；原本的「卡丁車全部 chunk」600 kB 照舊。
+
+### 4.81 路線圖外：計時賽全站排行榜（不靠帳號）（2026-11-23，`feat/kart-leaderboard`）
+
+`e11-t07` 卡丁車那一半的先行版：每張內建比賽賽道（`BOARD_TRACKS`＝`RACE_TRACK_IDS` 的 14 張，含竹圍高架、防波堤屋頂；挑戰專用、測試橢圓、自訂賽道不收）× 每個路線 `revision` 一份榜，每個暱稱留最佳一趟，前 100 名公開。防作弊與它擋不住的事在 `SECURITY.md` §11；伺服器怎麼判每個樣本在 `KART-NETCODE.md` §11.5。
+
+- **錄**（`shared/kart/boardRun.ts`，純函式）：計時賽從 GO（tick 0，車還在起跑點）到終點，每一步把車餵給房間重播用的同一卷帶子（`replay.ts` 的 `createKartTape`，每 6 tick 一個樣本，速度、gate、車款車手 byte、在空中都在裡面）；過終點那一步是最後一個樣本，之後滑行不錄。完賽交出一個 `Replay`（一台車、`mode: 'race'`、`lapMs`／`finishMs` 由步數換成 ms）。`spikeLoop.ts` 的新選項 `onBoardRun`：只在 `SpikePage` 判定是有榜的賽道時給、而且只有本賽道自己的圈數（挑戰的改圈數不算）、**標準調參**（`applyKart(KART_TUNING, 車)` 逐欄相等；在 `/kart/spike` 改過調參的瀏覽器跑的不給上傳）、途中調參物件換過就作廢。錄影模組在迴圈開始時動態載入（自己的小 chunk）；萬一 GO 前還沒載到，那一趟就不錄。
+- **上傳**（`src/kart/board/BoardUpload.tsx`，lazy）：結果畫面圈數下面多一張卡：暱稱（預填站上的暱稱 `tku-arcade.nickname`，同一套 `nameIssue` 邊打邊檢查）、「破個人紀錄時自動上傳」（`tku-arcade.kart.board.auto`；之後在這個瀏覽器破本機紀錄的一趟自己上傳）、上傳鈕；成功後顯示「這張賽道第 N 名／共 M 位」與「看排行榜」。送的是 `writeReplayFile` 寫成的 `.tkureplay`（標頭帶 `revision` 與暱稱），網址參數 `track`、`revision`、`nick`、`physics`（`boardStamp.ts` 的物理戳記）。
+- **Worker**（`worker/kartBoard.ts`）：`GET /api/kart/board?track=<id>[&nick=<名字>]` 回前 100 名、總人數、本週賽道、那個暱稱的那一列與名次（排在 100 名外也算得出來）；`GET /api/kart/board/replay?id=<列 id>` 回重播檔（`content-disposition: attachment`，一列每次刷新紀錄換新 id，所以可以長快取）；`POST /api/kart/board` 依序：來源、速率（每位址每分鐘 6 次，`LimiterDO` 的 `board` 桶＋每 instance 記憶體）、賽道、revision、物理戳記、暱稱（`acceptableName`）、大小（256 kB，邊讀邊數）、`readReplayFile` 嚴格解碼、`checkBoardRun` 逐樣本判、寫入；`ON CONFLICT ... DO UPDATE ... WHERE excluded.total_ms < kart_board.total_ms`，所以同暱稱只留最快的一趟（比較慢的回 `improved: false` 與原本的名次）。每次拒收 `console.log` 一行 `kart_board_refused`（原因、賽道、第幾個樣本）並記進 `daily_metrics`（`board_upload`，`game` 欄＝原因；收下的記 `improved`／`kept`）。擁有者 `DELETE /api/admin/kart-board?id=`（`STATS_KEY`）可拿掉一列。
+- **D1**（`migrations/0006_kart_board.sql`）：`kart_board`，主鍵 `(track, revision, nick_key)`；`nick_key` 是暱稱 NFKC＋小寫（Ann 與 ＡＮＮ 同一列，顯示用最新一次的寫法）；排名索引 `(track, revision, total_ms, created_at)`，同秒數先到先排。**重播存 D1 的 BLOB**（最後一欄，讀排名不會翻到它），不用 R2：實測 14 張圖各種開法 8.4–24.6 kB（deflate 後），一張榜 100 人約 1–2.5 MB，全部 14 張都滿也在 35 MB 內，免費方案 D1 5 GB 綽綽有餘；R2 要擁有者另建 bucket、多一次請求，換不到什麼。哪天真的大了（例如開放自訂賽道），再加一個 R2 bucket、`replay` 欄改存 key。
+- **排行榜畫面**（`src/kart/board/BoardView.tsx`，lazy chunk，`/kart?board[=<賽道>]`）：`/kart` 選單「排行榜」打開，預設本週賽道（`weeklyTrack`：從 2026-01-05 台北時間週一起每週一換下一張，14 週一輪；伺服器回的 `weekly` 用同一個函式），下拉選賽道（本週那張標「本週賽道」）、自己的名次條、名單（名次斜牌前三名亮色、暱稱、車款・車手、時間、最快圈、日期；手機只留名次、暱稱、時間與按鈕兩列）。每列「下載」（`<a download>` 直接拿檔案，可以在 `/kart/replay` 看）與「和幽靈車比」：下載重播 → `readReplayFile` → `ghostFromReplay`（從樣本每 3 tick 內插成計時賽的 `Ghost`，帶車款與「在空中」）→ 回到那張賽道的計時賽，`SpikePage` 的 `chase` 走 `spikeLoop` 既有的 `ghost` 選項（挑戰的獎牌幽靈車同一條路），地圖旁顯示「正在和 X 的幽靈車比（時間）」與「停止」。「跑這張賽道」直接回計時賽。
+- **首屏**（合併 #160 之後量）：大廳 101.9 kB、房間各款不變（只差 chunk 雜湊字串幾十 bytes）；`/kart` 首屏 235.5 → 236.1 kB（選單鈕、追幽靈條、四句字串）；比賽引擎 286.1 → 286.4 kB（錄影器在迴圈開始時動態載入）；從選單進比賽 368.6 → 369.8 kB（上限 480）；排行榜畫面（`BoardView`）、上傳卡（`BoardUpload`）、API 與重播檔讀寫各在自己的 lazy chunk，和 #160 的選單面板（`menuPanels.ts`）一樣在打開時才載；卡丁車 chunk 合計 571.8 → 581.4 kB（上限 600）。`BOARD_TRACKS` 刻意寫成字面清單（測試釘住等於 `RACE_TRACK_IDS`），不 import `tracks/list.ts`，否則 rolldown 會把它從大廳的 chunk 拆出來。
+- **之後綁帳號（F1）**：`kart_board` 加 `account_id` 欄（可為 null）；登入的人上傳時伺服器用 token 的帳號、不再信網址的暱稱；第一次登入時可以「認領」自己暱稱的列（同 `nick_key`、帳號為 null 的設成自己的帳號，之後那個暱稱只有本人能上傳）；未登入的照舊用暱稱，兩種列放同一張榜。賽季（AC-11.4 的另一半）＝在主鍵前加 `season`，每季開新榜、舊的保留。
+- **測試**：`tests/kart/board.test.ts`（14 張圖用自動駕駛與 master 電腦車的手跑真的一趟都通過、按重置鍵 40 次也通過、幽靈車和重播對得上；改速度、跳點、重置到不能重置的地方、繞在路旁、整段時間壓縮、時間不符、少一圈、樣本缺一個、不從起點開始、別張賽道、別的 revision、不同形狀、壞檔都被拒；本週賽道每週一換、14 週走完一輪；`BOARD_TRACKS` 等於 `RACE_TRACK_IDS`）；`tests/worker/kart-board.test.ts`（真的 SQLite 跑 migration：收下真的一趟、回傳名次與重播、同暱稱只留最快、名次與 100 名外的自己、平手先到先排、別的 revision 不混、物理戳記／revision／暱稱／賽道錯、竄改與壞檔與過大都拒且記原因、每分鐘 6 次、外站來源 403、擁有者刪除）；`e2e/kart-board.spec.ts`（選單打開排行榜 → 自動駕駛跑完滬尾砲台坡一趟 → 上傳 → 在榜上看到 → 下載 `.tkureplay` → 和它的幽靈車比）。另外跑過 14 張圖 × 新手／普通／專家／大師 × 輪流各種車款、一半夾重置的 56 趟，**0 趟誤拒**；伺服器判一趟 0.6–7 ms。
+
+### 4.82 路線圖外：成就與個人檔案（本機版）（2026-11-23，`e11-t06`，`feat/achievements-profile`）
+
+AC-11.3 原本排在帳號（F1）之後；擁有者 2026-11-22 要「電競化專業化」、授權照建議決定，這批先做**存在瀏覽器**的版本，資料格式設計成 F1 上線後原封不動上傳。程式在 `src/achievements/`，字串在 `shared/achievements/i18n.ts`。
+
+- **事件**（`events.ts`，只有型別）：不改任何遊戲規則，從畫面已經有的東西推：`kart.run`（卡丁車一場跑到終點，任何模式，由物理步推出完美起跑、最高連段、噴射覆蓋率、甩尾起跳、漲潮、上高台、穿縫、真岔路）、`kart.race`（有對手的比賽的名次、最強電腦等級、團隊勝負：對戰電腦／大獎賽在 `BotRaceView`，房間在 `room.ts`）、`board.result`（房間結果裡自己的名次；合作遊戲看 summary key 判斷整桌成功，放風箏帶分數、默契牌局帶關數）、`kart.progress`（挑戰獎牌與任務、駕訓星等、大獎賽最佳、最佳紀錄：`sync.ts` 直接讀卡丁車自己的 localStorage）、`kart.leaderboard`（計時賽排行榜上傳成功、名次在前 100：`src/kart/board/api.ts` 的 `uploadRun` 送，§4.81）、`platform.app`（從主畫面打開：引擎每次都問 `isStandalone()`）。
+- **入口很小**（`track.ts` 的 `trackAchievement`、`holdAchievements`）：只有一個動態 import，引擎要等第一個事件才載；中間再隔一層空的 `load.ts`，讓首屏只帶一個短 import 而不是引擎所有 chunk 的清單（`/me` 的 `profileRoute.ts` 同理）。房間頁的 `RoomWatch` 直接走 `load.ts`（`track.ts` 會在每個房間變成一個獨立 chunk）。卡丁車的 store（挑戰、駕訓、大獎賽）存檔後只發一個 window 事件 `tku-arcade:kart-progress`，什麼都不 import；成就要用的卡丁車清單（車、比賽賽道、盃、課、各章任務）抄在 `kartLists.ts`，`tests/achievements/kartLists.test.ts` 對不上就失敗——直接 import 會讓 bundler 把那些模組從 `/kart` 首屏拆成獨立 chunk（量過，+1.3 kB）。
+- **比賽的步**（`kartHook.ts` → `kartRun.ts`）：`spikeLoop` 每一物理步把 `SpikeStep` 交給 `watchKartRun`（重新開始時換一個新的）；`kartRun.ts` 在倒數時載入，之前的步先排著。岔路用 `forkAt`（只算 `rise` 未定義的真岔路）、高台用 `onPlatform`、穿縫用賽道 guide 的 `slots`（判定同挑戰模式的「穿縫」：從牆線負側到正側、離縫中心 5.5 m 內）。到終點那一步送出一次 `kart.run`。
+- **規則**（`rules.ts`）：一張表，54 條（卡丁車 28、桌遊 21、平台 5，隱藏 5），每條是 `{ id, category, tier 1–3, hidden?, game?, when }`；`when` 只有四種：計數器 ≥ min、tally 含全部／含某個／至少 min 種。`evaluate`、`progressOf`、`newlyUnlocked` 是純函式。id 永遠不改（存檔與將來的帳號都用它）。名稱與描述全部原創、雙語，`{game}` 帶大廳上的遊戲名（暫名改了不用動成就字串）。
+- **統計**（`stats.ts`）：只有兩種形狀：`n`（計數器，多數只增；`*.max*`、`kart.gold` 等取最大；`board.streak` 唯一會歸零）與 `t`（每個 id 的次數，`kart.bestLap` 存最低 ms）。`applyEvent(stats, event, at)` 純函式；`mergeStats` 逐鍵取大（最佳圈取小）。
+- **引擎**（`engine.ts`）：一次一個事件（Promise 串起來），每次先讀存檔再寫，兩個分頁不會互蓋；每次造訪的第一個事件順便讀卡丁車的 store（成就上線前拿的獎牌也算）。新解鎖的記時間、存檔、排進彈出佇列。
+- **彈出**（`popups.ts` 佇列、`Popups.tsx` 畫面、`popupsRoot.tsx` 自己的 React root）：右上角轉播風格徽章，一次一個 5 秒（滑鼠指著或焦點在上面時不走）；比賽中（`trial.phase === 'racing'` 且沒暫停）`spikeLoop` 每幀設 `holdAchievements(true)`，排著等到終點或暫停選單才出；一次解鎖一大串（第一次造訪時補發）只顯示前兩個加「另外解鎖了 N 個」。WebAudio 合成音（`sound.ts`，等級越高多一個音，網站音效關掉就不響）；`prefers-reduced-motion` 不滑入、不掃光；`role="status"` 的區域一直在頁面上。
+- **存檔**（`store.ts`）：localStorage `tku-arcade.achievements`，`{ "format": 1, "stats": { "n": {…}, "t": {…} }, "unlocked": { "<規則 id>": <ms> } }`；讀到不對的值逐欄丟掉（不認得的規則 id 保留，可能是新版寫的）；storage 不能用時活到關頁。
+- **F1 之後的遷移**：(1) D1 加 `achievements`（`account_id`、`format`、`stats` JSON、`unlocked` JSON、`updated_at`）；(2) 登入後第一次把本機 `Saved` 原樣 POST 到 `/api/me/achievements`，伺服器用 `mergeSaved`（`store.ts`，同一支純函式搬到 `shared/`）和帳號那份合併：解鎖取聯集、時間取早，計數器取大、最佳圈取小——同一個人兩台裝置不會重複加總（代價是兩台的總和只算較大的那台）；(3) 之後事件仍先在本機算，再定期推送；排行榜類（`kart.leaderboard`）改由伺服器發。格式升級時 `format` 加一，舊格式在伺服器轉。
+- **頁面**（`/me`，`ProfilePage.tsx`，lazy）：選手卡（暱稱或「訪客選手」、解鎖數與百分比、進度條、「只存在這個瀏覽器」）、統計（完成局數、桌遊勝場、卡丁車完賽與冠軍、總噴射時間、最愛車款與賽道、各遊戲勝率表、各賽道最佳圈速表）、成就牆（全部／卡丁車／桌遊／平台篩選；未解鎖灰、可計數的有進度條；隱藏且未解鎖顯示「隱藏成就」與「？」徽章）。大廳暱稱那一列多一個「我的檔案」連結。
+- **首屏**（`npm run budget`）：對照合併排行榜後的 main：大廳 101.9 → 102.1 kB；各桌遊首屏 +0.2～0.3 kB（房間頁的 `RoomWatch`）；`/kart` 236.1 → 236.4 kB；卡丁車房間首屏 135.5 → 135.8 kB；比賽引擎（不是首屏）286.4 → 286.9 kB。
+- **測試**：`tests/achievements/`：每條規則剛好達標與差一點、事件推導（統計、房間、比賽步：真的碼頭倉庫岔路與高台、山城坡巷的縫）、存檔與壞資料、合併、彈出排隊與比賽中暫停、引擎（補讀 store、一次一個）、個人檔案頁；e2e `e2e/achievements.spec.ts`：測試橢圓計時賽讓自動駕駛跑完，比賽中沒有徽章、終點出現「格子旗初登場」、點進 `/me` 顯示已解鎖；大廳入口、篩選、隱藏、手機版面與 axe。
+
 ## 5. i18n
 
 - `t(key, params)`，key 以語意命名（`lobby.newRoom`）；`en.ts` 是來源，`zh-TW.ts` 必須 key 完全一致（`check-i18n` 在 CI 擋）。
@@ -1747,7 +1812,8 @@ N2 提前做（前提 L5 還沒完成；擁有者 2026-11-17 要求繼續開發�
 | 一款遊戲的選項與房間要的字串（選項標籤、錯誤、結算） | `shared/games/<id>/info.ts`、`i18n.ts`（仍是兩語一檔，很小） | 進那款遊戲的房間時（`src/i18n/gameDetails.ts` 用 `import.meta.glob` 每款各一個 chunk；`RoomPage` 一拿到房間摘要就開始載，第一次顯示房間前等它；房主換遊戲時選單一變就開始載） |
 | 陞官圖完整版的畫面字串（最大的一張表） | `shared/games/promotion/i18n.full.en.ts`、`i18n.full.zh-TW.ts` | 和完整版畫面一起（`screens.ts` 的 lazy、`full/fullStrings.ts`），只載目前語言；字型要的中文字在畫面之後才載（`fullFont.ts`） |
 | 其他 15 款桌遊畫面的字串（2026-11-22） | `shared/games/<id>/i18n.screen.en.ts`、`i18n.screen.zh-TW.ts`（`i18n.screen.ts` 只是兩語合起來給 check-i18n、`npm run play` 與測試） | 和畫面一起（`screens.ts` 的 `withStrings`、`src/games/screenStrings.ts` 用 `import.meta.glob` 每款每語一個 chunk），只載目前語言；`tests/games/screenStrings.test.ts` 擋網站再 import 兩語那份 |
-| 陞官圖簡化版畫面、卡丁車 | `i18n.screen.ts` 等，`registerMessages` | 照舊隨畫面 chunk，兩語（簡化版很小、字型要全部中文字；卡丁車另有 `KART_PARTS`） |
+| 陞官圖簡化版畫面的字（2026-11-23） | `shared/games/promotion/i18n.detail.en.ts`、`i18n.detail.zh-TW.ts`（`i18n.detail.ts` 只是兩語合起來） | 和畫面一起（`screens.ts`、`src/games/promotion/detailStrings.ts`），只載目前語言 |
+| 陞官圖圖版的字、卡丁車 | `i18n.screen.ts` 等，`registerMessages` | 照舊隨畫面（圖版）chunk，兩語（字型要全部中文字；卡丁車另有 `KART_PARTS`） |
 
 - **不閃英文**：`index.html` 有一段 inline script，用和 `t.ts` 一樣的規則（localStorage，否則 `navigator.languages`）決定語言，對那份字串 chunk 發 `modulepreload`，所以它和入口一起下載、不是入口跑完才開始；檔名由 `vite.config.ts` 的 `languageChunks` 在 build 時填進去（找不到就 build 失敗）。`src/main.tsx` 等那份到了才 render。載入失敗就改用英文，再失敗也照樣 render（看到的是 key）。
 - **切換語言**：`setLanguage` 先記住選擇（localStorage），等那個語言的網站字串與已註冊的語言分片（`registerLanguageParts`：房間、陞官圖完整版、15 款桌遊畫面）都到了才換；載過一次之後是立即的。連點兩下以最後一次為準。

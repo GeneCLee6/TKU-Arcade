@@ -13,6 +13,10 @@ test('one tap from the lobby to a hand of hold’em against five computers, on a
   await page.goto('/')
   const quick = page.getByTestId('quick-play')
   await expect(quick.getByRole('heading', { name: 'Play the computer' })).toBeVisible()
+  // 2026-11-23: folded on a phone, so that the games' New room stays on the first screen
+  await expect(quick.getByRole('button', { name: 'Easy' })).toBeHidden()
+  await quick.getByRole('button', { name: '9 ways' }).click()
+  await expect(quick.getByRole('button', { name: 'Hide' })).toHaveAttribute('aria-expanded', 'true')
   // The level, Normal unless picked; Easy here
   await quick.getByRole('button', { name: 'Easy' }).click()
   await expect(quick.getByRole('button', { name: 'Easy' })).toHaveAttribute('aria-pressed', 'true')

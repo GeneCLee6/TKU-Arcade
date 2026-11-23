@@ -10,8 +10,10 @@
 // out at sea), painted once from a function of the track's own (`depthAt`), so that the shader
 // needs no knowledge of the land. Our own shader code on three.js's standard material; no image.
 import {
+  BufferGeometry as Geometry,
   Color,
   DataTexture,
+  Float32BufferAttribute,
   LinearFilter,
   Mesh,
   MeshLambertMaterial,
@@ -57,6 +59,12 @@ export interface WaterOptions {
   readonly swell?: number
   /** Drawn over the ground it lies on (a river on the plain): pushed forward in the depth buffer */
   readonly overGround?: boolean
+  /**
+   * 2026-11-23 (docs/KART-PERF.md §11): where the camera goes (the track's box), world metres. On the
+   * high picture the surface is cut a vertex every WAVE_VERTEX metres there and ever more coarsely
+   * beyond it, where a swell of a few tens of centimetres is less than a pixel; left out, evenly
+   */
+  readonly near?: { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
 }
 
 export interface Water {
@@ -64,6 +72,73 @@ export interface Water {
   update(seconds: number): void
 }
 
+/** On the high picture, a vertex about every this many metres, for the swells to lift */
+export const WAVE_VERTEX = 12
+/** Beyond `near` (and NEAR_MARGIN round it), each row of vertices this much further from the last ... */
+const WAVE_GROWTH = 1.4
+/** ... up to this far apart, metres */
+const WAVE_FAR = 240
+/** How far past the track's box the fine cut reaches, metres: the camera, a kart flying off a ramp */
+export const NEAR_MARGIN = 150
+
+/**
+ * Where the rows of vertices go across [from, to]: every WAVE_VERTEX metres inside [nearFrom,
+ * nearTo] (clipped to the span), growing by WAVE_GROWTH a row outside it; ends included, ascending
+ */
+export function waveTicks(from: number, to: number, nearFrom: number, nearTo: number): number[] {
+  const a = Math.max(from, Math.min(to, nearFrom))
+  const b = Math.max(a, Math.min(to, nearTo))
+  const inside = b > a ? Math.max(1, Math.round((b - a) / WAVE_VERTEX)) : 0
+  const ticks: number[] = []
+  for (let i = 0; i <= inside; i++) ticks.push(inside === 0 ? a : a + ((b - a) * i) / inside)
+  const outward = (start: number, end: number, sign: 1 | -1) => {
+    const out: number[] = []
+    let step = WAVE_VERTEX
+    let at = start
+    while (sign * (end - at) > 0) {
+      step = Math.min(WAVE_FAR, step * WAVE_GROWTH)
+      at = sign * (end - (at + sign * step)) < step * 0.5 ? end : at + sign * step
+      out.push(at)
+    }
+    return out
+  }
+  return [...outward(a, from, -1).reverse(), ...ticks, ...outward(b, to, 1)]
+}
+
+/**
+ * A flat grid like three.js's PlaneGeometry (in its own x and y, facing +z, rows from the top), its
+ * columns at `xs` and its rows at `ys` (both ascending, centred on 0)
+ */
+function gradedPlane(xs: readonly number[], ys: readonly number[], width: number, height: number): Geometry {
+  const positions: number[] = []
+  const normals: number[] = []
+  const uvs: number[] = []
+  const rows = [...ys].reverse()
+  for (const y of rows) {
+    for (const x of xs) {
+      positions.push(x, y, 0)
+      normals.push(0, 0, 1)
+      uvs.push(x / width + 0.5, y / height + 0.5)
+    }
+  }
+  const columns = xs.length
+  const indices: number[] = []
+  for (let iy = 0; iy < rows.length - 1; iy++) {
+    for (let ix = 0; ix < columns - 1; ix++) {
+      const a = ix + columns * iy
+      const b = ix + columns * (iy + 1)
+      const c = ix + 1 + columns * (iy + 1)
+      const d = ix + 1 + columns * iy
+      indices.push(a, b, d, b, c, d)
+    }
+  }
+  const geometry = new Geometry()
+  geometry.setIndex(indices)
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('normal', new Float32BufferAttribute(normals, 3))
+  geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2))
+  return geometry
+}
 /** The depth picture's size, texels a side */
 const DEPTH_TEXELS = 128
 /** The swells (direction x, direction z, wavelength m, height m, speed m/s): our own mix */
@@ -237,9 +312,32 @@ export function buildWater(kit: WaterKit, options: WaterOptions, level: WaterLev
   }`,
       )
   }
-  // The high picture's swells need vertices to lift: about one every 12 m
-  const segments = level === 2 ? Math.min(220, Math.max(8, Math.round(Math.max(options.width, options.depth) / 12))) : 1
-  const geometry = new PlaneGeometry(options.width, options.depth, segments, segments)
+  // The high picture's swells need vertices to lift: about one every 12 m. (2026-11-23, docs/KART-PERF.md
+  // §11: along each side by its own length. A river 60 m wide and 2 km long was cut 220 by 220, a
+  // vertex every 27 cm across it: 97 000 triangles where 3 000 lift it the same)
+  const segments = (length: number) =>
+    level === 2 ? Math.min(220, Math.max(8, Math.round(length / WAVE_VERTEX))) : 1
+  const { near } = options
+  // Local x is world x less the middle; local y is the middle less world z (the plane is laid down)
+  const geometry =
+    level === 2 && near
+      ? gradedPlane(
+          waveTicks(
+            -options.width / 2,
+            options.width / 2,
+            near.minX - NEAR_MARGIN - options.x,
+            near.maxX + NEAR_MARGIN - options.x,
+          ),
+          waveTicks(
+            -options.depth / 2,
+            options.depth / 2,
+            options.z - near.maxZ - NEAR_MARGIN,
+            options.z - near.minZ + NEAR_MARGIN,
+          ),
+          options.width,
+          options.depth,
+        )
+      : new PlaneGeometry(options.width, options.depth, segments(options.width), segments(options.depth))
   const mesh = new Mesh(kit.keep(geometry), material)
   mesh.rotation.x = -Math.PI / 2
   mesh.position.set(options.x, options.y, options.z)

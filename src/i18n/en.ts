@@ -20,6 +20,7 @@ export const en = {
   'language.zhTW': '繁中',
   'lobby.changeNickname': 'Change',
   'lobby.games': 'Games',
+  'lobby.profile': 'My profile',
   'lobby.playingAs': 'Playing as {name}',
   'lobby.join.invalid': "That's not a room number or link. Check it and try again.",
   'lobby.join.label': 'Got a room number or a link?',
@@ -42,6 +43,8 @@ export const en = {
   'lobby.quick.title': 'Play the computer',
   'lobby.quick.hint':
     'Nobody around? One tap opens a private room with computer players and starts the game. Friends can still come in by its link to watch.',
+  'lobby.quick.show': '{count} ways',
+  'lobby.quick.hide': 'Hide',
   'lobby.quick.level': 'Computer level',
   'lobby.quick.level.easy': 'Easy',
   'lobby.quick.level.normal': 'Normal',

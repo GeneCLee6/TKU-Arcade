@@ -5,7 +5,14 @@ import type { RoomMessageKey } from './room.en.ts'
 export type Language = 'en' | 'zh-TW'
 export type MessageParams = Record<string, string | number>
 /** A site or room string, or a game's (shared/games/<id>/i18n.ts): `${game.meta.i18nKey}.name` */
-export type TextKey = MessageKey | RoomMessageKey | `games.${string}` | `kart.${string}` | `room.extra.${string}`
+export type TextKey =
+  | MessageKey
+  | RoomMessageKey
+  | `games.${string}`
+  | `kart.${string}`
+  | `room.extra.${string}`
+  // 2026-11-23: the achievements' (shared/achievements/i18n.ts), registered by their lazy chunks
+  | `ach.${string}`
 export type Translate = (key: TextKey, params?: MessageParams) => string
 
 // One language in the first load, not two (docs/ARCHITECTURE.md §5): each language's site strings and

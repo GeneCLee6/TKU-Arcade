@@ -31,7 +31,7 @@ import {
 } from 'three'
 import { createRng } from '../../../shared/games/rng.ts'
 import { roadClearance, scatter } from '../../../shared/kart/scenery.ts'
-import { roadDirection } from '../../../shared/kart/track.ts'
+import { roadDirection, trackBounds } from '../../../shared/kart/track.ts'
 import { HARBOUR_SCALE } from '../../../shared/kart/tracks/harbour.ts'
 import { harbourScene, kartScene, kartThemes, waterScene } from '../../styles/kartTokens.ts'
 import { grain, painted } from './textures.ts'
@@ -281,6 +281,7 @@ export function buildHarbour(kit: ArtKit): { update(seconds: number): void } {
       flatMap: textures.water,
       flatColor: harbourScene.sea,
       flatRepeat: 16,
+      near: trackBounds(track),
     },
     level.water ?? 0,
   )

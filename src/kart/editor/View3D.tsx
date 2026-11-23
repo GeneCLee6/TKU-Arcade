@@ -10,6 +10,7 @@ import { color, fontSize, space } from '../../styles/tokens.ts'
 import { loadBody, loadDriver } from '../bodies.ts'
 import { loadQuality } from '../quality.ts'
 import { loadTrackScenery } from '../art/trackScenery.ts'
+import { loadTrackFeatures } from '../art/trackFeatures.ts'
 import { createKartScene, supportsWebGL2 } from '../Scene.ts'
 
 /** How fast the kart flies round, m/s */
@@ -47,7 +48,8 @@ export default function View3D({ track, overhead, t }: View3DProps) {
     let stop = () => {
       gone = true
     }
-    void loadTrackScenery(parsed.track).then(
+    // 2026-11-23: and the parts of what it has, its obstacles, its branches (trackFeatures.ts)
+    void Promise.all([loadTrackScenery(parsed.track), loadTrackFeatures(parsed.track)]).then(
       () => {
         if (!gone) stop = start(holder, parsed.track)
       },

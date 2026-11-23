@@ -3,13 +3,15 @@ import { BOARD, END_CELL, START_CELL } from '../../../shared/games/promotion/boa
 import { DEPARTMENTS, DEPARTMENT_IDS } from '../../../shared/games/promotion/departments.ts'
 import {
   arcPoints,
-  BOARD_LAYOUTS,
   cellNameLines,
   centre,
-  CELL_WIDTH,
-  fitBoard,
   piecePoints,
   pieceOffsets,
+} from '../../../src/games/promotion/boardGeometry.ts'
+import {
+  BOARD_LAYOUTS,
+  CELL_WIDTH,
+  fitBoard,
   type BoardShape,
   type Box,
   type CellBox,
