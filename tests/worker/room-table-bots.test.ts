@@ -8,6 +8,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { holdem } from '../../shared/games/holdem/rules.ts'
 import type { HoldemView } from '../../shared/games/holdem/types.ts'
 import { kart } from '../../shared/games/kart/rules.ts'
+import { kite } from '../../shared/games/kite/rules.ts'
+import { lanternWait } from '../../shared/games/lantern/bot.ts'
+import { lantern } from '../../shared/games/lantern/rules.ts'
+import type { LanternView } from '../../shared/games/lantern/types.ts'
+import { misery } from '../../shared/games/misery/rules.ts'
+import { silentTable } from '../../shared/games/silent-table/rules.ts'
 import { palace } from '../../shared/games/palace/rules.ts'
 import { secretScroll } from '../../shared/games/secret-scroll/rules.ts'
 import { tiles } from '../../shared/games/tiles/rules.ts'
@@ -90,6 +96,11 @@ class World {
       wasabi: wasabi as unknown as AnyGameModule,
       tiles: tiles as unknown as AnyGameModule,
       kart: kart as unknown as AnyGameModule,
+      // 2026-11-23
+      kite: kite as unknown as AnyGameModule,
+      lantern: lantern as unknown as AnyGameModule,
+      'silent-table': silentTable as unknown as AnyGameModule,
+      misery: misery as unknown as AnyGameModule,
       tictactoe: ticTacToe as unknown as AnyGameModule,
       ...modules,
     }
@@ -501,6 +512,107 @@ describe('the next round is the people’s to start', () => {
     expect(world.host.nextAlarm()! - world.clock).toBeGreaterThan(BOT_THINK_MS.max)
     ann.send({ t: 'action', action: { type: 'next' } })
     expect(phase()).toBe('turn')
+  })
+})
+
+// 2026-11-23: games where everyone may act at any moment, each computer on its own clock
+// (`GameModule.botTime`). Ann plays as a person would: lantern, her lowest lantern once her own count
+// (the computers' rule) is up before any computer's; silent-table, a chip and ready, then she waits
+function personMove(world: World, ann: Client, gameId: string): unknown | null {
+  const legal = ann.game.legal as { type?: string; card?: number }[]
+  if (legal.length === 0) return null
+  const ready = legal.find((one) => one.type === 'ready')
+  if (gameId === 'lantern') {
+    if (ready) return ready
+    const view = ann.game.view as unknown as LanternView
+    const light = legal.find((one) => one.type === 'light')
+    const wait = lanternWait(view)
+    const alarm = world.host.nextAlarm()
+    // Since the last change: the room counts the computers' waits from then too
+    if (light && wait !== null && (alarm === null || world.clock + 1 >= alarm || wait <= alarm - world.clock)) {
+      return light
+    }
+    return null
+  }
+  if (gameId === 'silent-table') {
+    const me = (ann.game.view as unknown as { players: { seat: number; chip: number | null }[]; you: number }).players
+      .find((player) => player.seat === (ann.game.view as unknown as { you: number }).you)
+    if (me?.chip === null) return legal.find((one) => one.type === 'takeChip') ?? null
+    return ready ?? null
+  }
+  return legal[0]
+}
+
+describe('one person and a full table of computers, each on its own clock or in turn (2026-11-23)', () => {
+  const games: [string, Record<string, unknown> | undefined, number][] = [
+    ['kite', undefined, 5],
+    ['lantern', { levelTable: 'taster' }, 4],
+    ['silent-table', { levelsToWin: 1, failureLimit: 1 }, 6],
+    ['misery', { target: 8 }, 10],
+  ]
+  for (const [gameId, options, seats] of games) {
+    it(gameId, () => {
+      const world = new World()
+      const count = seats - 1
+      const levels = Array.from({ length: count }, (_, index) => (index % 2 === 0 ? 'easy' : 'normal'))
+      expect(
+        world.host.create('abcdefghij', gameId, options, false, null, null, { count, level: 'normal', levels }),
+      ).toBe(true)
+      const ann = world.join('Ann')
+      expect(ann.view!.room.status).toBe('playing')
+      let steps = 0
+      while (ann.view!.room.status === 'playing' && steps++ < 50_000) {
+        const action = personMove(world, ann, gameId)
+        if (action !== null) ann.send({ t: 'action', action })
+        else world.tick()
+      }
+      expect(ann.view!.room.status).toBe('ended')
+      expect(ann.game.result!.standings).toHaveLength(seats)
+      expect(ann.errors).toEqual([])
+    })
+  }
+
+  it('lantern: every computer counts at once, from the last change, and the count survives hibernation', () => {
+    const { world, ann } = room('lantern', { levelTable: 'taster' })
+    ann.send({ t: 'add_bot', level: 'normal' })
+    ann.send({ t: 'add_bot', level: 'normal' })
+    ann.send({ t: 'start' })
+    ann.send({ t: 'action', action: { type: 'ready' } })
+    // Both computers raise a hand, each on its own clock
+    world.tick()
+    world.tick()
+    const view = () => ann.game.view as unknown as LanternView
+    expect(view().phase).toBe('play')
+    const due = world.host.nextAlarm() as number
+    // Somebody's lantern comes up a beat later at the earliest
+    expect(due - world.clock).toBeGreaterThanOrEqual(600)
+    world.hibernate()
+    expect(world.host.nextAlarm()).toBe(due)
+    const pile = view().pile.length
+    world.clock = due - 1
+    world.host.sweep()
+    expect(view().pile.length).toBe(pile)
+    world.clock = due
+    world.host.sweep()
+    expect(view().pile.length).toBe(pile + 1)
+  })
+
+  it('silent-table: a computer content with its chip waits, and moves again when a chip moves', () => {
+    const { world, ann } = room('silent-table')
+    ann.send({ t: 'add_bot', level: 'normal' })
+    ann.send({ t: 'add_bot', level: 'normal' })
+    ann.send({ t: 'start' })
+    for (let i = 0; i < 40 && world.host.nextAlarm() !== null; i++) {
+      const before = world.host.nextAlarm() as number
+      if (before - world.clock > 10_000) break
+      world.tick()
+    }
+    const players = () => (ann.game.view as unknown as { players: { chip: number | null; ready: boolean; seat: number }[] }).players
+    const bots = players().filter((player) => player.seat !== 0)
+    expect(bots.every((player) => player.chip !== null && player.ready)).toBe(true)
+    // Ann takes the last chip: the computers' ready is cleared and they think again
+    ann.send({ t: 'action', action: (ann.game.legal as { type: string }[]).find((one) => one.type === 'takeChip') })
+    expect(world.host.nextAlarm()! - world.clock).toBeLessThan(5_000)
   })
 })
 

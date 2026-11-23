@@ -7,6 +7,8 @@
 //
 // docs/PRD/e14-misery-line.md has the rules and every detail decided here.
 import { MISERY_CARDS } from './bank.ts'
+import { miseryBot, miseryBotTime } from './bot.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import { miseryInfo } from './info.ts'
 import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
@@ -148,6 +150,15 @@ const pass = (state: MiseryState): MiseryState =>
 export const misery: GameModule<MiseryState, MiseryAction, MiseryView, MiseryOptions> = {
   ...miseryInfo,
   meta: GAME_META.misery,
+  // Computer players, played by the room (bot.ts). Their own clock (`botTime`) so that a computer
+  // drawing the next card leaves the shown one up long enough to read
+  bots: TABLE_BOTS,
+  bot(view, legal, level, rng) {
+    return miseryBot(view, legal, level, rng)
+  },
+  botTime(_view, legal, _level, rng) {
+    return miseryBotTime(legal, rng)
+  },
 
   init(seats, options, rng: Rng) {
     const players = seats.map((seat) => seat.id)

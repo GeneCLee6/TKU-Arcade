@@ -54,6 +54,10 @@ The host picks these in the waiting room.
 - **Time for each round**: no clock by default, or 60, 90 or 120 seconds. When the time is up, whoever holds no chip gets the lowest one left on the table, and the round moves on as it stands.
 - **Table theme**: a plain table, a diving team or a climbing team. It changes how the table looks, not the rules.
 
+## Computer players
+
+Short of players? In the waiting room the host can add computer players to free seats (or fill them all), each at **Easy** or **Normal**. They see only their own two cards, the shared cards turned so far and where every chip is, and they do not talk either: whenever a chip moves they think a moment and then act; once they hold a chip they are content with and have said ready, they wait. Normal works out the share of random two-card hands its own would beat at the end (dealing out the cards still to come), turns that into the chip it wants and takes the nearest free one, moving only for one clearly nearer; early in a round it may take exactly the chip it wants from another seat (at most twice a round, so two computers cannot fight over one for ever). Easy judges only the hand it has made so far, ignores the cards to come, and only ever takes from the table.
+
 ## Players
 
 3 to 6 players. If someone drops out, the host can decide for them: they take the lowest chip left and say ready.

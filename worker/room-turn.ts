@@ -54,6 +54,13 @@ export type StoredGame = {
    * from before, where the seat alone decides as it did
    */
   holders?: Record<string, string>
+  /**
+   * When the game last changed (2026-11-23): the start, or the last accepted step. A computer seat of
+   * a game that times its own moves (`GameModule.botTime`) counts from here, so that waking from
+   * hibernation does not start its wait over. Absent in a game from before: the wait counts from
+   * when the room looks
+   */
+  steppedAt?: number
 }
 
 export type ActionOutcome =
@@ -143,6 +150,7 @@ export function beginGame(
       match,
       steps: 0,
       timers: nextTimers(module, match.state, [], now),
+      steppedAt: now,
     }
     projectAll(module, game)
     return game
@@ -171,6 +179,7 @@ export function playAction(
       match,
       steps: game.steps + 1,
       timers: nextTimers(module, match.state, game.timers, now),
+      steppedAt: now,
     }
     projectAll(module, next)
     return {

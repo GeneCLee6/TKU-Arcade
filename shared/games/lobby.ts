@@ -13,7 +13,7 @@ export const GAME_META = {
   promotion: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.promotion', proxyTurns: true, computer: true },
   // Listed on the owner's request, 2026-11-12 (the IP-CHECKLIST.md signature lines are still the owner's).
   // No `proxyTurns`: a chip is a decision, and a random one could lose the level
-  'silent-table': { minPlayers: 3, maxPlayers: 6, minutes: 20, i18nKey: 'games.silent-table' },
+  'silent-table': { minPlayers: 3, maxPlayers: 6, minutes: 20, i18nKey: 'games.silent-table', computer: true },
   // Listed on the owner's request, 2026-11-12, under its working title (PRD Q3 still open). No
   // `proxyTurns`: an answer has to come from a person.
   // 4 to 11: at least three answerers, so that the largest and the smallest are two different
@@ -26,12 +26,12 @@ export const GAME_META = {
   'odd-word': { minPlayers: 3, maxPlayers: 12, minutes: 20, i18nKey: 'games.odd-word' },
   // 2 to 4 as the game is meant; 5 and 6 play a shorter table (owner's request 2026-11-14). No
   // `proxyTurns`: when to light a lantern is the whole game
-  lantern: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.lantern' },
+  lantern: { minPlayers: 2, maxPlayers: 6, minutes: 20, i18nKey: 'games.lantern', computer: true },
   // 2 to 4: the owner's numbers (2026-11-14), and what 106 tiles hold (14 each, a pool to draw from).
   // No `proxyTurns`: a turn is a decision
   tiles: { minPlayers: 2, maxPlayers: 4, minutes: 30, i18nKey: 'games.tiles', computer: true },
   // No `proxyTurns`: every turn is a decision, and a random one could snap a line
-  kite: { minPlayers: 2, maxPlayers: 5, minutes: 30, i18nKey: 'games.kite' },
+  kite: { minPlayers: 2, maxPlayers: 5, minutes: 30, i18nKey: 'games.kite', computer: true },
   // `computer`: the room plays computer seats (2026-11-20, GameModule.bot) in this and holdem and
   // promotion; 2026-11-21 in tiles, secret-scroll, wasabi and palace too
   traders: { minPlayers: 2, maxPlayers: 4, minutes: 30, i18nKey: 'games.traders', computer: true },
@@ -46,7 +46,7 @@ export const GAME_META = {
   holdem: { minPlayers: 2, maxPlayers: 9, minutes: 45, i18nKey: 'games.holdem', computer: true },
   // 2 to 10 (owner's request 2026-11-14). The talking is on the friends' own voice call; no
   // `proxyTurns`: where a card goes is a decision
-  misery: { minPlayers: 2, maxPlayers: 10, minutes: 25, i18nKey: 'games.misery' },
+  misery: { minPlayers: 2, maxPlayers: 10, minutes: 25, i18nKey: 'games.misery', computer: true },
   // 2 to 10: co-op for two or three, two partnerships from four (owner's numbers, 2026-11-14)
   'word-bridge': { minPlayers: 2, maxPlayers: 10, minutes: 20, i18nKey: 'games.word-bridge' },
   // 3 to 7 (owner's numbers, 2026-11-14). No `proxyTurns`: a clue has to come from a person

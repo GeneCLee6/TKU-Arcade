@@ -245,12 +245,20 @@ export async function playOn(
   log: PlayLog,
   until: (log: PlayLog) => boolean = () => false,
   maxActions = 1500,
+  /** Only these of a seat's legal moves (2026-11-23: lantern's person leaves moonlight alone) */
+  allow: (action: unknown) => boolean = () => true,
 ): Promise<void> {
   const host = seats[0]
   let idleSince = Date.now()
+  let lastRev = host.rev
   while (!host.view?.game?.over && !until(log)) {
     if (log.actions >= maxActions) throw new Error(`no end after ${maxActions} moves`)
-    const able = seats.filter((seat) => seat.legal.length > 0)
+    const able = seats.filter((seat) => seat.legal.some(allow))
+    // Computer seats moving count as the game going on (2026-11-23: lantern's may wait a while)
+    if (host.rev !== lastRev) {
+      lastRev = host.rev
+      idleSince = Date.now()
+    }
     if (able.length === 0) {
       const allowed = Math.max(...seats.map((seat) => seat.timerMs)) + 15_000
       if (Date.now() - idleSince > allowed) {
@@ -260,7 +268,7 @@ export async function playOn(
       continue
     }
     const seat = able[pick(able.length)]
-    const legal = seat.legal
+    const legal = seat.legal.filter(allow)
     const action = legal[pick(legal.length)]
     const rev = seat.rev
     const refusals = seat.refusals.length

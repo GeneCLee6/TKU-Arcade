@@ -9,7 +9,9 @@
 // docs/PRD/e16-kite-day.md has the rules and every detail decided here.
 import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
+import { kiteBot } from './bot.ts'
 import { handSize, kiteInfo, MAX_BURNS, MAX_NOTES } from './info.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import type {
   KiteAction,
   KiteCard,
@@ -209,6 +211,11 @@ const shownCard = (card: KiteCard, visible: boolean): KiteViewCard =>
 export const kite: GameModule<KiteState, KiteAction, KiteView, KiteOptions> = {
   ...kiteInfo,
   meta: GAME_META.kite,
+  // Computer players, played by the room (bot.ts)
+  bots: TABLE_BOTS,
+  bot(view, legal, level, rng) {
+    return kiteBot(view, legal, level, rng)
+  },
 
   init(seats, options, rng: Rng) {
     const suits: KiteSuit[] = options.rainbow ? [...BASE_SUITS, 'rainbow'] : [...BASE_SUITS]

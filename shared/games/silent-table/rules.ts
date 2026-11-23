@@ -9,7 +9,9 @@
 // - Hands that tie may hold their chips in either order.
 // - Any chip moving clears everyone's ready, because ready means accepting the chips as they are.
 // - `MOVES_PER_ROUND` caps a seat's moves in a round, so a round always ends without a clock.
+import { silentTableBot, silentTableBotTime } from './bot.ts'
 import { COMMUNITY_BY_ROUND, ROUNDS, silentTableInfo } from './info.ts'
+import { TABLE_BOTS } from '../tableBots.ts'
 import { bestHand, fullDeck, type Card } from '../../poker/hand.ts'
 import { GAME_META } from '../lobby.ts'
 import { gameError, type GameModule, type GameResult, type Rng, type SeatId } from '../types.ts'
@@ -219,6 +221,15 @@ export const silentTable: GameModule<
 > = {
   ...silentTableInfo,
   meta: GAME_META['silent-table'],
+  // Computer players, played by the room (bot.ts), each on its own clock: everyone acts at once, and
+  // a computer content with its chip waits for the others
+  bots: TABLE_BOTS,
+  bot(view, legal, level) {
+    return silentTableBot(view, legal, level)
+  },
+  botTime(view, legal, level, rng) {
+    return silentTableBotTime(view, legal, level, rng)
+  },
 
   init(seats, options, rng) {
     const players = seats.map(
