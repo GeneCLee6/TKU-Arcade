@@ -368,7 +368,7 @@ export default function RaceView({
         quality: loadQuality(),
         body: loadout.body,
         driver: loadout.driver,
-        onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
+        onPose: (x, z, heading, nextGate, tick) => minimap.current?.place(x, z, heading, nextGate, tick),
         onTrial: setTrial,
         onClock: (total, lap) => clock.current?.set(total, lap),
         touch: touchSource,
@@ -698,6 +698,7 @@ export default function RaceView({
           gates={track.gates}
           walls={track.walls}
           forks={track.forks}
+          obstacles={track.obstacles}
           dots={
             view.teams
               ? others.map((racer) => {

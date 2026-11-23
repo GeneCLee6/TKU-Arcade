@@ -23,6 +23,7 @@ import {
 } from '../../shared/kart/shots.ts'
 import { shotsAt } from '../../shared/kart/replayShots.ts'
 import { courseOf, type RoadPoint } from '../../shared/kart/track.ts'
+import { groundAt } from '../../shared/kart/terrain.ts'
 import { raceTrack } from '../../shared/kart/tracks/registry.ts'
 
 // 2026-11-23 (docs/ARCHITECTURE.md §4.87): the items by height. At the Zhuwei Flyover's crossing a
@@ -189,7 +190,8 @@ describe('a fog bank', () => {
   it('lies on its target\'s road and fogs only karts near its height', () => {
     const target = { ...before(crossing.lower, 40, crossing.lowerY), speed: 0 }
     const shot = layFog(1, before(crossing.lower, 80, crossing.lowerY), target, AT, [], undefined, terrain)
-    expect(shot.y).toBeCloseTo(target.y, 0)
+    expect(shot.y).toBeCloseTo(groundAt(terrain, shot.x, shot.z, crossing.lowerY).y, 5)
+    expect(Math.abs(shot.y! - crossing.lowerY)).toBeLessThan(Math.abs(shot.y! - crossing.upperY))
     expect(heightsMeet('fog', shot.y! + 3.5, shot.y!)).toBe(true)
     expect(heightsMeet('fog', shot.y! + 5, shot.y!)).toBe(false)
     expect(heightsMeet('fog', shot.y! - 2, shot.y!)).toBe(false)

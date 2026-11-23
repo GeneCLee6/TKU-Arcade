@@ -297,7 +297,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
           const followed = frame.karts.find((kart) => kart.id === frame.follow)
           if (followed) {
             const gate = frames.current.get(followed.id)?.nextGate ?? 0
-            minimap.current?.place(followed.x, followed.z, followed.heading, gate)
+            minimap.current?.place(followed.x, followed.z, followed.heading, gate, frame.tick)
           }
           // 2026-11-23: the broadcast's map shows every kart (the dots, when it is on)
           minimap.current?.others?.(
@@ -435,6 +435,7 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
             road={track.road}
             gates={track.gates}
             forks={track.forks}
+            obstacles={track.obstacles}
             dots={directing ? view.racers.map((one) => one.seat).map((seat) => ({ seat, fill: color.text })) : undefined}
           />
         </MapCorner>

@@ -266,7 +266,7 @@ export function SpikePage({
         body,
         driver,
         ghostPick,
-        onPose: (x, z, heading, nextGate) => minimap.current?.place(x, z, heading, nextGate),
+        onPose: (x, z, heading, nextGate, tick) => minimap.current?.place(x, z, heading, nextGate, tick),
         onTrial: (next) => {
           // A run's upload card goes with its results: a new countdown leaves it behind
           if (next.phase === 'countdown') setBoardRun(null)
@@ -739,7 +739,15 @@ export function SpikePage({
               }}
             />
           )}
-          <Minimap ref={minimap} t={t} road={track.road} gates={track.gates} forks={track.forks} walls={track.walls} />
+          <Minimap
+            ref={minimap}
+            t={t}
+            road={track.road}
+            gates={track.gates}
+            forks={track.forks}
+            walls={track.walls}
+            obstacles={track.obstacles}
+          />
         </MapCorner>
       )}
       <TouchControls t={t} touch={touch} hud={hud} maxStored={tuning.maxStoredBoosts} />

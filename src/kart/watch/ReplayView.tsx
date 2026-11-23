@@ -442,7 +442,7 @@ export default function ReplayView({
           const samples = frame.follow === null ? undefined : reel.samples.get(frame.follow)
           if (followed && samples) {
             const gate = sampleAt(samples, head.current.tick)?.nextGate ?? 0
-            minimap.current?.place(followed.x, followed.z, followed.heading, gate)
+            minimap.current?.place(followed.x, followed.z, followed.heading, gate, frame.tick)
           }
           // 2026-11-23: the broadcast's map shows every kart (the dots, when it is on)
           minimap.current?.others?.(
@@ -643,6 +643,7 @@ export default function ReplayView({
             road={track.road}
             gates={track.gates}
             forks={track.forks}
+            obstacles={track.obstacles}
             dots={directing ? seats.map((seat) => ({ seat, fill: color.text })) : undefined}
           />
         </MapCorner>
