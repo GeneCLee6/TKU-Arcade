@@ -53,6 +53,10 @@ const VIEWS = {
   cockpit: { orbit: 0.35, back: 1.9, up: 1.5 },
   portrait: { orbit: 2.5, back: 1.5, up: 1.1 },
   over: { orbit: 0.2, back: 1.3, up: 2.1 },
+  // 2026-11-23 (§4.91): close on the joints, the shoulder and the elbow from the side, the knee from
+  // ahead and above (looking for a seam)
+  joint: { orbit: 1.75, back: 1.05, up: 1.2 },
+  knee: { orbit: 2.7, back: 1.2, up: 1.35 },
 }
 
 // 2026-11-23 (§4.86): what each pose sets on the look (spikeLoop.ts's debug `pose`, `gesture`, `fx`)
@@ -68,6 +72,7 @@ const POSES = {
   pump: { gesture: 'pump', wait: 450 },
   cheer: { gesture: 'cheer', wait: 1400 },
   trophy: { gesture: 'trophy' },
+  podium: { gesture: 'podium', wait: 4600 },
 }
 const poses = option('poses', '').split(',').filter(Boolean)
 const drivers = option('drivers', 'spade,heart,diamond,club').split(',')

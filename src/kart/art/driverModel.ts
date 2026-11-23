@@ -15,21 +15,45 @@
 // suit has shoulder armour, a harness, the number on the chest as well, stitching along its panels,
 // knee pads and boots with soles. How much of it by the quality (`DriverDetail`): low keeps the plain
 // driver and kartModel.ts merges it standing still.
+//
+// 2026-11-23 (§4.91, driverLimbs.ts, driverSkin.ts): no seams, legs, fingers. On the full kit the
+// limbs are skin: a ball at each shoulder and hip that the limb turns in, and the sleeve and the leg
+// each one piece over the elbow and the knee, bending smoothly (one skinned mesh a material for all
+// four limbs, sharing a skeleton: fewer draws than the rigid parts). The legs have a hip, a knee and
+// an ankle each, so that kartModel.ts can put the feet on the pedals or the ground, seated or
+// standing; the gloves have fingers and a thumb in seven shapes (round the grip, a fist, open,
+// pointing, a thumb up, a V, at ease), one shown at a time. Low keeps rigid parts, merged and still.
 import {
+  Bone,
   BoxGeometry,
   CylinderGeometry,
   ExtrudeGeometry,
   Group,
+  LatheGeometry,
   Shape,
+  Vector2,
   Vector3,
   Object3D,
   type Material,
+  type Skeleton,
 } from 'three'
 import type { DriverId } from '../../../shared/kart/karts.ts'
 import type { Quality } from '../quality.ts'
 import { kartDrivers, kartLivery } from '../../styles/kartTokens.ts'
 import { FOREARM, UPPER_ARM } from '../driverRig.ts'
+import {
+  HAND_SHAPES,
+  handCurl,
+  HIP_X,
+  KNUCKLES,
+  PELVIS_Y,
+  SHIN,
+  THIGH,
+  type HandCurl,
+  type HandShape,
+} from '../driverLimbs.ts'
 import { hull, wedge, type BodyKit } from './kartParts.ts'
+import { skinLimbs, type SkinBend } from './driverSkin.ts'
 
 /** How much of the driver is drawn and moved: low, plain and still; medium and high, the full kit */
 export type DriverDetail = 'low' | 'medium' | 'high'
@@ -44,18 +68,26 @@ export const DRIVER_DETAIL: Readonly<Record<Quality, DriverDetail>> = {
 export interface DriverModel {
   /** Placed at the kart's seat */
   readonly group: Group
+  /** 2026-11-23 (§4.91): the hips' middle; the torso and the legs hang from it (driverLimbs.ts) */
+  readonly pelvis: Group
   /** Everything above the seat: leans into a turn, back in a boost, sways when stunned */
   readonly torso: Group
   /** Turns to look where the driver steers */
   readonly head: Group
   /** Left and right shoulders: each arm hangs from one, straight down (-y) at rest */
-  readonly arms: readonly [Group, Group]
+  readonly arms: readonly [Bone, Bone]
   /** Left and right elbows, bending about their own x */
-  readonly elbows: readonly [Group, Group]
+  readonly elbows: readonly [Bone, Bone]
   /** Left and right hands' joints, at the end of the forearm (the glove is drawn with the forearm) */
   readonly hands: readonly [Object3D, Object3D]
-  /** The right hand's two fingers for a V, hidden until a gesture shows them; none on low */
-  readonly vee: Object3D | null
+  /** 2026-11-23 (§4.91): each leg's hip, knee (bending about its x) and ankle, hanging straight down */
+  readonly hips: readonly [Bone, Bone]
+  readonly knees: readonly [Bone, Bone]
+  readonly ankles: readonly [Bone, Bone]
+  /** The limbs' skin's skeleton (to dispose of its bone texture); none on low */
+  readonly skeleton: Skeleton | null
+  /** What each hand shows (driverLimbs.ts); on low the plain glove shows nothing else */
+  setHands(left: HandShape, right: HandShape): void
 }
 
 /** The suit's sign, flat in x (across) and y (up), about 0.27 tall, its foot at the origin */
@@ -136,13 +168,15 @@ function limb(
   r0: number,
   r1: number,
   around = 6,
+  /** 2026-11-23 (§4.91): no ends (a finger's bone inside the next): fewer triangles */
+  open = false,
 ): void {
   const from = new Vector3(...a)
   const along = new Vector3(...b).sub(from)
   const length = along.length()
   const mesh = kit.put(
     parent,
-    new CylinderGeometry(r1, r0, length, around),
+    new CylinderGeometry(r1, r0, length, around, 1, open),
     material,
     from.x + along.x / 2,
     from.y + along.y / 2,
@@ -162,26 +196,119 @@ const standing = (sections: Parameters<typeof hull>[0]) => hull(sections).rotate
 const WRIST = FOREARM - 0.06
 
 /**
- * `onFeet` (2026-11-23, #151): on their feet beside the kart, for the race room's place cards
- * (src/kart/lobby/lobbyStage.ts): the legs straight down to the ground, the arms hanging at the sides.
- * The group's origin is still the hips' seat, 0.8 m above the soles
+ * On their feet beside the kart (2026-11-23, #151), for the race room's place cards
+ * (src/kart/lobby/lobbyStage.ts): the group's origin is still the hips' seat, 0.8 m above the soles
  */
 export const STANDING_HIP = 0.8
 
 /** Where the shoulders are on the torso (x either side), metres */
 export const SHOULDER: Point = [0.2, 0.44, 0]
 
+/** A joint: a bone at a place on its parent */
+function joint(parent: Object3D, x: number, y: number, z: number): Bone {
+  const bone = new Bone()
+  bone.position.set(x, y, z)
+  parent.add(bone)
+  return bone
+}
+
+/** A limb's outline, hanging from its joint: [metres down (negative), radius], top to bottom */
+type Profile = readonly (readonly [number, number])[]
+
+/** The leg: from the hip's ball down to the ankle, rings close together round the knee */
+const LEG_PROFILE: Profile = [
+  [0, 0.085],
+  [-0.2, 0.078],
+  [-THIGH + 0.06, 0.068],
+  [-THIGH + 0.03, 0.066],
+  [-THIGH, 0.064],
+  [-THIGH - 0.03, 0.061],
+  [-THIGH - 0.06, 0.059],
+  [-THIGH - SHIN * 0.5, 0.052],
+  [-THIGH - SHIN + 0.03, 0.045],
+]
+/** The ball at the shoulder and the top of the upper arm, in the panel's colour */
+const DELTOID_PROFILE: Profile = [
+  [0, 0.07],
+  [-0.06, 0.064],
+  [-0.115, 0.058],
+]
+/** The sleeve: from under the shoulder's panel down over the elbow to the glove */
+const ARM_PROFILE: Profile = [
+  [-0.09, 0.056],
+  [-UPPER_ARM + 0.06, 0.05],
+  [-UPPER_ARM + 0.03, 0.048],
+  [-UPPER_ARM, 0.047],
+  [-UPPER_ARM - 0.03, 0.046],
+  [-UPPER_ARM - 0.06, 0.044],
+  [-UPPER_ARM - (FOREARM - 0.06) + 0.05, 0.04],
+]
+
 /**
- * `astride` (2026-11-19): on a bike. The legs go down either side to the pegs, knees forward,
- * instead of out ahead into a kart's nose; the model lays the torso forward (kartModel.ts)
+ * A limb turned about its own axis from `profile`, `around` sides; `ball` closes the top in a half
+ * sphere round the joint, so that the limb turns in it without opening a seam
  */
-export function buildDriver(
-  kit: BodyKit,
-  driver: DriverId,
-  astride = false,
-  onFeet = false,
-  detail: DriverDetail = 'high',
-): DriverModel {
+function sleeve(profile: Profile, around: number, ball: boolean): LatheGeometry {
+  const points: Vector2[] = []
+  for (let i = profile.length - 1; i >= 0; i--) points.push(new Vector2(profile[i]![1], profile[i]![0]))
+  if (ball) {
+    const radius = profile[0]![1]
+    const top = profile[0]![0]
+    for (let step = 1; step <= 4; step++) {
+      const angle = (step / 4) * (Math.PI / 2)
+      points.push(new Vector2(Math.max(0.002, Math.cos(angle) * radius), top + Math.sin(angle) * radius))
+    }
+  }
+  return new LatheGeometry(points, around)
+}
+
+/** The boot's toe from its ankle, built pointing forward with the leg hanging straight down */
+const BOOT_TOE: Point = [0, -0.04, -0.15]
+
+/** Each finger's bones' lengths, metres (the root, the middle, the tip), index to little */
+const PHALANGES = [0.034, 0.024, 0.019] as const
+const FINGER_SCALE = [0.95, 1, 0.95, 0.8] as const
+
+/**
+ * A glove's fingers and thumb in one shape (driverLimbs.ts's handCurl), on `bone` at the palm's
+ * start: each finger from its knuckle at the end of the palm, bending at each knuckle towards the
+ * palm (-z); `toIndex` the way across the hand (x) to the index finger and the thumb
+ */
+function fingers(kit: BodyKit, bone: Object3D, material: Material, curl: HandCurl, toIndex: number, around: number) {
+  const from = new Vector3()
+  const to = new Vector3()
+  const way = new Vector3()
+  const point = (v: Vector3): Point => [v.x, v.y, v.z]
+  for (let finger = 0; finger < 4; finger++) {
+    const fan = (1.5 - finger) * curl.spread * toIndex
+    from.set(toIndex * (0.027 - finger * 0.018), -0.075, -0.004)
+    let bent = 0
+    for (let knuckle = 0; knuckle < 3; knuckle++) {
+      bent += curl.fingers[finger]! * KNUCKLES[knuckle]!
+      way.set(Math.sin(fan), -Math.cos(fan) * Math.cos(bent), -Math.cos(fan) * Math.sin(bent))
+      to.copy(from).addScaledVector(way, PHALANGES[knuckle]! * FINGER_SCALE[finger]!)
+      const thick = 0.0115 - knuckle * 0.001
+      // Open-ended but the tip: each bone's end is inside the next
+      limb(kit, bone, material, point(from), point(to), thick, thick - 0.0005, around, knuckle < 2)
+      from.copy(to)
+    }
+  }
+  // The thumb: two bones from its root at the side of the palm, the tip turned in a little more
+  from.set(toIndex * 0.036, -0.022, -0.012)
+  way.set(toIndex * curl.thumb[0], curl.thumb[1], curl.thumb[2]).normalize()
+  to.copy(from).addScaledVector(way, 0.032)
+  limb(kit, bone, material, point(from), point(to), 0.0135, 0.012, around, true)
+  from.copy(to)
+  if (curl.thumb[2] < 0) way.add(new Vector3(-toIndex * 0.25, 0, -0.25)).normalize()
+  to.copy(from).addScaledVector(way, 0.026)
+  limb(kit, bone, material, point(from), point(to), 0.012, 0.011, around)
+}
+
+/**
+ * The driver, built seated or standing alike: the pose (seated in a kart, astride a bike, on their
+ * feet) is the skeleton's, put on by kartModel.ts (driverLimbs.ts)
+ */
+export function buildDriver(kit: BodyKit, driver: DriverId, detail: DriverDetail = 'high'): DriverModel {
   const colours = kartDrivers[driver]
   const suit = kit.colour(colours.suit, 0.8, 0.05)
   const panel = kit.colour(colours.panel, 0.55, 0.1, 0.12)
@@ -198,61 +325,48 @@ export function buildDriver(
   const glint = full ? kit.colour(kartLivery.ink, 0.05, 1, 0.9) : visor
 
   const group = new Group()
-  // Seated: the thighs forward and up to the knees, the shins down into the nose, boots
+  // 2026-11-23 (§4.91): a pelvis, the torso on it and a leg hanging from each hip, a hip, a knee and
+  // an ankle each (bones); kartModel.ts puts the feet on the pedals or the ground (driverLimbs.ts)
+  const pelvis = new Group()
+  pelvis.position.set(0, PELVIS_Y, 0)
+  group.add(pelvis)
+  const hips: Bone[] = []
+  const knees: Bone[] = []
+  const ankles: Bone[] = []
   for (const side of [-1, 1]) {
-    let hip: Point = [side * 0.09, 0.1, 0]
-    let knee: Point
-    let ankle: Point
-    let toe: Point
-    if (onFeet) {
-      // Standing: the thighs down to the knees, the shins to the ankles, the boots forward
-      knee = [side * 0.105, -0.32, -0.025]
-      ankle = [side * 0.105, -0.72, 0]
-      toe = [side * 0.105, -0.76, -0.15]
-    } else if (astride) {
-      // Astride: the thighs forward and down round the tank, the shins back to the pegs, boots
-      hip = [side * 0.1, 0.09, 0]
-      knee = [side * 0.215, -0.02, -0.34]
-      ankle = [side * 0.2, -0.21, -0.04]
-      toe = [side * 0.2, -0.24, -0.17]
+    const hip = joint(pelvis, side * HIP_X, 0, 0)
+    const knee = joint(hip, 0, -THIGH, 0)
+    const ankle = joint(knee, 0, -SHIN, 0)
+    // Marked, for a test to find
+    ankle.userData.ankle = true
+    if (full) {
+      // One piece from a ball at the hip down past the knee to the ankle, bending smoothly at the knee
+      const leg = kit.put(hip, sleeve(LEG_PROFILE, finest ? 10 : 8, true), suit)
+      leg.userData.skin = { next: knee, joint: THIGH } satisfies SkinBend
+      // The knee pad over the knee, a carbon cap on it
+      limb(kit, knee, panel, [0, 0.055, 0.03], [0, -0.05, 0.03], 0.052, 0.05)
+      kit.put(knee, box(0.07, 0.085, 0.03), carbon, 0, 0.005, 0.072)
     } else {
-      knee = [side * 0.12, 0.21, -0.4]
-      ankle = [side * 0.1, 0.07, -0.76]
-      toe = [side * 0.1, 0.11, -0.9]
+      limb(kit, hip, suit, [0, 0, 0], [0, -THIGH, 0], 0.085, 0.065)
+      limb(kit, knee, suit, [0, 0, 0], [0, -SHIN, 0], 0.06, 0.045)
+      limb(kit, knee, panel, [0, 0.06, 0.02], [0, -0.04, 0.02], 0.066, 0.064)
     }
-    limb(kit, group, suit, hip, knee, 0.085, 0.065)
-    limb(kit, group, suit, knee, ankle, 0.06, 0.045)
-    // The knee pad: a panel over the knee, with a carbon cap on the full kit
-    const thigh = new Vector3(...knee).sub(new Vector3(...hip)).normalize()
-    const padFrom: Point = [knee[0] - thigh.x * 0.1, knee[1] - thigh.y * 0.1 + 0.02, knee[2] - thigh.z * 0.1]
-    limb(kit, group, panel, padFrom, [knee[0], knee[1] + 0.02, knee[2]], 0.066, 0.07)
+    // The boot, built pointing forward from the ankle (kartModel.ts turns it to its toe): an upper to
+    // the toe; on the full kit a sole under it and a cuff in the panel's colour
+    limb(kit, ankle, trim, [0, 0, 0], BOOT_TOE, 0.05, 0.045)
     if (full) {
-      kit.put(group, box(0.07, 0.03, 0.08), carbon, knee[0], knee[1] + 0.075, knee[2] + 0.01).rotation.x =
-        Math.atan2(thigh.y, -thigh.z) * 0.5
+      limb(kit, ankle, dark, [0, -0.04, 0.01], [0, BOOT_TOE[1] - 0.035, BOOT_TOE[2] - 0.01], 0.034, 0.03)
+      limb(kit, ankle, panel, [0, 0.06, 0], [0, 0.01, 0], 0.052, 0.054)
     }
-    // The boot: an upper to the toe; on the full kit a sole under it and a cuff in the panel's colour
-    limb(kit, group, trim, ankle, toe, 0.05, 0.045)
-    if (full) {
-      limb(
-        kit,
-        group,
-        dark,
-        [ankle[0], ankle[1] - 0.04, ankle[2] + 0.01],
-        [toe[0], toe[1] - 0.035, toe[2] - 0.01],
-        0.034,
-        0.03,
-      )
-      limb(kit, group, panel, [ankle[0], ankle[1] + 0.06, ankle[2]], [ankle[0], ankle[1] + 0.01, ankle[2]], 0.052, 0.054)
-    }
-    if (finest) {
-      // A seam down the outside of each thigh
-      seam(kit, group, thread, [hip[0] + side * 0.085, hip[1], hip[2]], [knee[0] + side * 0.066, knee[1], knee[2]])
-    }
+    // A seam down the outside of each thigh
+    if (finest) seam(kit, hip, thread, [side * 0.085, -0.02, 0], [side * 0.067, -THIGH + 0.06, 0])
+    hips.push(hip)
+    knees.push(knee)
+    ankles.push(ankle)
   }
 
   const torso = new Group()
-  torso.position.set(0, 0.1, 0)
-  group.add(torso)
+  pelvis.add(torso)
   // The trunk: hips, a waist, a chest, shoulders
   kit.put(
     torso,
@@ -326,16 +440,20 @@ export function buildDriver(
     seam(kit, torso, thread, [0, 0.13, -0.116], [0, 0.49, -0.1])
   }
 
-  const elbows: Group[] = []
+  const elbows: Bone[] = []
   const hands: Object3D[] = []
-  let vee: Group | null = null
+  // 2026-11-23 (§4.91): each hand's shapes, a bone each (shown at full size, the rest at none)
+  const shapes: Map<HandShape, Bone>[] = []
   const arms = [-1, 1].map((side) => {
     // The shoulder, the arm hanging from it: an upper arm to the elbow, a forearm to the hand
-    const arm = new Group()
-    arm.position.set(side * SHOULDER[0], SHOULDER[1], SHOULDER[2])
-    limb(kit, arm, panel, [0, 0.015, 0], [0, -0.11, 0], 0.07, 0.058)
-    limb(kit, arm, suit, [0, -0.11, 0], [0, -UPPER_ARM, 0], 0.055, 0.047)
+    const arm = joint(torso, side * SHOULDER[0], SHOULDER[1], SHOULDER[2])
+    const elbow = joint(arm, 0, -UPPER_ARM, 0)
     if (full) {
+      // A ball at the shoulder in the panel's colour, round the joint, so that the arm turns in it
+      // without a seam; the sleeve one piece from under it to the glove, bending smoothly at the elbow
+      kit.put(arm, sleeve(DELTOID_PROFILE, finest ? 10 : 8, true), panel)
+      const sleeved = kit.put(arm, sleeve(ARM_PROFILE, finest ? 10 : 8, false), suit)
+      sleeved.userData.skin = { next: elbow, joint: UPPER_ARM } satisfies SkinBend
       // Shoulder armour: a moulded carbon cap over the shoulder, a rim in the panel's colour
       const cap = kit.put(
         arm,
@@ -351,46 +469,44 @@ export function buildDriver(
       )
       cap.rotation.z = side * -1.25
       limb(kit, arm, panel, [side * 0.045, -0.06, -0.05], [side * 0.045, -0.06, 0.05], 0.012, 0.012, 4)
+      if (finest) seam(kit, arm, thread, [side * 0.058, -0.11, 0], [side * 0.05, -UPPER_ARM + 0.06, 0])
+      // The elbow's carbon guard
+      limb(kit, elbow, carbon, [0, -0.02, 0.03], [0, -0.07, 0.035], 0.024, 0.02, 4)
+    } else {
+      limb(kit, arm, panel, [0, 0.015, 0], [0, -0.11, 0], 0.07, 0.058)
+      limb(kit, arm, suit, [0, -0.11, 0], [0, -UPPER_ARM, 0], 0.055, 0.047)
+      limb(kit, elbow, suit, [0, 0, 0], [0, -WRIST + 0.04, 0], 0.047, 0.04)
     }
-    if (finest) seam(kit, arm, thread, [side * 0.058, -0.11, 0], [side * 0.049, -UPPER_ARM + 0.02, 0])
-    const elbow = new Group()
-    elbow.position.set(0, -UPPER_ARM, 0)
-    arm.add(elbow)
-    limb(kit, elbow, suit, [0, 0, 0], [0, -WRIST + 0.04, 0], 0.047, 0.04)
     // The glove's gauntlet, over the end of the sleeve
     limb(kit, elbow, trim, [0, -WRIST + 0.07, 0], [0, -WRIST, 0], 0.044, 0.046)
-    if (full) limb(kit, elbow, carbon, [0, -0.02, 0.03], [0, -0.07, 0.035], 0.024, 0.02, 4)
-    // The hand: drawn with the forearm (it never turns by itself, so it costs no draw of its own),
-    // its joint marked where the palm begins, for a test to find
+    // The hand: drawn with the forearm (it never turns by itself), its joint marked where the palm
+    // begins, for a test to find
     const hand = new Object3D()
     hand.position.set(0, -WRIST, 0)
     hand.userData.hand = true
     elbow.add(hand)
     const w = -WRIST
+    const own = new Map<HandShape, Bone>()
     if (full) {
-      // The glove: a palm, the fingers curled round a grip, a thumb, a carbon guard over the knuckles
+      // The glove: a palm, a carbon guard over the knuckles, a dark cuff; the fingers and the thumb
+      // in each of the hand's shapes (driverLimbs.ts), on a bone of its own
       kit.put(elbow, box(0.075, 0.075, 0.04), trim, 0, w - 0.04, 0)
-      kit.put(elbow, box(0.075, 0.04, 0.05), trim, 0, w - 0.085, -0.012).rotation.x = 0.35
-      limb(kit, elbow, trim, [side * -0.035, w - 0.02, -0.01], [side * -0.05, w - 0.065, -0.035], 0.014, 0.012, 5)
       kit.put(elbow, box(0.068, 0.03, 0.012), carbon, 0, w - 0.06, 0.024)
       kit.put(elbow, box(0.077, 0.012, 0.043), dark, 0, w - 0.012, 0)
-      if (side > 0) {
-        // Two fingers up for a V, shown only by a gesture (kartModel.ts)
-        vee = new Group()
-        vee.visible = false
-        vee.position.set(0, w, 0)
-        elbow.add(vee)
-        limb(kit, vee, trim, [-0.018, -0.09, -0.01], [-0.04, -0.175, -0.01], 0.012, 0.011, 5)
-        limb(kit, vee, trim, [0.018, -0.09, -0.01], [0.04, -0.175, -0.01], 0.012, 0.011, 5)
+      for (const shape of HAND_SHAPES) {
+        const bone = joint(hand, 0, 0, 0)
+        fingers(kit, bone, trim, handCurl(shape), -side, 4)
+        bone.scale.setScalar(shape === 'grip' ? 1 : 0)
+        own.set(shape, bone)
       }
     } else {
       limb(kit, elbow, trim, [0, w, 0], [0, w - 0.09, 0], 0.044, 0.046)
     }
+    shapes.push(own)
     elbows.push(elbow)
     hands.push(hand)
-    torso.add(arm)
     return arm
-  }) as [Group, Group]
+  }) as [Bone, Bone]
 
   const head = new Group()
   head.position.set(0, 0.7, -0.01)
@@ -459,13 +575,27 @@ export function buildDriver(
   sign.scale(0.62, 0.62, 1)
   kit.put(head, sign, crest, 0, 0.075, 0.2).rotation.x = -0.92
   torso.add(head)
+  // The limbs as skin (driverSkin.ts): the full kit; low keeps the rigid parts (merged, still)
+  const skeleton = full ? skinLimbs(group, [...hips, ...arms], kit.allPaint) : null
+  const shown: (HandShape | null)[] = [null, null]
   return {
     group,
+    pelvis,
     torso,
     head,
     arms,
-    elbows: elbows as [Group, Group],
+    elbows: elbows as [Bone, Bone],
     hands: hands as [Object3D, Object3D],
-    vee,
+    hips: hips as [Bone, Bone],
+    knees: knees as [Bone, Bone],
+    ankles: ankles as [Bone, Bone],
+    skeleton,
+    setHands(left, right) {
+      for (const [index, wanted] of [left, right].entries()) {
+        if (shown[index] === wanted) continue
+        shown[index] = wanted
+        for (const [shape, bone] of shapes[index]!) bone.scale.setScalar(shape === wanted ? 1 : 0)
+      }
+    },
   }
 }

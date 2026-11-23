@@ -54,6 +54,31 @@ describe('a real run', () => {
     }
   }, 60_000)
 
+  it('passes with its finish kept to the centimetre right on the line (2026-11-23)', async () => {
+    // The tape keeps a centimetre: a finish a hair past the line can come out on it, which has not
+    // crossed it. The last sample is judged two centimetres on along its way: one a centimetre short
+    // of the line finishes, one a metre short does not
+    const track = raceTrack('riverside')!
+    const replay = driveBoardRun(track)!
+    const samples = decodeTape(replay.karts[0]!.bytes)
+    const last = samples.length - 1
+    const line = track.gates[0]!
+    const onLine = (sample: (typeof samples)[number], short: number) => {
+      // Moved back along its way onto gate 0's line, then `short` metres further back
+      const dx = line.bx - line.ax
+      const dz = line.bz - line.az
+      const side = (dx * (sample.z - line.az) - dz * (sample.x - line.ax)) / Math.hypot(dx, dz)
+      const speed = Math.hypot(sample.vx, sample.vz)
+      const across = (dx * sample.vz - dz * sample.vx) / (Math.hypot(dx, dz) * speed)
+      const back = side / across + short
+      return { ...sample, x: sample.x - (sample.vx / speed) * back, z: sample.z - (sample.vz / speed) * back }
+    }
+    const kept = retape(replay, (sample, index) => (index === last ? onLine(sample, 0.01) : sample))
+    expect(await check(kept, track)).toMatchObject({ ok: true })
+    const short = retape(replay, (sample, index) => (index === last ? onLine(sample, 1) : sample))
+    expect((await check(short, track)).ok).toBe(false)
+  })
+
   it('is a ghost to chase, the very run, in its own kart', () => {
     const track = raceTrack('riverside')!
     const replay = driveBoardRun(track, 'eel', 'club')!

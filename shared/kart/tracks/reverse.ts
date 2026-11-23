@@ -23,7 +23,9 @@
 //   platform, ledges.ts; the works' loading deck over its fence) cannot be got into from its far end
 //   (the drop at its end is a face to drive up, the fence is a wall): it is closed, and with it
 //   whatever stood on it alone (a boost pad, item boxes). The lip that led into it stays, as a jump.
-// - Boost pads face the other way; item boxes, walls, scenery stay where they are.
+// - Boost pads face the other way; item boxes, walls, scenery stay where they are, but for a fence
+//   across a lane flown into over it from a lip (FENCE_TOP, 2026-11-23): the lane is a dead end the
+//   other way round, and the reversed track leaves the fence out.
 // - A moving obstacle stays on its own clock at its own place; its sides are swapped (right of the
 //   middle is left the other way round).
 // - The guides (guide.ts) belong to the original's road and are not carried over: the reversed
@@ -38,6 +40,7 @@ import { branchPath, roadDepth } from '../branches.ts'
 import type { Spot } from '../course.ts'
 import type { ObstacleJson } from '../obstacles.ts'
 import { MAX_GRADE, type Gate, type RoadPoint, type TrackJson } from '../track.ts'
+import type { Wall } from '../walls.ts'
 import type { BranchJson } from '../branches.ts'
 import { gridBehindLine } from './circuit.ts'
 import { reverseId } from './reverseId.ts'
@@ -48,7 +51,19 @@ export { forwardId, isReverseId, REVERSE_SUFFIX, reverseId } from './reverseId.t
  * Raised whenever the way a track is reversed changes enough that old times no longer compare: a
  * reversed track's revision is its original's plus this, less one
  */
-export const REVERSE_REVISION = 1
+export const REVERSE_REVISION = 2
+
+/**
+ * 2026-11-23 (REVERSE_REVISION 2, reverseGuides.ts): a fence flown over from a lip (no higher than
+ * this over the road) that stands within FENCE_AFTER road points after the lip and reaches more than
+ * FENCE_INTO metres into the road closes a lane inside the road (wharf.ts's quay, lanes.ts's well).
+ * The other way round nothing flies over it (the lip throws the car the other way) and the lane is
+ * a dead end: the reversed track leaves the fence out, and the lane is open at both ends. A fence
+ * along the kerb (the works' loading deck) is not such a fence
+ */
+export const FENCE_TOP = 2.5
+export const FENCE_AFTER = 12
+export const FENCE_INTO = 3
 
 const round = (value: number) => Math.round(value * 100) / 100
 const wrap = (angle: number) => {
@@ -73,6 +88,8 @@ export interface ReverseNotes {
   /** Branches kept (reversed) and closed (flown into from a lip) */
   readonly branchesKept: number
   readonly branchesClosed: number
+  /** Fences across a lane flown into, left out (FENCE_TOP) */
+  readonly fencesOpened: number
   /** Boost pads and item boxes left off with a closed branch */
   readonly padsDropped: number
   readonly boxesDropped: number
@@ -190,6 +207,33 @@ export interface Reversed {
   readonly notes: ReverseNotes
 }
 
+/** The road point nearest (x, z) (a plain search: the track is not parsed yet) */
+function nearestIndex(road: readonly RoadPoint[], x: number, z: number): number {
+  let best = 0
+  let least = Infinity
+  road.forEach((point, index) => {
+    const distance = (point.x - x) ** 2 + (point.z - z) ** 2
+    if (distance < least) {
+      least = distance
+      best = index
+    }
+  })
+  return best
+}
+
+/** Whether a wall of the original is a fence across a lane flown into from a lip (FENCE_TOP) */
+export function closesFlownLane(json: TrackJson, wall: Wall): boolean {
+  if (wall.top === undefined || wall.base !== undefined) return false
+  const { road } = json
+  const count = road.length
+  const ends = [nearestIndex(road, wall.ax, wall.az), nearestIndex(road, wall.bx, wall.bz)]
+  const y = Math.max(...ends.map((index) => road[index]!.y ?? 0))
+  if (wall.top - y > FENCE_TOP) return false
+  const first = Math.min(...ends)
+  if (!(json.jumps ?? []).some((lip) => (first - lip + count) % count <= FENCE_AFTER)) return false
+  return Math.max(roadDepth(road, true, wall.ax, wall.az), roadDepth(road, true, wall.bx, wall.bz)) > FENCE_INTO
+}
+
 /** The track driven the other way round (see the top of this file) */
 export function reverseTrack(json: TrackJson): Reversed {
   const base = json.road
@@ -271,6 +315,9 @@ export function reverseTrack(json: TrackJson): Reversed {
       : { ...one, at, a: -one.a, b: -one.b }
   })
 
+  // A fence across a lane flown into: a dead end the other way round, left out
+  const walls = json.walls.filter((wall) => !closesFlownLane(json, wall))
+
   const track: TrackJson = {
     format: json.format,
     id: reverseId(json.id),
@@ -283,7 +330,7 @@ export function reverseTrack(json: TrackJson): Reversed {
     respawns,
     grid,
     solo,
-    walls: json.walls,
+    walls,
     boostPads,
     itemBoxes,
     decor: json.decor,
@@ -298,6 +345,7 @@ export function reverseTrack(json: TrackJson): Reversed {
       jumpsRemoved,
       branchesKept: branches.length,
       branchesClosed,
+      fencesOpened: json.walls.length - walls.length,
       padsDropped: json.boostPads.length - boostPads.length,
       boxesDropped: json.itemBoxes.length - itemBoxes.length,
     },

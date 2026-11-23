@@ -16,8 +16,10 @@ import { loadQuality, QUALITIES, saveQuality, type Quality } from '../quality.ts
 import {
   EFFECTS_LEVELS,
   loadSettings,
+  OPENING_SHOWS,
   saveSettings,
   subscribeSettings,
+  type OpeningShow,
   type RaceSettings,
 } from '../settings.ts'
 import { loadCoachOn, saveCoachOn } from '../school/store.ts'
@@ -91,25 +93,21 @@ export function SettingsPanel({ t, onControls, onQuality }: SettingsPanelProps) 
         <Small>{t('kart.flow.settings.qualityNote')}</Small>
       </Group>
       <Group>
-        <legend>{t('kart.flow.settings.opening')}</legend>
-        <Check>
-          <input
-            type="checkbox"
-            checked={settings.driverIntro}
-            onChange={(event) => change({ driverIntro: event.target.checked })}
-            data-testid="kart-settings-driver-intro"
-          />
-          {t('kart.flow.settings.driverIntro')}
-        </Check>
-        <Check>
-          <input
-            type="checkbox"
-            checked={settings.flyby}
-            onChange={(event) => change({ flyby: event.target.checked })}
-            data-testid="kart-settings-flyby"
-          />
-          {t('kart.flow.settings.flyby')}
-        </Check>
+        <legend>{t('kart.flow.settings.raceGroup')}</legend>
+        <Row>
+          <span>{t('kart.flow.settings.opening')}</span>
+          <select
+            value={settings.opening}
+            onChange={(event) => change({ opening: event.target.value as OpeningShow })}
+            data-testid="kart-settings-opening"
+          >
+            {OPENING_SHOWS.map((one) => (
+              <option key={one} value={one}>
+                {t(one === 'group' ? 'kart.flow.settings.openingGroup' : 'kart.flow.settings.openingOff')}
+              </option>
+            ))}
+          </select>
+        </Row>
         <Check>
           <input
             type="checkbox"

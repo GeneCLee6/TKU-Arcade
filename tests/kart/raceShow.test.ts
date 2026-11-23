@@ -16,7 +16,6 @@ import {
   INTRO_FROM,
   INTRO_TO,
   inIntro,
-  introShot,
 } from '../../src/kart/director.ts'
 import { CONFETTI_MS, confettiPieces } from '../../src/kart/ui/confettiPieces.ts'
 import { useFinishHold } from '../../src/kart/race/useFinishHold.ts'
@@ -27,38 +26,24 @@ import { kartFestival } from '../../src/styles/kartTokens.ts'
 
 const track = raceTrack('riverside') as Track
 const spots = Array.from({ length: 8 }, (_, slot) => gridSpot(track, slot))
-const close = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
-  Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
 
-describe('the fly round before the countdown', () => {
+describe('the opening before the countdown', () => {
   it('fills the room countdown before the 3, 2, 1', () => {
-    // 2026-11-22 (§4.73): the opening grows with the field; INTRO_FROM is a full grid's
-    expect(introMs(8)).toBeGreaterThanOrEqual(2_000)
+    // 2026-11-23: one group shot, the same length for any field (raceFlow.test.ts)
+    expect(introMs(8)).toBeGreaterThanOrEqual(1_000)
     expect(INTRO_FROM).toBeCloseTo(countdownMs(8) / 1000, 9)
     expect(INTRO_TO).toBe(3)
-    expect(inIntro(5)).toBe(true)
+    expect(inIntro(4)).toBe(true)
     expect(inIntro(2.9)).toBe(false)
     expect(inIntro(null)).toBe(false)
   })
 
-  it('starts ahead of the grid, goes round, and ends on the grid shot for the 3', () => {
+  it('cuts at the 3 to the grid shot from behind, which then glides down', () => {
     const grid = gridShot(spots)!
     const pole = spots[0]!
     const ahead = { x: Math.sin(pole.heading), z: -Math.cos(pole.heading) }
-    const first = introShot(spots, INTRO_FROM)!
-    // In front of the pole, looking back at the karts
-    expect((first.eye.x - pole.x) * ahead.x + (first.eye.z - pole.z) * ahead.z).toBeGreaterThan(5)
-    const last = introShot(spots, INTRO_TO + 1e-6)!
-    expect(close(last.eye, grid.eye)).toBeLessThan(0.05)
-    expect(close(last.target, grid.target)).toBeLessThan(0.05)
-    // No jumps on the way: frame to frame at 60 fps it moves little
-    let before = first
-    for (let left = INTRO_FROM; left > INTRO_TO; left -= 1 / 60) {
-      const shot = introShot(spots, left)!
-      expect(close(shot.eye, before.eye)).toBeLessThan(2)
-      before = shot
-    }
-    expect(introShot(spots, INTRO_TO)).toBeNull()
+    // Behind the pole, the whole grid ahead of it
+    expect((grid.eye.x - pole.x) * ahead.x + (grid.eye.z - pole.z) * ahead.z).toBeLessThan(0)
   })
 })
 

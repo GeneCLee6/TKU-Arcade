@@ -9,7 +9,7 @@
 // 2026-11-20 (§4.46): through the kart's one AudioContext (audio/bus.ts), into its effects bus, so
 // that the effects volume sets it apart from the music.
 import { isSoundOn } from '../lib/sound.ts'
-import { refreshKartBus, unlockKartAudio } from './audio/bus.ts'
+import { madeKartBus, refreshKartBus, unlockKartAudio } from './audio/bus.ts'
 import { audioTier, voiceBudget, type AudioTier } from './audio/tiers.ts'
 import type { Quality } from './quality.ts'
 import { squealVoice } from './feelFx.ts'
@@ -288,6 +288,7 @@ export function createKartAudio(options: KartAudioOptions = {}): KartAudio {
     noise: AudioBuffer
   } | null = null
   let wasBoosting = false
+  let disposed = false
   /** When the last announced burst sounded, on the audio clock */
   let lastBurst = -Infinity
   const burstAt = (now: number) => now - lastBurst < 0.25
@@ -524,11 +525,20 @@ export function createKartAudio(options: KartAudioOptions = {}): KartAudio {
   return {
     unlock() {
       const bus = unlockKartAudio()
-      if (!bus || audio) return
+      if (!bus || audio || disposed) return
       audio = bus.context
       build(audio, bus.effects, bus.noise)
     },
     update(sound) {
+      // 2026-11-23 (audio/unlock.ts): the context made elsewhere (the waiting room's click, the race
+      // screen's tap) is built on at once, not at this race's own first key
+      if (!audio && !disposed) {
+        const bus = madeKartBus()
+        if (bus) {
+          audio = bus.context
+          build(audio, bus.effects, bus.noise)
+        }
+      }
       if (!audio || !nodes) return
       // On a lower quality the parameters move every few frames (audio/tiers.ts): they glide anyway
       frames = (frames + 1) % tier.updateEvery
@@ -598,6 +608,7 @@ export function createKartAudio(options: KartAudioOptions = {}): KartAudio {
       playVoices(audio, nodes.master, nodes.noise, voices, volume)
     },
     dispose() {
+      disposed = true
       const master = nodes?.master
       const sources = running
       running = []

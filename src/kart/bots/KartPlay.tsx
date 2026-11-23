@@ -12,6 +12,7 @@ import { resumeCup, type CupRun } from '../cup/cupRun.ts'
 import { loadCupRun, saveCupRun } from '../cup/store.ts'
 import type { BotSetup } from './setup.ts'
 import type { BoardChase } from '../board/chase.ts'
+import { useKartAudioUnlock } from '../audio/unlock.ts'
 
 const BotRaceView = lazy(() => import('./BotRaceView.tsx'))
 const CupView = lazy(() => import('../cup/CupView.tsx'))
@@ -70,6 +71,9 @@ function useBotsAsked(): boolean {
 
 export function KartPlay() {
   const t = useT()
+  // 2026-11-23 (audio/unlock.ts): every click on /kart's menus wakes the kart's sound, so that a race
+  // started from them has it from its first frame
+  useKartAudioUnlock()
   const [playing, setPlaying] = useState<Playing>(resumed)
   const openBots = useBotsAsked()
   // The school is in the address, so that a reload stays in it

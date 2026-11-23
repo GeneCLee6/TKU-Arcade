@@ -229,6 +229,19 @@ export default function SpectateView({ view, realtime, nameOf, onClose }: Specta
                     target: event.targets[0]!,
                     at: (event.at - goAt) / 1000,
                   })),
+                // 2026-11-23: the items in flight, for the hits the director foresees
+                shots: (room.shots ?? [])
+                  .filter((shot) => shotLive(shot, clock.now()))
+                  .map((shot) => ({
+                    n: shot.n,
+                    by: shot.by,
+                    target: shot.target,
+                    ...shotPosition(
+                      shot,
+                      clock.now(),
+                      shot.target === null ? null : (karts.find((kart) => kart.id === shot.target) ?? null),
+                    ),
+                  })),
               },
               seconds,
               () => scene.cameraPose(),

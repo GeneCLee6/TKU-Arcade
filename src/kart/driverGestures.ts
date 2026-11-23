@@ -7,10 +7,18 @@
 // 2026-11-23 (§4.86, driverRig.ts): the driver has elbows and hands now, so a pose can bend an arm
 // (a flexed arm, hands meeting over the helmet), tilt the head, turn the torso and show a V; and the
 // wait on the grid and the win across the line are each driver's own (`GestureStyle`).
+//
+// 2026-11-23 (§4.91, driverLimbs.ts): and legs and fingers. A pose moves the pelvis (the weight over
+// one foot, a squat), steps, lifts a foot (a kick, a jump's tuck) and widens the stance; and says
+// what each hand shows when it is off the wheel (a fist, open, pointing, a thumb up, a V). Standing in
+// the race room the drivers have their own wait (`stand`: the weight from one foot to the other, now
+// and then a change of feet) and get ready (`ready`: on the balls of the feet, a thumb up); their win
+// jumps, steps or squats as each one does, seated (the podium) or standing.
+import type { HandShape } from './driverLimbs.ts'
 
 // 2026-11-22 (§4.73): and on the podium after a race, the winner lifts the trophy high (the podium's
 // stage puts the cup in the hands)
-export type DriverGesture = 'idle' | 'wave' | 'pump' | 'cheer' | 'podium' | 'trophy'
+export type DriverGesture = 'idle' | 'wave' | 'pump' | 'cheer' | 'podium' | 'trophy' | 'stand' | 'ready'
 
 /** A fist in the air this long after a place gained, s */
 export const PUMP_SECONDS = 1.3
@@ -59,6 +67,21 @@ export interface GesturePose {
   readonly twist: number
   /** 2026-11-23: the right hand shows two fingers (a V), 0 to 1: shown from a half */
   readonly vSign: number
+  /**
+   * 2026-11-23 (§4.91, driverLimbs.ts's LegPose): the legs. The pelvis over the right foot (+x,
+   * metres) or lower (a squat); each foot forward and lifted; the feet further apart. Standing, the
+   * bounce lifts the pelvis (taken in the knees, or a jump); seated, the torso
+   */
+  readonly hipShift: number
+  readonly hipDrop: number
+  readonly leftStep: number
+  readonly rightStep: number
+  readonly leftLift: number
+  readonly rightLift: number
+  readonly stance: number
+  /** What each hand shows off the wheel (driverLimbs.ts); left out, a fist seated, at ease standing */
+  readonly leftHand?: HandShape
+  readonly rightHand?: HandShape
 }
 
 export const REST: GesturePose = {
@@ -75,6 +98,13 @@ export const REST: GesturePose = {
   bounce: 0,
   twist: 0,
   vSign: 0,
+  hipShift: 0,
+  hipDrop: 0,
+  leftStep: 0,
+  rightStep: 0,
+  leftLift: 0,
+  rightLift: 0,
+  stance: 0,
 }
 
 /**
@@ -105,6 +135,7 @@ function idleOf(style: GestureStyle | undefined, t: number, phase: number): Gest
         leftOut: visor * 0.1,
         leftBend: visor * 0.25,
         bounce: Math.sin(t * 1.4 + phase) * 0.004,
+        leftHand: 'open',
       }
     }
     case 'heart': {
@@ -146,6 +177,7 @@ function idleOf(style: GestureStyle | undefined, t: number, phase: number): Gest
         leftUp: stretch * 0.26,
         leftOut: stretch * 0.15,
         bounce: Math.abs(Math.sin(roll * 2)) * 0.006,
+        leftHand: 'open',
       }
     }
     default: {
@@ -177,6 +209,11 @@ function cheerOf(style: GestureStyle | undefined, t: number, phase: number): Ges
         headTurn: 0.12 * rise,
         torsoBack: 0.08 * rise,
         twist: 0.1 * rise,
+        // A step forward onto the left foot, the weight on it
+        leftStep: 0.16 * rise,
+        hipShift: -0.03 * rise,
+        rightHand: 'fist',
+        leftHand: 'point',
       }
     }
     case 'heart': {
@@ -195,7 +232,12 @@ function cheerOf(style: GestureStyle | undefined, t: number, phase: number): Ges
         headUp: 0.2 * rise,
         torsoBack: 0.1 * rise,
         twist: sway * 0.05 * rise,
-        bounce: Math.abs(sway) * 0.025 * rise,
+        // Jumping: up off the ground in time with the sway, the feet tucked under
+        bounce: Math.abs(sway) * 0.1 * rise,
+        leftLift: Math.abs(sway) * 0.05 * rise,
+        rightLift: Math.abs(sway) * 0.05 * rise,
+        leftHand: 'open',
+        rightHand: 'open',
       }
     }
     case 'diamond': {
@@ -212,6 +254,12 @@ function cheerOf(style: GestureStyle | undefined, t: number, phase: number): Ges
         headUp: 0.12 * rise,
         torsoBack: 0.06 * rise,
         vSign: rise,
+        // The weight on the left foot, the right heel kicked up behind
+        hipShift: -0.035 * rise,
+        rightLift: (0.12 + wag * 0.3) * rise,
+        rightStep: -0.12 * rise,
+        rightHand: 'vee',
+        leftHand: 'relax',
       }
     }
     case 'club': {
@@ -229,6 +277,11 @@ function cheerOf(style: GestureStyle | undefined, t: number, phase: number): Ges
         headUp: (0.28 + pump * 0.08) * rise,
         torsoBack: 0.12 * rise,
         bounce: pump * 0.05 * rise,
+        // A wide, strong stance, sinking into it with each flex
+        stance: 0.12 * rise,
+        hipDrop: (0.05 + pump * 0.04) * rise,
+        leftHand: 'fist',
+        rightHand: 'fist',
       }
     }
     default: {
@@ -244,9 +297,122 @@ function cheerOf(style: GestureStyle | undefined, t: number, phase: number): Ges
         headTurn: Math.sin(t * 2 + phase) * 0.2 * rise,
         headUp: 0.3 * rise,
         torsoBack: 0.15 * rise,
-        bounce: Math.abs(Math.sin(t * 5.5 + phase)) * 0.05 * rise,
+        bounce: Math.abs(Math.sin(t * 5.5 + phase)) * 0.08 * rise,
+        leftLift: Math.abs(Math.sin(t * 5.5 + phase)) * 0.04 * rise,
+        rightLift: Math.abs(Math.sin(t * 5.5 + phase)) * 0.04 * rise,
+        leftHand: 'fist',
+        rightHand: 'fist',
       }
     }
+  }
+}
+
+/**
+ * 2026-11-23 (§4.91): standing in the race room. The weight on one foot, then over to the other every
+ * few seconds, the free foot a little forward and lifted as it changes; a breath; and each driver's
+ * own: Spade barely moves, Hartie bobs to a beat on her heels, Dee checks the read-out on a wrist,
+ * Clover stretches (an arm overhead, a heel pulled up behind). Arms hang at the sides at rest (an arm
+ * hanging by the side goes out with a negative `out`)
+ */
+function standOf(style: GestureStyle | undefined, t: number, phase: number): GesturePose {
+  const calm = style === 'spade' ? 0.6 : 1
+  // Which foot the weight is on: a smooth step from one to the other, -1 the left, 1 the right
+  const wave = Math.sin(t * 0.7 + phase)
+  const weight = Math.tanh(wave * 4)
+  const changing = (1 - weight * weight) * 0.035
+  const moving = Math.cos(t * 0.7 + phase)
+  const base: GesturePose = {
+    ...REST,
+    hipShift: weight * 0.04 * calm,
+    leftStep: Math.max(0, weight) * 0.06 * calm,
+    rightStep: Math.max(0, -weight) * 0.06 * calm,
+    leftLift: moving > 0 ? changing : 0,
+    rightLift: moving < 0 ? changing : 0,
+    twist: -weight * 0.05 * calm,
+    headTurn: Math.sin(t * 0.4 + phase * 1.3) * 0.3 * calm,
+    headTilt: weight * 0.05,
+    bounce: Math.sin(t * 1.5 + phase) * 0.004,
+    leftUp: Math.sin(t * 0.7 + phase) * 0.05,
+    rightUp: -Math.sin(t * 0.7 + phase) * 0.05,
+    leftHand: 'relax',
+    rightHand: 'relax',
+  }
+  switch (style) {
+    case 'heart': {
+      // A beat: up on the toes and down, the head bobbing, the hands swinging to it
+      const beat = t * 4.2 + phase
+      return {
+        ...base,
+        bounce: Math.abs(Math.sin(beat)) * 0.02,
+        headUp: 0.04 + Math.abs(Math.sin(beat)) * 0.08,
+        headTilt: Math.sin(beat / 2) * 0.14,
+        leftUp: Math.sin(beat / 2) * 0.3,
+        rightUp: -Math.sin(beat / 2) * 0.3,
+        leftBend: 0.3,
+        rightBend: 0.3,
+      }
+    }
+    case 'diamond': {
+      // Now and then the left forearm up in front, the head down to the read-out on the wrist
+      const look = Math.max(0, Math.sin(t * 0.45 + phase) - 0.3) / 0.7
+      return {
+        ...base,
+        leftUp: 0.55 * look,
+        leftOut: 0.25 * look,
+        leftBend: 1.55 * look,
+        headUp: -0.32 * look + 0.03,
+        headTurn: base.headTurn * (1 - look) + 0.25 * look,
+        leftHand: look > 0.5 ? 'fist' : 'relax',
+      }
+    }
+    case 'club': {
+      // Loosening up: both arms overhead now and then; between, a heel pulled up behind
+      const reach = Math.max(0, Math.sin(t * 0.5 + phase) - 0.5) / 0.5
+      const heel = Math.max(0, Math.sin(t * 0.5 + phase + Math.PI) - 0.6) / 0.4
+      return {
+        ...base,
+        leftUp: base.leftUp + 2.9 * reach,
+        rightUp: base.rightUp + 2.9 * reach,
+        leftOut: -0.1 * reach,
+        rightOut: -0.1 * reach,
+        torsoBack: 0.08 * reach,
+        headUp: 0.15 * reach,
+        hipShift: base.hipShift * (1 - heel) - 0.04 * heel,
+        rightLift: base.rightLift + 0.3 * heel,
+        rightStep: base.rightStep * (1 - heel) - 0.22 * heel,
+        rightBend: 0.4 * heel,
+        leftHand: reach > 0.3 ? 'open' : 'relax',
+        rightHand: reach > 0.3 ? 'open' : 'relax',
+      }
+    }
+    default:
+      return base
+  }
+}
+
+/**
+ * 2026-11-23 (§4.91): ready, standing: on the balls of the feet, bouncing, shifting from foot to
+ * foot like a fighter; a thumb up held out in front; the head nodding
+ */
+function readyOf(t: number, phase: number): GesturePose {
+  const rise = riseOf(t, 0.35)
+  const hop = t * 5 + phase
+  return {
+    ...REST,
+    bounce: (0.012 + Math.abs(Math.sin(hop)) * 0.03) * rise,
+    hipShift: Math.sin(hop / 2) * 0.02 * rise,
+    leftLift: Math.max(0, Math.sin(hop / 2)) * 0.03 * rise,
+    rightLift: Math.max(0, -Math.sin(hop / 2)) * 0.03 * rise,
+    stance: 0.03 * rise,
+    rightUp: 1.15 * rise,
+    rightOut: -0.15 * rise,
+    rightBend: 0.95 * rise,
+    leftUp: (0.35 + Math.sin(hop) * 0.08) * rise,
+    leftBend: 1.2 * rise,
+    headUp: (0.06 + Math.abs(Math.sin(hop / 2)) * 0.06) * rise,
+    twist: Math.sin(hop / 2) * 0.05 * rise,
+    rightHand: 'thumb',
+    leftHand: 'fist',
   }
 }
 
@@ -265,6 +431,10 @@ export function gesturePose(
   switch (gesture) {
     case 'idle':
       return idleOf(style, t, phase)
+    case 'stand':
+      return standOf(style, t, phase)
+    case 'ready':
+      return readyOf(t, phase)
     case 'wave': {
       // The right arm up and waving, the head turned out to the crowd
       const wave = Math.sin(t * 8 + phase)
@@ -278,6 +448,7 @@ export function gesturePose(
         headTilt: wave * 0.05,
         torsoBack: 0.05,
         twist: -0.06,
+        rightHand: 'open',
       }
     }
     case 'pump': {
@@ -291,6 +462,7 @@ export function gesturePose(
         headUp: 0.15 * rise,
         torsoBack: 0.08 * rise,
         twist: -0.08 * rise,
+        rightHand: 'fist',
       }
     }
     case 'cheer':
@@ -310,6 +482,11 @@ export function gesturePose(
         torsoBack: 0.12,
         twist: left * 0.05,
         bounce: Math.abs(Math.sin(t * 3)) * 0.03,
+        // Knees bouncing in the seat in turn
+        leftLift: Math.max(0, left) * 0.06,
+        rightLift: Math.max(0, -left) * 0.06,
+        leftHand: 'open',
+        rightHand: 'open',
       }
     }
     case 'trophy': {
@@ -326,6 +503,11 @@ export function gesturePose(
         headUp: 0.35 * rise,
         torsoBack: 0.1 * rise,
         bounce: lift * 0.25 * rise,
+        leftLift: lift * 0.3 * rise,
+        rightLift: lift * 0.3 * rise,
+        // Round the cup's stem
+        leftHand: 'grip',
+        rightHand: 'grip',
       }
     }
   }
@@ -348,5 +530,22 @@ export function blendPose(from: GesturePose, to: GesturePose, share: number): Ge
     bounce: mix(from.bounce, to.bounce),
     twist: mix(from.twist, to.twist),
     vSign: mix(from.vSign, to.vSign),
+    hipShift: mix(from.hipShift, to.hipShift),
+    hipDrop: mix(from.hipDrop, to.hipDrop),
+    leftStep: mix(from.leftStep, to.leftStep),
+    rightStep: mix(from.rightStep, to.rightStep),
+    leftLift: mix(from.leftLift, to.leftLift),
+    rightLift: mix(from.rightLift, to.rightLift),
+    stance: mix(from.stance, to.stance),
+    // The fingers do not ease: the shape asked for, as soon as it is asked (the arm eases up to show it)
+    ...handsOf(share > 0 ? to : from),
+  }
+}
+
+/** A pose's hand shapes, as an object to spread (none where it says none) */
+function handsOf(pose: GesturePose): Pick<GesturePose, 'leftHand' | 'rightHand'> {
+  return {
+    ...(pose.leftHand ? { leftHand: pose.leftHand } : {}),
+    ...(pose.rightHand ? { rightHand: pose.rightHand } : {}),
   }
 }
