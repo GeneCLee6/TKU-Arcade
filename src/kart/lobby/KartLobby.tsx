@@ -19,7 +19,8 @@
 //     series, tier, a computer's level, team, the host's crown and, big, whether they are ready.
 //   - The side rail: the track (TrackCard.tsx), the garage, and the big Ready (or, for the host,
 //     Start, which waits on everyone and says for whom).
-//   - A phone held upright gets a list instead, and is asked to turn sideways.
+//   - A phone held upright gets a list instead, and is asked to turn sideways. 2026-11-23 (§4.91): with
+//     a big 3D picture of your own racer (or the first in the line) over it.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import styled, { css, keyframes } from 'styled-components'
 import type { ChatMessage } from '../../../shared/chat.ts'
@@ -61,6 +62,9 @@ import { broadcast, broadcastSolid, cutClip, slam, ticker } from '../ui/broadcas
 import { KartArt } from './KartArt.tsx'
 import { LobbyBackdrop } from './LobbyBackdrop.tsx'
 import type { LobbyStage } from './lobbyStage.ts'
+
+/** lobbyStage.ts's HERO (imported as a type only: the stage's chunk comes later, with three.js) */
+const HERO_SLOT = 8
 import { seatState, waitingOn } from './readiness.ts'
 import { raceTrackId, useLobbyTrack } from './lobbyTrack.ts'
 import { TrackCard } from './TrackCard.tsx'
@@ -377,6 +381,8 @@ export default function KartLobby({
             </Watchers>
           )}
         </Rail>
+        {/* Upright only (first, the body being upright in reverse): the big picture of your racer */}
+        <HeroPicture stage={stage} member={myPick ? me ?? null : (seated.find((one) => parseLook(one.look)) ?? null)} />
       </Body>
 
       <Sideways>{t('games.kart.lobby.sideways')}</Sideways>
@@ -522,6 +528,43 @@ function usePicture(stage: LobbyStage | null, seat: number, member: RoomMember |
   return canvas
 }
 
+/**
+ * 2026-11-23 (§4.91): a phone held upright: your own racer (or the first in the line) big over the
+ * list, in live 3D like a card's (lobbyStage.ts's HERO), the flat drawing without WebGL
+ */
+function HeroPicture({ stage, member }: { stage: LobbyStage | null; member: RoomMember | null }) {
+  const t = useT()
+  const canvas = usePicture(stage, HERO_SLOT, member)
+  const pick = parseLook(member?.look)
+  if (!member || !pick) return null
+  const name = memberName(member, 'kart')
+  return (
+    <Hero $swatch={kartBodies[pick.kart].accent} data-testid="kart-lobby-hero">
+      {stage === null && (
+        <HeroFlat data-flat="">
+          <KartArt kart={pick.kart} driver={pick.driver} />
+        </HeroFlat>
+      )}
+      <canvas
+        ref={canvas}
+        role="img"
+        aria-label={t('games.kart.lobby.card', {
+          name,
+          kart: t(`kart.body.${pick.kart}`),
+          driver: t(`kart.driver.${pick.driver}`),
+          state: seatState(member) === 'ready' ? t('games.kart.lobby.ready') : t('games.kart.lobby.notReady'),
+        })}
+      />
+      <HeroName aria-hidden="true">
+        <strong>{name}</strong>
+        <span>
+          {t(`kart.body.${pick.kart}`)} · {t(`kart.driver.${pick.driver}`)}
+        </span>
+      </HeroName>
+    </Hero>
+  )
+}
+
 interface PlaceCardProps {
   seat: number
   member: RoomMember
@@ -558,7 +601,7 @@ function PlaceCard({ seat, member, isYou, viewerIsHost, team, stage, onManage }:
       data-state={state}
       data-testid="kart-lobby-place"
     >
-      <Picture $swatch={swatch} $seat={seat}>
+      <Picture $swatch={swatch}>
         {pick && (
           <Flat $shown={stage === null} data-flat="">
             <KartArt kart={pick.kart} driver={pick.driver} />
@@ -1034,21 +1077,10 @@ const Place = styled.li<{ $state: PlaceState; $swatch: string }>`
   }
 `
 
-/**
- * 2026-11-23 (#151): a phone draws each picture once (lobbyStage.ts); the card sways it a little,
- * each card at its own point of the sway, which costs the compositor nothing
- */
-const idleSway = keyframes`
-  0%, 100% { transform: translateY(0) rotate(-0.7deg) scale(1); }
-  50% { transform: translateY(-1.6%) rotate(0.7deg) scale(1.02); }
-`
-const SWAYED = [
-  '(prefers-reduced-motion: no-preference) and (pointer: coarse)',
-  '(prefers-reduced-motion: no-preference) and (max-width: 499px)',
-  '(prefers-reduced-motion: no-preference) and (max-height: 499px)',
-].join(', ')
+// 2026-11-23 (§4.91): a phone draws its pictures live again (lobbyStage.ts), so the CSS sway that
+// stood in for the motion (#151) is gone
 
-const Picture = styled.div<{ $swatch: string; $seat?: number }>`
+const Picture = styled.div<{ $swatch: string }>`
   position: relative;
   min-height: 0;
   background: radial-gradient(
@@ -1065,19 +1097,68 @@ const Picture = styled.div<{ $swatch: string; $seat?: number }>`
     height: 100%;
   }
 
-  @media ${SWAYED} {
-    canvas {
-      transform-origin: 50% 92%;
-      animation: ${idleSway} 5.6s ease-in-out infinite;
-      animation-delay: ${({ $seat = 0 }) => -($seat * 0.9).toFixed(1)}s;
-      will-change: transform;
-    }
-  }
-
   @media ${UPRIGHT} {
     canvas {
       display: none;
     }
+  }
+`
+
+/** 2026-11-23 (§4.91): the big picture over the list, upright only */
+const Hero = styled.div<{ $swatch: string }>`
+  display: none;
+
+  @media ${UPRIGHT} {
+    position: relative;
+    display: block;
+    height: min(62vw, 300px);
+    background: radial-gradient(
+      ellipse at 50% 86%,
+      color-mix(in srgb, ${({ $swatch }) => $swatch} 50%, transparent),
+      transparent 64%
+    );
+    clip-path: ${cutClip(14)};
+    box-shadow: inset 0 0 0 1px ${color.line};
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  }
+`
+
+const HeroFlat = styled.div`
+  position: absolute;
+  inset: 12% 14% 6%;
+
+  svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+`
+
+const HeroName = styled.p`
+  position: absolute;
+  left: ${space.md}px;
+  bottom: ${space.sm}px;
+  display: grid;
+  margin: 0;
+  pointer-events: none;
+  text-shadow: 0 1px 6px ${color.bg};
+
+  strong {
+    ${displayType}
+    font-size: ${fontSize.lg}px;
+    text-transform: uppercase;
+  }
+
+  span {
+    color: ${color.muted};
+    font-size: ${fontSize.sm}px;
   }
 `
 

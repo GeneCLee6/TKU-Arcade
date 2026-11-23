@@ -21,6 +21,7 @@ import {
   LatheGeometry,
   Matrix4,
   Mesh,
+  SkinnedMesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
   PMREMGenerator,
@@ -36,6 +37,7 @@ import {
   type WebGLRenderer,
 } from 'three'
 import { DETAIL_BUMP } from './bodyDetail.ts'
+import { bakeSkinned } from './driverSkin.ts'
 import { kartParts } from '../../styles/kartTokens.ts'
 
 // ── The environment the paint reflects ──────────────────────────────────────────────────────────
@@ -626,7 +628,9 @@ export function mergeTree(
     if (Array.isArray(mesh.material)) continue
     const own = material ?? (mesh.material as Material)
     const source = mesh.geometry
-    const piece = source.index ? source.toNonIndexed() : source.clone()
+    // 2026-11-23 (§4.91): a skinned limb as its bones hold it now (driverSkin.ts)
+    const piece =
+      mesh instanceof SkinnedMesh ? bakeSkinned(mesh) : source.index ? source.toNonIndexed() : source.clone()
     if (material) for (const name of Object.keys(piece.attributes)) if (name !== 'position') piece.deleteAttribute(name)
     piece.applyMatrix4(relative.multiplyMatrices(toRoot, mesh.matrixWorld))
     const list = byMaterial.get(own)
@@ -752,6 +756,11 @@ export type DecalFace = 'up' | 'left' | 'right' | 'back'
 /** What kartModel.ts lends a body (kartBodies.ts) and the driver to build with */
 export interface BodyKit {
   readonly paint: BodyPaint
+  /**
+   * 2026-11-23 (§4.91): every paint of a part drawn as one (createPaintMaterial), for what is merged
+   * outside `flatten` (the driver's skinned limbs, driverSkin.ts); none on a ghost
+   */
+  readonly allPaint?: Material
   /** A mesh at a place, added to `parent`; turn or scale it afterwards as needed */
   put(
     parent: Object3D,
