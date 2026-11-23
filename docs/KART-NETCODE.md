@@ -221,7 +221,8 @@
 不用帳號、不經伺服器：重播存成檔案，或小到可以時直接塞進連結的 hash（hash 不會送到伺服器）。
 
 - **哪裡有**：房間比賽與電腦車比賽（2026-11-20 起電腦車比賽也錄，`BotRaceView` 用同一個 `useRaceRecorder`）的結果畫面、重播畫面的控制列：「**下載重播**」（`tku-kart-<賽道>-<年月日-時分>.tkureplay`）；檔案夠小時多一個「**複製重播連結**」。`/kart` 左上角「**開啟重播檔**」→ `/kart/replay`：選檔或把檔案拖進頁面；分享連結也開在這裡（`/kart/replay#r=…`）。房間首屏的按鈕是 lazy chunk（`ReplayShare.tsx`，約 1.5 kB），不吃首屏預算。
-- **格式**（`shared/kart/replayFile.ts`）：`TKUR`、檔案版本（1）、旗標（bit 0：其餘用 deflate-raw 壓縮），其餘＝u32 標頭長度＋標頭 JSON（`revision`：錄的時候賽道的 `revision`；`names`：每個座位的名字；`you`：存檔的人的座位；`savedAt`）＋ `encodeReplay` 的整包。賽道 id 本來就在包裡（自訂賽道是 `custom:<代碼>`，代碼本身就是整條賽道）；車款與車手在每台車的絕對樣本的車身 byte；道具在 `events`／`held`／`shots`。deflate 後約是原本的一半（實測：電腦車道具賽 1 圈 2 台約 70 秒，**10.9 kB**；8 台 3 圈約 3 分鐘估計 100–120 kB）。
+- **格式**（`shared/kart/replayFile.ts`）：`TKUR`、檔案版本（1）、旗標（bit 0：其餘用 deflate-raw 壓縮），其餘＝u32 標頭長度＋標頭 JSON（`revision`：錄的時候賽道的 `revision`；`names`：每個座位的名字；`you`：存檔的人的座位；`savedAt`；2026-11-23 起選用的 `outfits`，見下）＋ `encodeReplay` 的整包。賽道 id 本來就在包裡（自訂賽道是 `custom:<代碼>`，代碼本身就是整條賽道）；車款與車手在每台車的絕對樣本的車身 byte；道具在 `events`／`held`／`shots`。deflate 後約是原本的一半（實測：電腦車道具賽 1 圈 2 台約 70 秒，**10.9 kB**；8 台 3 圈約 3 分鐘估計 100–120 kB）。
+- **服裝**（2026-11-23，`ARCHITECTURE.md` §4.97）：frame 的車 byte 已滿、放不下服裝，所以放在**檔頭**：選用的 `outfits: [{ seat, outfit }]`（`race`／`street`／`campus`，賽車服省略，沒人知道就整欄不寫）。檔案版本仍是 1：舊頁面只讀它認得的欄位，新檔照開、顯示賽車服；舊檔沒有這欄 → 賽車服。讀的時候逐筆驗證（座位整數 0–31、同一座位取第一筆、不認得的服裝丟掉、不是陣列當沒有、只留重播裡有的座位），**只丟這一欄的壞資料，不拒收檔案**（它只影響衣服）。房間比賽寫成員 `look` 的第三個字、對戰電腦寫自己的與電腦車手抽到的、排行榜上傳寫自己的。
 - **連結**：壓縮後的檔案 ≤ **3,000 bytes** 才給連結（base64url 約 4 kB 的網址，聊天軟體貼得下），照上面的大小大約是 2 台車 20 秒以內的短片段；一般一場比賽都比這大，所以**主要的分享方式是檔案**，連結只在夠小時才出現。要放寬就改 `LINK_MAX_BYTES`。
 - **不信任內容**：讀檔先看大小（> 2 MB 不讀）、magic、版本（較新的版本說「請重新整理」）、未知旗標；解壓時**邊解邊數**，超過 8 MB 立刻停（防壓縮炸彈）；標頭逐欄驗證（名字去掉控制字元、截 40 字；座位 0–31）；`decodeReplay` 用 `checkReplayMeta` 逐欄驗證 meta（每個陣列有上限、座位與 tick 是整數且在範圍內、道具 id 必須是已知的、`shots` 走 `isShot`），**只留下重播有的欄位**，多的丟掉；每台車的座位不能重複、包尾不能有多的 bytes；樣本本來就是讀到截斷就停（`decodeTape`）。名字只當文字顯示（React），不會被當 HTML。
 - **賽道改過**：開檔時拿檔案裡的 `revision` 跟現在的賽道比，不同就在重播畫面左上角顯示「這條賽道在比賽後改過路線，車子可能對不上路面」，照樣播；找不到賽道（未知 id、壞的自訂代碼）就不播，說「找不到這場重播用的賽道」。重新下載一個從檔案開的重播，保留原本的 `revision`。
@@ -255,7 +256,7 @@
 
 | 方向 | 格式 | 內容 |
 | --- | --- | --- |
-| 瀏覽器 → 房間 | JSON `{ t: 'set_look', look }` | 等待室裡（任何狀態都收）：`look` 是 `kart.driver`（例 `heron.club`），2026-11-23 起可加第三個字＝服裝（`kart.driver.outfit`，例 `heron.club.street`；賽車服省略，所以沒換服裝的人送的字串和以前一模一樣；舊頁面 `split('.')` 只讀前兩個字，照樣看得到車與車手；`LOOK_PATTERN` 放寬到一到三個字），null 拿掉。服裝**不放進 frame**：車 byte 已經用滿（5 bit 車＋3 bit 車手），服裝只在比賽前選、比賽中不會變，所以跟著成員資料走一次就夠，別人的車在比賽中照 `netRace.ts` 的 `lookOf(seat).outfit` 畫（重播與觀戰只看 frame，顯示賽車服）。房間只檢查格式，存在成員上，所有人的 `RoomMember.look` 都看得到 |
+| 瀏覽器 → 房間 | JSON `{ t: 'set_look', look }` | 等待室裡（任何狀態都收）：`look` 是 `kart.driver`（例 `heron.club`），2026-11-23 起可加第三個字＝服裝（`kart.driver.outfit`，例 `heron.club.street`；賽車服省略，所以沒換服裝的人送的字串和以前一模一樣；舊頁面 `split('.')` 只讀前兩個字，照樣看得到車與車手；`LOOK_PATTERN` 放寬到一到三個字），null 拿掉。服裝**不放進 frame**：車 byte 已經用滿（5 bit 車＋3 bit 車手），服裝只在比賽前選、比賽中不會變，所以跟著成員資料走一次就夠，別人的車在比賽中照 `netRace.ts` 的 `lookOf(seat).outfit` 畫；2026-11-23 起觀戰也照成員的 `look` 畫，重播照錄的那一頁知道的（成員的 `look`、電腦車抽到的）、重播檔照檔頭的 `outfits`（§11.4）。房間只檢查格式，存在成員上，所有人的 `RoomMember.look` 都看得到 |
 | 比賽中 | frame 第 2 個 byte | 車 index 5 bit ＋角色 index 3 bit（`shared/kart/karts.ts` 的 `loadoutByte`／`loadoutOfByte`；2026-11-19 起，位元配置見下）。別人的畫面照這個畫車與角色、照車款決定碰撞圓與質量；伺服器照這個決定速度上限 |
 
 - **車 byte 的位元（2026-11-19，`feat/kart-vehicle-roster`；frame 大小、其他欄位、協定版本都沒變）**：車款從 6 台變 17 台，原本「車 4 bit＋角色 4 bit」只裝得下 16 台。新配置：**bit 0–3＝車 index 的低 4 位、bit 4–6＝角色 index（最多 8 位）、bit 7＝車 index 的第 5 位（最多 32 台）**。

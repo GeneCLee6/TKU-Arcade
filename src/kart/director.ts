@@ -160,8 +160,30 @@ export interface OpeningLook {
 }
 
 /**
+ * 2026-11-23 (docs/ARCHITECTURE.md §4.97): where the group shot stands. `front` is the shot as it
+ * was; on a track where something stands between it and the grid (a building by the start, a wall,
+ * a landmark, a hill) the opening takes the first of the others that sees every kart
+ * (`pickGroupAngle`): higher up, from either front corner, from behind and high, from overhead
+ */
+export const GROUP_ANGLES = ['front', 'high', 'left', 'right', 'behind', 'top'] as const
+export type GroupAngle = (typeof GROUP_ANGLES)[number]
+
+/** Each angle: turned this far from dead ahead round the grid (radians), this high for each metre away, at least this high */
+export const GROUP_ANGLE_LOOK: {
+  readonly [A in GroupAngle]: { readonly turn: number; readonly rise: number; readonly low: number }
+} = {
+  front: { turn: 0, rise: GROUP_RISE, low: GROUP_LOW },
+  high: { turn: 0, rise: 0.85, low: 7 },
+  left: { turn: 0.85, rise: 0.5, low: 4 },
+  right: { turn: -0.85, rise: 0.5, low: 4 },
+  behind: { turn: Math.PI, rise: 0.6, low: 5 },
+  top: { turn: 0.2, rise: 1.7, low: 14 },
+}
+
+/**
  * The group shot, `share` (0 to 1) of the way through it: in front of the grid, looking back at it,
- * far enough for every kart on it to be on the screen; null without a grid
+ * far enough for every kart on it to be on the screen; null without a grid. `angle`: where it
+ * stands (`front` unless something is in the way)
  */
 export function groupShot(
   spots: readonly Spot[],
@@ -169,16 +191,23 @@ export function groupShot(
   y = 0,
   reducedMotion = false,
   halfAngle = GROUP_HALF_ANGLE,
+  angle: GroupAngle = 'front',
 ): CameraShot | null {
   const pole = spots[0]
   if (!pole) return null
-  const forward = forwardOf(pole.heading)
+  const { turn, rise, low } = GROUP_ANGLE_LOOK[angle]
+  const ahead0 = forwardOf(pole.heading)
+  // Turned round the grid's middle: `forward` points from the grid to the camera
+  const forward = {
+    x: ahead0.x * Math.cos(turn) - ahead0.z * Math.sin(turn),
+    z: ahead0.x * Math.sin(turn) + ahead0.z * Math.cos(turn),
+  }
   const side = { x: -forward.z, z: forward.x }
   const middle = {
     x: spots.reduce((sum, spot) => sum + spot.x, 0) / spots.length,
     z: spots.reduce((sum, spot) => sum + spot.z, 0) / spots.length,
   }
-  // Furthest across the road from the middle, and furthest ahead of it (the pole, nearest the camera)
+  // Furthest across the picture from the middle, and furthest towards the camera from it
   const across = Math.max(
     0,
     ...spots.map((spot) => Math.abs((spot.x - middle.x) * side.x + (spot.z - middle.z) * side.z)),
@@ -194,12 +223,74 @@ export function groupShot(
   return {
     eye: {
       x: middle.x + forward.x * away + side.x * drift,
-      y: y + Math.max(GROUP_LOW, away * GROUP_RISE),
+      y: y + Math.max(low, away * rise),
       z: middle.z + forward.z * away + side.z * drift,
     },
     target: { x: middle.x, y: y + 0.6, z: middle.z },
     blend: 1,
   }
+}
+
+/** Whether something solid stands on the straight line between two points (Scene.ts's `sightBlocked`) */
+export type SightBlocked = (from: Point3, to: Point3) => boolean
+
+/** Where on a kart the group shot must see: its driver's head, and either side of its body */
+export const SIGHT_HEAD = 1.15
+export const SIGHT_BODY = 0.45
+export const SIGHT_SIDE = 0.45
+/** How far through the push-in the shot is looked along */
+const SIGHT_SHARES = [0, 0.5, 1]
+
+/**
+ * How many of the karts on `spots` the group shot from `angle` cannot see at some point of it: a
+ * kart counts as seen when its driver's head and at least one side of its body are in clear sight
+ */
+export function groupShotHidden(
+  spots: readonly Spot[],
+  angle: GroupAngle,
+  blocked: SightBlocked,
+  y = 0,
+  halfAngle = GROUP_HALF_ANGLE,
+  reducedMotion = false,
+): number {
+  const hidden = new Set<number>()
+  for (const share of reducedMotion ? [0.5] : SIGHT_SHARES) {
+    const shot = groupShot(spots, share, y, reducedMotion, halfAngle, angle)
+    if (!shot) return 0
+    spots.forEach((spot, index) => {
+      if (hidden.has(index)) return
+      const side = { x: Math.cos(spot.heading), z: Math.sin(spot.heading) }
+      const head = { x: spot.x, y: y + SIGHT_HEAD, z: spot.z }
+      const body = [-1, 1].map((sign) => ({
+        x: spot.x + side.x * SIGHT_SIDE * sign,
+        y: y + SIGHT_BODY,
+        z: spot.z + side.z * SIGHT_SIDE * sign,
+      }))
+      if (blocked(shot.eye, head) || body.every((point) => blocked(shot.eye, point))) hidden.add(index)
+    })
+  }
+  return hidden.size
+}
+
+/**
+ * The first of GROUP_ANGLES from which the group shot sees every kart on `spots`, or (where none
+ * does) the one that hides the fewest; `front` without anything to look through
+ */
+export function pickGroupAngle(
+  spots: readonly Spot[],
+  blocked: SightBlocked | null,
+  y = 0,
+  halfAngle = GROUP_HALF_ANGLE,
+  reducedMotion = false,
+): GroupAngle {
+  if (!blocked || spots.length === 0) return 'front'
+  let best: { angle: GroupAngle; hidden: number } | null = null
+  for (const angle of GROUP_ANGLES) {
+    const hidden = groupShotHidden(spots, angle, blocked, y, halfAngle, reducedMotion)
+    if (hidden === 0) return angle
+    if (!best || hidden < best.hidden) best = { angle, hidden }
+  }
+  return best?.angle ?? 'front'
 }
 
 /**
@@ -214,12 +305,14 @@ export function openingShot(
   y = 0,
   /** The screen's width over its height: the shot comes as close as it can and still fit every kart */
   aspect?: number,
+  /** 2026-11-23: where it stands (`pickGroupAngle`: away from anything in the way) */
+  angle: GroupAngle = 'front',
 ): CameraShot | null {
   if (!look.group) return null
   // Before GO is set (the others still loading) the shot waits at its start
   const stage = left === null ? { kind: 'group' as const, share: 0 } : openingStage(left)
   if (!stage || stage.kind === 'count') return null
-  return groupShot(spots, stage.share, y, reducedMotion, groupHalfAngle(aspect))
+  return groupShot(spots, stage.share, y, reducedMotion, groupHalfAngle(aspect), angle)
 }
 
 /** The finish: the swing round to the front takes this long, seconds */

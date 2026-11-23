@@ -153,6 +153,11 @@ function BotRound({
         : t('kart.bots.you')
     }
   }, [game, t])
+  // 2026-11-23: what each driver wears in the replay and its file (yours, and each computer's draw)
+  const outfitOf = useMemo(() => {
+    const yours = loadOutfit(loadDriver())
+    return (seat: number) => (seat === game.playerSeat ? yours : game.entries[seat]?.outfit)
+  }, [game])
 
   const act = useMemo(
     () => (action: JsonValue) => game.room.act(action as KartAction, game.playerSeat),
@@ -205,6 +210,7 @@ function BotRound({
           <ReplayView
             replay={replay}
             nameOf={nameOf}
+            outfitOf={outfitOf}
             you={game.playerSeat}
             onClose={() => setWatching(false)}
             highlights={watching === 'highlights'}
@@ -245,7 +251,7 @@ function BotRound({
               >
                 {t('games.kart.highlights.watch')}
               </Button>
-              <ReplayShare replay={replay} nameOf={nameOf} you={game.playerSeat} />
+              <ReplayShare replay={replay} nameOf={nameOf} you={game.playerSeat} outfitOf={outfitOf} />
             </Actions>
           )}
           <Actions>
@@ -378,8 +384,8 @@ function podiumEntries(
       name: nameOf(seat),
       kart: you || !entry ? loadBody() : entry.kart,
       driver: you || !entry ? loadDriver() : entry.driver,
-      // 2026-11-23 (shared/kart/outfits.ts): what you wear; the computer's drivers in the race suit
-      ...(you || !entry ? { outfit: loadOutfit(loadDriver()) } : {}),
+      // 2026-11-23 (shared/kart/outfits.ts): what you wear, and what each computer driver drew
+      ...(you || !entry ? { outfit: loadOutfit(loadDriver()) } : entry.outfit ? { outfit: entry.outfit } : {}),
       line: formatTime((finishOf(seat) ?? 0) / 1000),
       you,
     }

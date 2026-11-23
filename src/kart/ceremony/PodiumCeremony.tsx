@@ -15,7 +15,7 @@ import { kartPodium } from '../../styles/kartTokens.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { Confetti } from '../ui/Confetti.tsx'
 import { broadcast, slam } from '../ui/broadcast.ts'
-import { CEREMONY_MS, REVEAL_AT, SKIP_AFTER_MS, type PodiumEntry } from './podium.ts'
+import { CEREMONY_MS, REVEAL_AT, SKIP_AFTER_MS, WINNER_SHOW_AT, type PodiumEntry } from './podium.ts'
 import { createPodiumStage } from './podiumStage.ts'
 
 registerMessages(KART_MESSAGES)
@@ -35,6 +35,8 @@ export default function PodiumCeremony({ entries, title, onDone }: PodiumCeremon
   const holder = useRef<HTMLDivElement>(null)
   const [missing, setMissing] = useState(false)
   const [winner, setWinner] = useState(false)
+  // 2026-11-23 (§4.97): the camera's close-up on the winner, when the plates make way for the kart
+  const [closeUp, setCloseUp] = useState(false)
   const doneRef = useRef(onDone)
   useEffect(() => {
     doneRef.current = onDone
@@ -59,6 +61,9 @@ export default function PodiumCeremony({ entries, title, onDone }: PodiumCeremon
   useEffect(() => {
     const began = performance.now()
     const winnerTimer = window.setTimeout(() => setWinner(true), REVEAL_AT[1] * 1000)
+    // With less motion the camera stays wide, and so do the plates
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    const closeTimer = still ? 0 : window.setTimeout(() => setCloseUp(true), WINNER_SHOW_AT * 1000)
     const doneTimer = window.setTimeout(() => doneRef.current(), CEREMONY_MS)
     const skip = (event: Event) => {
       if (performance.now() - began < SKIP_AFTER_MS) return
@@ -69,6 +74,7 @@ export default function PodiumCeremony({ entries, title, onDone }: PodiumCeremon
     window.addEventListener('pointerdown', skip)
     return () => {
       window.clearTimeout(winnerTimer)
+      window.clearTimeout(closeTimer)
       window.clearTimeout(doneTimer)
       window.removeEventListener('keydown', skip)
       window.removeEventListener('pointerdown', skip)
@@ -83,7 +89,7 @@ export default function PodiumCeremony({ entries, title, onDone }: PodiumCeremon
       <Top>
         <Title>{title ?? t('kart.flow.podium.title')}</Title>
       </Top>
-      <Plates>
+      <Plates $close={closeUp} data-close={closeUp || undefined} data-testid="kart-podium-plates">
         {[2, 1, 3].map((place) => {
           const entry = entries.find((one) => one.place === place)
           if (!entry) return <span key={place} />
@@ -93,6 +99,7 @@ export default function PodiumCeremony({ entries, title, onDone }: PodiumCeremon
               $place={entry.place}
               $delay={REVEAL_AT[entry.place]}
               $you={entry.you}
+              $close={closeUp}
               data-testid={`kart-podium-${entry.place}`}
             >
               <PlaceTag $place={entry.place}>{t(`kart.flow.podium.place${entry.place}`)}</PlaceTag>
@@ -174,7 +181,7 @@ const Title = styled.h1`
   ${slam(380)}
 `
 
-const Plates = styled.div`
+const Plates = styled.div<{ $close: boolean }>`
   position: absolute;
   left: 50%;
   bottom: 84px;
@@ -185,6 +192,29 @@ const Plates = styled.div`
   width: min(760px, calc(100% - ${2 * space.md}px));
   translate: -50% 0;
   pointer-events: none;
+
+  /*
+   * 2026-11-23 (§4.97): in the winner's close-up the kart fills the middle of the picture, its nose
+   * low in it. The second and third plates go, and the winner's moves to where the kart is not: the
+   * lower left on a wide screen (the kart takes the middle), at the top under the title on a tall one
+   * (the kart there fills the width, its nose down to the bottom). e2e/kart-podium.spec.ts measures it
+   */
+  ${({ $close }) =>
+    $close &&
+    css`
+      grid-template-columns: minmax(0, 1fr);
+      left: ${space.md}px;
+      width: min(240px, 24vw);
+      translate: 0 0;
+
+      @media (max-aspect-ratio: 1/1) {
+        top: 84px;
+        bottom: auto;
+        left: 50%;
+        width: min(280px, calc(100% - ${2 * space.md}px));
+        translate: -50% 0;
+      }
+    `}
 `
 
 const plateIn = keyframes`
@@ -193,7 +223,12 @@ const plateIn = keyframes`
   to { opacity: 1; transform: none; }
 `
 
-const Plate = styled.section<{ $place: 1 | 2 | 3; $delay: number; $you: boolean }>`
+const plateAside = keyframes`
+  from { opacity: 0; transform: translateX(-24px) skewX(-8deg); }
+  to { opacity: 1; transform: none; }
+`
+
+const Plate = styled.section<{ $place: 1 | 2 | 3; $delay: number; $you: boolean; $close: boolean }>`
   ${broadcast}
   display: grid;
   gap: 2px;
@@ -214,6 +249,17 @@ const Plate = styled.section<{ $place: 1 | 2 | 3; $delay: number; $you: boolean 
       outline: 2px solid ${color.accent};
       outline-offset: 2px;
     `}
+  ${({ $close, $place }) =>
+    $close &&
+    ($place === 1
+      ? css`
+          margin-bottom: 0;
+          animation: ${plateAside} 0.4s ease-out forwards;
+          animation-delay: 0s;
+        `
+      : css`
+          display: none;
+        `)}
 
   @media (prefers-reduced-motion: reduce) {
     opacity: 1;

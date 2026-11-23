@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
+import { readReplayFile } from '../shared/kart/replayFile.ts'
 
 // Racing the computer (owner 2026-11-17; docs/ARCHITECTURE.md §4.20): /kart's menu starts an item
 // race against a computer kart, run by the race room's own rules in this browser. The player drives
@@ -27,6 +29,9 @@ test('one person races a computer kart in an item race, from the menu to the res
   await page.addInitScript(() => {
     localStorage.setItem('tku-arcade.kart.quality', 'low')
     localStorage.setItem('tku-arcade.language', 'en')
+    // 2026-11-23 (§4.97): in street wear, kept in the replay's file
+    localStorage.setItem('tku-arcade.kart.driver', 'heart')
+    localStorage.setItem('tku-arcade.kart.outfit.heart', 'street')
   })
   await page.goto('/kart?autopilot')
   // Below 1180 px the top row's controls are in its menu
@@ -142,6 +147,10 @@ test('one person races a computer kart in an item race, from the menu to the res
   expect(download.suggestedFilename()).toMatch(/^tku-kart-riverside-\d{8}-\d{4}\.tkureplay$/)
   const file = testInfo.outputPath('race.tkureplay')
   await download.saveAs(file)
+  // 2026-11-23 (§4.97): what each driver wore is in the file's header (a frame has no room for it):
+  // the player's street wear (the player is the last seat); the computer's own draw, unless the suit
+  const saved = await readReplayFile(new Uint8Array(readFileSync(file)))
+  expect(saved.ok && saved.file.outfits).toContainEqual({ seat: 1, outfit: 'street' })
   await page.goto('/kart/replay')
   const picker = page.getByTestId('kart-replay-file')
   await picker.getByTestId('kart-replay-file-input').setInputFiles({

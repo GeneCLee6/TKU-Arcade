@@ -3,6 +3,16 @@
 // site's sound switch. One context instead of one per sound source costs a phone less, and lets the
 // music and the effects be set apart (volumes.ts). A browser only lets a page make sound after a
 // gesture: `unlockKartAudio` from a key or a tap makes the context, or wakes a suspended one.
+//
+// 2026-11-23 (docs/ARCHITECTURE.md §4.97; #176's known limit, iOS): a context is not only
+// 'suspended' before a gesture. Safari puts it in 'interrupted' (a call, Siri, another app's sound,
+// the page sent to the background) and does not always give it back by itself; any browser may
+// suspend it in the background. So: the page going to the background suspends it here (nothing
+// plays to a pocket), coming back wakes it, and so does any state change while the page is shown
+// (`watchContext`). Where the browser will not let it wake without a gesture the race screen's "Tap
+// for sound" shows (unlock.ts listens through `onKartBusChange`). And iOS's silent switch mutes
+// WebAudio unless the page says it plays like a video: where Safari has the Audio Session API the
+// session is 'playback' while the site's sound is on (`applyAudioSession`).
 import { isSoundOn } from '../../lib/sound.ts'
 import { loadVolumes } from './volumes.ts'
 
@@ -50,6 +60,65 @@ function noiseBuffer(context: AudioContext, seconds: number): AudioBuffer {
   return buffer
 }
 
+const changeListeners = new Set<() => void>()
+
+/** Told when the context's state may have changed (made, woken, suspended, interrupted); returns a stop */
+export function onKartBusChange(listener: () => void): () => void {
+  changeListeners.add(listener)
+  return () => changeListeners.delete(listener)
+}
+
+const tellChange = () => {
+  for (const listener of changeListeners) listener()
+}
+
+/** Whether a context in `state` should be asked to resume: anything but running or closed */
+export const wantsWaking = (state: string): boolean => state !== 'running' && state !== 'closed'
+
+const pageShown = () => typeof document === 'undefined' || document.visibilityState !== 'hidden'
+
+/** Asks the context to run again; a refusal (no gesture yet) is left for the race's "Tap for sound" */
+function wake(context: AudioContext): void {
+  if (!wantsWaking(context.state)) return
+  try {
+    void context.resume().then(tellChange, tellChange)
+  } catch {
+    tellChange()
+  }
+}
+
+/** iOS (Safari 16.4+): sound that plays with the silent switch on, while the site's sound is on */
+export function applyAudioSession(on = isSoundOn()): void {
+  if (typeof navigator === 'undefined') return
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+  if (!session) return
+  try {
+    session.type = on ? 'playback' : 'auto'
+  } catch {
+    // An older session that will not change: the switch decides
+  }
+}
+
+/** The context followed: woken on any change while the page is shown; suspended in the background */
+function watchContext(context: AudioContext): void {
+  context.addEventListener?.('statechange', () => {
+    if (pageShown()) wake(context)
+    tellChange()
+  })
+  if (typeof document === 'undefined') return
+  document.addEventListener('visibilitychange', () => {
+    if (bus?.context !== context) return
+    if (!pageShown()) {
+      if (context.state === 'running') void context.suspend().catch(() => undefined)
+    } else wake(context)
+    tellChange()
+  })
+  // Safari's pages kept in memory (back and forward) come back with 'pageshow'
+  window.addEventListener?.('pageshow', () => {
+    if (bus?.context === context && pageShown()) wake(context)
+  })
+}
+
 /** Call from a gesture. Nothing where the browser has no WebAudio */
 export function unlockKartAudio(): KartBus | null {
   if (typeof window === 'undefined' || typeof window.AudioContext !== 'function') return null
@@ -81,8 +150,13 @@ export function unlockKartAudio(): KartBus | null {
     }
     applied = ''
     refreshKartBus()
+    applyAudioSession()
+    watchContext(context)
+    tellChange()
   }
-  if (bus.context.state === 'suspended') void bus.context.resume()
+  // 'suspended' before a gesture or in the background; 'interrupted' on iOS after a call or the
+  // background (2026-11-23: only 'suspended' was woken, and Safari stayed silent)
+  if (wantsWaking(bus.context.state)) wake(bus.context)
   return bus
 }
 
@@ -103,6 +177,7 @@ export function refreshKartBus(): void {
   const { music, effects, ambience } = loadVolumes()
   const key = `${on}|${music}|${effects}|${ambience}|${paused}`
   if (key === applied) return
+  if (!applied.startsWith(`${on}|`)) applyAudioSession(on)
   applied = key
   const now = bus.context.currentTime
   bus.root.gain.setTargetAtTime(on ? 1 : 0, now, 0.05)

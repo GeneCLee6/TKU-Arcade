@@ -1,4 +1,4 @@
-// The game drawn to fit the stage's height (the app shell, docs/ARCHITECTURE.md §4.97). Loaded
+// The game drawn to fit the stage's height (the app shell, docs/ARCHITECTURE.md §4.98). Loaded
 // after the game's first paint, through GameLayout's useFitZoom: no room's first screen pays for it.
 
 /**
