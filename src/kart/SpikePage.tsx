@@ -49,7 +49,7 @@ import { TouchControls } from './touch/TouchControls.tsx'
 import { useTouchControls } from './touch/useTouchControls.ts'
 import { touchBottom, touchCorner, touchSpace } from './touch/touchLayout.ts'
 import { broadcastSolid } from './ui/broadcast.ts'
-import { PauseLayer } from './ui/PauseLayer.tsx'
+import { PauseButton, PauseLayer } from './ui/PauseLayer.tsx'
 import { CoachTip } from './school/CoachTip.tsx'
 import { useCoach } from './school/useCoach.ts'
 import { answerInvite, shouldInvite } from './school/store.ts'
@@ -657,6 +657,7 @@ export function SpikePage({
               {t(showNumbers ? 'kart.spike.hideNumbers' : 'kart.spike.showNumbers')}
             </Button>
           )}
+          {play && <PauseButton t={t} />}
           <Suspense>
             <FullscreenButton landscape />
           </Suspense>

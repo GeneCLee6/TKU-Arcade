@@ -31,6 +31,38 @@ type KartT = (key: KartMessageKey, params?: MessageParams) => string
 /** A gamepad's Start (the standard mapping's button 9): no driving action is on it */
 export const START_BUTTON = 9
 
+/**
+ * 2026-11-23 (#152): what a page's own pause button (`PauseButton`) sends: the menu opens as with
+ * Esc, wherever on the page the button sits (the school's, a challenge's, the time trial's rows)
+ */
+const OPEN_EVENT = 'kart-pause-open'
+
+/** Opens the pause menu on this page, as Esc would (nothing while it is not taking the keys) */
+export function openKartPause(): void {
+  window.dispatchEvent(new Event(OPEN_EVENT))
+}
+
+/**
+ * A pause button for a page's own row of buttons (2026-11-23, #152): one a finger can press on a
+ * phone, opening the same menu as Esc and Start
+ */
+export function PauseButton({ t }: { readonly t: KartT }) {
+  return (
+    <Button
+      type="button"
+      $size="sm"
+      $variant="secondary"
+      onClick={openKartPause}
+      title={t('kart.flow.pause.open')}
+      data-kart-menu=""
+      data-testid="kart-pause-button"
+    >
+      <RowIcon aria-hidden="true" />
+      {t('kart.flow.pause.button')}
+    </Button>
+  )
+}
+
 export interface PauseLayerProps {
   readonly t: KartT
   /** True: the race stops while the menu is open; false: a room's race, which goes on */
@@ -142,13 +174,19 @@ export function PauseLayer({
       if (pressed && !held) toggle()
       held = pressed
     }
+    // 2026-11-23: a page's own pause button (openKartPause)
+    const onOpen = () => {
+      if (showingRef.current === null) show('menu')
+    }
     window.addEventListener('keydown', onKeyDown)
+    window.addEventListener(OPEN_EVENT, onOpen)
     frame = requestAnimationFrame(poll)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener(OPEN_EVENT, onOpen)
       cancelAnimationFrame(frame)
     }
-  }, [enabled, toggle])
+  }, [enabled, toggle, show])
 
   const close = () => {
     show(null)
@@ -304,6 +342,16 @@ const PauseIcon = styled.span`
   background:
     linear-gradient(${color.text}, ${color.text}) 0 0 / 5px 100% no-repeat,
     linear-gradient(${color.text}, ${color.text}) 100% 0 / 5px 100% no-repeat;
+`
+
+/** The pause sign again, smaller, before the row button's word */
+const RowIcon = styled(PauseIcon)`
+  width: 10px;
+  height: 12px;
+  margin-right: ${space.xs}px;
+  background:
+    linear-gradient(currentColor, currentColor) 0 0 / 3px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) 100% 0 / 3px 100% no-repeat;
 `
 
 const fadeIn = keyframes`
