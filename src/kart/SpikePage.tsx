@@ -468,6 +468,23 @@ export function SpikePage({
               <Link to="/kart/replay" data-testid="kart-replay-file-link">
                 {t('kart.spike.replayFile')}
               </Link>
+              {onOnline && (
+                <>
+                  {' · '}
+                  {/* 2026-11-23 (§4.82): here rather than in the row of buttons, which a wide screen
+                      must keep on one line (the garage's close button sits under it) */}
+                  <OnlineLink
+                    to="/kart?online"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      onOnline()
+                    }}
+                    data-testid="kart-online-open"
+                  >
+                    {t('kart.online.open')}
+                  </OnlineLink>
+                </>
+              )}
             </>
           )}
           {linked === 'bad' && (
@@ -488,11 +505,6 @@ export function SpikePage({
           {t('kart.spike.menu')}
         </MenuButton>
         <Buttons id={menuId} $open={menuOpen}>
-          {onOnline && (
-            <Button $size="sm" $variant="primary" onClick={onOnline} data-testid="kart-online-open">
-              {t('kart.online.open')}
-            </Button>
-          )}
           {onSchool && (
             <Button
               $size="sm"
@@ -944,6 +956,12 @@ const Numbers = styled(Panel).attrs({ as: 'dl' })`
     margin: 0;
     overflow-wrap: anywhere;
   }
+`
+
+// The way to the online races: the panel's one link that stands out
+const OnlineLink = styled(Link)`
+  color: ${color.accent};
+  font-weight: 700;
 `
 
 const MenuButton = styled(Button)`

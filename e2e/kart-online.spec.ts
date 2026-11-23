@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { newPerson } from './helpers.ts'
 
 // 2026-11-23 (docs/ARCHITECTURE.md §4.82): the kart's online races, end to end through the real Worker,
-// LobbyDO and RoomDO. Ann opens the online page from /kart's menu and quick joins: an open public room,
+// LobbyDO and RoomDO. Ann opens the online page from /kart's top-left links and quick joins: an open public room,
 // or (none open, as on a fresh dev server) a new public one with a computer kart waiting. Bob, in his
 // own browser, finds that room in the list and joins it from there; both are in its waiting room.
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } })
@@ -17,7 +17,7 @@ const prepare = async (page: Page, nick: string) => {
   }, nick)
 }
 
-test('one quick joins from the kart menu, the other finds that room in the list and joins it', async ({
+test('one quick joins from the kart page, the other finds that room in the list and joins it', async ({
   browser,
 }) => {
   const viewport = { width: 1100, height: 720 }
@@ -28,9 +28,8 @@ test('one quick joins from the kart menu, the other finds that room in the list 
   await prepare(ann, 'Ann')
   await prepare(bob, 'Bob')
 
-  // Ann: /kart's menu → Online → Quick join, with one computer kart should a room open
+  // Ann: /kart → Online (top left, beside the track editor) → Quick join, with one computer kart should a room open
   await ann.goto('/kart')
-  await ann.getByTestId('kart-menu').click()
   await ann.getByTestId('kart-online-open').click()
   await expect(ann.getByTestId('kart-online')).toBeVisible()
   await expect(ann).toHaveURL(/online/)
