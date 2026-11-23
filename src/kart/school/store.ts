@@ -45,6 +45,9 @@ export function withResult(progress: Progress, id: LessonId, stars: 0 | 1 | 2 | 
 export function saveResult(id: LessonId, stars: 0 | 1 | 2 | 3): Progress {
   const next = withResult(loadProgress(), id, stars)
   writeStored(PROGRESS_KEY, JSON.stringify(next))
+  // e11-t06: three stars in every lesson is an achievement
+  // (src/achievements/kartLists.ts KART_PROGRESS_EVENT: nothing to import)
+  window.dispatchEvent(new Event('tku-arcade:kart-progress'))
   return next
 }
 

@@ -17,6 +17,7 @@ import { readReplayFile, writeReplayFile } from '../../../shared/kart/replayFile
 import { recordKey } from '../../../shared/kart/track.ts'
 import { readStored, writeStored } from '../../lib/storage.ts'
 import { spikeTrack, type SpikeCourse } from '../courses.ts'
+import { trackAchievement } from '../../achievements/track.ts'
 
 const AUTO_KEY = 'tku-arcade.kart.board.auto'
 
@@ -62,7 +63,11 @@ export async function uploadRun(
       headers: { 'content-type': 'application/octet-stream' },
     })
     const body = (await response.json().catch(() => null)) as BoardUploadResponse | null
-    if (body && typeof body === 'object' && 'ok' in body) return body
+    if (body && typeof body === 'object' && 'ok' in body) {
+      // e11-t06 (docs/ARCHITECTURE.md §4.82): a place on the board, for the achievements
+      if (body.ok) trackAchievement({ type: 'kart.leaderboard', track: run.track, rank: body.entry.rank })
+      return body
+    }
     return { ok: false, error: 'unavailable' }
   } catch {
     return { ok: false, error: 'network' }

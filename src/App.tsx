@@ -27,6 +27,11 @@ const StatsPage = lazy(() =>
   import('./pages/StatsPage.tsx').then(({ StatsPage }) => ({ default: StatsPage })),
 )
 
+// e11-t06 (2026-11-23): "My profile", the achievements and stats this browser keeps
+const ProfilePage = lazy(() =>
+  import('./achievements/profileRoute.ts').then(({ loadProfilePage }) => loadProfilePage()),
+)
+
 const RulesPage = lazy(() =>
   import('./pages/RulesPage.tsx').then(({ RulesPage }) => ({ default: RulesPage })),
 )
@@ -82,6 +87,7 @@ function AppRoutes() {
           <Route path="/kart/replay" element={<KartReplayFilePage />} />
           <Route path="/kart" element={<KartPlayPage />} />
           <Route path="/stats" element={<StatsPage />} />
+          <Route path="/me" element={<ProfilePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
