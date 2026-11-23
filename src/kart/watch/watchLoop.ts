@@ -5,6 +5,7 @@ import { gridSpot } from '../../../shared/kart/race.ts'
 import type { Track } from '../../../shared/kart/track.ts'
 import { padCommands, type WatchCommand } from '../../../shared/kart/watch.ts'
 import { readGamepad } from '../devices.ts'
+import type { CameraShot } from '../director.ts'
 import type { Quality } from '../quality.ts'
 import {
   createKartScene,
@@ -32,13 +33,18 @@ export interface WatchFrame {
   readonly hits?: HitFrame | null
   /** The race clock, steps since GO (2026-11-22): where the moving obstacles are drawn */
   readonly tick?: number
+  /**
+   * 2026-11-23 (the broadcast, src/kart/broadcastShots.ts): the director's shot over the chase
+   * camera, its heights over the followed kart's road; null or absent for the chase camera alone
+   */
+  readonly shot?: CameraShot | null
 }
 
 export interface WatchLoopOptions {
   readonly track: Track
   readonly quality: Quality
-  /** What to draw this frame, `seconds` after the last one */
-  frame(seconds: number): WatchFrame
+  /** What to draw this frame, `seconds` after the last one (the scene: where its camera stood) */
+  frame(seconds: number, scene: KartScene): WatchFrame
   /** After drawing: name tags and the minimap */
   drawn?(scene: KartScene, frame: WatchFrame): void
   /** A gamepad button pressed */
@@ -64,7 +70,7 @@ export function startWatchLoop(container: HTMLElement, options: WatchLoopOptions
     const pressed = pad?.snapshot.buttons.map((value) => value > 0.5) ?? []
     for (const command of padCommands(buttons, pressed)) options.onCommand?.(command)
     buttons = pressed
-    const watched = options.frame(seconds)
+    const watched = options.frame(seconds, scene)
     if (watched.hits) scene.hits(watched.hits, seconds)
     if (watched.tick !== undefined) scene.clock(watched.tick)
     scene.others(watched.karts, seconds)
@@ -76,6 +82,7 @@ export function startWatchLoop(container: HTMLElement, options: WatchLoopOptions
       followed = kart?.id ?? null
       scene.snapCamera(pose.heading)
     }
+    scene.shot(watched.shot ?? null)
     scene.watch(
       pose,
       {

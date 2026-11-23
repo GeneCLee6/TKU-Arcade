@@ -112,7 +112,8 @@ function BotRound({
   // 2026-11-20: recorded as a room's race is, for its replay and its file
   const recording = useRaceRecorder(view, game.realtime)
   const [replay, setReplay] = useState<Replay | null>(null)
-  const [watching, setWatching] = useState(false)
+  // 2026-11-23: the replay, or its highlights (the broadcast's)
+  const [watching, setWatching] = useState<false | 'replay' | 'highlights'>(false)
   // 2026-11-22 (§4.73): the podium shown (or skipped) once the race is over
   const [podiumDone, setPodiumDone] = useState(false)
 
@@ -184,6 +185,7 @@ function BotRound({
             nameOf={nameOf}
             you={game.playerSeat}
             onClose={() => setWatching(false)}
+            highlights={watching === 'highlights'}
           />
         </Suspense>
       )
@@ -208,10 +210,18 @@ function BotRound({
               <Button
                 type="button"
                 $variant="secondary"
-                onClick={() => setWatching(true)}
+                onClick={() => setWatching('replay')}
                 data-testid="kart-replay-open"
               >
                 {t('games.kart.replay.watch')}
+              </Button>
+              <Button
+                type="button"
+                $variant="secondary"
+                onClick={() => setWatching('highlights')}
+                data-testid="kart-highlights-results"
+              >
+                {t('games.kart.highlights.watch')}
               </Button>
               <ReplayShare replay={replay} nameOf={nameOf} you={game.playerSeat} />
             </Actions>

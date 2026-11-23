@@ -8,6 +8,7 @@ import { kartScreenMessages } from './kart/i18n.screen.ts'
 import { kartTeamMessages } from './kart/i18n.team.ts'
 import { kartLobbyMessages } from './kart/i18n.lobby.ts'
 import { kartWatchMessages } from './kart/i18n.watch.ts'
+import { kartBroadcastMessages } from './kart/i18n.broadcast.ts'
 import { kartReplayFileMessages } from './kart/i18n.replayFile.ts'
 import { kiteScreenMessages } from './kite/i18n.screen.ts'
 import { miseryScreenMessages } from './misery/i18n.screen.ts'
@@ -55,6 +56,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...miseryScreenMessages.en,
     ...kartScreenMessages.en,
     ...kartWatchMessages.en,
+    ...kartBroadcastMessages.en,
     ...kartReplayFileMessages.en,
     ...kartTeamMessages.en,
     ...kartLobbyMessages.en,
@@ -85,6 +87,7 @@ export const SCREEN_MESSAGES: GameMessages = {
     ...miseryScreenMessages['zh-TW'],
     ...kartScreenMessages['zh-TW'],
     ...kartWatchMessages['zh-TW'],
+    ...kartBroadcastMessages['zh-TW'],
     ...kartReplayFileMessages['zh-TW'],
     ...kartTeamMessages['zh-TW'],
     ...kartLobbyMessages['zh-TW'],

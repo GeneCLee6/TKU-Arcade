@@ -226,6 +226,17 @@
 - **賽道改過**：開檔時拿檔案裡的 `revision` 跟現在的賽道比，不同就在重播畫面左上角顯示「這條賽道在比賽後改過路線，車子可能對不上路面」，照樣播；找不到賽道（未知 id、壞的自訂代碼）就不播，說「找不到這場重播用的賽道」。重新下載一個從檔案開的重播，保留原本的 `revision`。
 - **測試**：`tests/kart/replayFile.test.ts`（檔案來回含 revision／名字／道具事件、不是重播／截斷／翻位元／未知旗標、較新的檔案版本與較新的重播版本、檔案過大與壓縮炸彈、meta 的各種壞欄位與多的欄位、連結只給小檔且能讀回、壞的 hash）；`e2e/kart-bots.spec.ts`（電腦車比賽結束後下載、到 `/kart/replay` 先開一個假檔看到錯誤，再開剛下載的檔看到重播）。
 
+### 11.6 轉播模式與精華（2026-11-23，`feat/kart-broadcast-mode`）
+
+觀戰與重播的「轉播」開關：導播自己決定看哪台、從哪個角度，畫面上多一套轉播字幕；比完多「看精華」。**不需要任何新資料**：
+
+- **觀戰**：導播吃的跟原本畫面一樣：`remotes.ts` 內插出來的姿勢、每台車最新 frame 的 `crossings`／`nextGate`／`airborne`（進度與名次）、房間 view 的 `racers`（`lapMs`、`finishMs`、`out`）與 `events` 的命中（`at − goAt` 換成比賽秒數，晚 `WATCH_LAG` 0.1 s，跟畫面一致）。差距是邊看邊記每台車過每個 gate 的時間（`notePassings`）。
+- **重播**：同一套輸入從樣本來（`sampleAt` 的 `crossings`／`nextGate`／`airborne`；`lapMs` 用 `lapsAt` 切到那一刻；命中是錄到的 `events` 裡 `hit` 的）。差距一開始從整卷算好（`replayPassings`），倒帶、拖曳都對。舊重播（沒記在空中，§11.4 的版本 1）照播，只是導播與精華都不知道誰在空中。
+- **精華**是重播的純函式（`shared/kart/highlights.ts`），所以每個人看到的精華取決於他自己錄到的重播：晚來的人只有進來之後的；別人的命中只認得房間 `events` 留下的最後幾筆之後的（§11 的限制照舊）。
+- **流量與房間**：零。旁觀者開不開轉播收的都一樣。
+
+導播怎麼決定、精華怎麼挑、字幕與大螢幕比例：`ARCHITECTURE.md` §4.82。
+
 ### 11.5 排行榜的重播驗證（2026-11-23，`feat/kart-leaderboard`）
 
 計時賽排行榜（`ARCHITECTURE.md` §4.81）把一趟計時賽錄成和房間重播同一種帶子（每 6 tick 一個樣本，`createKartTape`），上傳時伺服器把每個樣本當成一個 live frame 交給 `judgeFrame`，所以「伺服器怎麼判一台車」只有一份程式。和房間判 live frame 的差別（`shared/kart/boardCheck.ts`）：
