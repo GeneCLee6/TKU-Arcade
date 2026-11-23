@@ -5,9 +5,11 @@ import { checkTurn, displayOrder, isValidSet, openingPoints, OPENING_POINTS } fr
 import type { TileId, TilesAction, TilesView, TileTable } from '../../../shared/games/tiles/types.ts'
 import { Button } from '../../components/Button.tsx'
 import { GameLayout } from '../../components/GameLayout.tsx'
+import { TableCaption } from '../../components/LateParts.tsx'
+import { hueSurface, mix, PhaseBar, Ticker, turnGlow } from '../../components/table/tableKit.ts'
 import { SegmentedSwitch } from '../../components/SegmentedSwitch.tsx'
 import { useT } from '../../i18n/useT.ts'
-import { monoType, SLANT } from '../../styles/esports.ts'
+import { SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import type { GameScreenProps } from '../screens.ts'
 import { RoundScore } from './RoundScore.tsx'
@@ -192,6 +194,17 @@ export default function TilesScreen({ room, game }: GameScreenProps) {
       }
     >
       <Stage data-testid="tiles-stage">
+        {/* The broadcast's caption when a round ends (DESIGN §3.9): the round score's own line */}
+        <TableCaption
+          id={lastRound ? `round-${lastRound.round}` : null}
+          text={
+            lastRound === undefined
+              ? ''
+              : lastRound.out
+                ? t('games.tiles.ui.scored.out', { name: nameOf(lastRound.winners[0]) })
+                : t('games.tiles.ui.scored.stuck')
+          }
+        />
         <Header>
           <Round>{t('games.tiles.ui.round', { round: view.round, rounds: view.totalRounds })}</Round>
           <Fact data-testid="pool">
@@ -345,7 +358,7 @@ const Stage = styled.div`
   gap: ${space.md}px;
 `
 
-const Header = styled.div`
+const Header = styled(PhaseBar)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -353,10 +366,8 @@ const Header = styled.div`
   gap: ${space.sm}px ${space.md}px;
 `
 
-const Round = styled.span`
-  ${monoType}
-  font-weight: 700;
-`
+// The round as a broadcast's tag, on the phase bar (DESIGN §3.9)
+const Round = styled(Ticker)``
 
 const Fact = styled.span`
   padding: ${space.xs}px ${space.md}px;
@@ -385,14 +396,10 @@ const SeatChip = styled.li<{ $mark: string; $turn: boolean }>`
   display: grid;
   min-width: 0;
   padding: ${space.xs}px ${space.sm}px;
-  background: ${color.sunken};
+  background: linear-gradient(90deg, ${(p) => mix(p.$mark, 22, color.sunken)}, ${color.sunken} 65%);
   box-shadow: inset 4px 0 0 ${(p) => p.$mark};
-  ${(p) =>
-    p.$turn &&
-    css`
-      outline: 2px solid ${color.accent};
-      outline-offset: -2px;
-    `}
+  --seat: ${(p) => p.$mark};
+  ${(p) => p.$turn && turnGlow}
 `
 
 const SeatName = styled.span`
@@ -421,8 +428,8 @@ const TableArea = styled.section`
   gap: ${space.sm}px;
   min-height: 120px;
   padding: ${space.md}px;
-  background: ${color.sunken};
-  box-shadow: inset 0 0 0 1px ${color.line};
+  /* The club's table top under a broadcast's lights (DESIGN §3.9) */
+  ${hueSurface}
 `
 
 const SetBox = styled.div<{ $invalid: boolean; $target: boolean }>`

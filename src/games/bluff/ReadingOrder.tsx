@@ -2,12 +2,13 @@ import styled from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { BluffView } from '../../../shared/games/bluff/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
-import { Heading, List, Row, Section } from '../../components/roomParts.ts'
+import { Heading, List, Row } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { Muted, Name, Pill } from './bluffParts.ts'
 import { readingStatus } from './screenState.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 /** Who reads in what order, who reads now, and a call-out when it is you */
 export function ReadingOrder({ view, nameOf }: { view: BluffView; nameOf(seat: SeatId): string }) {

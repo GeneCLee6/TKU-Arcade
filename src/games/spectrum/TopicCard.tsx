@@ -1,8 +1,9 @@
 import styled, { keyframes } from 'styled-components'
 import type { SpectrumTopic } from '../../../shared/games/spectrum/types.ts'
 import { useLanguage, useT } from '../../i18n/useT.ts'
-import { displayType, glass, monoType, SLANT } from '../../styles/esports.ts'
+import { displayType, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 /**
  * This round's topic: its category, the topic itself, and its two ends on a scale from 1 to 10. The
@@ -43,7 +44,7 @@ const turn = keyframes`
 `
 
 const Card = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   justify-items: center;
   gap: ${space.sm}px;

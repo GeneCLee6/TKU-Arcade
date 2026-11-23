@@ -4,9 +4,10 @@ import type { PalaceView } from '../../../shared/games/palace/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
 import { Heading, List, Row } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType, SLANT } from '../../styles/esports.ts'
+import { monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { CardBack, RoleCard } from './RoleCard.tsx'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 /**
  * Every seat at court: silver, how many backers are still face down (as card backs) and the ones
@@ -74,7 +75,7 @@ export function Court({ view, nameOf }: { view: PalaceView; nameOf(seat: SeatId)
 }
 
 const Panel = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.md}px;
   padding: ${space.lg}px;

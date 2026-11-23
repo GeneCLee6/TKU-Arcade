@@ -2,9 +2,10 @@ import styled from 'styled-components'
 import type { PalaceLog } from '../../../shared/games/palace/types.ts'
 import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType } from '../../styles/esports.ts'
+import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { logLine, logTone } from './screenState.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 type Names = Parameters<typeof logLine>[1]
 
@@ -42,7 +43,7 @@ export function ActionLog({ log, names }: { log: readonly PalaceLog[]; names: Na
 }
 
 const Panel = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.lg}px;

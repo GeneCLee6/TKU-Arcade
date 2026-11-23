@@ -7,10 +7,10 @@ import {
 } from '../../../shared/games/spectrum/answer.ts'
 import { Button } from '../../components/Button.tsx'
 import { FieldError, FieldLabel, TextInput } from '../../components/Field.tsx'
-import { Section } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 interface AnswerFormProps {
   /** What the room has from you so far: null until it has an answer */

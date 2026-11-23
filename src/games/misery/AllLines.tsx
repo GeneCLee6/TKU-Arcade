@@ -3,11 +3,12 @@ import type { SeatId } from '../../../shared/games/types.ts'
 import type { MiseryView } from '../../../shared/games/misery/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
 import { useT } from '../../i18n/useT.ts'
-import { glass, monoType } from '../../styles/esports.ts'
+import { monoType } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { LineView } from './LineView.tsx'
 import { IndexBadge } from './MiseryCardFace.tsx'
 import { lineOf } from './screenState.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 /**
  * Everyone's line but yours (or everyone's, once the game is over): one row each, the indexes as
@@ -48,7 +49,7 @@ export function AllLines({ view, nameOf, final }: { view: MiseryView; nameOf(sea
 }
 
 const Panel = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.sm}px;
   padding: ${space.lg}px;

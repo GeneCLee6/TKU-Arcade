@@ -214,8 +214,7 @@ const Layout = styled.div`
 // say whose move it is, so neither rests on a colour
 const MemberRow = styled(Row)<{ $turn: boolean }>`
   background: linear-gradient(90deg, color-mix(in srgb, var(--seat, transparent) 22%, ${color.sunken}), ${color.sunken} 65%);
-  box-shadow: inset 4px 0 0 var(--seat, ${color.line})
-    ${(p) => (p.$turn ? `, 0 0 ${space.lg}px color-mix(in srgb, ${color.accent} 40%, transparent)` : '')};
+  box-shadow: inset 4px 0 0 var(--seat, ${color.line});
   outline: ${(p) => (p.$turn ? `2px solid ${color.accent}` : 'none')};
   outline-offset: -2px;
 `

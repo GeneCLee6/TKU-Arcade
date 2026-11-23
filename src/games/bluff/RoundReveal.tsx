@@ -2,12 +2,13 @@ import styled, { css, keyframes } from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { BluffView } from '../../../shared/games/bluff/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
-import { Heading, List, Row, Section } from '../../components/roomParts.ts'
+import { Heading, List, Row } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
 import { displayType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { Body, Name, Tag } from './bluffParts.ts'
 import { gains, revealedRole, signed } from './screenState.ts'
+import { TableSection as Section } from '../../components/table/tableKit.ts'
 
 /** How long apart the reveal's parts come up, when it is seen arriving */
 export const REVEAL_STEP_MS = 600

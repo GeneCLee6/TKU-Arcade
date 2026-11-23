@@ -2,12 +2,13 @@ import styled from 'styled-components'
 import type { SeatId } from '../../../shared/games/types.ts'
 import type { SpectrumView } from '../../../shared/games/spectrum/types.ts'
 import { Avatar } from '../../components/Avatar.tsx'
-import { Heading, List, Row, Section } from '../../components/roomParts.ts'
+import { Heading, List } from '../../components/roomParts.ts'
 import { VisuallyHidden } from '../../components/VisuallyHidden.ts'
 import { useT } from '../../i18n/useT.ts'
 import { displayType, monoType, SLANT } from '../../styles/esports.ts'
 import { color, fontSize, seatColor, space } from '../../styles/tokens.ts'
 import { byScore, gains } from './screenState.ts'
+import { PlateRow, placeOf, RankPlate, TableSection as Section } from '../../components/table/tableKit.ts'
 
 /** Everyone's total, highest first, with what this round added once it is revealed */
 export function Scoreboard({ view, nameOf }: { view: SpectrumView; nameOf(seat: SeatId): string }) {
@@ -20,11 +21,16 @@ export function Scoreboard({ view, nameOf }: { view: SpectrumView; nameOf(seat: 
         <Round>{t('games.spectrum.ui.round', { round: view.round, rounds: view.totalRounds })}</Round>
       </Top>
       <List as="ol">
-        {byScore(view).map((player) => {
+        {byScore(view).map((player, _index, all) => {
+          const place = placeOf(all.map((one) => one.score), player.score)
           const name = nameOf(player.seat)
           const gain = gained.get(player.seat)
           return (
-            <Row key={player.seat} $mark={seatColor(player.seat)}>
+            <PlateRow key={player.seat} $mark={seatColor(player.seat)}>
+              {/* The list is in order already: the plate only shows it, ties sharing a place */}
+              <RankPlate $lead={place === 1} aria-hidden="true">
+                {place}
+              </RankPlate>
               <Avatar name={name} tint={seatColor(player.seat)} />
               <Name>
                 {name}
@@ -38,7 +44,7 @@ export function Scoreboard({ view, nameOf }: { view: SpectrumView; nameOf(seat: 
                 </VisuallyHidden>
                 {gain !== undefined && <Gain>{t('games.spectrum.ui.gain', { points: gain })}</Gain>}
               </Score>
-            </Row>
+            </PlateRow>
           )
         })}
       </List>

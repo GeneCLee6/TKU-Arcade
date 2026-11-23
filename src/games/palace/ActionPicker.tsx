@@ -5,9 +5,9 @@ import type { PalaceAct, PalaceAction, PalaceView } from '../../../shared/games/
 import { Button } from '../../components/Button.tsx'
 import { Heading } from '../../components/roomParts.ts'
 import { useT } from '../../i18n/useT.ts'
-import { glass } from '../../styles/esports.ts'
 import { color, fontSize, space } from '../../styles/tokens.ts'
 import { actChoices, actKey, CLAIMS, isBluff, roleKey } from './screenState.ts'
+import { tablePanel } from '../../components/table/tableKit.ts'
 
 const COSTS: Partial<Record<PalaceAct, number>> = { storm: 7, arrest: 3 }
 
@@ -88,7 +88,7 @@ export function ActionPicker({ view, legal, disabled, nameOf, onAct }: Props) {
 }
 
 const Panel = styled.section`
-  ${glass}
+  ${tablePanel}
   display: grid;
   gap: ${space.md}px;
   padding: ${space.lg}px;
